@@ -98,7 +98,9 @@ public class DungeonDangerLabel1114Tests
     {
         var output = new MemoryStream();
         var term = new TerminalEmulator(new LineStream(Array.Empty<string>()), output);
-        var hero = new Character { Name1 = "dng", Name2 = "Dng", Class = CharacterClass.Warrior, Level = 12, HP = 390, MaxHP = 390, AI = CharacterAI.Human };
+        // Mental = 100 (v1.1.15): a bare Character now defaults Mental to 100 as well; kept
+        // explicit so this fixture never shows a Mental tag whatever the default becomes.
+        var hero = new Character { Name1 = "dng", Name2 = "Dng", Class = CharacterClass.Warrior, Level = 12, HP = 390, MaxHP = 390, AI = CharacterAI.Human, Mental = 100 };
         var d = new DungeonLocation();
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(d, term);
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(d, hero);

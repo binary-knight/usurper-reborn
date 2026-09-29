@@ -601,14 +601,12 @@ public partial class NPC : Character
     {
         var random = Random.Shared;
         
-        if (string.IsNullOrEmpty(God))
+        if (string.IsNullOrEmpty(WorshippedGod))
         {
-            // Potential conversion
-            if (random.Next(20) == 0)
+            // Potential conversion (1.2.0 Temple gods: to a god of the pantheon, NpcFaithSystem)
+            if (random.Next(20) == 0 && NpcFaithSystem.EnsureAssigned(this))
             {
-                var availableGods = new[] { "Nosferatu", "Darkcloak", "Druid" };
-                God = availableGods[random.Next(availableGods.Length)];
-                Memory.AddMemory($"I found faith in {God}", "faith", DateTime.Now);
+                Memory.AddMemory($"I found faith in {WorshippedGod}", "faith", DateTime.Now);
                 EmotionalState.AdjustMood("spiritual", 0.3f);
             }
         }
@@ -619,7 +617,7 @@ public partial class NPC : Character
             {
                 var actions = new[] { "pray", "make offering", "seek guidance" };
                 var action = actions[random.Next(actions.Length)];
-                Memory.AddMemory($"I {action} to {God}", "faith", DateTime.Now);
+                Memory.AddMemory($"I {action} to {WorshippedGod}", "faith", DateTime.Now);
                 
                 // Faith actions affect mood
                 EmotionalState.AdjustMood("spiritual", 0.1f);

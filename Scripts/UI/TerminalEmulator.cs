@@ -1524,7 +1524,7 @@ public partial class TerminalEmulator
         {
             try
             {
-                await Task.Run(() => Console.ReadKey(true));
+                await Task.Run(() => ConsoleReadKey());
                 WriteLine("");
             }
             catch
@@ -1584,6 +1584,47 @@ public partial class TerminalEmulator
         return int.Parse(await GetValidChoice(prompt, keys, "0", hint));
     }
 
+    /// <summary>
+    /// v1.1.15: a strict yes/no prompt that asks again on anything but a localized yes or a localized
+    /// no, instead of GameConfig.IsAffirmative alone silently reading a typo or a stray Enter as "No"
+    /// (see DiscoverySystem.RunRisk, where that used to walk a player away from a dungeon discovery
+    /// and use it up for the price of one wrong keystroke). Reads with GetInput(prompt); an
+    /// affirmative answer in any supported language returns true, a negative answer returns false.
+    /// A bare Enter (empty input) takes enterDefault when the caller gave one; otherwise it is
+    /// invalid like any other junk. Any other invalid answer prints a localized re-ask line and
+    /// tries again. After MaxInvalidChoiceAttempts invalid answers, or when the connection is gone,
+    /// returns false (No is the safe answer; a dead peer reading empty lines must not spin here).
+    /// </summary>
+    public async Task<bool> AskYesNoAsync(string prompt, bool? enterDefault = null)
+    {
+        return await AskYesNoCore(() => GetInput(prompt), enterDefault);
+    }
+
+    /// <summary>
+    /// v1.1.15: the single-key sibling of AskYesNoAsync, for the handful of sites that read a yes/no
+    /// answer with GetKeyInput instead of a line (no Enter needed). Shares the same strict loop and
+    /// fallback through AskYesNoCore rather than duplicating it.
+    /// </summary>
+    public async Task<bool> AskYesNoKeyAsync(bool? enterDefault = null)
+    {
+        return await AskYesNoCore(GetKeyInput, enterDefault);
+    }
+
+    /// <summary>v1.1.15: shared strict yes/no loop behind AskYesNoAsync and AskYesNoKeyAsync.</summary>
+    private async Task<bool> AskYesNoCore(Func<Task<string>> read, bool? enterDefault)
+    {
+        for (int attempt = 0; attempt < MaxInvalidChoiceAttempts; attempt++)
+        {
+            string input = (await read()).Trim();
+            if (GameConfig.IsAffirmative(input)) return true;
+            if (GameConfig.IsNegative(input)) return false;
+            if (input.Length == 0 && enterDefault.HasValue) return enterDefault.Value;
+            if (DoorMode.IsDisconnected) break;
+            WriteLine(UsurperRemake.Systems.Loc.Get("ui.answer_yes_no"), "red");
+        }
+        return false;
+    }
+
     /// <summary>v1.1.13: MUD stream (MUD, telnet, web, relay) and BBS socket modes read a whole line at a pause.</summary>
     private bool IsLineBasedPause => (_streamWriter != null && _streamReader != null) || ShouldUseBBSAdapter();
 
@@ -1619,6 +1660,9 @@ public partial class TerminalEmulator
         }
     }
     
+    /// <summary>v1.1.15: the one-key console read; a test seam so the console branch can be driven.</summary>
+    internal static Func<ConsoleKeyInfo> ConsoleReadKey = () => Console.ReadKey(intercept: true);
+
     public async Task<string> GetKeyInput()
     {
         // MUD stream mode - use line input since we can't read single keys from TCP
@@ -1650,12 +1694,19 @@ public partial class TerminalEmulator
             var input = (await GetInput("")).Trim();
             return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
         }
+        else if (GameConfig.MenuKeysNeedEnter)
+        {
+            // v1.1.15: single-player console, the player types the key and presses Enter, as online.
+            // Pauses (PressAnyKey) do not come through here and still continue on one key.
+            var input = (await GetInput("")).Trim();
+            return string.IsNullOrEmpty(input) ? "" : input[0].ToString();
+        }
         else
         {
-            // Console mode - read single key without Enter
+            // Console mode - read single key without Enter (the "menu keys need Enter" setting is off)
             try
             {
-                var keyInfo = Console.ReadKey(intercept: true);
+                var keyInfo = ConsoleReadKey();
                 var result = keyInfo.KeyChar.ToString();
                 WriteLine(result, "cyan");
                 return result;
@@ -1839,41 +1890,16 @@ public partial class TerminalEmulator
     public async Task<bool> ConfirmAsync(string? message = null)
     {
         message ??= Loc.Get("ui.confirm");
-        while (true)
-        {
-            WriteLine(message, "yellow");
-            var input = await GetInput();
-            var response = input.ToUpper().Trim();
-            
-            if (GameConfig.IsAffirmative(input) || response == "YES")
-                return true;
-            if (response == "N" || response == "NO")
-                return false;
-                
-            WriteLine("Please answer Y or N.", "red");
-        }
+        WriteLine(message, "yellow");
+        return await AskYesNoAsync("> ");
     }
-    
+
     // Overload for ConfirmAsync that takes a boolean parameter
     public async Task<bool> ConfirmAsync(string message, bool defaultValue)
     {
-        while (true)
-        {
-            string prompt = defaultValue ? $"{message} (Y/n): " : $"{message} (y/N): ";
-            WriteLine(prompt, "yellow");
-            var input = await GetInput();
-            var response = input.ToUpper().Trim();
-            
-            if (string.IsNullOrEmpty(response))
-                return defaultValue;
-            
-            if (GameConfig.IsAffirmative(input) || response == "YES")
-                return true;
-            if (response == "N" || response == "NO")
-                return false;
-                
-            WriteLine("Please answer Y or N.", "red");
-        }
+        string prompt = defaultValue ? $"{message} (Y/n): " : $"{message} (y/N): ";
+        WriteLine(prompt, "yellow");
+        return await AskYesNoAsync("> ", defaultValue);
     }
     
     public async Task<string> GetStringAsync(string prompt = "")

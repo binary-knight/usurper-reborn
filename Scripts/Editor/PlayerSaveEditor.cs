@@ -269,9 +269,67 @@ internal static class PlayerSaveEditor
         p.King = EditorIO.PromptBool("Is the current king?", p.King);
         p.Immortal = EditorIO.PromptBool("Immortal (ascended, pantheon)", p.Immortal);
 
+        EditorIO.Info("-- Mental health (v1.1.15) --");
+        p.MentalSchema = EditorIO.PromptInt("Mental schema (0 = legacy, resets Mental to full on load; 1 = current)", p.MentalSchema, min: 0, max: GameConfig.MentalSchemaCurrent);
+        p.MentalStrainRemainder = EditorIO.PromptInt("Mental strain remainder (hundredths of a per mille toward the next point)", p.MentalStrainRemainder, min: 0);
+        p.WillowDraughts = EditorIO.PromptInt($"Willow Draughts carried (0-{GameConfig.MaxWillowDraughts})", p.WillowDraughts, min: 0, max: GameConfig.MaxWillowDraughts);
+        p.MentalRecoveryUsedToday = EditorIO.PromptInt("Mental recovery sources used today (MentalDailySource bitmask, 0 = none)", p.MentalRecoveryUsedToday, min: 0);
+        p.MentalBroken = EditorIO.PromptBool("Mental collapse (Broken) affliction active", p.MentalBroken);
+        p.MentalHintShown = EditorIO.PromptBool("First mental-health hint already shown", p.MentalHintShown);
+        p.MentalDrugBoost = EditorIO.PromptInt("Pending drug-high Mental boost to crash later", p.MentalDrugBoost, min: 0);
+        p.MentalDrugUses = EditorIO.PromptInt("Drug uses within the tolerance window", p.MentalDrugUses, min: 0);
+        p.MentalLastDrugDay = EditorIO.PromptInt("Game day of the last drug use", p.MentalLastDrugDay, min: 0);
+
+        EditorIO.Info("-- God Favor (1.2.0) --");
+        p.GodFavorSchema = EditorIO.PromptInt("God Favor schema (0 = legacy, sets Favor 10 with the current god on load; 1 = current)", p.GodFavorSchema, min: 0, max: GameConfig.GodFavorSchemaCurrent);
+        p.GodFavor = EditorIO.PromptInt($"Favor with the worshipped god ({GameConfig.GodFavorMin}-{GameConfig.GodFavorMax})", p.GodFavor, min: GameConfig.GodFavorMin, max: GameConfig.GodFavorMax);
+        p.GodFavorGod = EditorIO.PromptString("God the Favor belongs to (must match the worshipped god, else Favor reads 0)", p.GodFavorGod ?? "");
+        p.DaysSinceDevotion = EditorIO.PromptInt("Daily resets since the last devotion (neglect)", p.DaysSinceDevotion, min: 0);
+        p.DivineDomain = PromptDivineDomain(p.DivineDomain);
+        if (EditorIO.PromptBool("Clear today's Favor gains per source", false))
+            p.GodFavorDayGains = new Dictionary<string, int>();
+        p.DaysSinceSpellCast = EditorIO.PromptInt("Daily resets since the last spell cast (Arcanus taboo at 7)", p.DaysSinceSpellCast, min: 0);
+        p.LastGodSwitchDay = EditorIO.PromptInt("Game day the character last left a god by choice (-1 never)", p.LastGodSwitchDay, min: -1);
+        p.MiracleUsedToday = EditorIO.PromptBool("Today's Miracle already used (Chosen tier, cleared at the daily reset)", p.MiracleUsedToday);
+        EditorIO.Info("Immortal: followers chastised today: " + (p.ChastisedToday == null || p.ChastisedToday.Count == 0 ? "none" : string.Join(", ", p.ChastisedToday)));
+        if (EditorIO.PromptBool("Clear the followers chastised today", false))
+            p.ChastisedToday = new List<string>();
+        EditorIO.Info($"Single-player desecration standing penalties (week {p.GodStandingPenaltyWeek}): " +
+            (p.GodStandingPenalties == null || p.GodStandingPenalties.Count == 0 ? "none" : string.Join(", ", p.GodStandingPenalties.Select(kv => $"{kv.Key} -{kv.Value}"))));
+        if (EditorIO.PromptBool("Clear the desecration standing penalties", false))
+        {
+            p.GodStandingPenalties = new Dictionary<string, int>();
+            p.GodStandingPenaltyWeek = -1;
+        }
+        EditorIO.Info($"Single-player strongest god of the week: {(string.IsNullOrEmpty(p.WeeklyGod) ? "none" : p.WeeklyGod)} (week {p.WeeklyGodWeek})");
+        if (EditorIO.PromptBool("Clear the weekly god pick (picked again at the next check)", false))
+        {
+            p.WeeklyGodWeek = -1;
+            p.WeeklyGod = "";
+        }
+
         EditorIO.Info("— Difficulty —");
         p.Difficulty = EditorIO.PromptEnum("Difficulty", p.Difficulty);
     }
+
+    /// <summary>
+    /// 1.2.0: the immortal's god domain, asked again until the input is one of the ten names (the
+    /// load would silently drop any other text). The current value is shown as the load reads it.
+    /// </summary>
+    private static string PromptDivineDomain(string? current)
+    {
+        string shown = GodBoonSystem.StoredDomain(current);
+        while (true)
+        {
+            string input = EditorIO.PromptString("Immortal's god domain (Light, War, Love, Law, Shadow, Earth, Death, Magic, Nature, Chaos; blank = not chosen)", shown);
+            if (IsValidDomainInput(input)) return input;
+            EditorIO.Warn($"Unknown domain \"{input}\". Enter one of Light, War, Love, Law, Shadow, Earth, Death, Magic, Nature, Chaos.");
+        }
+    }
+
+    /// <summary>True for blank (not chosen) or one of the ten domain names (GodBoonSystem.ParseDomain).</summary>
+    internal static bool IsValidDomainInput(string? input) =>
+        string.IsNullOrWhiteSpace(input) || GodBoonSystem.ParseDomain(input) != GodDomain.None;
 
     #endregion
 
@@ -1255,6 +1313,9 @@ internal static class PlayerSaveEditor
                 "Release from prison",
                 "Clear wanted level",
                 "Clear murder weight / perma-kill log",
+                $"Timed stat buffs ({p.TimedStatBuffs?.Count ?? 0} active, Groggo DEX={p.GroggoShadowBlessingDex}): list and clear",
+                $"Artifact stats restored at login (ArtifactStatsApplied={p.ArtifactStatsApplied}): toggle",
+                $"NG+ cycle stat bonus backfilled at login (CycleStatBonusApplied={p.CycleStatBonusApplied}): toggle",
             });
             if (choice == 0) return;
             switch (choice)
@@ -1301,8 +1362,43 @@ internal static class PlayerSaveEditor
                     EditorIO.Success("Murder weight cleared.");
                     EditorIO.Pause();
                     break;
+                case 9:
+                    EditTimedStatBuffs(p);
+                    break;
+                case 10:
+                    // 1.2.0: false makes the next login add the stats of every collected artifact once
+                    p.ArtifactStatsApplied = !p.ArtifactStatsApplied;
+                    EditorIO.Success($"ArtifactStatsApplied = {p.ArtifactStatsApplied}.");
+                    EditorIO.Pause();
+                    break;
+                case 11:
+                    // 1.2.0: false makes the next login grant the NG+ cycle stat bonus once from the cycle number
+                    p.CycleStatBonusApplied = !p.CycleStatBonusApplied;
+                    EditorIO.Success($"CycleStatBonusApplied = {p.CycleStatBonusApplied}.");
+                    EditorIO.Pause();
+                    break;
             }
         }
+    }
+
+    /// <summary>1.2.0: lists the temporary stat buffs and Groggo's Dexterity, and clears them on request.</summary>
+    private static void EditTimedStatBuffs(PlayerData p)
+    {
+        var buffs = TimedStatBuffData.ToBuffs(p.TimedStatBuffs);
+        if (buffs.Count == 0) EditorIO.Info("No timed stat buffs.");
+        foreach (var b in buffs)
+        {
+            string end = b.EndsOn == StatBuffEnd.Combats ? $"{b.CombatsLeft} fight(s) left" : "until next rest";
+            EditorIO.Info($"  {b.Source}: {b.Stat} {(b.Amount >= 0 ? "+" : "")}{b.Amount} ({end})");
+        }
+        EditorIO.Info($"  Groggo's Shadow Blessing: Dexterity +{p.GroggoShadowBlessingDex}");
+        if (EditorIO.Confirm("Clear all timed stat buffs and Groggo's blessing?"))
+        {
+            p.TimedStatBuffs = new List<TimedStatBuffData>();
+            p.GroggoShadowBlessingDex = 0;
+            EditorIO.Success("Timed stat buffs cleared.");
+        }
+        EditorIO.Pause();
     }
 
     private static void ResetDailyCounters(PlayerData p)
@@ -1585,6 +1681,7 @@ internal static class PlayerSaveEditor
         // v1.1.13: auto-combat potion threshold
         p.AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(EditorIO.PromptInt("Auto-combat heals at or below HP % (20-70, steps of 10)", p.AutoCombatHealPercent, min: 20, max: 70));
         p.ClassicMainStreet = EditorIO.PromptBool("Classic Main Street layout (instead of districts)", p.ClassicMainStreet); // v1.1.14
+        p.MenuKeysNeedEnter = EditorIO.PromptBool("Menu keys need Enter (single-player console)", p.MenuKeysNeedEnter); // v1.1.15
         p.ClassicTipDraws = EditorIO.PromptInt("Switch-to-classic tip draws shown (0-10, 10 = no more)", p.ClassicTipDraws, min: 0, max: 10); // v1.1.14
         p.DateFormatPreference = EditorIO.PromptInt("DateFormat (0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD)", p.DateFormatPreference, min: 0, max: 2);
         p.AutoRedistributeXP = EditorIO.PromptBool("Auto-redistribute XP when teammates die", p.AutoRedistributeXP);

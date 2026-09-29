@@ -199,7 +199,7 @@ public abstract class BaseLocation
         if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null
             && LocationId != GameLocation.Dungeons)
         {
-            var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, player.DisplayName);
+            var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, UsurperRemake.Server.SessionContext.Current?.Username);
             if (otherPlayers.Count > 0)
             {
                 term.SetColor("cyan");
@@ -534,9 +534,7 @@ public abstract class BaseLocation
             terminal.Write(Loc.Get("base.guard_rush_prompt"));
             terminal.SetColor("white");
 
-            string response = await terminal.ReadLineAsync();
-
-            if (GameConfig.IsAffirmative(response))
+            if (await terminal.AskYesNoAsync(""))
             {
                 king.ActiveDefenseEvent.PlayerResponded = true;
                 terminal.SetColor("bright_green");
@@ -634,6 +632,15 @@ public abstract class BaseLocation
     {
         bool exitLocation = false;
 
+        // v1.2.0: a collapse already due on entry (a resumed save, a login after a fight that ended at
+        // Mental 0) is carried out before the entry encounters, so no encounter fight is refused and then
+        // scored as a loss. Afterwards Mental is 20 and nothing below can be refused.
+        if (MentalSystem.CollapseDue(currentPlayer))
+        {
+            await HandleMentalCollapse();
+            if (!currentPlayer.IsAlive || GameEngine.Instance.IsPermadeath) return;
+        }
+
         // Check for encounters when first entering location
         if (ShouldCheckForEncounters())
         {
@@ -672,6 +679,9 @@ public abstract class BaseLocation
 
         while (!exitLocation && currentPlayer.IsAlive) // No turn limit - continuous gameplay
         {
+            // 1.2.0: a god boon update another session left pending (a player-god's reconfig,
+            // domain or recruit) is applied here, in this player's own session
+            GodBoonSystem.ApplyPendingBoonRecalc(currentPlayer);
             // v0.57.21: GMCP — push current vitals on every loop iteration. Bridge
             // checks SessionContext.GmcpEnabled internally, so this is a single
             // boolean check + early return for non-GMCP clients (web, SSH, BBS).
@@ -697,6 +707,15 @@ public abstract class BaseLocation
                 await terminal.PressAnyKey();
                 await NavigateToLocation(GameLocation.Prison);
                 return;
+            }
+
+            // v1.1.15: Mental collapse at 0, checked between actions, so after the fight or event
+            // that caused it and never mid-round. Not while jailed or locked to the Pantheon.
+            if (MentalSystem.CollapseDue(currentPlayer))
+            {
+                await HandleMentalCollapse();
+                if (!currentPlayer.IsAlive || GameEngine.Instance.IsPermadeath) return;
+                continue;
             }
 
             // Auto-level-up check — catches ALL XP sources (combat, quests, seals, events, etc.)
@@ -1425,12 +1444,12 @@ public abstract class BaseLocation
             }
             if (stage.Reward.Wisdom > 0)
             {
-                currentPlayer.Wisdom += stage.Reward.Wisdom;
+                currentPlayer.GrantPermanentStat(StatKind.Wisdom, stage.Reward.Wisdom); // 1.2.0: lasting, written to Base
                 terminal.WriteLine(Loc.Get("base.reward_wisdom", stage.Reward.Wisdom));
             }
             if (stage.Reward.Dexterity > 0)
             {
-                currentPlayer.Dexterity += stage.Reward.Dexterity;
+                currentPlayer.GrantPermanentStat(StatKind.Dexterity, stage.Reward.Dexterity);
                 terminal.WriteLine(Loc.Get("base.reward_dexterity", stage.Reward.Dexterity));
             }
             if (stage.Reward.WaveFragment.HasValue)
@@ -1558,6 +1577,10 @@ public abstract class BaseLocation
         // Breadcrumb navigation
         ShowBreadcrumb();
 
+        // Mental band tag for the header below (v1.1.15): empty at Stable, shown in both modes
+        // (unlike the fatigue tag, which only ever has content in single-player).
+        var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(currentPlayer);
+
         // Location header (with time-of-day for single-player, non-dungeon locations)
         terminal.SetColor("bright_yellow");
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer != null
@@ -1586,6 +1609,17 @@ public abstract class BaseLocation
                 terminal.Write(")");
                 headerLen += 3 + fatigueLabel.Length; // " (" + label + ")"
             }
+            // Mental band tag (both modes; Strained and below)
+            if (!string.IsNullOrEmpty(mentalTagLabel))
+            {
+                terminal.SetColor("gray");
+                terminal.Write(" (");
+                terminal.SetColor(mentalTagColor);
+                terminal.Write(mentalTagLabel);
+                terminal.SetColor("gray");
+                terminal.Write(")");
+                headerLen += 3 + mentalTagLabel.Length;
+            }
             terminal.WriteLine("");
 
             if (!IsScreenReader)
@@ -1607,11 +1641,24 @@ public abstract class BaseLocation
                 terminal.SetColor(fatigueColor);
                 terminal.Write(fatigueLabel);
                 terminal.SetColor("gray");
-                terminal.WriteLine(")");
+                terminal.Write(")");
+                int headerLen = Name.Length + 3 + fatigueLabel.Length;
+                // Mental band tag (both modes; Strained and below)
+                if (!string.IsNullOrEmpty(mentalTagLabel))
+                {
+                    terminal.SetColor("gray");
+                    terminal.Write(" (");
+                    terminal.SetColor(mentalTagColor);
+                    terminal.Write(mentalTagLabel);
+                    terminal.SetColor("gray");
+                    terminal.Write(")");
+                    headerLen += 3 + mentalTagLabel.Length;
+                }
+                terminal.WriteLine("");
                 if (!IsScreenReader)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(new string('═', Name.Length + 3 + fatigueLabel.Length));
+                    terminal.WriteLine(new string('═', headerLen));
                 }
             }
             else
@@ -1619,11 +1666,26 @@ public abstract class BaseLocation
                 // Localize the header name for non-dungeon locations (online + single-player);
                 // the Dungeons header keeps its raw Name because it carries the floor number.
                 string hdrName = LocationId == GameLocation.Dungeons ? Name : GetLocationName(LocationId);
-                terminal.WriteLine(hdrName);
+                terminal.Write(hdrName);
+                int headerLen = hdrName.Length;
+                // Mental band tag (both modes; Strained and below): this leaf is reached in
+                // online mode (dungeon and non-dungeon) and in single-player dungeon without
+                // fatigue, so it is the one place the online header actually gets a tag.
+                if (!string.IsNullOrEmpty(mentalTagLabel))
+                {
+                    terminal.SetColor("gray");
+                    terminal.Write(" (");
+                    terminal.SetColor(mentalTagColor);
+                    terminal.Write(mentalTagLabel);
+                    terminal.SetColor("gray");
+                    terminal.Write(")");
+                    headerLen += 3 + mentalTagLabel.Length;
+                }
+                terminal.WriteLine("");
                 if (!IsScreenReader)
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(new string('═', hdrName.Length));
+                    terminal.WriteLine(new string('═', headerLen));
                 }
             }
         }
@@ -4181,6 +4243,42 @@ public abstract class BaseLocation
     }
 
     /// <summary>
+    /// v1.1.15: Mental collapse at 0 (user decisions 2026-09-27). In the dungeon on
+    /// GameConfig.MentalCollapseDeathFloor or deeper it is a real death through the existing death
+    /// path (CombatEngine.HandleMentalCollapseDeath), then the Broken affliction and Mental 20; the
+    /// player goes to the Temple when that path says so. Anywhere else (shallower floors, town)
+    /// the player is carried to the Healer: Broken, Mental 20, the rescuers' gold fee, no death and
+    /// no XP or floor loss.
+    /// </summary>
+    protected async Task HandleMentalCollapse()
+    {
+        var player = currentPlayer;
+        if (!MentalSystem.NeedsCollapse(player)) return;
+        int floor = LocationId == GameLocation.Dungeons ? Math.Max(1, player.LastDungeonFloor) : 0;
+        terminal.WriteLine("");
+        if (MentalSystem.IsCollapseDeath(floor))
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("mental.collapse_death"));
+            await Task.Delay(1500);
+            var result = await new CombatEngine(terminal).HandleMentalCollapseDeath(player);
+            if (result.IsPermadeath || GameEngine.Instance.IsPermadeath) return;
+            MentalSystem.ApplyCollapseDeathAftermath(player);
+            if (result.ShouldReturnToTemple && LocationId != GameLocation.Temple)
+                await NavigateToLocation(GameLocation.Temple);
+            return;
+        }
+        long fee = MentalSystem.ApplyCollapseRescue(player);
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(Loc.Get("mental.collapse_rescue"));
+        if (fee > 0) terminal.WriteLine(Loc.Get("mental.collapse_fee", fee.ToString("N0")));
+        terminal.WriteLine("");
+        await terminal.PressAnyKey();
+        if (LocationId != GameLocation.Healer)
+            await NavigateToLocation(GameLocation.Healer);
+    }
+
+    /// <summary>
     /// Show the inventory screen for managing equipment
     /// </summary>
     protected virtual async Task ShowInventory()
@@ -4195,6 +4293,12 @@ public abstract class BaseLocation
     /// <summary>v1.1.14: the Main Street layout preference's value as the prefs menu shows it.</summary>
     internal static string MainStreetLayoutName(bool classic) =>
         Loc.Get(classic ? "prefs.main_street_classic" : "prefs.main_street_districts");
+
+    /// <summary>
+    /// v1.1.15: the "menu keys need Enter" setting only changes single-player in a local console;
+    /// online, MUD and door play always read a line, so the entry is hidden there.
+    /// </summary>
+    internal static bool MenuKeysSettingShown => !UsurperRemake.BBS.DoorMode.ShouldUseAnsiOutput && !UsurperRemake.BBS.DoorMode.IsMudServerMode;
 
     protected virtual async Task ShowPreferencesMenu()
     {
@@ -4233,6 +4337,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_equip")}: {(currentPlayer.AutoEquipDisabled ? Loc.Get("prefs.disabled") : Loc.Get("prefs.enabled"))}");
                 terminal.WriteLine($"  {Loc.Get("prefs.auto_combat_heal")}: {currentPlayer.AutoCombatHealPercent}%"); // v1.1.13: heal threshold
                 terminal.WriteLine($"  {Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                if (MenuKeysSettingShown)
+                    terminal.WriteLine($"  {Loc.Get("prefs.menu_keys_need_enter")}: {(currentPlayer.MenuKeysNeedEnter ? Loc.Get("prefs.enabled") : Loc.Get("prefs.disabled"))}"); // v1.1.15
                 terminal.WriteLine("");
 
                 string srDateFormat = currentPlayer.DateFormatPreference switch { 1 => "DD/MM/YYYY", 2 => "YYYY-MM-DD", _ => "MM/DD/YYYY" };
@@ -4255,6 +4361,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  M. {Loc.Get("prefs.toggle", Loc.Get("prefs.dungeon_automap"))}");
                 terminal.WriteLine($"  D. {Loc.Get("base.prefs_date_format")} ({srDateFormat})");
                 terminal.WriteLine($"  S. {Loc.Get("prefs.main_street_layout")} ({MainStreetLayoutName(currentPlayer.ClassicMainStreet)})"); // v1.1.14
+                if (MenuKeysSettingShown)
+                    terminal.WriteLine($"  E. {Loc.Get("prefs.toggle", Loc.Get("prefs.menu_keys_need_enter"))}"); // v1.1.15
                 if (IsRunningInWezTerm())
                     terminal.WriteLine($"  7. {Loc.Get("prefs.terminal_font")}");
                 terminal.WriteLine(Loc.Get("base.prefs_accessibility"));
@@ -4330,6 +4438,8 @@ public abstract class BaseLocation
                     WriteMenuOption("M", $"{Loc.Get("prefs.dungeon_automap")}: {onOff(currentPlayer.DungeonAutoMap)}");
                 WriteMenuOption("D", $"{Loc.Get("base.prefs_date_format")}: {dateFormatName}");
                 WriteMenuOption("S", $"{Loc.Get("prefs.main_street_layout")}: {MainStreetLayoutName(currentPlayer.ClassicMainStreet)}"); // v1.1.14
+                if (MenuKeysSettingShown)
+                    WriteMenuOption("E", $"{Loc.Get("prefs.menu_keys_need_enter")}: {onOff(currentPlayer.MenuKeysNeedEnter)}"); // v1.1.15
                 if (IsRunningInWezTerm())
                     WriteMenuOption("7", $"{Loc.Get("prefs.terminal_font")}: {ReadCurrentFont()}");
                 terminal.WriteLine("");
@@ -4487,6 +4597,15 @@ public abstract class BaseLocation
                     // v1.1.14: Main Street layout, the districts (default) or the classic pre-1.1.13 menu
                     currentPlayer.ClassicMainStreet = !currentPlayer.ClassicMainStreet;
                     terminal.WriteLine(Loc.Get("base.pref_main_street_layout_set", MainStreetLayoutName(currentPlayer.ClassicMainStreet)), "green");
+                    await GameEngine.Instance.SaveCurrentGame();
+                    await Task.Delay(800);
+                    break;
+
+                case "E" when MenuKeysSettingShown:
+                    // v1.1.15: single-player console menus wait for Enter (default) or act on one key
+                    currentPlayer.MenuKeysNeedEnter = !currentPlayer.MenuKeysNeedEnter;
+                    GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
+                    terminal.WriteLine(Loc.Get("base.pref_menu_keys_need_enter_set", Loc.Get(currentPlayer.MenuKeysNeedEnter ? "prefs.on" : "prefs.off")), "green");
                     await GameEngine.Instance.SaveCurrentGame();
                     await Task.Delay(800);
                     break;
@@ -4823,8 +4942,7 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("prefs.difficulty_nightmare_note"));
             terminal.WriteLine("");
             terminal.SetColor("white");
-            var confirm = await terminal.GetInput(Loc.Get("creation.difficulty.nightmare_confirm"));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("creation.difficulty.nightmare_confirm"), enterDefault: false))
             {
                 terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_wise"), "green");
                 await Task.Delay(1200);
@@ -5762,6 +5880,10 @@ public abstract class BaseLocation
             // Small relationship boost for friendly chat
             RelationshipSystem.UpdateRelationship(currentPlayer, npc, 1, 1, false, false);
 
+            // v1.1.15: talking with a friend eases the mind, once a day
+            int mentalBeforeTalk = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTalk, MentalSystem.ApplyFriendTalk(currentPlayer, npc));
+
             terminal.WriteLine("");
             await terminal.PressAnyKey();
         }
@@ -6109,8 +6231,7 @@ public abstract class BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.Write($"  {Loc.Get("base.murder_confirm_yn")} ");
-            var murderConfirm = await terminal.GetInput("");
-            if (!GameConfig.IsAffirmative(murderConfirm))
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.SetColor("green");
                 terminal.WriteLine($"  {Loc.Get("base.murder_walk_away")}");
@@ -6137,8 +6258,7 @@ public abstract class BaseLocation
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("base.attack_dangerous", npc.Name2, npc.Level));
             terminal.Write(Loc.Get("base.attack_confirm"));
-            var confirm = await terminal.GetInput("");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("base.attack_reconsider"));
@@ -6161,6 +6281,11 @@ public abstract class BaseLocation
         {
             terminal.SetColor("dark_red");
             terminal.WriteLine("\n  " + Loc.Get("base.attack_killed", npc.Name2));
+            // v1.1.15: a town NPC's death seen up close, the Mental witness loss (once a day)
+            int mentalBeforeWitness = currentPlayer.Mental;
+            MentalSystem.ApplyWitnessLoss(currentPlayer);
+            MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+            GodDeedSystem.Record(currentPlayer, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
 
             if (result.GoldGained > 0)
             {
@@ -6220,6 +6345,11 @@ public abstract class BaseLocation
     /// </summary>
     internal async Task ApplyMurderConsequences(Character player, NPC victim)
     {
+        // 1.2.0 Temple gods: Love and Law taboo, once for every murder that reaches the crown
+        // (street murder and the Magic Shop death spell). First, before capture, execution or the
+        // prison exit can end the session.
+        GodDeedSystem.Record(player, GodAct.Murder, terminal);
+
         await Task.Delay(1500);
 
         terminal.SetColor("bright_red");
@@ -6258,6 +6388,7 @@ public abstract class BaseLocation
         }
 
         bool captured;
+        bool skipExecutionRoll = false;
 
         if (choice == "S")
         {
@@ -6266,6 +6397,14 @@ public abstract class BaseLocation
             terminal.WriteLine("");
 
             captured = true;
+
+            // v1.2.0: a Surrender at Mental 0 is the same non-choice as a refused fight at
+            // Mental 0 (CollapseDue), so it skips the execution roll for the same reason.
+            // A Surrender above Mental 0 still rolls.
+            if (MentalSystem.CollapseDue(currentPlayer))
+            {
+                skipExecutionRoll = true;
+            }
         }
         else
         {
@@ -6312,7 +6451,20 @@ public abstract class BaseLocation
             // after the player killed all 5 guards — they'd fall through to
             // "arrested" and still go to prison. Fixed by checking Outcome.
             bool playerWon = result.Outcome == CombatOutcome.Victory;
-            if (playerWon)
+            if (result.MentalCollapseNotFought)
+            {
+                // v1.2.0: the witness loss after the murder (or the murder fight itself) left Mental at 0,
+                // so the guards' fight is not entered. The player is taken as on a surrender, with one line
+                // in place of the overpowered text; the collapse is left to the location loop. A refused
+                // arrest is not a choice to face the Crown's justice, so the execution roll is skipped
+                // (see the same CollapseDue check on the Surrender branch above); capture and the prison
+                // sentence still follow.
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                captured = true;
+                skipExecutionRoll = true;
+            }
+            else if (playerWon)
             {
                 AlignmentSystem.Instance.ChangeAlignment(player, 100, isGood: false, reason: "murder");
                 terminal.SetColor("red");
@@ -6333,8 +6485,10 @@ public abstract class BaseLocation
             }
         }
 
-        // 50% execution, 50% prison
-        bool isExecuted = Random.Shared.Next(100) < 50;
+        // 50% execution, 50% prison. A refused arrest fight (Mental collapse) or a Surrender at
+        // Mental 0 (CollapseDue) skips the roll; a voluntary Surrender above Mental 0 and a real
+        // defeat still roll.
+        bool isExecuted = !skipExecutionRoll && Random.Shared.Next(100) < 50;
 
         if (isExecuted && captured)
         {
@@ -6436,6 +6590,7 @@ public abstract class BaseLocation
 
                 // Prison for 2 real days — maximum security, no escape
                 p.DaysInPrison = 2;
+                GodDeedSystem.Record(p, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 p.IsMurderConvict = true;
                 p.PrisonEscapes = 0;
                 p.CellDoorOpen = false;
@@ -7373,8 +7528,8 @@ public abstract class BaseLocation
 
             if (currentPlayer.Darkness > 100)
                 terminal.WriteLine($"    {Loc.Get("reputation.wanted")}");
-            var (templeOk, _) = AlignmentSystem.Instance.CanAccessLocation(currentPlayer, GameLocation.Temple);
-            if (!templeOk)
+            var (churchOk, _) = AlignmentSystem.Instance.CanAccessLocation(currentPlayer, GameLocation.Church);   // 1.2.0: the Temple is open to all
+            if (!churchOk)
                 terminal.WriteLine($"    {Loc.Get("reputation.holy_barred")}");
 
             var faction = FactionSystem.Instance;
@@ -7400,10 +7555,54 @@ public abstract class BaseLocation
         terminal.Write(Loc.Get("base.stat_loyalty"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Loyalty}%");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.stat_mental"));
-        terminal.SetColor(currentPlayer.Mental >= 50 ? "green" : "red");
-        terminal.WriteLine($"{currentPlayer.Mental}");
+        // Mental Health (v1.1.15): band label and colour from Character.GetMentalTier, in both
+        // modes. A capped character (addiction) gets a cap suffix; a screen-reader session reads
+        // the band before the label so the worst news lands first.
+        int mentalVal = currentPlayer.Mental;
+        int mentalCap = MentalSystem.GetCap(currentPlayer);
+        var (mentalLabel, mentalColor) = currentPlayer.GetMentalTier();
+        string mentalCapText = mentalCap < GameConfig.MaxMentalStability
+            ? Loc.Get("status.mental_cap_suffix", mentalCap)
+            : "";
+        if (IsScreenReader)
+        {
+            terminal.SetColor(mentalColor);
+            string srLine = Loc.Get("status.mental_sr_line", mentalLabel, mentalVal, GameConfig.MaxMentalStability);
+            if (mentalCapText.Length > 0) srLine += ", " + mentalCapText;
+            terminal.WriteLine(srLine);
+        }
+        else
+        {
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("base.stat_mental"));
+            terminal.SetColor(mentalColor);
+            string capSuffix = mentalCapText.Length > 0 ? $" ({mentalCapText})" : "";
+            terminal.WriteLine($"{mentalVal}/{GameConfig.MaxMentalStability} ({mentalLabel}){capSuffix}");
+        }
+        if (currentPlayer.WillowDraughts > 0)
+        {
+            terminal.SetColor("white");
+            terminal.WriteLine(Loc.Get("status.willow_draughts", currentPlayer.WillowDraughts, GameConfig.MaxWillowDraughts));
+        }
+
+        // Afflictions (v1.1.15): shown from Shaken down, percentage read straight off
+        // MentalSystem.GetCombatPenalty so it can never drift from the real combat effect.
+        float mentalPenaltyPct = MentalSystem.GetCombatPenalty(mentalVal) * 100f;
+        if (currentPlayer.MentalBroken)
+        {
+            // v1.1.15: the Broken affliction replaces the band's penalty (MentalSystem.GetMentalPenalty)
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("base.mental_afflictions_label"));
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("base.mental_afflictions_broken", GameConfig.MentalBrokenPenaltyPct));
+        }
+        else if (mentalPenaltyPct > 0f)
+        {
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("base.mental_afflictions_label"));
+            terminal.SetColor("red");
+            terminal.WriteLine(Loc.Get("base.mental_afflictions_pct", (int)System.Math.Round(mentalPenaltyPct)));
+        }
 
         if (currentPlayer.King)
         {
@@ -7651,6 +7850,18 @@ public abstract class BaseLocation
             bool isEvilGod = godInfo != null && godInfo.Darkness > godInfo.Goodness;
             terminal.SetColor(isEvilGod ? "red" : "bright_cyan");
             terminal.WriteLine(worshippedGod);
+
+            // 1.2.0 Temple gods piece 2: the boon at the character's current strength, and the ward
+            var boonDomain = GodBoonSystem.GetDomain(currentPlayer);
+            if (boonDomain != GodDomain.None)
+            {
+                int strength = GodBoonSystem.GetStrengthPct(currentPlayer);
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(boonDomain, strength), strength)}");
+                bool warded = FavorSystem.GetTier(FavorSystem.GetFavor(currentPlayer)) >= GodFavorTier.Devout;
+                terminal.SetColor(warded ? "gray" : "darkgray");
+                terminal.WriteLine($"  {Loc.Get(warded ? "god.ward_line_active" : "god.ward_line", GodBoonSystem.DescribeWard(boonDomain))}");
+            }
         }
         else
         {
@@ -7666,7 +7877,10 @@ public abstract class BaseLocation
             terminal.WriteLine(Loc.Get("base.wrath_active"));
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("base.wrath_angered", currentPlayer.AngeredGodName));
-            terminal.WriteLine(Loc.Get("base.wrath_by_worshipping", currentPlayer.BetrayedForGodName));
+            // 1.2.0 Temple gods piece 4: a god left for no god records no god it was betrayed for
+            terminal.WriteLine(string.IsNullOrEmpty(currentPlayer.BetrayedForGodName)
+                ? Loc.Get("base.wrath_by_leaving")
+                : Loc.Get("base.wrath_by_worshipping", currentPlayer.BetrayedForGodName));
             terminal.SetColor("yellow");
             string severity = currentPlayer.DivineWrathLevel switch
             {
@@ -9222,9 +9436,7 @@ public abstract class BaseLocation
             terminal.Write(Loc.Get("base.trade_gold_amount", goldAmount.ToString("N0")));
         terminal.Write(Loc.Get("base.trade_to_confirm", recipient));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -9970,8 +10182,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("base.auction_buy_confirm", listing.Price.ToString("N0")));
-        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        if (!await terminal.AskYesNoAsync("")) return;
 
         bool success = await backend.BuyAuctionListing(listing.Id, username);
         if (!success)
@@ -10146,8 +10357,7 @@ public abstract class BaseLocation
         // Confirm
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("base.auction_list_confirm", item.Name, price.ToString("N0"), chosenLabel, listingFee.ToString("N0")));
-        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        if (!await terminal.AskYesNoAsync("")) return;
 
         string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
         int id = await backend.CreateAuctionListing(currentPlayer.DisplayName.ToLower(), item.Name, itemJson, price, chosenHours);
@@ -10165,7 +10375,7 @@ public abstract class BaseLocation
             // Global announcement
             UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
                 $"\u001b[93m  [Auction] {currentPlayer.DisplayName} just listed {item.Name} for {price:N0} gold! ({chosenLabel})\u001b[0m",
-                excludeUsername: currentPlayer.DisplayName);
+                excludeUsername: UsurperRemake.Server.SessionContext.Current?.Username);
         }
         else
         {
@@ -10699,8 +10909,7 @@ public abstract class BaseLocation
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("inn.equip_best_confirm", target.DisplayName));
-        var confirm = (await terminal.ReadLineAsync()).ToUpper().Trim();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -11375,9 +11584,7 @@ public abstract class BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("shop.filter_confirm", filtered.Count, totalGold.ToString("N0")));
-        var confirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(""))
         {
             foreach (var item in filtered)
                 currentPlayer.Inventory.Remove(item);

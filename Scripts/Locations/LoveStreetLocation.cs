@@ -472,8 +472,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_street.courtesan_wants_gold", courtesan.Name, $"{courtesan.Price:N0}"));
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("love_street.pay_confirm", courtesan.Name, $"{courtesan.Price:N0}"));
-        if (string.IsNullOrEmpty(confirm) || !GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("love_street.pay_confirm", courtesan.Name, $"{courtesan.Price:N0}")))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("love_street.shrug_loss", courtesan.Name));
@@ -610,8 +609,7 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("love_street.gigolo_wants_gold", gigolo.Name, $"{gigolo.Price:N0}"));
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("love_street.pay_confirm", gigolo.Name, $"{gigolo.Price:N0}"));
-        if (string.IsNullOrEmpty(confirm) || !GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("love_street.pay_confirm", gigolo.Name, $"{gigolo.Price:N0}")))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("love_street.gigolo_bow", gigolo.Name));
@@ -1599,8 +1597,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.WriteLine(Loc.Get("love_street.perhaps_another"));
             terminal.WriteLine("");
 
-            var response = await terminal.GetKeyInput();
-            if (GameConfig.IsAffirmative(response))
+            if (await terminal.AskYesNoKeyAsync())
             {
                 await IntimacySystem.Instance.StartIntimateScene(
                     currentPlayer,
@@ -1745,8 +1742,7 @@ public class LoveStreetLocation : BaseLocation
             terminal.WriteLine(Loc.Get("love_street.gift_not_accept", recipient.Name));
 
         terminal.WriteLine("");
-        var confirm = await terminal.GetInput(Loc.Get("love_street.gift_buy_confirm", giftName, recipient.Name, $"{giftCost:N0}"));
-        if (string.IsNullOrEmpty(confirm) || !GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("love_street.gift_buy_confirm", giftName, recipient.Name, $"{giftCost:N0}")))
         {
             terminal.WriteLine(Loc.Get("love_street.maybe_next_time"), "gray");
             await terminal.WaitForKey();

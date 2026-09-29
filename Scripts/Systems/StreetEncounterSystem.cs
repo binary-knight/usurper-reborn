@@ -909,7 +909,7 @@ public class StreetEncounterSystem
 
         string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
 
-        if (GameConfig.IsAffirmative(choice) || choice == "F")
+        if (GameConfig.IsAffirmative(choice) || choice == "F") // v1.1.15: yesno-exempt: F (flirt) is a third accept key alongside Y/N, not a plain yes/no
         {
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("street_encounter.romance.pleasant_time"));
@@ -921,7 +921,7 @@ public class StreetEncounterSystem
             {
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("street_encounter.romance.wonderful_conversation"));
-                player.Charisma = Math.Min(player.Charisma + 1, 30);
+                player.GrantPermanentStat(StatKind.Charisma, 1, cap: 30); // 1.2.0: lasting; the cap of 30 applies to BaseCharisma, not gear
                 result.Message = Loc.Get("street_encounter.romance.msg_connection");
             }
             else if (outcome < 80)
@@ -1211,6 +1211,7 @@ public class StreetEncounterSystem
                 await Task.Delay(2000);
 
                 player.DaysInPrison = (byte)Math.Min(255, sentence);
+                GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 result.Message = Loc.Get("street_encounter.guard.msg_arrested");
                 throw new LocationExitException(GameLocation.Prison);
             }
@@ -1240,6 +1241,7 @@ public class StreetEncounterSystem
                     await Task.Delay(2000);
 
                     player.DaysInPrison = (byte)Math.Min(255, sentence);
+                    GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                     result.Message = Loc.Get("street_encounter.guard.msg_defeated_arrested");
                     throw new LocationExitException(GameLocation.Prison);
                 }
@@ -1275,6 +1277,7 @@ public class StreetEncounterSystem
                     await Task.Delay(2000);
 
                     player.DaysInPrison = (byte)Math.Min(255, sentence);
+                    GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                     result.Message = Loc.Get("street_encounter.guard.msg_caught");
                     throw new LocationExitException(GameLocation.Prison);
                 }
@@ -1639,6 +1642,7 @@ public class StreetEncounterSystem
             }
             else if (isBrawl)
             {
+                GodDeedSystem.Record(player, GodAct.StreetBrawl, terminal);   // 1.2.0 Temple gods: Chaos deed
                 result.Message = Loc.Get("street.fight.brawl_victory", expGain.ToString());
             }
             else
@@ -1754,9 +1758,7 @@ public class StreetEncounterSystem
         terminal.Write("N", "bright_yellow");
         terminal.WriteLine($"]{Loc.Get("street_encounter.bribe.opt_no")}", "white");
 
-        string choice = (await terminal.GetKeyInput()).ToUpperInvariant();
-
-        if (GameConfig.IsAffirmative(choice))
+        if (await terminal.AskYesNoKeyAsync())
         {
             int bribeChance = 50 + (int)(player.Charisma - 10) * 3;
             if (_random.Next(100) < bribeChance)
@@ -2513,6 +2515,8 @@ public class StreetEncounterSystem
 
             var choice = await terminal.GetInput(Loc.Get("street_encounter.grudge.your_response"));
 
+            // v1.2.0: a clean escape is no fight, so neither the victory nor the defeat branch applies
+            bool fought = false;
             if (choice.Trim().ToUpper() == "R")
             {
                 int fleeChance = Math.Min(50, 20 + (int)(player.Dexterity * 1.5)); // Harder to flee murder revenge
@@ -2526,15 +2530,17 @@ public class StreetEncounterSystem
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("street_encounter.grudge.cuts_off_escape", grudgeNpc.Name2));
                     await FightNPC(player, grudgeNpc, result, terminal);
+                    fought = true;
                 }
             }
             else
             {
                 // Fight (default for any input)
                 await FightNPC(player, grudgeNpc, result, terminal);
+                fought = true;
             }
 
-            if (result.Victory)
+            if (fought && result.Victory)
             {
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("street_encounter.grudge.murder_goes_down", grudgeNpc.Name2));
@@ -2548,7 +2554,7 @@ public class StreetEncounterSystem
                 });
                 NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2}'s murder revenge attempt!");
             }
-            else
+            else if (fought)
             {
                 long goldTaken = player.Gold / 5; // Take 20% for murder revenge (more severe)
                 player.Gold -= goldTaken;

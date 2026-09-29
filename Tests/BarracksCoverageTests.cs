@@ -156,12 +156,10 @@ public class BarracksCoverageTests
         string body = MethodBody("Scripts/Systems/CombatEngine.cs", "ProcessMonsterAction");
         int grace = body.IndexOf("ApplyFleeGrace(player, actualDamage)", StringComparison.Ordinal);
         int barracks = body.IndexOf("TeamHQBonus.ApplyDefense(player, actualDamage)", StringComparison.Ordinal);
-        int divine = body.IndexOf("CheckDivineIntervention(", StringComparison.Ordinal);
         int sacrifice = body.IndexOf("CheckCompanionSacrifice(", StringComparison.Ordinal);
         int write = body.IndexOf("player.HP = Math.Max(0, player.HP - actualDamage)", StringComparison.Ordinal);
         grace.Should().BeGreaterThan(0);
         barracks.Should().BeGreaterThan(grace, "the Barracks is the last modifier, after the flee grace");
-        divine.Should().BeGreaterThan(barracks, "survive-at-1 must see the final number, not have it divided");
         sacrifice.Should().BeGreaterThan(barracks);
         write.Should().BeGreaterThan(barracks);
         Count(body, "TeamHQBonus.ApplyDefense(").Should().Be(1);

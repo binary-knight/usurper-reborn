@@ -1380,6 +1380,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("castle.imprisoned_confirm", target.Name, sentence));
+        GodDeedSystem.Record(currentPlayer, GodAct.ArrestOrdered, terminal);   // 1.2.0 Temple gods: Law deed
         NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} imprisoned {target.Name} for {crime}!");
 
         // Track daily imprisonment limits
@@ -1487,9 +1488,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.execute_confirm_prompt", name));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             // v1.1.13: one guarded court change; the execution follows only once it is written
             if (!await CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == name) > 0))
@@ -1533,6 +1533,14 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("castle.executed_confirm", name));
             terminal.WriteLine(Loc.Get("castle.darkness_increases"));
+            // v1.1.15: an NPC executed before the king's eyes, the Mental witness loss (once a day)
+            if (npc != null)
+            {
+                int mentalBeforeWitness = currentPlayer.Mental;
+                MentalSystem.ApplyWitnessLoss(currentPlayer);
+                MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+                GodDeedSystem.Record(currentPlayer, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
+            }
             NewsSystem.Instance.Newsy(true, $"{currentKing.GetTitle()} {currentKing.Name} executed {name}!");
 
             // Server-wide broadcast of execution
@@ -2289,18 +2297,14 @@ public class CastleLocation : BaseLocation
 
         await Task.Delay(1500);
 
+        // Groggo's Shadow Blessing fades on rest; 1.2.0: OnRest clears it and recalculates
+        if (currentPlayer.GroggoShadowBlessingDex > 0)
+            terminal.WriteLine(Loc.Get("castle.shadow_blessing_fades"), "gray");
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Full heal
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
-
-        // Remove Groggo's Shadow Blessing on rest
-        if (currentPlayer.GroggoShadowBlessingDex > 0)
-        {
-            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
-            terminal.WriteLine(Loc.Get("castle.shadow_blessing_fades"), "gray");
-            currentPlayer.GroggoShadowBlessingDex = 0;
-        }
 
         if (DoorMode.IsOnlineMode)
         {
@@ -2676,9 +2680,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.hire_guard_confirm", guardName, GameConfig.GuardRecruitmentCost.ToString("N0")));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             CharacterSex sex = guardName.StartsWith("Lady") || guardName.StartsWith("Dame") ? CharacterSex.Female : CharacterSex.Male;
             // Scale guard salary with king level (guards hired by stronger kings demand more pay)
@@ -4580,9 +4583,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("ui.confirm_divorce"));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             var faction = currentKing.Spouse.OriginalFaction;
             var spouseName = currentKing.Spouse.Name;
@@ -6018,9 +6020,8 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("castle.leave_team_crown"));
             terminal.SetColor("white");
-            string leaveConfirm = await terminal.ReadLineAsync();
-
-            if (!GameConfig.IsAffirmative(leaveConfirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("castle.remain_loyal_team"));
@@ -6064,9 +6065,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.proceed_yn"));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.reconsider"));
@@ -6113,7 +6113,8 @@ public class CastleLocation : BaseLocation
             if (result.Outcome != CombatOutcome.Victory)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.monster_guards_overwhelm"));
+                // v1.1.15: a fight not entered for a Mental collapse is not a defeat by the guards
+                terminal.WriteLine(result.MentalCollapseNotFought ? Loc.Get("mental.collapse_before_fight") : Loc.Get("castle.monster_guards_overwhelm"));
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                 terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                 await Task.Delay(2500);
@@ -6225,7 +6226,8 @@ public class CastleLocation : BaseLocation
                 if (result.Outcome != CombatOutcome.Victory)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("castle.royal_guards_overwhelm"));
+                    // v1.1.15: a fight not entered for a Mental collapse is not a defeat by the guards
+                    terminal.WriteLine(result.MentalCollapseNotFought ? Loc.Get("mental.collapse_before_fight") : Loc.Get("castle.royal_guards_overwhelm"));
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP);
                     terminal.WriteLine(Loc.Get("castle.challenge_failed"));
                     await RecordDefenceLossesAsync(losses);
@@ -6477,9 +6479,8 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("castle.leave_team_claim_yn"));
             terminal.SetColor("white");
-            string leaveConfirm = await terminal.ReadLineAsync();
-
-            if (!GameConfig.IsAffirmative(leaveConfirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("castle.remain_loyal_team"));
@@ -6494,9 +6495,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.proclaim_self_yn", title));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.decide_not_claim"));
@@ -6937,9 +6937,8 @@ public class CastleLocation : BaseLocation
 
                 terminal.SetColor("cyan");
                 terminal.Write(Loc.Get("castle.quest_accept_yn"));
-                string response = await terminal.ReadLineAsync();
-
-                if (GameConfig.IsAffirmative(response))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(""))
                 {
                     // Create the actual quest in the QuestSystem
                     var quest = QuestSystem.CreateRoyalAudienceQuest(
@@ -7230,9 +7229,8 @@ public class CastleLocation : BaseLocation
                 {
                     terminal.SetColor("cyan");
                     terminal.Write(Loc.Get("castle.pardon_partial_yn", partialReduction, partialCost));
-                    string partial = await terminal.ReadLineAsync();
-
-                    if (GameConfig.IsAffirmative(partial) && await PayIntoTreasury(partialCost, partialCost))   // v1.1.13: gold leaves once the court holds it
+                    // v1.1.15: yesno-convert-a, strict (Y/N)
+                    if (await terminal.AskYesNoAsync("") && await PayIntoTreasury(partialCost, partialCost))   // v1.1.13: gold leaves once the court holds it
                     {
                         currentPlayer.Darkness -= partialReduction;
 
@@ -7247,9 +7245,8 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("cyan");
                 terminal.Write(Loc.Get("castle.pardon_full_yn", pardonCost));
-                string response = await terminal.ReadLineAsync();
-
-                if (GameConfig.IsAffirmative(response) && await PayIntoTreasury(pardonCost, pardonCost))   // v1.1.13: gold leaves once the court holds it
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync("") && await PayIntoTreasury(pardonCost, pardonCost))   // v1.1.13: gold leaves once the court holds it
                 {
                     long oldDarkness = currentPlayer.Darkness;
                     currentPlayer.Darkness = 0;
@@ -7310,9 +7307,8 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("cyan");
                 terminal.Write(Loc.Get("castle.loan_repay_yn", totalOwed));
-                string response = await terminal.ReadLineAsync();
-
-                if (GameConfig.IsAffirmative(response) && await PayIntoTreasury(totalOwed, totalOwed))   // v1.1.13: gold leaves once the court holds it
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync("") && await PayIntoTreasury(totalOwed, totalOwed))   // v1.1.13: gold leaves once the court holds it
                 {
                     currentPlayer.RoyalLoanAmount = 0;
                     currentPlayer.RoyalLoanDueDay = 0;
@@ -7476,9 +7472,8 @@ public class CastleLocation : BaseLocation
                 {
                     terminal.SetColor("cyan");
                     terminal.Write(Loc.Get("castle.crime_pay_bounty_yn", bountyCost));
-                    string confirm = await terminal.ReadLineAsync();
-
-                    if (GameConfig.IsAffirmative(confirm) && await PayIntoTreasury(bountyCost, bountyCost / 2))   // Half goes to treasury; v1.1.13: gold leaves once the court holds it
+                    // v1.1.15: yesno-convert-a, strict (Y/N)
+                    if (await terminal.AskYesNoAsync("") && await PayIntoTreasury(bountyCost, bountyCost / 2))   // Half goes to treasury; v1.1.13: gold leaves once the court holds it
                     {
 
                         terminal.WriteLine("");
@@ -7580,9 +7575,8 @@ public class CastleLocation : BaseLocation
                     ? $"Pay {blessingCost:N0} gold for the Royal Blessing? (Y/N): "
                     : "Accept the Royal Blessing? (Y/N): ";
                 terminal.Write(prompt);
-                string response = await terminal.ReadLineAsync();
-
-                if (GameConfig.IsAffirmative(response))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(""))
                 {
                     if (blessingCost > 0 && !await PayIntoTreasury(blessingCost, blessingCost))   // v1.1.13: gold leaves once the court holds it
                         return;
@@ -7673,11 +7667,10 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("cyan");
                 terminal.Write(Loc.Get("castle.tax_pay_yn", petitionCost));
-                string response = await terminal.ReadLineAsync();
-
                 long oldRate = currentKing.TaxRate;
+                // v1.1.15: yesno-convert-a, strict (Y/N)
                 // v1.1.13: the payment and the lower tax are one guarded court change; gold leaves once it is written
-                if (GameConfig.IsAffirmative(response)
+                if (await terminal.AskYesNoAsync("")
                     && await PayIntoTreasury(petitionCost, petitionCost, court => { court.TaxRate = Math.Max(5, court.TaxRate - 5); return true; }))
                 {
 
@@ -7871,9 +7864,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.Write(Loc.Get("castle.guard_join_yn"));
         terminal.SetColor("white");
-        string response = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             // Add player as a guard; v1.1.13: one guarded court change
             string guardName = currentPlayer.DisplayName;
@@ -9034,9 +9026,8 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("castle.crown_decrease_standing"));
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInputAsync("Join The Crown? (Y/N) ");
-
-        if (GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("castle.crown_join_yn")))
         {
             await PerformCrownOath(factionSystem);
         }
@@ -9230,9 +9221,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_red");
         terminal.Write(Loc.Get("castle.siege_launch_yn"));
         terminal.SetColor("white");
-        string confirm = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("castle.siege_stands_down"));
@@ -9476,9 +9466,8 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_red");
         terminal.Write(Loc.Get("castle.siege_face_king_yn"));
         terminal.SetColor("white");
-        string faceKing = await terminal.ReadLineAsync();
-
-        if (!GameConfig.IsAffirmative(faceKing))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             await RecordDefenceLossesAsync(losses);
             await backend.CompleteSiege(siegeId, "retreated");

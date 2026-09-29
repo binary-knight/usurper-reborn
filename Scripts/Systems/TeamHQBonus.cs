@@ -70,7 +70,8 @@ namespace UsurperRemake.Systems
         }
         public static long ApplyXP(Character c, long xp)
         {
-            double m = (Training(c) > 0 ? XPMultiplier(c) : 1.0) * AwakeningBonus.XPMultiplier(c);
+            // 1.2.0 Temple gods piece 6: a follower of the week's strongest god (WeeklyGodSystem) rides here too
+            double m = (Training(c) > 0 ? XPMultiplier(c) : 1.0) * AwakeningBonus.XPMultiplier(c) * WeeklyGodSystem.XpMultiplier(c);
             return m != 1.0 ? (long)Math.Round(xp * m) : xp;
         }
         public static long ApplyPotionHeal(Character c, long heal) => Infirmary(c) > 0 ? (long)Math.Round(heal * PotionHealMultiplier(c)) : heal;

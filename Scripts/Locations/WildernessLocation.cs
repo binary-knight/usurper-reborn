@@ -221,6 +221,11 @@ public class WildernessLocation : BaseLocation
         foreach (var line in WildernessData.GetRegionDescription(region).Split('\n'))
             terminal.WriteLine(line);
         terminal.WriteLine("");
+
+        // v1.1.15: the first expedition of the day eases the mind (before the encounter, so a fight cannot skip it)
+        int mentalBeforeTrip = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTrip, MentalSystem.ApplyWilderness(currentPlayer));
+        GodDeedSystem.Record(currentPlayer, GodAct.WildernessExplored, terminal);   // 1.2.0 Temple gods: Nature deed
         await Task.Delay(2000);
 
         // Roll encounter type: 40% combat, 25% foraging, 15% ruins, 10% traveler, 10% shrine
@@ -433,7 +438,7 @@ public class WildernessLocation : BaseLocation
         if (result.Outcome == CombatOutcome.Victory)
         {
             // Bonus wilderness gold
-            long bonusGold = (long)(Random.Shared.Next(10, 30) * (1 + region.MinLevel / 10.0));
+            long bonusGold = GodBoonSystem.WildernessGain(currentPlayer, (long)(Random.Shared.Next(10, 30) * (1 + region.MinLevel / 10.0)));   // 1.2.0 Temple gods piece 2: Sylvana
             currentPlayer.Gold += bonusGold;
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("wilderness.bonus_gold", bonusGold));
@@ -578,19 +583,19 @@ public class WildernessLocation : BaseLocation
                 }
                 break;
             case "gold_small":
-                long goldS = FindGold("small", RewardLevel(region), Random.Shared);
+                long goldS = GodBoonSystem.WildernessGain(currentPlayer, FindGold("small", RewardLevel(region), Random.Shared));
                 currentPlayer.Gold += goldS;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldS));
                 break;
             case "gold_medium":
-                long goldM = FindGold("medium", RewardLevel(region), Random.Shared);
+                long goldM = GodBoonSystem.WildernessGain(currentPlayer, FindGold("medium", RewardLevel(region), Random.Shared));
                 currentPlayer.Gold += goldM;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldM));
                 break;
             case "gold_large":
-                long goldL = FindGold("large", RewardLevel(region), Random.Shared);
+                long goldL = GodBoonSystem.WildernessGain(currentPlayer, FindGold("large", RewardLevel(region), Random.Shared));
                 currentPlayer.Gold += goldL;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.worth_gold", goldL));
@@ -627,7 +632,7 @@ public class WildernessLocation : BaseLocation
             int roll = Random.Shared.Next(100);
             if (roll < 60)
             {
-                long gold = FindGold("treasure", RewardLevel(region), Random.Shared);
+                long gold = GodBoonSystem.WildernessGain(currentPlayer, FindGold("treasure", RewardLevel(region), Random.Shared));
                 currentPlayer.Gold += gold;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.ruins_gold_found", gold));
@@ -689,15 +694,15 @@ public class WildernessLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("wilderness.traveler_sell_potion", travelerName, cost));
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.traveler_buy_or_decline"));
-                var buy = await GetChoice();
-                if (GameConfig.IsAffirmative(buy) && currentPlayer.Gold >= cost)
+                bool buy = await terminal.AskYesNoAsync(Loc.Get("ui.your_choice"));
+                if (buy && currentPlayer.Gold >= cost)
                 {
                     currentPlayer.Gold -= cost;
                     currentPlayer.Healing = Math.Min(currentPlayer.Healing + 1, currentPlayer.MaxPotions);
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("wilderness.traveler_purchased"));
                 }
-                else if (GameConfig.IsAffirmative(buy))
+                else if (buy)
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("ui.not_enough_gold_plain"));
@@ -766,24 +771,24 @@ public class WildernessLocation : BaseLocation
                 terminal.SetColor("bright_cyan");
                 if (stat == 0)
                 {
-                    currentPlayer.Strength += 1;
+                    currentPlayer.GrantPermanentStat(StatKind.Strength, 1); // 1.2.0: lasting, written to Base
                     terminal.WriteLine(Loc.Get("wilderness.shrine_str"));
                 }
                 else if (stat == 1)
                 {
-                    currentPlayer.Dexterity += 1;
+                    currentPlayer.GrantPermanentStat(StatKind.Dexterity, 1);
                     terminal.WriteLine(Loc.Get("wilderness.shrine_dex"));
                 }
                 else
                 {
-                    currentPlayer.Wisdom += 1;
+                    currentPlayer.GrantPermanentStat(StatKind.Wisdom, 1);
                     terminal.WriteLine(Loc.Get("wilderness.shrine_wis"));
                 }
             }
             else if (roll < 75)
             {
                 // XP
-                long xp = 10 + currentPlayer.Level * 5;
+                long xp = GodBoonSystem.WildernessGain(currentPlayer, 10 + currentPlayer.Level * 5);
                 currentPlayer.Experience += xp;
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("wilderness.shrine_xp", xp));
@@ -922,8 +927,7 @@ public class WildernessLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("wilderness.pilgrimage_alignment", selected.ChivalryShift > 0 ? $"+{selected.ChivalryShift}" : selected.ChivalryShift.ToString())}");
         }
         terminal.WriteLine("");
-        var confirm = await terminal.GetInput(Loc.Get("wilderness.pilgrimage_confirm"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("wilderness.pilgrimage_confirm")))
             return;
 
         // Apply attunement. Two timers set so the right one fires per game mode:

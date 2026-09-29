@@ -398,19 +398,28 @@ namespace UsurperRemake.BBS
             }
         }
 
+        // v1.1.15: the same strict yes/no as TerminalEmulator.AskYesNoAsync -- IsAffirmative/IsNegative
+        // decide, a bare Enter takes defaultValue, and anything else re-asks (loc'd) instead of
+        // silently reading a typo as No. Kept as its own loop (this adapter cannot reach a
+        // TerminalEmulator instance), but it calls the same GameConfig methods and the same loc
+        // key so the two answer sets never drift apart.
         public async Task<bool> ConfirmAsync(string message, bool defaultValue = false)
         {
             string defaultHint = defaultValue ? " [Y/n]" : " [y/N]";
             SetColor("yellow");
             Write(message + defaultHint + " ");
 
-            var input = await GetInput("");
-            input = input.Trim().ToUpperInvariant();
-
-            if (string.IsNullOrEmpty(input))
-                return defaultValue;
-
-            return GameConfig.IsAffirmative(input) || input == "YES";
+            for (int attempt = 0; attempt < TerminalEmulator.MaxInvalidChoiceAttempts; attempt++)
+            {
+                var input = (await GetInput("")).Trim();
+                if (GameConfig.IsAffirmative(input)) return true;
+                if (GameConfig.IsNegative(input)) return false;
+                if (input.Length == 0) return defaultValue;
+                if (DoorMode.IsDisconnected) break;
+                SetColor("red");
+                WriteLine(UsurperRemake.Systems.Loc.Get("ui.answer_yes_no"));
+            }
+            return false;
         }
 
         public async Task<int> GetNumberInput(string prompt = "", int min = 0, int max = int.MaxValue)

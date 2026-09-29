@@ -361,9 +361,9 @@ namespace UsurperRemake.Systems
             var bonuses = new CycleBonuses();
 
             // Base bonuses scale with cycle
-            bonuses.StrengthBonus = 5 * cycle;
-            bonuses.DefenceBonus = 5 * cycle;
-            bonuses.StaminaBonus = 5 * cycle;
+            bonuses.StrengthBonus = CycleStatBonusPerCycle * cycle;
+            bonuses.DefenceBonus = CycleStatBonusPerCycle * cycle;
+            bonuses.StaminaBonus = CycleStatBonusPerCycle * cycle;
             bonuses.GoldBonus = 500 * cycle;
             bonuses.ExpMultiplier = 1.0f + (0.1f * cycle);
 
@@ -407,9 +407,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void ApplyCycleBonuses(Character player, CycleBonuses bonuses)
         {
-            player.Strength += bonuses.StrengthBonus;
-            player.Defence += bonuses.DefenceBonus;
-            player.Stamina += bonuses.StaminaBonus;
+            // 1.2.0: the Strength, Defence and Stamina bonus is granted to the new character only
+            // (ApplyCycleBonusesToNewCharacter), as lasting grants; here it was wiped at once.
             player.Gold += bonuses.GoldBonus;
             player.Chivalry += bonuses.ChivalryBonus;
             player.Darkness += bonuses.DarknessBonus;
@@ -436,6 +435,11 @@ namespace UsurperRemake.Systems
             // cycle is already incremented (e.g., 2 for first NG+), use cycle-1 for bonus calculation
             var bonuses = CalculateCycleBonuses(player, lastEnding, cycle - 1);
             ApplyCycleBonuses(player, bonuses);
+            // 1.2.0: lasting grants to the Base fields; before, the recalculation right after this call wiped them
+            player.GrantPermanentStats(
+                (StatKind.Strength, bonuses.StrengthBonus),
+                (StatKind.Defence, bonuses.DefenceBonus),
+                (StatKind.Stamina, bonuses.StaminaBonus));
 
             // Apply starting level bonus from MetaProgressionSystem
             int startingLevel = MetaProgressionSystem.Instance.GetStartingLevelBonus();
@@ -452,6 +456,34 @@ namespace UsurperRemake.Systems
                 player.RecalculateStats();
             }
         }
+
+        /// <summary>
+        /// 1.2.0 one-time login backfill of the NG+ cycle bonus, which no character received before
+        /// (it was wiped by the recalculation at NG+ start). For a character loaded from an older save
+        /// (CycleStatBonusApplied false) this grants the per-cycle part, +5 Strength, Defence and
+        /// Stamina for each completed cycle, from the saved cycle number; the ending-specific extra is
+        /// not derivable and is not granted. An immortal's cycle was advanced once more at ascension
+        /// without a new start, so that step is not counted. Cycle 1 grants nothing. Sets the flag, so
+        /// it runs once per character. Returns the amount granted per stat.
+        /// </summary>
+        public static int BackfillCycleStatBonus(Character player, int savedCycle)
+        {
+            if (player == null || player.CycleStatBonusApplied) return 0;
+            int completedCycles = Math.Max(0, savedCycle - 1 - (player.IsImmortal ? 1 : 0));
+            int amount = CycleStatBonusPerCycle * completedCycles;
+            if (amount > 0)
+            {
+                player.GrantPermanentStats(
+                    (StatKind.Strength, amount),
+                    (StatKind.Defence, amount),
+                    (StatKind.Stamina, amount));
+            }
+            player.CycleStatBonusApplied = true;
+            return amount;
+        }
+
+        /// <summary>The per-cycle Strength, Defence and Stamina bonus (CalculateCycleBonuses).</summary>
+        public const int CycleStatBonusPerCycle = 5;
 
         /// <summary>
         /// Get a list of current cycle bonuses for display purposes

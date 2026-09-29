@@ -143,7 +143,8 @@ public class GodSystem
         {
             if (!godsByName.ContainsKey(name))
             {
-                int npcBelievers = random.Next(5, 50);
+                // 1.2.0 Temple gods: no invented worshippers; standing comes from real followers' Favor
+                int npcBelievers = 0;
                 var god = new God
                 {
                     Name = name,
@@ -192,9 +193,9 @@ public class GodSystem
     {
         if (level >= 1 && level <= GameConfig.MaxGodLevel)
         {
-            return GameConfig.GodTitles[Math.Clamp(level - 1, 0, GameConfig.GodTitles.Length - 1)];
+            return UsurperRemake.Systems.GodText.Title(level);
         }
-        return "Lesser Spirit";
+        return UsurperRemake.Systems.GodText.Title(1);
     }
     
     /// <summary>

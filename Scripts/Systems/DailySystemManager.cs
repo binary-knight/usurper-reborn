@@ -76,18 +76,54 @@ public class DailySystemManager
     /// Get the most recent 7 PM Eastern Time boundary as UTC.
     /// This is the authoritative daily reset point for online mode.
     /// </summary>
-    public static DateTime GetCurrentResetBoundary()
+    public static DateTime GetCurrentResetBoundary() => ResetBoundaryAt(DateTime.UtcNow);
+
+    /// <summary>The most recent 7 PM Eastern daily reset boundary at or before utcNow, as UTC.</summary>
+    public static DateTime ResetBoundaryAt(DateTime utcNow)
+    {
+        var eastern = EasternZone();
+        return TimeZoneInfo.ConvertTimeToUtc(ResetBoundaryEastern(utcNow, eastern), eastern);
+    }
+
+    private static TimeZoneInfo EasternZone()
     {
         // IANA ID for Linux/macOS, Windows ID for Windows
-        TimeZoneInfo eastern;
-        try { eastern = TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
-        catch (TimeZoneNotFoundException) { eastern = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
-        var nowEastern = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, eastern);
+        try { return TimeZoneInfo.FindSystemTimeZoneById("America/New_York"); }
+        catch (TimeZoneNotFoundException) { return TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time"); }
+    }
+
+    private static DateTime ResetBoundaryEastern(DateTime utcNow, TimeZoneInfo eastern)
+    {
+        var nowEastern = TimeZoneInfo.ConvertTimeFromUtc(DateTime.SpecifyKind(utcNow, DateTimeKind.Utc), eastern);
         var resetToday = nowEastern.Date.AddHours(GameConfig.DailyResetHourEastern);
         if (nowEastern < resetToday)
             resetToday = resetToday.AddDays(-1); // Haven't hit 7 PM yet, use yesterday's
-        return TimeZoneInfo.ConvertTimeToUtc(resetToday, eastern);
+        return resetToday;
     }
+
+    /// <summary>
+    /// 1.2.0: the Eastern date of world reset boundary 0 (Sunday 5 January 2025, 7 PM Eastern). Fixed;
+    /// the world calendar counts daily reset boundaries from it.
+    /// </summary>
+    public static readonly DateTime WorldCalendarEpochEastern = new DateTime(2025, 1, 5);
+
+    /// <summary>
+    /// 1.2.0: the world day at utcNow, the count of 7 PM Eastern daily reset boundaries since
+    /// WorldCalendarEpochEastern (never below 0). The same for every session on the server, unlike
+    /// CurrentDay, which online comes from whichever save loaded last. Counted on Eastern dates, so
+    /// the 23 and 25 hour days of a clock change still count as one day each.
+    /// </summary>
+    public static int WorldDayAt(DateTime utcNow)
+    {
+        var boundary = ResetBoundaryEastern(utcNow, EasternZone());
+        return Math.Max(0, (boundary.Date - WorldCalendarEpochEastern.Date).Days);
+    }
+
+    /// <summary>1.2.0: the world week at utcNow (WorldDayAt / GodStandingWeekDays); it turns at a 7 PM Eastern reset on Sunday.</summary>
+    public static int WorldWeekAt(DateTime utcNow) => WorldDayAt(utcNow) / GameConfig.GodStandingWeekDays;
+
+    /// <summary>1.2.0: this world week (WorldWeekAt now). The weekly clock for everyone online.</summary>
+    public static int WorldWeek() => WorldWeekAt(DateTime.UtcNow);
 
     /// <summary>
     /// Check if a daily reset should occur based on current mode
@@ -403,6 +439,18 @@ public class DailySystemManager
 
         // Reset fatigue on full sleep (v0.49.1)
         player.Fatigue = 0;
+
+        // v1.1.15: Mental daily reset (clears the once-a-day recovery flags, then +MentalDailyReset
+        // up to the cap, or drops a surplus above the cap to it). The only production caller.
+        int mentalBefore = player.Mental;
+        MentalSystem.ApplyDailyReset(player);
+        if (terminal != null) MentalUi.AnnounceMentalChange(terminal, player, mentalBefore);
+
+        // 1.2.0 Temple gods: clears today's Favor gains per source and applies neglect. The only production caller.
+        FavorSystem.ApplyDailyReset(player);
+        GodDeedSystem.ApplyDailyReset(player, terminal);   // 1.2.0 Temple gods: a spellcaster's week without casting (Magic taboo)
+        MiracleSystem.ApplyDailyReset(player);   // 1.2.0 Temple gods: today's Miracle is ready again. The only production caller.
+        WeeklyGodSystem.Current(player);   // 1.2.0 Temple gods: a reset that starts a new week picks its strongest god (once per week)
 
         // Weekly rankings update (every Monday) — only in online mode
         // Must use Eastern time for day-of-week check since daily reset fires at 7 PM Eastern
@@ -765,7 +813,7 @@ public class DailySystemManager
             if (grief.IsGrieving)
             {
                 var previousStage = grief.CurrentStage;
-                grief.UpdateGrief(currentDay);
+                var griefEntered = grief.UpdateGrief(currentDay);
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
@@ -775,6 +823,7 @@ public class DailySystemManager
                         terminal.WriteLine($"  {effects.Description}", "gray");
                     terminal.WriteLine("");
                 }
+                ApplyGriefStagesToMental(player, terminal, griefEntered);
             }
         }
         catch { /* Grief system not initialized */ }
@@ -782,14 +831,18 @@ public class DailySystemManager
         // Process drug effects
         try
         {
-            if (player != null && (player.OnDrugs || player.IsAddicted))
+            // v1.1.15: runs after MentalSystem.ApplyDailyReset, which keeps a pending high, so the
+            // crash comes off the high once; a boost pending without a drug crashes here too
+            if (player != null && (player.OnDrugs || player.IsAddicted || player.MentalDrugBoost > 0))
             {
+                int mentalBeforeDrugs = player.Mental;
                 string drugMessage = DrugSystem.ProcessDailyDrugEffects(player);
                 if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
                 {
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(drugMessage);
                 }
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, player, mentalBeforeDrugs);
             }
         }
         catch { /* Drug system error */ }
@@ -856,6 +909,25 @@ public class DailySystemManager
         await Task.CompletedTask;
     }
 
+    /// <summary>
+    /// v1.1.15: the Mental change for each grief stage entered today (MentalSystem.ApplyGriefStage):
+    /// Depression is a loss announced by band only, Acceptance a gain reported with its amount.
+    /// Runs after MentalSystem.ApplyDailyReset, so the loss is never absorbed by the surplus drop.
+    /// </summary>
+    internal static void ApplyGriefStagesToMental(Character? player, TerminalEmulator? terminal, System.Collections.Generic.List<GriefStage> entered)
+    {
+        if (player == null || entered == null) return;
+        foreach (var stage in entered)
+        {
+            int mentalBeforeGrief = player.Mental;
+            int applied = MentalSystem.ApplyGriefStage(player, stage);
+            if (applied > 0)
+                MentalUi.ReportGain(terminal!, player, mentalBeforeGrief, applied);
+            else if (applied < 0 && terminal != null)
+                MentalUi.AnnounceMentalChange(terminal, player, mentalBeforeGrief);
+        }
+    }
+
     private async Task ProcessDailyEvents()
     {
         var terminal = GameEngine.Instance?.Terminal;
@@ -885,7 +957,7 @@ public class DailySystemManager
             if (grief.IsGrieving)
             {
                 var previousStage = grief.CurrentStage;
-                grief.UpdateGrief(currentDay);
+                var griefEntered = grief.UpdateGrief(currentDay);
 
                 // Notify player if grief stage changed
                 if (grief.CurrentStage != previousStage && terminal != null)
@@ -901,6 +973,7 @@ public class DailySystemManager
                     }
                     terminal.WriteLine("");
                 }
+                ApplyGriefStagesToMental(GameEngine.Instance?.CurrentPlayer, terminal, griefEntered);
             }
         }
         catch { /* Grief system not initialized */ }
@@ -909,14 +982,18 @@ public class DailySystemManager
         try
         {
             var drugPlayer = GameEngine.Instance?.CurrentPlayer;
-            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted))
+            // v1.1.15: runs after MentalSystem.ApplyDailyReset, which keeps a pending high, so the
+            // crash comes off the high once; a boost pending without a drug crashes here too
+            if (drugPlayer != null && (drugPlayer.OnDrugs || drugPlayer.IsAddicted || drugPlayer.MentalDrugBoost > 0))
             {
+                int mentalBeforeDrugs = drugPlayer.Mental;
                 string drugMessage = DrugSystem.ProcessDailyDrugEffects(drugPlayer);
                 if (!string.IsNullOrEmpty(drugMessage) && terminal != null)
                 {
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(drugMessage);
                 }
+                if (terminal != null) MentalUi.AnnounceMentalChange(terminal, drugPlayer, mentalBeforeDrugs);
             }
         }
         catch { /* Drug system error */ }
@@ -1215,6 +1292,7 @@ public class DailySystemManager
 
         // Reset daily deeds
         god.DeedsLeft = GameConfig.GodDeedsPerDay[godIdx];
+        ImmortalDeedSystem.ClearChastised(god);   // 1.2.0 piece 5b: each follower can be chastised again, on the deeds' day
 
         // Count believers and grant passive exp
         int believers = PantheonLocation.CountBelievers(god.DivineName);
@@ -1240,7 +1318,7 @@ public class DailySystemManager
         {
             god.GodLevel = newLevel;
             int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GameConfig.GodTitles[titleIdx]), "bright_cyan");
+            terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GodText.Title(newLevel)), "bright_cyan");
             NewsSystem.Instance?.Newsy(true, $"{god.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
         }
 
@@ -1376,6 +1454,8 @@ public class DailySystemManager
     /// </summary>
     public async Task RestAndAdvanceToMorning(Character player)
     {
+        // 1.2.0: the night's sleep ends the rest buffs (SleepAtInn, SleepAtHome and the dungeon sanctuary night come through here)
+        player?.OnRest();
         if (DoorMode.IsOnlineMode) return;
 
         int currentMinutes = player.GameTimeMinutes;

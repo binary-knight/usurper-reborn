@@ -457,8 +457,7 @@ public partial class PrisonLocation : BaseLocation
         }
 
         await terminal.WriteColorAsync($"  Pay {record.BailAmount:N0} gold for your freedom? (Y/N): ", TerminalEmulator.ColorCyan);
-        string confirm = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             await terminal.WriteColorLineAsync("  You decide to keep your gold... for now.", TerminalEmulator.ColorDarkGray);
             await Task.Delay(1500);
@@ -1307,9 +1306,8 @@ public partial class PrisonLocation : BaseLocation
         await Task.Delay(1500);
 
         await terminal.WriteAsync(Loc.Get("prison.vex_escape_prompt"));
-        string answer = await terminal.ReadLineAsync();
 
-        if (GameConfig.IsAffirmative(answer))
+        if (await terminal.AskYesNoAsync(""))
         {
             await VexHelpsEscape(player, vex);
         }

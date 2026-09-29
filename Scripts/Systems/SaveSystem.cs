@@ -681,6 +681,15 @@ namespace UsurperRemake.Systems
                 Darkness = player.Darkness,
                 Fame = player.Fame,
                 Mental = player.Mental,
+                MentalSchema = GameConfig.MentalSchemaCurrent, // v1.1.15: always write the current schema
+                MentalStrainRemainder = player.MentalStrainRemainder,
+                WillowDraughts = player.WillowDraughts,
+                MentalRecoveryUsedToday = (int)player.MentalRecoveryUsedToday,
+                MentalBroken = player.MentalBroken,
+                MentalHintShown = player.MentalHintShown,
+                MentalDrugBoost = player.MentalDrugBoost,
+                MentalDrugUses = player.MentalDrugUses,
+                MentalLastDrugDay = player.MentalLastDrugDay,
                 Poison = player.Poison,
                 PoisonTurns = player.PoisonTurns,
 
@@ -770,6 +779,20 @@ namespace UsurperRemake.Systems
                 GodAlignment = player.GodAlignment,
                 AscensionDate = player.AscensionDate,
                 WorshippedGod = player.WorshippedGod,
+                GodFavor = player.GodFavor,
+                GodFavorGod = player.GodFavorGod ?? "",
+                GodFavorSchema = player.GodFavorSchema, // 1.2.0: the character's own schema, so a load that skipped the migration repeats it
+                GodFavorDayGains = new Dictionary<string, int>(player.GodFavorDayGains ?? new Dictionary<string, int>()),
+                DaysSinceDevotion = player.DaysSinceDevotion,
+                DaysSinceSpellCast = player.DaysSinceSpellCast,
+                LastGodSwitchDay = player.LastGodSwitchDay,
+                MiracleUsedToday = player.MiracleUsedToday,
+                ChastisedToday = player.ChastisedToday?.ToList() ?? new List<string>(),
+                GodStandingPenalties = new Dictionary<string, int>(player.GodStandingPenalties ?? new Dictionary<string, int>()),
+                GodStandingPenaltyWeek = player.GodStandingPenaltyWeek,
+                WeeklyGodWeek = player.WeeklyGodWeek,
+                WeeklyGod = player.WeeklyGod ?? "",
+                DivineDomain = player.DivineDomain ?? "",
                 DivineBlessingCombats = player.DivineBlessingCombats,
                 DivineBlessingBonus = player.DivineBlessingBonus,
                 DivineBoonConfig = player.DivineBoonConfig ?? "",
@@ -798,6 +821,7 @@ namespace UsurperRemake.Systems
                 AutoCombatHealPercent = player.AutoCombatHealPercent, // v1.1.13: auto-combat potion threshold
                 ClassicMainStreet = player.ClassicMainStreet, // v1.1.14: Main Street layout preference
                 ClassicTipDraws = player.ClassicTipDraws, // v1.1.14: switch-to-classic tip count
+                MenuKeysNeedEnter = player.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
                 DateFormatPreference = player.DateFormatPreference,
                 AutoRedistributeXP = player.AutoRedistributeXP,
                 Specialization = (int)player.Specialization,
@@ -1002,6 +1026,9 @@ namespace UsurperRemake.Systems
 
                 // Dark Alley Overhaul (v0.41.0)
                 GroggoShadowBlessingDex = player.GroggoShadowBlessingDex,
+                TimedStatBuffs = TimedStatBuffData.FromBuffs(player.TimedStatBuffs),   // 1.2.0
+                ArtifactStatsApplied = player.ArtifactStatsApplied,   // 1.2.0
+                CycleStatBonusApplied = player.CycleStatBonusApplied,   // 1.2.0
                 SteroidShopPurchases = player.SteroidShopPurchases,
                 AlchemistINTBoosts = player.AlchemistINTBoosts,
                 GamblingRoundsToday = player.GamblingRoundsToday,
@@ -1523,9 +1550,6 @@ namespace UsurperRemake.Systems
                 // News and history
                 RecentNews = SerializeRecentNews(),
 
-                // God system state
-                GodStates = SerializeGodStates(),
-
                 // Marketplace listings
                 MarketplaceListings = MarketplaceSystem.Instance.ToSaveData(),
 
@@ -1880,12 +1904,6 @@ namespace UsurperRemake.Systems
         {
             // This would serialize recent news
             return new List<NewsEntryData>();
-        }
-        
-        private Dictionary<string, GodStateData> SerializeGodStates()
-        {
-            // This would serialize god states
-            return new Dictionary<string, GodStateData>();
         }
         
         /// <summary>

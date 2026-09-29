@@ -1601,6 +1601,7 @@ public partial class QuestSystem
         {
             long reward = bounty.BountyGold > 0 ? bounty.BountyGold : bounty.Reward * 100L;
             if (reward <= 0) reward = 500;
+            reward = GodBoonSystem.BountyReward(winner, reward);   // 1.2.0 Temple gods piece 2: Judicar's boon
             winner.Gold += reward;
             long xpReward = TeamHQBonus.ApplyXP(winner, Math.Max(winner.Level * 50, reward / 5));
             winner.Experience += xpReward;
@@ -1608,6 +1609,7 @@ public partial class QuestSystem
             StatisticsManager.Current?.RecordBountyComplete();
             NewsSystem.Instance?.Newsy(true, Loc.Get("quest.bounty_collected_news", winner.Name2, bounty.TargetNPCName, reward));
         }
+        if (claimed.Count > 0) GodDeedSystem.Record(winner, GodAct.BountyCollected);   // 1.2.0 Temple gods: Law deed
         return claimed;
     }
 
@@ -1741,6 +1743,7 @@ public partial class QuestSystem
             // Calculate reward — use BountyGold if set (king bounties), else legacy byte Reward
             long reward = bounty.BountyGold > 0 ? bounty.BountyGold : bounty.Reward * 100L;
             if (reward <= 0) reward = 500; // Minimum reward
+            if (player != null) reward = GodBoonSystem.BountyReward(player, reward);   // 1.2.0 Temple gods piece 2: Judicar's boon
 
             // Give player the reward immediately
             player.Gold += reward;
@@ -1763,6 +1766,7 @@ public partial class QuestSystem
 
             // GD.Print($"[QuestSystem] Auto-completed bounty on {npcName} for {player.Name2}, reward: {reward} gold");
         }
+        if (matchingBounties.Count > 0) GodDeedSystem.Record(player, GodAct.BountyCollected);   // 1.2.0 Temple gods: Law deed
 
         return totalReward;
     }

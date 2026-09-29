@@ -190,8 +190,10 @@ namespace UsurperRemake.Systems
             terminal.SetColor("gray");
             terminal.WriteLine("  " + Loc.Get("discovery.risk_odds", chance));
             terminal.WriteLine("");
-            var input = await terminal.GetInput(Loc.Get("discovery.risk_confirm"));
-            if (!IsYes(input))
+            // v1.1.15: strict yes/no (was IsYes: any other key silently read as No and walked the
+            // player away from the discovery, spending it for the price of one stray keystroke).
+            bool takeTheRisk = await terminal.AskYesNoAsync(Loc.Get("discovery.risk_confirm"));
+            if (!takeTheRisk)
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine("  " + Loc.Get("discovery.walk_away"));
@@ -490,12 +492,6 @@ namespace UsurperRemake.Systems
             string key = $"status.{s.ToString().ToLowerInvariant()}";
             string v = Loc.Get(key);
             return (string.IsNullOrEmpty(v) || v == key) ? s.ToString() : v;
-        }
-
-        private static bool IsYes(string input)
-        {
-            var v = input?.Trim().ToUpperInvariant();
-            return GameConfig.IsAffirmative(input) || v == "1";
         }
 
         private static void Msg(TerminalEmulator terminal, string color, string text)

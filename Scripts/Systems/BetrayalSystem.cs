@@ -446,7 +446,7 @@ namespace UsurperRemake.Systems
 
                 case BetrayalType.HeartBroken:
                     // Romantic betrayal - emotional damage
-                    player.Wisdom += 3; // Pain teaches wisdom
+                    player.GrantPermanentStat(StatKind.Wisdom, 3); // Pain teaches wisdom (1.2.0: lasting, written to Base)
                     break;
 
                 case BetrayalType.Political:
@@ -456,7 +456,7 @@ namespace UsurperRemake.Systems
 
                 case BetrayalType.Sacrifice:
                     // Sacrifice - grief but also enlightenment
-                    player.Wisdom += 5;
+                    player.GrantPermanentStat(StatKind.Wisdom, 5);
                     OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.CompanionSacrifice);
                     break;
             }

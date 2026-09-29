@@ -401,8 +401,7 @@ namespace UsurperRemake.Locations
             }
 
             // Confirm donation
-            var confirm = await terminal.GetInput(Loc.Get("church.donate_confirm", amount.ToString("N0"), GameConfig.MoneyType));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.donate_confirm", amount.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.donate_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -544,8 +543,7 @@ namespace UsurperRemake.Locations
             }
 
             // Confirm blessing purchase
-            var confirm = await terminal.GetInput(Loc.Get("church.blessing_confirm", amount.ToString("N0"), GameConfig.MoneyType));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.blessing_confirm", amount.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.blessing_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -774,8 +772,7 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            var confirm = await terminal.GetInput(Loc.Get("church.heal_pay_confirm", cost.ToString("N0"), GameConfig.MoneyType, service));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.heal_pay_confirm", cost.ToString("N0"), GameConfig.MoneyType, service)))
             {
                 terminal.WriteLine(Loc.Get("church.heal_cancelled"), "gray");
                 await Task.Delay(1500);
@@ -1014,8 +1011,7 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            var confirm = await terminal.GetInput(Loc.Get("church.marriage_proceed", targetNPC.Name2, ceremonyCost.ToString("N0"), GameConfig.MoneyType));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.marriage_proceed", targetNPC.Name2, ceremonyCost.ToString("N0"), GameConfig.MoneyType)))
             {
                 terminal.WriteLine(Loc.Get("church.marriage_more_certain"), "gray");
                 await Task.Delay(1500);
@@ -1068,7 +1064,7 @@ namespace UsurperRemake.Locations
 
             // Marriage bonuses — v0.57.12: paired movement
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 10, isGood: true, "church.wedding");
-            currentPlayer.Charisma += 5;
+            currentPlayer.GrantPermanentStat(StatKind.Charisma, 5); // 1.2.0: lasting, written to Base
 
             terminal.WriteLine(Loc.Get("church.wedding_chivalry"), "cyan");
             terminal.WriteLine(Loc.Get("church.wedding_charm"), "cyan");
@@ -1171,8 +1167,11 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.confess_penance_cost", penanceCost.ToString("N0"), GameConfig.MoneyType), "yellow");
             terminal.WriteLine("");
 
-            var confess = await terminal.GetInput(Loc.Get("church.confess_prompt"));
-            if (!GameConfig.IsAffirmative(confess))
+            // v1.1.15: confession's Mental gain would apply nothing (cap, or used today); say so before charging.
+            if (!MentalSystem.GainAvailable(currentPlayer, MentalDailySource.Confession))
+                terminal.WriteLine(Loc.Get(MentalSystem.UsedToday(currentPlayer, MentalDailySource.Confession) ? "mental.no_gain_used_today" : "mental.no_gain_at_cap"), "gray");
+
+            if (!await terminal.AskYesNoAsync(Loc.Get("church.confess_prompt")))
             {
                 terminal.WriteLine(Loc.Get("church.confess_return"), "gray");
                 await Task.Delay(1500);
@@ -1210,6 +1209,9 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("church.confess_chivalry_increase", chivalryGain), "cyan");
             terminal.WriteLine(Loc.Get("church.confess_penance_paid", penanceCost.ToString("N0")), "yellow");
             terminal.WriteLine(Loc.Get("church.confess_cleansed"), "bright_white");
+            int mentalBeforeConfession = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeConfession, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Confession, GameConfig.MentalConfessionGain));
+            GodDeedSystem.Record(currentPlayer, GodAct.Confession, terminal);   // 1.2.0 Temple gods: Shadow taboo
 
             await Task.Delay(3000);
 
@@ -1237,8 +1239,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("church.blood_weight_reduced_by", GameConfig.MurderWeightConfessionReduction.ToString("F1")));
                 terminal.WriteLine("");
 
-                var absolve = await terminal.GetInput(Loc.Get("church.blood_accept"));
-                if (GameConfig.IsAffirmative(absolve))
+                if (await terminal.AskYesNoAsync(Loc.Get("church.blood_accept")))
                 {
                     if (currentPlayer.Gold >= absolveCost)
                     {
@@ -1358,8 +1359,7 @@ namespace UsurperRemake.Locations
                 {
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("church.bishop_insist"), "bright_red");
-                    var forceConfess = await terminal.GetInput(Loc.Get("church.bishop_force_confess"));
-                    if (GameConfig.IsAffirmative(forceConfess))
+                    if (await terminal.AskYesNoAsync(Loc.Get("church.bishop_force_confess")))
                     {
                         await ProcessConfession();
                         return;

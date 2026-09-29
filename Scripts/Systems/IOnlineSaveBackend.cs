@@ -142,9 +142,6 @@ namespace UsurperRemake.Systems
         /// <summary>Count mortal players who worship a specific god.</summary>
         Task<int> CountPlayerBelievers(string divineName);
 
-        /// <summary>Atomically apply a divine blessing to an offline player.</summary>
-        Task ApplyDivineBlessing(string username, int combats, float bonus);
-
         /// <summary>Atomically reduce an offline player's HP by a percentage (never kills).</summary>
         Task ApplyDivineSmite(string username, float damagePercent);
 
@@ -449,6 +446,8 @@ namespace UsurperRemake.Systems
         public string GodAlignment { get; set; } = "";
         public bool IsOnline { get; set; }
         public string DivineBoonConfig { get; set; } = "";  // Configured boons for followers
+        public string DivineDomain { get; set; } = "";      // 1.2.0 Temple gods piece 2: the god's domain ("" until chosen)
+        public DateTime? LastLogin { get; set; }             // 1.2.0 Temple gods piece 2: players.last_login, UTC
     }
 
     public class MortalPlayerInfo

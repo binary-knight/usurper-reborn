@@ -47,7 +47,7 @@ namespace UsurperRemake.Systems
                     if (info == null || string.IsNullOrEmpty(info.Name)) continue;
                     int req = SpellSystem.GetLevelRequired(c.Class, spellLevel);
                     if (req <= 0) continue;
-                    list.Add(new Unlock(req, info.Name, true));
+                    list.Add(new Unlock(req, info.DisplayName, true));
                 }
             }
 

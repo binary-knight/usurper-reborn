@@ -91,12 +91,17 @@ public partial class TempleLocation : BaseLocation
         
         await DisplayWelcomeMessage();
         await VerifyPlayerGodExists();
+        // 1.2.0 Temple gods piece 2: a player-god follower's boon follows the god's current standing
+        await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);
         
         bool exitLocation = false;
         refreshMenu = true;
         
         while (!exitLocation)
         {
+            // 1.2.0: a god boon update another session left pending (a player-god's reconfig,
+            // domain or recruit) is applied here, in this player's own session
+            GodBoonSystem.ApplyPendingBoonRecalc(currentPlayer);
             try
             {
                 await DisplayMenu(refreshMenu);
@@ -108,115 +113,15 @@ public partial class TempleLocation : BaseLocation
                 var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
                 if (handled) { refreshMenu = true; continue; }
 
-                switch (choice.ToUpper())
+                if (choice.Trim() == "?")
                 {
-                    case "?":
-                        refreshMenu = true;
-                        continue;
-                        
-                    case GameConfig.TempleMenuWorship: // "W"
-                        await ProcessWorship();
-                        break;
-                        
-                    case GameConfig.TempleMenuDesecrate: // "D"
-                        await ProcessDesecrateAltar();
-                        break;
-                        
-                    case GameConfig.TempleMenuAltars: // "A"
-                        await DisplayAltars();
-                        break;
-                        
-                    case GameConfig.TempleMenuContribute: // "C"
-                        await ProcessContribute();
-                        break;
-
-                    case GameConfig.TempleMenuConfess: // "O" — v0.57.0 confess sins (chivalry cleansing)
-                        await ProcessConfession();
-                        break;
-
-                    case "U": // v0.65.6 Rite of Return (resurrection refill, online permadeath mode)
-                        await ProcessRiteOfReturn();
-                        break;
-
-                    case "K": // v0.65.8 (R5) Hall of the Fallen (permadeath memorial, online)
-                        await ShowHallOfTheFallen();
-                        break;
-                        
-                    case GameConfig.TempleMenuStatus: // "S"
-                        await DisplayPlayerStatus();
-                        break;
-                        
-                    case GameConfig.TempleMenuGodRanking: // "G"
-                        await DisplayGodRanking();
-                        break;
-                        
-                    case GameConfig.TempleMenuHolyNews: // "H"
-                        await DisplayHolyNews();
-                        break;
-
-                    case "P": // Prophecies of the Old Gods
-                        await DisplayOldGodsProphecies();
-                        break;
-
-                    case "Y": // Daily prayer
-                        await ProcessDailyPrayer();
-                        break;
-
-                    case "I": // Item sacrifice
-                        await ProcessItemSacrifice();
-                        break;
-
-                    case "T": // Deep Temple (Aurelion encounter)
-                        await EnterDeepTemple();
-                        break;
-
-                    case "E": // Examine ancient stones (Seal of Creation)
-                        await ExamineAncientStones();
-                        break;
-
-                    case "M": // Meditation Chapel (Mira companion recruitment)
-                        await VisitMeditationChapel();
-                        break;
-
-                    case "F": // The Faith faction recruitment
-                        await ShowFaithRecruitment();
-                        break;
-
-                    case "N": // Inner Sanctum (Faith only)
-                        await VisitInnerSanctum();
-                        break;
-
-                    case "J": // Join an immortal god's flock
-                        await WorshipImmortalGod();
-                        refreshMenu = true;
-                        break;
-
-                    case "$": // Sacrifice gold to immortal god
-                        await SacrificeToImmortalGod();
-                        break;
-
-                    case "L": // Leave immortal god's faith
-                        await LeaveImmortalFaith();
-                        refreshMenu = true;
-                        break;
-
-                    case "V": // View statues of the Ascended (alpha-era founders)
-                        // Mortals can't enter the Pantheon, so the immortal-founder
-                        // statues are mirrored here at the Temple where the public
-                        // venerates the gods. Same data as Pantheon's [H] menu.
-                        await UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
-                            UsurperRemake.Data.FounderStatueData.StatueLocationTag.Pantheon, terminal);
-                        break;
-
-                    case GameConfig.TempleMenuReturn: // "R"
-                        exitLocation = true;
-                        break;
-                        
-                    default:
-                        terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
-                        await Task.Delay(1000);
-                        break;
+                    refreshMenu = true;
+                    continue;
                 }
+
+                // 1.2.0 Temple gods piece 7: the rooms, and a pointer for a key that moved into one
+                if (await RouteTopLevel(choice))
+                    exitLocation = true;
             }
             catch (LocationChangeException ex)
             {
@@ -254,7 +159,8 @@ public partial class TempleLocation : BaseLocation
     }
     
     /// <summary>
-    /// Display temple menu (Pascal TEMPLE.PAS Meny procedure)
+    /// The Temple's hall screen (1.2.0 Temple gods piece 7): the rooms, one key each. The visual,
+    /// screen-reader and BBS menus are drawn from the one list TopMenuItems returns.
     /// </summary>
     private async Task DisplayMenu(bool forceDisplay)
     {
@@ -262,16 +168,13 @@ public partial class TempleLocation : BaseLocation
 
         terminal.ClearScreen();
 
-        // Phase 4: Electron mode emits Temple menu state. Pattern B —
-        // sub-screens (worship, desecrate, contribute, marriage, confess) still
-        // render text.
+        // Phase 4: Electron mode emits Temple menu state. Pattern B.
         if (GameConfig.ElectronMode)
         {
             EmitElectronEvents();
             return;
         }
 
-        // Temple header - standardized format
         WriteBoxHeader(Loc.Get("temple.header_visual"), "bright_cyan");
         terminal.WriteLine("");
 
@@ -281,8 +184,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.description_line3"));
 
         // Hint at ancient stones if seal not collected
-        var storyForHint = StoryProgressionSystem.Instance;
-        if (!storyForHint.CollectedSeals.Contains(UsurperRemake.Systems.SealType.Creation))
+        if (!StoryProgressionSystem.Instance.CollectedSeals.Contains(UsurperRemake.Systems.SealType.Creation))
         {
             terminal.WriteLine("");
             terminal.SetColor("gray");
@@ -291,486 +193,39 @@ public partial class TempleLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-
-        string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
-        if (!string.IsNullOrEmpty(playerGod))
-        {
-            terminal.WriteLine(Loc.Get("temple.worship_god", playerGod), "cyan");
-        }
-        else if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-        {
-            terminal.WriteLine(Loc.Get("temple.follow_immortal", currentPlayer.WorshippedGod), "bright_yellow");
-        }
-        else
-        {
-            terminal.WriteLine(Loc.Get("temple.not_believer"), "gray");
-        }
+        WriteWorshipLine();
         terminal.WriteLine("");
-        
-        // Main menu options
-        string prayerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
-        var story = StoryProgressionSystem.Instance;
-        var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
-        var immortalGods = await GetImmortalGodsAsync();
 
-        if (IsScreenReader)
-        {
-            terminal.WriteLine(Loc.Get("temple.services"));
-            terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("temple.sr_worship"));
-            terminal.WriteLine(Loc.Get("temple.sr_desecrate"));
-            terminal.WriteLine(Loc.Get("temple.sr_holy_news"));
-            terminal.WriteLine(Loc.Get("temple.sr_altars"));
-            terminal.WriteLine(Loc.Get("temple.sr_contribute"));
-            terminal.WriteLine(Loc.Get("temple.sr_confess"));
-            if (CanShowRiteOfReturn())
-                terminal.WriteLine(Loc.Get("temple.sr_rite", GameConfig.GetRiteOfReturnCost(currentPlayer.Level)));
-            if (CanShowHallOfTheFallen())
-                terminal.WriteLine(Loc.Get("temple.sr_hall_fallen"));
-            terminal.WriteLine(Loc.Get("temple.sr_item_sacrifice"));
-            terminal.WriteLine(Loc.Get("temple.sr_status"));
-            terminal.WriteLine(Loc.Get("temple.sr_god_ranking"));
-            terminal.WriteLine(Loc.Get("temple.sr_prophecies"));
-
-            if (!string.IsNullOrEmpty(prayerGod))
-            {
-                bool canPray = UsurperRemake.Systems.DivineBlessingSystem.Instance.CanPrayToday(currentPlayer.Name2);
-                if (canPray)
-                    terminal.WriteLine(Loc.Get("temple.sr_pray"));
-                else
-                    terminal.WriteLine(Loc.Get("temple.sr_prayed_today"));
-            }
-
-            if (!story.CollectedSeals.Contains(UsurperRemake.Systems.SealType.Creation))
-                terminal.WriteLine(Loc.Get("temple.sr_examine_stones"));
-
-            if (CanEnterDeepTemple())
-                terminal.WriteLine(Loc.Get("temple.sr_deep_temple"));
-
-            if (CanMeetMira())
-                terminal.WriteLine(Loc.Get("temple.sr_meditation_chapel"));
-
-            if (factionSystem.PlayerFaction != UsurperRemake.Systems.Faction.TheFaith)
-            {
-                if (factionSystem.PlayerFaction == null)
-                    terminal.WriteLine(Loc.Get("temple.sr_faith_seek"));
-                else
-                    terminal.WriteLine(Loc.Get("temple.sr_faith_serve_another"));
-            }
-            else
-            {
-                terminal.WriteLine(Loc.Get("temple.sr_faith_member"));
-            }
-
-            if (FactionSystem.Instance?.HasTempleAccess() == true)
-            {
-                bool meditatedToday;
-                if (DoorMode.IsOnlineMode)
-                {
-                    var boundary = DailySystemManager.GetCurrentResetBoundary();
-                    meditatedToday = currentPlayer.LastInnerSanctumRealDate >= boundary;
-                }
-                else
-                {
-                    int today = DailySystemManager.Instance?.CurrentDay ?? 0;
-                    meditatedToday = currentPlayer.InnerSanctumLastDay >= today;
-                }
-                if (meditatedToday)
-                    terminal.WriteLine(Loc.Get("temple.sr_inner_sanctum_meditated"));
-                else
-                    terminal.WriteLine(Loc.Get("temple.sr_inner_sanctum_cost", GameConfig.InnerSanctumCost));
-            }
-
-            if (immortalGods.Count > 0)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.sr_ascended_gods"));
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-                    terminal.WriteLine(Loc.Get("temple.sr_join_immortal_following", currentPlayer.WorshippedGod));
-                else
-                    terminal.WriteLine(Loc.Get("temple.sr_join_immortal_unaffiliated"));
-
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-                {
-                    terminal.WriteLine(Loc.Get("temple.sr_sacrifice_gold"));
-                    terminal.WriteLine(Loc.Get("temple.sr_leave_immortal"));
-                }
-            }
-
-            terminal.WriteLine(Loc.Get("temple.sr_return"));
-            terminal.WriteLine("");
-        }
-        else
-        {
-            terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("temple.services"));
-            terminal.WriteLine("");
-
-            // Row 1
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("W");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_worship"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("D");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_desecrate"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("H");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("temple.menu_holy_news"));
-
-            // Row 2
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("A");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_altars"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("C");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_contribute"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("I");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_item_sacrifice"));
-
-            // v0.57.0 [O] Confess sins (chivalry cleansing — counterpart to [D]esecrate)
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("O");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("temple.menu_confess"));
-
-            // Row 3
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("S");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_status"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("G");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_god_ranking"));
-
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("P");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("temple.menu_prophecies"));
-
-            // Daily prayer option - show if player worships a god
-            if (!string.IsNullOrEmpty(prayerGod))
-            {
-                bool canPray = UsurperRemake.Systems.DivineBlessingSystem.Instance.CanPrayToday(currentPlayer.Name2);
-                if (canPray)
-                {
-                    terminal.SetColor("darkgray");
-                    terminal.Write("[");
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("Y");
-                    terminal.SetColor("darkgray");
-                    terminal.Write("]");
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("temple.menu_pray"));
-                }
-                else
-                {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("temple.menu_prayed_today"));
-                }
-            }
-            else
-            {
-                terminal.WriteLine("");
-            }
-
-            // v0.65.6 Rite of Return: gold-priced resurrection refill, online
-            // permadeath mode only. Hidden while the player's lives are full.
-            if (CanShowRiteOfReturn())
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("U");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("bright_magenta");
-                terminal.WriteLine(Loc.Get("temple.menu_rite", GameConfig.GetRiteOfReturnCost(currentPlayer.Level)));
-            }
-
-            // Ancient stones option - only show if Seal of Creation not collected
-            if (!story.CollectedSeals.Contains(UsurperRemake.Systems.SealType.Creation))
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("E");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("white");
-                terminal.Write(Loc.Get("temple.menu_examine_stones"));
-            }
-            else
-            {
-                terminal.Write("                       ");
-            }
-
-            // Deep Temple option - only show if player meets requirements
-            if (CanEnterDeepTemple())
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write("[");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("T");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("bright_magenta");
-                terminal.WriteLine(Loc.Get("temple.menu_deep_temple"));
-            }
-            else
-            {
-                terminal.WriteLine("");
-            }
-
-            // Mira companion option - only show if she can be recruited
-            if (CanMeetMira())
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("M");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("bright_green");
-                terminal.Write(Loc.Get("temple.menu_meditation_chapel"));
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("temple.menu_meditation_hint"));
-            }
-
-            // The Faith faction option - only show if player isn't already a member
-            if (factionSystem.PlayerFaction != UsurperRemake.Systems.Faction.TheFaith)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("F");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("bright_yellow");
-                terminal.Write(Loc.Get("temple.menu_the_faith"));
-                if (factionSystem.PlayerFaction == null)
-                {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("temple.menu_faith_seek"));
-                }
-                else
-                {
-                    terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("temple.menu_faith_serve_another"));
-                }
-            }
-            else
-            {
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("temple.menu_faith_member"));
-            }
-
-            // Inner Sanctum (Faith only)
-            if (FactionSystem.Instance?.HasTempleAccess() == true)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("N");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("cyan");
-                terminal.Write(Loc.Get("temple.menu_inner_sanctum"));
-                bool meditatedToday;
-                if (DoorMode.IsOnlineMode)
-                {
-                    var boundary = DailySystemManager.GetCurrentResetBoundary();
-                    meditatedToday = currentPlayer.LastInnerSanctumRealDate >= boundary;
-                }
-                else
-                {
-                    int today = DailySystemManager.Instance?.CurrentDay ?? 0;
-                    meditatedToday = currentPlayer.InnerSanctumLastDay >= today;
-                }
-                if (meditatedToday)
-                {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("temple.menu_meditated_today"));
-                }
-                else
-                {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("temple.menu_inner_sanctum_cost", GameConfig.InnerSanctumCost));
-                }
-            }
-
-            // Immortal Worship section — only show if any ascended gods exist
-            if (immortalGods.Count > 0)
-            {
-                terminal.WriteLine("");
-                WriteSectionHeader(Loc.Get("temple.ascended_gods"), "bright_yellow");
-
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("J");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("white");
-                terminal.Write(Loc.Get("temple.menu_join_flock"));
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-                {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("temple.menu_following", currentPlayer.WorshippedGod));
-                }
-                else
-                {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("temple.menu_unaffiliated"));
-                }
-
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-                {
-                    terminal.SetColor("darkgray");
-                    terminal.Write(" [");
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("$");
-                    terminal.SetColor("darkgray");
-                    terminal.Write("]");
-                    terminal.SetColor("white");
-                    terminal.Write(Loc.Get("temple.menu_sacrifice_gold"));
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("temple.menu_sacrifice_gold_hint"));
-
-                    terminal.SetColor("darkgray");
-                    terminal.Write(" [");
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("L");
-                    terminal.SetColor("darkgray");
-                    terminal.Write("]");
-                    terminal.SetColor("white");
-                    terminal.WriteLine(Loc.Get("temple.menu_leave_faith"));
-                }
-            }
-
-            // Hall of the Ascended: alpha-era founder statues, mortals'
-            // viewpoint onto the Pantheon's deified founders.
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("V");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(" Hall of the Ascended");
-
-            // v0.65.8 (R5): Hall of the Fallen -- memorial wall for characters
-            // erased by permadeath. Online mode only (the memorial lives in the
-            // shared server DB; single-player has no permadeath erasure).
-            if (CanShowHallOfTheFallen())
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write(" [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("K");
-                terminal.SetColor("darkgray");
-                terminal.Write("]");
-                terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("temple.menu_hall_fallen"));
-            }
-
-            terminal.SetColor("darkgray");
-            terminal.Write(" [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("temple.menu_return"));
-            terminal.WriteLine("");
-        }
+        terminal.SetColor("cyan");
+        terminal.WriteLine(Loc.Get("temple.top.header"));
+        terminal.WriteLine("");
+        WriteTempleMenu(TopMenuItems(), bbsRows: true);
+        terminal.WriteLine("");
+        await Task.CompletedTask;
     }
 
     /// <summary>
     /// Process worship selection and god faith (Pascal TEMPLE.PAS)
     /// </summary>
-    private async Task ProcessWorship()
+    private async Task ProcessWorship(TempleRoom room = TempleRoom.Nave)
     {
         terminal.WriteLine("");
         terminal.WriteLine("");
-        
+
         string currentGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         bool goAhead = true;
+        GodSwitchCost? leftFaith = null;   // a god left in this run (its wrath names the god chosen next)
 
-        // Also check if following an immortal player-god
+        // Also check if following an immortal player-god (1.2.0 piece 7: the old L, leaving one, is this)
         if (string.IsNullOrEmpty(currentGod) && !string.IsNullOrEmpty(currentPlayer.WorshippedGod))
         {
             terminal.WriteLine(Loc.Get("temple.follow_immortal_currently", currentPlayer.WorshippedGod), "bright_yellow");
-            var choice = await terminal.GetInputAsync(Loc.Get("temple.abandon_for_elder", currentPlayer.WorshippedGod));
-            if (GameConfig.IsAffirmative(choice))
+            ShowSwitchCost(null);   // 1.2.0 Temple gods piece 4: the cost before the choice
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("temple.abandon_for_elder", currentPlayer.WorshippedGod)))
             {
                 string oldGod = currentPlayer.WorshippedGod;
-                currentPlayer.WorshippedGod = "";
-
-                // Persist to DB
-                if (DoorMode.IsOnlineMode)
-                {
-                    try
-                    {
-                        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                        var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
-                        if (backend != null && !string.IsNullOrEmpty(sessionUsername))
-                            await backend.SetPlayerWorshippedGod(sessionUsername, "");
-                    }
-                    catch { }
-                }
+                leftFaith = await SwitchGodAsync(null);
 
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
@@ -785,18 +240,19 @@ public partial class TempleLocation : BaseLocation
         else if (!string.IsNullOrEmpty(currentGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_worship", currentGod), "white");
+            ShowSwitchCost(null);   // 1.2.0 Temple gods piece 4: the cost before the choice
 
-            var choice = await terminal.GetInputAsync(Loc.Get("temple.lost_faith", currentGod));
-            if (GameConfig.IsAffirmative(choice))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("temple.lost_faith", currentGod)))
             {
                 // Abandon faith
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("temple.dont_believe", currentGod), "white");
                 terminal.WriteLine(Loc.Get("temple.powers_diminish", currentGod), "yellow");
 
-                var noteChoice = await terminal.GetInputAsync(Loc.Get("temple.send_note", currentGod));
                 string note = "";
-                if (GameConfig.IsAffirmative(noteChoice))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(Loc.Get("temple.send_note", currentGod)))
                 {
                     note = await terminal.GetInputAsync(Loc.Get("temple.note_prompt"));
                     terminal.WriteLine(Loc.Get("temple.done"), "green");
@@ -813,8 +269,8 @@ public partial class TempleLocation : BaseLocation
                     note = randomNotes[Random.Shared.Next(randomNotes.Length)];
                 }
 
-                // Remove from god system
-                godSystem.SetPlayerGod(currentPlayer.Name2, "");
+                // Remove from god system (1.2.0: all Favor and the god's wrath go with it)
+                leftFaith = await SwitchGodAsync(null);
 
                 // In Pascal, this would send mail to the god and news
                 terminal.WriteLine("");
@@ -829,9 +285,18 @@ public partial class TempleLocation : BaseLocation
 
         if (goAhead)
         {
-            var selectedGod = await SelectGod(Loc.Get("temple.choose_god_worship"));
+            // 1.2.0 Temple gods piece 7: one list of altars, the canon gods and the ascended
+            // player-gods (the old J joins here); in the Undercroft, the dark altars only
+            var pick = await SelectAltar(Loc.Get("temple.choose_god_worship"), room, requireConfirmation: true);
+            var selectedGod = pick?.Canon;
 
-            if (selectedGod != null)
+            if (pick?.PlayerGod is { } chosenPlayerGod)
+            {
+                await WorshipImmortalGod(chosenPlayerGod);
+                if (string.Equals(currentPlayer.WorshippedGod, chosenPlayerGod.DivineName, StringComparison.OrdinalIgnoreCase))
+                    GodSwitchSystem.NameBetrayedFor(currentPlayer, leftFaith, chosenPlayerGod.DivineName);
+            }
+            else if (selectedGod != null)
             {
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("temple.raise_hands_pray", selectedGod.Name), "white");
@@ -847,27 +312,10 @@ public partial class TempleLocation : BaseLocation
 
                 terminal.WriteLine(Loc.Get("temple.now_believer", selectedGod.Name), "yellow");
 
-                // Set in god system
-                godSystem.SetPlayerGod(currentPlayer.Name2, selectedGod.Name);
-
-                // Clear any immortal player-god worship (can only follow one type)
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-                {
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("temple.bond_severed", currentPlayer.WorshippedGod));
-                    currentPlayer.WorshippedGod = "";
-                    if (DoorMode.IsOnlineMode)
-                    {
-                        try
-                        {
-                            var backend2 = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                            var sessionUsername2 = UsurperRemake.Server.SessionContext.Current?.Username;
-                            if (backend2 != null && !string.IsNullOrEmpty(sessionUsername2))
-                                await backend2.SetPlayerWorshippedGod(sessionUsername2, "");
-                        }
-                        catch { }
-                    }
-                }
+                // Set in god system (1.2.0: one god, and the new god starts at Favor 0; a god
+                // left above was already left, so this costs nothing more)
+                await SwitchGodAsync(selectedGod.Name);
+                GodSwitchSystem.NameBetrayedFor(currentPlayer, leftFaith, selectedGod.Name);
 
                 // In Pascal, this would send mail to god and news
                 terminal.WriteLine("");
@@ -901,8 +349,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.upset_gods"));
-        if (!GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.upset_gods")))
         {
             terminal.WriteLine(Loc.Get("temple.good_for_you"), "green");
             await Task.Delay(1000);
@@ -922,8 +370,8 @@ public partial class TempleLocation : BaseLocation
         }
 
         terminal.SetColor("red");
-        var confirmChoice = await terminal.GetInputAsync(Loc.Get("temple.confirm_desecrate", selectedGod.Name));
-        if (!GameConfig.IsAffirmative(confirmChoice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_desecrate", selectedGod.Name)))
         {
             terminal.WriteLine(Loc.Get("temple.wise_choice"), "gray");
             return;
@@ -932,77 +380,6 @@ public partial class TempleLocation : BaseLocation
         await PerformEnhancedDesecration(selectedGod);
     }
     
-    /// <summary>
-    /// <summary>
-    /// v0.57.0 confession — pay gold to reduce accumulated chivalry. Counterpart to desecration's
-    /// darkness cleanse. Lets players who over-accumulated chivalry (via paired alignment movement,
-    /// temple contributions, etc.) bring themselves back toward neutral without needing to commit
-    /// evil deeds. Rate: 100g per 1 chivalry, capped at 100 chivalry per visit.
-    /// </summary>
-    private async Task ProcessConfession()
-    {
-        terminal.WriteLine("");
-        if (currentPlayer.Chivalry <= 0)
-        {
-            terminal.WriteLine(Loc.Get("temple.confess_no_sins"), "gray");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        // v0.57.0 — daily cap matches desecration (2/day). Without this, a patient player could
-        // farm Temple visits to cleanse thousands of chivalry in one session, trivialising alignment.
-        if (currentPlayer.ConfessionsToday >= 2)
-        {
-            terminal.WriteLine(Loc.Get("temple.confess_daily_limit"), "red");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        int maxReducible = (int)Math.Min(currentPlayer.Chivalry, GameConfig.ConfessionMaxChivalryPerVisit);
-        long maxCost = (long)maxReducible * GameConfig.ConfessionGoldPerChivalry;
-
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("temple.confess_header"));
-        terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("temple.confess_intro"));
-        terminal.WriteLine("");
-        terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("temple.confess_rate", GameConfig.ConfessionGoldPerChivalry));
-        terminal.WriteLine(Loc.Get("temple.confess_cap", GameConfig.ConfessionMaxChivalryPerVisit));
-        terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("temple.confess_current", currentPlayer.Chivalry, currentPlayer.Gold));
-        terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        var input = await terminal.GetInputAsync(Loc.Get("temple.confess_prompt", maxReducible));
-        if (!int.TryParse(input, out int requested) || requested <= 0)
-        {
-            terminal.WriteLine(Loc.Get("temple.confess_cancelled"), "gray");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        int amount = Math.Min(requested, maxReducible);
-        long cost = (long)amount * GameConfig.ConfessionGoldPerChivalry;
-        if (currentPlayer.Gold < cost)
-        {
-            terminal.WriteLine(Loc.Get("temple.confess_too_poor", cost), "red");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        currentPlayer.Gold -= cost;
-        // v0.57.0 — route through AlignmentSystem so large confessions fire the news pipeline.
-        // Darkness isn't paired-raised — confession just cleanses chivalry, doesn't morally tarnish.
-        UsurperRemake.Systems.AlignmentSystem.Instance.ModifyAlignment(currentPlayer, -amount, 0, "confessed sins");
-        currentPlayer.ConfessionsToday++;
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("temple.confess_success", amount, cost), "bright_yellow");
-        terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("temple.confess_flavor"));
-        await terminal.PressAnyKey();
-    }
-
     /// <summary>
     /// v0.65.6: whether the Rite of Return menu entry should render. Online
     /// permadeath mode only, and hidden while the player's lives are full.
@@ -1132,8 +509,8 @@ public partial class TempleLocation : BaseLocation
         }
 
         terminal.SetColor("white");
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.rite_confirm", cost));
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.rite_confirm", cost)))
         {
             terminal.WriteLine(Loc.Get("temple.rite_cancel"), "gray");
             await terminal.PressAnyKey();
@@ -1158,22 +535,19 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Process contribution/sacrifice to gods (Pascal TEMPLE.PAS contribute_to_god)
+    /// Gold at a canon god's altar (Pascal TEMPLE.PAS contribute_to_god). 1.2.0 Temple gods piece 7:
+    /// the altar is chosen in the Nave's or the Undercroft's offering (ProcessOffering).
     /// </summary>
-    private async Task ProcessContribute()
+    private async Task ProcessContribute(God selectedGod)
     {
         terminal.WriteLine("");
-        terminal.WriteLine("");
-        
+
         if (currentPlayer.ChivNr < 1)
         {
             terminal.WriteLine(Loc.Get("temple.no_good_deeds"), "red");
             await Task.Delay(2000);
             return;
         }
-
-        var selectedGod = await SelectGod(Loc.Get("temple.who_receive_gift"), requireConfirmation: false);
-        if (selectedGod == null) return;
 
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         bool wrongGod = false;
@@ -1185,8 +559,8 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.not_your_god", selectedGod.Name), "red");
             terminal.WriteLine(Loc.Get("temple.mighty_not_happy", playerGod), "red");
 
-            var choice = await terminal.GetInputAsync(Loc.Get("temple.continue_prompt"));
-            if (GameConfig.IsAffirmative(choice))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("temple.continue_prompt")))
             {
                 wrongGod = true;
             }
@@ -1199,39 +573,10 @@ public partial class TempleLocation : BaseLocation
         
         if (goAhead)
         {
-            await ProcessSacrificeMenu(selectedGod, wrongGod);
+            await ProcessGoldSacrifice(selectedGod, wrongGod);
         }
-        
+
         await Task.Delay(1000);
-    }
-    
-    /// <summary>
-    /// Display all altars (Pascal TEMPLE.PAS)
-    /// </summary>
-    private async Task DisplayAltars()
-    {
-        terminal.WriteLine("");
-        terminal.WriteLine("");
-        WriteSectionHeader(Loc.Get("temple.altars"), "magenta");
-        terminal.WriteLine("");
-        
-        var activeGods = godSystem.GetActiveGods();
-        if (activeGods.Count == 0)
-        {
-            terminal.WriteLine(Loc.Get("temple.no_gods_exist"), "gray");
-        }
-        else
-        {
-            foreach (var god in activeGods.OrderByDescending(g => g.Experience))
-            {
-                terminal.WriteLine(Loc.Get("temple.altar_of", god.Name, god.GetTitle()), "yellow");
-                terminal.WriteLine(Loc.Get("temple.believers_count", god.Believers), "white");
-                terminal.WriteLine(Loc.Get("temple.power_count", god.Experience), "cyan");
-                terminal.WriteLine("");
-            }
-        }
-        
-        await terminal.PressAnyKey();
     }
     
     /// <summary>
@@ -1242,33 +587,32 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine("");
 
-        var rankedGods = godSystem.ListGods(true);
-
-        // Build a unified ranking list: (name, title, followers, isPlayer)
-        var ranking = new List<(string Name, string Title, int Followers, bool IsPlayer)>();
-
-        foreach (var god in rankedGods)
-            ranking.Add((god.Name, god.GetTitle(), god.Believers, false));
-
-        // Add player immortals
+        // 1.2.0 Temple gods: one ranking of the unified god list (canon ten plus player-gods, never
+        // Manwe) by standing, the sum of the followers' Favor; followers are the saved characters
+        // worshipping the god plus living NPC followers
         var playerImmortals = await GetImmortalGodsAsync();
-        foreach (var ig in playerImmortals)
+        var godNames = playerImmortals.Select(ig => ig.DivineName).ToList();
+        if (currentPlayer.IsImmortal && !string.IsNullOrEmpty(currentPlayer.DivineName))
+            godNames.Add(currentPlayer.DivineName);
+        var standings = await GodRegistry.GetStandingsAsync(currentPlayer);
+
+        var ranking = new List<(string Name, string Title, int Followers, long Standing, bool IsPlayer)>();
+        foreach (var entry in GodRegistry.AllGods(godNames))
         {
-            int titleIdx = Math.Clamp(ig.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            ranking.Add((ig.DivineName, GameConfig.GodTitles[titleIdx], ig.Believers, true));
+            string title;
+            if (entry.IsCanon)
+                title = godSystem.GetGod(entry.Name)?.GetTitle() ?? "";
+            else
+            {
+                var ig = playerImmortals.FirstOrDefault(i => i.DivineName.Equals(entry.Name, StringComparison.OrdinalIgnoreCase));
+                int level = ig?.GodLevel ?? currentPlayer.GodLevel;
+                title = GodText.Title(level);
+            }
+            standings.TryGetValue(entry.Name, out var standing);
+            ranking.Add((entry.Name, title, standing.AllFollowers, standing.Standing, !entry.IsCanon));
         }
 
-        // Also include current player if they're an immortal and not already listed
-        if (currentPlayer.IsImmortal && !string.IsNullOrEmpty(currentPlayer.DivineName)
-            && !ranking.Any(r => r.Name.Equals(currentPlayer.DivineName, StringComparison.OrdinalIgnoreCase)))
-        {
-            int titleIdx = Math.Clamp(currentPlayer.GodLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-            int believers = PantheonLocation.CountBelievers(currentPlayer.DivineName);
-            ranking.Add((currentPlayer.DivineName, GameConfig.GodTitles[titleIdx], believers, true));
-        }
-
-        // Sort by followers descending
-        ranking = ranking.OrderByDescending(r => r.Followers).ToList();
+        ranking = ranking.OrderByDescending(r => r.Standing).ThenByDescending(r => r.Followers).ToList();
 
         if (ranking.Count == 0)
         {
@@ -1277,39 +621,28 @@ public partial class TempleLocation : BaseLocation
         else
         {
             terminal.WriteLine(Loc.Get("temple.god_ranking_header"), "white");
-            WriteThickDivider(59, "magenta");
+            WriteThickDivider(71, "magenta");
 
             for (int i = 0; i < ranking.Count; i++)
             {
                 var entry = ranking[i];
-                string line = $"{(i + 1).ToString().PadLeft(3)}. {entry.Name.PadRight(25)} {entry.Title.PadRight(20)} {entry.Followers.ToString().PadLeft(10)}";
+                string line = $"{(i + 1).ToString().PadLeft(3)}. {entry.Name.PadRight(25)} {entry.Title.PadRight(20)} {entry.Followers.ToString().PadLeft(10)} {entry.Standing.ToString().PadLeft(8)}";
                 terminal.WriteLine(line, entry.IsPlayer ? "bright_cyan" : "yellow");
             }
         }
 
-        await terminal.PressAnyKey();
-    }
-    
-    /// <summary>
-    /// Display holy news (Pascal TEMPLE.PAS)
-    /// </summary>
-    private async Task DisplayHolyNews()
-    {
+        // 1.2.0 Temple gods piece 6: this week's strongest god, picked at the weekly reset, and its bonus
+        var weekPick = await Task.Run(() => WeeklyGodSystem.Current(currentPlayer));
         terminal.WriteLine("");
-        terminal.WriteLine("");
-        WriteSectionHeader(Loc.Get("temple.holy_news"), "cyan");
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("temple.gods_watch"), "white");
-        terminal.WriteLine(Loc.Get("temple.divine_interventions"), "white");
-        terminal.WriteLine(Loc.Get("temple.prayers_reach"), "white");
-        terminal.WriteLine("");
-        
-        var stats = godSystem.GetGodStatistics();
-        terminal.WriteLine(Loc.Get("temple.total_gods", stats["TotalGods"]), "yellow");
-        terminal.WriteLine(Loc.Get("temple.total_believers", stats["TotalBelievers"]), "yellow");
-        terminal.WriteLine(Loc.Get("temple.most_powerful", stats["MostPowerfulGod"]), "yellow");
-        terminal.WriteLine(Loc.Get("temple.most_popular", stats["MostPopularGod"]), "yellow");
-        
+        if (weekPick is { } week && !string.IsNullOrEmpty(week.God))
+        {
+            terminal.WriteLine(Loc.Get("temple.week_god", week.God, GameConfig.GodWeeklyXpBonusPct), "bright_yellow");
+            if (WeeklyGodSystem.IsFollowerOfWeek(currentPlayer, week))
+                terminal.WriteLine(Loc.Get("temple.week_god_yours", week.God, GameConfig.GodWeeklyXpBonusPct), "bright_green");
+        }
+        else
+            terminal.WriteLine(Loc.Get("temple.week_god_none"), "gray");
+
         await terminal.PressAnyKey();
     }
     
@@ -1401,8 +734,8 @@ public partial class TempleLocation : BaseLocation
             if (requireConfirmation)
             {
                 terminal.WriteLine("");
-                var confirm = await terminal.GetInputAsync(Loc.Get("ui.confirm_choose", selectedGod.Name));
-                if (!GameConfig.IsAffirmative(confirm))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("ui.confirm_choose", selectedGod.Name)))
                 {
                     terminal.WriteLine(Loc.Get("temple.selection_cancelled"), "gray");
                     continue;
@@ -1416,7 +749,7 @@ public partial class TempleLocation : BaseLocation
     /// <summary>
     /// Display a compact list of available gods for selection
     /// </summary>
-    private void DisplayGodListCompact(List<God> gods)
+    private void DisplayGodListCompact(List<God> gods, bool nameHint = true)
     {
         terminal.WriteLine("");
         WriteSectionHeader(Loc.Get("temple.available_gods"), "cyan");
@@ -1430,10 +763,8 @@ public partial class TempleLocation : BaseLocation
 
         foreach (var god in gods)
         {
-            // Get domain/title from properties or use GetTitle()
-            string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
-                : god.GetTitle();
+            // 1.2.0 Temple gods: the epithet in the player's language (GodText)
+            string domain = GodText.Epithet(god);
 
             // Color based on alignment
             string color = "yellow";
@@ -1450,8 +781,19 @@ public partial class TempleLocation : BaseLocation
             }
 
             terminal.WriteLine($"  {alignmentMarker} {god.Name} - {domain}", color);
+
+            // 1.2.0 Temple gods piece 2: the god's boon (canon boons are fixed, full strength) and ward
+            var boonDomain = GodBoonSystem.DomainOfCanon(god.Name);
+            if (boonDomain != GodDomain.None)
+            {
+                Say(Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(boonDomain, 100), 100), "gray", "      ");   // 1.2.0 piece 7: wrapped to 80 columns
+                Say(Loc.Get("god.ward_line", GodBoonSystem.DescribeWard(boonDomain)), "darkgray", "      ");
+                // 1.2.0 Temple gods piece 5: the god's Miracle, for its Chosen
+                Say(Loc.Get("miracle.altar_line", MiracleSystem.Name(boonDomain), MiracleSystem.Describe(boonDomain)), "darkgray", "      ");
+            }
         }
 
+        if (!nameHint) return;   // 1.2.0 Temple gods piece 7: the altar list prints the hint after the player-gods
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("temple.type_name_hint"));
@@ -1479,10 +821,8 @@ public partial class TempleLocation : BaseLocation
 
         foreach (var god in activeGods)
         {
-            // Get domain/title from properties or use GetTitle()
-            string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
-                : god.GetTitle();
+            // 1.2.0 Temple gods: the epithet in the player's language (GodText)
+            string domain = GodText.Epithet(god);
 
             // Color based on alignment
             string color = "yellow";
@@ -1493,10 +833,11 @@ public partial class TempleLocation : BaseLocation
 
             terminal.WriteLine($"  {god.Name}, {domain}", color);
 
-            // Show description if available
-            if (god.Properties.ContainsKey("Description"))
+            // Show description if available (1.2.0: in the player's language, GodText)
+            string description = GodText.Description(god);
+            if (description.Length > 0)
             {
-                terminal.WriteLine($"    {god.Properties["Description"]}", "gray");
+                terminal.WriteLine($"    {description}", "gray");
             }
 
             terminal.WriteLine(Loc.Get("temple.god_list_stats", god.Believers, god.Experience.ToString("N0")), "white");
@@ -1554,50 +895,6 @@ public partial class TempleLocation : BaseLocation
     }
     
     /// <summary>
-    /// Process sacrifice menu (Pascal TEMPLE.PAS)
-    /// </summary>
-    private async Task ProcessSacrificeMenu(God god, bool wrongGod)
-    {
-        bool done = false;
-        
-        while (!done)
-        {
-            terminal.WriteLine("");
-            WriteSectionHeader(Loc.Get("temple.sacrifice_to", god.Name), "cyan");
-            terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("temple.sacrifice_gold_option"), "yellow");
-            terminal.WriteLine(Loc.Get("temple.sacrifice_status_option"), "yellow");
-            terminal.WriteLine(Loc.Get("temple.sacrifice_return_option"), "yellow");
-            
-            var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
-            
-            switch (choice.ToUpper())
-            {
-                case "G":
-                    await ProcessGoldSacrifice(god, wrongGod);
-                    break;
-                    
-                case "S":
-                    await DisplayPlayerStatus();
-                    break;
-                    
-                case "R":
-                    done = true;
-                    break;
-                    
-                case "?":
-                    // Menu already displayed
-                    break;
-                    
-                default:
-                    terminal.WriteLine(Loc.Get("temple.invalid_choice_short"), "red");
-                    await Task.Delay(1000);
-                    break;
-            }
-        }
-    }
-    
-    /// <summary>
     /// Process gold sacrifice (Pascal TEMPLE.PAS)
     /// </summary>
     private async Task ProcessGoldSacrifice(God god, bool wrongGod)
@@ -1629,8 +926,8 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_gold", goldAmount, god.Name));
-        if (!GameConfig.IsAffirmative(choice)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_gold", goldAmount, god.Name))) return;
 
         // Process sacrifice
         currentPlayer.Gold -= goldAmount;
@@ -1643,6 +940,9 @@ public partial class TempleLocation : BaseLocation
 
         // Grant temporary blessing from sacrifice (if worshipping this god)
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        // 1.2.0 Temple gods piece 3: gold given to your own god is Favor (capped per day)
+        if (!wrongGod && playerGod == god.Name)
+            FavorUi.ReportGain(terminal, currentPlayer, FavorSystem.GoldSacrifice(currentPlayer, goldAmount, godSystem), godSystem);
         if (!wrongGod && playerGod == god.Name && goldAmount >= 100)
         {
             var tempBlessing = UsurperRemake.Systems.DivineBlessingSystem.Instance.GrantSacrificeBlessing(
@@ -1730,6 +1030,60 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
+    /// 1.2.0 Temple gods piece 4: shows what leaving the current god for newGod (null for none)
+    /// costs, before the player is asked: all Favor with it, and its wrath by the Favor lost.
+    /// Read-only (GodSwitchSystem.Preview).
+    /// </summary>
+    private void ShowSwitchCost(string? newGod)
+    {
+        var cost = GodSwitchSystem.Preview(currentPlayer, newGod);
+        if (!cost.LeavesAGod || cost.OldGod.Equals(newGod ?? "", StringComparison.OrdinalIgnoreCase)) return;
+        terminal.WriteLine("");
+        if (cost.FavorLost > 0)
+            terminal.WriteLine(Loc.Get("god.switch_cost_favor", cost.OldGod, cost.FavorLost), "yellow");
+        else
+            terminal.WriteLine(Loc.Get("god.switch_cost_no_favor", cost.OldGod), "gray");
+        if (cost.WrathLevel > 0)
+            terminal.WriteLine(Loc.Get("god.switch_cost_wrath", cost.OldGod, WrathSeverityName(cost.WrathLevel)), "red");
+        if (cost.SmiteDamage > 0)
+            terminal.WriteLine(Loc.Get("god.switch_cost_smite", cost.OldGod, cost.SmiteDamage), "red");
+        terminal.WriteLine(Loc.Get("god.switch_cost_new_zero"), "gray");
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 4: the player's own god change at the Temple (W, J, L), through the
+    /// one switching rule (GodSwitchSystem.Switch, by the player): all Favor with the left god is
+    /// lost and its wrath follows. Online, the character is then saved at once (forced past the
+    /// autosave throttle), so the god, the Favor, the wrath and LastGodSwitchDay land in one write
+    /// and a dropped session cannot keep the new god without its cost.
+    /// </summary>
+    private async Task<GodSwitchCost?> SwitchGodAsync(string? newGod)
+    {
+        var cost = GodSwitchSystem.Switch(currentPlayer, newGod, GodChangeBy.Player);
+        if (cost is { } c)
+        {
+            if (c.WrathLevel > 0)
+                terminal.WriteLine(Loc.Get("god.switch_wrath_now", c.OldGod, WrathSeverityName(c.WrathLevel)), "bright_red");
+            if (c.SmiteDamage > 0)
+                terminal.WriteLine(Loc.Get("god.switch_smite_now", c.OldGod, c.SmiteDamage, currentPlayer.HP, currentPlayer.MaxHP), "bright_red");
+        }
+        if (DoorMode.IsOnlineMode)
+        {
+            try { await SaveSystem.Instance.AutoSave(currentPlayer, force: true); }
+            catch (Exception ex) { DebugLogger.Instance.LogError("FAITH", $"Save after a god switch failed: {ex.Message}"); }
+        }
+        return cost;
+    }
+
+    /// <summary>The name of a Divine Wrath level (base.wrath_minor, moderate, severe).</summary>
+    private static string WrathSeverityName(int level) => level switch
+    {
+        1 => Loc.Get("base.wrath_minor"),
+        2 => Loc.Get("base.wrath_moderate"),
+        _ => Loc.Get("base.wrath_severe"),
+    };
+
+    /// <summary>
     /// Verify player's god still exists (Pascal TEMPLE.PAS)
     /// </summary>
     private async Task VerifyPlayerGodExists()
@@ -1741,49 +1095,53 @@ public partial class TempleLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("temple.god_no_longer_exists", playerGod), "red");
                 terminal.WriteLine(Loc.Get("temple.faith_shaken"), "gray");
-                godSystem.SetPlayerGod(currentPlayer.Name2, "");
+                GodSwitchSystem.Switch(currentPlayer, null, GodChangeBy.Other);   // 1.2.0: the game's change, no wrath
                 await Task.Delay(2000);
             }
         }
     }
     
     /// <summary>
-    /// Display player status
+    /// The devotion part of the Nave's Altars screen (1.2.0 Temple gods piece 7; the old S status
+    /// screen, which repeated the character sheet, is gone): the god (canon or player-god), the
+    /// Favor and its tier, the boon at its current strength and the ward, the good and evil deeds
+    /// left, and the Miracle. The Altars screen waits for a key after the ranking that follows.
     /// </summary>
     private async Task DisplayPlayerStatus()
     {
         terminal.WriteLine("");
-        WriteSectionHeader(Loc.Get("temple.your_status"), "cyan");
-        terminal.WriteLine("");
-        terminal.WriteLine($"{Loc.Get("ui.name_label")}: {currentPlayer.Name2}", "yellow");
-        terminal.WriteLine($"{Loc.Get("ui.level")}: {currentPlayer.Level}", "yellow");
-        terminal.WriteLine($"{Loc.Get("ui.gold")}: {currentPlayer.Gold:N0}", "yellow");
-        terminal.WriteLine(Loc.Get("temple.good_deeds", currentPlayer.ChivNr), "green");
-        terminal.WriteLine(Loc.Get("temple.evil_deeds", currentPlayer.DarkNr), "red");
+        WriteSectionHeader(Loc.Get("temple.devotion.header"), "cyan");
 
-        // v0.61.3: player report — "when you contribute to an altar while you
-        // worship a player, and press stats on the sacrificing screen, the game
-        // writes you are worshiping noone." `GetPlayerGod` only returns elder
-        // gods from the GodSystem registry, so player-immortal worshippers
-        // (Character.WorshippedGod) fell through to the "god_none" line. Other
-        // temple display sites already fall back to WorshippedGod when the
-        // elder-god lookup is empty; this status screen was just missing the
-        // same fallback. Mirror the pattern from DisplayWelcomeMessage / DisplayMenu.
-        string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
-        if (!string.IsNullOrEmpty(playerGod))
+        var worshipped = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
+        if (worshipped is { } w)
         {
-            terminal.WriteLine(Loc.Get("temple.god_label", playerGod), "cyan");
-        }
-        else if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-        {
-            terminal.WriteLine(Loc.Get("temple.god_label", currentPlayer.WorshippedGod), "bright_yellow");
+            int favor = FavorSystem.GetFavor(currentPlayer, godSystem);
+            terminal.WriteLine(Loc.Get("temple.devotion.favor", w.Name, favor, TierName(FavorSystem.GetTier(favor))), w.IsCanon ? "cyan" : "bright_yellow");
+
+            // the boon at the character's current strength, and the ward (as the status sheet shows them)
+            var boonDomain = GodBoonSystem.GetDomain(currentPlayer, godSystem);
+            if (boonDomain != GodDomain.None)
+            {
+                int strength = GodBoonSystem.GetStrengthPct(currentPlayer, godSystem);
+                terminal.WriteLine($"  {Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(boonDomain, strength), strength)}", "gray");
+                bool warded = FavorSystem.GetTier(favor) >= GodFavorTier.Devout;
+                terminal.WriteLine($"  {Loc.Get(warded ? "god.ward_line_active" : "god.ward_line", GodBoonSystem.DescribeWard(boonDomain))}", warded ? "gray" : "darkgray");
+            }
         }
         else
         {
-            terminal.WriteLine(Loc.Get("temple.god_none"), "gray");
+            terminal.WriteLine(Loc.Get("temple.devotion.none"), "gray");
         }
 
-        await terminal.PressAnyKey();
+        terminal.WriteLine(Loc.Get("temple.good_deeds", currentPlayer.ChivNr), "green");
+        terminal.WriteLine(Loc.Get("temple.evil_deeds", currentPlayer.DarkNr), "red");
+
+        // 1.2.0 Temple gods piece 5: the Miracle (at Chosen, ready or used today; below, the tier that unlocks it)
+        string miracleLine = MiracleSystem.TempleLine(currentPlayer, godSystem);
+        if (miracleLine.Length > 0)
+            terminal.WriteLine(miracleLine, MiracleSystem.IsReady(currentPlayer, godSystem) ? "bright_magenta" : "gray");
+
+        await Task.CompletedTask;
     }
 
     #region Old Gods Integration
@@ -2001,29 +1359,18 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Check if player can enter the Deep Temple (Aurelion encounter)
+    /// 1.2.0 Temple gods piece 7: the Deep Temple is Aurelion's one site, and it shows only when his
+    /// fight can actually start: the story's own gate (OldGodBossSystem.CanEncounterBoss: his level
+    /// and the three Old Gods faced before him, or the Sunforged Blade for an awakened save). A save
+    /// that already resolved him finds his memory in the Halls of Memory instead.
     /// </summary>
-    private bool CanEnterDeepTemple()
-    {
-        // Requires level 55+ and at least 3 Old Gods defeated
-        if (currentPlayer.Level < 55)
-            return false;
-
-        var story = StoryProgressionSystem.Instance;
-        int godsDefeated = story.OldGodStates.Count(s => s.Value.Status == GodStatus.Defeated || s.Value.Status == GodStatus.Saved);
-
-        // Can enter if defeated/saved 3+ gods, OR if already encountered Aurelion
-        if (godsDefeated >= 3)
-            return true;
-
-        if (story.HasStoryFlag("aurelion_encountered"))
-            return true;
-
-        return false;
-    }
+    private bool CanEnterDeepTemple() =>
+        currentPlayer != null && OldGodBossSystem.Instance.CanEncounterBoss(currentPlayer, OldGodType.Aurelion);
 
     /// <summary>
-    /// Enter the Deep Temple - Aurelion's domain
+    /// Enter the Deep Temple, Aurelion's domain, and face him. The result is resolved as the dungeon
+    /// resolves an Old God (DungeonLocation.ResolveOldGodAtTemple: the artifact, alignment, God Slayer
+    /// surge, forced save and the town's reaction), so the story advances the same from here.
     /// </summary>
     private async Task EnterDeepTemple()
     {
@@ -2049,30 +1396,15 @@ public partial class TempleLocation : BaseLocation
         await Task.Delay(1500);
 
         var story = StoryProgressionSystem.Instance;
+        var bossSystem = OldGodBossSystem.Instance;
 
-        // Check Aurelion's status
-        if (story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var aurelionState))
+        // An awakened Aurelion (an older save's quest) and the Sunforged Blade: the save quest ends here
+        if (story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var aurelionState) && aurelionState.Status == GodStatus.Awakened)
         {
-            if (aurelionState.Status == GodStatus.Defeated)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.aurelion_altar_dark"), "gray");
-                terminal.WriteLine(Loc.Get("temple.aurelion_ash_remains"), "gray");
-                terminal.WriteLine(Loc.Get("temple.aurelion_sense_loss"), "white");
-                await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
-                return;
-            }
-            else if (aurelionState.Status == GodStatus.Saved)
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.aurelion_warm_light"), "bright_yellow");
-                terminal.WriteLine(Loc.Get("temple.aurelion_presence"), "bright_white");
-                terminal.WriteLine("", "white");
-                terminal.WriteLine(Loc.Get("temple.aurelion_thank_you"), "bright_cyan");
-                terminal.WriteLine(Loc.Get("temple.aurelion_new_vessel"), "bright_cyan");
-                await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
-                return;
-            }
+            var saveResult = await bossSystem.CompleteSaveQuest(currentPlayer, OldGodType.Aurelion, terminal);
+            await ResolveAurelionAtTemple(saveResult);
+            await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
+            return;
         }
 
         // Aurelion encounter available
@@ -2084,43 +1416,33 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.aurelion_few_can"), "bright_yellow");
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.approach_light"));
-
-        if (GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("temple.approach_light")))
         {
             story.SetStoryFlag("aurelion_encountered", true);
 
-            // Start Aurelion boss encounter
-            var bossSystem = OldGodBossSystem.Instance;
-            if (bossSystem.CanEncounterBoss(currentPlayer, OldGodType.Aurelion))
-            {
-                var result = await bossSystem.StartBossEncounter(currentPlayer, OldGodType.Aurelion, terminal);
+            // Start Aurelion boss encounter (the gate above is the story's own)
+            var result = await bossSystem.StartBossEncounter(currentPlayer, OldGodType.Aurelion, terminal);
 
-                if (result.Success)
+            if (result.Success)
+            {
+                // Generate news
+                switch (result.Outcome)
                 {
-                    // Generate news
-                    switch (result.Outcome)
-                    {
-                        case BossOutcome.Defeated:
-                            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} destroyed Aurelion, the Fading Light! Truth dies in darkness.");
-                            break;
-                        case BossOutcome.Saved:
-                            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} saved Aurelion, the Fading Light! Truth lives on within them.");
-                            break;
-                        case BossOutcome.Allied:
-                            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has allied with Aurelion, the Fading Light!");
-                            break;
-                    }
+                    case BossOutcome.Defeated:
+                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} destroyed Aurelion, the Fading Light! Truth dies in darkness.");
+                        break;
+                    case BossOutcome.Saved:
+                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} saved Aurelion, the Fading Light! Truth lives on within them.");
+                        break;
+                    case BossOutcome.Allied:
+                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has allied with Aurelion, the Fading Light!");
+                        break;
+                    case BossOutcome.NotFought:
+                        break; // v1.1.15: not entered for a Mental collapse, no news
                 }
             }
-            else
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("temple.aurelion_flickers"), "yellow");
-                terminal.WriteLine(Loc.Get("temple.aurelion_too_weak"), "bright_yellow");
-                terminal.WriteLine(Loc.Get("temple.aurelion_defeat_siblings"), "bright_yellow");
-                await Task.Delay(2000);
-            }
+            await ResolveAurelionAtTemple(result);
         }
         else
         {
@@ -2134,6 +1456,55 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
+    /// 1.2.0 Temple gods piece 7: Aurelion's result at the Deep Temple goes through the dungeon's own
+    /// Old God handling, so a Temple fight grants and saves what a floor fight did. A resolved
+    /// fight ends with the town's reaction and a return to Main Street (LocationExitException).
+    /// </summary>
+    private async Task ResolveAurelionAtTemple(BossEncounterResult result)
+    {
+        var dungeon = locationManager?.GetLocation(GameLocation.Dungeons) as DungeonLocation ?? new DungeonLocation();
+        await dungeon.ResolveOldGodAtTemple(result, currentPlayer, terminal);
+    }
+
+    /// <summary>True once Aurelion is resolved (defeated, saved, allied or consumed): the story is done with him.</summary>
+    internal static bool AurelionResolved()
+    {
+        var story = StoryProgressionSystem.Instance;
+        return story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var s) &&
+               (s.Status == GodStatus.Defeated || s.Status == GodStatus.Saved ||
+                s.Status == GodStatus.Allied || s.Status == GodStatus.Consumed);
+    }
+
+    /// <summary>
+    /// Halls of Memory, A: the Deep Temple after Aurelion was resolved (the dark altar and its ash,
+    /// or his warm light in its new vessel). Memory only, never a fight.
+    /// </summary>
+    private async Task ShowAurelionMemory()
+    {
+        if (!AurelionResolved()) return;
+        terminal.ClearScreen();
+        terminal.WriteLine("");
+        WriteSectionHeader(Loc.Get("temple.deep_temple"), "bright_yellow");
+        var status = StoryProgressionSystem.Instance.OldGodStates[OldGodType.Aurelion].Status;
+        terminal.WriteLine("");
+        if (status == GodStatus.Saved || status == GodStatus.Allied)
+        {
+            terminal.WriteLine(Loc.Get("temple.aurelion_warm_light"), "bright_yellow");
+            terminal.WriteLine(Loc.Get("temple.aurelion_presence"), "bright_white");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("temple.aurelion_thank_you"), "bright_cyan");
+            terminal.WriteLine(Loc.Get("temple.aurelion_new_vessel"), "bright_cyan");
+        }
+        else
+        {
+            terminal.WriteLine(Loc.Get("temple.aurelion_altar_dark"), "gray");
+            terminal.WriteLine(Loc.Get("temple.aurelion_ash_remains"), "gray");
+            terminal.WriteLine(Loc.Get("temple.aurelion_sense_loss"), "white");
+        }
+        await terminal.PressAnyKey(Loc.Get("temple.press_enter_return"));
+    }
+
+    /// <summary>
     /// Process item sacrifice - sacrifice equipment for divine favor
     /// </summary>
     private async Task ProcessItemSacrifice()
@@ -2143,15 +1514,18 @@ public partial class TempleLocation : BaseLocation
         WriteSectionHeader(Loc.Get("temple.item_sacrifice"), "cyan");
         terminal.WriteLine("");
 
-        string currentGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        // 1.2.0 Temple gods piece 3: any god, canon or player-god (one god system)
+        var worshipped = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
 
-        if (string.IsNullOrEmpty(currentGod))
+        if (worshipped == null)
         {
             terminal.WriteLine(Loc.Get("temple.must_worship_first"), "red");
             terminal.WriteLine(Loc.Get("temple.visit_worship"), "gray");
             await Task.Delay(2000);
             return;
         }
+        string currentGod = worshipped.Value.Name;
+        bool isCanon = worshipped.Value.IsCanon;
 
         terminal.WriteLine(Loc.Get("temple.kneel_before", currentGod), "white");
         terminal.WriteLine("", "white");
@@ -2168,13 +1542,13 @@ public partial class TempleLocation : BaseLocation
         switch (choice.ToUpper())
         {
             case "W":
-                await SacrificeWeapon(currentGod);
+                await SacrificeEquippedItem(currentGod, isCanon, EquipmentSlot.MainHand);
                 break;
             case "A":
-                await SacrificeArmor(currentGod);
+                await SacrificeEquippedItem(currentGod, isCanon, EquipmentSlot.Body);
                 break;
             case "H":
-                await SacrificePotions(currentGod);
+                await SacrificePotions(currentGod, isCanon);
                 break;
             case "R":
                 return;
@@ -2182,86 +1556,66 @@ public partial class TempleLocation : BaseLocation
     }
 
     /// <summary>
-    /// Sacrifice weapon to god
+    /// 1.2.0 Temple gods piece 3: sacrifice the weapon in hand (MainHand) or the body armor worn
+    /// (Body). The item is really given up (FavorSystem.SacrificeEquipped unequips and drops it and
+    /// recalculates the stats) and the god's Favor comes by its value. A cursed or unique item is
+    /// refused. A canon god's power grows as before; a player-god has no such power here.
     /// </summary>
-    private async Task SacrificeWeapon(string godName)
+    private async Task SacrificeEquippedItem(string godName, bool isCanon, EquipmentSlot slot)
     {
-        if (currentPlayer.WeapPow <= 0)
+        bool weapon = slot == EquipmentSlot.MainHand;
+        var item = currentPlayer.GetEquipment(slot);
+        if (item == null)
         {
-            terminal.WriteLine(Loc.Get("temple.no_weapon"), "red");
+            terminal.WriteLine(Loc.Get(weapon ? "temple.no_weapon" : "temple.no_armor"), "red");
+            await Task.Delay(1500);
+            return;
+        }
+        if (item.IsCursed || item.IsUnique)
+        {
+            terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", item.Name, godName), "red");
             await Task.Delay(1500);
             return;
         }
 
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_weapon", currentPlayer.WeapPow, godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        int power = weapon ? item.WeaponPower : item.ArmorClass;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get(weapon ? "temple.confirm_sacrifice_weapon" : "temple.confirm_sacrifice_armor", power, godName))) return;
 
-        long powerGained = currentPlayer.WeapPow * 2;
-        godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2); // Convert to equivalent gold power
-
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("temple.dissolves_divine_light"), "bright_yellow");
-        terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
-        terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
-
-        // Chance for divine blessing based on weapon power
-        if (random.NextDouble() < 0.3 + (currentPlayer.WeapPow / 500.0))
+        var (outcome, _, favor) = FavorSystem.SacrificeEquipped(currentPlayer, slot, godSystem);
+        if (outcome != ItemSacrificeOutcome.Done)
         {
-            int blessingBonus = random.Next(2, 6);
-            currentPlayer.Strength += blessingBonus;
-            terminal.WriteLine(Loc.Get("temple.blessing_strength", godName, blessingBonus), "bright_green");
+            terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", item.Name, godName), "red");
+            await Task.Delay(1500);
+            return;
         }
 
-        currentPlayer.WeapPow = 0;
-        // Note: WeaponName is derived from equipment slots
+        long powerGained = Math.Max(1, power) * 2L;
+        if (isCanon)
+            godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2); // Convert to equivalent gold power
+
+        terminal.WriteLine("");
+        terminal.WriteLine(Loc.Get(weapon ? "temple.dissolves_divine_light" : "temple.armor_dissolves"), "bright_yellow");
+        terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
+        if (isCanon)
+            terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
+        FavorUi.ReportGain(terminal, currentPlayer, favor, godSystem);
+
+        // Chance for divine blessing based on the item's power (1.2.0: lasting, written to Base)
+        if (random.NextDouble() < 0.3 + (power / 500.0))
+        {
+            int blessingBonus = random.Next(2, 6);
+            currentPlayer.GrantPermanentStat(weapon ? StatKind.Strength : StatKind.Defence, blessingBonus);
+            terminal.WriteLine(Loc.Get(weapon ? "temple.blessing_strength" : "temple.blessing_defence", godName, blessingBonus), "bright_green");
+        }
 
         // Apply faction effects based on god alignment
         ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
 
         // Generate news
-        NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple.");
-
-        await Task.Delay(2500);
-    }
-
-    /// <summary>
-    /// Sacrifice armor to god
-    /// </summary>
-    private async Task SacrificeArmor(string godName)
-    {
-        if (currentPlayer.ArmPow <= 0)
-        {
-            terminal.WriteLine(Loc.Get("temple.no_armor"), "red");
-            await Task.Delay(1500);
-            return;
-        }
-
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_armor", currentPlayer.ArmPow, godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
-
-        long powerGained = currentPlayer.ArmPow * 2;
-        godSystem.ProcessGoldSacrifice(godName, powerGained * 100, currentPlayer.Name2);
-
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("temple.armor_dissolves"), "bright_yellow");
-        terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
-        terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
-
-        // Chance for divine blessing
-        if (random.NextDouble() < 0.3 + (currentPlayer.ArmPow / 500.0))
-        {
-            int blessingBonus = random.Next(2, 6);
-            currentPlayer.Defence += blessingBonus;
-            terminal.WriteLine(Loc.Get("temple.blessing_defence", godName, blessingBonus), "bright_green");
-        }
-
-        currentPlayer.ArmPow = 0;
-        // Note: ArmorName is derived from equipment slots
-
-        // Apply faction effects based on god alignment
-        ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
-
-        NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
+        NewsSystem.Instance.Newsy(false, weapon
+            ? $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple."
+            : $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
 
         await Task.Delay(2500);
     }
@@ -2269,7 +1623,7 @@ public partial class TempleLocation : BaseLocation
     /// <summary>
     /// Sacrifice healing potions to god
     /// </summary>
-    private async Task SacrificePotions(string godName)
+    private async Task SacrificePotions(string godName, bool isCanon)
     {
         if (currentPlayer.Healing <= 0)
         {
@@ -2295,18 +1649,23 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        var confirm = await terminal.GetInputAsync(Loc.Get("temple.confirm_sacrifice_potions", amount, godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.confirm_sacrifice_potions", amount, godName))) return;
 
         long powerGained = amount * 5; // Each potion gives 5 power
-        godSystem.ProcessGoldSacrifice(godName, powerGained * 50, currentPlayer.Name2);
+        if (isCanon)
+            godSystem.ProcessGoldSacrifice(godName, powerGained * 50, currentPlayer.Name2);
 
         currentPlayer.Healing -= amount;
+        // 1.2.0 Temple gods piece 3: potions are items too, valued at the shop price
+        int favor = FavorSystem.ItemSacrifice(currentPlayer, GameConfig.GetHealingPotionCost(currentPlayer.Level) * amount, godSystem);
 
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("temple.potions_evaporate"), "bright_yellow");
         terminal.WriteLine(Loc.Get("temple.god_accepts", godName), "cyan");
-        terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
+        if (isCanon)
+            terminal.WriteLine(Loc.Get("temple.divine_power_increased", powerGained), "bright_cyan");
+        FavorUi.ReportGain(terminal, currentPlayer, favor, godSystem);
 
         // Chance for divine healing
         if (amount >= 3 && random.NextDouble() < 0.5)
@@ -2390,6 +1749,8 @@ public partial class TempleLocation : BaseLocation
         currentPlayer.Experience += xpGain;
         currentPlayer.DarkNr--;
         currentPlayer.DesecrationsToday++;
+        GodDeedSystem.Record(currentPlayer, GodAct.Desecration, terminal);   // 1.2.0 Temple gods: Earth taboo; Shadow, Death, Chaos deed
+        GodStandingPenalty.RecordDesecration(currentPlayer, god.Name);       // 1.2.0 Temple gods piece 4: that god's standing, until the weekly reset
 
         terminal.WriteLine("", "white");
         terminal.WriteLine(Loc.Get("temple.darkness_flows", darknessGain), "dark_red");
@@ -2478,9 +1839,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.touch_stone"));
-
-        if (!GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.touch_stone")))
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("temple.step_back_stones"), "gray");
@@ -2563,6 +1923,11 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
+        // 1.2.0 Temple gods: a prayer is devotion, so the neglect count starts over (either kind of god)
+        FavorSystem.MarkDevotion(currentPlayer);
+        // 1.2.0 Temple gods piece 3: prayer gives Favor once a day (the cap is saved, so a reload cannot repeat it)
+        int prayerFavor = FavorSystem.Prayer(currentPlayer, godSystem);
+
         // === Prayer to an immortal player-god ===
         if (!string.IsNullOrEmpty(worshippedImmortal))
         {
@@ -2576,6 +1941,11 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.prayers_rise_immortal"));
             await Task.Delay(1000);
 
+            // v1.1.15: prayer eases the mind once a day.
+            int mentalBeforeImmortal = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeImmortal, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.TemplePrayer, GameConfig.MentalTemplePrayerGain));
+            FavorUi.ReportGain(terminal, currentPlayer, prayerFavor, godSystem);
+
             // Mark prayer as done for today (set LastPrayerRealDate for online mode)
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 currentPlayer.LastPrayerRealDate = DateTime.UtcNow;
@@ -2588,7 +1958,8 @@ public partial class TempleLocation : BaseLocation
 
                 // Apply as temporary DivineBlessingCombats/Bonus using the strongest buff
                 // The prayer buff lasts for a time-based duration simulated as combat count
-                int prayerCombats = 20; // ~20 combats ≈ 2 hours of active play
+                // 1.2.0 Temple gods piece 2: twice as long at Zealot and up
+                int prayerCombats = DivineBlessingSystem.PrayerBlessingCombats(FavorSystem.GetTier(FavorSystem.GetFavor(currentPlayer)));
                 float prayerBonus = Math.Max(boosted.DamagePercent, boosted.DefensePercent);
                 if (prayerBonus > 0)
                 {
@@ -2684,6 +2055,11 @@ public partial class TempleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("temple.prayers_rise_incense"));
         await Task.Delay(1000);
+
+        // v1.1.15: prayer eases the mind once a day.
+        int mentalBeforePrayer = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforePrayer, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.TemplePrayer, GameConfig.MentalTemplePrayerGain));
+        FavorUi.ReportGain(terminal, currentPlayer, prayerFavor, godSystem);
 
         // Determine prayer response based on god's alignment
         float alignment = (float)(god.Goodness - god.Darkness) / Math.Max(1, god.Goodness + god.Darkness);
@@ -2984,8 +2360,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(2000);
 
-        var followUp = await terminal.GetInputAsync(Loc.Get("temple.ask_join_prompt"));
-        if (GameConfig.IsAffirmative(followUp))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("temple.ask_join_prompt")))
         {
             await AttemptMiraRecruitment(mira);
         }
@@ -3107,9 +2483,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.join_decrease"));
         terminal.WriteLine("");
 
-        var choice = await terminal.GetInputAsync(Loc.Get("temple.join_prompt"));
-
-        if (GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("temple.join_prompt")))
         {
             await PerformFaithOath(factionSystem);
         }
@@ -3240,8 +2615,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.sanctum_gold_label", currentPlayer.Gold.ToString("N0")));
         terminal.WriteLine("");
 
-        var input = await terminal.GetInput(Loc.Get("temple.sanctum_enter_prompt"));
-        if (!GameConfig.IsAffirmative(input))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("temple.sanctum_enter_prompt")))
             return;
 
         if (currentPlayer.Gold < GameConfig.InnerSanctumCost)
@@ -3269,19 +2644,22 @@ public partial class TempleLocation : BaseLocation
         // Grant +1 to a random stat
         var rng = Random.Shared;
         string statName;
+        // 1.2.0: the +1 is written to the Base field through GrantPermanentStat, so it lasts
+        StatKind sanctumStat;
         switch (rng.Next(9))
         {
-            case 0: currentPlayer.Strength += 1; statName = "Strength"; break;
-            case 1: currentPlayer.Defence += 1; statName = "Defence"; break;
-            case 2: currentPlayer.Stamina += 1; statName = "Stamina"; break;
-            case 3: currentPlayer.Agility += 1; statName = "Agility"; break;
-            case 4: currentPlayer.Charisma += 1; statName = "Charisma"; break;
-            case 5: currentPlayer.Dexterity += 1; statName = "Dexterity"; break;
-            case 6: currentPlayer.Wisdom += 1; statName = "Wisdom"; break;
-            case 7: currentPlayer.Intelligence += 1; statName = "Intelligence"; break;
-            case 8: currentPlayer.Constitution += 1; statName = "Constitution"; break;
-            default: currentPlayer.Strength += 1; statName = "Strength"; break;
+            case 0: sanctumStat = StatKind.Strength; statName = "Strength"; break;
+            case 1: sanctumStat = StatKind.Defence; statName = "Defence"; break;
+            case 2: sanctumStat = StatKind.Stamina; statName = "Stamina"; break;
+            case 3: sanctumStat = StatKind.Agility; statName = "Agility"; break;
+            case 4: sanctumStat = StatKind.Charisma; statName = "Charisma"; break;
+            case 5: sanctumStat = StatKind.Dexterity; statName = "Dexterity"; break;
+            case 6: sanctumStat = StatKind.Wisdom; statName = "Wisdom"; break;
+            case 7: sanctumStat = StatKind.Intelligence; statName = "Intelligence"; break;
+            case 8: sanctumStat = StatKind.Constitution; statName = "Constitution"; break;
+            default: sanctumStat = StatKind.Strength; statName = "Strength"; break;
         }
+        currentPlayer.GrantPermanentStat(sanctumStat, 1);
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("\n" + Loc.Get("temple.sanctum_stat_gain", statName));
@@ -3308,6 +2686,9 @@ public partial class TempleLocation : BaseLocation
             try
             {
                 var immortals = await backend.GetImmortalPlayers();
+                // 1.2.0: one standings read for the whole listing: follower counts and each god's domain boon scale.
+                var standings = await Task.Run(() => backend.GetGodStandings());
+                long strongestCanon = GodBoonSystem.StrongestCanon(standings);
                 foreach (var god in immortals)
                 {
                     // Don't show the player's own god entry if they ARE the immortal.
@@ -3321,10 +2702,14 @@ public partial class TempleLocation : BaseLocation
                         DivineName = god.DivineName,
                         GodLevel = god.GodLevel,
                         GodAlignment = god.GodAlignment,
-                        Believers = PantheonLocation.CountBelievers(god.DivineName),
+                        Believers = PantheonLocation.CountBelievers(god.DivineName, standings),
                         IsOnline = god.IsOnline,
                         Username = god.Username,
-                        DivineBoonConfig = god.DivineBoonConfig ?? ""
+                        DivineBoonConfig = god.DivineBoonConfig ?? "",
+                        Domain = GodBoonSystem.ParseDomain(god.DivineDomain),
+                        BoonScalePct = GodBoonSystem.PlayerGodScalePct(
+                            GodBoonSystem.StandingOf(standings, god.DivineName), strongestCanon,
+                            GodBoonSystem.DaysInactive(god.IsOnline, god.LastLogin, DateTime.UtcNow))
                     });
                 }
             }
@@ -3350,43 +2735,45 @@ public partial class TempleLocation : BaseLocation
         return gods;
     }
 
-    private async Task WorshipImmortalGod()
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: the ascended player-gods' altars, listed under the canon gods in
+    /// the one altar list (the old J screen's list): each god's title, whether they are online,
+    /// alignment and followers, domain boon at the god's current scale, ward and configured boons.
+    /// </summary>
+    private void DisplayPlayerGodAltars(List<ImmortalGodInfo> gods)
     {
-        var gods = await GetImmortalGodsAsync();
-        if (gods.Count == 0)
-        {
-            terminal.WriteLine(Loc.Get("temple.no_ascended_gods"), "gray");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("temple.altars_ascended"), "bright_yellow");
+        if (gods.Count == 0) return;
+        terminal.WriteLine("");
+        WriteSectionHeader(Loc.Get("temple.altars_ascended"), "bright_yellow");
         terminal.WriteLine("");
 
         for (int i = 0; i < gods.Count; i++)
         {
             var god = gods[i];
             string title = PantheonLocation.GetGodTitle(god.GodLevel);
-            terminal.SetColor("white");
-            terminal.Write($"  {i + 1}. ");
             terminal.SetColor("bright_yellow");
-            terminal.Write($"{god.DivineName}");
-            terminal.SetColor("gray");
-            terminal.Write($" the {title}  ");
+            terminal.Write($"  {Loc.Get("temple.pgod.row", god.DivineName, title)}  ");
             terminal.SetColor(god.IsOnline ? "bright_green" : "gray");
-            terminal.Write(god.IsOnline ? "[ONLINE]" : "[OFFLINE]");
+            terminal.Write(Loc.Get(god.IsOnline ? "temple.pgod.online" : "temple.pgod.offline"));
             terminal.SetColor("white");
-            terminal.WriteLine($"  ({god.GodAlignment}, {god.Believers} believers)");
+            terminal.WriteLine($"  {Loc.Get("temple.pgod.followers", AlignmentName(god.GodAlignment), god.Believers)}");
+
+            // 1.2.0 Temple gods piece 2: the god's domain, its boon at the god's current scale, and its ward
+            terminal.SetColor("cyan");
+            if (god.Domain == GodDomain.None)
+                terminal.WriteLine($"     {Loc.Get("god.player_domain_none")}");
+            else
+            {
+                Say(Loc.Get("god.player_domain_line", GodBoonSystem.DomainName(god.Domain), god.BoonScalePct), "cyan", "     ");
+                Say(Loc.Get("god.boon_line", GodBoonSystem.DescribeBoon(god.Domain, god.BoonScalePct), god.BoonScalePct), "gray", "     ");
+                Say(Loc.Get("god.ward_line", GodBoonSystem.DescribeWard(god.Domain)), "darkgray", "     ");
+            }
 
             // Show boon description
-            string desc = DivineBoonRegistry.GenerateDescription(god.DivineBoonConfig, god.GodAlignment);
-            terminal.SetColor("gray");
-            terminal.WriteLine($"     {desc}");
+            Say(DivineBoonRegistry.GenerateDescription(god.DivineBoonConfig, god.GodAlignment), "gray", "     ");
 
             // Show individual boons
-            var boonLines = DivineBoonRegistry.GetEffectSummaryLines(god.DivineBoonConfig);
-            foreach (var line in boonLines)
+            foreach (var line in DivineBoonRegistry.GetEffectSummaryLines(god.DivineBoonConfig))
             {
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"     • {line}");
@@ -3394,13 +2781,15 @@ public partial class TempleLocation : BaseLocation
 
             if (i < gods.Count - 1) terminal.WriteLine("");
         }
+    }
 
-        terminal.WriteLine("");
-        string input = await terminal.GetInputAsync(Loc.Get("temple.worship_which"));
-        if (!int.TryParse(input, out int idx) || idx < 1 || idx > gods.Count) return;
-
-        var chosen = gods[idx - 1];
-
+    /// <summary>
+    /// Worship an ascended player-god chosen from the one altar list (1.2.0 Temple gods piece 7:
+    /// the old J key's switch, reached from W). The cost of leaving a current god is shown and asked
+    /// before the switch, which goes through SwitchGodAsync like every Temple god change.
+    /// </summary>
+    private async Task WorshipImmortalGod(ImmortalGodInfo chosen)
+    {
         // Check if already following this god
         if (currentPlayer.WorshippedGod == chosen.DivineName)
         {
@@ -3409,51 +2798,35 @@ public partial class TempleLocation : BaseLocation
             return;
         }
 
-        // If already following another player god, warn
+        // If already following another player god, show the cost and ask
         if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_follow", currentPlayer.WorshippedGod), "yellow");
-            string confirm = await terminal.GetInputAsync(Loc.Get("temple.abandon_prompt"));
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            ShowSwitchCost(chosen.DivineName);   // 1.2.0 Temple gods piece 4: the cost before the choice
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_prompt"))) return;
         }
 
-        // If following an NPC god, renounce them — the elder god may punish apostasy
+        // If following a canon god, show the cost and ask. 1.2.0 Temple gods piece 4: its wrath is
+        // the one switching rule (Divine Wrath by the Favor lost), no longer a random smite here.
         string oldNpcGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         if (!string.IsNullOrEmpty(oldNpcGod))
         {
             terminal.WriteLine(Loc.Get("temple.currently_worship_elder", oldNpcGod), "yellow");
-            string confirm = await terminal.GetInputAsync(Loc.Get("temple.abandon_elder_prompt", oldNpcGod));
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            ShowSwitchCost(chosen.DivineName);
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("temple.abandon_elder_prompt", oldNpcGod))) return;
 
-            godSystem.SetPlayerGod(currentPlayer.Name2, "");
             terminal.WriteLine("");
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("temple.renounce_elder", oldNpcGod));
-
-            // Divine retribution — the elder god may smite the apostate
-            var rng = Random.Shared;
-            if (rng.NextDouble() < 0.6) // 60% chance of punishment
-            {
-                long smiteDamage = Math.Max(1, (long)(currentPlayer.MaxHP * (0.1 + rng.NextDouble() * 0.2)));
-                currentPlayer.HP = Math.Max(1, currentPlayer.HP - smiteDamage);
-                terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get("temple.elder_strikes", oldNpcGod));
-                terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("temple.elder_damage", smiteDamage, currentPlayer.HP, currentPlayer.MaxHP));
-                await Task.Delay(1500);
-            }
-            else
-            {
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("temple.elder_watches", oldNpcGod));
-                await Task.Delay(1000);
-            }
         }
 
-        currentPlayer.WorshippedGod = chosen.DivineName;
+        await SwitchGodAsync(chosen.DivineName);
 
         // Cache boon effects from the chosen god
         currentPlayer.CachedBoonEffects = DivineBoonRegistry.CalculateEffects(chosen.DivineBoonConfig);
+        await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);   // 1.2.0 Temple gods piece 2: the domain boon
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
@@ -3479,19 +2852,6 @@ public partial class TempleLocation : BaseLocation
         {
             UsurperRemake.Server.MudServer.Instance.SendToPlayer(chosen.Username,
                 $"\u001b[1;33m  ✦ A mortal named {currentPlayer.Name2} now worships you! ✦\u001b[0m");
-        }
-
-        // Persist worship atomically to DB so believer counts update immediately
-        if (DoorMode.IsOnlineMode)
-        {
-            try
-            {
-                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
-                if (backend != null && !string.IsNullOrEmpty(sessionUsername))
-                    await backend.SetPlayerWorshippedGod(sessionUsername, chosen.DivineName);
-            }
-            catch { }
         }
 
         terminal.WriteLine("");
@@ -3587,6 +2947,8 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.gold_upon_altar", amount.ToString("N0"), currentPlayer.WorshippedGod));
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("temple.offering_burns", power));
+        // 1.2.0 Temple gods piece 3: the same Favor for gold as a canon god (one god system)
+        FavorUi.ReportGain(terminal, currentPlayer, FavorSystem.GoldSacrifice(currentPlayer, amount, godSystem), godSystem);
 
         // v0.61.3: player report — "when you are affiliated with a player god,
         // sacrificing gold to your deity doesn't make faith standing go higher."
@@ -3622,44 +2984,7 @@ public partial class TempleLocation : BaseLocation
         await terminal.PressAnyKey();
     }
 
-    private async Task LeaveImmortalFaith()
-    {
-        if (string.IsNullOrEmpty(currentPlayer.WorshippedGod))
-        {
-            terminal.WriteLine(Loc.Get("temple.no_immortal_god"), "gray");
-            await terminal.PressAnyKey();
-            return;
-        }
-
-        string godName = currentPlayer.WorshippedGod;
-        string confirm = await terminal.GetInputAsync(Loc.Get("temple.abandon_faith_prompt", godName));
-        if (!GameConfig.IsAffirmative(confirm)) return;
-
-        currentPlayer.WorshippedGod = "";
-        terminal.WriteLine("");
-        terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("temple.turn_away", godName));
-        terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("temple.without_patronage"));
-
-        // Persist atomically to DB so believer counts update immediately
-        if (DoorMode.IsOnlineMode)
-        {
-            try
-            {
-                var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
-                var sessionUsername = UsurperRemake.Server.SessionContext.Current?.Username;
-                if (backend != null && !string.IsNullOrEmpty(sessionUsername))
-                    await backend.SetPlayerWorshippedGod(sessionUsername, "");
-            }
-            catch { }
-        }
-
-        terminal.WriteLine("");
-        await terminal.PressAnyKey();
-    }
-
-    private class ImmortalGodInfo
+    internal class ImmortalGodInfo
     {
         public string DivineName { get; set; } = "";
         public int GodLevel { get; set; }
@@ -3668,7 +2993,558 @@ public partial class TempleLocation : BaseLocation
         public bool IsOnline { get; set; }
         public string Username { get; set; } = "";
         public string DivineBoonConfig { get; set; } = "";
+        public GodDomain Domain { get; set; } = GodDomain.None;     // 1.2.0 Temple gods piece 2
+        public int BoonScalePct { get; set; }                       // percent of a canon god's boon
     }
+
+    #endregion
+
+    #region Temple rooms (1.2.0 Temple gods piece 7)
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: the Temple's rooms. The hall screen lists them, one key each: the
+    /// Nave of the Gods (every altar, worship, prayer, offerings, the Altars screen), the Undercroft
+    /// (the dark altars and desecration), the Faith (Mirael, the oath, the Cloister), the Old Stones
+    /// (prophecies, visions, the foundation stones) and the Halls of Memory (the Fallen, the Rite
+    /// of Return, the Ascended). The Meditation Chapel and the Deep Temple are scenes, not rooms.
+    /// </summary>
+    internal enum TempleRoom { Nave, Undercroft, Faith, OldStones, Memory }
+
+    /// <summary>One menu entry: its key, its label (visual and screen reader) and its short BBS label.</summary>
+    internal readonly record struct TempleMenuItem(string Key, string Label, string Short);
+
+    /// <summary>One altar from the one god list: a canon god or an ascended player-god.</summary>
+    internal sealed record AltarPick(string Name, God? Canon, ImmortalGodInfo? PlayerGod);
+
+    /// <summary>
+    /// Keys the hall screen had before the rooms, and where each went. Typed at the hall they print
+    /// this pointer and do nothing else.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> MovedKeys = new Dictionary<string, string>
+    {
+        ["W"] = "temple.moved.worship", ["J"] = "temple.moved.worship", ["L"] = "temple.moved.worship",
+        ["Y"] = "temple.moved.pray",
+        ["C"] = "temple.moved.offer", ["I"] = "temple.moved.offer", ["$"] = "temple.moved.offer",
+        ["S"] = "temple.moved.altars", ["G"] = "temple.moved.altars",
+        ["D"] = "temple.moved.desecrate",
+        ["E"] = "temple.moved.stones",
+        ["K"] = "temple.moved.memory", ["V"] = "temple.moved.memory",
+        ["N"] = "temple.moved.faith",
+        ["O"] = "temple.moved.confession",
+    };
+
+    /// <summary>Tests only: the ascended player-gods the altar lists use instead of the save backend.</summary>
+    internal List<ImmortalGodInfo>? ImmortalGodsForTests;
+
+    private static TempleMenuItem Item(string key, string labelKey, string shortKey) =>
+        new(key, Loc.Get(labelKey), Loc.Get(shortKey));
+
+    /// <summary>The hall screen's rooms, in order; H, M and T only where they apply.</summary>
+    private List<TempleMenuItem> TopMenuItems()
+    {
+        var items = new List<TempleMenuItem>
+        {
+            Item("A", "temple.top.nave", "temple.room.nave"),
+            Item("U", "temple.top.undercroft", "temple.room.undercroft"),
+            Item("F", "temple.top.faith", "temple.room.faith"),
+            Item("P", "temple.top.stones", "temple.room.stones"),
+        };
+        if (HallsOfMemoryOpen()) items.Add(Item("H", "temple.top.memory", "temple.room.memory"));
+        if (CanMeetMira()) items.Add(Item("M", "temple.top.chapel", "temple.room.chapel"));
+        if (CanEnterDeepTemple()) items.Add(Item("T", "temple.top.deep", "temple.room.deep"));
+        items.Add(Item("R", "temple.top.return", "temple.room.return"));
+        return items;
+    }
+
+    /// <summary>What a hall key opens. M and T check their own conditions again.</summary>
+    private Func<Task>? TopAction(string key) => key switch
+    {
+        "A" => () => RunRoom(TempleRoom.Nave),
+        "U" => () => RunRoom(TempleRoom.Undercroft),
+        "F" => () => RunRoom(TempleRoom.Faith),
+        "P" => () => RunRoom(TempleRoom.OldStones),
+        "H" => () => RunRoom(TempleRoom.Memory),
+        "M" => VisitMeditationChapel,
+        "T" => EnterDeepTemple,
+        _ => null
+    };
+
+    /// <summary>
+    /// One key at the hall screen. A listed key opens its room (R leaves the Temple: true). M and T
+    /// while hidden run their own closed message. An old key that moved into a room prints a
+    /// one-line pointer and does nothing else; any other key is invalid.
+    /// </summary>
+    private async Task<bool> RouteTopLevel(string choice)
+    {
+        string key = (choice ?? "").Trim().ToUpperInvariant();
+        bool listed = TopMenuItems().Any(i => i.Key == key);
+        if (key == "R" && listed) return true;
+        // T once Aurelion is resolved: his memory is in the Halls of Memory, never a fight
+        if (key == "T" && !listed && AurelionResolved())
+        {
+            terminal.WriteLine("");
+            Say(Loc.Get("temple.moved.aurelion"), "yellow");
+            await terminal.PressAnyKey();
+            return false;
+        }
+        if (listed || key == "M" || key == "T")
+        {
+            var action = TopAction(key);
+            if (action != null) await action();
+            refreshMenu = true;
+            return false;
+        }
+
+        // H while no hall applies: the old H (holy news) became the Nave's Altars screen
+        string? pointer = key == "H" ? "temple.moved.altars" : MovedKeys.TryGetValue(key, out var k) ? k : null;
+        // K and V moved into the Halls of Memory: the pointer only makes sense while that hall is open
+        if (pointer == "temple.moved.memory" && !HallsOfMemoryOpen()) pointer = null;
+        if (pointer != null)
+        {
+            terminal.WriteLine("");
+            Say(Loc.Get(pointer), "yellow");
+            await terminal.PressAnyKey();
+        }
+        else
+        {
+            terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
+            await Task.Delay(1000);
+        }
+        return false;
+    }
+
+    /// <summary>A room's entries, in order, only those that apply now.</summary>
+    private async Task<List<TempleMenuItem>> RoomItems(TempleRoom room)
+    {
+        var items = new List<TempleMenuItem>();
+        string back = Loc.Get("temple.room.back");
+        switch (room)
+        {
+            case TempleRoom.Nave:
+                items.Add(Item("W", "temple.nave.worship", "temple.nave.worship"));
+                AddPrayItem(items);
+                items.Add(Item("O", "temple.nave.offer", "temple.nave.offer"));
+                items.Add(Item("A", "temple.nave.altars", "temple.nave.altars"));
+                break;
+            case TempleRoom.Undercroft:
+                items.Add(Item("W", "temple.undercroft.worship", "temple.undercroft.worship"));
+                if (await OwnGodIsDark()) AddPrayItem(items);
+                items.Add(Item("O", "temple.undercroft.offer", "temple.undercroft.offer"));
+                items.Add(Item("D", "temple.undercroft.desecrate", "temple.undercroft.desecrate"));
+                break;
+            case TempleRoom.Faith:
+                items.Add(Item("M", "temple.faith_hall.mirael", "temple.faith_hall.mirael"));
+                if (FactionSystem.Instance?.HasTempleAccess() == true)
+                {
+                    string cloister = MeditatedInCloisterToday()
+                        ? Loc.Get("temple.faith_hall.cloister_done")
+                        : Loc.Get("temple.faith_hall.cloister", GameConfig.InnerSanctumCost);
+                    items.Add(new TempleMenuItem("C", cloister, cloister));
+                }
+                break;
+            case TempleRoom.OldStones:
+                items.Add(Item("P", "temple.stones.prophecies", "temple.stones.prophecies"));
+                if (!StoryProgressionSystem.Instance.CollectedSeals.Contains(UsurperRemake.Systems.SealType.Creation))
+                    items.Add(Item("E", "temple.stones.examine", "temple.stones.examine"));
+                break;
+            case TempleRoom.Memory:
+                if (CanShowHallOfTheFallen()) items.Add(Item("K", "temple.memory.fallen", "temple.memory.fallen"));
+                if (CanShowRiteOfReturn())
+                {
+                    string rite = Loc.Get("temple.memory.rite", GameConfig.GetRiteOfReturnCost(currentPlayer.Level));
+                    items.Add(new TempleMenuItem("U", rite, rite));
+                }
+                if (HasAscendedStatues()) items.Add(Item("V", "temple.memory.ascended", "temple.memory.ascended"));
+                if (AurelionResolved()) items.Add(Item("A", "temple.memory.aurelion", "temple.memory.aurelion"));
+                break;
+        }
+        items.Add(new TempleMenuItem("R", back, back));
+        return items;
+    }
+
+    /// <summary>Y: prayer to the character's own god, once a day (shown only with a god).</summary>
+    private void AddPrayItem(List<TempleMenuItem> items)
+    {
+        var own = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
+        if (own == null) return;
+        bool canPray = DivineBlessingSystem.Instance.CanPrayToday(currentPlayer.Name2);
+        string label = Loc.Get(canPray ? "temple.nave.pray" : "temple.nave.prayed", own.Value.Name);
+        items.Add(new TempleMenuItem("Y", label, label));
+    }
+
+    /// <summary>What a room key does. Desecration exists only in the Undercroft.</summary>
+    private Func<Task>? RoomAction(TempleRoom room, string key) => (room, key) switch
+    {
+        (TempleRoom.Nave, "W") => () => ProcessWorship(TempleRoom.Nave),
+        (TempleRoom.Nave, "Y") => ProcessDailyPrayer,
+        (TempleRoom.Nave, "O") => () => ProcessOffering(TempleRoom.Nave),
+        (TempleRoom.Nave, "A") => ShowAltarsScreen,
+        (TempleRoom.Undercroft, "W") => () => ProcessWorship(TempleRoom.Undercroft),
+        (TempleRoom.Undercroft, "Y") => ProcessDailyPrayer,
+        (TempleRoom.Undercroft, "O") => () => ProcessOffering(TempleRoom.Undercroft),
+        (TempleRoom.Undercroft, "D") => ProcessDesecrateAltar,
+        (TempleRoom.Faith, "M") => ShowFaithRecruitment,
+        (TempleRoom.Faith, "C") => VisitInnerSanctum,
+        (TempleRoom.OldStones, "P") => DisplayOldGodsProphecies,
+        (TempleRoom.OldStones, "E") => ExamineAncientStones,
+        (TempleRoom.Memory, "K") => ShowHallOfTheFallen,
+        (TempleRoom.Memory, "U") => ProcessRiteOfReturn,
+        (TempleRoom.Memory, "V") => ShowAscendedStatues,
+        (TempleRoom.Memory, "A") => ShowAurelionMemory,
+        _ => null
+    };
+
+    /// <summary>
+    /// A room's loop: its screen (skipped in Expert mode unless asked with ?), the global commands,
+    /// a listed key's action, and R or Enter back to the hall screen.
+    /// </summary>
+    private async Task RunRoom(TempleRoom room)
+    {
+        bool redraw = true;
+        while (true)
+        {
+            GodBoonSystem.ApplyPendingBoonRecalc(currentPlayer);
+            var items = await RoomItems(room);
+            if (redraw || !currentPlayer.Expert) DrawRoom(room, items);
+            redraw = false;
+
+            string choice = ((await terminal.GetInputAsync(Loc.Get("ui.your_choice"))) ?? "").Trim();
+            var (handled, _) = await TryProcessGlobalCommand(choice);
+            if (handled) { redraw = true; continue; }
+
+            string key = choice.ToUpperInvariant();
+            if (key == "?") { redraw = true; continue; }
+            if (key == "R" || key.Length == 0) return;
+
+            var action = items.Any(i => i.Key == key) ? RoomAction(room, key) : null;
+            if (action == null)
+            {
+                terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
+                await Task.Delay(1000);
+                continue;
+            }
+            await action();
+        }
+    }
+
+    /// <summary>A room's screen: its header, what the player sees there, and its menu.</summary>
+    private void DrawRoom(TempleRoom room, List<TempleMenuItem> items)
+    {
+        terminal.ClearScreen();
+        switch (room)
+        {
+            case TempleRoom.Nave:
+                WriteBoxHeader(Loc.Get("temple.nave.header"), "bright_cyan");
+                terminal.WriteLine("");
+                Say(Loc.Get("temple.nave.desc1"), "white");
+                Say(Loc.Get("temple.nave.desc2"), "white");
+                terminal.WriteLine("");
+                WriteWorshipLine();
+                if (IsEvilPlayer()) Say(Loc.Get("temple.nave.evil_unwelcome"), "red");
+                break;
+            case TempleRoom.Undercroft:
+                WriteBoxHeader(Loc.Get("temple.undercroft.header"), "dark_red");
+                terminal.WriteLine("");
+                Say(Loc.Get("temple.undercroft.desc1"), "white");
+                Say(Loc.Get("temple.undercroft.desc2"), "white");
+                terminal.WriteLine("");
+                WriteWorshipLine();
+                var band = AlignmentSystem.Instance.GetAlignment(currentPlayer);
+                bool dark = band == AlignmentSystem.AlignmentType.Evil || band == AlignmentSystem.AlignmentType.Dark;
+                Say(Loc.Get(dark ? "temple.undercroft.welcome_dark" : "temple.undercroft.welcome_other"), dark ? "bright_magenta" : "gray");
+                break;
+            case TempleRoom.Faith:
+                WriteBoxHeader(Loc.Get("temple.faith_hall.header"), "bright_yellow");
+                terminal.WriteLine("");
+                Say(Loc.Get("temple.faith_hall.creed1"), "bright_cyan");
+                Say(Loc.Get("temple.faith_hall.creed2"), "bright_cyan");
+                Say(Loc.Get("temple.faith_hall.creed3"), "bright_cyan");
+                break;
+            case TempleRoom.OldStones:
+                WriteBoxHeader(Loc.Get("temple.stones.header"), "bright_magenta");
+                terminal.WriteLine("");
+                Say(Loc.Get("temple.stones.desc1"), "white");
+                Say(Loc.Get("temple.stones.desc2"), "white");
+                break;
+            case TempleRoom.Memory:
+                WriteBoxHeader(Loc.Get("temple.memory.header"), "bright_cyan");
+                terminal.WriteLine("");
+                Say(Loc.Get("temple.memory.desc1"), "white");
+                break;
+        }
+        terminal.WriteLine("");
+        WriteTempleMenu(items, bbsRows: false);
+        terminal.WriteLine("");
+    }
+
+    /// <summary>
+    /// A menu from its item list, the same keys in every mode: the screen reader reads "K. label"
+    /// lines, the BBS hall screen packs the short labels three to a row, and otherwise each entry
+    /// is one "[K] label" line.
+    /// </summary>
+    private void WriteTempleMenu(List<TempleMenuItem> items, bool bbsRows)
+    {
+        if (IsScreenReader)
+        {
+            foreach (var i in items) WriteSRMenuOption(i.Key, i.Label);
+            return;
+        }
+        if (bbsRows && IsBBSSession)
+        {
+            for (int n = 0; n < items.Count; n += 3)
+                ShowBBSMenuRow(items.Skip(n).Take(3).Select(i => (i.Key, "bright_yellow", i.Short)).ToArray());
+            return;
+        }
+        foreach (var i in items)
+        {
+            terminal.Write(" ");
+            WriteSRMenuOption(i.Key, i.Label);
+        }
+    }
+
+    /// <summary>A line of Temple text, wrapped to the 80-column screen.</summary>
+    private void Say(string text, string color, string indent = " ")
+    {
+        terminal.SetColor(color);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, text, indent);
+    }
+
+    /// <summary>The god the player worships (canon or player-god), or that they worship none.</summary>
+    private void WriteWorshipLine()
+    {
+        string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
+        if (!string.IsNullOrEmpty(playerGod))
+            terminal.WriteLine(Loc.Get("temple.worship_god", playerGod), "cyan");
+        else if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod))
+            terminal.WriteLine(Loc.Get("temple.follow_immortal", currentPlayer.WorshippedGod), "bright_yellow");
+        else
+            terminal.WriteLine(Loc.Get("temple.not_believer"), "gray");
+    }
+
+    /// <summary>
+    /// The Nave's Altars screen: the player's devotion (DisplayPlayerStatus), then every god on one
+    /// ranking by standing with this week's god (DisplayGodRanking, which waits for a key). It
+    /// replaces the old altar list, rankings, holy news and status keys; Manwe is on neither list.
+    /// </summary>
+    private async Task ShowAltarsScreen()
+    {
+        terminal.ClearScreen();
+        WriteSectionHeader(Loc.Get("temple.altars"), "magenta");
+        await DisplayPlayerStatus();
+        await DisplayGodRanking();
+    }
+
+    /// <summary>
+    /// The altars of a room: the Nave has every god (the ten canon gods and each ascended
+    /// player-god), the Undercroft only the dark ones (Umbrath, Mortis, Discordia, and player-gods
+    /// of the Dark). Never Manwe.
+    /// </summary>
+    private async Task<List<AltarPick>> AltarsFor(TempleRoom room)
+    {
+        var list = new List<AltarPick>();
+        foreach (var god in godSystem.GetActiveGods().Where(g => GodRegistry.IsCanon(g.Name)).OrderBy(g => g.Name))
+        {
+            var pick = new AltarPick(god.Name, god, null);
+            if (room != TempleRoom.Undercroft || IsDarkAltar(pick)) list.Add(pick);
+        }
+        foreach (var ig in ImmortalGodsForTests ?? await GetImmortalGodsAsync())
+        {
+            if (string.IsNullOrWhiteSpace(ig.DivineName) || GodRegistry.IsCanon(ig.DivineName) || GodRegistry.IsManwe(ig.DivineName)) continue;
+            var pick = new AltarPick(ig.DivineName, null, ig);
+            if (room != TempleRoom.Undercroft || IsDarkAltar(pick)) list.Add(pick);
+        }
+        return list;
+    }
+
+    /// <summary>A god of the light: a canon god with more Goodness than Darkness, or a player-god of the Light.</summary>
+    private static bool IsGoodAltar(AltarPick pick) =>
+        pick.Canon != null ? pick.Canon.Goodness > pick.Canon.Darkness
+                           : string.Equals(pick.PlayerGod?.GodAlignment, "Light", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A dark god: a canon god with more Darkness than Goodness, or a player-god of the Dark.</summary>
+    private static bool IsDarkAltar(AltarPick pick) =>
+        pick.Canon != null ? pick.Canon.Darkness > pick.Canon.Goodness
+                           : string.Equals(pick.PlayerGod?.GodAlignment, "Dark", StringComparison.OrdinalIgnoreCase);
+
+    private bool IsEvilPlayer() =>
+        AlignmentSystem.Instance.GetAlignment(currentPlayer) == AlignmentSystem.AlignmentType.Evil;
+
+    /// <summary>
+    /// Evil players are unwelcome in the Nave: its priests refuse their offerings to a good god,
+    /// except their own: an Evil follower of a good god may still offer to the god they worship.
+    /// </summary>
+    private bool NaveRefusesOffering(TempleRoom room, AltarPick pick)
+    {
+        if (room != TempleRoom.Nave || !IsEvilPlayer() || !IsGoodAltar(pick)) return false;
+        var own = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
+        bool isOwn = own is { } o && o.Name.Equals(pick.Name, StringComparison.OrdinalIgnoreCase);
+        return !isOwn;
+    }
+
+    /// <summary>True when the character's own god has an altar in the Undercroft.</summary>
+    private async Task<bool> OwnGodIsDark()
+    {
+        var own = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
+        if (own == null) return false;
+        return (await AltarsFor(TempleRoom.Undercroft)).Any(a => a.Name.Equals(own.Value.Name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Choose an altar of this room from the one god list by (part of) its name. Enter cancels.
+    /// </summary>
+    private async Task<AltarPick?> SelectAltar(string prompt, TempleRoom room, bool requireConfirmation)
+    {
+        var altars = await AltarsFor(room);
+        if (altars.Count == 0)
+        {
+            terminal.WriteLine(Loc.Get("temple.no_gods_available"), "red");
+            await Task.Delay(1000);
+            return null;
+        }
+
+        DisplayGodListCompact(altars.Where(a => a.Canon != null).Select(a => a.Canon!).ToList(), nameHint: false);
+        DisplayPlayerGodAltars(altars.Where(a => a.PlayerGod != null).Select(a => a.PlayerGod!).ToList());
+        terminal.WriteLine("");
+        terminal.SetColor("gray");
+        terminal.WriteLine(Loc.Get("temple.type_name_hint"));
+
+        while (true)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("temple.select_prompt", prompt), "white");
+            string input = ((await terminal.GetInputAsync("> ")) ?? "").Trim();
+            if (input.Length == 0) return null;
+
+            var pick = altars.FirstOrDefault(a => a.Name.Equals(input, StringComparison.OrdinalIgnoreCase));
+            if (pick == null)
+            {
+                var starts = altars.Where(a => a.Name.StartsWith(input, StringComparison.OrdinalIgnoreCase)).ToList();
+                var contains = altars.Where(a => a.Name.Contains(input, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (starts.Count == 1) pick = starts[0];
+                else if (starts.Count == 0 && contains.Count == 1) pick = contains[0];
+                else if (contains.Count == 0)
+                {
+                    terminal.WriteLine(Loc.Get("temple.no_god_match", input), "red");
+                    continue;
+                }
+                else
+                {
+                    terminal.WriteLine("");
+                    terminal.WriteLine(Loc.Get("temple.multiple_matches"), "yellow");
+                    foreach (var m in starts.Count > 0 ? starts : contains)
+                        terminal.WriteLine($"  {m.Name}", "white");
+                    terminal.WriteLine(Loc.Get("temple.be_more_specific"), "gray");
+                    continue;
+                }
+            }
+
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("temple.selected_altar", pick.Name), IsDarkAltar(pick) ? "dark_red" : IsGoodAltar(pick) ? "bright_cyan" : "yellow");
+            if (requireConfirmation)
+            {
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("ui.confirm_choose", pick.Name)))
+                {
+                    terminal.WriteLine(Loc.Get("temple.selection_cancelled"), "gray");
+                    continue;
+                }
+            }
+            return pick;
+        }
+    }
+
+    /// <summary>
+    /// O: one offering at an altar of this room (the old C, I and $). Gold goes to any canon altar
+    /// (with the old warning and wrath when it is not your god's) or to your own player-god; goods
+    /// (weapon, armor, healing potions) go only to your own god. In the Nave, an Evil player's
+    /// offering to a good god is refused.
+    /// </summary>
+    private async Task ProcessOffering(TempleRoom room)
+    {
+        terminal.WriteLine("");
+        var pick = await SelectAltar(Loc.Get("temple.offer.prompt"), room, requireConfirmation: false);
+        if (pick == null) return;
+
+        if (NaveRefusesOffering(room, pick))
+        {
+            terminal.WriteLine("");
+            Say(Loc.Get("temple.offer.refused_evil", pick.Name), "red");
+            Say(Loc.Get("temple.offer.refused_evil_hint"), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        var own = GodRegistry.GetWorshippedGod(currentPlayer, godSystem);
+        bool isOwn = own is { } o && o.Name.Equals(pick.Name, StringComparison.OrdinalIgnoreCase);
+        if (pick.PlayerGod != null && !isOwn)
+        {
+            Say(Loc.Get("temple.offer.followers_only", pick.Name), "yellow");
+            await terminal.PressAnyKey();
+            return;
+        }
+
+        terminal.WriteLine("");
+        var kinds = new List<TempleMenuItem> { new("G", Loc.Get("temple.offer.gold"), "") };
+        if (isOwn) kinds.Add(new TempleMenuItem("I", Loc.Get("temple.offer.goods"), ""));
+        kinds.Add(new TempleMenuItem("R", Loc.Get("temple.room.back_short"), ""));
+        WriteTempleMenu(kinds, bbsRows: false);
+
+        string kind = ((await terminal.GetInputAsync(Loc.Get("ui.your_choice"))) ?? "").Trim().ToUpperInvariant();
+        if (kind == "G")
+        {
+            if (pick.Canon != null) await ProcessContribute(pick.Canon);
+            else await SacrificeToImmortalGod();
+        }
+        else if (kind == "I" && isOwn)
+        {
+            await ProcessItemSacrifice();
+        }
+        else if (kind != "R" && kind.Length > 0)
+        {
+            terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
+            await Task.Delay(1000);
+        }
+    }
+
+    /// <summary>The Halls of Memory open when one of its halls applies.</summary>
+    private bool HallsOfMemoryOpen() => CanShowHallOfTheFallen() || CanShowRiteOfReturn() || HasAscendedStatues() || AurelionResolved();
+
+    /// <summary>The Hall of the Ascended shows when founder statues stand at the Pantheon.</summary>
+    private static bool HasAscendedStatues() =>
+        UsurperRemake.Data.FounderStatueData.GetStatuesAt(UsurperRemake.Data.FounderStatueData.StatueLocationTag.Pantheon).Any();
+
+    /// <summary>
+    /// V: the founder statues. Mortals can't enter the Pantheon, so the immortal-founder statues are
+    /// mirrored here where the public venerates the gods. Same data as the Pantheon's [H] menu.
+    /// </summary>
+    private Task ShowAscendedStatues() =>
+        UsurperRemake.Systems.FounderStatueSystem.ShowStatuesAt(
+            UsurperRemake.Data.FounderStatueData.StatueLocationTag.Pantheon, terminal);
+
+    /// <summary>True when the Cloister's meditation was used today (online by the reset boundary).</summary>
+    private bool MeditatedInCloisterToday()
+    {
+        if (DoorMode.IsOnlineMode)
+            return currentPlayer.LastInnerSanctumRealDate >= DailySystemManager.GetCurrentResetBoundary();
+        return currentPlayer.InnerSanctumLastDay >= (DailySystemManager.Instance?.CurrentDay ?? 0);
+    }
+
+    /// <summary>A Favor tier's name.</summary>
+    private static string TierName(GodFavorTier tier) => tier switch
+    {
+        GodFavorTier.Chosen => Loc.Get("temple.tier.chosen"),
+        GodFavorTier.Zealot => Loc.Get("temple.tier.zealot"),
+        GodFavorTier.Devout => Loc.Get("temple.tier.devout"),
+        _ => Loc.Get("temple.tier.follower"),
+    };
+
+    /// <summary>A player-god's alignment (Light, Dark, Balance) in the player's language.</summary>
+    private static string AlignmentName(string? alignment) => alignment?.Trim().ToLowerInvariant() switch
+    {
+        "light" => Loc.Get("temple.align.light"),
+        "dark" => Loc.Get("temple.align.dark"),
+        _ => Loc.Get("temple.align.balance"),
+    };
 
     #endregion
 

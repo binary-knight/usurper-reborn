@@ -141,7 +141,7 @@ public class JournalSystemTests
         // directions. The contract: it must end at a dungeon-facing key.
         step.LocKey.Should().BeOneOf(
             "journal.next_delve", "journal.next_delve_resume",
-            "journal.next_seal", "journal.next_god");
+            "journal.next_seal", "journal.next_god", "journal.next_god_temple");
     }
 
     [Fact]

@@ -243,9 +243,7 @@ public class InnLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        var choice = await GetChoice();
-
-        if (GameConfig.IsAffirmative(choice))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.your_choice")))
         {
             bool success = await CompanionSystem.Instance.RecruitCompanion(CompanionId.Aldric, currentPlayer, terminal);
             if (success)
@@ -761,6 +759,9 @@ public class InnLocation : BaseLocation
     /// <summary>
     /// Buy a drink at the inn
     /// </summary>
+    /// <summary>1.2.0: the source of the ale's temporary stat buffs (one per stat, refreshed by a repeat).</summary>
+    internal const string AleBuffSource = "inn_ale";
+
     private async Task BuyDrink()
     {
         long drinkBasePrice = 5;
@@ -790,15 +791,15 @@ public class InnLocation : BaseLocation
         {
             case 1:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_charisma"));
-                currentPlayer.Charisma += 2;
+                currentPlayer.AddTimedStatBuff(AleBuffSource, StatKind.Charisma, 2, StatBuffEnd.Rest);   // 1.2.0: until the next rest; a repeat refreshes
                 break;
             case 2:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_strength"));
-                currentPlayer.Strength += 1;
+                currentPlayer.AddTimedStatBuff(AleBuffSource, StatKind.Strength, 1, StatBuffEnd.Rest);
                 break;
             case 3:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_wisdom"));
-                currentPlayer.Wisdom = Math.Max(1, currentPlayer.Wisdom - 1);
+                currentPlayer.AddTimedStatBuff(AleBuffSource, StatKind.Wisdom, -1, StatBuffEnd.Rest);
                 break;
             case 4:
                 terminal.WriteLine(Loc.Get("inn.drink_effect_hp"));
@@ -875,9 +876,7 @@ public class InnLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("ui.confirm_fight"));
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.confirm_fight"), enterDefault: false))
         {
             await FightSethAble();
         }
@@ -1026,6 +1025,13 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("inn.seth_massive_headache"));
                 currentPlayer.HP = 1;
                 currentPlayer.PDefeats++;
+                break;
+
+            case CombatOutcome.PlayerEscaped when result.MentalCollapseNotFought:
+                // v1.1.15: not entered (Mental 0), not fled
+                terminal.SetColor("gray");
+                terminal.WriteLine("");
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
                 break;
 
             case CombatOutcome.PlayerEscaped:
@@ -1307,8 +1313,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.npc_regret_decision"));
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput(Loc.Get("inn.fight_now_prompt"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("inn.fight_now_prompt"), enterDefault: false))
         {
             terminal.WriteLine(Loc.Get("inn.npc_changed_mind", npc.Name2), "gray");
             await Task.Delay(2000);
@@ -2182,6 +2187,9 @@ public class InnLocation : BaseLocation
                 // Found the next undefeated god
                 if (anyDefeated)
                 {
+                    // Aurelion's site is the Temple's Deep Temple, not a dungeon floor
+                    if (entry.God == OldGodType.Aurelion)
+                        return Loc.Get("inn.bartender_rumor_next_god_temple");
                     // Hint about the next god
                     return Loc.Get("inn.bartender_rumor_next_god", entry.Floor, entry.Name);
                 }
@@ -2363,13 +2371,10 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.rest_quiet_corner"), "green");
         await Task.Delay(2000);
 
-        // Remove Groggo's Shadow Blessing on rest (v0.41.0)
+        // Groggo's Shadow Blessing fades on rest (v0.41.0); 1.2.0: OnRest clears it and recalculates
         if (currentPlayer.GroggoShadowBlessingDex > 0)
-        {
-            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
             terminal.WriteLine(Loc.Get("inn.rest_shadow_fades"), "gray");
-            currentPlayer.GroggoShadowBlessingDex = 0;
-        }
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
         // Blood Price rest penalty — dark memories reduce rest effectiveness
         float restEfficiency = 1.0f;
@@ -2413,6 +2418,10 @@ public class InnLocation : BaseLocation
             if (currentPlayer.Fatigue < oldFatigue)
                 terminal.WriteLine(Loc.Get("inn.rest_fatigue_reduced", oldFatigue - currentPlayer.Fatigue), "bright_green");
         }
+
+        // v1.1.15: Mental, once a day; more with an NPC friend at the table (InnTable and InnFriend share the day).
+        int mentalBeforeTable = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeTable, MentalSystem.ApplyInnTable(currentPlayer, GetLiveNPCsAtLocation()));
 
         // Check for dreams during rest (nightmares take priority if MurderWeight > 0)
         var dream = DreamSystem.Instance.GetDreamForRest(currentPlayer, 0);
@@ -2556,6 +2565,10 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("");
             DreamSystem.Instance.ExperienceDream(dream.Id);
         }
+
+        // v1.1.15: a night's sleep eases the mind (no daily flag beyond the sleep itself).
+        int mentalBeforeSleep = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalInnSleepGain));
 
         // Advance to morning
         terminal.WriteLine("");
@@ -3512,9 +3525,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine($" {Loc.Get("inn.not_yet")}");
             terminal.WriteLine("");
 
-            var choice = await terminal.GetInput(Loc.Get("inn.will_you_help"));
-
-            if (GameConfig.IsAffirmative(choice))
+            if (await terminal.AskYesNoAsync(Loc.Get("inn.will_you_help")))
             {
                 bool started = CompanionSystem.Instance.StartPersonalQuest(companion.Id);
                 if (started)
@@ -4298,8 +4309,7 @@ public class InnLocation : BaseLocation
         terminal.Write(Loc.Get("inn.leave_nothing"));
         terminal.SetColor("white");
 
-        var confirm = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -4498,21 +4508,21 @@ public class InnLocation : BaseLocation
                     terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
                     terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
                     terminal.SetColor(isDisabled ? "gray" : "white");
-                    terminal.Write($"{spell.Name,-24}");
+                    terminal.Write($"{spell.DisplayName,-24}");
                     terminal.SetColor("darkgray");
                     terminal.Write($" {spell.ManaCost,2} MP  Lv{SpellSystem.GetLevelRequired(charClass, spell.Level),-3}  ");
                     terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                    if (IsScreenReader || spell.Description.Length <= 35)
+                    if (IsScreenReader || spell.DisplayDescription.Length <= 35)
                     {
-                        terminal.WriteLine(spell.Description);
+                        terminal.WriteLine(spell.DisplayDescription);
                     }
                     else
                     {
-                        int breakAt = spell.Description.LastIndexOf(' ', 35);
+                        int breakAt = spell.DisplayDescription.LastIndexOf(' ', 35);
                         if (breakAt <= 10) breakAt = 35;
-                        terminal.WriteLine(spell.Description[..breakAt]);
+                        terminal.WriteLine(spell.DisplayDescription[..breakAt]);
                         terminal.SetColor("dark_gray");
-                        terminal.WriteLine($"        {spell.Description[breakAt..].TrimStart()}");
+                        terminal.WriteLine($"        {spell.DisplayDescription[breakAt..].TrimStart()}");
                     }
                 }
             }
@@ -4571,13 +4581,13 @@ public class InnLocation : BaseLocation
                     {
                         companion.DisabledSpells.Remove(spell.Name);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  Enabled: {spell.Name}");
+                        terminal.WriteLine($"  Enabled: {spell.DisplayName}");
                     }
                     else
                     {
                         companion.DisabledSpells.Add(spell.Name);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  Disabled: {spell.Name}");
+                        terminal.WriteLine($"  Disabled: {spell.DisplayName}");
                     }
                 }
                 await Task.Delay(600);
@@ -5049,9 +5059,7 @@ public class InnLocation : BaseLocation
                     terminal.SetColor("cyan");
                     terminal.Write(" ");
                     terminal.SetColor("white");
-                    string dd = (await terminal.ReadLineAsync()).ToUpper().Trim();
-
-                    if (GameConfig.IsAffirmative(dd))
+                    if (await terminal.AskYesNoAsync(""))
                         continue; // the pot rides; only the stake was ever real money
 
                     currentPlayer.Gold += pot;
@@ -5326,9 +5334,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(" ");
         terminal.SetColor("white");
-        string accept = (await terminal.ReadLineAsync()).ToUpper().Trim();
-
-        if (!GameConfig.IsAffirmative(accept))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("inn.aw_back_away"));
@@ -5495,12 +5501,15 @@ public class InnLocation : BaseLocation
             terminal.SetColor("white");
         }
 
+        // v1.1.15: the room's Mental gain would apply nothing at the cap; say so before charging.
+        if (!MentalSystem.GainAvailable(currentPlayer))
+            terminal.WriteLine(Loc.Get("mental.no_gain_at_cap"), "gray");
+
         // Confirm total cost
         long totalCost = roomCost + totalGuardCost;
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("inn.rent_total_cost", totalCost.ToString("N0"), roomCost.ToString("N0"), totalGuardCost.ToString("N0")));
-        var confirm = await terminal.GetInput(Loc.Get("inn.rent_confirm"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("inn.rent_confirm"), enterDefault: false))
         {
             terminal.WriteLine(Loc.Get("inn.rent_cancelled"), "gray");
             await Task.Delay(1000);
@@ -5527,23 +5536,23 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.rent_bank_withdraw", shortfall.ToString("N0")), "gray");
         }
 
-        // Remove Groggo's Shadow Blessing on rest (v0.41.0)
+        // Groggo's Shadow Blessing fades on rest (v0.41.0); 1.2.0: OnRest clears it and recalculates
         if (currentPlayer.GroggoShadowBlessingDex > 0)
-        {
-            currentPlayer.Dexterity = Math.Max(1, currentPlayer.Dexterity - currentPlayer.GroggoShadowBlessingDex);
             terminal.WriteLine(Loc.Get("inn.rent_shadow_fades"), "gray");
-            currentPlayer.GroggoShadowBlessingDex = 0;
-        }
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
 
-        // Restore HP/Mana/Stamina
+        // Restore HP/Mana
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
             await DailySystemManager.Instance.ForceDailyReset();
         }
+
+        // v1.1.15: a rented room's sleep eases the mind (no daily flag beyond the sleep itself).
+        int mentalBeforeRoom = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeRoom, MentalSystem.Change(currentPlayer, GameConfig.MentalInnSleepGain));
 
         // Save game
         await GameEngine.Instance.SaveCurrentGame();

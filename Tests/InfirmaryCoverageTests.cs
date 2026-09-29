@@ -184,7 +184,7 @@ public class InfirmaryCoverageTests
         for (int n = 0; n < 2; n++)
         {
             int difficulty = body.IndexOf("DifficultySystem.ApplyHealingMultiplier(healAmount)", from, StringComparison.Ordinal);
-            int bonus = body.IndexOf("PotionBonus.ApplyOwnerBonuses(player, healAmount)", from, StringComparison.Ordinal);
+            int bonus = body.IndexOf("PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters)", from, StringComparison.Ordinal);
             int cap = body.IndexOf("Math.Min(healAmount, player.MaxHP - player.HP)", from, StringComparison.Ordinal);
             difficulty.Should().BeGreaterThan(0);
             bonus.Should().BeGreaterThan(difficulty, "the Infirmary is the last modifier");
@@ -198,7 +198,7 @@ public class InfirmaryCoverageTests
     {
         string body = MethodBody("Scripts/Systems/CombatEngine.cs", "TeammateHealWithPotion");
         body.Should().Contain("potionOwner = owner;", "a potion from the player's belt carries the belt owner's bonus");
-        body.Should().Contain("PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount)");
+        body.Should().Contain("PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters)");
     }
 
     [Fact]

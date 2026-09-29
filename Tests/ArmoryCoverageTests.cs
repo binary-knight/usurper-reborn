@@ -201,7 +201,7 @@ public class ArmoryCoverageTests
             var target = Dummy();
             long before = target.HP;
             await (Task)typeof(CombatEngine).GetMethod("ApplyAoEDamage", F)!
-                .Invoke(engine, new object?[] { new List<Monster> { target }, 1200L, new CombatResult(), "spell", true, null })!;
+                .Invoke(engine, new object?[] { new List<Monster> { target }, 1200L, new CombatResult(), "spell", true, null, null })!;
             return before - target.HP;
         }
         (await AoE(Hero(0))).Should().Be(1000);

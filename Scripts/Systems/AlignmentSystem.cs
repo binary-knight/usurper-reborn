@@ -147,8 +147,9 @@ namespace UsurperRemake.Systems
 
             switch (location)
             {
+                // 1.2.0 Temple gods piece 7: the Temple is open to all (its dark altars are served
+                // in the Undercroft); only the Church keeps its ward
                 case GameLocation.Church:
-                case GameLocation.Temple:
                     if (alignment == AlignmentType.Evil)
                         return (false, Loc.Get("alignment.wards_repel"));
                     if (alignment == AlignmentType.Dark && character.Darkness > 600)
@@ -674,7 +675,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("alignment.event_dark_energy"));
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("alignment.event_wickedness_empowers"));
-                    player.Strength += 1;
+                    player.AddTimedStatBuff("alignment_evil", StatKind.Strength, 1, StatBuffEnd.Rest);   // 1.2.0: until the next rest
                     terminal.WriteLine(Loc.Get("alignment.event_str_temp"));
                     await Task.Delay(2000);
                     return true;

@@ -374,6 +374,15 @@ namespace UsurperRemake.Systems
         public long Darkness { get; set; }
         public int Fame { get; set; }
         public int Mental { get; set; }
+        public int MentalSchema { get; set; }  // v1.1.15: 0 = a save written before Mental existed; old saves read 0
+        public int MentalStrainRemainder { get; set; }  // v1.1.15: dungeon strain toward the next Mental point
+        public int WillowDraughts { get; set; }  // v1.1.15: Willow Draughts carried, 0..GameConfig.MaxWillowDraughts
+        public int MentalRecoveryUsedToday { get; set; }  // v1.1.15: MentalDailySource flags already used today
+        public bool MentalBroken { get; set; }  // v1.1.15: Broken collapse affliction
+        public bool MentalHintShown { get; set; }  // v1.1.15: first drop-below-75 Mental hint already shown
+        public int MentalDrugBoost { get; set; }  // v1.1.15: pending drug-high Mental boost to crash later
+        public int MentalDrugUses { get; set; }  // v1.1.15: drug uses within the tolerance window
+        public int MentalLastDrugDay { get; set; }  // v1.1.15: DailySystemManager.CurrentDay of the last drug use
         public int Poison { get; set; }
         public int PoisonTurns { get; set; }  // Remaining turns of poison
 
@@ -448,6 +457,7 @@ namespace UsurperRemake.Systems
         public bool AutoEquipDisabled { get; set; }  // Shop purchases go to inventory
         public int AutoCombatHealPercent { get; set; } = 50;  // v1.1.13: auto-combat potion threshold, HP %; old saves read 50
         public bool ClassicMainStreet { get; set; }  // v1.1.14: classic Main Street layout; old saves read false (districts)
+        public bool MenuKeysNeedEnter { get; set; } = true;  // v1.1.15: console menus wait for Enter; old saves read true
         public int ClassicTipDraws { get; set; }  // v1.1.14: switch-to-classic tip draws so far; old saves read 0
         public int DateFormatPreference { get; set; }  // 0=MM/DD, 1=DD/MM, 2=YYYY-MM-DD
         public bool AutoRedistributeXP { get; set; } = true; // Auto-redistribute XP when teammates die
@@ -665,6 +675,9 @@ namespace UsurperRemake.Systems
 
         // Dark Alley Overhaul (v0.41.0)
         public int GroggoShadowBlessingDex { get; set; }
+        public List<TimedStatBuffData> TimedStatBuffs { get; set; } = new();   // 1.2.0
+        public bool ArtifactStatsApplied { get; set; }   // 1.2.0: false in older saves, so the login restore runs once
+        public bool CycleStatBonusApplied { get; set; }  // 1.2.0: false in older saves, so the NG+ backfill runs once
         public int SteroidShopPurchases { get; set; }
         public int AlchemistINTBoosts { get; set; }
         public int GamblingRoundsToday { get; set; }
@@ -768,6 +781,20 @@ namespace UsurperRemake.Systems
         public DateTime AscensionDate { get; set; }
         public bool HasEarnedAltSlot { get; set; }  // Account has earned the alt character slot
         public string WorshippedGod { get; set; } = "";  // Mortal worship: DivineName of an immortal player-god
+        public int GodFavor { get; set; }  // 1.2.0: Favor 0..100 with the worshipped god
+        public string GodFavorGod { get; set; } = "";  // 1.2.0: the god GodFavor belongs to
+        public int GodFavorSchema { get; set; }  // 1.2.0: 0 = a save from before Favor; old saves read 0
+        public Dictionary<string, int> GodFavorDayGains { get; set; } = new();  // 1.2.0: FavorSource name -> Favor gained today
+        public int DaysSinceDevotion { get; set; }  // 1.2.0: daily resets since the last devotion
+        public int DaysSinceSpellCast { get; set; }  // 1.2.0: daily resets since the last spell cast; old saves read 0
+        public int LastGodSwitchDay { get; set; } = -1;  // 1.2.0: game day of the last god left by choice; old saves read -1 (never)
+        public bool MiracleUsedToday { get; set; }  // 1.2.0: today's Miracle is spent; old saves read false (ready)
+        public List<string> ChastisedToday { get; set; } = new();  // 1.2.0 piece 5b, an immortal: followers chastised today; old saves read none
+        public Dictionary<string, int> GodStandingPenalties { get; set; } = new();  // 1.2.0 single-player: god -> standing lost to desecration this week
+        public int GodStandingPenaltyWeek { get; set; } = -1;  // 1.2.0: the week those penalties belong to; old saves read -1 (none)
+        public int WeeklyGodWeek { get; set; } = -1;  // 1.2.0 single-player: the week the strongest god was picked for; old saves read -1 (not yet)
+        public string WeeklyGod { get; set; } = "";  // 1.2.0 single-player: that week's strongest god ("" none)
+        public string DivineDomain { get; set; } = "";  // 1.2.0: an immortal's god domain (GodDomain name); old saves read ""
         public int DivineBlessingCombats { get; set; }
         public float DivineBlessingBonus { get; set; }
         public string DivineBoonConfig { get; set; } = "";  // Gods: comma-separated "boonId:tier" boon configuration
@@ -781,6 +808,41 @@ namespace UsurperRemake.Systems
         public int ExecuteLeft { get; set; }
         public int QuestsLeft { get; set; }
         public int PrisonActivitiesToday { get; set; }
+    }
+
+    /// <summary>
+    /// 1.2.0: a saved temporary stat buff (Character.TimedStatBuffs). Stat and EndsOn are the enum
+    /// values as ints; a row with an unknown value is dropped on load.
+    /// </summary>
+    public class TimedStatBuffData
+    {
+        public string Source { get; set; } = "";
+        public int Stat { get; set; }
+        public int Amount { get; set; }
+        public int EndsOn { get; set; }
+        public int CombatsLeft { get; set; }
+
+        public static List<TimedStatBuffData> FromBuffs(IEnumerable<TimedStatBuff>? buffs) =>
+            (buffs ?? Enumerable.Empty<TimedStatBuff>()).Select(b => new TimedStatBuffData
+            {
+                Source = b.Source,
+                Stat = (int)b.Stat,
+                Amount = b.Amount,
+                EndsOn = (int)b.EndsOn,
+                CombatsLeft = b.CombatsLeft
+            }).ToList();
+
+        public static List<TimedStatBuff> ToBuffs(IEnumerable<TimedStatBuffData>? rows) =>
+            (rows ?? Enumerable.Empty<TimedStatBuffData>())
+                .Where(r => r != null && Enum.IsDefined(typeof(StatKind), r.Stat) && Enum.IsDefined(typeof(StatBuffEnd), r.EndsOn))
+                .Select(r => new TimedStatBuff
+                {
+                    Source = r.Source ?? "",
+                    Stat = (StatKind)r.Stat,
+                    Amount = r.Amount,
+                    EndsOn = (StatBuffEnd)r.EndsOn,
+                    CombatsLeft = r.CombatsLeft
+                }).ToList();
     }
 
     /// <summary>
@@ -1276,9 +1338,6 @@ namespace UsurperRemake.Systems
         // News and history
         public List<NewsEntryData> RecentNews { get; set; } = new();
 
-        // God system state
-        public Dictionary<string, GodStateData> GodStates { get; set; } = new();
-
         // Marketplace listings
         public List<MarketListingData> MarketplaceListings { get; set; } = new();
 
@@ -1547,19 +1606,6 @@ namespace UsurperRemake.Systems
         public DateTime Timestamp { get; set; }
         public string Author { get; set; } = "";
         public List<string> Tags { get; set; } = new();
-    }
-
-    /// <summary>
-    /// God state data
-    /// </summary>
-    public class GodStateData
-    {
-        public string GodId { get; set; } = "";
-        public string Name { get; set; } = "";
-        public long Power { get; set; }
-        public int Followers { get; set; }
-        public DateTime LastActivity { get; set; }
-        public Dictionary<string, object> Attributes { get; set; } = new();
     }
 
     /// <summary>

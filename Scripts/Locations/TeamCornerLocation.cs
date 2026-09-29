@@ -1444,9 +1444,8 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_quit", currentPlayer.Team));
-        string response = await terminal.ReadLineAsync();
-
-        if (GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             string oldTeam = currentPlayer.Team;
             currentPlayer.Team = "";
@@ -1981,8 +1980,8 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("team.recruit_confirm_prompt", recruit.DisplayName, $"{cost:N0}"));
         terminal.SetColor("white");
-        string response = (await terminal.ReadLineAsync())?.Trim().ToUpperInvariant() ?? "";
-        if (!GameConfig.IsAffirmative(response) && response != "YES")
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.recruit_cancelled"));
@@ -2615,8 +2614,8 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_sack", member.DisplayName));
-        string response = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(response)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync("")) return;
 
         // v1.1.12: the NPC keeps what they wear when they go; offer to take it first
         bool tookGear = false;
@@ -2626,7 +2625,8 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("team.sack_gear_warning", member.DisplayName));
             terminal.Write(Loc.Get("team.sack_take_gear_prompt"));
-            if (GameConfig.IsAffirmative(await terminal.ReadLineAsync()))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(""))
             {
                 // v1.1.12: the live copy, checked still on this team before any gear comes off; a reload or
                 // a move while the prompts were up means nothing is taken
@@ -2791,7 +2791,8 @@ public class TeamCornerLocation : BaseLocation
         }
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_resurrect", toResurrect.DisplayName, $"{cost:N0}"));
-        if (!GameConfig.IsAffirmative(await terminal.ReadLineAsync())) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync("")) return;
 
         // v1.1.12: a dead member holds a slot, so a revival adds no slot; it may bring the living up to
         // MaxTeamSize and no further (a team from before the cap, with more, keeps its members). Checked before the
@@ -3469,8 +3470,8 @@ public class TeamCornerLocation : BaseLocation
         terminal.Write(Loc.Get("team.take_all_warning"));
         terminal.SetColor("white");
 
-        var answer = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(answer))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -3719,8 +3720,8 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("team.war_daily_remaining", GameConfig.MaxTeamWarsPerDay - currentPlayer.TeamWarsToday, GameConfig.MaxTeamWarsPerDay)}");
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_war", enemyTeam.TeamName));
-        string confirm = (await terminal.ReadLineAsync())?.Trim().ToUpper() ?? "";
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync("")) return;
 
         if (currentPlayer.Gold < wager)
         {
@@ -4186,7 +4187,8 @@ public class TeamCornerLocation : BaseLocation
         // v1.1.12: asked first, the vault is the whole team's
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("team.confirm_withdraw", $"{amount:N0}"));
-        if (!GameConfig.IsAffirmative(await terminal.ReadLineAsync())) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync("")) return;
 
         bool success = await backend.WithdrawFromTeamVault(teamName, amount);
         if (success)

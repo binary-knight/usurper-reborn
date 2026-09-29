@@ -497,13 +497,13 @@ public class DungeonLocation : BaseLocation
         term.WriteLine(Loc.Get("dungeon.tut.intro_skip"), "darkgray");
         term.WriteLine("");
 
-        string ans = await term.GetInput(Loc.Get(isSR ? "dungeon.tut.prompt_sr" : "dungeon.tut.prompt"));
-        ans = ans.Trim().ToUpperInvariant();
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        bool tutorialAns = await term.AskYesNoAsync(Loc.Get(isSR ? "dungeon.tut.prompt_sr" : "dungeon.tut.prompt"));
 
         // Mark as seen regardless of choice so we never ask again
         player.HintsShown.Add(DUNGEON_TUTORIAL_FLAG);
 
-        if (!GameConfig.IsAffirmative(ans))
+        if (!tutorialAns)
         {
             term.WriteLine(Loc.Get("dungeon.tut.declined"), "gray");
             await Task.Delay(1200);
@@ -1061,8 +1061,8 @@ public class DungeonLocation : BaseLocation
                     await Task.Delay(2000);
 
                     term.WriteLine(Loc.Get("dungeon.face_maelketh"), "yellow");
-                    var response = await term.GetInput("> ");
-                    if (GameConfig.IsAffirmative(response))
+                    // v1.1.15: yesno-convert-a, strict (Y/N)
+                    if (await term.AskYesNoAsync("> "))
                     {
                         var result = await OldGodBossSystem.Instance.StartBossEncounter(player, OldGodType.Maelketh, term, teammates);
                         await HandleGodEncounterResult(result, player, term);
@@ -1256,29 +1256,7 @@ public class DungeonLocation : BaseLocation
         // Stat scaling: pet level matters somewhat, player level matters more (the bond grows).
         // Effective level = max(pet.Level, player.Level / 2).
         int effLevel = Math.Max(pet.Level, (int)player.Level / 2);
-        long scaledHP = def.CombatBaseHP + (long)(def.CombatBaseHP * (effLevel - 1) * 0.10);
-        long scaledAtk = def.CombatBaseAttack + (long)(def.CombatBaseAttack * (effLevel - 1) * 0.08);
-        long scaledDef = def.CombatBaseDefence + (long)(def.CombatBaseDefence * (effLevel - 1) * 0.05);
-
-        var wrapper = new Character
-        {
-            Name1 = pet.Name,
-            Name2 = pet.Name,
-            Level = effLevel,
-            HP = scaledHP,
-            MaxHP = scaledHP,
-            Strength = scaledAtk,
-            WeapPow = scaledAtk / 2,
-            Defence = (long)scaledDef,
-            ArmPow = scaledDef / 2,
-            Mana = 0,
-            MaxMana = 0,
-            Class = CharacterClass.Warrior, // Marker class so the basic-attack AI path runs.
-            Race = CharacterRace.Troll,     // Beast-ish marker; no race bonuses apply since IsPet.
-            IsPet = true,
-            PetSpeciesId = pet.Id,          // v0.61.2: carry species id for per-beast combat behavior.
-            Allowed = true,
-        };
+        var wrapper = UsurperRemake.Data.BeastData.BuildCombatWrapper(def, effLevel, pet.Name);   // 1.2.0: shared with Sylvana's Miracle
 
         teammates.Add(wrapper);
         term.SetColor("bright_yellow");
@@ -1765,9 +1743,8 @@ public class DungeonLocation : BaseLocation
             if (affordableFee > 0 && affordableTeammates.Any(t => breakdown.Any(b => b.npc == t && b.fee > 0)))
             {
                 term.SetColor("cyan");
-                var payChoice = await term.GetInput(Loc.Get("dungeon.pay_affordable", affordableFee.ToString("N0")));
-
-                if (GameConfig.IsAffirmative(payChoice))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await term.AskYesNoAsync(Loc.Get("dungeon.pay_affordable", affordableFee.ToString("N0"))))
                 {
                     player.Gold -= affordableFee;
                     term.SetColor("green");
@@ -1811,9 +1788,8 @@ public class DungeonLocation : BaseLocation
 
         // Player can afford all fees - ask for confirmation
         term.SetColor("cyan");
-        var confirm = await term.GetInput(Loc.Get("dungeon.pay_all_allies", totalFee.ToString("N0")));
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await term.AskYesNoAsync(Loc.Get("dungeon.pay_all_allies", totalFee.ToString("N0"))))
         {
             player.Gold -= totalFee;
             term.SetColor("green");
@@ -2000,6 +1976,34 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Handle the result of an Old God boss encounter
     /// </summary>
+    /// <summary>1.2.0 Temple gods piece 7: set while an Old God fought at the Temple is resolved here.</summary>
+    private bool _resolvingAtTemple;
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: Aurelion is fought in the Temple's Deep Temple; his result is resolved
+    /// by the same handling as a floor fight (artifact, alignment, God Slayer surge, forced save, the
+    /// town's reaction), with the online news naming the Deep Temple instead of a floor.
+    /// </summary>
+    internal async Task ResolveOldGodAtTemple(BossEncounterResult result, Character player, TerminalEmulator term)
+    {
+        _resolvingAtTemple = true;
+        try { await HandleGodEncounterResult(result, player, term); }
+        finally { _resolvingAtTemple = false; }
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 7: true while Aurelion waits at the Temple, so his floor points the
+    /// player there: not yet resolved (defeated, saved, allied, consumed) and not awakened (an older
+    /// save's quest, which still ends on his floor with the Sunforged Blade).
+    /// </summary>
+    internal static bool AurelionAwaitsAtTemple()
+    {
+        var story = StoryProgressionSystem.Instance;
+        if (!story.OldGodStates.TryGetValue(OldGodType.Aurelion, out var s)) return true;
+        return s.Status != GodStatus.Defeated && s.Status != GodStatus.Saved && s.Status != GodStatus.Allied &&
+               s.Status != GodStatus.Consumed && s.Status != GodStatus.Awakened;
+    }
+
     private async Task HandleGodEncounterResult(BossEncounterResult result, Character player, TerminalEmulator term)
     {
         if (result == null || !result.Success) return;
@@ -2015,7 +2019,8 @@ public class DungeonLocation : BaseLocation
                 if (artifactType.HasValue)
                 {
                     term.WriteLine(Loc.Get("dungeon.obtained_artifact", artifactType.Value), "bright_magenta");
-                    StoryProgressionSystem.Instance.CollectedArtifacts.Add(artifactType.Value);
+                    // 1.2.0: the artifact's stats too, unless the defeat already collected it
+                    ArtifactSystem.Instance.GrantArtifactIfMissing(player, artifactType.Value);
                 }
 
                 // v1.1.11: the XP and gold were paid by OldGodBossSystem.HandleBossDefeated; adding
@@ -2034,7 +2039,9 @@ public class DungeonLocation : BaseLocation
                 {
                     var godDisplayName = player.Name2 ?? player.Name1;
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                        $"{godDisplayName} has slain the Old God {result.God} on floor {currentDungeonLevel}!", "combat");
+                        _resolvingAtTemple
+                            ? $"{godDisplayName} has slain the Old God {result.God} in the Deep Temple!"
+                            : $"{godDisplayName} has slain the Old God {result.God} on floor {currentDungeonLevel}!", "combat");
                 }
                 break;
 
@@ -2064,7 +2071,7 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine(Loc.Get("dungeon.forged_alliance"), "white");
 
                 AlignmentSystem.Instance.ChangeAlignment(player, 50, isGood: true, "dungeon.old_god_allied"); // v0.57.12: paired movement
-                player.Wisdom += 2;
+                player.GrantPermanentStat(StatKind.Wisdom, 2); // 1.2.0: lasting, written to Base
                 break;
 
             case BossOutcome.Spared:
@@ -2090,6 +2097,10 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine(Loc.Get("dungeon.god_fled_retreat"), "gray");
                 term.WriteLine(Loc.Get("dungeon.god_fled_wait"), "dark_gray");
                 break;
+
+            case BossOutcome.NotFought:
+                // v1.1.15: the fight was not entered (Mental 0); nothing to resolve, the loop collapses the player
+                break;
         }
 
         await Task.Delay(3000);
@@ -2097,6 +2108,7 @@ public class DungeonLocation : BaseLocation
         // Auto-return to town with reaction scene for resolved encounters (not Manwe — has own ending)
         if (result.God != OldGodType.Manwe &&
             result.Outcome != BossOutcome.Fled &&
+            result.Outcome != BossOutcome.NotFought &&
             result.Outcome != BossOutcome.PlayerDefeated)
         {
             // Grant God Slayer buff — temporary divine power surge (v0.49.3)
@@ -2761,6 +2773,8 @@ public class DungeonLocation : BaseLocation
             row1.Add(("D", "bright_yellow", Loc.Get("dungeon.bbs_descend")));
         if ((room.IsCleared || !room.HasMonsters) && !hasCampedThisFloor)
             row1.Add(("R", "bright_yellow", Loc.Get("dungeon.bbs_camp")));
+        if (player.WillowDraughts > 0)
+            row1.Add(("U", "bright_yellow", Loc.Get("dungeon.bbs_willow", player.WillowDraughts)));
 
         if (row1.Count > 0)
             ShowBBSMenuRow(row1.ToArray());
@@ -3171,6 +3185,8 @@ public class DungeonLocation : BaseLocation
             WriteSRMenuOption("P", Loc.Get("dungeon.potions"));
             if (currentPlayer.TotalHerbCount > 0)
                 WriteSRMenuOption("J", Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString()));
+            if (currentPlayer.WillowDraughts > 0)
+                WriteSRMenuOption("U", Loc.Get("dungeon.willow", currentPlayer.WillowDraughts.ToString()));
             if (teammates.Count > 0)
                 WriteSRMenuOption("Y", Loc.Get("dungeon.party"));
             WriteSRMenuOption("%", Loc.Get("dungeon.status"));
@@ -3306,6 +3322,18 @@ public class DungeonLocation : BaseLocation
             terminal.Write($"{Loc.Get("dungeon.herbs", currentPlayer.TotalHerbCount.ToString())}  ");
         }
 
+        if (currentPlayer.WillowDraughts > 0)
+        {
+            terminal.SetColor("darkgray");
+            terminal.Write("[");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("U");
+            terminal.SetColor("darkgray");
+            terminal.Write("] ");
+            terminal.SetColor("bright_cyan");
+            terminal.Write($"{Loc.Get("dungeon.willow", currentPlayer.WillowDraughts.ToString())}  ");
+        }
+
         if (teammates.Count > 0)
         {
             terminal.SetColor("darkgray");
@@ -3435,46 +3463,91 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
         }
 
-        // Health bar
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("status.hp")}: ");
-        DrawBar(player.HP, player.MaxHP, 20, "red", "darkgray");
-        terminal.Write($" {player.HP}/{player.MaxHP}");
+        // v1.1.15: visible column on the current line, tracked from each plain string actually
+        // written (not a guess), so every segment below (HP, Potions, Gold, XP, then the trailing
+        // tags) wraps correctly regardless of language, screen-reader mode (no bar) or stat width
+        // (HP/gold/XP digits can each run much wider at high level than at level 1).
+        int col = 0;
 
-        terminal.Write("  ");
+        // v1.1.15: every segment wraps to a new line whenever appending it (plus its "  "
+        // separator) would push the line past 80 visible columns. A segment that still would not
+        // fit alone at the start of a fresh line is written anyway (nothing shorter to fall back
+        // to); that has not happened with any current segment or tag text. `write` performs the
+        // segment's own SetColor/Write calls so a multi-part segment (the HP bar) is never split
+        // across the wrap point.
+        void AppendSegment(int width, Action write)
+        {
+            int sep = col > 0 ? 2 : 0;
+            if (col > 0 && col + sep + width > 80)
+            {
+                terminal.WriteLine("");
+                col = 0;
+                sep = 0;
+            }
+            if (sep > 0) terminal.Write("  ");
+            write();
+            col += sep + width;
+        }
+
+        // Health bar
+        string hpLabel = $"{Loc.Get("status.hp")}: ";
+        string hpValue = $" {player.HP}/{player.MaxHP}";
+        int hpBarWidth = GameConfig.ScreenReaderMode ? 0 : 22; // "[" + 20 fill chars + "]"; DrawBar itself no-ops under screen reader
+        AppendSegment(hpLabel.Length + hpBarWidth + hpValue.Length, () =>
+        {
+            terminal.SetColor("white");
+            terminal.Write(hpLabel);
+            DrawBar(player.HP, player.MaxHP, 20, "red", "darkgray");
+            terminal.SetColor("white");
+            terminal.Write(hpValue);
+        });
 
         // Potions
-        terminal.SetColor("green");
-        terminal.Write($"{Loc.Get("status.potions")}: {player.Healing}/{player.MaxPotions}");
-
-        terminal.Write("  ");
+        string potionsText = $"{Loc.Get("status.potions")}: {player.Healing}/{player.MaxPotions}";
+        AppendSegment(potionsText.Length, () =>
+        {
+            terminal.SetColor("green");
+            terminal.Write(potionsText);
+        });
 
         // Gold
-        terminal.SetColor("yellow");
-        terminal.Write($"{Loc.Get("status.gold_label")}: {player.Gold:N0}");
+        string goldText = $"{Loc.Get("status.gold_label")}: {player.Gold:N0}";
+        AppendSegment(goldText.Length, () =>
+        {
+            terminal.SetColor("yellow");
+            terminal.Write(goldText);
+        });
 
         // v0.65.4: ambient XP progress -- makes every fight visibly count toward the next level,
         // the cheapest lever on the "one more fight before I log off" impulse (and the L1-3 stall).
-        terminal.Write("  ");
-        terminal.SetColor("bright_cyan");
-        if (player.Level < 100)
+        string xpText = player.Level < 100
+            ? Loc.Get("status.xp_compact", player.Level, player.Experience, GameConfig.GetExperienceForLevel(player.Level + 1))
+            : Loc.Get("status.xp_max", player.Level);
+        AppendSegment(xpText.Length, () =>
         {
-            long nextXp = GameConfig.GetExperienceForLevel(player.Level + 1);
-            terminal.Write(Loc.Get("status.xp_compact", player.Level, player.Experience, nextXp));
-        }
-        else
+            terminal.SetColor("bright_cyan");
+            terminal.Write(xpText);
+        });
+
+        // Trailing tags (fatigue, mental, danger) go through the same wrap.
+        void AppendTag(string text, string color)
         {
-            terminal.Write(Loc.Get("status.xp_max", player.Level));
+            if (string.IsNullOrEmpty(text)) return;
+            AppendSegment(text.Length, () =>
+            {
+                terminal.SetColor(color);
+                terminal.Write(text);
+            });
         }
 
         // Fatigue indicator (only when Tired or Exhausted)
         var (fatigueLabel, fatigueColor) = player.GetFatigueTier();
         if (!string.IsNullOrEmpty(fatigueLabel) && fatigueLabel != "Well-Rested")
-        {
-            terminal.Write("  ");
-            terminal.SetColor(fatigueColor);
-            terminal.Write(fatigueLabel);
-        }
+            AppendTag(fatigueLabel, fatigueColor);
+
+        // Mental band tag (v1.1.15), both modes; empty at Stable
+        var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(player);
+        AppendTag(mentalTagLabel, mentalTagColor);
 
         // v0.65.6 compact floor danger tag: persistent room-bar reminder whenever
         // the floor runs above the player's level (all floor-change paths -- entry,
@@ -3482,11 +3555,11 @@ public class DungeonLocation : BaseLocation
         int dangerGap = currentDungeonLevel - player.Level;
         if (dangerGap >= 1)
         {
-            terminal.Write("  ");
-            terminal.SetColor(dangerGap >= 6 ? "bright_red" : dangerGap >= 3 ? "red" : "yellow");
-            terminal.Write(Loc.Get(dangerGap >= 6 ? "dungeon.danger_tag_deadly"
+            string dangerColor = dangerGap >= 6 ? "bright_red" : dangerGap >= 3 ? "red" : "yellow";
+            string dangerText = Loc.Get(dangerGap >= 6 ? "dungeon.danger_tag_deadly"
                 : dangerGap >= 3 ? "dungeon.danger_tag_dangerous"
-                : "dungeon.danger_tag_risky", dangerGap));
+                : "dungeon.danger_tag_risky", dangerGap);
+            AppendTag(dangerText, dangerColor);
         }
 
         terminal.WriteLine("");
@@ -4053,8 +4126,8 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("yellow");
                 terminal.Write(Loc.Get("dungeon.confirm_leave"));
                 terminal.SetColor("white");
-                string exitConfirm = (await terminal.GetInput("")).Trim().ToUpper();
-                if (GameConfig.IsAffirmative(exitConfirm))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(""))
                 {
                     await NavigateToLocation(GameLocation.MainStreet);
                     return true;
@@ -4632,6 +4705,11 @@ public class DungeonLocation : BaseLocation
                 RequestRedisplay();
                 return false;
 
+            case "U":
+                await DrinkWillowDraught();
+                RequestRedisplay();
+                return false;
+
             case "Y":
                 if (teammates.Count > 0)
                 {
@@ -4654,6 +4732,106 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.invalid_choice"), "red");
                 await Task.Delay(1000);
                 return false;
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: Mental strain for entering a new room, floor x GameConfig.MentalRoomStrainPerFloor per
+    /// mille, on the player and on every living grouped human follower (NPC teammates and companions
+    /// are skipped by MentalSystem). Living story companions in the party cut the strain. Each player
+    /// whose Mental changed gets the band announcement on their own terminal.
+    /// </summary>
+    internal void ApplyRoomMentalStrain()
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return;
+        int companions = MentalSystem.CountStoryCompanions(teammates);
+        int before = player.Mental;
+        if (MentalSystem.ApplyRoomStrain(player, currentDungeonLevel, companions) > 0)
+            MentalUi.AnnounceMentalChange(terminal, player, before);
+        foreach (var mate in teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, player)) continue;
+            int mateBefore = mate.Mental;
+            if (MentalSystem.ApplyRoomStrain(mate, currentDungeonLevel, companions) > 0 && mate.RemoteTerminal != null)
+                MentalUi.AnnounceMentalChange(mate.RemoteTerminal, mate, mateBefore);
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: the Mental band's room line for a new room (MentalSystem.PickRoomLine): an uneasy
+    /// line while Strained, a harmless hallucination while Shaken or worse. Rolled for the player and
+    /// for every living grouped human follower from their own Mental, printed as plain text on their
+    /// own terminal. Nothing changes; flavour only.
+    /// </summary>
+    internal void ShowRoomMindLines()
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return;
+        var key = MentalSystem.PickRoomLine(player, dungeonRandom);
+        if (key != null)
+        {
+            terminal.SetColor("magenta");
+            terminal.WriteLine(Loc.Get(key));
+        }
+        foreach (var mate in teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, player) || mate.RemoteTerminal == null) continue;
+            var mateKey = MentalSystem.PickRoomLine(mate, dungeonRandom);
+            if (mateKey == null) continue;
+            mate.RemoteTerminal.SetColor("magenta");
+            mate.RemoteTerminal.WriteLine(Loc.Get(mateKey));
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: the Mental check before going deeper, shared by every path that moves the player to a
+    /// deeper floor (the stairs, a jump to a deeper floor, the portal). The Broken affliction refuses
+    /// it outright. Breaking asks two yes/no questions (AskYesNoAsync) and either no turns the player
+    /// back. portal picks the portal wording. Returns true when the descent may go ahead.
+    /// DungeonMentalDescentGate1115Tests fails when a floor change in this file is not preceded by it.
+    /// </summary>
+    internal async Task<bool> ConfirmMentalDescent(Character? player, bool portal = false)
+    {
+        if (player == null) return true;
+        var rule = MentalSystem.GetDescentRule(player);
+        if (rule == MentalDescent.Refused)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("mental.descend_refused"), "bright_red");
+            await Task.Delay(1500);
+            return false;
+        }
+        if (rule != MentalDescent.AskTwice) return true;
+        terminal.WriteLine("");
+        if (await terminal.AskYesNoAsync(Loc.Get(portal ? "mental.portal_confirm_1" : "mental.descend_confirm_1"))
+            && await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_2")))
+            return true;
+        terminal.WriteLine(Loc.Get(portal ? "mental.portal_turned_back" : "mental.descend_turned_back"), "gray");
+        await Task.Delay(1000);
+        return false;
+    }
+
+    /// <summary>
+    /// v1.1.15: Mental recovery for a dungeon rest (camp or Safe Haven), gain Mental up to the cap, on
+    /// the player and on every living grouped human follower resting with them (NPC teammates and
+    /// companions are skipped by MentalSystem). Rides the one-rest-per-floor limit the callers
+    /// already enforce; no daily flag. Each player who gained gets the gain line and the band
+    /// announcement on their own terminal.
+    /// </summary>
+    internal void ApplyRestMentalRecovery(int gain)
+    {
+        var player = GetCurrentPlayer();
+        if (player == null) return;
+        int before = player.Mental;
+        MentalUi.ReportGain(terminal, player, before, MentalSystem.Change(player, gain));
+        foreach (var mate in teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, player)) continue;
+            int mateBefore = mate.Mental;
+            int applied = MentalSystem.Change(mate, gain);
+            if (mate.RemoteTerminal != null)
+                MentalUi.ReportGain(mate.RemoteTerminal, mate, mateBefore, applied);
         }
     }
 
@@ -4762,6 +4940,10 @@ public class DungeonLocation : BaseLocation
             // Room discovery message
             terminal.SetColor(GetThemeColor(currentFloor.Theme));
             terminal.WriteLine(Loc.Get("dungeon.you_enter_room", targetRoom.Name));
+            // v1.1.15: Mental strain for a new room, both modes, leader and grouped followers
+            ApplyRoomMentalStrain();
+            // v1.1.15: a band's room line (Strained uneasy, Shaken and worse hallucinations), each from their own Mental
+            ShowRoomMindLines();
             await Task.Delay(500);
 
             // Check for seal discovery on this floor
@@ -5309,8 +5491,8 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 foreach (var t in low)
                     terminal.WriteLine($"  {Loc.Get("dungeon.ally_low_hp_warning", t.DisplayName, (int)(100.0 * t.HP / t.MaxHP))}", "yellow");
-                var go = await terminal.GetInput(Loc.Get("dungeon.fight_anyway_prompt"));
-                if (!GameConfig.IsAffirmative(go)) return;
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("dungeon.fight_anyway_prompt"))) return;
             }
         }
 
@@ -5323,6 +5505,29 @@ public class DungeonLocation : BaseLocation
             WriteBoxHeader(Loc.Get("dungeon.boss_encounter"), "red", 51);
             terminal.WriteLine("");
             UsurperRemake.UI.UIHelper.WriteWrapped(terminal, room.Description); // v1.1.14
+
+            // 1.2.0 Temple gods piece 7: Aurelion's one site is the Temple's Deep Temple; his floor
+            // points the player there (no fight here, the room stays as it is). The Temple's own T
+            // needs OldGodBossSystem.CanEncounterBoss (level 75 and three Old Gods faced), so a player
+            // who is not ready yet hears the path is sealed, not a pointer to a door they cannot open.
+            if (currentDungeonLevel == 85 && AurelionAwaitsAtTemple())
+            {
+                terminal.SetColor("bright_yellow");
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple"));
+                terminal.SetColor("gray");
+                if (OldGodBossSystem.Instance.CanEncounterBoss(player!, OldGodType.Aurelion))
+                {
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.aurelion_at_temple_hint"));
+                }
+                else
+                {
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("temple.deep_temple_sealed"));
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("temple.deep_temple_prove"));
+                }
+                terminal.WriteLine("");
+                await terminal.PressAnyKey();
+                return;
+            }
 
             // Check for Old God boss encounters on specific floors
             bool hadOldGodEncounter = await TryOldGodBossEncounter(player!, room);
@@ -5776,15 +5981,14 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("dungeon.face_god_prompt", godName));
-        var response = await terminal.GetInput("> ");
-
-        if (GameConfig.IsAffirmative(response))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync("> "))
         {
             var result = await OldGodBossSystem.Instance.StartBossEncounter(player, godType.Value, terminal, teammates);
             await HandleGodEncounterResult(result, player, terminal);
 
             // Mark room as cleared if defeated or alternate outcome achieved
-            if (result.Outcome != BossOutcome.Fled && result.Outcome != BossOutcome.PlayerDefeated)
+            if (result.Outcome != BossOutcome.Fled && result.Outcome != BossOutcome.NotFought && result.Outcome != BossOutcome.PlayerDefeated)
             {
                 room.IsCleared = true;
                 currentFloor.BossDefeated = true;
@@ -5926,9 +6130,11 @@ public class DungeonLocation : BaseLocation
     {
         // v1.1.13: the chest and the shrine are spent by the player's choice (SpendRoomEvent), not before
         // the prompt, so a typo does not use them up. The other events are spent up front as before.
+        // v1.1.15: the secret boss is spent only by a win (SecretBossEncounter), so a flee, a loss, a
+        // death or a fight not entered at Mental 0 leaves it to try again.
         bool spentByChoice = room.EventType is DungeonEventType.TreasureChest or DungeonEventType.Shrine;
         if (spentByChoice) _roomEventAwaitingChoice = room;
-        else room.EventCompleted = true;
+        else if (room.EventType != DungeonEventType.SecretBoss) room.EventCompleted = true;
         try
         {
             await RunRoomEvent(room);
@@ -5962,6 +6168,31 @@ public class DungeonLocation : BaseLocation
     {
         terminal.WriteLine($"  {Loc.Get(key)}", "gray");
         await Task.Delay(800);
+    }
+
+    /// <summary>
+    /// v1.1.15: drink a Willow Draught bought at the Healer, room key U. None carried, or Mental
+    /// already at the cap, says so and keeps the draught; otherwise MentalSystem.DrinkWillowDraught.
+    /// </summary>
+    private async Task DrinkWillowDraught()
+    {
+        var player = currentPlayer;
+        if (player == null) return;
+        if (player.WillowDraughts <= 0)
+        {
+            await ExplainNoAction("dungeon.no_willow");
+            return;
+        }
+        if (player.Mental >= MentalSystem.GetCap(player))
+        {
+            await ExplainNoAction("dungeon.willow_at_cap");
+            return;
+        }
+        int mentalBefore = player.Mental;
+        int applied = MentalSystem.DrinkWillowDraught(player);
+        terminal.WriteLine($"  {Loc.Get("dungeon.willow_drink", player.WillowDraughts)}", "bright_cyan");
+        MentalUi.ReportGain(terminal, player, mentalBefore, applied);
+        await terminal.PressAnyKey();
     }
 
     private async Task RunRoomEvent(DungeonRoom room)
@@ -6019,7 +6250,7 @@ public class DungeonLocation : BaseLocation
                 await MemoryFragmentEncounter();
                 break;
             case DungeonEventType.SecretBoss:
-                await SecretBossEncounter();
+                await SecretBossEncounter(room);
                 break;
             case DungeonEventType.Settlement:
                 await SettlementEncounter(room);
@@ -6842,6 +7073,10 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
+        // v1.1.15: Mental at the stairs (Breaking asks twice)
+        if (!await ConfirmMentalDescent(player))
+            return;
+
         // v1.1.3 (council ruling 5): the floor guard. An ally eleven or more levels below the
         // player gets a warning and the offer of Cautious; nothing is switched silently.
         if (player != null)
@@ -6854,8 +7089,8 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("dungeon.ally_outleveled_warning", t.DisplayName, player.Level - t.Level)}", "yellow");
                 if (_declinedCautious.Contains(TeammateStances.KeyFor(t))) continue; // warned, asked once this visit
-                var answer = await terminal.GetInput(Loc.Get("dungeon.offer_cautious_prompt", t.DisplayName));
-                if (!GameConfig.IsAffirmative(answer)) { _declinedCautious.Add(TeammateStances.KeyFor(t)); continue; }
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("dungeon.offer_cautious_prompt", t.DisplayName))) { _declinedCautious.Add(TeammateStances.KeyFor(t)); continue; }
                 TeammateStances.Set(player, TeammateStances.KeyFor(t), TeammateStance.Cautious);
                 terminal.WriteLine(Loc.Get("dungeon.stance_set", t.DisplayName, Loc.Get(TeammateStances.NameKey(TeammateStance.Cautious))), "bright_green");
                 try { await SaveSystem.Instance.AutoSave(player); } catch { /* best-effort */ }
@@ -6976,6 +7211,8 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         await Task.Delay(1500);
 
+        player.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Blood Price rest penalty — dark memories reduce rest effectiveness
         float restEfficiency = 1.0f;
         if (player.MurderWeight >= 6f) restEfficiency = 0.50f;
@@ -7045,6 +7282,8 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}  {Loc.Get("combat.bar_mp")}: {player.Mana}/{player.MaxMana}  {Loc.Get("combat.bar_st")}: {player.CurrentCombatStamina}/{player.MaxCombatStamina}");
+
+        ApplyRestMentalRecovery(GameConfig.MentalDungeonCampGain);
 
         MarkRestedOnThisFloor(player);
         // v1.1.12: the camp and a sanctuary share one rest per floor.
@@ -7203,6 +7442,10 @@ public class DungeonLocation : BaseLocation
         if (targetLevel != currentDungeonLevel)
         {
             var player = GetCurrentPlayer();
+
+            // v1.1.15: Mental before a jump deeper (Breaking asks twice); going up is never asked
+            if (targetLevel > currentDungeonLevel && !await ConfirmMentalDescent(player))
+                return;
 
             // Save current floor state before leaving
             if (player != null)
@@ -7525,9 +7768,8 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        var recite = await terminal.GetInput(Loc.Get("dungeon.recite_scroll_prompt"));
-        
-        if (GameConfig.IsAffirmative(recite))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("dungeon.recite_scroll_prompt")))
         {
             await ExecuteScrollMagic(scrollType, currentPlayer);
         }
@@ -7568,6 +7810,7 @@ public class DungeonLocation : BaseLocation
                     // Create undead monster
                     var undead = CreateUndeadMonster();
                     terminal.WriteLine(Loc.Get("dungeon.scroll_summoned_undead", undead.Name));
+                    GodDeedSystem.Record(player, GodAct.UndeadRaised, terminal);   // 1.2.0 Temple gods: Death taboo
                     
                     // Fight the undead
                     var combatEngine = new CombatEngine(terminal);
@@ -7905,6 +8148,9 @@ public class DungeonLocation : BaseLocation
                 // Teleport deeper (5-10 floors)
                 int floorsDown = dungeonRandom.Next(5, 11);
                 int newFloor = Math.Min(currentDungeonLevel + floorsDown, GameConfig.MaxDungeonLevel);
+                // v1.1.15: Mental before the portal takes the player deeper (Broken refuses, Breaking asks twice)
+                if (newFloor > currentDungeonLevel && !await ConfirmMentalDescent(currentPlayer, portal: true))
+                    return;
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("dungeon.portal_whisks_deeper"));
                 terminal.WriteLine(Loc.Get("dungeon.portal_emerge_floor", newFloor));
@@ -8897,7 +9143,7 @@ public class DungeonLocation : BaseLocation
                     break;
                 case 1:
                     var strBonus = dungeonRandom.Next(5) + 1;
-                    currentPlayer.Strength += strBonus;
+                    currentPlayer.GrantPermanentStat(StatKind.Strength, strBonus); // 1.2.0: lasting, written to Base
                     terminal.WriteLine(Loc.Get("dungeon.shrine_stronger", strBonus), "green");
                     BroadcastDungeonEvent($"\u001b[32m  {currentPlayer.Name2} prays at a shrine and gains +{strBonus} Strength!\u001b[0m");
                     break;
@@ -9103,8 +9349,8 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine($"\"{lyris.DialogueHints[2]}\"");
                 terminal.WriteLine("");
 
-                var followUp = await terminal.GetInput(Loc.Get("quest.lyris_shrine.ask_join_yn"));
-                if (GameConfig.IsAffirmative(followUp))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (await terminal.AskYesNoAsync(Loc.Get("quest.lyris_shrine.ask_join_yn")))
                 {
                     await TryRecruitCompanionInDungeon(
                         UsurperRemake.Systems.CompanionId.Lyris, player);
@@ -9944,9 +10190,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.merchant_purchase_confirm", item.Name, item.Price));
-        var confirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             player.Gold -= item.Price;
             item.Sold = true;
@@ -10261,6 +10506,9 @@ public class DungeonLocation : BaseLocation
         }
         else if (currentDungeonLevel < maxDungeonLevel)
         {
+            // v1.1.15: Mental before going deeper
+            if (!await ConfirmMentalDescent(player))
+                return;
             int nextLevel = currentDungeonLevel + 1;
             var floorResult = GenerateOrRestoreFloor(player, nextLevel);
             currentFloor = floorResult.Floor;
@@ -10914,6 +11162,7 @@ public class DungeonLocation : BaseLocation
         var disabledSpells = isCompanion
             ? companion!.DisabledSpells
             : new HashSet<string>(owner.TeammateDisabledSpells.TryGetValue(key, out var savedS) ? savedS : new List<string>());
+        SpellSystem.RemapLegacySageDisabledSpells(teammate, disabledSpells); // v1.1.15: renamed Sage spells show under their new names
 
         var abilities = ClassAbilitySystem.GetAvailableAbilities(teammate) ?? new();
         var spells = SpellSystem.GetAllSpellsForClass(teammate.Class)
@@ -10954,7 +11203,7 @@ public class DungeonLocation : BaseLocation
                 foreach (var sp in spells)
                 {
                     row++;
-                    WriteSkillToggleRow(row, sp.Name, sp.Description, disabledSpells.Contains(sp.Name));
+                    WriteSkillToggleRow(row, sp.DisplayName, sp.DisplayDescription, disabledSpells.Contains(sp.Name));
                 }
             }
 
@@ -11344,8 +11593,8 @@ public class DungeonLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("cyan");
-                var confirm = await terminal.GetInput(Loc.Get("dungeon.pay_fee_confirm", fee));
-                if (!GameConfig.IsAffirmative(confirm))
+                // v1.1.15: yesno-convert-a, strict (Y/N)
+                if (!await terminal.AskYesNoAsync(Loc.Get("dungeon.pay_fee_confirm", fee)))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dungeon.npc_shrugs", npc.DisplayName));
@@ -12750,9 +12999,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("ui.choice"));
-        var choice = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (!GameConfig.IsAffirmative(choice))
+        // v1.1.15: yesno-convert-a, a Y/N menu, strict
+        if (!await terminal.AskYesNoAsync(""))
         {
             return;
         }
@@ -12893,9 +13141,8 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.will_use_potions", potionsToUse));
-        string confirm = (await terminal.GetInput("")).Trim().ToUpper();
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -15095,12 +15342,12 @@ public class DungeonLocation : BaseLocation
                 player.HP = Math.Min(player.MaxHP, player.HP + 10);
                 break;
             case "lockpick":
-                // Lockpick: +5 Dexterity temporarily (until next combat)
-                player.Dexterity += 2;
+                // Lockpick: +2 Dexterity through the next fight (1.2.0: a timed buff, applied in RecalculateStats)
+                player.AddTimedStatBuff("settlement_lockpick", StatKind.Dexterity, 2, StatBuffEnd.Combats, 1);
                 break;
             case "smoke_bomb":
-                // Smoke bomb: small agility boost
-                player.Agility += 2;
+                // Smoke bomb: +2 Agility through the next fight
+                player.AddTimedStatBuff("settlement_smoke_bomb", StatKind.Agility, 2, StatBuffEnd.Combats, 1);
                 break;
         }
     }
@@ -15201,6 +15448,8 @@ public class DungeonLocation : BaseLocation
                 player.PoisonTurns = 0;
                 terminal.WriteLine(Loc.Get("dungeon.sanctuary_cure_poison"), "cyan");
             }
+
+            ApplyRestMentalRecovery(GameConfig.MentalSafeHavenGain);
 
             MarkRestedOnThisFloor(player);
             // v1.1.12: the sanctuary and the [R] camp share one rest per floor.
@@ -15834,18 +16083,29 @@ public class DungeonLocation : BaseLocation
     }
 
     /// <summary>
-    /// Secret Boss encounter - epic hidden bosses with deep lore
+    /// Secret Boss encounter - epic hidden bosses with deep lore.
+    /// v1.1.15: only a win spends the room (FinishSecretBoss); a flee, a loss, a death or a fight not
+    /// entered at Mental 0 leaves the boss to try again, and nothing is granted at the fight start.
     /// </summary>
-    private async Task SecretBossEncounter()
+    private async Task SecretBossEncounter(DungeonRoom room)
     {
         var player = GetCurrentPlayer();
         var bossMgr = SecretBossManager.Instance;
+
+        // v1.1.15: a boss already beaten here is not fought (or paid) again
+        if (room.SecretBossDefeated)
+        {
+            room.EventCompleted = true;
+            return;
+        }
 
         // Check if there's a secret boss for this floor
         var bossType = bossMgr.GetBossForFloor(currentDungeonLevel);
 
         if (bossType == null)
         {
+            room.EventCompleted = true;   // nothing to fight: the chamber is spent by the visit
+
             // No boss for this floor - give atmospheric message instead
             terminal.ClearScreen();
             terminal.SetColor("dark_magenta");
@@ -15868,21 +16128,44 @@ public class DungeonLocation : BaseLocation
             return;
         }
 
-        // Finding a secret boss chamber counts as discovering a secret
-        player.Statistics.RecordSecretFound();
-
         // Encounter the secret boss (displays intro and dialogue)
         var encounterResult = await bossMgr.EncounterBoss(bossType.Value, player, terminal);
 
         if (!encounterResult.Encountered)
             return;
 
-        // Create the boss monster for actual combat
-        var bossMonster = bossMgr.CreateBossMonster(bossType.Value, player.Level);
+        // Create the boss monster for actual combat (a wrong pre-fight choice hits harder this fight)
+        var bossMonster = bossMgr.CreateBossMonster(bossType.Value, player.Level, encounterResult.WrongChoice ? 1.5 : 1.0);
+
+        // v1.1.15: the grouped players in the party when the fight starts (a follower who dies or
+        // leaves is removed from teammates during the fight)
+        List<Character> groupedAtStart;
+        lock (teammates)
+            groupedAtStart = teammates.Where(t => t != null && t.IsGroupedPlayer).ToList();
 
         // Engage in combat with the secret boss
         var combatEngine = new CombatEngine(terminal);
         var combatResult = await combatEngine.PlayerVsMonster(player, bossMonster, teammates);
+
+        await FinishSecretBoss(room, bossType.Value, player, bossMonster, combatResult, groupedAtStart);
+    }
+
+    /// <summary>
+    /// v1.1.15: the end of a secret boss fight. A win marks the room spent and the boss defeated before
+    /// the rewards, so a dropped connection during the victory text cannot pay the win twice; any other
+    /// end leaves the room as it was.
+    /// </summary>
+    private async Task FinishSecretBoss(DungeonRoom room, SecretBossType bossType, Character player, Monster bossMonster, CombatResult combatResult, List<Character> groupedAtStart)
+    {
+        var bossMgr = SecretBossManager.Instance;
+
+        if (combatResult.MentalCollapseNotFought)
+        {
+            terminal.WriteLine(Loc.Get("mental.collapse_before_fight"), "gray");
+            terminal.WriteLine(Loc.Get("dungeon.secret_boss_remains"), "gray");
+            await terminal.PressAnyKey();
+            return;
+        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -15897,11 +16180,23 @@ public class DungeonLocation : BaseLocation
         // Check if player won (player is still alive and boss is dead)
         if (player.HP > 0 && bossMonster.HP <= 0)
         {
+            room.EventCompleted = true;
+            room.SecretBossDefeated = true;
+
+            // Finding and beating a secret boss chamber counts as discovering a secret
+            player.Statistics.RecordSecretFound();
+
+            // v1.1.15: every grouped player who fought and is standing at the end gets the chamber
+            // cleared in their own floor state and the victory reward once (the boss monster pays
+            // nothing on the kill)
+            foreach (var mate in groupedAtStart.Where(m => m != null && m.IsAlive && !ReferenceEquals(m, player)))
+                RewardSecretBossParticipant(mate, bossType, room.Id);
+
             // Player won - handle victory through the SecretBossManager
-            await bossMgr.HandleVictory(bossType.Value, player, terminal);
+            await bossMgr.HandleVictory(bossType, player, terminal);
 
             // Additional memory trigger for secret boss defeat
-            var bossData = bossMgr.GetBoss(bossType.Value);
+            var bossData = bossMgr.GetBoss(bossType);
             if (bossData?.TriggersMemoryFlash == true)
             {
                 await Task.Delay(1000);
@@ -15910,6 +16205,69 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.battle_breaks_open"));
                 await Task.Delay(1500);
                 AmnesiaSystem.Instance.CheckMemoryTrigger(TriggerType.SecretBossDefeated, player);
+            }
+            return;
+        }
+
+        terminal.WriteLine(Loc.Get("dungeon.secret_boss_remains"), "gray");
+        await terminal.PressAnyKey();
+    }
+
+    /// <summary>
+    /// v1.1.15: a grouped player's part of a secret boss win: the chamber marked in their own floor
+    /// state (and in their own cached floor, so a later save of that floor does not undo it), the
+    /// secret counted, and RewardXP and RewardGold paid once, as the leader's victory screen pays them.
+    /// </summary>
+    private void RewardSecretBossParticipant(Character mate, SecretBossType bossType, string roomId)
+    {
+        var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+        var theirDungeon = session?.Context?.LocationManager?.GetLocation(GameLocation.Dungeons) as DungeonLocation;
+        MarkSecretBossWon(mate, theirDungeon, currentDungeonLevel, roomId);
+        mate.Statistics.RecordSecretFound();
+
+        var boss = SecretBossManager.Instance.GetBoss(bossType);
+        if (boss == null) return;
+        long xp = TeamHQBonus.ApplyXP(mate, boss.RewardXP);
+        mate.Experience += xp;
+        mate.Gold += boss.RewardGold;
+        if (mate.AutoLevelUp)
+            LevelMasterLocation.CheckAutoLevelUp(mate);
+
+        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", boss.Name, xp, boss.RewardGold)}\u001b[0m");
+    }
+
+    /// <summary>
+    /// v1.1.15: mark a won secret boss chamber in one player's saved floor state, and in that player's
+    /// own cached floor when it is the same floor.
+    /// </summary>
+    private static void MarkSecretBossWon(Character who, DungeonLocation? theirDungeon, int floorLevel, string roomId)
+    {
+        if (!who.DungeonFloorStates.TryGetValue(floorLevel, out var floorState))
+        {
+            floorState = new DungeonFloorState
+            {
+                FloorLevel = floorLevel,
+                LastVisitedAt = DateTime.Now,
+                RoomStates = new Dictionary<string, DungeonRoomState>()
+            };
+            who.DungeonFloorStates[floorLevel] = floorState;
+        }
+        if (!floorState.RoomStates.TryGetValue(roomId, out var roomState))
+        {
+            roomState = new DungeonRoomState { RoomId = roomId };
+            floorState.RoomStates[roomId] = roomState;
+        }
+        roomState.EventCompleted = true;
+        roomState.SecretBossDefeated = true;
+
+        var cached = theirDungeon?.currentFloor;
+        if (cached != null && cached.Level == floorLevel)
+        {
+            var cachedRoom = cached.Rooms.FirstOrDefault(r => r.Id == roomId);
+            if (cachedRoom != null)
+            {
+                cachedRoom.EventCompleted = true;
+                cachedRoom.SecretBossDefeated = true;
             }
         }
     }
@@ -15965,6 +16323,9 @@ public class DungeonLocation : BaseLocation
         }
         else
         {
+            // v1.1.15: Mental before the jump deeper
+            if (!await ConfirmMentalDescent(GetCurrentPlayer()))
+                return;
             currentDungeonLevel = targetLevel;
             if (currentPlayer != null) { currentPlayer.CurrentLocation = $"Dungeon Floor {currentDungeonLevel}"; currentPlayer.LastDungeonFloor = currentDungeonLevel; }
             terminal.WriteLine(Loc.Get("dungeon.steel_nerves", currentDungeonLevel), "magenta");
@@ -18236,6 +18597,13 @@ public class DungeonLocation : BaseLocation
             if (!alive) throw new GameExitException();
             throw new LocationExitException(GameLocation.Temple);
         }
+        // v1.1.15: the follower collapsed on a shallow floor in the leader's fight; the rescue is
+        // applied (CombatEngine.ApplyFollowerCollapse), now carry them to the Healer
+        if (player.PendingMentalRescue)
+        {
+            player.PendingMentalRescue = false;
+            throw new LocationExitException(GameLocation.Healer);
+        }
     }
 
     /// <summary>
@@ -18257,7 +18625,7 @@ public class DungeonLocation : BaseLocation
                 // Active read from follower's own terminal — message pump is active,
                 // so EnqueueMessage broadcasts appear at the prompt
                 string? input;
-                if (player.PendingGroupDeath != null) break; // v1.2: died in the leader's fight
+                if (player.PendingGroupDeath != null || player.PendingMentalRescue) break; // v1.2: died in the leader's fight; v1.1.15: or collapsed
                 try
                 {
                     input = await term.GetInput("");
@@ -18282,7 +18650,7 @@ public class DungeonLocation : BaseLocation
                 }
 
                 if (input == null) break; // disconnect
-                if (player.PendingGroupDeath != null) break; // v1.2: died while this read was pending
+                if (player.PendingGroupDeath != null || player.PendingMentalRescue) break; // v1.2: died (v1.1.15: or collapsed) while this read was pending
 
                 var trimmed = input.Trim();
 

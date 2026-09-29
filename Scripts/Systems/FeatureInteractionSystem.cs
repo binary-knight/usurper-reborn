@@ -837,9 +837,6 @@ public class FeatureInteractionSystem
 
     #endregion
 
-    // v1.1.13: the risk prompt's answers: every language's yes (as GameConfig.IsAffirmative) and no
-    private static readonly string[] RiskAnswers = { "Y", "S", "O", "I", "YES", "SI", "S\u00CC", "OUI", "IGEN", "N", "NO", "NON", "NEM" };
-
     #region Moral Choice
 
     private async Task HandleMoralChoice(RoomFeature feature, Character player, int level,
@@ -1233,10 +1230,8 @@ public class FeatureInteractionSystem
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("feature.take_risk"));
 
-        // v1.1.13: yes or no; anything else asks again (it read as no)
-        var input = await terminal.GetValidChoice("> ", RiskAnswers, "N", Loc.Get("feature.risk_answers"));
-
-        if (GameConfig.IsAffirmative(input))
+        // v1.1.15: yes or no; anything else asks again
+        if (await terminal.AskYesNoAsync("> "))
         {
             int roll = random.Next(100);
             terminal.WriteLine("");
@@ -1320,7 +1315,10 @@ public class FeatureInteractionSystem
 
         // The memory system uses enum-based fragments, so just display the thematic text
         // This creates atmosphere without requiring tight integration
-        player.Mental = Math.Min(100, player.Mental + 1); // Slight mental boost from memory recovery
+        // Slight mental boost from memory recovery. v1.1.15: through MentalSystem.Change (capped)
+        int mentalBefore = player.Mental;
+        MentalSystem.Change(player, GameConfig.MentalMemoryRecoveryGain);
+        MentalUi.AnnounceMentalChange(terminal, player, mentalBefore);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("feature.memory_fades"));

@@ -728,9 +728,8 @@ namespace UsurperRemake.Locations
             }
 
             terminal.WriteLine(Loc.Get("dark_alley.drug_buy_confirm", selected.name, finalPrice), "yellow");
-            var confirm = await terminal.GetInput("> ");
-
-            if (!GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync("> "))
             {
                 terminal.WriteLine(Loc.Get("dark_alley.drug_back_away"), "gray");
                 await Task.Delay(1500);
@@ -738,6 +737,7 @@ namespace UsurperRemake.Locations
             }
 
             currentPlayer.Gold -= finalPrice;
+            int mentalBeforeDrug = currentPlayer.Mental;
             var (success, message) = DrugSystem.UseDrug(currentPlayer, selected.drug);
 
             if (success)
@@ -745,6 +745,8 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("bright_green");
                 terminal.WriteLine("");
                 terminal.WriteLine(message);
+                // v1.1.15: the Mental high, with its amount
+                MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeDrug, currentPlayer.Mental - mentalBeforeDrug);
                 terminal.WriteLine("");
 
                 // Show effects based on drug type
@@ -778,6 +780,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(message);
+                MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeDrug);   // v1.1.15: the overdose loss
             }
 
             await Task.Delay(2500);
@@ -802,8 +805,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.steroid_cost", price, GameConfig.MoneyType), "cyan");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.steroid_purchases", currentPlayer.SteroidShopPurchases, GameConfig.MaxSteroidShopPurchases));
-            var ans = await terminal.GetInput(Loc.Get("dark_alley.steroid_inject_prompt"));
-            if (!GameConfig.IsAffirmative(ans)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.steroid_inject_prompt"))) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -813,8 +816,7 @@ namespace UsurperRemake.Locations
             }
 
             currentPlayer.Gold -= price;
-            currentPlayer.Strength += 5;
-            currentPlayer.Stamina += 3;
+            currentPlayer.GrantPermanentStats((StatKind.Strength, 5), (StatKind.Stamina, 3)); // 1.2.0: lasting, written to Base
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 3, isGood: false, "dark_alley.steroids"); // v0.57.12: paired movement
             currentPlayer.Fame = Math.Max(0, currentPlayer.Fame - 2); // Infamy
             currentPlayer.SteroidShopPurchases++;
@@ -831,8 +833,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.orbs_enter"), "white");
             long price = GetAdjustedPrice(currentPlayer.Level * 50 + 100);
             terminal.WriteLine(Loc.Get("dark_alley.orbs_cost", price, GameConfig.MoneyType), "cyan");
-            var ans = await terminal.GetInput(Loc.Get("dark_alley.orbs_pay_prompt"));
-            if (!GameConfig.IsAffirmative(ans)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.orbs_pay_prompt"))) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -918,7 +920,7 @@ namespace UsurperRemake.Locations
                         break;
                     }
                     currentPlayer.GroggoShadowBlessingDex = 3;
-                    currentPlayer.Dexterity += 3;
+                    currentPlayer.RecalculateStats();   // 1.2.0: applied in RecalculateStats until the next rest
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("dark_alley.groggo_traces"), "bright_magenta");
                     terminal.WriteLine(Loc.Get("dark_alley.groggo_shadows_wrap"), "white");
@@ -940,8 +942,8 @@ namespace UsurperRemake.Locations
             long price = GetAdjustedPrice(10);
             terminal.WriteLine(Loc.Get("dark_alley.bob_price", price), "yellow");
 
-            var ans = await terminal.GetInput(Loc.Get("dark_alley.bob_drink_prompt"));
-            if (!GameConfig.IsAffirmative(ans)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.bob_drink_prompt"))) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -979,8 +981,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.alchemist_enter"), "white");
             long price = GetAdjustedPrice(300);
             terminal.WriteLine(Loc.Get("dark_alley.alchemist_price", price, GameConfig.MoneyType), "cyan");
-            var ans = await terminal.GetInput(Loc.Get("dark_alley.alchemist_buy_prompt"));
-            if (!GameConfig.IsAffirmative(ans)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.alchemist_buy_prompt"))) return;
 
             if (currentPlayer.Gold < price)
             {
@@ -1000,7 +1002,7 @@ namespace UsurperRemake.Locations
                     }
                     else
                     {
-                        currentPlayer.Intelligence += 2;
+                        currentPlayer.GrantPermanentStat(StatKind.Intelligence, 2); // 1.2.0: lasting, written to Base
                         currentPlayer.AlchemistINTBoosts++;
                         terminal.WriteLine(Loc.Get("dark_alley.alchemist_int_boost", GameConfig.MaxAlchemistINTBoosts - currentPlayer.AlchemistINTBoosts), "bright_green");
                     }
@@ -1097,9 +1099,8 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dark_alley.faction_leave_warn", facName));
                 terminal.WriteLine("");
-                var leaveChoice = (await terminal.GetInputAsync(Loc.Get("dark_alley.faction_leave_prompt", facName)) ?? "").Trim().ToUpperInvariant();
-                // Accept localized affirmatives: Yes / Igen (hu) / Si (es,it) / Oui (fr)
-                bool confirmLeave = GameConfig.IsAffirmative(leaveChoice);
+                // v1.1.15: yesno-convert-a, prompt shows (y/N) so a bare Enter keeps the old default of No
+                bool confirmLeave = await terminal.AskYesNoAsync(Loc.Get("dark_alley.faction_leave_prompt", facName), enterDefault: false);
                 if (confirmLeave)
                 {
                     factionSystem.LeaveFaction();
@@ -1183,9 +1184,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.shadows_warning2"));
             terminal.WriteLine("");
 
-            var choice = await terminal.GetInputAsync(Loc.Get("dark_alley.shadows_join_prompt"));
-
-            if (GameConfig.IsAffirmative(choice))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(Loc.Get("dark_alley.shadows_join_prompt")))
             {
                 await PerformShadowsInitiation(factionSystem);
             }
@@ -1778,8 +1778,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.bm_gold", currentPlayer.Gold));
             terminal.WriteLine("");
 
-            var input = await terminal.GetInput(Loc.Get("dark_alley.informant_pay_prompt"));
-            if (!GameConfig.IsAffirmative(input))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.informant_pay_prompt")))
                 return;
 
             if (currentPlayer.Gold < GameConfig.InformantCost)
@@ -2303,8 +2303,10 @@ namespace UsurperRemake.Locations
             await Task.Delay(1500);
 
             // DEX check
-            float chance = Math.Min(0.75f, 0.40f + currentPlayer.Dexterity * 0.005f +
-                (currentPlayer.Class == CharacterClass.Assassin ? 0.15f : 0f));
+            // 1.2.0 Temple gods piece 2: Umbrath's boon adds to the chance and raises its cap the same
+            float umbrath = (float)(GodBoonSystem.TheftChanceBonusPct(currentPlayer) / 100.0);
+            float chance = Math.Min(0.75f + umbrath, 0.40f + currentPlayer.Dexterity * 0.005f +
+                (currentPlayer.Class == CharacterClass.Assassin ? 0.15f : 0f) + umbrath);
 
             float roll = (float)Random.Shared.NextDouble();
 
@@ -2319,6 +2321,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.pick_prison"));
                 terminal.WriteLine("");
                 currentPlayer.DaysInPrison = 1;
+                GodDeedSystem.Record(currentPlayer, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 currentPlayer.Statistics?.RecordPickpocketAttempt(false);
                 await Task.Delay(2500);
                 throw new LocationExitException(GameLocation.Prison);
@@ -2331,6 +2334,7 @@ namespace UsurperRemake.Locations
                 target.Gold -= stolen;
                 currentPlayer.Gold += stolen;
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 3, isGood: false, "dark_alley.pickpocket"); // v0.57.12: paired movement
+                GodDeedSystem.Record(currentPlayer, GodAct.Theft, terminal);   // 1.2.0 Temple gods: Shadow deed, Law taboo
                 currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 2);
 
                 terminal.SetColor("bright_green");
@@ -2931,8 +2935,8 @@ namespace UsurperRemake.Locations
             var selected = itemsForSale[sel - 1];
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dark_alley.fence_confirm", selected.name, selected.value));
-            var confirm = await terminal.GetInput("> ");
-            if (!GameConfig.IsAffirmative(confirm)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync("> ")) return;
 
             // Remove item from inventory
             currentPlayer.Inventory.RemoveAt(selected.index);
@@ -2988,8 +2992,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine($"{Loc.Get("ui.gold")}: {currentPlayer.Gold:N0}");
             terminal.WriteLine("");
 
-            var ans = await terminal.GetInput(Loc.Get("dark_alley.safe_rest_prompt"));
-            if (!GameConfig.IsAffirmative(ans)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.safe_rest_prompt"))) return;
 
             if (currentPlayer.Gold < cost)
             {
@@ -3104,8 +3108,8 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.tribute_your_gold", currentPlayer.Gold));
             terminal.WriteLine("");
 
-            var ans = await terminal.GetInput(Loc.Get("dark_alley.tribute_pay_prompt"));
-            if (!GameConfig.IsAffirmative(ans)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.tribute_pay_prompt"))) return;
 
             if (currentPlayer.Gold < tributeCost)
             {
@@ -3240,6 +3244,7 @@ namespace UsurperRemake.Locations
                         term.SetColor("bright_red");
                         term.WriteLine(Loc.Get("dark_alley.enc_guard_prison"));
                         player.DaysInPrison = 1;
+                        GodDeedSystem.Record(player, GodAct.Imprisoned, term);   // 1.2.0 Temple gods: Law taboo
                         await Task.Delay(2500);
                         throw new LocationExitException(GameLocation.Prison);
                     }
@@ -3278,15 +3283,16 @@ namespace UsurperRemake.Locations
                     term.Write("    ");
                     WriteSRMenuOption("N", Loc.Get("dark_alley.enc_merchant_pass"));
                     term.WriteLine("");
-                    var ans = await term.GetInput("> ");
-                    if (GameConfig.IsAffirmative(ans) && player.Gold >= potionPrice)
+                    // v1.1.15: yesno-convert-a, a two-option Y/N menu, strict
+                    bool ans = await term.AskYesNoAsync("> ");
+                    if (ans && player.Gold >= potionPrice)
                     {
                         player.Gold -= potionPrice;
                         player.Healing = Math.Min(player.MaxPotions, player.Healing + 1);
                         term.SetColor("bright_green");
                         term.WriteLine(Loc.Get("dark_alley.enc_merchant_pocket"));
                     }
-                    else if (GameConfig.IsAffirmative(ans))
+                    else if (ans)
                     {
                         term.SetColor("red");
                         term.WriteLine(Loc.Get("dark_alley.enc_merchant_no_gold"));
@@ -3301,31 +3307,32 @@ namespace UsurperRemake.Locations
                     term.Write("    ");
                     WriteSRMenuOption("N", Loc.Get("dark_alley.enc_merchant_pass"));
                     term.WriteLine("");
-                    var ans = await term.GetInput("> ");
-                    if (GameConfig.IsAffirmative(ans) && player.Gold >= price)
+                    // v1.1.15: yesno-convert-a, a two-option Y/N menu, strict
+                    bool ans = await term.AskYesNoAsync("> ");
+                    if (ans && player.Gold >= price)
                     {
                         player.Gold -= price;
                         int stat = Random.Shared.Next(1, 4);
                         switch (stat)
                         {
                             case 1:
-                                player.Strength += 1;
+                                player.GrantPermanentStat(StatKind.Strength, 1); // 1.2.0: lasting, written to Base
                                 term.SetColor("bright_green");
                                 term.WriteLine(Loc.Get("dark_alley.enc_merchant_str"));
                                 break;
                             case 2:
-                                player.Dexterity += 1;
+                                player.GrantPermanentStat(StatKind.Dexterity, 1);
                                 term.SetColor("bright_green");
                                 term.WriteLine(Loc.Get("dark_alley.enc_merchant_dex"));
                                 break;
                             default:
-                                player.Constitution += 1;
+                                player.GrantPermanentStat(StatKind.Constitution, 1);
                                 term.SetColor("bright_green");
                                 term.WriteLine(Loc.Get("dark_alley.enc_merchant_con"));
                                 break;
                         }
                     }
-                    else if (GameConfig.IsAffirmative(ans))
+                    else if (ans)
                     {
                         term.SetColor("red");
                         term.WriteLine(Loc.Get("dark_alley.enc_merchant_no_gold2"));
@@ -3360,6 +3367,17 @@ namespace UsurperRemake.Locations
 
             var combatEngine = new CombatEngine(term);
             var result = await combatEngine.PlayerVsMonster(player, enforcer, null, false);
+
+            // v1.2.0: a fight not entered for a Mental collapse (a save resumed here at Mental 0) is neither a
+            // beating nor a win: the loan, the gold and the HP stay as they are, and the location loop collapses.
+            if (result.MentalCollapseNotFought)
+            {
+                term.SetColor("gray");
+                term.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                term.WriteLine("");
+                await Task.Delay(1500);
+                return;
+            }
 
             if (result.Outcome == CombatOutcome.Victory)
             {
@@ -3688,8 +3706,8 @@ namespace UsurperRemake.Locations
             }
             terminal.WriteLine("");
 
-            var confirm = await terminal.GetInput(Loc.Get("dark_alley.evil_commit_prompt"));
-            if (!GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync(Loc.Get("dark_alley.evil_commit_prompt")))
                 return;
 
             terminal.WriteLine("");

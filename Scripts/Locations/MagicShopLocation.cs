@@ -321,7 +321,7 @@ public partial class MagicShopLocation : BaseLocation
                 await EnchantEquipment(player);
                 return false;
             case "I":
-                IdentifyItem(player);
+                await IdentifyItem(player);
                 await terminal.WaitForKey();
                 return false;
             case "C":
@@ -467,7 +467,7 @@ public partial class MagicShopLocation : BaseLocation
     // Legacy curio listing/buying methods removed in v0.26.0 - replaced by modern Accessory Shop [A]
     
     
-    private void IdentifyItem(Character player)
+    private async Task IdentifyItem(Character player)
     {
         DisplayMessage("");
 
@@ -508,10 +508,11 @@ public partial class MagicShopLocation : BaseLocation
             string unidName = LootGenerator.GetUnidentifiedName(item);
             CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.identification_label"), identifyCost);
             DisplayMessage(Loc.Get("magic_shop.identify_confirm", unidName, $"{idTotalWithTax:N0}"), "yellow", false);
-            var confirm = terminal.GetInputSync("").ToUpper();
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            bool confirm = await terminal.AskYesNoAsync("");
             DisplayMessage("");
 
-            if (GameConfig.IsAffirmative(confirm))
+            if (confirm)
             {
                 player.Gold -= idTotalWithTax;
                 CityControlSystem.Instance.ProcessSaleTax(identifyCost);
@@ -815,9 +816,8 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
-        var confirm = await terminal.GetInput(Loc.Get("magic_shop.curse_confirm", targetItem.Name, $"{curseTotalWithTax:N0}"));
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm", targetItem.Name, $"{curseTotalWithTax:N0}")))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -918,9 +918,8 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
-        var confirm = await terminal.GetInput($"Remove curse from {ownerName}'s {targetEquip.Name} for {curseTotalWithTax:N0} gold? (Y/N) ");
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm_team", ownerName, targetEquip.Name, $"{curseTotalWithTax:N0}")))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -1142,9 +1141,8 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
-        var confirm = await terminal.GetInput(Loc.Get("magic_shop.old_enchant_confirm", targetItem.Name, $"{enchTotalWithTax:N0}"));
-
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.old_enchant_confirm", targetItem.Name, $"{enchTotalWithTax:N0}")))
             return;
 
         player.Gold -= enchTotalWithTax;
@@ -1376,9 +1374,8 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.reset_scroll_tax_label"), scrollPrice);
         DisplayMessage(Loc.Get("magic_shop.reset_scroll_confirm", selectedFloor.Key.ToString(), scrollTotalWithTax.ToString("N0")), "yellow", false);
-        var confirm = (await terminal.GetInput("")).ToUpper();
-
-        if (GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (await terminal.AskYesNoAsync(""))
         {
             player.Gold -= scrollTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(scrollPrice);
@@ -2057,8 +2054,8 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.proceed_yn")}");
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.proceed_yn")}"))
             return;
 
         // Execute enchantment
@@ -2344,8 +2341,8 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         var (rmSlot, rmEquip) = enchantedItems[choice - 1];
-        var confirmInput = await terminal.GetInput(Loc.Get("magic_shop.remove_enchant_confirm", rmEquip.Name));
-        if (!GameConfig.IsAffirmative(confirmInput))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.remove_enchant_confirm", rmEquip.Name)))
         {
             await terminal.WaitForKey();
             return;
@@ -2703,8 +2700,8 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
 
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, price);
-        var buyConfirm = await terminal.GetInput($"  {Loc.Get("magic_shop.buy_confirm", $"{totalWithTax:N0}")}");
-        if (!GameConfig.IsAffirmative(buyConfirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.buy_confirm", $"{totalWithTax:N0}")}")) return;
 
         player.Gold -= totalWithTax;
 
@@ -2895,8 +2892,8 @@ public partial class MagicShopLocation : BaseLocation
             long totalGold = sellable.Sum(s => s.sellPrice);
             terminal.SetColor("yellow");
             terminal.Write($"  {Loc.Get("magic_shop.bulk_sell_confirm", sellable.Count, totalGold.ToString("N0"))}");
-            var confirm = await terminal.GetInput("");
-            if (GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (await terminal.AskYesNoAsync(""))
             {
                 // Remove all sold items from inventory (reverse to preserve indices)
                 int soldCount = 0;
@@ -3386,8 +3383,8 @@ public partial class MagicShopLocation : BaseLocation
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.love_spells"), spellCost);
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.proceed_yn")}");
-        if (!GameConfig.IsAffirmative(confirm))
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.proceed_yn")}"))
             return;
 
         // Deduct costs
@@ -3603,8 +3600,8 @@ public partial class MagicShopLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("blue");
             terminal.WriteLine("  Your noble heart resists this dark path.");
-            var warnConfirm = await terminal.GetInput("  Are you sure you want to proceed? (Y/N): ");
-            if (!GameConfig.IsAffirmative(warnConfirm)) return;
+            // v1.1.15: yesno-convert-a, strict (Y/N)
+            if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.proceed_yn")}")) return;
         }
 
         // Build target list: exclude protected NPCs, spouse, and current King
@@ -3664,8 +3661,8 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("magic_shop.dark_on_failure")}");
         terminal.WriteLine("");
 
-        var confirm = await terminal.GetInput($"  {Loc.Get("magic_shop.dark_proceed")}");
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.dark_proceed")}")) return;
 
         // Deduct costs
         player.Gold -= deathTotalWithTax;

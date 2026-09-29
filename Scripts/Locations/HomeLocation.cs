@@ -684,6 +684,8 @@ public class HomeLocation : BaseLocation
         }
         await Task.Delay(1500);
 
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
+
         // Blood Price rest penalty — dark memories reduce rest effectiveness (multiplicative)
         float restEfficiency = recoveryPercent;
         if (currentPlayer.MurderWeight >= 6f) restEfficiency *= 0.50f;
@@ -741,6 +743,10 @@ public class HomeLocation : BaseLocation
         }
 
         currentPlayer.HomeRestsToday++;
+
+        // v1.1.15: Mental, once a day, alongside the HomeRestsToday limit.
+        int mentalBeforeRest = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeRest, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.HomeRest, GameConfig.MentalHomeRestGain));
 
         // Reduce fatigue from home rest (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && currentPlayer.Fatigue > 0)
@@ -812,9 +818,9 @@ public class HomeLocation : BaseLocation
     {
         if (currentPlayer == null) return;
 
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
         if (backend != null)
@@ -822,6 +828,10 @@ public class HomeLocation : BaseLocation
             var username = UsurperRemake.BBS.DoorMode.OnlineUsername ?? currentPlayer.Name2;
             await backend.RegisterSleepingPlayer(username, "home", "[]", 1);
         }
+
+        // v1.1.15: sleeping at home eases the mind once a day (HomeSleep); later sleeps still rest the body.
+        int mentalBeforeSleep = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.HomeSleep, GameConfig.MentalHomeSleepGain));
 
         terminal.SetColor("gray");
         terminal.WriteLine($"\n  {Loc.Get("home.sleep_reinforced")}");
@@ -938,6 +948,10 @@ public class HomeLocation : BaseLocation
             DreamSystem.Instance.ExperienceDream(dream.Id);
         }
 
+        // v1.1.15: a night's sleep at home eases the mind; the night then runs the daily reset.
+        int mentalBeforeSleep = currentPlayer.Mental;
+        MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSleep, MentalSystem.Change(currentPlayer, GameConfig.MentalHomeSleepGain));
+
         // Advance to morning
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -954,7 +968,8 @@ public class HomeLocation : BaseLocation
     private async Task GatherHerbs()
     {
         int gardenLevel = Math.Clamp(currentPlayer.GardenLevel, 0, 5);
-        int maxHerbs = GameConfig.HerbsPerDay[gardenLevel];
+        // 1.2.0 Temple gods piece 2: Terran's boon on the garden's herbs a day
+        int maxHerbs = (int)GodBoonSystem.EarthYield(currentPlayer, GameConfig.HerbsPerDay[gardenLevel]);
 
         if (gardenLevel <= 0)
         {
@@ -1027,6 +1042,7 @@ public class HomeLocation : BaseLocation
 
                 currentPlayer.AddHerb(herbType);
                 currentPlayer.HerbsGatheredToday++;
+                GodDeedSystem.Record(currentPlayer, GodAct.HerbGathered, terminal);   // 1.2.0 Temple gods: Earth deed
                 herbsLeft--;
 
                 terminal.SetColor(HerbData.GetColor(herbType));
@@ -1116,9 +1132,10 @@ public class HomeLocation : BaseLocation
     }
 
     /// <summary>
-    /// Apply an herb's effect to the player. Consumes 1 herb from inventory.
+    /// Apply an herb's effect to the player. Consumes 1 herb from inventory. The monsters are the
+    /// fight the player is in (null outside combat), for Solarius's boon on the healing herb.
     /// </summary>
-    public static async Task ApplyHerbEffect(Character player, HerbType type, TerminalEmulator terminal)
+    public static async Task ApplyHerbEffect(Character player, HerbType type, TerminalEmulator terminal, IEnumerable<Monster>? monsters = null)
     {
         if (!player.ConsumeHerb(type)) return;
 
@@ -1132,6 +1149,7 @@ public class HomeLocation : BaseLocation
                 if (player.Class == CharacterClass.Alchemist)
                     herbHealPct *= (1.0f + GameConfig.AlchemistPotionMasteryBonus);
                 long healAmount = (long)(player.MaxHP * herbHealPct);
+                healAmount = GodBoonSystem.HealAgainstUndead(player, healAmount, monsters); // 1.2.0: Solarius, in combat only
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
                 terminal.WriteLine(Loc.Get("home.herb_healing_use", herbName, healAmount, player.HP, player.MaxHP));
@@ -2365,6 +2383,13 @@ public class HomeLocation : BaseLocation
                 break;
         }
 
+        // v1.1.15: dinner, a walk or the fire with a spouse or a lover eases the mind once a day (one Spouse bit).
+        if (choice >= 1 && choice <= 3 && MentalSystem.IsPartner(partner.ID))
+        {
+            int mentalBeforeSpouse = currentPlayer.Mental;
+            MentalUi.ReportGain(terminal, currentPlayer, mentalBeforeSpouse, MentalSystem.TryDailyGain(currentPlayer, MentalDailySource.Spouse, GameConfig.MentalSpouseGain));
+        }
+
         await terminal.WaitForKey();
         }
         finally { partner.IsInConversation = false; }
@@ -2683,8 +2708,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine($" {Loc.Get("home.divorce_no")}");
         terminal.WriteLine();
 
-        var input = await terminal.GetInput(Loc.Get("ui.choice"));
-        if (!GameConfig.IsAffirmative(input))
+        if (!await terminal.AskYesNoAsync(Loc.Get("ui.choice")))
         {
             terminal.WriteLine();
             terminal.SetColor("bright_cyan");
@@ -3144,8 +3168,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine($" {Loc.Get("home.alt_no_another_time")}");
             terminal.WriteLine();
 
-            var input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync(Loc.Get("ui.choice")))
             {
                 await PlayHotwifingScene(spouse, spouseData);
             }
@@ -3362,8 +3385,7 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine($" {Loc.Get("home.alt_no_another_time")}");
             terminal.WriteLine();
 
-            var input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync(Loc.Get("ui.choice")))
             {
                 await PlayCuckoldingScene(spouse, spouseData);
             }
@@ -4248,9 +4270,7 @@ public class HomeLocation : BaseLocation
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("home.upgrade_confirm", name, $"{cost:N0}"));
-        var confirm = await terminal.GetInput("(Y/N): ");
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.yn_prompt")))
         {
             currentPlayer.Gold -= cost;
             currentPlayer.Statistics.RecordGoldSpent(cost);
@@ -5002,8 +5022,7 @@ public class HomeLocation : BaseLocation
         terminal.Write(Loc.Get("home.take_all_warning"));
         terminal.SetColor("white");
 
-        var confirm = await terminal.ReadLineAsync();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(""))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));

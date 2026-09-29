@@ -1372,9 +1372,7 @@ public partial class MainStreetLocation : BaseLocation
             terminal.WriteLine($"\n  {Loc.Get("main_street.attack_warning")}");
             terminal.WriteLine($"  {Loc.Get("main_street.attack_confirm")}");
 
-            string confirm = (await terminal.GetKeyInput()).ToUpperInvariant();
-
-            if (GameConfig.IsAffirmative(confirm))
+            if (await terminal.AskYesNoKeyAsync())
             {
                 // Attack!
                 var encounterResult = await StreetEncounterSystem.Instance.AttackCharacter(
@@ -1464,9 +1462,9 @@ public partial class MainStreetLocation : BaseLocation
             if (choice == "H" && currentPlayer.HasReinforcedDoor)
             {
                 // Sleep at home — safe behind reinforced door
+                currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
                 currentPlayer.HP = currentPlayer.MaxHP;
                 currentPlayer.Mana = currentPlayer.MaxMana;
-                currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
                 var backend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
                 if (backend != null)
@@ -1499,9 +1497,9 @@ public partial class MainStreetLocation : BaseLocation
                 isBroke = true;
             }
 
+            currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
             currentPlayer.HP = currentPlayer.MaxHP;
             currentPlayer.Mana = currentPlayer.MaxMana;
-            currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
             var dormBackend = SaveSystem.Instance.Backend as UsurperRemake.Systems.SqlSaveBackend;
             if (dormBackend != null)
@@ -1781,9 +1779,7 @@ public partial class MainStreetLocation : BaseLocation
         terminal.WriteLine(Loc.Get("main_street.combat_test_weapon", testMonster.Name, testMonster.Weapon));
         terminal.WriteLine("");
         
-        var confirm = await terminal.GetInput(Loc.Get("main_street.combat_test_confirm"));
-        
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync(Loc.Get("main_street.combat_test_confirm")))
         {
             // Initialize combat engine
             var combatEngine = new CombatEngine(terminal);
@@ -1819,6 +1815,10 @@ public partial class MainStreetLocation : BaseLocation
             if (result.Outcome == CombatOutcome.Victory)
             {
                 terminal.WriteLine(Loc.Get("main_street.combat_test_victory"), "green");
+            }
+            else if (result.MentalCollapseNotFought)
+            {
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"), "gray"); // v1.1.15: not entered, not fled
             }
             else if (result.Outcome == CombatOutcome.PlayerEscaped)
             {
@@ -1885,6 +1885,13 @@ public partial class MainStreetLocation : BaseLocation
     {
         terminal.ClearScreen();
         WorldEventSystem.Instance.DisplayWorldStatus(terminal);
+        // v1.1.15: seeing a world disaster on the status screen, the Mental witness loss (once a day)
+        if (WorldEventSystem.Instance.HasActiveDisaster)
+        {
+            int mentalBeforeWitness = currentPlayer.Mental;
+            MentalSystem.ApplyWitnessLoss(currentPlayer);
+            MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeWitness);
+        }
         terminal.WriteLine("");
         await terminal.PressAnyKey(Loc.Get("ui.press_enter"));
     }
@@ -1950,6 +1957,7 @@ public partial class MainStreetLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("main_street.gods_desc")}");
         terminal.WriteLine("");
 
+        // 1.2.0 Temple gods piece 7 leftover: Aurelion's site is the Deep Temple, not a dungeon floor.
         var allGods = new (OldGodType type, string name, int floor)[]
         {
             (OldGodType.Maelketh, "Maelketh",  25),
@@ -1963,6 +1971,7 @@ public partial class MainStreetLocation : BaseLocation
 
         foreach (var (godType, godName, floor) in allGods)
         {
+            string site = godType == OldGodType.Aurelion ? Loc.Get("temple.room.deep") : $"Fl.{floor}";
             if (story.OldGodStates.TryGetValue(godType, out var godState) &&
                 godState.HasBeenEncountered)
             {
@@ -1983,12 +1992,12 @@ public partial class MainStreetLocation : BaseLocation
                     _                                        => "bright_yellow",
                 };
                 terminal.SetColor(color);
-                terminal.WriteLine($"    Fl.{floor,-4} {godName,-10} [{statusText}]");
+                terminal.WriteLine($"    {site,-7} {godName,-10} [{statusText}]");
             }
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"    Fl.{floor,-4} {"????",-10} [{Loc.Get("main_street.god_unknown")}]");
+                terminal.WriteLine($"    {site,-7} {"????",-10} [{Loc.Get("main_street.god_unknown")}]");
             }
         }
         terminal.WriteLine("");

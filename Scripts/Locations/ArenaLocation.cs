@@ -312,9 +312,7 @@ public class ArenaLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("arena.warning_damage")}");
         terminal.WriteLine($"  {Loc.Get("arena.gold_steal_rule", GameConfig.PvPGoldStealPercent * 100)}");
         terminal.WriteLine("");
-        var confirm = await terminal.GetInput($"  {Loc.Get("arena.confirm_prompt")}");
-
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync($"  {Loc.Get("arena.confirm_prompt")}"))
         {
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("arena.step_back")}");
@@ -426,9 +424,12 @@ public class ArenaLocation : BaseLocation
 
             // Claim any bounties on the defeated player
             long bountyReward = await backend.ClaimBounties(defenderUsername, myUsername);
+            bountyReward = GodBoonSystem.BountyReward(currentPlayer, bountyReward);   // 1.2.0 Temple gods piece 2: Judicar's boon
 
             // Fame from PvP victory
             currentPlayer.Fame += 10;
+            GodDeedSystem.Record(currentPlayer, GodAct.PvpWin, terminal);   // 1.2.0 Temple gods: Chaos deed
+            if (bountyReward > 0) GodDeedSystem.Record(currentPlayer, GodAct.BountyCollected, terminal);   // 1.2.0 Temple gods: Law deed
 
             // Display victory
             terminal.WriteLine("");

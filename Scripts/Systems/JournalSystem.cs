@@ -127,6 +127,8 @@ public static class JournalSystem
             if (godInBand)
             {
                 string godName = OldGodsData.GetGodBossData(god!.Value.God)?.Name ?? god.Value.God.ToString();
+                if (god.Value.God == OldGodType.Aurelion)   // 1.2.0 Temple gods piece 7: fought in the Deep Temple
+                    return new JournalNextStep { LocKey = "journal.next_god_temple", Args = new object[] { godName } };
                 return new JournalNextStep { LocKey = "journal.next_god", Args = new object[] { godName, god.Value.Floor } };
             }
         }
@@ -276,7 +278,9 @@ public static class JournalSystem
             if (god.HasValue)
             {
                 string godName = OldGodsData.GetGodBossData(god.Value.God)?.Name ?? god.Value.God.ToString();
-                lines.Add((Loc.Get("journal.line_next_god", godName, god.Value.Floor), "dark_cyan"));
+                lines.Add((god.Value.God == OldGodType.Aurelion   // 1.2.0 Temple gods piece 7
+                    ? Loc.Get("journal.line_next_god_temple", godName)
+                    : Loc.Get("journal.line_next_god", godName, god.Value.Floor), "dark_cyan"));
             }
         }
         catch { }

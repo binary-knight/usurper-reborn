@@ -586,8 +586,7 @@ public class MusicShopLocation : BaseLocation
             terminal.Write(Loc.Get("music_shop.incl_tax"));
         }
         terminal.WriteLine(Loc.Get("music_shop.gold_yn"));
-        string confirm = await GetChoice();
-        if (!GameConfig.IsAffirmative(confirm)) return;
+        if (!await terminal.AskYesNoAsync(Loc.Get("ui.your_choice"))) return;
 
         currentPlayer.Gold -= totalCost;
         currentPlayer.Statistics?.RecordPurchase(totalCost);
@@ -1113,9 +1112,7 @@ public class MusicShopLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine($"\n{Loc.Get("music_shop.recruit_join_prompt")}");
-        string input = await GetChoice();
-
-        if (GameConfig.IsAffirmative(input))
+        if (await terminal.AskYesNoAsync(Loc.Get("ui.your_choice")))
         {
             bool success = await CompanionSystem.Instance.RecruitCompanion(CompanionId.Melodia, currentPlayer, terminal);
             if (success)

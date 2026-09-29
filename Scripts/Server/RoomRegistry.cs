@@ -105,7 +105,9 @@ public class RoomRegistry
     }
 
     /// <summary>
-    /// Get player names at a location, excluding a specific player.
+    /// Get player names at a location, excluding a specific player by account username
+    /// (the room key). v1.2.0: it used to compare a character name, which missed the viewer
+    /// whenever their shown name differed from the session's (a family name, an alt).
     /// </summary>
     public IReadOnlyList<string> GetPlayerNamesAt(GameLocation location, string? excludeUsername = null)
     {
@@ -118,8 +120,9 @@ public class RoomRegistry
             ? (SessionContext.Current?.WizardLevel ?? WizardLevel.Mortal)
             : WizardLevel.Mortal;
 
-        return room.Values
-            .Where(s => excludeKey == null || s.ActiveCharacterName.ToLowerInvariant() != excludeKey)
+        return room
+            .Where(kv => excludeKey == null || kv.Key != excludeKey)
+            .Select(kv => kv.Value)
             .Where(s => !s.IsWizInvisible || viewerWizLevel >= s.WizardLevel) // Hide invisible wizards from lower-level
             .Select(s =>
             {

@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.1.14";
-    public const string VersionName = "Regalia"; // 1.1 line: the gear and reward loop
+    public const string Version = "1.2.0";
+    public const string VersionName = "Devotion"; // 1.2 line: Mental Health, the Sage and the gods
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -295,6 +295,14 @@ public static partial class GameConfig
     /// semantics that prevent this). In single-player/BBS mode, uses a simple static field.
     /// </summary>
     private static bool _compactModeGlobal = false;
+
+    /// <summary>
+    /// v1.1.15: single-player in a local console reads a menu key as a line (type the key, press Enter)
+    /// when true, or acts on one keypress when false. Mirrored from Character.MenuKeysNeedEnter on load.
+    /// Only the local console branch of TerminalEmulator.GetKeyInput reads it; MUD, BBS and door input
+    /// always read a line, so a plain static is enough.
+    /// </summary>
+    public static bool MenuKeysNeedEnter { get; set; } = true;
 
     public static bool CompactMode
     {
@@ -1117,6 +1125,9 @@ public static partial class GameConfig
         return (int)Math.Round(clamped / (double)AutoCombatHealPercentStep) * AutoCombatHealPercentStep;
     }
 
+    /// <summary>v1.1.15: a saved or edited Willow Draught count, kept in [0, MaxWillowDraughts].</summary>
+    public static int ClampWillowDraughts(int count) => Math.Clamp(count, 0, MaxWillowDraughts);
+
     /// <summary>v1.1.13: the next threshold in the preferences cycle, wrapping from the top to the bottom.</summary>
     public static int NextAutoCombatHealPercent(int percent)
     {
@@ -1632,6 +1643,175 @@ public static partial class GameConfig
     public const float FatigueExhaustedDamagePenalty = -0.10f; // -10% damage when Exhausted
     public const float FatigueExhaustedDefensePenalty = -0.10f; // -10% defense when Exhausted
     public const float FatigueExhaustedXPPenalty = -0.10f;    // -10% XP when Exhausted
+    // Mental health (v1.1.15), both modes, see MentalSystem. Max is MaxMentalStability.
+    public const int MentalStableThreshold = 75;              // 75-100 = Stable
+    public const int MentalStrainedThreshold = 50;            // 50-74 = Strained
+    public const int MentalShakenThreshold = 25;              // 25-49 = Shaken
+    public const int MentalBreakingThreshold = 1;             // 1-24 = Breaking, 0 = Broken
+    public const float MentalShakenCombatPenalty = 0.05f;     // Positive magnitude: 5% damage and defence lost when Shaken
+    public const float MentalBreakingCombatPenalty = 0.10f;   // Positive magnitude: 10% lost when Breaking or Broken
+    public const int MentalStrainPerPoint = 1000;             // Strain is per mille: every full 1000 costs 1 Mental
+    // Strain multipliers, race x class, in percent (MentalSystem.GetStrainPct multiplies the two)
+    public const int MentalStrainRacePctHardy = 80;           // Troll, Orc, Gnoll, Mutant
+    public const int MentalStrainRacePctSensitive = 120;      // Elf, Hobbit
+    public const int MentalStrainRacePctUneasy = 110;         // HalfElf, Gnome
+    public const int MentalStrainClassPctDark = 85;           // Assassin, Abysswarden, Voidreaver
+    public const int MentalStrainClassPctBarbarian = 90;      // Barbarian
+    public const int MentalStrainClassPctDevout = 90;         // Cleric, Paladin, Tidesworn
+    public const int MentalStrainClassPctPerformer = 110;     // Bard, Jester
+    public const int MentalStrainClassPctSage = 85;           // Sage
+    public const int MentalStrainCompanionCutPct = 10;        // Each story companion in the party cuts strain 10%
+    public const int MentalStrainCompanionCutMaxPct = 20;     // Companion cut stops at 20%
+    // Loss sources (piece 4): strain is per mille per floor, the rest are flat Mental points
+    public const int MentalRoomStrainPerFloor = 4;            // New dungeon room: floor x 4 per mille
+    public const int MentalFightStrainPerFloor = 12;          // Monster fight end in the dungeon: floor x 12 per mille
+    public const int MentalFleeLoss = 2;                      // Fled a monster fight
+    public const int MentalNearDeathLoss = 4;                 // Ended a monster fight at or below MentalNearDeathHpPct of max HP
+    public const int MentalNearDeathHpPct = 15;
+    public const int MentalBossLoss = 3;                      // Fought a floor boss or mini-boss
+    public const int MentalOldGodLoss = 8;                    // Fought an Old God (replaces the boss loss, does not stack)
+    public const int MentalDeathLoss = 12;                    // Died in a monster fight
+    public const int MentalMemoryRecoveryGain = 1;            // Recovering a lost memory fragment (FeatureInteractionSystem)
+    public const int MentalDailyReset = 10;                   // Daily gain applied by MentalSystem.ApplyDailyReset
+    // Recovery sources (piece 5a). Dungeon rests ride the one-rest-per-floor limit; the town ones are once a day
+    public const int MentalDungeonCampGain = 6;               // Dungeon camp ([R] in a cleared room)
+    public const int MentalSafeHavenGain = 10;                // Safe Haven rest spot
+    public const int MentalInnTableGain = 5;                  // Inn table rest, once a day (shares the day with the friend variant)
+    public const int MentalInnFriendGain = 8;                 // Inn table rest with an NPC friend present
+    public const int MentalInnSleepGain = 15;                 // Inn sleep (single-player) or rented room (online), no daily flag
+    public const int MentalHomeRestGain = 8;                  // Home rest, once a day, alongside HomeRestsToday
+    public const int MentalHomeSleepGain = 20;                // Home sleep, no daily flag
+    public const int MentalSpouseGain = 8;                    // Quality time with a spouse, once a day
+    public const int MentalTemplePrayerGain = 10;             // Temple daily prayer, once a day
+    public const int MentalConfessionGain = 5;                // Church confession, once a day
+    // Recovery sources (piece 5b), each once a day through MentalSystem.TryDailyGain
+    public const int MentalFriendTalkGain = 5;                // Talking with an NPC friend (MentalSystem.IsFriend)
+    public const int MentalWildernessGain = 6;                // First wilderness exploration of the day
+    public const int MentalLearningGain = 4;                  // Learning: a new spell, a training session or Library reading, one shared day
+    // Healer (piece 5b): talk therapy restores to MaxMentalStability; its cost per missing point is TherapyCostBase + TherapyCostPerLevel x Level
+    public const int MentalTherapyCostBase = 10;
+    public const int MentalTherapyCostPerLevel = 2;
+    public const int MentalTherapyBrokenMinPoints = 10;       // Talk therapy for a Broken character bills at least this many points, even at full Mental
+    public const int MentalWillowDraughtGain = 20;            // Willow Draught, drunk in the dungeon, stops at the cap
+    public const int MentalWillowPotionMultiplier = 2;        // Willow Draught price: this many healing potions
+    public const int MentalRehabGain = 15;                    // Healer rehab, after the addiction is cleared
+    // Grief and witnessing (piece 6): losses through MentalSystem.Change, the Acceptance gain stops at the cap
+    public const int MentalCompanionGriefLoss = 10;           // A story companion died (grief begins)
+    public const int MentalNpcGriefLoss = 6;                  // An NPC teammate, spouse or lover died (NPC grief begins)
+    public const int MentalGriefDepressionLoss = 8;           // A grief entered the Depression stage
+    public const int MentalGriefAcceptanceGain = 10;          // A grief reached Acceptance
+    public const int MentalWitnessLoss = 3;                   // Witnessed a town NPC death or a world disaster, once a day (WitnessLoss)
+    // Drugs (piece 6): the high may pass the addiction cap (never MaxMentalStability) until the drug wears off
+    public const int MentalDrugHighGain = 8;                  // High on use
+    public const int MentalDrugHighStrongGain = 15;           // High for DarkEssence and DemonBlood
+    public const int MentalDrugToleranceWindowDays = 3;       // DEFAULT: a use within this many days of the last one counts toward tolerance
+    public const int MentalDrugHighStepPct = 25;              // DEFAULT: each counted use after the first shrinks the high by this percent
+    public const int MentalDrugHighMinPct = 25;               // DEFAULT: the high never falls below this percent
+    public const int MentalDrugCrashBaseHalves = 4;           // DEFAULT: the crash is boost x (4 + CrashStepHalves x (uses - 1)) / 2, rounded half up
+    public const int MentalDrugCrashStepHalves = 1;           // DEFAULT: each counted use after the first adds half the boost to the crash
+    public const int MentalOverdoseLoss = 8;                  // Overdose when stacking drugs
+    public const int MentalWithdrawalLossPerSeverity = 3;     // Daily withdrawal loss per severity point (Addict / 25)
+    // Band effects (piece 7): chances in percent, rolled per new dungeon room or at combat start
+    public const int MentalStrainedUneasyPct = 3;             // DEFAULT: Strained, an uneasy room line (flavour only)
+    public const int MentalShakenHallucinationPct = 4;        // Shaken, a harmless hallucination line per new room
+    public const int MentalBreakingHallucinationPct = 8;      // Breaking, a harmless hallucination line per new room
+    public const int MentalShakenFearPct = 10;                // Shaken, fear at combat start: the first action is lost
+    public const int MentalBreakingFearPct = 20;              // Breaking, panic at combat start: the first action is lost
+    public const float MentalFatigueCombatCap = 0.15f;        // Single-player: Mental plus Fatigue never cost more than 15% damage or defence
+    public const int MentalHallucinationLineCount = 5;        // Loc pool mental.hallucination_1..5
+    public const int MentalUneasyLineCount = 3;               // Loc pool mental.uneasy_1..3
+    public const int MentalFearLineCount = 3;                 // Loc pool mental.fear_1..3
+    // Collapse at Mental 0 (piece 7, user decisions 2026-09-27)
+    public const int MentalCollapseDeathFloor = 26;           // A collapse on this dungeon floor or deeper is a real death
+    public const int MentalCollapseRescueMental = 20;         // Carried to the Healer: Mental set to this
+    public const int MentalCollapseGoldFeePct = 5;            // Carried to the Healer: this percent of gold on hand to the rescuers
+    public const int MentalBrokenPenaltyPct = 25;             // Broken affliction: damage, defence and XP gained; replaces the band penalty, exempt from the Fatigue cap
+    public const int MentalSchemaCurrent = 1;                // Current Mental save schema; below this, restore resets Mental to full and stamps this
+    public const int MaxWillowDraughts = 3;                   // Healer Willow Draught: carryable cap
+    // Temple gods piece 1 (1.2.0 design, decided 2026-09-28): Favor with the god a character worships
+    public const int GodFavorMin = 0;
+    public const int GodFavorMax = 100;
+    public const int GodFavorTierDevoutMin = 25;              // Follower 0-24, Devout 25-49
+    public const int GodFavorTierZealotMin = 50;              // Zealot 50-74
+    public const int GodFavorTierChosenMin = 75;              // Chosen 75-100
+    public const int GodFavorLegacyStart = 10;                // A save from before Favor: Favor with its current god on first load
+    public const int GodNeglectGraceDays = 3;                 // Days without devotion before neglect starts
+    public const int GodNeglectDailyLoss = 1;                 // Favor lost at each daily reset past the grace days
+    public const int GodFavorSchemaCurrent = 1;               // Below this, the load gives Favor GodFavorLegacyStart with the current god
+    // Temple gods piece 3: devotion at the Temple (each source capped per day, FavorSystem.GainCapped)
+    public const int GodFavorPrayerGain = 3;                  // Daily prayer
+    public const int GodFavorGoldPerLevel = 100;              // Gold sacrifice: +1 Favor per (Level x this) gold
+    public const int GodFavorGoldDailyCap = 5;                // Gold sacrifice: at most this much Favor a day
+    public const int GodFavorItemMin = 1;                     // Item sacrifice: Favor for any item worth offering
+    public const int GodFavorItemMax = 4;                     // Item sacrifice: Favor for the most valuable item
+    public const int GodFavorItemDailyCap = 4;                // Item sacrifice: at most this much Favor a day
+    // Temple gods piece 3: deeds and taboos of the worshipped god's domain (GodDeedSystem)
+    public const int GodFavorDeedDailyCap = 4;                // Deeds: at most this much Favor a day
+    public const int GodDeedMinor = 1;                        // A common fitting deed (a kill, a heal, a theft)
+    public const int GodDeedMajor = 2;                        // A rarer fitting deed (a bounty, a spell learned, a marriage)
+    public const int GodTabooMinor = 3;                       // Drug use, fleeing, a theft against Law
+    public const int GodTabooMajor = 5;                       // Prison, confession, raising undead, a week without casting, marriage for Chaos, murder for Law
+    public const int GodTabooGrave = 10;                      // Murder for Love, desecration for Earth
+    public const int GodTabooNoCastDays = 7;                  // Magic: daily resets without a spell cast before the taboo
+    public const int GodDeedDesecration = 3;                  // Shadow, Death and Chaos: an altar desecrated (under the daily deed cap)
+    // Temple gods piece 4: each desecration lowers that god's standing by this until the next weekly reset
+    public const int GodDesecrationStandingPenalty = 5;
+    public const int GodStandingWeekDays = 7;                 // The weekly reset: week = day / this (online the world day, DailySystemManager.WorldDayAt)
+    // Temple gods piece 6: NPC townsfolk worship a god (NpcFaithSystem), saved as the NPC's WorshippedGod
+    public const int GodNpcFollowerStanding = 5;              // Each living NPC follower adds this to its god's standing
+    public const int NpcFaithAlignedWeight = 3;               // Pick weight of a canon god of the NPC's own alignment
+    public const int NpcFaithNeutralWeight = 1;               // Pick weight of a god that neither shares nor opposes it
+    public const int NpcFaithClassWeight = 3;                 // Added for the god of the NPC's class (never to an opposed god)
+    public const int NpcFaithSharedRelationSteps = 1;         // First talk of the day with an NPC of the player's god: relation steps warmer
+    public const int NpcFaithOpposedRelationSteps = 1;        // First talk of the day with an NPC whose god opposes the player's: steps cooler
+    public const int GodWeeklyXpBonusPct = 5;                 // The week's strongest god (WeeklyGodSystem): its followers' XP gained
+    public const int GodEchoDamagePct = 10;                   // Zealot and Chosen: damage against the Old God their god echoes (OldGodEchoSystem)
+    // Temple gods piece 5: Miracles (MiracleSystem). A Chosen follower has one a day, from the god's domain.
+    public const int MiracleBanishBossDamagePct = 10;         // Solarius: a boss, mini-boss or Old God is not banished; it takes this percent of its max HP
+    public const int MiracleBindRounds = 2;                   // Judicar: rounds a foe is bound (the monster hold rules and boss limits apply)
+    public const int MiracleConfuseRounds = 3;                // Discordia: rounds each foe is confused (Mass Confusion's boss limits apply)
+    public const float MiracleCritMultiplier = 2.0f;          // Valorian: the guaranteed critical hit's damage multiplier (a natural 20's best)
+    public const string MiracleBeastId = "dire_wolf";         // Sylvana: the beast called (BeastData), at the follower's level
+    // Temple gods piece 4: leaving a god costs all Favor with it; its wrath follows by the Favor lost
+    // (GodSwitchSystem). A canon god's wrath is a DivineWrath level: 1 for Favor lost below
+    // GodFavorTierDevoutMin, 2 below GodFavorTierZealotMin, 3 from there. A player-god smites at
+    // once: GodSmiteMinPercent of max HP plus the rest of the smite range scaled by Favor lost / 100.
+    // Temple gods piece 2: each god's boon, scaled by the follower's tier (percent of the full boon)
+    public const int GodBoonFollowerStrengthPct = 33;         // Follower: 1/3 of the full boon
+    public const int GodBoonDevoutStrengthPct = 67;           // Devout: 2/3
+    public const int GodBoonZealotStrengthPct = 100;          // Zealot: full
+    public const int GodBoonChosenStrengthPct = 100;          // Chosen: full
+    public const int GodBoonSolariusUndeadDamagePct = 15;     // Solarius: damage against undead and demons
+    public const int GodBoonSolariusHealPct = 15;              // Solarius: heals cast while fighting undead or demons
+    public const int GodBoonValorianLowHpDamagePct = 10;      // Valorian: damage while below the HP threshold
+    public const int GodBoonValorianHpThresholdPct = 50;      // Valorian: "below half HP"
+    public const int GodBoonAmaraHealPct = 15;                // Amara: heals the follower casts and the party wards they raise
+    public const int GodBoonJudicarDefencePct = 10;           // Judicar: damage taken from monsters reduced by this percent
+    public const int GodBoonJudicarBountyPct = 20;            // Judicar: bounty rewards
+    public const int GodBoonUmbrathCritPct = 10;              // Umbrath: extra critical chance (percentage points)
+    public const int GodBoonUmbrathTheftPct = 10;             // Umbrath: Dark Alley pickpocket success (percentage points, cap raised the same)
+    public const int GodBoonTerranMaxHpPct = 10;              // Terran: max HP, applied in RecalculateStats
+    public const int GodBoonTerranYieldPct = 20;              // Terran: garden herbs a day and the settlement council share
+    public const int GodBoonMortisDeathGoldCutPct = 25;       // Mortis: gold lost to the death penalty reduced by this percent
+    public const int GodBoonArcanusSpellPct = 10;             // Arcanus: spell damage
+    public const int GodBoonArcanusManaRegenPct = 10;         // Arcanus: mana regenerated each combat round
+    public const int GodBoonSylvanaWildernessPct = 100;       // Sylvana: wilderness gold and XP (100 = doubled)
+    public const int GodBoonDiscordiaPvpDamagePct = 10;       // Discordia: damage in PvP
+    public const int GodBoonDiscordiaFirstActionFailPct = 15; // Discordia: chance per monster that its first action fails
+    public const float GodPrayerBlessingZealotMultiplier = 2.0f; // Zealot and up: the daily prayer blessing lasts this many times as long
+    public const int GodPrayerBlessingCombats = 20;           // A player-god prayer blessing lasts this many combats (about 2 hours of play)
+    // Temple gods piece 2: Mental wards (Devout and up), applied inside MentalSystem
+    public const int GodWardLossCutPct = 50;                  // A ward halves its losses (and Discordia's fear chance)
+    public const int GodWardSylvanaStrainCutPct = 10;         // Sylvana: dungeon strain reduced by this percent
+    // Temple gods piece 2: a player-god's boon, in percent of the canon boon at the same tier, from its
+    // standing against the strongest canon god's
+    public const int GodPlayerBoonFloorPct = 50;              // Lowest scale (no standing, or long inactive)
+    public const int GodPlayerBoonCapPct = 120;               // Highest scale: a rising player-god out-blesses a canon god
+    public const int GodPlayerInactiveDays = 7;               // Days without a login before the scale decays
+    public const int GodPlayerInactiveDecayPctPerDay = 10;    // Scale lost per day past that, never below the floor
+    /// <summary>The ten canon gods, in Temple order. Manwe (SupremeCreatorName) is never one of them.</summary>
+    public static readonly string[] CanonGodNames =
+        { "Solarius", "Valorian", "Amara", "Judicar", "Umbrath", "Terran", "Mortis", "Arcanus", "Sylvana", "Discordia" };
     // Session XP diminishing returns (v0.54.0) — online mode only
     // Threshold scales with level: max(100000, XP_for_next_level * 8) — allows ~8 full levels per session
     public const long SessionXPDiminishBaseThreshold = 100000;  // Minimum threshold for low-level players
@@ -1808,8 +1988,16 @@ public static partial class GameConfig
     public const int GodFreePrisonerExp = 10;             // Exp for freeing a prisoner
     public const int GodProclamationExp = 5;              // Exp for divine proclamation
     public const float GodRecruitPaganChance = 0.33f;     // 33% chance to recruit a pagan
-    public const float GodBlessBonusPercent = 0.10f;      // 10% damage/defense buff
     public const int GodBlessCombatDuration = 10;         // Blessing lasts 10 combats
+    // 1.2.0 Temple gods piece 5b: a player-god's bless follows the follower's Favor tier
+    // (ImmortalDeedSystem.BlessBonusFor) and gives the follower Favor, at most the cap a day
+    public const float GodBlessBonusFollower = 0.05f;     // Follower tier: 5% damage/defense
+    public const float GodBlessBonusDevout = 0.07f;       // Devout tier: 7%
+    public const float GodBlessBonusZealot = 0.10f;       // Zealot and Chosen tiers: 10%
+    public const float GodBlessBonusNpc = 0.10f;          // An NPC follower (no Favor): 10%, as before tiers
+    public const int GodBlessFavorGain = 2;               // Favor a bless gives the follower
+    public const int GodBlessFavorDailyCap = 2;           // FavorSource.ImmortalBlessing: at most this much Favor a day
+    public const int GodChastiseFavorLoss = 5;            // Chastise: Favor a player-god takes from its own follower, once a day each
     public const float GodSmiteMinPercent = 0.10f;        // Smite deals 10-25% of target MaxHP
     public const float GodSmiteMaxPercent = 0.25f;
     public const float GodRecruitPlayerMultiplier = 0.75f;     // Players are harder to recruit than NPCs
@@ -1910,6 +2098,13 @@ public static partial class GameConfig
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses
     public const float BossStunResistChance = 0.50f;          // Bosses resist stun outright at this rate
+    public const int BossSoftControlResistPercent = 25;        // v1.1.15: bosses shrug off soft control (slow, distract, mark, taunt, confusion) this often
+    public const int MassConfusionBossMaxRounds = 2;          // v1.1.15: Mass Confusion holds a boss at most this long
+    public const int SageSealWardPercentPerSeal = 5;          // v1.1.15: each seal collected strengthens the Sage's party wards this much
+    public const int SageSealWardMaxPercent = 35;             // v1.1.15: cap on the seal bonus (seven seals)
+    public const int MarkedBonusPercent = 30;                 // a marked monster takes this much more damage from every ally
+    public const int SageLibraryMarkBonusPercent = 45;        // v1.1.15: Scholar's Mark or Unveil cast by a Sage with the Settlement Library buff up
+    public const int PvPBlindedMissPercent = 25;              // v1.1.15: a Blinded fighter misses this share of weapon swings in a duel
     public const float PoisonEnchantProcChance = 0.20f;       // 20% chance to poison per attack
     public const float HolyEnchantProcChance = 0.25f;         // 25% chance for holy damage (bonus vs undead)
     public const float HolyEnchantDamageMultiplier = 0.20f;   // Holy damage = weapon damage * 20%
@@ -2465,6 +2660,22 @@ public static partial class GameConfig
     }
 
     /// <summary>
+    /// v1.1.15: Centralized localized yes/no test, the negative half of IsAffirmative. Returns true
+    /// when the player's input is a negative in ANY supported language: N (English No), N (Spanish
+    /// "No" / Italian "No", same letter), N (French "Non"), N (Hungarian "Nem"). Every displayed
+    /// yes/no hint in this game shows N as its negative letter regardless of language (checked the
+    /// (S/N), (O/N) and (I/N) prompts), so no extra single letter is needed here, only the full
+    /// words. Used together with IsAffirmative so a stray key or a typo is neither yes nor no and a
+    /// caller can ask again instead of one of the two silently winning by default.
+    /// </summary>
+    public static bool IsNegative(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var c = input.Trim().ToUpperInvariant();
+        return c == "N" || c == "NO" || c == "NON" || c == "NEM";
+    }
+
+    /// <summary>
     /// v0.65.1: Short human-readable weapon-class tag (One-Handed / Two-Handed /
     /// Shield / Buckler / Tower Shield / Off-Hand) for item displays, so players
     /// can tell a weapon's handedness and spot shields WITHOUT equipping it
@@ -2907,8 +3118,6 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     public const int DailyResetHourEastern = 19;          // 7 PM Eastern Time — online mode daily reset
     public const int DailyDarknessReset = 6;              // Daily darkness deeds reset
     public const int DailyChivalryReset = 6;              // Daily chivalry deeds reset
-    public const int DailyMentalStabilityChance = 7;      // 1 in 7 chance for mental stability increase
-    public const int MentalStabilityIncrease = 5;         // Max mental stability increase per day
     public const int MaxMentalStability = 100;            // Maximum mental stability
     
     // Healing Potion Maintenance (Pascal healing potion spoilage)
@@ -2958,7 +3167,7 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     
     // Birthday Gift Types (Pascal birthday system)
     public const int BirthdayExperienceGift = 1000;       // Experience gift amount
-    public const int BirthdayLoveGift = 500;              // Love/charisma gift amount
+    public const int BirthdayLoveGift = 5;                // Love gift: a lasting Charisma grant (1.2.0: was 500, lost at the next fight)
     public const int BirthdayChildGift = 1;               // Adoption gift
     
     // Blood Moon Event (v0.52.0)

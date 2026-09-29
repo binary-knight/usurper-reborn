@@ -2879,7 +2879,7 @@ public static class ClassAbilitySystem
                         terminal.SetColor("bright_yellow");
                         terminal.Write($"  [{i + 1}] ");
                         terminal.SetColor("cyan");
-                        terminal.Write($"{(spell?.Name ?? slotId),-24}");
+                        terminal.Write($"{(spell?.DisplayName ?? slotId),-24}");
                         terminal.SetColor("darkgray");
                         terminal.Write($"  (spell)");
                         terminal.WriteLine("");

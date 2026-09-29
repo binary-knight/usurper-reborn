@@ -820,8 +820,7 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.reset_cost", $"{goldCost:N0}"), "yellow");
             terminal.WriteLine(Loc.Get("training.reset_refund", pointsInvested), "bright_green");
             terminal.WriteLine("");
-            var confirm = await terminal.GetInput(Loc.Get("training.confirm_prompt"));
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(Loc.Get("training.confirm_prompt")))
                 return;
 
             // Execute reset with lore flavor
@@ -912,8 +911,7 @@ public static class TrainingSystem
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("ui.confirm_cannot_undo"), "red");
 
-        var confirm = await terminal.GetInput(Loc.Get("training.confirm_prompt"));
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("training.confirm_prompt")))
             return;
 
         // Execute reset with lore flavor
@@ -1151,6 +1149,10 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.progress_update", skillName, progress, needed, trainingPointsToSpend), "green");
         }
 
+        // v1.1.15: a training session eases the mind, once a day (shared Learning day)
+        int mentalBeforeTraining = player.Mental;
+        MentalUi.ReportGain(terminal, player, mentalBeforeTraining, MentalSystem.ApplyLearning(player));
+
         // Auto-save after training
         await SaveSystem.Instance.AutoSave(player);
 
@@ -1198,7 +1200,7 @@ public static class TrainingSystem
                 if (!learned) continue;
 
                 string skillId = GetSpellSkillId(character.Class, spell.Level);
-                skills.Add((skillId, spell.Name));
+                skills.Add((skillId, spell.DisplayName));
             }
         }
 

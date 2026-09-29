@@ -91,16 +91,18 @@ public static class GmcpBridge
         long hp = player.HP, maxHp = player.MaxHP;
         long mana = player.Mana, maxMana = player.MaxMana;
         long sta = player.Stamina;
+        int mental = player.Mental; // v1.1.15: Mental runs in both modes, so it belongs on Vitals too
         if (hp == ctx.LastGmcpHp && maxHp == ctx.LastGmcpMaxHp
             && mana == ctx.LastGmcpMana && maxMana == ctx.LastGmcpMaxMana
-            && sta == ctx.LastGmcpStamina)
+            && sta == ctx.LastGmcpStamina && mental == ctx.LastGmcpMental)
             return;
 
         ctx.LastGmcpHp = hp; ctx.LastGmcpMaxHp = maxHp;
         ctx.LastGmcpMana = mana; ctx.LastGmcpMaxMana = maxMana;
         ctx.LastGmcpStamina = sta;
+        ctx.LastGmcpMental = mental;
 
-        Emit("Char.Vitals", new { hp, maxHp, mp = mana, maxMp = maxMana, sp = sta });
+        Emit("Char.Vitals", new { hp, maxHp, mp = mana, maxMp = maxMana, sp = sta, mental, maxMental = GameConfig.MaxMentalStability });
     }
 
     /// <summary>
@@ -228,7 +230,7 @@ public static class GmcpBridge
             if (spell == null) continue;
             spells.Add(new
             {
-                name = spell.Name,
+                name = spell.DisplayName,
                 manaCost = spell.ManaCost,
                 requiresLevel = spell.LevelRequired
             });

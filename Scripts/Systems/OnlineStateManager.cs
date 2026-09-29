@@ -41,6 +41,8 @@ namespace UsurperRemake.Systems
         private int cachedOnlinePlayerCount = 1; // Default to 1 (self)
         private long lastSeenMessageId = 0; // Track last processed message to avoid re-fetching broadcasts
         private string? cachedDisplayName; // Last display name registered, used for Discord logout message
+        private bool loginRecorded;    // v1.1.15: a login was recorded (StartOnlineTracking or SwitchIdentity), so Shutdown records the logout
+        private bool arrivalAnnounced; // v1.1.15: StartOnlineTracking announced the arrival, so Shutdown announces the departure
 
         /// <summary>
         /// Connection type saved at auth time, used by GameEngine.LoadSaveByFileName()
@@ -1859,10 +1861,12 @@ namespace UsurperRemake.Systems
             var ipAddress = SessionContext.Current?.RemoteIP ?? "";
             await backend.RegisterOnline(username, displayName, currentLocation, connectionType, ipAddress);
             await backend.UpdatePlayerSession(username, isLogin: true, ipAddress: ipAddress);
+            loginRecorded = true;
 
             // v0.57.13: announce arrival to Discord gossip channel (no-op if bridge disabled)
             cachedDisplayName = displayName;
             try { DiscordBridge.QueueSystemEvent($"{displayName} has entered the world."); } catch { }
+            arrivalAnnounced = true;
 
             // Initialize message watermark to current max ID so we don't replay old broadcasts
             try { lastSeenMessageId = await backend.GetMaxMessageId(); }
@@ -2061,6 +2065,7 @@ namespace UsurperRemake.Systems
             username = newKey;
             await backend.RegisterOnline(newKey, displayName, currentLocation, connectionType);
             await backend.UpdatePlayerSession(newKey, isLogin: true);
+            loginRecorded = true;
             DebugLogger.Instance.LogInfo("ONLINE", $"Switched identity from '{oldKey}' to '{newKey}'");
         }
 
@@ -2075,11 +2080,18 @@ namespace UsurperRemake.Systems
             try
             {
                 await backend.UnregisterOnline(username);
-                await backend.UpdatePlayerSession(username, isLogin: false);
+
+                // v1.1.15: a session dropped before tracking started (during character creation) had no login
+                // recorded and no arrival announced, so it records no logout and announces no departure
+                if (loginRecorded)
+                    await backend.UpdatePlayerSession(username, isLogin: false);
 
                 // v0.57.13: announce departure to Discord gossip channel (no-op if bridge disabled)
-                var departName = cachedDisplayName ?? username;
-                try { DiscordBridge.QueueSystemEvent($"{departName} has left the world."); } catch { }
+                if (arrivalAnnounced)
+                {
+                    var departName = cachedDisplayName ?? username;
+                    try { DiscordBridge.QueueSystemEvent($"{departName} has left the world."); } catch { }
+                }
 
                 DebugLogger.Instance.LogInfo("ONLINE", $"Online tracking stopped for '{username}'");
             }

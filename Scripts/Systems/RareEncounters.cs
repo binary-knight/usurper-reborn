@@ -295,9 +295,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal.Write(Loc.Get("encounter.tavern.gamble_bet_prompt", bet), "white");
-            var choice = await terminal.GetInput("");
-
-            if (GameConfig.IsAffirmative(choice))
+            if (await terminal.AskYesNoAsync(""))
             {
                 player.Gold -= bet;
                 await Task.Delay(1000);
@@ -373,11 +371,10 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.tavern.stranger_deal_3"));
                     terminal.WriteLine("");
                     terminal.Write(Loc.Get("encounter.tavern.stranger_deal_prompt"), "white");
-                    var accept = await terminal.GetInput("");
-                    if (GameConfig.IsAffirmative(accept))
+                    if (await terminal.AskYesNoAsync(""))
                     {
-                        player.Strength += 5;
-                        player.Defence += 5;
+                        player.GrantPermanentStat(StatKind.Strength, 5);
+                        player.GrantPermanentStat(StatKind.Defence, 5);
                         terminal.SetColor("magenta");
                         terminal.WriteLine(Loc.Get("encounter.tavern.stranger_deal_accept"));
                         terminal.WriteLine(Loc.Get("encounter.tavern.stranger_deal_stats"));
@@ -461,14 +458,14 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("encounter.minstrel.valor_play"));
                     terminal.WriteLine(Loc.Get("encounter.minstrel.valor_effect"));
-                    player.Strength += 3; // Permanent +3 STR from minstrel's valor song
+                    player.GrantPermanentStat(StatKind.Strength, 3); // Permanent +3 STR from minstrel's valor song
                     terminal.WriteLine(Loc.Get("encounter.minstrel.plus_strength"), "green");
                     break;
 
                 case "2":
                     terminal.SetColor("blue");
                     terminal.WriteLine(Loc.Get("encounter.minstrel.warding_play"));
-                    player.Defence += 3;
+                    player.GrantPermanentStat(StatKind.Defence, 3);
                     terminal.WriteLine(Loc.Get("encounter.minstrel.plus_defence"), "green");
                     break;
 
@@ -625,7 +622,7 @@ namespace UsurperRemake.Systems
                         // Random curse
                         if (random.NextDouble() < 0.5)
                         {
-                            player.Strength = Math.Max(1, player.Strength - 2);
+                            player.GrantPermanentStat(StatKind.Strength, -2); // 1.2.0: a lasting penalty, floored at 1
                             terminal.WriteLine(Loc.Get("encounter.fairy.steal_curse"));
                         }
                     }
@@ -659,7 +656,7 @@ namespace UsurperRemake.Systems
                         case 2:
                             terminal.SetColor("cyan");
                             terminal.WriteLine(Loc.Get("encounter.fairy.dance_queen_kiss"));
-                            player.Charisma += 5;
+                            player.GrantPermanentStat(StatKind.Charisma, 5);
                             terminal.WriteLine(Loc.Get("encounter.fairy.dance_plus_cha"));
                             break;
                         case 3:
@@ -670,7 +667,7 @@ namespace UsurperRemake.Systems
                         case 4:
                             terminal.SetColor("bright_white");
                             terminal.WriteLine(Loc.Get("encounter.fairy.dance_language"));
-                            player.Intelligence += 3;
+                            player.GrantPermanentStat(StatKind.Intelligence, 3);
                             terminal.WriteLine(Loc.Get("encounter.fairy.dance_plus_int"));
                             break;
                     }
@@ -1085,8 +1082,8 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.ghost.advice_5"));
                     terminal.WriteLine("");
 
-                    player.Intelligence += 2;
-                    player.Wisdom += 2;
+                    player.GrantPermanentStat(StatKind.Intelligence, 2);
+                    player.GrantPermanentStat(StatKind.Wisdom, 2);
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("encounter.ghost.advice_reward"));
                     break;
@@ -1102,7 +1099,7 @@ namespace UsurperRemake.Systems
                     // Give a nice reward
                     long goldGift = level * 300;
                     player.Gold += goldGift;
-                    player.Strength += 3;
+                    player.GrantPermanentStat(StatKind.Strength, 3);
 
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(Loc.Get("encounter.ghost.friend_gold", goldGift));
@@ -1232,16 +1229,16 @@ namespace UsurperRemake.Systems
                     case "S":
                         if (won)
                         {
-                            player.Strength += 10;
-                            player.Intelligence += 10;
+                            player.GrantPermanentStat(StatKind.Strength, 10);
+                            player.GrantPermanentStat(StatKind.Intelligence, 10);
                             terminal.SetColor("bright_green");
                             terminal.WriteLine(Loc.Get("encounter.demons.soul_win"));
                             terminal.WriteLine(Loc.Get("encounter.demons.soul_win_stats"));
                         }
                         else
                         {
-                            player.Strength = Math.Max(1, player.Strength - 5);
-                            player.Charisma = Math.Max(1, player.Charisma - 5);
+                            player.GrantPermanentStat(StatKind.Strength, -5); // 1.2.0: a lasting penalty, floored at 1
+                            player.GrantPermanentStat(StatKind.Charisma, -5); // 1.2.0: a lasting penalty, floored at 1
                             player.Darkness += 50;
                             terminal.SetColor("red");
                             terminal.WriteLine(Loc.Get("encounter.demons.soul_lose"));
@@ -1351,7 +1348,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.hermit.ask_1"));
                     terminal.WriteLine(Loc.Get("encounter.hermit.ask_2"));
                     terminal.WriteLine(Loc.Get("encounter.hermit.ask_3"));
-                    player.Intelligence += 1;
+                    player.GrantPermanentStat(StatKind.Intelligence, 1);
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("encounter.hermit.ask_reward"));
                     break;
@@ -1371,7 +1368,7 @@ namespace UsurperRemake.Systems
                         switch (reward)
                         {
                             case 0:
-                                player.Strength += 5;
+                                player.GrantPermanentStat(StatKind.Strength, 5);
                                 terminal.WriteLine(Loc.Get("encounter.hermit.give_amulet"));
                                 break;
                             case 1:
@@ -1493,27 +1490,27 @@ namespace UsurperRemake.Systems
                         switch (stat)
                         {
                             case 0:
-                                player.Strength += 5;
+                                player.GrantPermanentStat(StatKind.Strength, 5);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.elixir_str"), "green");
                                 break;
                             case 1:
-                                player.Intelligence += 5;
+                                player.GrantPermanentStat(StatKind.Intelligence, 5);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.elixir_int"), "green");
                                 break;
                             case 2:
-                                player.Wisdom += 5;
+                                player.GrantPermanentStat(StatKind.Wisdom, 5);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.elixir_wis"), "green");
                                 break;
                             case 3:
-                                player.Dexterity += 5;
+                                player.GrantPermanentStat(StatKind.Dexterity, 5);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.elixir_dex"), "green");
                                 break;
                             case 4:
-                                player.Constitution += 5;
+                                player.GrantPermanentStat(StatKind.Constitution, 5);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.elixir_con"), "green");
                                 break;
                             case 5:
-                                player.Charisma += 5;
+                                player.GrantPermanentStat(StatKind.Charisma, 5);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.elixir_cha"), "green");
                                 break;
                         }
@@ -1540,8 +1537,8 @@ namespace UsurperRemake.Systems
                                 terminal.WriteLine(Loc.Get("encounter.merchant.mystery_jackpot", secretPrice * 3), "bright_yellow");
                                 break;
                             case 1:
-                                player.Strength += 10;
-                                player.Defence += 10;
+                                player.GrantPermanentStat(StatKind.Strength, 10);
+                                player.GrantPermanentStat(StatKind.Defence, 10);
                                 terminal.WriteLine(Loc.Get("encounter.merchant.mystery_power"), "bright_green");
                                 break;
                             case 2:
@@ -1621,7 +1618,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.timewarp.battle_1"));
                     terminal.WriteLine(Loc.Get("encounter.timewarp.battle_2"));
                     player.Experience += level * 300;
-                    player.Strength += 2;
+                    player.GrantPermanentStat(StatKind.Strength, 2);
                     terminal.WriteLine(Loc.Get("encounter.timewarp.battle_reward", level * 300));
                     break;
 
@@ -1638,9 +1635,9 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("encounter.timewarp.young_1"));
                     terminal.WriteLine(Loc.Get("encounter.timewarp.young_2"));
-                    player.HP = player.MaxHP;
+                    player.GrantPermanentStat(StatKind.Constitution, 3);
+                    player.HP = player.MaxHP;       // after the grant, so the CON bonus to MaxHP is healed too
                     player.Mana = player.MaxMana;
-                    player.Constitution += 3;
                     terminal.WriteLine(Loc.Get("encounter.timewarp.young_reward"));
                     break;
 
@@ -1649,7 +1646,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.timewarp.death_1"));
                     terminal.WriteLine(Loc.Get("encounter.timewarp.death_2"));
                     terminal.WriteLine(Loc.Get("encounter.timewarp.death_3"));
-                    player.Defence += 5;
+                    player.GrantPermanentStat(StatKind.Defence, 5);
                     terminal.WriteLine(Loc.Get("encounter.timewarp.death_reward"));
                     break;
             }
@@ -1726,16 +1723,16 @@ namespace UsurperRemake.Systems
                 case "1":
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("encounter.library.combat_study"));
-                    player.Strength += 3;
-                    player.Dexterity += 2;
+                    player.GrantPermanentStat(StatKind.Strength, 3);
+                    player.GrantPermanentStat(StatKind.Dexterity, 2);
                     terminal.WriteLine(Loc.Get("encounter.library.combat_reward"));
                     break;
 
                 case "2":
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(Loc.Get("encounter.library.arcane_study"));
-                    player.Intelligence += 3;
-                    player.MaxMana += 10;
+                    player.GrantPermanentStat(StatKind.Intelligence, 3);
+                    player.GrantPermanentStat(StatKind.MaxMana, 10);
                     player.Mana = player.MaxMana;
                     terminal.WriteLine(Loc.Get("encounter.library.arcane_reward"));
                     break;
@@ -1744,7 +1741,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("encounter.library.history_study"));
                     player.Experience += level * 400;
-                    player.Wisdom += 2;
+                    player.GrantPermanentStat(StatKind.Wisdom, 2);
                     terminal.WriteLine(Loc.Get("encounter.library.history_reward", level * 400));
                     break;
 
@@ -1850,7 +1847,7 @@ namespace UsurperRemake.Systems
                                 case 2:
                                     terminal.SetColor("green");
                                     terminal.WriteLine(Loc.Get("encounter.well.wish_strength"));
-                                    player.Strength += 3;
+                                    player.GrantPermanentStat(StatKind.Strength, 3);
                                     terminal.WriteLine(Loc.Get("encounter.well.wish_str_amount"));
                                     break;
                                 case 3:
@@ -2005,6 +2002,12 @@ namespace UsurperRemake.Systems
                         if (player.HP <= 0)
                             player.HP = 1;
                     }
+                    else if (result.MentalCollapseNotFought)
+                    {
+                        // v1.1.15: not entered (Mental 0), not fled
+                        terminal.SetColor("gray");
+                        terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
+                    }
                     else
                     {
                         terminal.SetColor("gray");
@@ -2083,7 +2086,7 @@ namespace UsurperRemake.Systems
                         break;
                     case 1:
                         terminal.WriteLine(Loc.Get("encounter.bone_oracle.prophecy_1"));
-                        player.Defence += 2;
+                        player.GrantPermanentStat(StatKind.Defence, 2);
                         break;
                     case 2:
                         terminal.WriteLine(Loc.Get("encounter.bone_oracle.prophecy_2"));
@@ -2091,7 +2094,7 @@ namespace UsurperRemake.Systems
                         break;
                     case 3:
                         terminal.WriteLine(Loc.Get("encounter.bone_oracle.prophecy_3"));
-                        player.Wisdom += 2;
+                        player.GrantPermanentStat(StatKind.Wisdom, 2);
                         break;
                 }
             }
@@ -2101,7 +2104,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("encounter.bone_oracle.dungeon_1"));
                 terminal.WriteLine(Loc.Get("encounter.bone_oracle.dungeon_2"));
                 terminal.WriteLine(Loc.Get("encounter.bone_oracle.dungeon_3"));
-                player.Intelligence += 1;
+                player.GrantPermanentStat(StatKind.Intelligence, 1);
             }
 
             await terminal.PressAnyKey();
@@ -2354,7 +2357,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.tomb.open_dust_1"));
                     terminal.WriteLine(Loc.Get("encounter.tomb.open_dust_2"));
                     player.Gold += level * 2400;  // Increased from 800 for economic balance
-                    player.Strength += 2;
+                    player.GrantPermanentStat(StatKind.Strength, 2);
                     terminal.WriteLine(Loc.Get("encounter.tomb.open_dust_reward", level * 2400));
                 }
             }
@@ -2580,7 +2583,7 @@ namespace UsurperRemake.Systems
                 switch (effect)
                 {
                     case 0:
-                        player.Strength += 5;
+                        player.GrantPermanentStat(StatKind.Strength, 5);
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("encounter.alchemy.drink_power"));
                         break;
@@ -2596,14 +2599,14 @@ namespace UsurperRemake.Systems
                         player.PoisonTurns = Math.Max(player.PoisonTurns, 10 + player.Level / 5);
                         break;
                     case 3:
-                        player.Intelligence += 5;
+                        player.GrantPermanentStat(StatKind.Intelligence, 5);
                         terminal.SetColor("cyan");
                         terminal.WriteLine(Loc.Get("encounter.alchemy.drink_enlighten"));
                         break;
                     case 4:
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("encounter.alchemy.drink_invisible"));
-                        player.Dexterity += 3;
+                        player.GrantPermanentStat(StatKind.Dexterity, 3);
                         break;
                 }
             }
@@ -2611,7 +2614,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("encounter.alchemy.read_notes"));
-                player.Intelligence += 2;
+                player.GrantPermanentStat(StatKind.Intelligence, 2);
                 player.Experience += level * 100;
                 terminal.WriteLine(Loc.Get("encounter.alchemy.read_reward", level * 100));
             }
@@ -2719,8 +2722,8 @@ namespace UsurperRemake.Systems
 
             if (random.NextDouble() < 0.6)
             {
-                player.Mana = player.MaxMana;
-                player.Intelligence += 3;
+                player.GrantPermanentStat(StatKind.Intelligence, 3);
+                player.Mana = player.MaxMana;   // after the grant, so the INT bonus to MaxMana is filled too
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("encounter.crystal.good_1"));
                 terminal.WriteLine(Loc.Get("encounter.crystal.good_2"));
@@ -2852,7 +2855,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.civilization.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.civilization.desc_2"));
 
-            player.Intelligence += 5;
+            player.GrantPermanentStat(StatKind.Intelligence, 5);
             player.Experience += level * 300;
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("encounter.civilization.reward", level * 300));
@@ -2889,7 +2892,7 @@ namespace UsurperRemake.Systems
             var choice = await terminal.GetInput(Loc.Get("ui.your_choice"));
             if (choice.ToUpper() == "A")
             {
-                player.Strength += 10;
+                player.GrantPermanentStat(StatKind.Strength, 10);
                 player.Darkness += 100;
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("encounter.demon_bargain.accept_result"));
@@ -2964,7 +2967,7 @@ namespace UsurperRemake.Systems
             var choice = await terminal.GetInput(Loc.Get("ui.your_choice"));
             if (choice.ToUpper() == "R")
             {
-                player.Wisdom += 5;
+                player.GrantPermanentStat(StatKind.Wisdom, 5);
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("encounter.succubus.resist_result"));
             }
@@ -3004,7 +3007,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.ice_queen.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.ice_queen.desc_2"));
 
-            player.Charisma += 3;
+            player.GrantPermanentStat(StatKind.Charisma, 3);
             player.Mana = player.MaxMana;
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("encounter.ice_queen.reward"));
@@ -3044,9 +3047,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.aurora.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.aurora.desc_2"));
 
-            player.HP = player.MaxHP;
+            player.GrantPermanentStat(StatKind.Wisdom, 3);
+            player.HP = player.MaxHP;       // after the grant, so the pools end full at the new maximum
             player.Mana = player.MaxMana;
-            player.Wisdom += 3;
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("encounter.aurora.reward"));
             await terminal.PressAnyKey();
@@ -3062,8 +3065,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.fire_elemental.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.fire_elemental.desc_2"));
 
-            player.Intelligence += 3;
-            player.MaxMana += 20;
+            player.GrantPermanentStat(StatKind.Intelligence, 3);
+            player.GrantPermanentStat(StatKind.MaxMana, 20);
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("encounter.fire_elemental.reward"));
             await terminal.PressAnyKey();
@@ -3101,8 +3104,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.phoenix.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.phoenix.desc_2"));
 
-            player.HP = player.MaxHP;
-            player.Constitution += 5;
+            player.GrantPermanentStat(StatKind.Constitution, 5);
+            player.HP = player.MaxHP; // after the grant, so the CON bonus to MaxHP is healed too
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("encounter.phoenix.reward"));
             await terminal.PressAnyKey();
@@ -3117,9 +3120,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.mirror.desc_1"), "white");
             terminal.WriteLine(Loc.Get("encounter.mirror.desc_2"));
 
-            player.Strength += 2;
-            player.Intelligence += 2;
-            player.Dexterity += 2;
+            player.GrantPermanentStat(StatKind.Strength, 2);
+            player.GrantPermanentStat(StatKind.Intelligence, 2);
+            player.GrantPermanentStat(StatKind.Dexterity, 2);
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("encounter.mirror.reward"));
             await terminal.PressAnyKey();
@@ -3134,8 +3137,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("encounter.void.desc"), "white");
 
-            player.Intelligence += 5;
-            player.Wisdom += 5;
+            player.GrantPermanentStat(StatKind.Intelligence, 5);
+            player.GrantPermanentStat(StatKind.Wisdom, 5);
             player.Darkness += 30;
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("encounter.void.reward"));
@@ -3176,7 +3179,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("encounter.cosmic.desc_2"));
 
             player.Experience += level * 500;
-            player.Wisdom += 10;
+            player.GrantPermanentStat(StatKind.Wisdom, 10);
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("encounter.cosmic.reward"));
             await terminal.PressAnyKey();
@@ -3213,14 +3216,14 @@ namespace UsurperRemake.Systems
             {
                 if (random.NextDouble() < 0.5)
                 {
-                    player.Intelligence += 10;
+                    player.GrantPermanentStat(StatKind.Intelligence, 10);
                     player.Darkness += 50;
                     terminal.SetColor("magenta");
                     terminal.WriteLine(Loc.Get("encounter.madness.look_good"));
                 }
                 else
                 {
-                    player.Intelligence = Math.Max(1, player.Intelligence - 5);
+                    player.GrantPermanentStat(StatKind.Intelligence, -5); // 1.2.0: a lasting penalty, floored at 1
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("encounter.madness.look_bad"));
                 }

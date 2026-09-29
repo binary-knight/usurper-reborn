@@ -16,11 +16,70 @@ public class CharacterCreationSystem
 {
     private readonly TerminalEmulator terminal;
     private readonly Random random;
-    
+
+    /// <summary>
+    /// v1.1.15: where a stat roll in progress is kept per save key until the new character is first saved, so a
+    /// dropped connection resumes the same roll and rerolls left. Online mode only; null elsewhere.
+    /// </summary>
+    internal SqlSaveBackend? RollStore { get; set; }
+
+    /// <summary>v1.1.15: the dice of a stat roll before class and race modifiers, and the rerolls left.</summary>
+    internal sealed class CreationRoll
+    {
+        public int[] Dice { get; set; } = Array.Empty<int>();
+        public int RerollsRemaining { get; set; }
+    }
+
+    // v1.1.15: Dice holds 3d6 for Strength, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence,
+    // Constitution, then 2d6 for HP
+    private const int DiceCount = 9;
+    private const int MaxRerolls = 5;
+
     public CharacterCreationSystem(TerminalEmulator terminal)
     {
         this.terminal = terminal;
         this.random = Random.Shared;
+        RollStore = DoorMode.IsOnlineMode ? SaveSystem.Instance?.Backend as SqlSaveBackend : null;
+    }
+
+    /// <summary>v1.1.15: the stored roll in progress for this character's save key, or null (none, or not valid).</summary>
+    internal CreationRoll? LoadRoll(Character character)
+    {
+        if (RollStore == null || string.IsNullOrEmpty(character.Name1)) return null;
+        try
+        {
+            var json = RollStore.LoadCreationRoll(character.Name1);
+            if (string.IsNullOrEmpty(json)) return null;
+            var roll = System.Text.Json.JsonSerializer.Deserialize<CreationRoll>(json);
+            if (roll?.Dice == null || roll.Dice.Length != DiceCount) return null;
+            for (int i = 0; i < DiceCount; i++)
+            {
+                int min = i < DiceCount - 1 ? 3 : 2, max = i < DiceCount - 1 ? 18 : 12;
+                if (roll.Dice[i] < min || roll.Dice[i] > max) return null;
+            }
+            roll.RerollsRemaining = Math.Clamp(roll.RerollsRemaining, 0, MaxRerolls);
+            return roll;
+        }
+        catch { return null; }
+    }
+
+    private void SaveRoll(Character character, int[] dice, int rerollsRemaining)
+    {
+        if (RollStore == null || string.IsNullOrEmpty(character.Name1)) return;
+        RollStore.SaveCreationRoll(character.Name1, System.Text.Json.JsonSerializer.Serialize(
+            new CreationRoll { Dice = dice, RerollsRemaining = rerollsRemaining }));
+    }
+
+    /// <summary>
+    /// v1.1.15: the new character's first save. The roll in progress is dropped only when that save succeeded;
+    /// a failed or interrupted save keeps it, so a reconnect resumes the same roll. Store is null outside online mode.
+    /// </summary>
+    internal static async Task<bool> SaveNewCharacter(Func<Task<bool>> save, SqlSaveBackend? store, Character character)
+    {
+        bool saved = await save();
+        if (saved && store != null && !string.IsNullOrEmpty(character?.Name1))
+            store.ClearCreationRoll(character.Name1);
+        return saved;
     }
     
     /// <summary>
@@ -182,8 +241,8 @@ public class CharacterCreationSystem
             // Step 9: Show character summary and confirm
             await ShowCharacterSummary(character);
             
-            var confirm = await terminal.GetInputAsync(Loc.Get("creation.confirm"));
-            if (!string.IsNullOrEmpty(confirm) && !GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, prompt shows (Y/n) so a bare Enter keeps the old default of Yes
+            if (!await terminal.AskYesNoAsync(Loc.Get("creation.confirm"), enterDefault: true))
             {
                 terminal.WriteLine(Loc.Get("creation.aborted"), "red");
                 return null;
@@ -196,10 +255,8 @@ public class CharacterCreationSystem
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("creation.autolook_prompt"), "bright_cyan");
                 terminal.WriteLine(Loc.Get("creation.autolook_desc"), "gray");
-                var autoLookAns = (await terminal.GetInputAsync(Loc.Get("creation.autolook_ask")) ?? "").Trim().ToUpperInvariant();
-                // Accept localized affirmatives: Yes / Igen (hu) / Si (es,it) / Oui (fr)
-                character.AutoLook = autoLookAns.StartsWith("Y") || autoLookAns.StartsWith("I")
-                    || autoLookAns.StartsWith("S") || autoLookAns.StartsWith("O");
+                // v1.1.15: yesno-convert-a, prompt shows (y/N) so a bare Enter keeps the old default of No
+                character.AutoLook = await terminal.AskYesNoAsync(Loc.Get("creation.autolook_ask"), enterDefault: false);
                 GameConfig.AutoLook = character.AutoLook;
                 terminal.WriteLine(character.AutoLook
                     ? Loc.Get("creation.autolook_on")
@@ -347,7 +404,10 @@ public class CharacterCreationSystem
 
         // Single stat roll -- no reroll loop. Quick Start players don't know
         // what the numbers mean yet anyway; the Level Master explains later.
-        RollStats(character);
+        // v1.1.15: a roll in progress from an earlier dropped session is used instead of a fresh one
+        var savedRoll = LoadRoll(character);
+        if (savedRoll != null) ApplyDice(character, savedRoll.Dice);
+        else RollStats(character);
 
         GeneratePhysicalAppearance(character);
         SetStartingConfiguration(character);
@@ -394,6 +454,8 @@ public class CharacterCreationSystem
             CTurf = false,
             GnollP = 0,
             Mental = GameConfig.DefaultMentalHealth,
+            MentalSchema = GameConfig.MentalSchemaCurrent, // v1.1.15: new characters start current, never legacy
+            GodFavorSchema = GameConfig.GodFavorSchemaCurrent, // 1.2.0: new characters start current, never legacy
             Addict = 0,
             WeapPow = 0,
             ArmPow = 0,
@@ -414,7 +476,6 @@ public class CharacterCreationSystem
             Punch = 0,
             Deleted = false,
             Quests = 0,
-            God = "",
             RoyQuests = 0,
             Resurrections = GameConfig.DefaultStartingResurrections, // v0.60.7: admin-tunable
             MaxResurrections = GameConfig.DefaultStartingResurrections, // v0.60.7: admin-tunable
@@ -557,9 +618,8 @@ public class CharacterCreationSystem
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("creation.name_confirm", name), "yellow");
-            var confirm = await terminal.GetInputAsync("");
-
-            if (string.IsNullOrEmpty(confirm) || GameConfig.IsAffirmative(confirm))
+            // v1.1.15: yesno-convert-a, prompt shows (Y/n) so a bare Enter keeps the old default of Yes
+            if (await terminal.AskYesNoAsync("", enterDefault: true))
             {
                 validName = true;
             }
@@ -738,8 +798,8 @@ public class CharacterCreationSystem
                     terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc2"), "red");
                     terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_desc3"), "red");
                     terminal.WriteLine("");
-                    var confirm = await terminal.GetInputAsync(Loc.Get("creation.difficulty.nightmare_confirm"));
-                    if (GameConfig.IsAffirmative(confirm))
+                    // v1.1.15: yesno-convert-a, prompt shows (y/N) so a bare Enter keeps the old default of No
+                    if (await terminal.AskYesNoAsync(Loc.Get("creation.difficulty.nightmare_confirm"), enterDefault: false))
                     {
                         terminal.WriteLine(Loc.Get("creation.difficulty.nightmare_sealed"), "bright_red");
                         await Task.Delay(1500);
@@ -1137,10 +1197,8 @@ public class CharacterCreationSystem
         terminal.Write(new string('═', TOTAL_W - 2), "gray");
         terminal.WriteLine("╝", "gray");
 
-        var response = await terminal.GetInputAsync("");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync("");
     }
 
     /// <summary>
@@ -1414,10 +1472,8 @@ public class CharacterCreationSystem
         // ── Confirm prompt ──
         terminal.WriteLine("");
         var raceDesc = GameConfig.RaceDescriptions[race];
-        var response = await terminal.GetInputAsync($"{pad} {Loc.Get("creation.preview.be_race_yn", raceDesc)}");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_race_yn", raceDesc)}");
     }
 
     /// <summary>
@@ -1675,10 +1731,8 @@ public class CharacterCreationSystem
         terminal.Write(new string('═', TOTAL_W - 2), "gray");
         terminal.WriteLine("╝", "gray");
 
-        var response = await terminal.GetInputAsync("");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync("");
     }
 
     /// <summary>
@@ -1915,10 +1969,8 @@ public class CharacterCreationSystem
         // ── Confirm prompt ──
         terminal.WriteLine("");
         var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
-        var response = await terminal.GetInputAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article, className)}");
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article, className)}");
     }
 
     /// <summary>Screen reader race preview: plain text, no boxes or stat bars.</summary>
@@ -1976,10 +2028,8 @@ public class CharacterCreationSystem
 
         terminal.WriteLine("");
         var raceDesc = GameConfig.RaceDescriptions[race];
-        var response = await terminal.GetInputAsync(Loc.Get("creation.preview.be_race_yn", raceDesc));
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_race_yn", raceDesc));
     }
 
     /// <summary>Screen reader class preview: plain text, no boxes or stat bars.</summary>
@@ -2022,10 +2072,8 @@ public class CharacterCreationSystem
 
         terminal.WriteLine("");
         var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
-        var response = await terminal.GetInputAsync(Loc.Get("creation.preview.be_class_yn", article, className));
-
-        return !string.IsNullOrEmpty(response) &&
-               (GameConfig.IsAffirmative(response) || response.ToUpper() == "YES");
+        // v1.1.15: yesno-convert-a, strict (Y/N)
+        return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_class_yn", article, className));
     }
 
     private static string GetClassDescription(CharacterClass cls) => cls switch
@@ -2352,22 +2400,27 @@ public class CharacterCreationSystem
     /// </summary>
     private async Task RollCharacterStats(Character character)
     {
-        const int MAX_REROLLS = 5;
-        int rerollsRemaining = MAX_REROLLS;
+        // v1.1.15: a roll in progress from an earlier dropped session resumes with its rerolls left
+        var saved = LoadRoll(character);
+        int rerollsRemaining = saved?.RerollsRemaining ?? MaxRerolls;
         // v0.60.4: gate the roll on a flag so invalid input doesn't trigger a
         // free reroll every keypress. Pre-fix the invalid-input branch fell
         // through to `continue` which jumped back to RollStats at the top of
         // the loop, letting Rage roll forever ("two whole more CON than I had
         // rolled previously after a few tries"). Now: roll on entry, roll on
         // explicit [R], skip the roll when re-prompting after a typo.
-        bool shouldRoll = true;
+        bool shouldRoll = saved == null;
+        bool showResumed = saved != null;
+        if (saved != null) ApplyDice(character, saved.Dice);
 
         while (true)
         {
             // Roll the stats only when the flag is set (initial entry or after [R])
             if (shouldRoll)
             {
-                RollStats(character);
+                var dice = RollDice();
+                ApplyDice(character, dice);
+                SaveRoll(character, dice, rerollsRemaining); // v1.1.15: kept until the character is first saved
                 shouldRoll = false;
             }
 
@@ -2494,6 +2547,12 @@ public class CharacterCreationSystem
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("character_creation.total_stats")}: {totalStats}", totalStats >= 70 ? "bright_green" : totalStats >= 55 ? "yellow" : "red");
             terminal.WriteLine("");
+            if (showResumed)
+            {
+                terminal.WriteLine(Loc.Get("character_creation.roll_resumed"), "yellow"); // v1.1.15
+                terminal.WriteLine("");
+                showResumed = false;
+            }
 
             if (rerollsRemaining > 0)
             {
@@ -2574,7 +2633,19 @@ public class CharacterCreationSystem
     /// Roll stats for a character based on their class and race
     /// Uses 3d6 style rolling with class modifiers
     /// </summary>
-    private void RollStats(Character character)
+    private void RollStats(Character character) => ApplyDice(character, RollDice());
+
+    /// <summary>v1.1.15: the dice of one stat roll, in the order of CreationRoll.Dice.</summary>
+    private int[] RollDice()
+    {
+        var dice = new int[DiceCount];
+        for (int i = 0; i < DiceCount - 1; i++) dice[i] = Roll3d6();
+        dice[DiceCount - 1] = Roll2d6();
+        return dice;
+    }
+
+    /// <summary>v1.1.15: set the character's stats from rolled dice plus its class and race modifiers.</summary>
+    private void ApplyDice(Character character, int[] dice)
     {
         // Get class base attributes (these are now modifiers, not fixed values)
         var classAttrib = GameConfig.ClassStartingAttributes[character.Class];
@@ -2582,16 +2653,16 @@ public class CharacterCreationSystem
 
         // Roll each stat using 3d6 base + class modifier + small random bonus
         // Class attributes act as bonuses to make classes feel distinct
-        character.Strength = Roll3d6() + classAttrib.Strength + raceAttrib.StrengthBonus;
+        character.Strength = dice[0] + classAttrib.Strength + raceAttrib.StrengthBonus;
         // Defence starts low (no 3d6 roll) - gear and levels provide the bulk of defence
         character.Defence = classAttrib.Defence + raceAttrib.DefenceBonus;
-        character.Stamina = Roll3d6() + classAttrib.Stamina + raceAttrib.StaminaBonus;
-        character.Agility = Roll3d6() + classAttrib.Agility;
-        character.Charisma = Roll3d6() + classAttrib.Charisma;
-        character.Dexterity = Roll3d6() + classAttrib.Dexterity;
-        character.Wisdom = Roll3d6() + classAttrib.Wisdom;
-        character.Intelligence = Roll3d6() + classAttrib.Intelligence;
-        character.Constitution = Roll3d6() + classAttrib.Constitution;
+        character.Stamina = dice[1] + classAttrib.Stamina + raceAttrib.StaminaBonus;
+        character.Agility = dice[2] + classAttrib.Agility;
+        character.Charisma = dice[3] + classAttrib.Charisma;
+        character.Dexterity = dice[4] + classAttrib.Dexterity;
+        character.Wisdom = dice[5] + classAttrib.Wisdom;
+        character.Intelligence = dice[6] + classAttrib.Intelligence;
+        character.Constitution = dice[7] + classAttrib.Constitution;
 
         // Store base values for equipment bonus tracking
         character.BaseStrength = character.Strength;
@@ -2603,7 +2674,7 @@ public class CharacterCreationSystem
 
         // HP is rolled differently - 2d6 + class HP bonus + race HP bonus + Constitution bonus
         int constitutionBonus = (int)(character.Constitution / 3); // Constitution adds to HP
-        character.HP = Roll2d6() + (classAttrib.HP * 3) + raceAttrib.HPBonus + constitutionBonus;
+        character.HP = dice[8] + (classAttrib.HP * 3) + raceAttrib.HPBonus + constitutionBonus;
         character.MaxHP = character.HP;
 
         // Mana for spellcasters only - base from class + Intelligence bonus
@@ -2909,14 +2980,8 @@ public class CharacterCreationSystem
     private async Task<bool> ConfirmChoice(string message, bool defaultYes)
     {
         var hint = defaultYes ? "Y/n" : "y/N";
-        var response = await terminal.GetInputAsync($"{message}? ({hint}): ");
-
-        if (string.IsNullOrEmpty(response))
-        {
-            return defaultYes;
-        }
-
-        return GameConfig.IsAffirmative(response);
+        // v1.1.15: yesno-convert-a, the hint here already shows the caller's own default
+        return await terminal.AskYesNoAsync($"{message}? ({hint}): ", enterDefault: defaultYes);
     }
     
     /// <summary>

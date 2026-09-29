@@ -679,8 +679,7 @@ public class LevelMasterLocation : BaseLocation
                 await terminal.PressAnyKey();
                 return;
             }
-            var conf = (await terminal.GetInput(Loc.Get("spec.confirm_respec", chosen.Name, $"{respecCost:N0}"))).Trim();
-            if (!GameConfig.IsAffirmative(conf)) return;
+            if (!await terminal.AskYesNoAsync(Loc.Get("spec.confirm_respec", chosen.Name, $"{respecCost:N0}"))) return;
             player.Gold -= respecCost;
         }
 

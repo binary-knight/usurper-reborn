@@ -84,13 +84,38 @@ public class Character
     // v1.2 (design item B): killer's name when this grouped follower died in the leader's fight
     // and their own session has not yet resolved the death. Persisted so a disconnect cannot lose it.
     public string? PendingGroupDeath { get; set; }
+    // v1.1.15: this grouped follower collapsed (Mental 0) in the leader's fight on a shallow floor; the
+    // rescue is already applied, their own session leaves the group and goes to the Healer. Not saved.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool PendingMentalRescue { get; set; }
+    // 1.2.0: another session changed this player's god boon caches (a player-god's reconfig, domain
+    // or recruit); this player's own session applies the boon update at its next safe point (the
+    // location loop, the end of a fight). Not saved: the load recalculates and refreshes the boon.
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool GodBoonRecalcPending { get; set; }
 
     public int GnollP { get; set; }                 // gnoll poison, temporary
-    public int Mental { get; set; }                 // mental health
+    public int Mental { get; set; } = GameConfig.MaxMentalStability; // mental health; v1.1.15: a bare Character starts full, not Broken
+    // v1.1.15: 0 means a save written before the Mental schema existed; GameEngine restore resets
+    // Mental to full and stamps the current schema for those. A fresh Character starts current.
+    public int MentalSchema { get; set; } = GameConfig.MentalSchemaCurrent;
+    public int WillowDraughts { get; set; }         // v1.1.15: Willow Draughts carried, 0..GameConfig.MaxWillowDraughts
+    // v1.1.15: today's Mental recovery sources already used; cleared by MentalSystem.ApplyDailyReset
+    public MentalDailySource MentalRecoveryUsedToday { get; set; }
+    public bool MentalBroken { get; set; }          // v1.1.15: Broken collapse affliction; persists until therapy or rehab
+    public bool MentalHintShown { get; set; }       // v1.1.15: the first drop-below-75 Mental hint has been shown
     public int Addict { get; set; }                 // drug addiction level (0-100)
     public int SteroidDays { get; set; }            // days remaining on steroids
     public int DrugEffectDays { get; set; }         // days remaining on drug effects
     public DrugType ActiveDrug { get; set; }        // currently active drug type
+    // v1.1.15: drug tolerance and crash shape (see evidence/v1115-designs/mental-design.md).
+    // MentalDrugBoost is the pending high amount that crashes (at twice the boost) when it wears
+    // off. MentalDrugUses and MentalLastDrugDay (DailySystemManager.CurrentDay of the last use)
+    // together drive the tolerance window: a use within 3 days of the last one gives a smaller
+    // high and a bigger crash. The tolerance math itself is a later piece.
+    public int MentalDrugBoost { get; set; }
+    public int MentalDrugUses { get; set; }
+    public int MentalLastDrugDay { get; set; }
     public bool WellWish { get; set; }              // has visited wishing well
     public int Height { get; set; }                 // height
     public int Weight { get; set; }                 // weight
@@ -150,6 +175,7 @@ public class Character
     public bool AutoEquipDisabled { get; set; }      // when true, shop purchases go straight to inventory
     public int AutoCombatHealPercent { get; set; } = GameConfig.AutoCombatHealPercentDefault; // v1.1.13: auto-combat drinks a potion at or below this HP %
     public bool ClassicMainStreet { get; set; }      // v1.1.14: Main Street in the pre-1.1.13 layout instead of districts (off by default)
+    public bool MenuKeysNeedEnter { get; set; } = true; // v1.1.15: single-player console menus wait for Enter (on by default)
     public int ClassicTipDraws { get; set; }         // v1.1.14: district Main Street draws that showed the switch-to-classic tip (stops at 10)
     public int DateFormatPreference { get; set; }    // 0=MM/DD/YYYY, 1=DD/MM/YYYY, 2=YYYY-MM-DD
     public bool AutoRedistributeXP { get; set; } = true; // auto-redistribute XP when teammates die in combat
@@ -587,6 +613,20 @@ public class Character
         return (Loc.Get("status.fatigue_exhausted"), "bright_red");
     }
 
+    /// <summary>Get Mental band label and color for display (v1.1.15). Unlike GetFatigueTier,
+    /// every band including Stable returns a label, since the status sheet always shows one.</summary>
+    public (string label, string color) GetMentalTier()
+    {
+        return MentalSystem.GetBand(Mental) switch
+        {
+            MentalBand.Stable => (Loc.Get("status.mental_stable"), "bright_green"),
+            MentalBand.Strained => (Loc.Get("status.mental_strained"), "yellow"),
+            MentalBand.Shaken => (Loc.Get("status.mental_shaken"), "bright_yellow"),
+            MentalBand.Breaking => (Loc.Get("status.mental_breaking"), "red"),
+            _ => (Loc.Get("status.mental_broken"), "bright_red"),
+        };
+    }
+
     // Session XP pacing (v0.54.0) — transient, resets on login, NOT serialized
     /// <summary>Total XP earned this session. Used for diminishing returns in online mode.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -594,6 +634,9 @@ public class Character
     /// <summary>Combats fought this session. Used to throttle diminishing-returns messages.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int SessionCombatCount { get; set; }
+    /// <summary>v1.1.15: dungeon strain carried toward the next Mental point, in hundredths of a
+    /// per mille (100_000 = 1 point). Saved through the five sites; see MentalSystem.AddStrain.</summary>
+    public int MentalStrainRemainder { get; set; }
 
     // Team HQ upgrade levels (v0.52.8) — cached from DB on login, not serialized
     public int HQArmoryLevel { get; set; }    // +5% attack per level
@@ -759,6 +802,14 @@ public class Character
 
     // Dark Alley Overhaul (v0.41.0)
     public int GroggoShadowBlessingDex { get; set; } = 0;      // Active Groggo DEX buff (removed on rest)
+    // 1.2.0: temporary stat buffs (Inn ale, the evil alignment event, the settlement lockpick and smoke
+    // bomb). Applied inside RecalculateStats, ended by OnRest or by the combat countdown. Empty for NPCs.
+    public List<TimedStatBuff> TimedStatBuffs { get; set; } = new();
+    // 1.2.0: the one-time login restore of artifact stats has run (or was never needed). True for every
+    // character made on this version; only an older save, which lacks the field, loads it as false.
+    public bool ArtifactStatsApplied { get; set; } = true;
+    // 1.2.0: the one-time login backfill of the NG+ cycle stat bonus has run (or was never needed); as above.
+    public bool CycleStatBonusApplied { get; set; } = true;
     public int SteroidShopPurchases { get; set; } = 0;          // Lifetime steroid purchases (cap 3)
     public int AlchemistINTBoosts { get; set; } = 0;            // Lifetime alchemist INT boosts (cap 3)
     public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)
@@ -1676,6 +1727,11 @@ public class Character
         // 2026-09-03). Placed before the CON-to-HP line so a set CON bonus flows into MaxHP.
         UsurperRemake.Systems.GearSetRegistry.Apply(this);
 
+        // 1.2.0: temporary stat buffs, after gear so a buff flows into HP and mana the way gear does.
+        // Groggo's Shadow Blessing keeps its own saved field and is added here; a rest clears it.
+        if (GroggoShadowBlessingDex > 0) Dexterity += GroggoShadowBlessingDex;
+        ApplyTimedStatBuffs();
+
         // v1.1.12: the awakening's Wisdom, added like gear Wisdom so it flows into mana; never stored
         int awakeningStage = UsurperRemake.Systems.AwakeningBonus.StageOf(this);
         Wisdom += UsurperRemake.Systems.AwakeningBonus.WisdomAt(awakeningStage);
@@ -1710,23 +1766,21 @@ public class Character
             MaxHP = (long)(MaxHP * GameConfig.KingCombatHPBonus);
         }
 
-        // Apply divine boon MaxHP bonus (from worshipped player-god's configured boons)
-        if (CachedBoonEffects?.MaxHPPercent > 0)
-        {
-            MaxHP += (long)(MaxHP * CachedBoonEffects.MaxHPPercent);
-        }
-
-        // Apply divine boon MaxMana bonus
-        if (CachedBoonEffects?.MaxManaPercent > 0 && MaxMana > 0)
-        {
-            MaxMana += (long)(MaxMana * CachedBoonEffects.MaxManaPercent);
-        }
-
-        // v1.1.12: the awakening's max HP and max mana percentages, beside the divine boons
+        // The divine boons (the player-god's configured MaxHP and MaxMana percent), the awakening's
+        // max HP and max mana percent (v1.1.12) and Terran's max HP boon (1.2.0), in that order.
+        // 1.2.0: the segment's input and output are recorded, so a god boon change can update
+        // MaxHP and MaxMana alone (RecalculateBoonShare) without resetting the other stats.
         double awakeningHP = UsurperRemake.Systems.AwakeningBonus.HPAt(awakeningStage);
-        if (awakeningHP > 0) MaxHP += (long)(MaxHP * awakeningHP);
         double awakeningMana = UsurperRemake.Systems.AwakeningBonus.ManaAt(awakeningStage);
-        if (awakeningMana > 0 && MaxMana > 0) MaxMana += (long)(MaxMana * awakeningMana);
+        _boonPreMaxHP = MaxHP;
+        _boonPreMaxMana = MaxMana;
+        _boonAwakeningHP = awakeningHP;
+        _boonAwakeningMana = awakeningMana;
+        MaxHP = BoonSegmentMaxHP(_boonPreMaxHP, awakeningHP);
+        MaxMana = BoonSegmentMaxMana(_boonPreMaxMana, awakeningMana);
+        _boonOutMaxHP = MaxHP;
+        _boonOutMaxMana = MaxMana;
+        _boonRecorded = true;
 
         // Apply Fountain of Vitality bonus HP
         if (BonusMaxHP > 0)
@@ -1764,6 +1818,224 @@ public class Character
             UsurperRemake.Systems.DebugLogger.Instance.LogDebug("STATS", $"HP clamped: {hpBefore} -> {HP} (MaxHP={MaxHP}, BaseMaxHP={BaseMaxHP})");
         }
         Mana = Math.Min(Mana, MaxMana);
+    }
+
+    // 1.2.0: what the last RecalculateStats put in and got out of the god boon segment. Runtime
+    // only (fields, so never serialized): every load runs RecalculateStats, which records them again.
+    private long _boonPreMaxHP, _boonPreMaxMana, _boonOutMaxHP, _boonOutMaxMana;
+    private double _boonAwakeningHP, _boonAwakeningMana;
+    private bool _boonRecorded;
+
+    /// <summary>1.2.0: max HP after the configured boon, the awakening and Terran, from the pre-boon max HP.</summary>
+    private long BoonSegmentMaxHP(long pre, double awakeningHP)
+    {
+        long hp = pre;
+        // Apply divine boon MaxHP bonus (from worshipped player-god's configured boons)
+        if (CachedBoonEffects?.MaxHPPercent > 0) hp += (long)(hp * CachedBoonEffects.MaxHPPercent);
+        if (awakeningHP > 0) hp += (long)(hp * awakeningHP);
+        // 1.2.0 Temple gods piece 2: Terran's boon on max HP (players only; NPCs never reach the registry)
+        if (!IsNPC) hp += UsurperRemake.Systems.GodBoonSystem.MaxHpBonus(this, hp);
+        return hp;
+    }
+
+    /// <summary>1.2.0: max mana after the configured boon and the awakening, from the pre-boon max mana.</summary>
+    private long BoonSegmentMaxMana(long pre, double awakeningMana)
+    {
+        long mana = pre;
+        if (CachedBoonEffects?.MaxManaPercent > 0 && mana > 0) mana += (long)(mana * CachedBoonEffects.MaxManaPercent);
+        if (awakeningMana > 0 && mana > 0) mana += (long)(mana * awakeningMana);
+        return mana;
+    }
+
+    /// <summary>
+    /// 1.2.0: after a god boon's input changed (the god, the Favor tier, the configured boons, a
+    /// player-god's domain or scale), updates only the boons' share of MaxHP and MaxMana: the
+    /// segment is recomputed from the pre-boon values the last RecalculateStats recorded, in the
+    /// same order, and the difference is applied. Every other stat is left alone, so gains written
+    /// straight into the derived stats are kept. HP and mana
+    /// are only clamped down. A character never recalculated has no record and gets a full
+    /// RecalculateStats (production players always have one: the load recalculates).
+    /// </summary>
+    public void RecalculateBoonShare()
+    {
+        if (!_boonRecorded)
+        {
+            RecalculateStats();
+            return;
+        }
+        long hp = BoonSegmentMaxHP(_boonPreMaxHP, _boonAwakeningHP);
+        long mana = BoonSegmentMaxMana(_boonPreMaxMana, _boonAwakeningMana);
+        MaxHP = Math.Max(1, MaxHP + hp - _boonOutMaxHP);
+        MaxMana = Math.Max(0, MaxMana + mana - _boonOutMaxMana);
+        _boonOutMaxHP = hp;
+        _boonOutMaxMana = mana;
+        HP = Math.Min(HP, MaxHP);
+        Mana = Math.Min(Mana, MaxMana);
+    }
+
+    /// <summary>
+    /// 1.2.0: a lasting stat change (a shrine, a purchase, a story reward, a penalty). Adds
+    /// <paramref name="amount"/> (may be negative) to the matching Base* field, which is what
+    /// RecalculateStats rebuilds from, so the change survives the fight-start recalc, equipment
+    /// changes, level-ups and a save round trip. The derived stat is never written directly.
+    /// Floors: 1 for the nine attributes, 10 for MaxHP, 0 for MaxMana. <paramref name="cap"/>,
+    /// when given, limits the Base field; a positive grant never lowers a Base already above the
+    /// cap, it only adds nothing. <paramref name="raisePool"/> adds the amount to HP (MaxHP) or
+    /// Mana (MaxMana) after the recalc, clamped to the new maximum. Side effects of the normal
+    /// pipeline apply: a Constitution grant also raises MaxHP through the CON bonus, and a MaxHP
+    /// grant is scaled by the King, boon and awakening percentages. Works on NPCs unchanged.
+    /// </summary>
+    public void GrantPermanentStat(StatKind stat, long amount, long? cap = null, bool raisePool = false)
+    {
+        ApplyPermanentToBase(stat, amount, cap);
+        RecalculateStats();
+        if (raisePool) RaisePoolAfterGrant(stat, amount);
+    }
+
+    /// <summary>1.2.0: several lasting stat changes with a single recalc (for example STR and STA together).</summary>
+    public void GrantPermanentStats(params (StatKind stat, long amount)[] grants)
+    {
+        foreach (var (stat, amount) in grants) ApplyPermanentToBase(stat, amount, null);
+        RecalculateStats();
+    }
+
+    /// <summary>
+    /// 1.2.0: a temporary stat buff. A buff with the same source and stat is replaced (refreshed),
+    /// never stacked. <paramref name="endsOn"/> Rest ends it at the next rest (OnRest); Combats ends
+    /// it after <paramref name="combats"/> fights (at least 1), counted down at the end of each fight.
+    /// The buff is applied inside RecalculateStats, so it survives the fight-start recalc and a save.
+    /// </summary>
+    public void AddTimedStatBuff(string source, StatKind stat, int amount, StatBuffEnd endsOn, int combats = 0)
+    {
+        TimedStatBuffs.RemoveAll(b => b.Source == source && b.Stat == stat);
+        TimedStatBuffs.Add(new TimedStatBuff
+        {
+            Source = source,
+            Stat = stat,
+            Amount = amount,
+            EndsOn = endsOn,
+            CombatsLeft = endsOn == StatBuffEnd.Combats ? Math.Max(1, combats) : 0
+        });
+        RecalculateStats();
+    }
+
+    /// <summary>
+    /// 1.2.0: a rest ends every Rest buff and Groggo's Shadow Blessing. Called from every rest entry
+    /// point (the night's sleep through DailySystemManager.RestAndAdvanceToMorning). Does nothing
+    /// when no buff ends, so a second call in the same rest is harmless. A pool that was full
+    /// before stays full.
+    /// </summary>
+    public void OnRest()
+    {
+        bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Rest) > 0;
+        if (GroggoShadowBlessingDex != 0)
+        {
+            GroggoShadowBlessingDex = 0;
+            changed = true;
+        }
+        if (!changed) return;
+        RecalculateKeepingFullPools();
+    }
+
+    /// <summary>1.2.0: the end of a fight counts down every Combats buff; one at 0 ends.</summary>
+    public void TickTimedStatBuffsAfterCombat()
+    {
+        foreach (var b in TimedStatBuffs)
+            if (b.EndsOn == StatBuffEnd.Combats) b.CombatsLeft--;
+        bool changed = TimedStatBuffs.RemoveAll(b => b.EndsOn == StatBuffEnd.Combats && b.CombatsLeft <= 0) > 0;
+        if (changed) RecalculateStats();
+    }
+
+    private void RecalculateKeepingFullPools()
+    {
+        bool hpFull = HP >= MaxHP;
+        bool manaFull = Mana >= MaxMana;
+        RecalculateStats();
+        if (hpFull) HP = MaxHP;
+        if (manaFull) Mana = MaxMana;
+    }
+
+    private void ApplyTimedStatBuffs()
+    {
+        if (TimedStatBuffs == null || TimedStatBuffs.Count == 0) return;
+        foreach (var b in TimedStatBuffs)
+        {
+            long floor = PermanentStatFloor(b.Stat);
+            switch (b.Stat)
+            {
+                case StatKind.Strength: Strength = Math.Max(floor, Strength + b.Amount); break;
+                case StatKind.Dexterity: Dexterity = Math.Max(floor, Dexterity + b.Amount); break;
+                case StatKind.Constitution: Constitution = Math.Max(floor, Constitution + b.Amount); break;
+                case StatKind.Intelligence: Intelligence = Math.Max(floor, Intelligence + b.Amount); break;
+                case StatKind.Wisdom: Wisdom = Math.Max(floor, Wisdom + b.Amount); break;
+                case StatKind.Charisma: Charisma = Math.Max(floor, Charisma + b.Amount); break;
+                case StatKind.Defence: Defence = Math.Max(floor, Defence + b.Amount); break;
+                case StatKind.Stamina: Stamina = Math.Max(floor, Stamina + b.Amount); break;
+                case StatKind.Agility: Agility = Math.Max(floor, Agility + b.Amount); break;
+                case StatKind.MaxHP: MaxHP = Math.Max(floor, MaxHP + b.Amount); break;
+                case StatKind.MaxMana: MaxMana = Math.Max(floor, MaxMana + b.Amount); break;
+            }
+        }
+    }
+
+    /// <summary>1.2.0: the lowest value each Base field may reach through GrantPermanentStat.</summary>
+    public static long PermanentStatFloor(StatKind stat) => stat switch
+    {
+        StatKind.MaxHP => 10,
+        StatKind.MaxMana => 0,
+        _ => 1
+    };
+
+    private void ApplyPermanentToBase(StatKind stat, long amount, long? cap)
+    {
+        long old = GetBaseStat(stat);
+        long next = old + amount;
+        if (cap.HasValue) next = Math.Min(next, Math.Max(cap.Value, old));
+        next = Math.Max(PermanentStatFloor(stat), next);
+        SetBaseStat(stat, next);
+    }
+
+    private void RaisePoolAfterGrant(StatKind stat, long amount)
+    {
+        if (amount <= 0) return;
+        if (stat == StatKind.MaxHP) HP = Math.Min(MaxHP, HP + amount);
+        else if (stat == StatKind.MaxMana) Mana = Math.Min(MaxMana, Mana + amount);
+    }
+
+    /// <summary>1.2.0: the Base* field behind a StatKind.</summary>
+    public long GetBaseStat(StatKind stat) => stat switch
+    {
+        StatKind.Strength => BaseStrength,
+        StatKind.Dexterity => BaseDexterity,
+        StatKind.Constitution => BaseConstitution,
+        StatKind.Intelligence => BaseIntelligence,
+        StatKind.Wisdom => BaseWisdom,
+        StatKind.Charisma => BaseCharisma,
+        StatKind.Defence => BaseDefence,
+        StatKind.Stamina => BaseStamina,
+        StatKind.Agility => BaseAgility,
+        StatKind.MaxHP => BaseMaxHP,
+        StatKind.MaxMana => BaseMaxMana,
+        _ => throw new ArgumentOutOfRangeException(nameof(stat))
+    };
+
+    private void SetBaseStat(StatKind stat, long value)
+    {
+        switch (stat)
+        {
+            case StatKind.Strength: BaseStrength = value; break;
+            case StatKind.Dexterity: BaseDexterity = value; break;
+            case StatKind.Constitution: BaseConstitution = value; break;
+            case StatKind.Intelligence: BaseIntelligence = value; break;
+            case StatKind.Wisdom: BaseWisdom = value; break;
+            case StatKind.Charisma: BaseCharisma = value; break;
+            case StatKind.Defence: BaseDefence = value; break;
+            case StatKind.Stamina: BaseStamina = value; break;
+            case StatKind.Agility: BaseAgility = value; break;
+            case StatKind.MaxHP: BaseMaxHP = value; break;
+            case StatKind.MaxMana: BaseMaxMana = value; break;
+            default: throw new ArgumentOutOfRangeException(nameof(stat));
+        }
     }
 
     /// <summary>
@@ -1931,7 +2203,7 @@ public class Character
     // New for version 0.14+
     public int Quests { get; set; }                 // completed missions/quests
     public bool Deleted { get; set; }               // is record deleted
-    public string God { get; set; } = "";           // worshipped god name
+    // 1.2.0 Temple gods: the Pascal "God" field is gone; an NPC's god is WorshippedGod (NpcFaithSystem)
     public long RoyQuests { get; set; }             // royal quests accomplished
     
     // New for version 0.17+
@@ -2069,6 +2341,39 @@ public class Character
 
     // Mortal worship field — which immortal player-god this character follows
     public string WorshippedGod { get; set; } = "";                            // DivineName of their chosen immortal god
+
+    // 1.2.0 Temple gods piece 1: Favor 0..100 with the worshipped god (canon or player-god, see
+    // GodRegistry and FavorSystem). GodFavorGod names the god the Favor belongs to, so a switch by
+    // any path starts the new god at 0. GodFavorSchema 0 is a save from before Favor; the load
+    // (GodRegistry.ApplyLoad) gives it GameConfig.GodFavorLegacyStart with its current god.
+    public int GodFavor { get; set; }
+    public string GodFavorGod { get; set; } = "";
+    public int GodFavorSchema { get; set; } = GameConfig.GodFavorSchemaCurrent;
+    public Dictionary<string, int> GodFavorDayGains { get; set; } = new();       // FavorSource name -> Favor gained today; cleared at the daily reset
+    public int DaysSinceDevotion { get; set; }                                   // Daily resets since the last prayer or fitting deed (neglect)
+    public int DaysSinceSpellCast { get; set; }                                  // 1.2.0 Temple gods: daily resets since the last spell cast (Arcanus taboo)
+    public int LastGodSwitchDay { get; set; } = -1;                              // 1.2.0 Temple gods piece 4: game day the character last left a god by choice (-1 never)
+    public bool MiracleUsedToday { get; set; }                                   // 1.2.0 Temple gods piece 5: today's Miracle is spent (MiracleSystem); cleared by the daily reset
+    public List<string> ChastisedToday { get; set; } = new();                    // 1.2.0 piece 5b, an immortal: followers chastised today (ImmortalDeedSystem.ChastiseKey); cleared with the deeds
+    [System.Text.Json.Serialization.JsonIgnore] public bool MiracleCritPending { get; set; }   // 1.2.0: Valorian's Miracle, the next swing is a critical hit (transient)
+    [System.Text.Json.Serialization.JsonIgnore] public bool IsMiracleAlly { get; set; }        // 1.2.0: Sylvana's beast, a teammate for one fight only (transient)
+    // 1.2.0 Temple gods piece 4, single-player: standing lost by each god to desecration this week
+    // (GodStandingPenalty). Kept for the week GodStandingPenaltyWeek only; online it is in SQL.
+    public Dictionary<string, int> GodStandingPenalties { get; set; } = new();
+    public int GodStandingPenaltyWeek { get; set; } = -1;
+    // 1.2.0 Temple gods piece 6, single-player: the week's strongest god (WeeklyGodSystem), picked once
+    // for WeeklyGodWeek ("" when no god had standing); online it is in world_state.
+    public int WeeklyGodWeek { get; set; } = -1;
+    public string WeeklyGod { get; set; } = "";
+
+    // 1.2.0 Temple gods piece 2: an immortal's god domain (a GodDomain name, "" until chosen; saved).
+    public string DivineDomain { get; set; } = "";
+    // Runtime only (not saved): the boon of the player-god this character follows, cached at login
+    // and at the Temple by GodBoonSystem.RefreshPlayerGodBoonAsync. It counts only while it names
+    // the god worshipped now.
+    public string PlayerGodBoonGod { get; set; } = "";
+    public UsurperRemake.Systems.GodDomain PlayerGodBoonDomain { get; set; }
+    public int PlayerGodBoonScalePct { get; set; }
 
     // Divine Blessing buff (granted by an immortal god's Bless deed)
     public int DivineBlessingCombats { get; set; }                             // Combats remaining with blessing
@@ -2667,6 +2972,29 @@ public class Character
     }
 }
 
+/// <summary>1.2.0: the stats a lasting grant can change (Character.GrantPermanentStat).</summary>
+public enum StatKind
+{
+    Strength, Dexterity, Constitution, Intelligence, Wisdom,
+    Charisma, Defence, Stamina, Agility, MaxHP, MaxMana
+}
+
+/// <summary>1.2.0: what ends a temporary stat buff: the next rest, or a number of fights.</summary>
+public enum StatBuffEnd
+{
+    Rest, Combats
+}
+
+/// <summary>1.2.0: a temporary stat buff (Character.AddTimedStatBuff), applied in RecalculateStats.</summary>
+public class TimedStatBuff
+{
+    public string Source { get; set; } = "";
+    public StatKind Stat { get; set; }
+    public int Amount { get; set; }
+    public StatBuffEnd EndsOn { get; set; }
+    public int CombatsLeft { get; set; }
+}
+
 /// <summary>
 /// Character AI type from Pascal
 /// </summary>
@@ -2873,7 +3201,8 @@ public static class DrugSystem
                 long hpLoss = (long)(character.MaxHP * GameConfig.DrugOverdoseHPLoss);
                 character.HP = Math.Max(1, character.HP - hpLoss);
                 character.Addict = Math.Min(100, (int)(character.Addict * GameConfig.DrugOverdoseAddictionMultiplier) + 10);
-                return (false, $"OVERDOSE! The substances react violently! You lose {hpLoss} HP and your addiction worsens!");
+                MentalSystem.ApplyOverdose(character);   // v1.1.15: no high, not counted as a use
+                return (false, Loc.Get("drugs.overdose", hpLoss));
             }
             // No overdose — replace current drug
             character.ActiveDrug = DrugType.None;
@@ -2921,8 +3250,28 @@ public static class DrugSystem
             character.Addict = Math.Min(100, character.Addict + _random.Next(5, 15));
         }
 
-        return (true, $"You take the {drug}. You feel its effects coursing through you!");
+        // v1.1.15: the Mental high (may pass the addiction cap until the drug wears off)
+        MentalSystem.ApplyDrugHigh(character, drug, DailySystemManager.Instance.CurrentDay);
+        GodDeedSystem.Record(character, GodAct.DrugUse);   // 1.2.0 Temple gods: Light taboo
+
+        return (true, Loc.Get("drugs.taken", GetDrugName(drug)));
     }
+
+    /// <summary>v1.1.15: the drug's display name, the Drug Palace's localized names.</summary>
+    public static string GetDrugName(DrugType drug) => drug switch
+    {
+        DrugType.Steroids => Loc.Get("dark_alley.drug_name_steroids"),
+        DrugType.BerserkerRage => Loc.Get("dark_alley.drug_name_berserker"),
+        DrugType.Haste => Loc.Get("dark_alley.drug_name_haste"),
+        DrugType.QuickSilver => Loc.Get("dark_alley.drug_name_quicksilver"),
+        DrugType.ManaBoost => Loc.Get("dark_alley.drug_name_mana_boost"),
+        DrugType.ThirdEye => Loc.Get("dark_alley.drug_name_third_eye"),
+        DrugType.Ironhide => Loc.Get("dark_alley.drug_name_ironhide"),
+        DrugType.Stoneskin => Loc.Get("dark_alley.drug_name_stoneskin"),
+        DrugType.DarkEssence => Loc.Get("dark_alley.drug_name_dark_essence"),
+        DrugType.DemonBlood => Loc.Get("dark_alley.drug_name_demon_blood"),
+        _ => drug.ToString()
+    };
 
     /// <summary>
     /// Get stat bonuses from active drug
@@ -2962,17 +3311,25 @@ public static class DrugSystem
             {
                 // Check drug type BEFORE clearing it for crash effects
                 var expiringDrug = character.ActiveDrug;
-                messages.Add($"The effects of {expiringDrug} have worn off.");
+                messages.Add(Loc.Get("drugs.worn_off", GetDrugName(expiringDrug)));
 
                 // Crash effects for some drugs
                 if (expiringDrug == DrugType.DarkEssence)
                 {
                     character.HP = Math.Max(1, character.HP - character.MaxHP / 4);
-                    messages.Add("You crash hard from the Dark Essence. Your body aches.");
+                    messages.Add(Loc.Get("drugs.dark_essence_crash"));
                 }
 
                 character.ActiveDrug = DrugType.None;
             }
+        }
+
+        // v1.1.15: the Mental crash once no drug is active (the wear-off above, or a boost left
+        // pending), taken from the high the daily reset kept
+        if (!character.OnDrugs && character.MentalDrugBoost > 0)
+        {
+            MentalSystem.ApplyDrugCrash(character);
+            messages.Add(Loc.Get("drugs.mental_crash"));
         }
 
         // Reduce steroid duration
@@ -2989,14 +3346,15 @@ public static class DrugSystem
             // Stat penalties during withdrawal
             character.Strength = Math.Max(1, character.Strength - withdrawalSeverity);
             character.Agility = Math.Max(1, character.Agility - withdrawalSeverity);
+            MentalSystem.ApplyWithdrawal(character, withdrawalSeverity);   // v1.1.15
 
             if (withdrawalSeverity >= 2)
             {
-                messages.Add("Your hands shake... you crave your next fix.");
+                messages.Add(Loc.Get("drugs.withdrawal_shakes"));
             }
             if (withdrawalSeverity >= 3)
             {
-                messages.Add("The withdrawal is agonizing. Your body screams for drugs.");
+                messages.Add(Loc.Get("drugs.withdrawal_agony"));
             }
 
             // Slow addiction recovery if clean

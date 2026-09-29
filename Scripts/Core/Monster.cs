@@ -136,12 +136,31 @@ public class Monster
     // 2nd = 50%, 3rd = 25%, 4th+ = full immunity until the window resets).
     public int RecentStunCount { get; set; } = 0;
     public int RoundsSinceLastStun { get; set; } = 0;
+
+    // v1.1.15: the shared hold budget. Every hold that lands this fight (stun, web, freeze,
+    // sleep) counts here; it never decays, so CombatEngine.TryHoldMonster gives a freeze or
+    // sleep full, half, then quarter duration, and after three holds the monster is immune
+    // to them for the rest of the fight.
+    public int HoldsThisFight { get; set; } = 0;
+
+    /// <summary>v1.1.15: held in any way (stun, web, freeze, sleep); no new hold lands on top.</summary>
+    public bool IsHeld => IsStunned || Stunned || StunRounds > 0 || IsFrozen || IsSleeping;
     public bool IsSlowed { get; set; } = false;
     public int SlowDuration { get; set; } = 0;
+
+    // v1.1.15: Slumber Mist. The HP the monster had when the slumber landed; any damage since
+    // (a hit or a damage over time tick) wakes it at its next turn. -1 when no slumber is on it.
+    public long SlumberHpMark { get; set; } = -1;
+
+    // v1.1.15: Psychic Scream. Distracted is spent on the next attack roll; while DistractedRounds
+    // is above 0 it is armed again once a round with DistractedRoundsPenalty.
+    public int DistractedRounds { get; set; } = 0;
+    public int DistractedRoundsPenalty { get; set; } = 0;
 
     // Ability-applied status effects
     public bool IsMarked { get; set; } = false;        // Marked for death/hunt - takes bonus damage
     public int MarkedDuration { get; set; } = 0;
+    public int MarkedBonusPercent { get; set; } = 0;  // v1.1.15: set at cast by a Sage mark; 0 means the usual GameConfig.MarkedBonusPercent. Combat only, never saved.
     public bool IsFrozen { get; set; } = false;         // Frozen solid - cannot act
     public int FrozenDuration { get; set; } = 0;
     public long PowerSurgeStrength { get; set; } = 0;   // v1.1.10: Strength a boss's power surge added, taken back when it ends
@@ -189,6 +208,8 @@ public class Monster
 
     // Enhanced monster family system properties
     public string FamilyName { get; set; } = "";            // Monster family (Goblinoid, Undead, etc.)
+    [System.Text.Json.Serialization.JsonIgnore]
+    public UsurperRemake.Systems.OldGodType? OldGod { get; set; }   // 1.2.0: the Old God this boss is (OldGodBossSystem), for the Old Gods link; run time only
     public string TierName { get; set; } = "";              // Tier name (Goblin, Hobgoblin, etc.)
     public string MonsterColor { get; set; } = "white";     // Color for display
     public string AttackType { get; set; } = "physical";    // Attack type (physical, fire, poison, etc.)

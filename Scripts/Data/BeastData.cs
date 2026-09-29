@@ -220,6 +220,39 @@ public static class BeastData
         Beasts.FirstOrDefault(b => string.Equals(b.Id, id, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
+    /// v0.61.0 Beast Taming: the combat teammate for a Combat-role beast at an effective level. HP,
+    /// attack and defence scale from the definition (+10%, +8% and +5% per level above 1). The
+    /// wrapper has IsPet=true so social and relationship flows skip it; its HP restores at combat
+    /// end. Shared by the tamed pet (DungeonLocation) and Sylvana's Miracle (1.2.0).
+    /// </summary>
+    public static Character BuildCombatWrapper(BeastDefinition def, int effLevel, string name)
+    {
+        effLevel = Math.Max(1, effLevel);
+        long scaledHP = def.CombatBaseHP + (long)(def.CombatBaseHP * (effLevel - 1) * 0.10);
+        long scaledAtk = def.CombatBaseAttack + (long)(def.CombatBaseAttack * (effLevel - 1) * 0.08);
+        long scaledDef = def.CombatBaseDefence + (long)(def.CombatBaseDefence * (effLevel - 1) * 0.05);
+        return new Character
+        {
+            Name1 = name,
+            Name2 = name,
+            Level = effLevel,
+            HP = scaledHP,
+            MaxHP = scaledHP,
+            Strength = scaledAtk,
+            WeapPow = scaledAtk / 2,
+            Defence = (long)scaledDef,
+            ArmPow = scaledDef / 2,
+            Mana = 0,
+            MaxMana = 0,
+            Class = CharacterClass.Warrior, // Marker class so the basic-attack AI path runs.
+            Race = CharacterRace.Troll,     // Beast-ish marker; no race bonuses apply since IsPet.
+            IsPet = true,
+            PetSpeciesId = def.Id,          // v0.61.2: carry species id for per-beast combat behavior.
+            Allowed = true,
+        };
+    }
+
+    /// <summary>
     /// Pick a single beast that's eligible to spawn for this player on this expedition.
     /// Eligibility: matches the region the player is exploring AND player meets MinPlayerLevel.
     /// Returns null if nothing qualifies. The wilderness encounter code rolls

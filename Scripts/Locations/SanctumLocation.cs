@@ -329,8 +329,7 @@ namespace UsurperRemake.Locations
             }
 
             // Confirm
-            string confirm = (await terminal.GetInput(Loc.Get("sanctum.alms_confirm", cost))).Trim().ToUpperInvariant();
-            if (!(GameConfig.IsAffirmative(confirm)))
+            if (!await terminal.AskYesNoAsync(Loc.Get("sanctum.alms_confirm", cost)))
             {
                 return;
             }
@@ -369,8 +368,7 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            string confirm = (await terminal.GetInput(Loc.Get("sanctum.orphanage_confirm", cost))).Trim().ToUpperInvariant();
-            if (!(GameConfig.IsAffirmative(confirm)))
+            if (!await terminal.AskYesNoAsync(Loc.Get("sanctum.orphanage_confirm", cost)))
             {
                 return;
             }
@@ -409,8 +407,7 @@ namespace UsurperRemake.Locations
                 return;
             }
 
-            string confirm = (await terminal.GetInput(Loc.Get("sanctum.hospice_confirm", cost))).Trim().ToUpperInvariant();
-            if (!(GameConfig.IsAffirmative(confirm)))
+            if (!await terminal.AskYesNoAsync(Loc.Get("sanctum.hospice_confirm", cost)))
             {
                 return;
             }
@@ -560,8 +557,7 @@ namespace UsurperRemake.Locations
             }
 
             terminal.SetColor("cyan");
-            string confirm = (await terminal.GetInput(Loc.Get("tournament.enter_prompt", $"{entryFee:N0}"))).Trim().ToUpperInvariant();
-            if (!(GameConfig.IsAffirmative(confirm)))
+            if (!await terminal.AskYesNoAsync(Loc.Get("tournament.enter_prompt", $"{entryFee:N0}")))
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("tournament.cancelled"));
@@ -648,7 +644,12 @@ namespace UsurperRemake.Locations
                     // (combat-reviewer LOW finding: same message read wrong for fleeing players).
                     terminal.WriteLine("");
                     terminal.SetColor("red");
-                    if (result.Outcome == CombatOutcome.PlayerEscaped)
+                    if (result.MentalCollapseNotFought)
+                    {
+                        // v1.1.15: the wave was not fought (Mental 0); the location loop collapses the player
+                        terminal.WriteLine($"  {Loc.Get("mental.collapse_before_fight")}");
+                    }
+                    else if (result.Outcome == CombatOutcome.PlayerEscaped)
                     {
                         terminal.WriteLine($"  {Loc.Get("tournament.flee", championData.LocName())}");
                     }

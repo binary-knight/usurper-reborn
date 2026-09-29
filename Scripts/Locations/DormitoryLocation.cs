@@ -372,9 +372,9 @@ public class DormitoryLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dormitory.claim_bunk"));
         await Task.Delay(1500);
 
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {
@@ -425,9 +425,9 @@ public class DormitoryLocation : BaseLocation
         await Task.Delay(1000);
 
         // Restore HP/Mana/Stamina
+        currentPlayer.OnRest();   // 1.2.0: a rest ends the rest buffs
         currentPlayer.HP = currentPlayer.MaxHP;
         currentPlayer.Mana = currentPlayer.MaxMana;
-        currentPlayer.Stamina = Math.Max(currentPlayer.Stamina, currentPlayer.Constitution * 2);
 
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
         {

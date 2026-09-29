@@ -778,8 +778,7 @@ public class BankLocation : BaseLocation
         terminal.WriteLine(Loc.Get("bank.wire_confirm_fee", $"{fee:N0}", (GameConfig.BankTransferFeePercent * 100).ToString("0.#")));
         terminal.WriteLine(Loc.Get("bank.wire_confirm_net", $"{net:N0}"));
         terminal.SetColor("white");
-        string confirm = (await terminal.GetInput(Loc.Get("bank.wire_confirm_prompt"))).Trim().ToUpper();
-        if (!GameConfig.IsAffirmative(confirm))
+        if (!await terminal.AskYesNoAsync(Loc.Get("bank.wire_confirm_prompt")))
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("bank.transfer_cancelled"));
@@ -1101,9 +1100,7 @@ public class BankLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("bank.guard_accept_prompt"));
 
-        string accept = await terminal.GetInput("> ");
-
-        if (GameConfig.IsAffirmative(accept))
+        if (await terminal.AskYesNoAsync("> "))
         {
             currentPlayer.BankGuard = true;
             currentPlayer.BankWage = guardWage;
@@ -1125,8 +1122,7 @@ public class BankLocation : BaseLocation
             terminal.WriteLine(Loc.Get("bank.guard_public_prompt"));
             terminal.WriteLine(Loc.Get("bank.guard_public_hint"));
 
-            string goPublic = await terminal.GetInput("> ");
-            if (GameConfig.IsAffirmative(goPublic))
+            if (await terminal.AskYesNoAsync("> "))
             {
                 NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has been hired as a guard at the Ironvault Bank!");
             }
@@ -1164,9 +1160,7 @@ public class BankLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("bank.resign_confirm"));
 
-        string confirm = await terminal.GetInput("> ");
-
-        if (GameConfig.IsAffirmative(confirm))
+        if (await terminal.AskYesNoAsync("> "))
         {
             currentPlayer.BankGuard = false;
             currentPlayer.BankWage = 0;
@@ -1463,6 +1457,7 @@ public class BankLocation : BaseLocation
                 long goldBeforeRob = currentPlayer.Gold;
                 currentPlayer.Gold = SafeAddGold(currentPlayer.Gold, stolenGold);
                 DebugLogger.Instance.LogInfo("GOLD", $"BANK ROBBERY: {currentPlayer.DisplayName} stole {stolenGold:N0}g (gold {goldBeforeRob:N0}->{currentPlayer.Gold:N0})");
+                GodDeedSystem.Record(currentPlayer, GodAct.Theft, terminal);   // 1.2.0 Temple gods: Shadow deed, Law taboo
 
                 terminal.WriteLine("");
                 WriteBoxHeader(Loc.Get("bank.rob_success", stolenGold.ToString("N0")), "bright_green");
@@ -1505,6 +1500,13 @@ public class BankLocation : BaseLocation
             }
 
             NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} attempted to rob the Ironvault Bank but was defeated by guards!");
+        }
+        else if (result.MentalCollapseNotFought)
+        {
+            // v1.1.15: not entered (Mental 0), not fled: no flee line, no flee news
+            terminal.SetColor("gray");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("mental.collapse_before_fight"));
         }
         else
         {

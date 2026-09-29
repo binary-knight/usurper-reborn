@@ -827,7 +827,7 @@ namespace UsurperRemake.Systems
             // Wisdom changes
             if (choice.WisdomChange != 0)
             {
-                player.Wisdom += choice.WisdomChange;
+                player.GrantPermanentStat(StatKind.Wisdom, choice.WisdomChange); // 1.2.0: lasting, written to Base; a loss is floored at 1
             }
 
             // Set story flag

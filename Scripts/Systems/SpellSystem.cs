@@ -58,7 +58,29 @@ public static class SpellSystem
             MagicWords = magicWords;
             IsMultiTarget = isMultiTarget;
             SpellType = spellType;
+            DefaultName = name;
+            DefaultDescription = description;
         }
+
+        // v1.1.15: Name stays the English identifier (disabled-spell lists, overrides, code checks).
+        // What the player sees comes from spell.<class>.<level>.name / .desc when that key exists
+        // and the name or description was not overridden by the server.
+        public string DefaultName { get; }
+        public string DefaultDescription { get; }
+        public string LocKeyBase { get; set; } = "";
+
+        public string DisplayName =>
+            LocKeyBase.Length > 0 && Name == DefaultName && Loc.Has(LocKeyBase + ".name") ? Loc.Get(LocKeyBase + ".name") : Name;
+
+        public string DisplayDescription =>
+            LocKeyBase.Length > 0 && Description == DefaultDescription && Loc.Has(LocKeyBase + ".desc") ? Loc.Get(LocKeyBase + ".desc") : Description;
+    }
+
+    static SpellSystem()
+    {
+        foreach (var cls in SpellBook)
+            foreach (var spell in cls.Value)
+                spell.Value.LocKeyBase = $"spell.{cls.Key.ToString().ToLowerInvariant()}.{spell.Key}";
     }
     
     // Expanded spell system - 25 spells per class spread across 100 levels
@@ -152,36 +174,36 @@ public static class SpellSystem
         [CharacterClass.Sage] = new Dictionary<int, SpellInfo>
         {
             // --- EARLY TIER (Levels 1-25) - First Awakening (Shore Walker) ---
-            [1] = new SpellInfo(1, "Fog of War", "Mist obscures the battlefield. Only you see clearly. Protection: +5. Duration: whole fight.", 5, 1, "Exadmasaxmarie", false, "Buff"),
+            [1] = new SpellInfo(1, "Fog of War", "Mist hides the whole party from the enemy. All allies: protection +5, scales with level. Duration: whole fight.", 5, 1, "Exadmasaxmarie", true, "Buff"),
             [2] = new SpellInfo(2, "Poison Touch", "Inflict magical toxins on your enemy. Damage over time. Duration: varies.", 8, 2, "Exadlimmarie", false, "Debuff"),
             [3] = new SpellInfo(3, "Mind Spike", "A psychic attack that damages and disorients. Damage: 8-14. Duration: 1 turn.", 10, 3, "Mindspikearie", false, "Attack"),
             [4] = new SpellInfo(4, "Freeze", "Encase the target in ice. Effect: cannot move. Duration: varies.", 15, 4, "Excadaliemarie", false, "Debuff"),
-            [5] = new SpellInfo(5, "Duplicate", "Create an illusory copy to confuse enemies. Protection: +12. Duration: whole fight.", 18, 5, "Exmassesumarie", false, "Buff"),
-            [6] = new SpellInfo(6, "Roast", "Hellfire scorches the target. Damage: 20-30 + burn. Duration: 1 turn.", 22, 6, "Exdamseaxmarie", false, "Attack"),
+            [5] = new SpellInfo(5, "Dulling Mist", "A grey mist dulls every enemy. Effect: all enemies slowed. Duration: 2 rounds.", 18, 5, "Exmassesumarie", true, "Debuff"),
+            [6] = new SpellInfo(6, "Scholar's Mark", "Reveal one foe's weak points. Effect: it takes +30% damage from every ally. Duration: 3 rounds.", 22, 6, "Exdamseaxmarie", false, "Debuff"),
             [7] = new SpellInfo(7, "Confusion", "Muddle your enemy's thoughts. Effect: may attack self. Duration: varies.", 25, 7, "Confusarie", false, "Debuff"),
 
             // --- MID TIER (Levels 26-50) - Second Awakening (Tide Reader) ---
             [8] = new SpellInfo(8, "Hit Self", "Force the target to strike itself. Damage: 40-55. Duration: 1 turn.", 30, 8, "Exadliemasumarie", false, "Attack"),
             [9] = new SpellInfo(9, "Escape", "Vanish from battle instantly. Success based on level. Effect: ends combat.", 35, 9, "Exemarie", false, "Escape"),
-            [10] = new SpellInfo(10, "Giant Form", "Transform into a mighty giant. Attack: +30. Duration: whole fight.", 40, 10, "Excadmassumarie", false, "Buff"),
+            [10] = new SpellInfo(10, "Slumber Mist", "A drowsy mist settles on the enemy. Effect: all enemies asleep, any damage wakes them, bosses immune. Duration: 2 rounds.", 40, 10, "Excadmassumarie", true, "Debuff"),
             [11] = new SpellInfo(11, "Steal Life", "Drain the enemy's vitality. Damage: 35-50, heals half. Duration: 1 turn.", 45, 11, "Steallifearie", false, "Attack"),
-            [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all. Duration: 1 turn.", 50, 12, "Psychscrearie", true, "Attack"),
-            [13] = new SpellInfo(13, "Shadow Cloak", "Wrap yourself in living shadow. Protection: +35. Duration: whole fight.", 55, 13, "Shadowcloakarie", false, "Buff"),
-            [14] = new SpellInfo(14, "Dominate", "Seize control of a weak-minded foe. Effect: enemy attacks allies. Duration: varies.", 60, 14, "Dominatarie", false, "Debuff"),
+            [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all, and their accuracy drops. Duration: 2 rounds.", 50, 12, "Psychscrearie", true, "Attack"),
+            [13] = new SpellInfo(13, "Shadow Cloak", "Wrap the whole party in living shadow. All allies: protection +35 and Blur. Duration: whole fight.", 55, 13, "Shadowcloakarie", true, "Buff"),
+            [14] = new SpellInfo(14, "Compel", "Bend every enemy's will toward your tank. Effect: all enemies taunted and weakened; Old Gods resist. Duration: 2 rounds.", 60, 14, "Dominatarie", true, "Debuff"),
 
             // --- HIGH TIER (Levels 51-75) - Third Awakening (Wave Dancer) ---
             [15] = new SpellInfo(15, "Energy Drain", "Force victim to channel energy into their own destruction. Damage: 90-120. Duration: 1 turn.", 75, 15, "Examdammasaxmarie", false, "Attack"),
-            [16] = new SpellInfo(16, "Mind Blank", "Render your thoughts impervious. Protection: +50, immune to mind effects. Duration: whole fight.", 85, 16, "Mindblankarie", false, "Buff"),
+            [16] = new SpellInfo(16, "Mind Blank", "Seal every ally's mind. All allies: protection +50 and immune to status effects. Duration: whole fight.", 85, 16, "Mindblankarie", true, "Buff"),
             [17] = new SpellInfo(17, "Shadow Step", "Teleport through shadows to strike. Damage: 80-100, ignores defense. Duration: 1 turn.", 95, 17, "Shadowsteparie", false, "Attack"),
-            [18] = new SpellInfo(18, "Summon Demon", "Call a servant-demon from the nether. Attack: +70. Duration: whole fight.", 110, 18, "Edujnomed", false, "Summon"),
+            [18] = new SpellInfo(18, "Unveil the Pattern", "Lay bare the weak points of the whole enemy line. Effect: all enemies marked, +30% damage from every ally. Duration: 2 rounds.", 110, 18, "Edujnomed", true, "Debuff"),
             [19] = new SpellInfo(19, "Mass Confusion", "Drive all enemies mad with visions. Effect: all enemies confused. Duration: varies.", 125, 19, "Massconfusarie", true, "Debuff"),
-            [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess protects her follower. Protection: +70. Duration: whole fight.", 140, 20, "Nocturaveilarie", false, "Buff"),
+            [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess shelters your party. All allies: protection +70 and Blur. Duration: whole fight.", 140, 20, "Nocturaveilarie", true, "Buff"),
 
             // --- LEGENDARY TIER (Levels 76-100) - Deep Awakening (Abyss Gazer) ---
             [21] = new SpellInfo(21, "Soul Rend", "Tear the very soul from your enemy. Damage: 150-200. Duration: 1 turn.", 160, 21, "Soulrendarie", false, "Attack"),
-            [22] = new SpellInfo(22, "Ocean's Memory", "Tap into the infinite wisdom. All spells cost half mana. Duration: whole fight.", 180, 22, "Oceanmemarie", false, "Buff"),
+            [22] = new SpellInfo(22, "Ocean's Memory", "Tap into the infinite wisdom. All allies: spells cost half mana. Duration: whole fight.", 180, 22, "Oceanmemarie", true, "Buff"),
             [23] = new SpellInfo(23, "Temporal Paradox", "Trap the enemy in a time loop. Damage: 180-220. Duration: 1 turn.", 200, 23, "Temporalarie", false, "Attack"),
-            [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. Heals 250 + Protection +80. Duration: whole fight.", 230, 24, "Velouralovearie", false, "Heal"),
+            [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. All allies: heal 250 and protection +80. Duration: whole fight.", 230, 24, "Velouralovearie", true, "Heal"),
             [25] = new SpellInfo(25, "Death Kiss", "The ultimate draining of life force. Damage: 280-380. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
         },
 
@@ -422,7 +444,34 @@ public static class SpellSystem
         
         return null;
     }
-    
+
+    /// <summary>v1.1.15: the Sage spells renamed this release, old name to slot.</summary>
+    private static readonly (string oldName, int slot)[] LegacySageSpellSlots =
+    {
+        ("Duplicate", 5), ("Roast", 6), ("Giant Form", 10), ("Dominate", 14), ("Summon Demon", 18),
+    };
+
+    /// <summary>
+    /// v1.1.15: a Sage teammate's disabled-spell list is kept by spell name, so an entry under a
+    /// renamed spell's old name is moved to the slot's current name. Sage only: the Magician's
+    /// Summon Demon keeps its name. Changes the list in place; true when anything moved.
+    /// </summary>
+    public static bool RemapLegacySageDisabledSpells(Character teammate, ICollection<string> names)
+    {
+        if (teammate == null || teammate.Class != CharacterClass.Sage || names == null || names.Count == 0) return false;
+        bool changed = false;
+        foreach (var (oldName, slot) in LegacySageSpellSlots)
+        {
+            if (!names.Contains(oldName)) continue;
+            string newName = GetSpellInfo(CharacterClass.Sage, slot)?.Name;
+            if (string.IsNullOrEmpty(newName) || newName == oldName) continue;
+            names.Remove(oldName);
+            if (!names.Contains(newName)) names.Add(newName);
+            changed = true;
+        }
+        return changed;
+    }
+
     /// <summary>
     /// Get all available spells for character
     /// Only returns spells that have been learned (Spell[level-1][0] == true)
@@ -594,6 +643,7 @@ public static class SpellSystem
         // forever but no code ever incremented it -- entire alpha cohort
         // showed totalSpellsCast=0 including Lv.100 wizards.
         caster.Statistics?.RecordSpellCast();
+        GodDeedSystem.MarkSpellCast(caster);   // 1.2.0 Temple gods: the Magic week-without-casting count starts over
 
         // Check for spell failure
         // Spells don't auto-fail on natural 1 (unlike melee attacks) — only the flat fumble
@@ -779,7 +829,9 @@ public static class SpellSystem
         // Calculate final effect including proficiency bonus
         double scaledEffect = baseEffect * levelMultiplier * statBonus * variance * proficiencyMult * drugSpellMult * herbSpellMult * foodSpellMult;
 
-        return Math.Max(1, (int)scaledEffect);
+        // 1.2.0 Temple gods piece 2: Arcanus's boon on spell damage
+        int spellDamage = Math.Max(1, (int)scaledEffect);
+        return (int)Math.Min(UsurperRemake.Systems.GodBoonSystem.SpellDamage(caster, spellDamage), int.MaxValue);
     }
 
     /// <summary>
@@ -1060,7 +1112,8 @@ public static class SpellSystem
             case 4: // Sleep
                 result.SpecialEffect = "sleep";
                 result.Duration = (int)((random.Next(5) + 3 + (caster.Level / 20)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"} falls into magical slumber!";
+                // v1.1.15: the hold can be resisted, so the cast line does not claim it landed
+                result.Message += $" {Loc.Get("combat.spell_sleep_cast")}";
                 break;
 
             case 5: // Frost Touch - Base: 40-58 damage
@@ -1225,50 +1278,53 @@ public static class SpellSystem
         switch (spellLevel)
         {
             // --- EARLY TIER (Levels 1-25) - First Awakening ---
-            case 1: // Fog of War - Protection +7
-                result.ProtectionBonus = ScaleProtectionEffect(7 + (caster.Level / 12), caster, profMult);
+            case 1: // Fog of War
+                // v1.1.15: now reaches the whole party, so smaller (was 7 + Level/12)
+                result.ProtectionBonus = ScaleProtectionEffect(5 + (caster.Level / 15), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "fog";
-                result.Message += $" Mist obscures the battlefield! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.sage_fog_cast", result.ProtectionBonus)}";
                 break;
 
             case 2: // Poison Touch - DoT
                 result.SpecialEffect = "poison";
                 result.Duration = (int)((random.Next(6) + 3 + (caster.Level / 20)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"} is poisoned!";
+                result.Message += $" {Loc.Get("combat.sage_poison_touch_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"))}";
                 break;
 
             case 3: // Mind Spike - Base: 12-22 damage
                 int baseDamage3 = 12 + random.Next(11);
                 result.Damage = ScaleSpellEffect(baseDamage3, caster, random, profMult);
                 result.SpecialEffect = "psychic";
-                result.Message += $" A psychic spike strikes {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_mind_spike_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 4: // Freeze
                 result.SpecialEffect = "freeze";
-                result.Duration = (int)((random.Next(5) + 2 + (caster.Level / 20)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"} is frozen in ice!";
+                // v1.1.15: 1-2 rounds plus one per 40 levels; the hold budget caps it at 3 (1 on a boss)
+                result.Duration = 1 + random.Next(2) + (caster.Level / 40);
+                result.Message += $" {Loc.Get("combat.spell_freeze_cast")}";
                 break;
 
-            case 5: // Duplicate - Protection +14
-                result.ProtectionBonus = ScaleProtectionEffect(14 + (caster.Level / 8), caster, profMult);
-                result.Duration = 999;
-                result.SpecialEffect = "duplicate";
-                result.Message += $" An illusory duplicate confuses enemies! (+{result.ProtectionBonus} defense)";
+            case 5: // Dulling Mist
+                // v1.1.15: all enemies slowed 2 rounds (bosses 1 round, and they resist a quarter of the time)
+                result.SpecialEffect = "dulling_mist";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_dulling_mist_cast")}";
                 break;
 
-            case 6: // Roast - Base: 25-38 damage
-                int baseDamage6 = 25 + random.Next(14);
-                result.Damage = ScaleSpellEffect(baseDamage6, caster, random, profMult);
-                result.SpecialEffect = "fire";
-                result.Message += $" Hellfire scorches {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+            case 6: // Scholar's Mark
+                // v1.1.15: one target takes +30% damage from every ally for 3 rounds
+                result.SpecialEffect = "scholars_mark";
+                result.Duration = 3;
+                result.Message += $" {Loc.Get("combat.sage_scholars_mark_cast")}";
                 break;
 
             case 7: // Confusion
                 result.SpecialEffect = "confusion";
                 result.Duration = (int)((random.Next(4) + 2 + (caster.Level / 20)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"}'s mind becomes muddled!";
+                result.Message += $" {Loc.Get("combat.sage_confusion_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"))}";
                 break;
 
             // --- MID TIER (Levels 26-50) - Second Awakening ---
@@ -1276,48 +1332,52 @@ public static class SpellSystem
                 int baseDamage8 = 45 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage8, caster, random, profMult);
                 result.SpecialEffect = "psychic";
-                result.Message += $" {target?.Name2 ?? "The target"} strikes themselves for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_hit_self_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 9: // Escape
                 result.SpecialEffect = "escape";
-                result.Message += $" {caster.Name2} vanishes from battle!";
+                result.Message += $" {Loc.Get("combat.sage_escape_cast", caster.Name2)}";
                 break;
 
-            case 10: // Giant Form - Attack +32
-                int baseAttack10 = (int)((32 + (caster.Level / 4)) * profMult);
-                result.AttackBonus = baseAttack10;
-                result.Duration = 999;
-                result.SpecialEffect = "giant";
-                result.Message += $" {caster.Name2} transforms into a GIANT! (+{result.AttackBonus} attack)";
+            case 10: // Slumber Mist
+                // v1.1.15: all enemies asleep 2 rounds through the hold rules; any damage wakes; bosses immune
+                result.SpecialEffect = "slumber_mist";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_slumber_mist_cast")}";
                 break;
 
             case 11: // Steal Life - Base: 40-60 damage, heals half (via drain handler)
                 int baseDamage11 = 40 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage11, caster, random, profMult);
                 result.SpecialEffect = "drain";
-                result.Message += $" Life is stolen for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_steal_life_cast", result.Damage)}";
                 break;
 
             case 12: // Psychic Scream - Base: 45-65 damage to all
                 int baseDamage12 = 45 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage12, caster, random, profMult);
                 result.IsMultiTarget = true;
-                result.SpecialEffect = "psychic";
-                result.Message += $" A psychic scream assaults all enemies for {result.Damage} damage!";
+                // v1.1.15: the damage stays; every enemy hit is also distracted for 2 rounds
+                result.SpecialEffect = "psychic_scream";
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_psychic_scream_cast", result.Damage)}";
                 break;
 
-            case 13: // Shadow Cloak - Protection +38
+            case 13: // Shadow Cloak: party protection and Blur (v1.1.15)
                 result.ProtectionBonus = ScaleProtectionEffect(38 + (caster.Level / 5), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "shadow";
-                result.Message += $" Living shadow cloaks {caster.Name2}! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.sage_shadow_cloak_cast", caster.Name2, result.ProtectionBonus)}";
                 break;
 
-            case 14: // Dominate
-                result.SpecialEffect = "dominate";
-                result.Duration = (int)((random.Next(3) + 2 + (caster.Level / 25)) * profMult);
-                result.Message += $" {caster.Name2} seizes control of {target?.Name2 ?? "the enemy"}'s mind!";
+            case 14: // Compel
+                // v1.1.15: all enemies taunted onto the party's tank and weakened, 2 rounds; Old Gods resist
+                result.SpecialEffect = "compel";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_compel_cast")}";
                 break;
 
             // --- HIGH TIER (Levels 51-75) - Third Awakening ---
@@ -1325,43 +1385,43 @@ public static class SpellSystem
                 int baseDamage15 = 95 + random.Next(36);
                 result.Damage = ScaleSpellEffect(baseDamage15, caster, random, profMult);
                 result.SpecialEffect = "drain";
-                result.Message += $" Energy is drained from {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_energy_drain_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
-            case 16: // Mind Blank - Protection +55, immune to mind
+            case 16: // Mind Blank: party protection and status immunity (v1.1.15)
                 result.ProtectionBonus = ScaleProtectionEffect(55 + (caster.Level / 3), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "mindblank";
-                result.Message += $" {caster.Name2}'s mind becomes impervious! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.sage_mind_blank_cast", caster.Name2, result.ProtectionBonus)}";
                 break;
 
             case 17: // Shadow Step - Base: 85-115 damage, ignores defense
                 int baseDamage17 = 85 + random.Next(31);
                 result.Damage = ScaleSpellEffect(baseDamage17, caster, random, profMult);
                 result.SpecialEffect = "shadowstep";
-                result.Message += $" {caster.Name2} strikes through shadows for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_shadow_step_cast", caster.Name2, result.Damage)}";
                 break;
 
-            case 18: // Summon Demon - Attack +75
-                int baseAttack18 = (int)((75 + (caster.Level)) * profMult);
-                result.AttackBonus = baseAttack18;
-                result.Duration = 999;
-                result.SpecialEffect = "demon";
-                result.Message += $" A servant-demon answers the call! (+{result.AttackBonus} attack)";
+            case 18: // Unveil the Pattern
+                // v1.1.15: every enemy marked for 2 rounds (+30% damage from every ally)
+                result.SpecialEffect = "unveil_pattern";
+                result.IsMultiTarget = true;
+                result.Duration = 2;
+                result.Message += $" {Loc.Get("combat.sage_unveil_cast")}";
                 break;
 
             case 19: // Mass Confusion - All enemies confused
                 result.SpecialEffect = "mass_confusion";
                 result.IsMultiTarget = true;
                 result.Duration = (int)((random.Next(3) + 2 + (caster.Level / 30)) * profMult);
-                result.Message += $" All enemies are driven mad with visions!";
+                result.Message += $" {Loc.Get("combat.sage_mass_confusion_cast")}";
                 break;
 
-            case 20: // Noctura's Veil - Protection +75
+            case 20: // Noctura's Veil: party protection and Blur (v1.1.15)
                 result.ProtectionBonus = ScaleProtectionEffect(75 + (caster.Level / 2), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "shadow";
-                result.Message += $" The Shadow Goddess protects {caster.Name2}! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.sage_noctura_veil_cast", caster.Name2, result.ProtectionBonus)}";
                 break;
 
             // --- LEGENDARY TIER (Levels 76-100) - Deep Awakening ---
@@ -1369,36 +1429,36 @@ public static class SpellSystem
                 int baseDamage21 = 170 + random.Next(71);
                 result.Damage = ScaleSpellEffect(baseDamage21, caster, random, profMult);
                 result.SpecialEffect = "soul";
-                result.Message += $" The soul is torn from {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_soul_rend_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
-            case 22: // Ocean's Memory - Half mana cost
+            case 22: // Ocean's Memory: half mana cost for the party (v1.1.15)
                 result.SpecialEffect = "ocean_memory";
                 result.Duration = 999;
                 caster.HasOceanMemory = true;  // Set flag for half mana cost
-                result.Message += $" {caster.Name2} taps into infinite wisdom! Spells cost half mana!";
+                result.Message += $" {Loc.Get("combat.sage_ocean_memory_cast", caster.Name2)}";
                 break;
 
             case 23: // Temporal Paradox - Base: 200-280 damage
                 int baseDamage23 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(baseDamage23, caster, random, profMult);
                 result.SpecialEffect = "temporal";
-                result.Message += $" {target?.Name2 ?? "The target"} is trapped in a time loop for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_temporal_paradox_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
-            case 24: // Veloura's Embrace - Heal 280 + Protection +85
+            case 24: // Veloura's Embrace: party heal and protection (v1.1.15)
                 int baseHeal24 = 240 + random.Next(81);
                 result.Healing = ScaleHealingEffect(baseHeal24, caster, random, profMult);
                 result.ProtectionBonus = ScaleProtectionEffect(85 + (caster.Level / 2), caster, profMult);
                 result.Duration = 999;
-                result.Message += $" Veloura's love heals {result.Healing}! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.sage_veloura_embrace_cast", result.Healing, result.ProtectionBonus)}";
                 break;
 
             case 25: // Death Kiss - Base: 300-420 damage
                 int baseDamage25 = 300 + random.Next(121);
                 result.Damage = ScaleSpellEffect(baseDamage25, caster, random, profMult);
                 result.SpecialEffect = "death";
-                result.Message += $" The DEATH KISS drains all life for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.sage_death_kiss_cast", result.Damage)}";
                 break;
         }
     }

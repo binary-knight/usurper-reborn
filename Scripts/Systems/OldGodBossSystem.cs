@@ -328,6 +328,15 @@ namespace UsurperRemake.Systems
                 // Companion-specific reactions before dialogue
                 await PlayCompanionBossReaction(type, player, terminal);
 
+                // 1.2.0 Temple gods: a Zealot or Chosen of a god echoing this Old God hears one more line
+                string? echoLine = OldGodEchoSystem.EncounterLine(player, type);
+                if (echoLine != null)
+                {
+                    terminal.WriteLine("");
+                    PrintDialogueLine(terminal, echoLine, boss.ThemeColor);
+                    await Task.Delay(2000);
+                }
+
                 // Run dialogue
                 var dialogueResult = await DialogueSystem.Instance.StartDialogue(
                     player, $"{type.ToString().ToLower()}_encounter", terminal);
@@ -934,6 +943,7 @@ namespace UsurperRemake.Systems
                 MagicRes = (int)(50 + boss.Wisdom / 10),
                 MonsterColor = boss.ThemeColor,
                 FamilyName = "OldGod",
+                OldGod = boss.Type,
                 IsBoss = true,
                 IsActive = true,
                 CanSpeak = true,
@@ -1080,7 +1090,18 @@ namespace UsurperRemake.Systems
         private async Task<BossEncounterResult> ConvertToBossResult(
             CombatResult combatResult, OldGodBossData boss, bool wasSaved, TerminalEmulator terminal)
         {
-            if (wasSaved)
+            if (combatResult.MentalCollapseNotFought)
+            {
+                // v1.1.15: the fight was not entered (Mental 0): not fought, not fled; the room stays as it was
+                terminal.WriteLine(Loc.Get("mental.collapse_before_fight"), "gray");
+                return new BossEncounterResult
+                {
+                    Success = false,
+                    Outcome = BossOutcome.NotFought,
+                    God = boss.Type
+                };
+            }
+            else if (wasSaved)
             {
                 return await HandleBossSaved(combatResult.Player, boss, terminal, inCombat: true);
             }
@@ -1227,6 +1248,15 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("old_god.defeated_fades", boss.Name), "white");
             terminal.WriteLine("");
+
+            // 1.2.0 Temple gods: a Chosen follower's god, which echoes this Old God, speaks as it falls
+            string? echoFall = OldGodEchoSystem.FallLine(player, boss.Type, boss.Name);
+            if (echoFall != null)
+            {
+                terminal.WriteLine(echoFall, "bright_yellow");
+                terminal.WriteLine("");
+                await Task.Delay(1500);
+            }
 
             // Update story state
             var story = StoryProgressionSystem.Instance;
@@ -1404,7 +1434,9 @@ namespace UsurperRemake.Systems
                 AttacksPerRound = 1,
                 CanSave = false,
             };
-            var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates);
+            // v1.1.15: a story fight, fought even at Mental 0 (Manwe's fight can end there): a refusal
+            // would be recorded for good as Noctura escaping. The collapse follows it, from the location loop.
+            var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates, storyFight: true);
             combatEngine.BossContext = null;
 
             if (result.Outcome == CombatOutcome.Victory)
@@ -1724,7 +1756,8 @@ namespace UsurperRemake.Systems
         Allied,
         Spared,
         PlayerDefeated,
-        Fled
+        Fled,
+        NotFought // v1.1.15: the fight was not entered for a Mental collapse; counts like no encounter
     }
 
     public class BossEncounterResult

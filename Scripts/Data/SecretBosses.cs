@@ -432,16 +432,12 @@ namespace UsurperRemake.Data
             // Pre-fight dialogue
             await DisplayDialogue(boss.LocPreDialogue(), boss.Name, terminal);
 
-            // Handle choice if required
+            // Handle choice if required. v1.1.15: a wrong choice makes this one fight harder (the
+            // attackMultiplier of CreateBossMonster); the shared boss data is not changed, so a retry or
+            // another player starts from the base stats.
+            bool wrongChoice = false;
             if (boss.RequiresChoice)
-            {
-                bool correctChoice = await HandleBossChoice(boss, terminal);
-                if (!correctChoice)
-                {
-                    // Wrong choice makes fight harder or changes outcome
-                    boss.Stats.Attack = (int)(boss.Stats.Attack * 1.5);
-                }
-            }
+                wrongChoice = !await HandleBossChoice(boss, terminal);
 
             // Battle cry
             terminal.WriteLine("");
@@ -453,19 +449,12 @@ namespace UsurperRemake.Data
             // For now, simulate the encounter
             OnSecretBossEncountered?.Invoke(type, true);
 
-            // Trigger memory flash if applicable
-            if (boss.TriggersMemoryFlash)
-            {
-                // The memory flash is handled by the amnesia system
-                // This will be triggered during/after combat
-                StoryProgressionSystem.Instance.SetStoryFlag("memory_flash_pending", true);
-            }
-
             return new SecretBossResult
             {
                 Encountered = true,
                 BossType = type,
-                BossStats = boss.Stats
+                BossStats = boss.Stats,
+                WrongChoice = wrongChoice
             };
         }
 
@@ -516,6 +505,10 @@ namespace UsurperRemake.Data
             {
                 OceanPhilosophySystem.Instance.CollectFragment(boss.GrantsFragment.Value);
             }
+
+            // v1.1.15: set by the win, not at the fight start, so a fight fled or lost sets nothing
+            if (boss.TriggersMemoryFlash)
+                StoryProgressionSystem.Instance.SetStoryFlag("memory_flash_pending", true);
 
             // Unlock lore
             if (!string.IsNullOrEmpty(boss.UnlocksLore))
@@ -611,7 +604,7 @@ namespace UsurperRemake.Data
         /// <summary>
         /// Create a Monster instance for combat from boss data
         /// </summary>
-        public Monster CreateBossMonster(SecretBossType type, int playerLevel)
+        public Monster CreateBossMonster(SecretBossType type, int playerLevel, double attackMultiplier = 1.0)
         {
             var boss = GetBoss(type);
             if (boss == null)
@@ -619,6 +612,7 @@ namespace UsurperRemake.Data
 
             // Scale boss to player level with minimum of base level
             int effectiveLevel = Math.Max(boss.BaseLevel, playerLevel + 5);
+            int attack = (int)(boss.Stats.Attack * attackMultiplier);
 
             return new Monster
             {
@@ -626,12 +620,14 @@ namespace UsurperRemake.Data
                 Level = effectiveLevel,
                 HP = boss.Stats.HP + (effectiveLevel * 100),
                 MaxHP = boss.Stats.HP + (effectiveLevel * 100),
-                Strength = boss.Stats.Attack + (effectiveLevel * 2),   // Strength is attack power
+                Strength = attack + (effectiveLevel * 2),   // Strength is attack power
                 Defence = boss.Stats.Defense + effectiveLevel,          // Defence (Pascal spelling)
-                Punch = boss.Stats.Attack + (effectiveLevel * 2),       // Punch used in combat
+                Punch = attack + (effectiveLevel * 2),       // Punch used in combat
                 MagicLevel = (byte)Math.Min(255, boss.Stats.MagicPower / 10),
-                Gold = boss.RewardGold,
-                Experience = boss.RewardXP,
+                // v1.1.15: the kill pays nothing of its own; HandleVictory (leader) and
+                // DungeonLocation.FinishSecretBoss (grouped players) pay RewardXP and RewardGold once
+                Gold = 0,
+                Experience = 0,
                 IsBoss = true,
                 Phrase = $"\"{boss.LocBattleCry()}\""
             };
@@ -720,6 +716,7 @@ namespace UsurperRemake.Data
         public SecretBossStats? BossStats { get; set; }
         public bool Victory { get; set; }
         public bool Fled { get; set; }
+        public bool WrongChoice { get; set; }   // v1.1.15: the pre-fight choice was wrong, so this fight hits harder
         public int XPReward { get; set; }
         public int GoldReward { get; set; }
         public WaveFragment? GrantedFragment { get; set; }

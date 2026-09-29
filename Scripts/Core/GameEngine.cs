@@ -912,6 +912,7 @@ public partial class GameEngine
             PendingNewGamePlus = false;
             // Preserve player preferences before deleting old save
             bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
+            bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
             var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
             // Use the active character key (could be main or alt)
             var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
@@ -924,6 +925,8 @@ public partial class GameEngine
             {
                 currentPlayer.ScreenReaderMode = preserveScreenReader;
                 currentPlayer.Orientation = preserveOrientation;
+                currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
+                GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
             }
         }
     }
@@ -2856,7 +2859,9 @@ public partial class GameEngine
             // entry for a deleted same-name character was restored with any save.
             string? godRestoreFilter = GodRestoreFilterFor(currentPlayer);
             SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godRestoreFilter);
+            GodRegistry.ApplyLoad(currentPlayer); // 1.2.0: one god, then the Favor schema guard
             AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
+            RunStatRewardMigrations(currentPlayer, saveData.StorySystems); // 1.2.0: once per character
 
             // Migration: sync RelationshipSystem with RomanceTracker for saves affected by
             // the bidirectional key bug (pre-v0.42.4). If RomanceTracker says Lover/Spouse/FWB
@@ -3082,25 +3087,9 @@ public partial class GameEngine
 
             // Manwe worship cleanup: Manwe (Supreme Creator / final boss) is not a valid
             // worship target — players could select it at the temple due to missing filter.
+            // Dual-worship cleanup: one god only, the canon god wins (1.2.0: GodRegistry, also run at restore)
             if (currentPlayer != null)
-            {
-                var godSystem = UsurperRemake.GodSystemSingleton.Instance;
-                var elderGod = godSystem?.GetPlayerGod(currentPlayer.Name2);
-                if (elderGod == GameConfig.SupremeCreatorName)
-                {
-                    DebugLogger.Instance.LogWarning("WORSHIP", $"Cleaned up invalid Manwe worship for {currentPlayer.Name2}");
-                    godSystem?.SetPlayerGod(currentPlayer.Name2, "");
-                    elderGod = "";
-                }
-
-                // Dual-worship cleanup: player can't worship both an elder god and a player-god
-                if (!string.IsNullOrEmpty(currentPlayer.WorshippedGod) && !string.IsNullOrEmpty(elderGod))
-                {
-                    // Elder god takes priority — clear the player-god worship
-                    DebugLogger.Instance.LogWarning("WORSHIP", $"Dual worship detected for {currentPlayer.Name2}: elder god '{elderGod}' + immortal '{currentPlayer.WorshippedGod}'. Clearing immortal.");
-                    currentPlayer.WorshippedGod = "";
-                }
-            }
+                GodRegistry.EnforceSingleGod(currentPlayer);
 
             // Marriage cleanup: verify spouse NPC still exists and is alive
             if (currentPlayer != null && currentPlayer.IsMarried && !string.IsNullOrEmpty(currentPlayer.SpouseName))
@@ -3138,6 +3127,10 @@ public partial class GameEngine
                     DebugLogger.Instance.LogWarning("BOONS", $"Failed to cache boon effects: {ex.Message}");
                 }
             }
+
+            // 1.2.0 Temple gods piece 2: a player-god follower's domain boon, scaled by the god's standing
+            if (currentPlayer != null)
+                await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);
 
             // Failsafe: if player beat Manwe but the ending sequence didn't complete (whether
             // they disconnected mid-sequence OR something downstream crashed before the ending
@@ -4755,7 +4748,9 @@ public partial class GameEngine
         // snapshots would overwrite their current worship choices in the shared GodSystem.
         string? godFilter = GodRestoreFilterFor(currentPlayer); // v1.1.11: single-player too
         SaveSystem.Instance.RestoreStorySystems(saveData.StorySystems, godFilter);
+        GodRegistry.ApplyLoad(currentPlayer); // 1.2.0: one god, then the Favor schema guard
         AwakeningBonus.RecalculateAfterRestore(currentPlayer, saveData.Player?.HP ?? 0, saveData.Player?.Mana ?? 0); // v1.1.12
+        RunStatRewardMigrations(currentPlayer, saveData.StorySystems); // 1.2.0: once per character
 
         // In online mode, override royal court, children, and marriages with world_state
         // (authoritative source). RestoreStorySystems loaded stale data from the player's
@@ -5033,6 +5028,9 @@ public partial class GameEngine
         currentPlayer.DisableCharacterMonsterArt = GameConfig.DisableCharacterMonsterArt;
         currentPlayer.Language = GameConfig.Language;
 
+        // v1.1.15: a new character starts with menu keys needing Enter; a prior character's choice does not carry over
+        GameConfig.MenuKeysNeedEnter = currentPlayer.MenuKeysNeedEnter;
+
         // Auto-populate quickbar with starting spells/abilities
         AutoPopulateQuickbar(currentPlayer);
 
@@ -5105,7 +5103,11 @@ public partial class GameEngine
         // Save the new game using the character's actual name (Name1)
         // This is important because playerName may be empty if coming from no-saves path
         string savePlayerName = !string.IsNullOrEmpty(currentPlayer.Name1) ? currentPlayer.Name1 : currentPlayer.Name2;
-        var success = await SaveSystem.Instance.SaveGame(savePlayerName, currentPlayer);
+        // v1.1.15: the stored creation roll is dropped only once this first save succeeded
+        var success = await CharacterCreationSystem.SaveNewCharacter(
+            () => SaveSystem.Instance.SaveGame(savePlayerName, currentPlayer),
+            UsurperRemake.BBS.DoorMode.IsOnlineMode ? SaveSystem.Instance?.Backend as UsurperRemake.Systems.SqlSaveBackend : null,
+            currentPlayer);
         if (success)
         {
             terminal.WriteLine(Loc.Get("engine.new_game_saved"), "green");
@@ -5358,6 +5360,29 @@ public partial class GameEngine
     /// <summary>
     /// Restore player from save data
     /// </summary>
+    /// <summary>
+    /// 1.2.0: one-time login restores of lasting stats that older versions lost, read from the save
+    /// being loaded (not the live story singleton, which can hold another character's state). Each is
+    /// guarded by its own saved flag, so it runs once per character and a second login changes nothing.
+    /// </summary>
+    internal static void RunStatRewardMigrations(Character? player, StorySystemsData? story)
+    {
+        if (player == null) return;
+        try
+        {
+            if (ArtifactSystem.RestoreMissingArtifactStats(player, story?.CollectedArtifacts))
+                DebugLogger.Instance.LogInfo("MIGRATION", $"Artifact stats restored for {player.Name2} ({story?.CollectedArtifacts?.Count ?? 0} artifact(s))");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Artifact stat restore failed: {ex.Message}"); }
+        try
+        {
+            int cycleBonus = CycleSystem.BackfillCycleStatBonus(player, story?.CurrentCycle ?? 1);
+            if (cycleBonus > 0)
+                DebugLogger.Instance.LogInfo("MIGRATION", $"NG+ cycle bonus backfilled for {player.Name2}: +{cycleBonus} Strength, Defence, Stamina");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"NG+ cycle bonus backfill failed: {ex.Message}"); }
+    }
+
     private Character RestorePlayerFromSaveData(PlayerData playerData)
     {
         // v1.1.7: any item clamped while this save is restored is logged under this account's name
@@ -5488,7 +5513,19 @@ public partial class GameEngine
             Chivalry = AlignmentSystem.HealOverflowChivalry(playerData.Chivalry, playerData.Darkness),
             Darkness = AlignmentSystem.HealOverflowDarkness(playerData.Chivalry, playerData.Darkness),
             Fame = playerData.Fame,
-            Mental = playerData.Mental,
+            // v1.1.15: schema guard. A save at schema 0 (written before Mental existed, or an
+            // empty/legacy save) never had a real Mental value, so it loads full and is stamped to
+            // the current schema; a save already at or past the current schema keeps its Mental.
+            Mental = playerData.MentalSchema >= GameConfig.MentalSchemaCurrent ? playerData.Mental : GameConfig.DefaultMentalHealth,
+            MentalSchema = GameConfig.MentalSchemaCurrent,
+            MentalStrainRemainder = playerData.MentalStrainRemainder,
+            WillowDraughts = GameConfig.ClampWillowDraughts(playerData.WillowDraughts),
+            MentalRecoveryUsedToday = (MentalDailySource)playerData.MentalRecoveryUsedToday,
+            MentalBroken = playerData.MentalBroken,
+            MentalHintShown = playerData.MentalHintShown,
+            MentalDrugBoost = playerData.MentalDrugBoost,
+            MentalDrugUses = playerData.MentalDrugUses,
+            MentalLastDrugDay = playerData.MentalLastDrugDay,
             Poison = playerData.Poison,
             PoisonTurns = playerData.PoisonTurns,
 
@@ -5577,6 +5614,26 @@ public partial class GameEngine
             GodAlignment = playerData.GodAlignment ?? "",
             AscensionDate = playerData.AscensionDate,
             WorshippedGod = playerData.WorshippedGod ?? "",
+            // 1.2.0: Favor as saved; the schema guard and the bind to the god run in
+            // GodRegistry.ApplyLoad once the save's worship entry is restored
+            GodFavor = Math.Clamp(playerData.GodFavor, GameConfig.GodFavorMin, GameConfig.GodFavorMax),
+            GodFavorGod = playerData.GodFavorGod ?? "",
+            GodFavorSchema = playerData.GodFavorSchema,
+            GodFavorDayGains = playerData.GodFavorDayGains != null ? new Dictionary<string, int>(playerData.GodFavorDayGains) : new Dictionary<string, int>(),
+            DaysSinceDevotion = Math.Max(0, playerData.DaysSinceDevotion),
+            DaysSinceSpellCast = Math.Max(0, playerData.DaysSinceSpellCast),
+            LastGodSwitchDay = Math.Max(-1, playerData.LastGodSwitchDay),
+            MiracleUsedToday = playerData.MiracleUsedToday,
+            ChastisedToday = playerData.ChastisedToday?.ToList() ?? new List<string>(),
+            GodStandingPenalties = playerData.GodStandingPenalties != null
+                ? new Dictionary<string, int>(playerData.GodStandingPenalties, StringComparer.OrdinalIgnoreCase)
+                : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),
+            GodStandingPenaltyWeek = Math.Max(-1, playerData.GodStandingPenaltyWeek),
+            WeeklyGodWeek = Math.Max(-1, playerData.WeeklyGodWeek),
+            WeeklyGod = playerData.WeeklyGod ?? "",
+            // 1.2.0 Temple gods piece 2 schema guard: a missing (old save) or unknown domain reads as
+            // not chosen, and the Pantheon asks the immortal on the next visit
+            DivineDomain = GodBoonSystem.StoredDomain(playerData.DivineDomain),
             DivineBlessingCombats = playerData.DivineBlessingCombats,
             DivineBlessingBonus = playerData.DivineBlessingBonus,
             DivineBoonConfig = playerData.DivineBoonConfig ?? "",
@@ -5605,6 +5662,7 @@ public partial class GameEngine
             AutoCombatHealPercent = GameConfig.ClampAutoCombatHealPercent(playerData.AutoCombatHealPercent), // v1.1.13: in range
             ClassicMainStreet = playerData.ClassicMainStreet, // v1.1.14: Main Street layout preference
             ClassicTipDraws = Math.Max(0, playerData.ClassicTipDraws), // v1.1.14: switch-to-classic tip count
+            MenuKeysNeedEnter = playerData.MenuKeysNeedEnter, // v1.1.15: menu keys need Enter preference
             DateFormatPreference = playerData.DateFormatPreference,
             AutoRedistributeXP = playerData.AutoRedistributeXP,
             Specialization = (ClassSpecialization)playerData.Specialization,
@@ -6136,6 +6194,9 @@ public partial class GameEngine
 
         // Dark Alley Overhaul (v0.41.0)
         player.GroggoShadowBlessingDex = playerData.GroggoShadowBlessingDex;
+        player.TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs);   // 1.2.0: before the load recalc
+        player.ArtifactStatsApplied = playerData.ArtifactStatsApplied;   // 1.2.0: false in older saves
+        player.CycleStatBonusApplied = playerData.CycleStatBonusApplied;   // 1.2.0: false in older saves
         player.SteroidShopPurchases = playerData.SteroidShopPurchases;
         player.AlchemistINTBoosts = playerData.AlchemistINTBoosts;
         player.GamblingRoundsToday = playerData.GamblingRoundsToday;
@@ -6352,6 +6413,7 @@ public partial class GameEngine
 
         // Sync compact mode and language from player save to global
         GameConfig.CompactMode = player.CompactMode;
+        GameConfig.MenuKeysNeedEnter = player.MenuKeysNeedEnter; // v1.1.15
         GameConfig.AutoLook = player.AutoLook;
         GameConfig.DisableCharacterMonsterArt = player.DisableCharacterMonsterArt;
         // If the player actively chose a language on the main menu this session, keep it
@@ -7465,12 +7527,11 @@ public partial class GameEngine
                 terminal.WriteLine(Loc.Get("engine.creation_cancelled"), "yellow");
                 terminal.WriteLine(Loc.Get("engine.must_create"), "white");
 
-                var retry = await terminal.GetInputAsync(Loc.Get("engine.retry_prompt"));
-                if (GameConfig.IsAffirmative(retry))
+                if (await terminal.AskYesNoAsync(Loc.Get("engine.retry_prompt")))
                 {
                     return await CreateNewPlayer(playerName); // Retry
                 }
-                
+
                 return null; // User chose not to retry
             }
             
@@ -7488,12 +7549,11 @@ public partial class GameEngine
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Character creation error:\n{ex}");
 
             terminal.WriteLine(Loc.Get("engine.please_try_again"), "yellow");
-            var retry = await terminal.GetInputAsync(Loc.Get("engine.retry_prompt"));
-            if (GameConfig.IsAffirmative(retry))
+            if (await terminal.AskYesNoAsync(Loc.Get("engine.retry_prompt")))
             {
                 return await CreateNewPlayer(playerName); // Retry
             }
-            
+
             return null;
         }
     }
@@ -7608,9 +7668,7 @@ public partial class GameEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("engine.resurrections_available", currentPlayer.Resurrections));
             terminal.WriteLine("");
-            var resurrect = await terminal.GetInput(Loc.Get("engine.use_resurrection_prompt"));
-
-            if (GameConfig.IsAffirmative(resurrect))
+            if (await terminal.AskYesNoAsync(Loc.Get("engine.use_resurrection_prompt")))
             {
                 currentPlayer.Resurrections--;
                 currentPlayer.Statistics.RecordResurrection();

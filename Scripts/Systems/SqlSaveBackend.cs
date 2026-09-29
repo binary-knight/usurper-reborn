@@ -11,6 +11,13 @@ using UsurperRemake.Server;
 namespace UsurperRemake.Systems
 {
     /// <summary>
+    /// 1.2.0 Temple gods piece 5b: what SqlSaveBackend.UpdateFollowerSaveOffline did. Failed is true
+    /// when the database could not be read or written (nothing was written); else Result is the
+    /// change's result, or default when there is no save.
+    /// </summary>
+    public readonly record struct FollowerSaveUpdate<T>(bool Failed, T? Result);
+
+    /// <summary>
     /// Tolerant JSON converter that handles empty arrays [] for Dictionary types.
     /// This prevents deserialization crashes when an empty Dictionary was serialized as [].
     /// </summary>
@@ -1021,6 +1028,35 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"pending_sales_tax not ensured: {ex.Message}"); }
 
+            // v1.1.15: a character creation stat roll in progress (dice and rerolls left), kept per save key until the
+            // character is accepted, so dropping the connection at the roll is not a free reroll
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS creation_rolls (username TEXT PRIMARY KEY, data TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"creation_rolls not ensured: {ex.Message}"); }
+
+            // 1.2.0 Temple gods piece 4: standing a god lost to desecration, per week (GodStandingPenalty)
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "CREATE TABLE IF NOT EXISTS god_standing_penalties (god TEXT NOT NULL, week INTEGER NOT NULL, points INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (god, week));";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"god_standing_penalties not ensured: {ex.Message}"); }
+
+            // 1.2.0 Temple gods: god standing is read from player_data (GetGodStandings); the god_favor
+            // table an earlier 1.2.0 build kept is no longer used and is dropped where it exists
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = "DROP TABLE IF EXISTS god_favor;";
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"god_favor not dropped: {ex.Message}"); }
+
             // v1.1.14: one-time claims on an NPC's gear, so two processes cannot both take the same piece
             try
             {
@@ -1517,6 +1553,7 @@ namespace UsurperRemake.Systems
                 ExecPurge(connection, tx, "guild_members",     "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "online_players",    "LOWER(username) = LOWER(@u)", username);
                 ExecPurge(connection, tx, "sleeping_players",  "LOWER(username) = LOWER(@u)", username);
+                ExecPurge(connection, tx, "creation_rolls",    "LOWER(username) = LOWER(@u)", username); // v1.1.15
                 // v1.1.14: wizard_flags (frozen, muted) are the account's, keyed by its login name; they are kept
                 // through a delete, so deleting and recreating a character no longer sheds them
 
@@ -1769,6 +1806,19 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = "UPDATE players SET player_data = '{}' WHERE LOWER(username) = LOWER(@username);";
                 cmd.Parameters.AddWithValue("@username", playerName);
                 var affected = cmd.ExecuteNonQuery();
+
+                // v1.1.15: a stat roll left under this key must not resume into the next character's creation
+                try
+                {
+                    using var rollCmd = connection.CreateCommand();
+                    rollCmd.CommandText = "DELETE FROM creation_rolls WHERE LOWER(username) = LOWER(@username);";
+                    rollCmd.Parameters.AddWithValue("@username", playerName);
+                    rollCmd.ExecuteNonQuery();
+                }
+                catch (Exception rollEx)
+                {
+                    DebugLogger.Instance.LogWarning("SAVE", $"creation roll not cleared for '{playerName}': {rollEx.Message}");
+                }
                 return affected > 0;
             }
             catch (Exception ex)
@@ -3748,7 +3798,9 @@ namespace UsurperRemake.Systems
                         json_extract(p.player_data, '$.player.godExperience') as god_exp,
                         json_extract(p.player_data, '$.player.godAlignment') as god_align,
                         CASE WHEN op.username IS NOT NULL THEN 1 ELSE 0 END as is_online,
-                        json_extract(p.player_data, '$.player.divineBoonConfig') as boon_config
+                        json_extract(p.player_data, '$.player.divineBoonConfig') as boon_config,
+                        json_extract(p.player_data, '$.player.divineDomain') as divine_domain,
+                        p.last_login
                     FROM players p
                     LEFT JOIN online_players op ON LOWER(p.username) = LOWER(op.username)
                         AND op.last_heartbeat >= datetime('now', '-300 seconds')
@@ -3770,7 +3822,9 @@ namespace UsurperRemake.Systems
                         GodExperience = reader.IsDBNull(4) ? 0 : Convert.ToInt64(reader.GetValue(4)),
                         GodAlignment = reader.IsDBNull(5) ? "" : reader.GetString(5),
                         IsOnline = reader.GetInt32(6) == 1,
-                        DivineBoonConfig = reader.IsDBNull(7) ? "" : reader.GetString(7)
+                        DivineBoonConfig = reader.IsDBNull(7) ? "" : reader.GetString(7),
+                        DivineDomain = reader.IsDBNull(8) ? "" : reader.GetString(8),
+                        LastLogin = reader.IsDBNull(9) ? null : ParseSqliteUtc(reader.GetString(9))
                     });
                 }
             }
@@ -3780,6 +3834,12 @@ namespace UsurperRemake.Systems
             }
             return immortals;
         }
+
+        /// <summary>1.2.0 Temple gods piece 2: a SQLite datetime('now') text (UTC) as a UTC DateTime, or null.</summary>
+        internal static DateTime? ParseSqliteUtc(string? text) =>
+            DateTime.TryParse(text, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal, out var utc)
+                ? utc : null;
 
         public async Task<List<MortalPlayerInfo>> GetMortalPlayers(int limit = 30)
         {
@@ -3836,49 +3896,19 @@ namespace UsurperRemake.Systems
             return mortals;
         }
 
+        /// <summary>
+        /// Saved characters following a god: the follower count of GetGodStandings, the same count the
+        /// Temple ranking and altars show (1.2.0: one computation for both).
+        /// </summary>
         public async Task<int> CountPlayerBelievers(string divineName)
         {
+            if (string.IsNullOrWhiteSpace(divineName)) return 0;
             try
             {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    SELECT COUNT(*) FROM players
-                    WHERE json_extract(player_data, '$.player.worshippedGod') = @divineName
-                    AND (json_extract(player_data, '$.player.isImmortal') IS NULL
-                         OR json_extract(player_data, '$.player.isImmortal') = 0)
-                    AND player_data != '{}' AND LENGTH(player_data) > 2
-                    AND is_banned = 0 AND username NOT LIKE 'emergency_%';
-                ";
-                cmd.Parameters.AddWithValue("@divineName", divineName);
-                var result = await Task.Run(() => cmd.ExecuteScalar());
-                return Convert.ToInt32(result);
+                var standings = await Task.Run(() => GetGodStandings());
+                return standings.TryGetValue(divineName.Trim(), out var s) ? s.Followers : 0;
             }
             catch { return 0; }
-        }
-
-        public async Task ApplyDivineBlessing(string username, int combats, float bonus)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    UPDATE players SET player_data = json_set(player_data,
-                        '$.player.divineBlessingCombats', @combats,
-                        '$.player.divineBlessingBonus', @bonus)
-                    WHERE LOWER(username) = LOWER(@username)
-                    AND player_data != '{}' AND LENGTH(player_data) > 2;
-                ";
-                cmd.Parameters.AddWithValue("@username", username);
-                cmd.Parameters.AddWithValue("@combats", combats);
-                cmd.Parameters.AddWithValue("@bonus", (double)bonus);
-                await Task.Run(() => cmd.ExecuteNonQuery());
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to apply divine blessing to {username}: {ex.Message}");
-            }
         }
 
         public async Task ApplyDivineSmite(string username, float damagePercent)
@@ -3905,21 +3935,151 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// 1.2.0 Temple gods piece 5b: a player-god's deed on a follower who is not online. In one
+        /// transaction the save is read, change is given the player data and the save's canon worship
+        /// dictionary (it returns whether to write, and a result), and only the Favor and blessing
+        /// fields are written back: godFavor, godFavorGod, godFavorSchema, godFavorDayGains,
+        /// daysSinceDevotion, divineBlessingCombats, divineBlessingBonus. Every other part of the save
+        /// is left as it is. Result is default when there is no save; Failed is true, with nothing
+        /// written, when the database could not be read or written (busy or failing), so a caller
+        /// can tell it from a refusal.
+        /// </summary>
+        public async Task<FollowerSaveUpdate<T>> UpdateFollowerSaveOffline<T>(string username, Func<PlayerData, Dictionary<string, string>?, (bool Write, T Result)> change)
+        {
+            if (string.IsNullOrWhiteSpace(username) || change == null) return default;
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);
+                string key;
+                string json;
+                using (var read = connection.CreateCommand())
+                {
+                    read.Transaction = tx;
+                    read.CommandText = @"
+                        SELECT username, player_data FROM players
+                        WHERE LOWER(username) = LOWER(@username) AND player_data != '{}' AND LENGTH(player_data) > 2
+                        ORDER BY (username = LOWER(@username)) DESC, LENGTH(player_data) DESC LIMIT 1;";
+                    read.Parameters.AddWithValue("@username", username);
+                    using var reader = await Task.Run(() => read.ExecuteReader());
+                    if (!reader.Read()) return default;  // no save
+                    key = reader.GetString(0);
+                    json = reader.GetString(1);
+                }
+                var save = JsonSerializer.Deserialize<SaveGameData>(json, jsonOptions);
+                if (save?.Player == null) return default;
+                var (write, result) = change(save.Player, save.StorySystems?.PlayerGods);
+                if (!write) return new FollowerSaveUpdate<T>(false, result);
+                var p = save.Player;
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+                        UPDATE players SET player_data = json_set(player_data,
+                            '$.player.godFavor', @favor,
+                            '$.player.godFavorGod', @favorGod,
+                            '$.player.godFavorSchema', @schema,
+                            '$.player.godFavorDayGains', json(@gains),
+                            '$.player.daysSinceDevotion', @devotion,
+                            '$.player.divineBlessingCombats', @combats,
+                            '$.player.divineBlessingBonus', @bonus)
+                        WHERE username = @key;";
+                    cmd.Parameters.AddWithValue("@key", key);
+                    cmd.Parameters.AddWithValue("@favor", p.GodFavor);
+                    cmd.Parameters.AddWithValue("@favorGod", p.GodFavorGod ?? "");
+                    cmd.Parameters.AddWithValue("@schema", p.GodFavorSchema);
+                    cmd.Parameters.AddWithValue("@gains", JsonSerializer.Serialize(p.GodFavorDayGains ?? new Dictionary<string, int>()));
+                    cmd.Parameters.AddWithValue("@devotion", p.DaysSinceDevotion);
+                    cmd.Parameters.AddWithValue("@combats", p.DivineBlessingCombats);
+                    cmd.Parameters.AddWithValue("@bonus", (double)p.DivineBlessingBonus);
+                    await Task.Run(() => cmd.ExecuteNonQuery());
+                }
+                tx.Commit();
+                return new FollowerSaveUpdate<T>(false, result);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to update the saved follower {username}: {ex.Message}");
+                return new FollowerSaveUpdate<T>(true, default);
+            }
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 5b: the god a saved character follows (the canon entry wins over the
+        /// player-god, as on load), or "" with none or no save. Pantheon reads it before a smite of a
+        /// player who is not online.
+        /// </summary>
+        public async Task<string> GetSavedWorshippedGod(string username)
+        {
+            var save = await ReadGameData(username);
+            return save?.Player == null ? "" : GodRegistry.StandingEntryFrom(save.Player, save.StorySystems?.PlayerGods).God;
+        }
+
+        /// <summary>
+        /// Writes a saved character's player-god straight to player_data (an offline recruit, or the
+        /// Temple's own-session write). 1.2.0: a character worships one god, so worshipping a
+        /// player-god also blanks the character's own canon entry in the saved worship dictionary;
+        /// otherwise the canon god would still win on load and in god standing.
+        /// </summary>
         public async Task SetPlayerWorshippedGod(string username, string divineName)
         {
             try
             {
                 using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    UPDATE players SET player_data = json_set(player_data,
-                        '$.player.worshippedGod', @god)
-                    WHERE LOWER(username) = LOWER(@username)
-                    AND player_data != '{}' AND LENGTH(player_data) > 2;
-                ";
-                cmd.Parameters.AddWithValue("@username", username);
-                cmd.Parameters.AddWithValue("@god", divineName);
-                await Task.Run(() => cmd.ExecuteNonQuery());
+                using var tx = connection.BeginTransaction();
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = @"
+                        UPDATE players SET player_data = json_set(player_data,
+                            '$.player.worshippedGod', @god)
+                        WHERE LOWER(username) = LOWER(@username)
+                        AND player_data != '{}' AND LENGTH(player_data) > 2;
+                    ";
+                    cmd.Parameters.AddWithValue("@username", username);
+                    cmd.Parameters.AddWithValue("@god", divineName ?? "");
+                    await Task.Run(() => cmd.ExecuteNonQuery());
+                }
+                if (!string.IsNullOrWhiteSpace(divineName))
+                {
+                    // The canon entry under the character's own key (Name2, else Name1, any case)
+                    var paths = new List<string>();
+                    using (var find = connection.CreateCommand())
+                    {
+                        find.Transaction = tx;
+                        find.CommandText = @"
+                            SELECT je.key, je.fullkey,
+                                   json_extract(p.player_data, '$.player.name1'),
+                                   json_extract(p.player_data, '$.player.name2')
+                            FROM players p, json_each(p.player_data, '$.storySystems.playerGods') je
+                            WHERE LOWER(p.username) = LOWER(@username)
+                            AND p.player_data != '{}' AND LENGTH(p.player_data) > 2;
+                        ";
+                        find.Parameters.AddWithValue("@username", username);
+                        using var reader = find.ExecuteReader();
+                        while (reader.Read())
+                        {
+                            string key = ReadJsonText(reader, 0);
+                            string name1 = ReadJsonText(reader, 2);
+                            string name2 = ReadJsonText(reader, 3);
+                            string own = !string.IsNullOrEmpty(name2) ? name2 : name1;
+                            if (own.Length > 0 && key.Equals(own, StringComparison.OrdinalIgnoreCase))
+                                paths.Add(ReadJsonText(reader, 1));
+                        }
+                    }
+                    foreach (var path in paths)
+                    {
+                        using var remove = connection.CreateCommand();
+                        remove.Transaction = tx;
+                        // Blanked, not removed: the load restores the blank over any entry still in memory
+                        remove.CommandText = "UPDATE players SET player_data = json_set(player_data, @path, '') WHERE LOWER(username) = LOWER(@username);";
+                        remove.Parameters.AddWithValue("@path", path);
+                        remove.Parameters.AddWithValue("@username", username);
+                        remove.ExecuteNonQuery();
+                    }
+                }
+                tx.Commit();
             }
             catch (Exception ex)
             {
@@ -4427,6 +4587,8 @@ namespace UsurperRemake.Systems
                         DELETE FROM castle_sieges;
                         DELETE FROM wizard_flags;
                         DELETE FROM sleeping_players;
+                        DELETE FROM creation_rolls;
+                        DELETE FROM god_standing_penalties;
                     ";
                     await cmd.ExecuteNonQueryAsync();
                 }
@@ -8841,6 +9003,269 @@ namespace UsurperRemake.Systems
         // =====================================================================
         // Sleeping Player Vulnerability System
         // =====================================================================
+
+        // =====================================================================
+        // v1.1.15: Character creation stat roll in progress
+        // =====================================================================
+
+        /// <summary>v1.1.15: the stat roll in progress for a save key (JSON), or null when there is none.</summary>
+        public string? LoadCreationRoll(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT data FROM creation_rolls WHERE username = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                return cmd.ExecuteScalar() as string;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to load creation roll for {username}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>v1.1.15: store the stat roll in progress for a save key, replacing any earlier one.</summary>
+        public void SaveCreationRoll(string username, string data)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "INSERT OR REPLACE INTO creation_rolls (username, data, updated_at) VALUES (LOWER(@username), @data, datetime('now'));";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.Parameters.AddWithValue("@data", data);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to save creation roll for {username}: {ex.Message}");
+            }
+        }
+
+        // =====================================================================
+        // 1.2.0 Temple gods: god standing, computed from the saved characters when it is read
+        // =====================================================================
+
+        /// <summary>
+        /// 1.2.0: every god's standing (sum of its followers' Favor) and follower count, read from the
+        /// player_data of every saved character that is not banned, not emptied and not itself a god.
+        /// Each row goes through GodRegistry.StandingEntryFrom (the canon god under the character's key
+        /// wins, else the player-god; a save from before Favor counts GodFavorLegacyStart; Favor for
+        /// another god counts 0), so characters not saved since an upgrade and direct player_data
+        /// writes (SetPlayerWorshippedGod) count as they stand. The Temple ranking, the altars and the
+        /// Pantheon (CountPlayerBelievers) all read this. Canon names come back in their canon spelling.
+        /// </summary>
+        public Dictionary<string, GodStanding> GetGodStandings() => GetGodStandings(GodStandingPenalty.CurrentWeek());
+
+        /// <summary>
+        /// GetGodStandings for a week: the followers' Favor plus GodNpcFollowerStanding for each living
+        /// NPC follower in the world's NPC roster (world_state 'npcs'), less that week's desecration
+        /// penalties (god_standing_penalties), all read on the same connection, never below 0.
+        /// </summary>
+        public Dictionary<string, GodStanding> GetGodStandings(int week)
+        {
+            var entries = new List<(string God, int Favor)>();
+            var penalties = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var npcCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                using var connection = OpenConnection();
+                try
+                {
+                    // 1.2.0 Temple gods piece 6: the world's living NPC followers per god, from the NPC
+                    // roster in world_state (one grouped read on this connection, no per-god scan)
+                    using var npcCmd = connection.CreateCommand();
+                    npcCmd.CommandText = @"
+                        SELECT json_extract(j.value, '$.worshippedGod') AS god, COUNT(*)
+                        FROM world_state w, json_each(w.value) j
+                        WHERE w.key = 'npcs' AND json_valid(w.value) AND json_type(w.value) = 'array'
+                          AND COALESCE(json_extract(j.value, '$.isDead'), 0) = 0
+                          AND json_extract(j.value, '$.worshippedGod') IS NOT NULL
+                          AND json_extract(j.value, '$.worshippedGod') != ''
+                        GROUP BY god;";
+                    using var nr = npcCmd.ExecuteReader();
+                    while (nr.Read())
+                    {
+                        string god = ReadJsonText(nr, 0).Trim();
+                        int count = nr.IsDBNull(1) ? 0 : nr.GetInt32(1);
+                        if (god.Length > 0 && count > 0)
+                        {
+                            string name = GodRegistry.CanonName(god) ?? god;
+                            npcCounts[name] = (npcCounts.TryGetValue(name, out int v) ? v : 0) + count;
+                        }
+                    }
+                }
+                catch (Exception npcEx) { DebugLogger.Instance.LogWarning("SQL", $"God standing NPC followers unavailable: {npcEx.Message}"); }
+                try
+                {
+                    using var pen = connection.CreateCommand();
+                    pen.CommandText = "SELECT god, points FROM god_standing_penalties WHERE week = @week;";
+                    pen.Parameters.AddWithValue("@week", week);
+                    using var pr = pen.ExecuteReader();
+                    while (pr.Read())
+                    {
+                        string god = pr.IsDBNull(0) ? "" : pr.GetString(0);
+                        int points = pr.IsDBNull(1) ? 0 : pr.GetInt32(1);
+                        if (god.Length > 0) penalties[god] = (penalties.TryGetValue(god, out int v) ? v : 0) + points;
+                    }
+                }
+                catch (Exception penEx) { DebugLogger.Instance.LogWarning("SQL", $"God standing penalties unavailable: {penEx.Message}"); }
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT json_extract(player_data, '$.player.name1'),
+                           json_extract(player_data, '$.player.name2'),
+                           json_extract(player_data, '$.player.worshippedGod'),
+                           json_extract(player_data, '$.player.godFavor'),
+                           json_extract(player_data, '$.player.godFavorGod'),
+                           json_extract(player_data, '$.player.godFavorSchema'),
+                           json_extract(player_data, '$.storySystems.playerGods')
+                    FROM players
+                    WHERE is_banned = 0 AND username NOT LIKE 'emergency_%'
+                      AND player_data != '{}' AND LENGTH(player_data) > 2
+                      AND (json_extract(player_data, '$.player.isImmortal') IS NULL
+                           OR json_extract(player_data, '$.player.isImmortal') = 0);";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    try
+                    {
+                        var p = new PlayerData
+                        {
+                            Name1 = ReadJsonText(reader, 0),
+                            Name2 = ReadJsonText(reader, 1),
+                            WorshippedGod = ReadJsonText(reader, 2),
+                            GodFavor = ReadJsonInt(reader, 3),
+                            GodFavorGod = ReadJsonText(reader, 4),
+                            GodFavorSchema = ReadJsonInt(reader, 5),
+                        };
+                        Dictionary<string, string>? canon = null;
+                        string canonJson = ReadJsonText(reader, 6);
+                        if (canonJson.StartsWith("{", StringComparison.Ordinal))
+                        {
+                            try { canon = JsonSerializer.Deserialize<Dictionary<string, string>>(canonJson); }
+                            catch (JsonException) { canon = null; }
+                        }
+                        entries.Add(GodRegistry.StandingEntryFrom(p, canon));
+                    }
+                    catch (Exception rowEx)
+                    {
+                        DebugLogger.Instance.LogWarning("SQL", $"God standing skipped a row: {rowEx.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to read god standings: {ex.Message}");
+            }
+            return GodStandingPenalty.Apply(GodRegistry.AddNpcFollowers(GodRegistry.ComputeStandings(entries), npcCounts), penalties);
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 4: adds a desecration penalty to a god's standing for a week (one
+        /// atomic upsert), and drops the rows older than the week before, which no longer count. The
+        /// week before is kept: the weekly god pick for a new week counts the ending week's penalties
+        /// (WeeklyGodSystem.OnlinePick), and a desecration can come before that pick is recorded.
+        /// </summary>
+        public void AddGodStandingPenalty(string god, int week, int points)
+        {
+            if (string.IsNullOrWhiteSpace(god) || points <= 0) return;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO god_standing_penalties (god, week, points) VALUES (@god, @week, @points)
+                    ON CONFLICT(god, week) DO UPDATE SET points = points + excluded.points;
+                    DELETE FROM god_standing_penalties WHERE week < @week - 1;";
+                cmd.Parameters.AddWithValue("@god", god.Trim());
+                cmd.Parameters.AddWithValue("@week", week);
+                cmd.Parameters.AddWithValue("@points", points);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to add a god standing penalty for {god}: {ex.Message}");
+            }
+        }
+
+        /// <summary>1.2.0 Temple gods piece 6: this world's weekly god record (WeeklyGodSystem.WorldStateKey), or null.</summary>
+        public WeeklyGodPick? GetWeeklyGod()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", WeeklyGodSystem.WorldStateKey);
+                return WeeklyGodSystem.FromJson(cmd.ExecuteScalar() as string);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to read the weekly god: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 1.2.0 Temple gods piece 6: records the weekly god in one conditional upsert that only a week
+        /// newer than the saved one passes, so of any number of sessions or processes crossing the
+        /// weekly reset the first decides the week and the rest leave it as it is.
+        /// </summary>
+        public void RecordWeeklyGod(WeeklyGodPick pick)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = @"
+                    INSERT INTO world_state (key, value, version, updated_at, updated_by)
+                    VALUES (@key, @value, 1, datetime('now'), 'weekly_god')
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value, version = world_state.version + 1,
+                        updated_at = datetime('now'), updated_by = 'weekly_god'
+                    WHERE COALESCE(CASE WHEN json_valid(world_state.value) THEN json_extract(world_state.value, '$.week') END, -1) < @week;";
+                cmd.Parameters.AddWithValue("@key", WeeklyGodSystem.WorldStateKey);
+                cmd.Parameters.AddWithValue("@value", WeeklyGodSystem.ToJson(pick));
+                cmd.Parameters.AddWithValue("@week", pick.Week);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to record the weekly god: {ex.Message}");
+            }
+        }
+
+        /// <summary>A json_extract column as text ("" for NULL).</summary>
+        private static string ReadJsonText(SqliteDataReader reader, int i) =>
+            reader.IsDBNull(i) ? "" : Convert.ToString(reader.GetValue(i), System.Globalization.CultureInfo.InvariantCulture) ?? "";
+
+        /// <summary>A json_extract column as an int (0 for NULL or text that is not a number).</summary>
+        private static int ReadJsonInt(SqliteDataReader reader, int i)
+        {
+            if (reader.IsDBNull(i)) return 0;
+            var v = reader.GetValue(i);
+            if (v is long l) return (int)Math.Clamp(l, int.MinValue, int.MaxValue);
+            if (v is double d) return double.IsNaN(d) ? 0 : (int)Math.Clamp(d, int.MinValue, int.MaxValue);
+            return int.TryParse(Convert.ToString(v, System.Globalization.CultureInfo.InvariantCulture), out int n) ? n : 0;
+        }
+
+        /// <summary>v1.1.15: drop the stat roll in progress for a save key (the character was first saved).</summary>
+        public void ClearCreationRoll(string username)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM creation_rolls WHERE username = LOWER(@username);";
+                cmd.Parameters.AddWithValue("@username", username);
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to clear creation roll for {username}: {ex.Message}");
+            }
+        }
 
         public async Task RegisterSleepingPlayer(string username, string location, string guardsJson, int innBoost)
         {

@@ -43,6 +43,8 @@ public partial class CombatEngine
     // Combat state
     private bool globalBegged = false;
     private bool globalEscape = false;
+    // 1.2.0 Temple gods piece 5: the leader vanished with Umbrath's Miracle this fight (no flee penalty)
+    private bool _miracleVanished;
     private bool globalNoBeg = false;
 
     // Ability cooldowns - reset each combat
@@ -163,7 +165,7 @@ public partial class CombatEngine
         if (teammates != null)
             foreach (var t in teammates)
                 if (t.IsAlive && t.MaxHP > 0 && t.HP * 2 < t.MaxHP) _lowAlliesAtTurnStart.Add(t);
-        _ownerAidedThisTurn = action.Type == CombatActionType.HealAlly;
+        _ownerAidedThisTurn = action.Type == CombatActionType.HealAlly || action.FromAidMenu;
     }
 
     /// <summary>Could <paramref name="owner"/> have saved <paramref name="ally"/>: the ally was
@@ -342,10 +344,10 @@ public partial class CombatEngine
     /// Redirects to new PlayerVsMonsters method with single-monster list
     /// Based on Player_vs_Monsters procedure from PLVSMON.PAS
     /// </summary>
-    public async Task<CombatResult> PlayerVsMonster(Character player, Monster monster, List<Character>? teammates = null, bool offerMonkEncounter = true)
+    public async Task<CombatResult> PlayerVsMonster(Character player, Monster monster, List<Character>? teammates = null, bool offerMonkEncounter = true, bool storyFight = false)
     {
         // Redirect to new multi-monster method with single monster
-        return await PlayerVsMonsters(player, new List<Monster> { monster }, teammates, offerMonkEncounter);
+        return await PlayerVsMonsters(player, new List<Monster> { monster }, teammates, offerMonkEncounter, storyFight: storyFight);
     }
     
     /// <summary>
@@ -433,6 +435,7 @@ public partial class CombatEngine
                 }
             }
         }
+        c.TickTimedStatBuffsAfterCombat();   // 1.2.0: stat buffs that last a number of fights
     }
 
     /// <summary>
@@ -445,6 +448,7 @@ public partial class CombatEngine
         c.TempAttackBonus = 0; c.TempAttackBonusDuration = 0;
         c.TempDefenseBonus = 0; c.TempDefenseBonusDuration = 0;
         c.MagicACBonus = 0;
+        c.HasOceanMemory = false; // v1.1.15
         c.DodgeNextAttack = false;
         c.HasBloodlust = false;
         c.TempCritChanceBonus = 0;
@@ -455,7 +459,7 @@ public partial class CombatEngine
         c.TempDamageReductionPercent = 0; c.TempDamageReductionDuration = 0;
         c.TempThornReflectPercent = 0; c.TempThornReflectDuration = 0;
         c.TempPercentRegenPerRound = 0; c.TempPercentRegenDuration = 0;
-        foreach (var st in new[] { StatusEffect.Protected, StatusEffect.Blessed, StatusEffect.Haste, StatusEffect.Reflecting,
+        foreach (var st in new[] { StatusEffect.Protected, StatusEffect.Blessed, StatusEffect.Haste, StatusEffect.Reflecting, StatusEffect.Blur,
                                    StatusEffect.Stunned, StatusEffect.Paralyzed, StatusEffect.Sleeping, StatusEffect.Frozen, StatusEffect.Slow })
             c.RemoveStatus(st);
     }
@@ -474,6 +478,83 @@ public partial class CombatEngine
     // v1.1.10: the fighters whose turn has come this duel round. A hold put on one of them ticks once
     // at the end of this round before it can cost a turn (Codex round 7).
     private readonly HashSet<Character> _pvpTurnTakenThisRound = new();
+    // v1.1.15: the players (leader and grouped followers) whose Mental fear at combat start costs their first action
+    private readonly HashSet<Character> _mentalFeared = new();
+
+    /// <summary>
+    /// v1.1.15: rolls Mental fear at the start of a monster fight for the leader and every living
+    /// grouped human follower (MentalSystem.RollFear with the engine RNG); a feared player loses
+    /// their first action. NPC teammates, companions and pets never roll. PvP does not come here.
+    /// </summary>
+    internal void RollMentalFear(Character player, IEnumerable<Character>? teammates)
+    {
+        _mentalFeared.Clear();
+        if (MentalSystem.RollFear(player, random)) _mentalFeared.Add(player);
+        if (teammates == null) return;
+        foreach (var mate in teammates.ToList())
+            if (mate != null && mate.IsGroupedPlayer && mate.IsAlive && !ReferenceEquals(mate, player) && MentalSystem.RollFear(mate, random))
+                _mentalFeared.Add(mate);
+    }
+
+    // 1.2.0 Temple gods piece 2: the monsters whose first action fails to Discordia's boon
+    private readonly HashSet<Monster> _discordStruck = new();
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 2: Discordia's boon at the start of a monster fight, rolled per follower
+    /// (v1.1.15 leftover): the leader and every living grouped human follower who has the boon (their
+    /// own GodBoonSystem.DiscordiaFirstActionFailPct, from their own worship and Favor) each roll
+    /// against each living foe (engine RNG). A foe struck by any of those rolls is added once and
+    /// fails its first action once, never twice. NPC teammates, companions and pets never roll.
+    /// </summary>
+    internal void RollDiscordiaFirstActionFail(Character player, IEnumerable<Monster>? monsters, IEnumerable<Character>? teammates = null)
+    {
+        _discordStruck.Clear();
+        if (monsters == null) return;
+        var foes = monsters.Where(m => m != null && m.IsAlive).ToList();
+        if (foes.Count == 0) return;
+        RollDiscordiaAgainst(player, foes);
+        if (teammates == null) return;
+        foreach (var mate in teammates.ToList())
+            if (mate != null && mate.IsGroupedPlayer && mate.IsAlive && !ReferenceEquals(mate, player))
+                RollDiscordiaAgainst(mate, foes);
+    }
+
+    /// <summary>One roller's Discordia boon against each foe; a hit adds the foe to _discordStruck.</summary>
+    private void RollDiscordiaAgainst(Character roller, List<Monster> foes)
+    {
+        foreach (var m in foes)
+            if (GodBoonSystem.DiscordiaStrikes(roller, random))
+                _discordStruck.Add(m);
+    }
+
+    /// <summary>1.2.0 Temple gods piece 2: true once for a monster struck by Discordia's boon; prints the line.</summary>
+    internal bool ConsumeDiscordiaFail(Monster monster)
+    {
+        if (monster == null || !_discordStruck.Remove(monster)) return false;
+        terminal?.WriteLine(Loc.Get("combat.discordia_first_action_fails", monster.Name), "magenta");
+        return true;
+    }
+
+    /// <summary>
+    /// v1.1.15: true once for a player who rolled fear at combat start: prints a fear line on
+    /// their own terminal (and a third-person line on the leader's when a follower) and clears it,
+    /// so the caller skips that action. False for everyone else.
+    /// </summary>
+    internal bool ConsumeMentalFear(Character c, TerminalEmulator? own)
+    {
+        if (c == null || !_mentalFeared.Remove(c)) return false;
+        if (own != null)
+        {
+            own.SetColor("magenta");
+            own.WriteLine(Loc.Get(MentalSystem.PickFearLine(random)));
+        }
+        if (!ReferenceEquals(own, terminal) && terminal != null)
+        {
+            terminal.SetColor("magenta");
+            terminal.WriteLine(Loc.Get("mental.fear_other", c.DisplayName));
+        }
+        return true;
+    }
 
     /// <summary>v1.1.13: auto-combat drinks a potion at or below the player's HP threshold.</summary>
     internal static bool ShouldAutoCombatHeal(Character p) =>
@@ -527,6 +608,18 @@ public partial class CombatEngine
         if (!IsHeld(fighter) && ++st.RoundsSinceLast >= GameConfig.StunDRWindowRounds) st.RecentCount = 0;
     }
 
+    /// <summary>
+    /// v1.1.15: a Blinded fighter misses GameConfig.PvPBlindedMissPercent of their weapon swings in
+    /// a duel. Before this Blinded did nothing in a duel. True when the swing missed.
+    /// </summary>
+    internal bool PvPBlindedMiss(Character attacker)
+    {
+        if (attacker == null || !attacker.HasStatus(StatusEffect.Blinded)) return false;
+        if (random.Next(100) >= GameConfig.PvPBlindedMissPercent) return false;
+        terminal.WriteLine(Loc.Get("combat.pvp_blinded_miss", attacker.DisplayName), "gray");
+        return true;
+    }
+
     private void EndPvPCombat(Character attacker, Character defender)
     {
         foreach (var kv in _pvpDisarmedWeapPow) kv.Key.WeapPow = kv.Value;
@@ -534,6 +627,7 @@ public partial class CombatEngine
         _pvpControl.Clear();
         _pvpTurnTakenThisRound.Clear();
         ConsumeCombatBuffs(attacker);
+        GodBoonSystem.ApplyPendingBoonRecalc(attacker);   // 1.2.0: the acting player only, never the defender
         ScrubTransientCombatState(attacker);
         ScrubTransientCombatState(defender);
     }
@@ -839,8 +933,27 @@ public partial class CombatEngine
         List<Monster> monsters,
         List<Character>? teammates = null,
         bool offerMonkEncounter = true,
-        bool isAmbush = false)
+        bool isAmbush = false,
+        bool storyFight = false)
     {
+        // v1.1.15: collapse happens after combat. A fight that ended at Mental 0 is the last one: an
+        // action that chains fights (gauntlet waves, a save quest then an ambush) gets this empty
+        // result for the next fight, which is not entered, and the location loop carries out the
+        // collapse once (BaseLocation.HandleMentalCollapse, the floor rule unchanged).
+        // storyFight: a one-time story fight whose refusal would be recorded for good (the Noctura
+        // betrayal after Manwe) is fought even at Mental 0; the collapse still follows it, once,
+        // from the location loop (MentalCollapsePending is set at the fight end as for any fight).
+        if (!storyFight && MentalSystem.CollapseDue(player))
+            return new CombatResult
+            {
+                Player = player,
+                Monsters = new List<Monster>(monsters),
+                Teammates = teammates != null ? new List<Character>(teammates) : new List<Character>(),
+                Outcome = CombatOutcome.PlayerEscaped,
+                MentalCollapsePending = true,
+                MentalCollapseNotFought = true,
+            };
+
         // Wizard godmode: save HP/Mana before combat to restore after
         bool isGodMode = UsurperRemake.Server.SessionContext.IsActive
             && (UsurperRemake.Server.SessionContext.Current?.WizardGodMode ?? false);
@@ -849,6 +962,8 @@ public partial class CombatEngine
 
         // Store player reference for combat speed setting
         currentPlayer = player;
+        // v1.1.15: Mental before the fight, so the fight-end announcement covers every loss taken in it
+        int mentalAtFightStart = player.Mental;
 
         // v1.1.11: the Team HQ levels of this moment (a teammate may have upgraded, or the player changed team)
         if (DoorMode.IsOnlineMode)
@@ -906,6 +1021,7 @@ public partial class CombatEngine
         player.TempDefenseBonus = 0;
         player.TempDefenseBonusDuration = 0;
         player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
+        player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
@@ -1030,6 +1146,7 @@ public partial class CombatEngine
         // Initialize combat state
         globalBegged = false;
         globalEscape = false;
+        _miracleVanished = false;   // 1.2.0 Temple gods piece 5
 
         // Combat start broadcast removed — too spammy with multiple players online.
 
@@ -1099,6 +1216,7 @@ public partial class CombatEngine
                     teammate.TempDefenseBonus = 0;
                     teammate.TempDefenseBonusDuration = 0;
                     teammate.MagicACBonus = 0;
+                    teammate.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
                     teammate.DodgeNextAttack = false;
                     teammate.HasBloodlust = false;
                     // v1.2: a brace on the round the last monster fell skips the round-end clear
@@ -1149,6 +1267,18 @@ public partial class CombatEngine
             else
                 terminal.WriteLine(Loc.Get("combat.fatigue_dull"));
         }
+
+        // Mental band tag at combat start (v1.1.15), both modes; empty at Stable
+        var (mentalTagLabel, mentalTagColor) = MentalUi.GetMentalTag(player);
+        if (!string.IsNullOrEmpty(mentalTagLabel))
+        {
+            terminal.SetColor(mentalTagColor);
+            terminal.WriteLine(Loc.Get("combat.mental_tag", mentalTagLabel));
+        }
+        // v1.1.15: Mental fear at combat start, the leader and grouped followers each from their own Mental
+        RollMentalFear(player, result.Teammates);
+        // 1.2.0 Temple gods piece 2: Discordia's boon, a chance each foe's first action fails, per roller
+        RollDiscordiaFirstActionFail(player, monsters, result.Teammates);
 
         // Show first combat hint for new players
         HintSystem.Instance.TryShowHint(HintSystem.HINT_FIRST_COMBAT, terminal, player.HintsShown);
@@ -1619,7 +1749,12 @@ public partial class CombatEngine
 
                 CombatAction playerAction;
 
-                if (autoCombat)
+                if (ConsumeMentalFear(player, terminal))
+                {
+                    // v1.1.15: Mental fear at combat start, the first action is lost
+                    playerAction = new CombatAction { Type = CombatActionType.None };
+                }
+                else if (autoCombat)
                 {
                     // Auto-combat: automatically attack random living monster
                     terminal.SetColor("bright_cyan");
@@ -1912,6 +2047,10 @@ public partial class CombatEngine
                 result.DefeatedMonsters.Add(m);
         }
 
+        // 1.2.0 Temple gods piece 5: Sylvana's beast was this fight's only; it leaves before the
+        // outcome, so it takes no XP share and never reaches the pet or party code after the fight
+        result.Teammates?.RemoveAll(t => t != null && t.IsMiracleAlly);
+
         // Determine combat outcome
         if (globalEscape)
         {
@@ -1919,8 +2058,8 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.escaped"));
 
-            // Fame loss for fleeing
-            if (result.Player.Fame > 0)
+            // Fame loss for fleeing (none after Umbrath's Miracle)
+            if (result.Player.Fame > 0 && !_miracleVanished)
             {
                 result.Player.Fame = Math.Max(0, result.Player.Fame - 1);
             }
@@ -2104,12 +2243,14 @@ public partial class CombatEngine
         player.TempDefenseBonus = 0;
         player.TempDefenseBonusDuration = 0;
         player.MagicACBonus = 0;
+        player.HasOceanMemory = false; // v1.1.15: it never ended before
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.DeathsEmbraceActive = false;
         player.StatusLifestealPercent = 0;
+        player.RemoveStatus(StatusEffect.Blur); // v1.1.15: a whole-fight Blur ends with the fight
         player.RemoveStatus(StatusEffect.Protected);
         player.RemoveStatus(StatusEffect.Blessed);
         player.RemoveStatus(StatusEffect.Haste);
@@ -2136,6 +2277,8 @@ public partial class CombatEngine
             foreach (var teammate in result.Teammates)
             {
                 if (teammate == null) continue;
+                teammate.HasOceanMemory = false; // v1.1.15: the Sage's party spells end with the fight
+                teammate.RemoveStatus(StatusEffect.Blur);
                 teammate.RemoveStatus(StatusEffect.Protected);
                 teammate.RemoveStatus(StatusEffect.Blessed);
                 teammate.RemoveStatus(StatusEffect.Haste);
@@ -2185,6 +2328,16 @@ public partial class CombatEngine
         player.UnmakingCooldown = 0;
         player.DelugeCooldown = 0;
 
+        // v1.1.15: Mental fight-end losses (strain, flee, near death, boss, Old God), one net change and
+        // one announcement per player. Strain only in the dungeon, on the leader's floor.
+        int mentalFloor = MentalFightFloor(player);
+        // 1.2.0 Temple gods piece 5: vanishing with Umbrath's Miracle is not fleeing (no Mental flee loss, no taboo)
+        bool fledThisFight = globalEscape && !_miracleVanished;
+        ApplyMentalFightEnd(result, mentalFloor, fledThisFight, BossContext != null, terminal, mentalAtFightStart);
+        if (fledThisFight && !result.PlayerActuallyDied) GodDeedSystem.Record(player, GodAct.Fled, terminal);   // 1.2.0 Temple gods: War taboo
+        // v1.1.15: checked right after the fight; the next fight in a chain is not entered (see the top)
+        result.MentalCollapsePending = MentalSystem.CollapseDue(player);
+
         // v0.60.3: GMCP Char.Combat.End — single return point for PlayerVsMonsters
         // means MUD client scripts get a clean "leaving combat" signal regardless
         // of whether the player won, fled, was subdued, or died. Outcome string
@@ -2224,6 +2377,7 @@ public partial class CombatEngine
         finally
         {
             ConsumeCombatBuffs(player);
+            GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
         }
 
         return result;
@@ -2697,7 +2851,7 @@ public partial class CombatEngine
     /// Compact dungeon combat action menu for BBS 80x25 terminals (multi-monster combat).
     /// Fits on 2-3 lines. Quickbar skills shown as "[1-9]Skills" shortcut.
     /// </summary>
-    private void ShowDungeonCombatMenuBBS(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
+    private void ShowDungeonCombatMenuBBS(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false, GodDomain miracle = GodDomain.None)
     {
         // Row 1: Core actions
         terminal.SetColor("bright_yellow");
@@ -2814,6 +2968,15 @@ public partial class CombatEngine
             terminal.Write(Loc.Get("combat.save_label"));
         }
         terminal.WriteLine("");
+
+        // 1.2.0 Temple gods piece 5: the day's Miracle, on a row of its own, only while it can be called
+        if (miracle != GodDomain.None)
+        {
+            terminal.SetColor("bright_yellow");
+            terminal.Write(" [M]");
+            terminal.SetColor("bright_magenta");
+            terminal.WriteLine(MiracleSystem.MenuLabel(miracle));
+        }
     }
 
     /// <summary>
@@ -3102,7 +3265,7 @@ public partial class CombatEngine
     /// <summary>
     /// Display dungeon combat menu in screen reader friendly format (no box-drawing characters)
     /// </summary>
-    private void ShowDungeonCombatMenuScreenReader(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
+    private void ShowDungeonCombatMenuScreenReader(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false, GodDomain miracle = GodDomain.None)
     {
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("combat.dungeon_menu"));
@@ -3159,6 +3322,10 @@ public partial class CombatEngine
         if (BossContext?.CanSave == true)
             terminal.WriteLine(Loc.Get("combat.menu_save_boss"));
 
+        // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
+        if (miracle != GodDomain.None)
+            terminal.WriteLine($"  M - {MiracleSystem.MenuLabel(miracle)}, {MiracleSystem.Describe(miracle)}");
+
         // Retreat and auto
         terminal.WriteLine(Loc.Get("combat.menu_retreat"));
         if (!isFollower)
@@ -3180,7 +3347,7 @@ public partial class CombatEngine
     /// <summary>
     /// Display dungeon combat menu with box-drawing characters (standard visual mode)
     /// </summary>
-    private void ShowDungeonCombatMenuStandard(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false)
+    private void ShowDungeonCombatMenuStandard(Character player, bool hasTeammatesNeedingAid, bool canHealAlly, List<(string key, string name, bool available)> classInfo, bool isFollower = false, GodDomain miracle = GodDomain.None)
     {
         terminal.SetColor("green");
         terminal.WriteLine("╔═══════════════════════════════════════╗");
@@ -3300,6 +3467,18 @@ public partial class CombatEngine
             terminal.SetColor("bright_green");
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
             terminal.Write($"{herbDesc,-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
+        // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
+        if (miracle != GodDomain.None)
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[M] ");
+            terminal.SetColor("bright_magenta");
+            terminal.Write($"{MiracleSystem.MenuLabel(miracle),-34}");
             terminal.SetColor("green");
             terminal.WriteLine("║");
         }
@@ -3729,15 +3908,16 @@ public partial class CombatEngine
         }
 
         // Apply grief effects - grief stage can modify damage dealt
+        // v1.1.15: Grief, Mental and Fatigue in one multiplier (MentalSystem.CombinePenalties): the worse of
+        // Grief and Mental, never the sum, and Mental plus Fatigue capped in single-player.
         var griefEffects = GriefSystem.Instance.GetCurrentEffects();
+        float mindDamageMult = MentalSystem.GetCombatMultiplier(attacker,
+            griefEffects.DamageModifier + griefEffects.CombatModifier + griefEffects.AllStatModifier,
+            UsurperRemake.BBS.DoorMode.IsOnlineMode, defence: false);
+        if (mindDamageMult != 1f)
+            attackPower = (long)(attackPower * mindDamageMult);
         if (griefEffects.DamageModifier != 0 || griefEffects.CombatModifier != 0 || griefEffects.AllStatModifier != 0)
         {
-            // Damage modifier: positive = more damage (Anger stage), negative = less damage
-            // Combat modifier: general combat effectiveness (Denial/Bargaining)
-            // AllStatModifier: affects everything (Depression)
-            float totalGriefMod = 1.0f + griefEffects.DamageModifier + griefEffects.CombatModifier + griefEffects.AllStatModifier;
-            attackPower = (long)(attackPower * totalGriefMod);
-
             // Show grief effect message for significant modifiers
             if (griefEffects.DamageModifier > 0.1f)
             {
@@ -3818,14 +3998,7 @@ public partial class CombatEngine
             attackPower += (long)(attackPower * attacker.SettlementBuffValue);
         }
 
-        // Fatigue damage penalty (single-player only)
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && attacker.Fatigue >= GameConfig.FatigueTiredThreshold)
-        {
-            float fatigueDmgPenalty = attacker.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                ? GameConfig.FatigueExhaustedDamagePenalty
-                : GameConfig.FatigueTiredDamagePenalty;
-            attackPower += (long)(attackPower * fatigueDmgPenalty);
-        }
+        // Fatigue damage penalty (single-player only): v1.1.15, taken with Grief and Mental above
 
         // Blood Price combat penalty — guilt weighs on killers (v0.53.0)
         if (attacker.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
@@ -4189,7 +4362,7 @@ public partial class CombatEngine
             long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
             healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
             // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
-            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount);
+            healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
             player.Statistics?.RecordPotionUsed(healAmount);
@@ -4206,7 +4379,7 @@ public partial class CombatEngine
             // Regular heal - ask how many potions to use for full control
             long missingHP = player.MaxHP - player.HP;
             long avgHealPerPotion = 50 + player.Level * 5;  // Average heal: 30 + level*5 + avg(10-30)
-            avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion); // v1.1.11: Infirmary
+            avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion, result.Monsters); // v1.1.11: Infirmary
             int potionsToFullHeal = (int)Math.Ceiling((double)missingHP / avgHealPerPotion);
             potionsToFullHeal = Math.Min(potionsToFullHeal, (int)player.Healing);
 
@@ -4232,7 +4405,7 @@ public partial class CombatEngine
                 long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
                 healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
                 // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
-                healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount);
+                healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
                 healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
                 player.HP += healAmount;
                 totalHeal += healAmount;
@@ -4249,6 +4422,122 @@ public partial class CombatEngine
         }
 
         await Task.Delay(GetCombatDelay(1000));
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: the Miracle the actor may call on now in this monster fight, or
+    /// None. The combat menus show [M] only for a Miracle offered here.
+    /// </summary>
+    private GodDomain MiracleOffered(Character actor, List<Monster> monsters, CombatResult result) =>
+        MiracleSystem.OfferedInFight(actor, monsters, MiracleParty(result), DifficultySystem.CanFlee());
+
+    /// <summary>1.2.0: everyone on the actor's side of this fight (the leader and every teammate).</summary>
+    private static List<Character> MiracleParty(CombatResult result)
+    {
+        var party = new List<Character>();
+        if (result?.Player != null) party.Add(result.Player);
+        if (result?.Teammates != null) party.AddRange(result.Teammates.Where(t => t != null && !party.Contains(t)));
+        return party;
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: calls on the actor's Miracle (the leader or a grouped follower).
+    /// The day's Miracle is spent only when it is offered here; then its effect follows. A
+    /// follower's Umbrath Miracle never reaches this (ProcessGroupedPlayerTurn handles it).
+    /// </summary>
+    private async Task ExecuteMiracle(Character actor, List<Monster> monsters, CombatAction action, CombatResult result)
+    {
+        var miracle = MiracleOffered(actor, monsters, result);
+        if (miracle == GodDomain.None || !MiracleSystem.TryConsume(actor))
+        {
+            terminal.WriteLine(Loc.Get("miracle.not_ready"), "yellow");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+        string god = GodRegistry.GetWorshippedGod(actor)?.Name ?? "";
+        terminal.WriteLine("");
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine(Loc.Get("miracle.called", god, MiracleSystem.Name(miracle)));
+        result.CombatLog.Add($"{actor.DisplayName} calls on the Miracle {miracle}");
+
+        Monster? target = action.TargetIndex.HasValue && action.TargetIndex.Value >= 0 && action.TargetIndex.Value < monsters.Count
+            && monsters[action.TargetIndex.Value].IsAlive ? monsters[action.TargetIndex.Value] : null;
+
+        switch (miracle)
+        {
+            case GodDomain.Light:
+            {
+                if (target == null || !MiracleSystem.CanBanish(target))
+                    target = monsters.FirstOrDefault(MiracleSystem.CanBanish);
+                if (target == null) break;
+                if (MiracleSystem.BanishKillsOutright(target))
+                {
+                    target.HP = 0;
+                    terminal.WriteLine(Loc.Get("miracle.banish", target.Name), "bright_white");
+                    if (!result.DefeatedMonsters.Contains(target)) result.DefeatedMonsters.Add(target);
+                }
+                else
+                {
+                    terminal.WriteLine(Loc.Get("miracle.banish_resist", target.Name), "bright_yellow");
+                    await ApplySingleMonsterDamage(target, MiracleSystem.BanishBossDamage(target), result, "banish", actor, isSpellDamage: true);
+                }
+                break;
+            }
+
+            case GodDomain.War:
+                actor.MiracleCritPending = true;
+                await ProcessPlayerActionMultiMonster(new CombatAction { Type = CombatActionType.Attack, TargetIndex = target != null ? monsters.IndexOf(target) : null },
+                    actor, monsters, result);
+                actor.MiracleCritPending = false;   // an attack that found no foe keeps nothing for later
+                break;
+
+            case GodDomain.Love:
+                foreach (var healed in MiracleSystem.HealPartyToFull(MiracleParty(result)))
+                    terminal.WriteLine(Loc.Get("miracle.healed", healed.DisplayName, healed.HP, healed.MaxHP), "bright_green");
+                break;
+
+            case GodDomain.Law:
+                target ??= monsters.Where(m => m.IsAlive).OrderByDescending(m => m.HP).FirstOrDefault();
+                if (target == null) break;
+                if (TryHoldMonster(target, HoldKind.Bind, GameConfig.MiracleBindRounds))
+                    terminal.WriteLine(Loc.Get("miracle.bind", target.Name, target.StunDuration), "bright_cyan");
+                else
+                    terminal.WriteLine(Loc.Get("miracle.bind_resist", target.Name), "yellow");
+                break;
+
+            case GodDomain.Shadow:
+                terminal.WriteLine(Loc.Get("miracle.vanish"), "bright_magenta");
+                _miracleVanished = true;
+                globalEscape = true;
+                break;
+
+            case GodDomain.Earth:
+                MiracleSystem.HealToFull(actor);
+                terminal.WriteLine(Loc.Get("miracle.healed", actor.DisplayName, actor.HP, actor.MaxHP), "bright_green");
+                break;
+
+            case GodDomain.Magic:
+                MiracleSystem.RefillMana(actor);
+                terminal.WriteLine(Loc.Get("miracle.mana", actor.Mana, actor.MaxMana), "bright_cyan");
+                break;
+
+            case GodDomain.Nature:
+            {
+                var beast = MiracleSystem.SummonBeast(actor);
+                if (beast == null) break;
+                result.Teammates ??= new List<Character>();
+                result.Teammates.Add(beast);   // this fight's list (currentTeammates); it never joins the dungeon party
+                terminal.WriteLine(Loc.Get("miracle.beast", beast.DisplayName), "bright_green");
+                break;
+            }
+
+            case GodDomain.Chaos:
+                terminal.WriteLine(Loc.Get("miracle.confuse"), "magenta");
+                foreach (var m in monsters.Where(m => m.IsAlive).ToList())
+                    ApplySageControl(m, "mass_confusion", GameConfig.MiracleConfuseRounds, actor, result);
+                break;
+        }
+        await Task.Delay(GetCombatDelay(1200));
     }
 
     /// <summary>
@@ -4289,7 +4578,7 @@ public partial class CombatEngine
         string input = (await terminal.ReadLineAsync())?.Trim() ?? "";
         if (int.TryParse(input, out int sel) && sel >= 1 && sel <= options.Count)
         {
-            await HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal);
+            await HomeLocation.ApplyHerbEffect(player, options[sel - 1], terminal, result.Monsters);
         }
         else
         {
@@ -4321,8 +4610,7 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.poison_already_coated", $"{PoisonData.GetName(player.ActivePoisonType)} ({player.PoisonCoatingCombats} combats remaining)"));
             terminal.Write(Loc.Get("combat.replace_yn"));
-            var confirm = await terminal.GetInput("");
-            if (!GameConfig.IsAffirmative(confirm))
+            if (!await terminal.AskYesNoAsync(""))
             {
                 terminal.WriteLine(Loc.Get("combat.poison_keep_current"), "gray");
                 await Task.Delay(GetCombatDelay(500));
@@ -4840,6 +5128,17 @@ public partial class CombatEngine
             }
         }
 
+        // v1.1.15: Slumber Mist breaks on any damage taken since it landed, a hit or a damage
+        // over time tick above; the monster wakes and acts this turn.
+        if (monster.IsSleeping && monster.SlumberHpMark >= 0 && monster.HP < monster.SlumberHpMark)
+        {
+            monster.IsSleeping = false;
+            monster.SleepDuration = 0;
+            monster.SlumberHpMark = -1;
+            monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
+            terminal.WriteLine(Loc.Get("combat.sage_slumber_broken", monster.Name), "yellow");
+        }
+
         // Check if monster is sleeping (from Sleep spell or ability)
         if (monster.IsSleeping)
         {
@@ -4848,6 +5147,9 @@ public partial class CombatEngine
             if (monster.SleepDuration <= 0)
             {
                 monster.IsSleeping = false;
+                monster.SlumberHpMark = -1;
+                // v1.1.15: sleep is a hold; the same post-hold immunity as a stun follows it
+                monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
                 terminal.WriteLine(Loc.Get("combat.monster_wakes", monster.Name), "yellow");
             }
             await Task.Delay(GetCombatDelay(600));
@@ -4899,6 +5201,13 @@ public partial class CombatEngine
             return;
         }
 
+        // 1.2.0 Temple gods piece 2: Discordia's boon, this foe's first action fails (after its ticks)
+        if (ConsumeDiscordiaFail(monster))
+        {
+            await Task.Delay(GetCombatDelay(600));
+            return;
+        }
+
         // Check if monster is stunned (modern stun from spells, distinct from legacy Stunned)
         if (monster.IsStunned)
         {
@@ -4940,6 +5249,8 @@ public partial class CombatEngine
             if (monster.FrozenDuration <= 0)
             {
                 monster.IsFrozen = false;
+                // v1.1.15: freeze is a hold; the same post-hold immunity as a stun follows it
+                monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
                 terminal.WriteLine(Loc.Get("combat.ice_shatters", monster.Name), "cyan");
             }
             await Task.Delay(GetCombatDelay(600));
@@ -5001,6 +5312,7 @@ public partial class CombatEngine
             if (monster.MarkedDuration <= 0)
             {
                 monster.IsMarked = false;
+                monster.MarkedBonusPercent = 0;
                 terminal.WriteLine(Loc.Get("combat.mark_fades", monster.Name), "gray");
             }
         }
@@ -5057,6 +5369,15 @@ public partial class CombatEngine
                 monster.TauntedBy = null;
                 monster.TauntStickChance = 100;
             }
+        }
+
+        // v1.1.15: Psychic Scream's distraction is armed again once a round while it lasts
+        if (firstActionThisRound && monster.DistractedRounds > 0)
+        {
+            monster.DistractedRounds--;
+            monster.Distracted = true;
+            monster.DistractedPenalty = Math.Max(monster.DistractedPenalty, monster.DistractedRoundsPenalty);
+            if (monster.DistractedRounds <= 0) monster.DistractedRoundsPenalty = 0;
         }
 
         if (aliveTeammates != null && aliveTeammates.Count > 0)
@@ -5259,14 +5580,13 @@ public partial class CombatEngine
         playerDefense += player.TempDefenseBonus;
 
         // Apply grief effects to defense - grief stage can modify defense
+        // v1.1.15: Grief, Mental and Fatigue in one multiplier (MentalSystem.CombinePenalties)
         var griefDefenseEffects = GriefSystem.Instance.GetCurrentEffects();
-        if (griefDefenseEffects.DefenseModifier != 0 || griefDefenseEffects.AllStatModifier != 0)
-        {
-            // Defense modifier: positive = more defense, negative = less defense (Anger stage)
-            // AllStatModifier: affects everything (Depression)
-            float totalGriefDefMod = 1.0f + griefDefenseEffects.DefenseModifier + griefDefenseEffects.AllStatModifier;
-            playerDefense = (long)(playerDefense * totalGriefDefMod);
-        }
+        float mindDefenceMult = MentalSystem.GetCombatMultiplier(player,
+            griefDefenseEffects.DefenseModifier + griefDefenseEffects.AllStatModifier,
+            UsurperRemake.BBS.DoorMode.IsOnlineMode, defence: true);
+        if (mindDefenceMult != 1f)
+            playerDefense = (long)(playerDefense * mindDefenceMult);
 
         // Apply Royal Authority bonus (+10% defense while player is king)
         if (player.King)
@@ -5292,14 +5612,7 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * player.SettlementBuffValue);
         }
 
-        // Fatigue defense penalty (single-player only)
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
-        {
-            float fatigueDefPenalty = player.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                ? GameConfig.FatigueExhaustedDefensePenalty
-                : GameConfig.FatigueTiredDefensePenalty;
-            playerDefense += (long)(playerDefense * fatigueDefPenalty);
-        }
+        // Fatigue defense penalty (single-player only): v1.1.15, taken with Grief and Mental above
 
         // Ironbark Root herb defense bonus
         if (player.HerbBuffType == (int)HerbType.IronbarkRoot && player.HerbBuffCombats > 0)
@@ -5494,16 +5807,9 @@ public partial class CombatEngine
             return;
         }
 
-        // Check for divine intervention (save from lethal hit)
+        // 1.2.0 Temple gods piece 2: the old alignment table's divine save is gone with the table
+        // (Mortis cheating death is a Chosen Miracle, a later piece).
         bool wouldDie = player.HP - actualDamage <= 0;
-        if (wouldDie && DivineBlessingSystem.Instance.CheckDivineIntervention(player, (int)actualDamage))
-        {
-            var blessing = DivineBlessingSystem.Instance.GetBlessings(player);
-            terminal.WriteLine(Loc.Get("combat.god_intervenes", blessing.GodName), "bright_magenta");
-            terminal.WriteLine(Loc.Get("combat.divine_light_turns_death"), "bright_white");
-            actualDamage = player.HP - 1; // Survive with 1 HP
-            wouldDie = false;
-        }
 
         // Check for companion sacrifice (if player would still die)
         if (wouldDie && result.Teammates != null)
@@ -6805,10 +7111,10 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_no_more")}", "bright_yellow");
                     terminal.WriteLine("");
                     terminal.Write($"  {Loc.Get("combat.manwe_accept_prompt")}", "bright_white");
-                    string response = (await terminal.GetKeyInput()).ToUpperInvariant();
+                    bool accepted = await terminal.AskYesNoKeyAsync();
                     terminal.WriteLine("");
 
-                    if (GameConfig.IsAffirmative(response))
+                    if (accepted)
                     {
                         // Peaceful resolution — mark as spared
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_lower_weapon")}", "bright_cyan");
@@ -7270,11 +7576,11 @@ public partial class CombatEngine
                 expReward = (long)(expReward * guildMult);
         }
 
-        // Fatigue XP penalty — Exhausted tier only (single-player only)
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
-        {
-            expReward -= (long)(expReward * GameConfig.FatigueExhaustedXPPenalty);
-        }
+        // Fatigue XP penalty, Exhausted tier only (single-player only). v1.1.15: a cut, not a bonus
+        expReward = MentalSystem.ApplyFatigueXp(result.Player, expReward, UsurperRemake.BBS.DoorMode.IsOnlineMode);
+
+        // v1.1.15: the Broken affliction costs 25% of XP gained
+        expReward = MentalSystem.ApplyBrokenXp(result.Player, expReward);
 
         // v0.64.1 early-game XP multiplier. Telemetry showed Lv 1->10 takes
         // ~200 combats (engaged players hitting the wall and quitting before
@@ -7425,8 +7731,7 @@ public partial class CombatEngine
         if (result.Monster.GrabWeap && !string.IsNullOrEmpty(result.Monster.Weapon))
         {
             terminal.WriteLine(Loc.Get("combat.pickup_weapon", result.Monster.Weapon), "yellow");
-            var input = await terminal.GetInput("> ");
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync("> "))
             {
                 Item lootItem;
                 var baseWeapon = ItemManager.GetClassicWeapon((int)result.Monster.WeapNr);
@@ -7468,8 +7773,7 @@ public partial class CombatEngine
         if (result.Monster.GrabArm && !string.IsNullOrEmpty(result.Monster.Armor))
         {
             terminal.WriteLine(Loc.Get("combat.pickup_armor", result.Monster.Armor), "yellow");
-            var input = await terminal.GetInput("> ");
-            if (GameConfig.IsAffirmative(input))
+            if (await terminal.AskYesNoAsync("> "))
             {
                 Item lootItem;
                 var baseArmor = ItemManager.GetClassicArmor((int)result.Monster.ArmNr);
@@ -7699,9 +8003,9 @@ public partial class CombatEngine
         var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
         if (teammates == null || teammates.Count == 0) return;
 
-        // v0.56.0: healer spec bonus applies to party song heals (Minstrel Bard)
-        if (abilityResult.Healing > 0)
-            abilityResult.Healing = ApplyHealerSpecBonus(bard, abilityResult.Healing);
+        // 1.2.0: abilityResult.Healing already carries the healer spec bonus and the gods' boons:
+        // both ability paths run ApplyHealerSpecBonus on it before the party_song effect, so a
+        // second call here gave the party every bonus twice.
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(isPlayer
@@ -8205,7 +8509,7 @@ public partial class CombatEngine
 
         if (target.IsMarked)
         {
-            long markedBonus = (long)(actualDamage * 0.3);
+            long markedBonus = MarkedBonusDamage(target, actualDamage);
             actualDamage += markedBonus;
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -8290,21 +8594,6 @@ public partial class CombatEngine
             long applied = Math.Min(requested, lifestealBudget);
             lifestealBudget -= applied;
             return applied;
-        }
-
-        // Divine lifesteal
-        int lifesteal = DivineBlessingSystem.Instance.CalculateLifesteal(attacker, (int)damage);
-        if (lifesteal > 0)
-        {
-            long applied = ApplyLifestealSlice(lifesteal);
-            if (applied > 0)
-            {
-                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + applied);
-                if (isPlayer)
-                    terminal.WriteLine(Loc.Get("combat.dark_power_drain", applied), "dark_magenta");
-                else
-                    terminal.WriteLine(Loc.Get("combat.tm_dark_drain", attackerName, applied), "dark_magenta");
-            }
         }
 
         // Equipment lifesteal (Lifedrinker enchant), gear-wide, skip for spells.
@@ -8512,7 +8801,8 @@ public partial class CombatEngine
 
         // Already stunned in ANY system: refuse. Refresh-stacking was the primary
         // perma-stun path -- spell or proc kept extending an existing stun's clock.
-        if (target.IsStunned || target.Stunned || target.StunRounds > 0)
+        // v1.1.15: frozen or asleep counts too; one hold at a time.
+        if (target.IsHeld)
             return false;
 
         // Post-recovery immunity window
@@ -8547,7 +8837,395 @@ public partial class CombatEngine
         target.StunDuration = duration;
         target.RecentStunCount++;
         target.RoundsSinceLastStun = 0;
+        target.HoldsThisFight++;
         return true;
+    }
+
+    internal enum HoldKind { Freeze, Sleep, Bind }
+
+    /// <summary>
+    /// v1.1.15: freeze and sleep on a monster, under the shared hold budget with stun and web.
+    /// Refused while the target is held in any way or in its post-hold immunity. Diminishing
+    /// returns per fight: the first hold runs full length, the second half, the third a quarter,
+    /// then the monster is immune to freeze and sleep for the fight. Capped at
+    /// GameConfig.MaxStunDurationNormal rounds; bosses and mini-bosses resist at
+    /// GameConfig.BossStunResistChance and are held at most GameConfig.MaxStunDurationBoss.
+    /// A landed hold also counts toward the stun diminishing returns. True when it landed.
+    /// </summary>
+    internal bool TryHoldMonster(Monster target, HoldKind kind, int requestedRounds)
+    {
+        if (target == null || !target.IsAlive) return false;
+        if (target.IsHeld) return false;
+        if (target.StunImmunityRounds > 0) return false;
+
+        int percent = target.HoldsThisFight switch { 0 => 100, 1 => 50, 2 => 25, _ => 0 };
+        if (percent == 0) return false;
+        int duration = Math.Max(1, (Math.Max(1, requestedRounds) * percent + 99) / 100);
+
+        if (target.IsBoss || target.IsMiniBoss)
+        {
+            if (random.Next(100) < (int)(GameConfig.BossStunResistChance * 100))
+                return false;
+            duration = Math.Min(duration, GameConfig.MaxStunDurationBoss);
+        }
+        else
+        {
+            duration = Math.Min(duration, GameConfig.MaxStunDurationNormal);
+        }
+
+        if (kind == HoldKind.Freeze)
+        {
+            target.IsFrozen = true;
+            target.FrozenDuration = duration;
+        }
+        else if (kind == HoldKind.Bind)
+        {
+            // 1.2.0 Temple gods piece 5: Judicar's Miracle, a hold that takes the monster's turns as a stun does
+            target.IsStunned = true;
+            target.StunDuration = duration;
+        }
+        else
+        {
+            target.IsSleeping = true;
+            target.SleepDuration = duration;
+        }
+        target.HoldsThisFight++;
+        target.RecentStunCount++;
+        target.RoundsSinceLastStun = 0;
+        return true;
+    }
+
+    /// <summary>
+    /// v1.1.15: soft control (slow, distract, mark, taunt, confusion) on a boss or mini-boss.
+    /// A boss shrugs it off GameConfig.BossSoftControlResistPercent of the time and otherwise
+    /// takes half the rounds, at least one. Returns the rounds to apply; 0 when resisted.
+    /// </summary>
+    internal int SoftControlRounds(Monster target, int rounds)
+    {
+        if (target == null || rounds <= 0) return 0;
+        if (!(target.IsBoss || target.IsMiniBoss)) return rounds;
+        if (random.Next(100) < GameConfig.BossSoftControlResistPercent) return 0;
+        return Math.Max(1, rounds / 2);
+    }
+
+    /// <summary>
+    /// v1.1.15: an area spell deals damage when it rolled some, or when it is an attack spell (which
+    /// then takes the level-based fallback). A control spell with no damage of its own deals none.
+    /// </summary>
+    internal static bool AreaSpellDealsDamage(string spellType, long rolledDamage) =>
+        rolledDamage > 0 || spellType == "Attack";
+
+    /// <summary>v1.1.15: a tank by class, by companion role or by specialization.</summary>
+    internal static bool IsPartyTank(Character c)
+    {
+        if (c == null) return false;
+        if (c.Class == CharacterClass.Warrior || c.Class == CharacterClass.Paladin || c.Class == CharacterClass.Barbarian)
+            return true;
+        if (c.IsCompanion && c.CompanionId.HasValue &&
+            UsurperRemake.Systems.CompanionSystem.Instance?.GetCompanion(c.CompanionId.Value)?.CombatRole == UsurperRemake.Systems.CombatRole.Tank)
+            return true;
+        // Spec-based tank detection (Protection Warrior, Juggernaut Barbarian)
+        return c is NPC tankNpc && UsurperRemake.Data.SpecializationData.IsTankSpec(tankNpc.Specialization);
+    }
+
+    /// <summary>
+    /// v1.1.15: who Compel turns the enemy onto. The living tank with the most hit points among
+    /// the caster, the party leader and the teammates; with no tank, the living member with the
+    /// most hit points.
+    /// </summary>
+    internal Character? FindCompelTarget(Character caster, CombatResult? result)
+    {
+        var party = new List<Character>();
+        if (caster != null) party.Add(caster);
+        if (result?.Player != null && !party.Contains(result.Player)) party.Add(result.Player);
+        if (currentTeammates != null)
+            foreach (var t in currentTeammates)
+                if (t != null && !party.Contains(t)) party.Add(t);
+        var alive = party.Where(c => c.IsAlive).ToList();
+        return alive.Where(IsPartyTank).OrderByDescending(c => c.MaxHP).FirstOrDefault()
+            ?? alive.OrderByDescending(c => c.MaxHP).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// v1.1.15: a ward keeps the stronger of what the ally has and what it is given. Every ward
+    /// (the Sage's, the Cleric's, the Wavecaller's) lives in MagicACBonus, so wards never stack.
+    /// True when the new ward went on. On an equal value the longer ward wins, so a short ward
+    /// no longer blocks a whole-fight one of the same strength.
+    /// </summary>
+    internal static bool ApplyWardHighestWins(Character tgt, int bonus, int duration)
+    {
+        if (tgt == null || bonus <= 0 || tgt.MagicACBonus > bonus) return false;
+        if (tgt.MagicACBonus == bonus && WardRoundsLeft(tgt) >= duration) return false;
+        tgt.MagicACBonus = bonus;
+        tgt.ApplyStatus(StatusEffect.Blessed, duration);
+        return true;
+    }
+
+    /// <summary>
+    /// v1.1.15: rounds left on the ward in MagicACBonus. Blessed, Protected and Defending each clear
+    /// it when they end; with none of them up the ward has no clock, so it counts as endless.
+    /// </summary>
+    private static int WardRoundsLeft(Character tgt)
+    {
+        int left = -1;
+        foreach (var s in new[] { StatusEffect.Blessed, StatusEffect.Protected, StatusEffect.Defending })
+            if (tgt.ActiveStatuses.TryGetValue(s, out int rounds)) left = Math.Max(left, rounds);
+        return left < 0 ? int.MaxValue : left;
+    }
+
+    /// <summary>v1.1.15: puts a ward on one ally under the highest-wins rule and says what happened.</summary>
+    private void WardAlly(Character tgt, int bonus, int duration)
+    {
+        if (ApplyWardHighestWins(tgt, bonus, duration))
+            terminal.WriteLine(Loc.Get("combat.magically_protected", tgt.DisplayName, bonus), "blue");
+        else
+            terminal.WriteLine(Loc.Get("combat.ward_stronger_holds", tgt.DisplayName), "gray");
+    }
+
+    /// <summary>
+    /// v1.1.15: the ward a multi-target heal carries (Veloura's Embrace) on every living ally, the
+    /// highest ward winning on each. Shared by the player's cast and a teammate's.
+    /// </summary>
+    internal void WardPartyFromHeal(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
+        => WardPartyFromHeal(caster, LivingPartyOf(caster, result), spellResult);
+
+    /// <summary>v1.1.15: the same ward on a party list the caller already healed; a Sage's takes the seal bonus.</summary>
+    private void WardPartyFromHeal(Character caster, List<Character> party, SpellSystem.SpellResult spellResult)
+    {
+        if (spellResult.ProtectionBonus <= 0) return;
+        // 1.2.0 Temple gods piece 2: Amara's boon on the party ward a follower raises
+        int bonus = (int)Math.Min(GodBoonSystem.PartyWard(caster, SageWardStrength(caster, spellResult.ProtectionBonus)), int.MaxValue);
+        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+        foreach (var ally in party)
+            WardAlly(ally, bonus, dur);
+    }
+
+    /// <summary>v1.1.15: the caster, every living teammate, and the leader when a follower casts.</summary>
+    private List<Character> LivingPartyOf(Character caster, CombatResult? result)
+    {
+        var party = new List<Character>();
+        if (caster != null && caster.IsAlive) party.Add(caster);
+        if (currentTeammates != null)
+            foreach (var t in currentTeammates)
+                if (t != null && t.IsAlive && !party.Contains(t)) party.Add(t);
+        if (result?.Player != null && result.Player.IsAlive && !party.Contains(result.Player)) party.Add(result.Player);
+        return party;
+    }
+
+    /// <summary>v1.1.15: the seal bonus to a Sage's ward strength for a number of seals, capped.</summary>
+    internal static int SageSealWardPercentFor(int seals) =>
+        Math.Clamp(seals * GameConfig.SageSealWardPercentPerSeal, 0, GameConfig.SageSealWardMaxPercent);
+
+    /// <summary>
+    /// v1.1.15: the seals a grouped online player holds in their own session's story. A static so
+    /// tests can stand in for the live session lookup.
+    /// </summary>
+    internal static Func<Character, int> GroupedPlayerSealCount = c =>
+    {
+        var session = string.IsNullOrEmpty(c.GroupPlayerUsername) ? null : GroupSystem.GetSession(c.GroupPlayerUsername);
+        return session?.Context?.Story?.CollectedSeals?.Count ?? 0;
+    };
+
+    /// <summary>
+    /// v1.1.15: whose seals strengthen this caster's Sage wards. A grouped online player: their own.
+    /// Everyone else (the player who leads, a companion, an NPC teammate, an echo): the story of the
+    /// session running the fight, which is the leader's. Grouped is checked first, because during a
+    /// follower's turn currentPlayer is the follower while the session story is still the leader's.
+    /// </summary>
+    internal static int SageSealCountOf(Character caster)
+    {
+        if (caster == null) return 0;
+        if (caster.IsGroupedPlayer) return GroupedPlayerSealCount(caster);
+        return StoryProgressionSystem.Instance?.CollectedSeals?.Count ?? 0;
+    }
+
+    /// <summary>
+    /// v1.1.15: the one place a Sage's ward strength takes the seal bonus. Every Sage ward path goes
+    /// through here: the party wards (ApplySagePartyWard), Veloura's Embrace (WardPartyFromHeal), the
+    /// PvP spell and the world boss spell. Not a Sage, or no ward: the strength is unchanged.
+    /// </summary>
+    internal static int SageWardWithSeals(Character caster, int bonus, out int percent)
+    {
+        percent = 0;
+        if (caster == null || bonus <= 0 || caster.Class != CharacterClass.Sage) return bonus;
+        percent = SageSealWardPercentFor(SageSealCountOf(caster));
+        return bonus + bonus * percent / 100;
+    }
+
+    /// <summary>v1.1.15: SageWardWithSeals, saying so once per cast when the seals add anything.</summary>
+    internal int SageWardStrength(Character caster, int bonus)
+    {
+        int strength = SageWardWithSeals(caster, bonus, out int percent);
+        if (percent > 0)
+            terminal.WriteLine(Loc.Get("combat.sage_seal_ward", caster.DisplayName, percent), "bright_cyan");
+        return strength;
+    }
+
+    /// <summary>
+    /// v1.1.15: the extra damage a marked monster takes on a hit: the percent its mark set at cast,
+    /// or the usual GameConfig.MarkedBonusPercent for a mark that set none.
+    /// </summary>
+    internal static long MarkedBonusDamage(Monster target, long damage)
+    {
+        int percent = target.MarkedBonusPercent > 0 ? target.MarkedBonusPercent : GameConfig.MarkedBonusPercent;
+        return damage * percent / 100;
+    }
+
+    /// <summary>
+    /// v1.1.15: the percent a Sage's Scholar's Mark or Unveil the Pattern sets on its target: higher
+    /// while the caster's Settlement Library buff is up. Read once, at cast.
+    /// </summary>
+    internal static int SageMarkBonusPercent(Character? caster)
+    {
+        if (caster != null && caster.Class == CharacterClass.Sage && caster.HasSettlementBuff
+            && caster.SettlementBuffType == (int)SettlementBuffType.LibraryXP)
+            return GameConfig.SageLibraryMarkBonusPercent;
+        return GameConfig.MarkedBonusPercent;
+    }
+
+    /// <summary>
+    /// v1.1.15: the Sage's party wards reach every ally. Fog of War: protection. Shadow Cloak and
+    /// Noctura's Veil: protection and Blur. Mind Blank: protection and status immunity. Ocean's
+    /// Memory: half mana cost. Protection follows the highest-wins rule.
+    /// </summary>
+    internal void ApplySagePartyWard(Character caster, SpellSystem.SpellResult spellResult, CombatResult? result)
+    {
+        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
+        string effect = (spellResult.SpecialEffect ?? "").ToLowerInvariant();
+        int bonus = SageWardStrength(caster, spellResult.ProtectionBonus);
+        foreach (var ally in LivingPartyOf(caster, result))
+        {
+            if (bonus > 0) WardAlly(ally, bonus, dur);
+            switch (effect)
+            {
+                case "shadow":
+                    ally.ApplyStatus(StatusEffect.Blur, dur);
+                    terminal.WriteLine(Loc.Get("combat.shimmers_blurs", ally.DisplayName), "cyan");
+                    break;
+                case "mindblank":
+                    ally.HasStatusImmunity = true;
+                    ally.StatusImmunityDuration = Math.Max(ally.StatusImmunityDuration, dur);
+                    terminal.WriteLine(Loc.Get("combat.impenetrable_fortress", ally.DisplayName), "bright_white");
+                    break;
+                case "ocean_memory":
+                    ally.HasOceanMemory = true;
+                    if (ally != caster)
+                        terminal.WriteLine(Loc.Get("combat.sage_ocean_memory_ally", ally.DisplayName), "bright_cyan");
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: the Sage's control spells on one monster, and the boss rules for Confusion and
+    /// Mass Confusion. Shared by the multi-monster and single-monster spell paths. False when the
+    /// effect is not one of these.
+    /// </summary>
+    private bool ApplySageControl(Monster target, string effect, int duration, Character caster, CombatResult? result)
+    {
+        if (target == null || !target.IsAlive) return false;
+        switch (effect)
+        {
+            case "dulling_mist":
+            {
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                target.IsSlowed = true;
+                target.SlowDuration = Math.Max(target.SlowDuration, rounds);
+                terminal.WriteLine(Loc.Get("combat.spell_slowed", target.Name), "gray");
+                return true;
+            }
+
+            case "scholars_mark":
+            case "unveil_pattern":
+            {
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : (effect == "scholars_mark" ? 3 : 2));
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                // the percent is fixed at cast; a mark already up keeps the higher of the two
+                int percent = SageMarkBonusPercent(caster);
+                if (target.IsMarked) percent = Math.Max(percent, target.MarkedBonusPercent > 0 ? target.MarkedBonusPercent : GameConfig.MarkedBonusPercent);
+                target.IsMarked = true;
+                target.MarkedDuration = Math.Max(target.MarkedDuration, rounds);
+                target.MarkedBonusPercent = percent;
+                if (percent > GameConfig.MarkedBonusPercent)
+                    terminal.WriteLine(Loc.Get("combat.sage_marked_library", target.Name, rounds, percent), "bright_yellow");
+                else
+                    terminal.WriteLine(Loc.Get("combat.sage_marked", target.Name, rounds), "bright_yellow");
+                return true;
+            }
+
+            case "slumber_mist":
+                if (target.IsBoss || target.IsMiniBoss)
+                {
+                    terminal.WriteLine(Loc.Get("combat.sage_slumber_boss_immune", target.Name), "yellow");
+                    return true;
+                }
+                if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 2))
+                {
+                    target.SlumberHpMark = target.HP;
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                }
+                else
+                {
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
+                }
+                return true;
+
+            case "psychic_scream":
+            {
+                // the old psychic rider stays: a quarter of the time the blast confuses for a round
+                if (random.Next(100) < 25)
+                {
+                    target.IsConfused = true;
+                    target.ConfusedDuration = Math.Max(target.ConfusedDuration, 1);
+                    terminal.WriteLine(Loc.Get("combat.spell_psychic", target.Name), "magenta");
+                }
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                int penalty = 5 + (caster?.Level ?? 0) / 5 + (int)((caster?.Wisdom ?? 0) / 10);
+                target.Distracted = true;
+                target.DistractedPenalty = Math.Max(target.DistractedPenalty, penalty);
+                target.DistractedRounds = Math.Max(target.DistractedRounds, rounds);
+                target.DistractedRoundsPenalty = Math.Max(target.DistractedRoundsPenalty, penalty);
+                terminal.WriteLine(Loc.Get("combat.distracted", target.Name, penalty), "yellow");
+                return true;
+            }
+
+            case "compel":
+            {
+                if (target.FamilyName == "OldGod")
+                {
+                    terminal.WriteLine(Loc.Get("combat.sage_compel_old_god", target.Name), "yellow");
+                    return true;
+                }
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                var tank = FindCompelTarget(caster, result);
+                if (tank != null)
+                {
+                    target.TauntedBy = tank.DisplayName;
+                    target.TauntRoundsLeft = Math.Max(target.TauntRoundsLeft, rounds);
+                    target.TauntStickChance = GameConfig.SoftTauntStickChance;
+                }
+                target.WeakenRounds = Math.Max(target.WeakenRounds, rounds);
+                terminal.WriteLine(Loc.Get("combat.sage_compel", target.Name, tank?.DisplayName ?? caster?.DisplayName ?? ""), "bright_magenta");
+                return true;
+            }
+
+            case "confusion":
+            case "mass_confusion":
+            {
+                int rounds = SoftControlRounds(target, duration > 0 ? duration : 3);
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (effect == "mass_confusion" && (target.IsBoss || target.IsMiniBoss))
+                    rounds = Math.Min(rounds, GameConfig.MassConfusionBossMaxRounds);
+                target.IsConfused = true;
+                target.ConfusedDuration = rounds;
+                terminal.WriteLine(Loc.Get(effect == "confusion" ? "combat.confusion_stumble" : "combat.spell_mass_confusion", target.Name), "magenta");
+                return true;
+            }
+        }
+        return false;
     }
 
     /// <summary>
@@ -10866,10 +11544,7 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.Write(Loc.Get("combat.loot_ally_confirm_prompt", tname));
 
-        string ch = (await terminal.GetKeyInput()).Trim().ToUpper();
-        // Accept affirmative first-letter across supported languages: English Y, Spanish S (Sí),
-        // French O (Oui), Italian S (Sì), Hungarian I (Igen). Falls through to N otherwise.
-        bool approved = GameConfig.IsAffirmative(ch);
+        bool approved = await terminal.AskYesNoKeyAsync();
 
         // v0.57.8: only print the declined message here. The "approved" line
         // ("You nod. Aldric gears up.") is printed by the caller AFTER EquipItem
@@ -11233,6 +11908,7 @@ public partial class CombatEngine
             PostShareMultiplier *= m;
             if (TeamHQBonus.XPMultiplier(player) > 1.0 && !Sources.Contains("team_hq")) Sources.Add("team_hq");
             if (AwakeningBonus.XPMultiplier(player) != 1.0 && !Sources.Contains("awakening")) Sources.Add("awakening");
+            if (WeeklyGodSystem.XpMultiplier(player) > 1.0 && !Sources.Contains("god_week")) Sources.Add("god_week");
         }
     }
 
@@ -12555,7 +13231,7 @@ public partial class CombatEngine
         _ => 0.25 // 25% floor for 4th+ targets
     };
 
-    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string damageSource = "AoE attack", bool isSpellDamage = false, Character? attacker = null)
+    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string damageSource = "AoE attack", bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
@@ -12593,6 +13269,13 @@ public partial class CombatEngine
             };
             long damagePerMonster = Math.Max(1, (long)(totalDamage * diminish));
 
+            // 1.2.0 Temple gods: the player's own area spell (spell damage with a null attacker, from
+            // ExecuteSpellMultiMonster) deals the Old God echo bonus to the echoed Old God, per target.
+            // The caster's god decides (a grouped follower's spell passes spellCaster; else the fight's player).
+            var echoCaster = spellCaster ?? currentPlayer;
+            if (isSpellDamage && attacker == null && echoCaster != null)
+                damagePerMonster += OldGodEchoSystem.BonusDamage(echoCaster, monster, damagePerMonster);
+
             // v0.65.5: boss phase-immunity + divine-armor reduction, matching ApplySingleMonsterDamage.
             // Pre-fix ApplyAoEDamage applied NEITHER, so AoE spells/abilities (Fireball, Chain Lightning,
             // Maelstrom) full-damaged Old Gods during immune phases and ignored divine armor, while the
@@ -12620,9 +13303,9 @@ public partial class CombatEngine
             if (monster.IsCorroded) armor = Math.Max(0, (long)(armor * 0.6));
             long actualDamage = Math.Max(1, damagePerMonster - armor);
 
-            // Marked targets take 30% bonus damage
+            // Marked targets take bonus damage (30%, or what a Sage's mark set)
             if (monster.IsMarked)
-                actualDamage = (long)(actualDamage * 1.3);
+                actualDamage += MarkedBonusDamage(monster, actualDamage);
 
             // Sleeping monsters take 50% bonus damage but stay asleep
             if (monster.IsSleeping)
@@ -12785,10 +13468,10 @@ public partial class CombatEngine
                 $"magImmune={target.IsMagicalImmune}");
         }
 
-        // Marked target takes 30% bonus damage
+        // Marked target takes bonus damage (30%, or what a Sage mark set)
         if (target.IsMarked)
         {
-            long markedBonus = (long)(actualDamage * 0.3);
+            long markedBonus = MarkedBonusDamage(target, actualDamage);
             actualDamage += markedBonus;
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -13076,15 +13759,25 @@ public partial class CombatEngine
                         // crit when followed by a plain swing. Mirror the Power-Strike
                         // pattern: stealth crit short-circuits the natural-20 / dex-crit
                         // rolls so we don't accidentally double-apply.
-                        bool stealthCrit = player.HasStatus(StatusEffect.Hidden);
+                        // 1.2.0 Temple gods piece 5: Valorian's Miracle, a certain critical hit on this swing
+                        bool miracleCrit = player.MiracleCritPending;
+                        if (miracleCrit)
+                        {
+                            player.MiracleCritPending = false;
+                            // the attack ends stealth as every other attack does (the stealth branch below is skipped)
+                            if (player.HasStatus(StatusEffect.Hidden)) player.RemoveStatus(StatusEffect.Hidden);
+                            rollMult = GameConfig.MiracleCritMultiplier;
+                            terminal.WriteLine(Loc.Get("miracle.crit"), "bright_red");
+                        }
+                        bool stealthCrit = !miracleCrit && player.HasStatus(StatusEffect.Hidden);
                         if (stealthCrit)
                         {
                             player.RemoveStatus(StatusEffect.Hidden);
                             rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
                             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
                         }
-                        bool isCrit = !stealthCrit && random.Next(1, 21) == 20; // natural 20
-                        bool dexCrit = !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
+                        bool isCrit = !miracleCrit && !stealthCrit && random.Next(1, 21) == 20; // natural 20
+                        bool dexCrit = !miracleCrit && !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
                         if (isCrit)
                         {
                             rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
@@ -13097,7 +13790,7 @@ public partial class CombatEngine
                         }
 
                         // Wavecaller Ocean's Voice: +20% bonus crit chance when buff active
-                        if (!stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
+                        if (!miracleCrit && !stealthCrit && !isCrit && !dexCrit && player.Class == CharacterClass.Wavecaller
                             && player.TempAttackBonus > 0 && player.TempAttackBonusDuration > 0)
                         {
                             if (random.Next(100) < (int)(GameConfig.WavecallerOceansVoiceCritBonus * 100))
@@ -13117,13 +13810,16 @@ public partial class CombatEngine
                         // Grief effects
                         var griefFx = GriefSystem.Instance.GetCurrentEffects();
                         long preGriefAttack = attackPower;
-                        if (griefFx.DamageModifier != 0 || griefFx.CombatModifier != 0 || griefFx.AllStatModifier != 0)
+                        // v1.1.15: Grief, Mental and Fatigue in one multiplier (MentalSystem.CombinePenalties)
+                        float totalGriefMod = MentalSystem.GetCombatMultiplier(player,
+                            griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier,
+                            UsurperRemake.BBS.DoorMode.IsOnlineMode, defence: false);
+                        if (totalGriefMod != 1f)
                         {
-                            float totalGriefMod = 1.0f + griefFx.DamageModifier + griefFx.CombatModifier + griefFx.AllStatModifier;
                             attackPower = (long)(attackPower * totalGriefMod);
                             DebugLogger.Instance.LogInfo("COMBAT_GRIEF",
                                 $"player={player.Name} griefDmg={griefFx.DamageModifier:F2} griefCombat={griefFx.CombatModifier:F2} " +
-                                $"griefAllStat={griefFx.AllStatModifier:F2} totalGriefMod={totalGriefMod:F2} " +
+                                $"griefAllStat={griefFx.AllStatModifier:F2} mental={player.Mental} fatigue={player.Fatigue} totalMindMod={totalGriefMod:F2} " +
                                 $"preGrief={preGriefAttack} postGrief={attackPower}");
                         }
 
@@ -13147,14 +13843,7 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * player.GodSlayerDamageBonus);
                         if (player.HasDarkPactBuff)
                             attackPower += (long)(attackPower * player.DarkPactDamageBonus);
-                        // Fatigue damage penalty (single-player only, multi-monster path)
-                        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && player.Fatigue >= GameConfig.FatigueTiredThreshold)
-                        {
-                            float fatigueDmgPenaltyMM = player.Fatigue >= GameConfig.FatigueExhaustedThreshold
-                                ? GameConfig.FatigueExhaustedDamagePenalty
-                                : GameConfig.FatigueTiredDamagePenalty;
-                            attackPower += (long)(attackPower * fatigueDmgPenaltyMM);
-                        }
+                        // Fatigue damage penalty (single-player only, multi-monster path): v1.1.15, taken with Grief and Mental above
                         if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
                         if (player.HerbBuffType == (int)HerbType.FirebloomPetal && player.HerbBuffCombats > 0)
@@ -13294,7 +13983,7 @@ public partial class CombatEngine
                 terminal.SetColor("white");
                 terminal.Write($"[{i + 1}] ");
                 terminal.SetColor("cyan");
-                terminal.Write($"{spell.Name}");
+                terminal.Write($"{spell.DisplayName}");
                 terminal.SetColor("gray");
                 terminal.Write(Loc.Get("combat.spell_level", spell.Level));
                 terminal.SetColor("yellow");
@@ -13303,7 +13992,7 @@ public partial class CombatEngine
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine(Loc.Get("combat.spell_not_enough_mana", i + 1, spell.Name, spell.Level, manaCost));
+                terminal.WriteLine(Loc.Get("combat.spell_not_enough_mana", i + 1, spell.DisplayName, spell.Level, manaCost));
             }
         }
 
@@ -13391,6 +14080,7 @@ public partial class CombatEngine
             bool hasTeammatesNeedingAid = hasInjuredTeammates || hasManaNeededTeammates;
             bool canHealAlly = hasTeammatesNeedingAid && (player.Healing > 0 || player.ManaPotions > 0 || (ClassAbilitySystem.IsSpellcaster(player.Class) && player.Mana > 0));
             var classInfo = GetClassSpecificActions(player);
+            var miracleOffered = MiracleOffered(player, monsters, result);   // 1.2.0 Temple gods piece 5
 
             // Phase 2: Electron mode emits the structured menu state for the
             // graphical client and skips the text menu entirely.
@@ -13400,15 +14090,15 @@ public partial class CombatEngine
             }
             else if (DoorMode.IsInDoorMode || GameConfig.CompactMode)
             {
-                ShowDungeonCombatMenuBBS(player, hasTeammatesNeedingAid, canHealAlly, classInfo);
+                ShowDungeonCombatMenuBBS(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
             }
             else if (player.ScreenReaderMode)
             {
-                ShowDungeonCombatMenuScreenReader(player, hasTeammatesNeedingAid, canHealAlly, classInfo);
+                ShowDungeonCombatMenuScreenReader(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
             }
             else
             {
-                ShowDungeonCombatMenuStandard(player, hasTeammatesNeedingAid, canHealAlly, classInfo);
+                ShowDungeonCombatMenuStandard(player, hasTeammatesNeedingAid, canHealAlly, classInfo, miracle: miracleOffered);
                 // Combat tip is visual-only.
                 ShowCombatTipIfNeeded(player);
             }
@@ -13490,6 +14180,33 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.herb_empty"), "yellow");
                     await Task.Delay(GetCombatDelay(1000));
                     continue;
+
+                case "M":
+                {
+                    // 1.2.0 Temple gods piece 5: the day's Miracle
+                    var miracle = MiracleOffered(player, monsters, result);
+                    if (miracle == GodDomain.None)
+                    {
+                        terminal.WriteLine(Loc.Get("miracle.not_ready"), "yellow");
+                        await Task.Delay(GetCombatDelay(1000));
+                        continue;
+                    }
+                    action.Type = CombatActionType.Miracle;
+                    if (MiracleSystem.NeedsTarget(miracle))
+                    {
+                        action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                        if (action.TargetIndex == TargetCancelled) continue;
+                        if (miracle == GodDomain.Light && action.TargetIndex.HasValue
+                            && !MiracleSystem.CanBanish(monsters[action.TargetIndex.Value]))
+                        {
+                            terminal.WriteLine(Loc.Get("miracle.banish_pick"), "yellow");
+                            await Task.Delay(GetCombatDelay(1000));
+                            continue;
+                        }
+                    }
+                    action.FromAidMenu = miracle == GodDomain.Love;   // a party heal is aid to the allies
+                    return (action, false);
+                }
 
                 case "V":
                     if (BossContext?.CanSave == true)
@@ -13728,6 +14445,10 @@ public partial class CombatEngine
                 await ExecuteUseHerb(player, result);
                 break;
 
+            case CombatActionType.Miracle:
+                await ExecuteMiracle(player, monsters, action, result);   // 1.2.0 Temple gods piece 5
+                break;
+
             case CombatActionType.Retreat:
                 // Check if fleeing is allowed on current difficulty
                 if (!DifficultySystem.CanFlee())
@@ -13874,6 +14595,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.critical_backstab", backstabDamage));
 
             await ApplySingleMonsterDamage(target, backstabDamage, result, "backstab", player);
+            if (!target.IsAlive) GodDeedSystem.Record(player, GodAct.StealthKill, terminal);   // 1.2.0 Temple gods: Shadow deed
         }
         else
         {
@@ -14544,14 +15266,14 @@ public partial class CombatEngine
                     actualDamage = Math.Max(1, actualDamage - defense);
                 }
 
-                // Marked target takes 30% bonus damage. Player report: Shield Bash (and
+                // Marked target takes bonus damage (30%, or what a Sage mark set). Player report: Shield Bash (and
                 // every other single-target class ability) skipped the Marked bonus
                 // because this path applies damage directly to target.HP instead of
                 // routing through ApplySingleMonsterDamage. Mirrors the basic-attack
                 // path at line ~11234 and the AoE path at line ~11114.
                 if (target.IsMarked)
                 {
-                    long markedBonus = (long)(actualDamage * 0.3);
+                    long markedBonus = MarkedBonusDamage(target, actualDamage);
                     actualDamage += markedBonus;
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -14684,7 +15406,7 @@ public partial class CombatEngine
         if (abilityResult.Healing > 0)
         {
             // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
-            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing);
+            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monsters);
 
             Character healTarget = player;
             bool healedAlly = false;
@@ -14904,10 +15626,10 @@ public partial class CombatEngine
             case "weaken":
                 if (target != null && target.IsAlive)
                 {
+                    // v1.1.15: the timed cut only (Monster.GetAttackPower/GetDefensePower apply
+                    // -30%/-20% while WeakenRounds > 0); base Strength and Defence stay as they were
                     int weakenAtkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int weakenDefReduction = Math.Max(1, (int)(target.Defence * 0.20));
-                    target.Strength = Math.Max(0, target.Strength - weakenAtkReduction);
-                    target.Defence = Math.Max(0, target.Defence - weakenDefReduction);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, weakenAtkReduction, weakenDefReduction));
@@ -15251,11 +15973,11 @@ public partial class CombatEngine
             case "freeze":
                 if (target != null && target.IsAlive)
                 {
-                    int freezeChance = target.IsBoss ? 40 : 75;
-                    if (random.Next(100) < freezeChance)
+                    // v1.1.15: the freeze goes through the shared hold budget; its boss resist
+                    // replaces the old 40% boss chance (75% then half: about 37% on a boss)
+                    if (random.Next(100) < 75
+                        && TryHoldMonster(target, HoldKind.Freeze, abilityResult.Duration > 0 ? abilityResult.Duration : 2))
                     {
-                        target.IsFrozen = true;
-                        target.FrozenDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.ability_frozen", target.Name));
                     }
@@ -15977,9 +16699,10 @@ public partial class CombatEngine
                         m.WeakenRounds = Math.Max(m.WeakenRounds, abilityResult.Duration);
                         m.IsMarked = true;
                         m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration);
-                        if (random.Next(100) < 25 && m.StunImmunityRounds <= 0) m.Stunned = true;
+                        // v1.1.15: through the hold rules, like the single-target twin
+                        bool waveStun = random.Next(100) < 25 && TryStunMonster(m, 1);
                         terminal.SetColor("magenta");
-                        terminal.WriteLine(Loc.Get(m.Stunned ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", m.Name));
+                        terminal.WriteLine(Loc.Get(waveStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", m.Name));
                     }
                 }
                 break;
@@ -16020,7 +16743,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + 200);
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.CastHeal(player, 200, result.Monsters)); // 1.2.0: Amara and Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
                     }
                 }
@@ -17012,7 +17735,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.you_cast_spell", spellInfo.Name));
+        terminal.WriteLine(Loc.Get("combat.you_cast_spell", spellInfo.DisplayName));
 
         // When targeting an ally, strip the spell effect portion from the message
         // (caster-named heal/buff text) since the correct target messages are shown by ApplySpellEffects
@@ -17061,28 +17784,23 @@ public partial class CombatEngine
             {
                 if (spellResult.Healing > 0)
                 {
-                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                     long oldHP = tgt.HP;
                     tgt.HP = Math.Min(tgt.MaxHP, tgt.HP + spellResult.Healing);
                     long actualHeal = tgt.HP - oldHP;
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("combat.aid_recover_hp", tgt.DisplayName, actualHeal));
+                    if (actualHeal > 0 && tgt != player) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
                     if (tgt.IsCompanion && tgt.CompanionId.HasValue)
                         CompanionSystem.Instance.SyncCompanionHP(tgt);
                 }
                 if (spellResult.ProtectionBonus > 0)
-                {
-                    int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                    tgt.MagicACBonus = spellResult.ProtectionBonus;
-                    tgt.ApplyStatus(StatusEffect.Blessed, dur);
-                    terminal.SetColor("blue");
-                    terminal.WriteLine(Loc.Get("combat.magically_protected", tgt.DisplayName, spellResult.ProtectionBonus));
-                }
+                    WardAlly(tgt, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
             }
             void ApplyBuffTo(Character tgt)
             {
-                ApplySpellEffects(tgt, null, spellResult);
+                ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
             }
 
@@ -17095,17 +17813,23 @@ public partial class CombatEngine
                 if (!overrideTgt.IsAlive || overrideTgt == player)
                 {
                     // Dead target or self -> apply to caster (matches the dead-ally fallback).
-                    ApplySpellEffects(player, null, spellResult);
+                    ApplySpellEffects(player, null, spellResult, monsters: monsters);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(overrideTgt);
                 else ApplyBuffTo(overrideTgt);
             }
-            // Multi-target buff (e.g. Covenant of the Deep, Symphony of the Depths) — buff caster AND all teammates
+            // v1.1.15: the Sage's party wards and Ocean's Memory reach every ally
+            else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff" && player.Class == CharacterClass.Sage)
+            {
+                ApplySagePartyWard(player, spellResult, result);
+                result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
+            }
+            // Multi-target buff (e.g. Covenant of the Deep, Symphony of the Depths): buff caster AND all teammates
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
             {
                 // Apply buffs to caster
-                ApplySpellEffects(player, null, spellResult);
+                ApplySpellEffects(player, null, spellResult, monsters: monsters);
 
                 // Apply buffs to all living teammates
                 if (currentTeammates != null)
@@ -17113,12 +17837,7 @@ public partial class CombatEngine
                     foreach (var tm in currentTeammates.Where(t => t.IsAlive))
                     {
                         if (spellResult.ProtectionBonus > 0)
-                        {
-                            int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                            tm.MagicACBonus = spellResult.ProtectionBonus;
-                            tm.ApplyStatus(StatusEffect.Blessed, dur);
-                            terminal.WriteLine(Loc.Get("combat.magically_protected", tm.DisplayName, spellResult.ProtectionBonus), "blue");
-                        }
+                            WardAlly(tm, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
                         if (spellResult.AttackBonus > 0)
                         {
                             int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
@@ -17151,12 +17870,7 @@ public partial class CombatEngine
                 {
                     var lead = result.Player;
                     if (spellResult.ProtectionBonus > 0)
-                    {
-                        int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                        lead.MagicACBonus = spellResult.ProtectionBonus;
-                        lead.ApplyStatus(StatusEffect.Blessed, dur);
-                        terminal.WriteLine(Loc.Get("combat.magically_protected", lead.DisplayName, spellResult.ProtectionBonus), "blue");
-                    }
+                        WardAlly(lead, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
                     if (spellResult.AttackBonus > 0)
                     {
                         int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
@@ -17174,7 +17888,7 @@ public partial class CombatEngine
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Heal" && spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus applies to spell heals too
-                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                 // Heal the caster
                 long oldPlayerHP = player.HP;
                 player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
@@ -17186,6 +17900,7 @@ public partial class CombatEngine
                 }
 
                 // Heal all living teammates
+                bool partyAllyHealed = false;   // 1.2.0 Temple gods: Amara's deed, once per cast
                 if (currentTeammates != null)
                 {
                     foreach (var tm in currentTeammates.Where(t => t.IsAlive))
@@ -17195,6 +17910,7 @@ public partial class CombatEngine
                         long actualHeal = tm.HP - oldHP;
                         if (actualHeal > 0)
                         {
+                            if (tm != player) partyAllyHealed = true;
                             terminal.SetColor("bright_green");
                             terminal.WriteLine(Loc.Get("combat.aid_recover_hp", tm.DisplayName, actualHeal));
 
@@ -17217,37 +17933,15 @@ public partial class CombatEngine
                     long leaderHeal = result.Player.HP - oldLeaderHP;
                     if (leaderHeal > 0)
                     {
+                        partyAllyHealed = true;
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("combat.aid_recover_hp", result.Player.DisplayName, leaderHeal));
                     }
                 }
+                if (partyAllyHealed) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
 
                 // Apply any protection/buff bonus from the spell to entire party
-                if (spellResult.ProtectionBonus > 0)
-                {
-                    int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                    player.MagicACBonus = spellResult.ProtectionBonus;
-                    player.ApplyStatus(StatusEffect.Blessed, dur);
-                    terminal.WriteLine(Loc.Get("combat.you_magically_protected", spellResult.ProtectionBonus), "blue");
-
-                    if (currentTeammates != null)
-                    {
-                        foreach (var tm in currentTeammates.Where(t => t.IsAlive))
-                        {
-                            tm.MagicACBonus = spellResult.ProtectionBonus;
-                            tm.ApplyStatus(StatusEffect.Blessed, dur);
-                            terminal.WriteLine(Loc.Get("combat.magically_protected", tm.DisplayName, spellResult.ProtectionBonus), "blue");
-                        }
-                    }
-                    // v0.65.1: leader inclusion (see above).
-                    if (result.Player != null && result.Player != player && result.Player.IsAlive
-                        && (currentTeammates == null || !currentTeammates.Contains(result.Player)))
-                    {
-                        result.Player.MagicACBonus = spellResult.ProtectionBonus;
-                        result.Player.ApplyStatus(StatusEffect.Blessed, dur);
-                        terminal.WriteLine(Loc.Get("combat.magically_protected", result.Player.DisplayName, spellResult.ProtectionBonus), "blue");
-                    }
-                }
+                WardPartyFromHeal(player, spellResult, result);
 
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
             }
@@ -17259,7 +17953,7 @@ public partial class CombatEngine
                 if (!allyTarget.IsAlive)
                 {
                     // Ally died between selection and execution — fall back to self
-                    ApplySpellEffects(player, null, spellResult);
+                    ApplySpellEffects(player, null, spellResult, monsters: monsters);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(allyTarget);
@@ -17268,7 +17962,7 @@ public partial class CombatEngine
             else
             {
                 // Self-targeting (no ally selected, or invalid index)
-                ApplySpellEffects(player, null, spellResult);
+                ApplySpellEffects(player, null, spellResult, monsters: monsters);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
             }
         }
@@ -17277,19 +17971,25 @@ public partial class CombatEngine
         {
             // Use the spell's calculated damage
             long totalDamage = spellResult.Damage;
-            if (totalDamage <= 0)
+            // v1.1.15: the fallback is for attack spells only. A control spell that sets no
+            // damage (Mass Confusion, Slumber Mist, Compel) was hitting every enemy for about
+            // spell level x 50, which would also wake a Slumber Mist at once.
+            if (AreaSpellDealsDamage(spellInfo.SpellType, totalDamage))
             {
-                // Fallback if spell didn't set damage
-                totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
+                if (totalDamage <= 0)
+                {
+                    // Fallback if spell didn't set damage
+                    totalDamage = spellInfo.Level * 50 + (player.Intelligence / 2);
+                }
+                totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
+                await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.DisplayName, isSpellDamage: true, spellCaster: player);
             }
-            totalDamage = DifficultySystem.ApplyPlayerDamageMultiplier(totalDamage);
-            await ApplyAoEDamage(monsters, totalDamage, result, spellInfo.Name, isSpellDamage: true);
 
             // Apply self-healing from attack spells (e.g. Deluge of Sanctity)
             if (spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus
-                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                 long oldHP = player.HP;
                 player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
                 long actualHeal = player.HP - oldHP;
@@ -17347,6 +18047,7 @@ public partial class CombatEngine
                 if (damage > 0)
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+                    damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
                     await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
                 }
 
@@ -17354,7 +18055,7 @@ public partial class CombatEngine
                 if (spellResult.Healing > 0)
                 {
                     // v0.56.0 healer spec bonus
-                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                    spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                     long oldHP = player.HP;
                     player.HP = Math.Min(player.MaxHP, player.HP + spellResult.Healing);
                     long actualHeal = player.HP - oldHP;
@@ -17377,7 +18078,7 @@ public partial class CombatEngine
         if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("combat.spell_proficiency_up", spellInfo.Name, spellResult.NewProficiencyLevel));
+            terminal.WriteLine(Loc.Get("combat.spell_proficiency_up", spellInfo.DisplayName, spellResult.NewProficiencyLevel));
             await Task.Delay(GetCombatDelay(800));
         }
     }
@@ -17387,12 +18088,16 @@ public partial class CombatEngine
     /// </summary>
     private void HandleSpecialSpellEffectOnMonster(Monster target, string effect, int duration, Character player, long spellDamage, CombatResult result)
     {
+        // v1.1.15: the Sage's control spells, and the boss rules for Confusion and Mass Confusion
+        if (ApplySageControl(target, effect.ToLower(), duration, player, result)) return;
+
         switch (effect.ToLower())
         {
             case "sleep":
-                target.IsSleeping = true;
-                target.SleepDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 3))
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
                 break;
 
             case "fear":
@@ -17422,9 +18127,10 @@ public partial class CombatEngine
                 break;
 
             case "freeze":
-                target.IsFrozen = true;
-                target.FrozenDuration = duration > 0 ? duration : 2;
-                terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                if (TryHoldMonster(target, HoldKind.Freeze, duration > 0 ? duration : 2))
+                    terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", target.Name), "cyan");
                 break;
 
             case "frost":
@@ -17438,18 +18144,6 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.spell_web", target.Name), "white");
                 else
                     terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
-                break;
-
-            case "confusion":
-                target.IsConfused = true;
-                target.ConfusedDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.confusion_stumble", target.Name), "magenta");
-                break;
-
-            case "mass_confusion":
-                target.IsConfused = true;
-                target.ConfusedDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_mass_confusion", target.Name), "magenta");
                 break;
 
             case "dominate":
@@ -17710,12 +18404,12 @@ public partial class CombatEngine
                 break;
 
             case "weaken":
-                // Reduce attack and defense — used by Siren's Lament, Cutting Words, etc.
+                // Reduce attack and defense for a time; used by Siren's Lament, Noctura's Whisper, etc.
+                // v1.1.15: the timed cut only (Monster.GetAttackPower/GetDefensePower apply
+                // -30%/-20% while WeakenRounds > 0); base Strength and Defence stay as they were
                 {
                     int atkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int defReduction2 = Math.Max(1, (int)(target.Defence * 0.20));
-                    target.Strength = Math.Max(0, target.Strength - atkReduction);
-                    target.Defence = Math.Max(0, target.Defence - defReduction2);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, duration > 0 ? duration : 4);
                     terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, atkReduction, defReduction2), "yellow");
                 }
@@ -17809,8 +18503,9 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Handle player aiding an ally - choose between HP potion, mana potion, or heal spell, then choose target
-    /// Returns the action to execute, or null if cancelled
+    /// Handle player aiding an ally. Prompt order: the aid option (HP potion, mana potion or heal
+    /// spell); for a heal spell, the spell; then the ally. A party heal skips the ally pick and
+    /// returns the spell menu's CastSpell action. Returns the action to execute, or null if cancelled
     /// </summary>
     private async Task<CombatAction?> HandleHealAlly(Character player, List<Monster> monsters)
     {
@@ -17883,6 +18578,64 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.invalid_choice"), "red");
             await Task.Delay(GetCombatDelay(500));
             return null;
+        }
+
+        // v1.1.15: a heal spell is picked before the ally. A party heal (Veloura's Embrace) needs
+        // no ally: it becomes the same cast the spell menu makes, so it heals and wards the whole
+        // living party through the spell menu's party heal path.
+        SpellSystem.SpellInfo? selectedSpell = null;
+        if (selectedOption.type == "spell")
+        {
+            // Show heal spells and let player choose
+            var healSpells = GetAvailableHealSpells(player);
+            if (healSpells.Count == 0)
+            {
+                terminal.WriteLine(Loc.Get("combat.aid_no_heal_spells"), "yellow");
+                await Task.Delay(GetCombatDelay(1000));
+                return null;
+            }
+
+            terminal.WriteLine("");
+            terminal.SetColor("bright_blue");
+            terminal.WriteLine(Loc.Get("combat.select_healing_spell"));
+            for (int i = 0; i < healSpells.Count; i++)
+            {
+                var spell = healSpells[i];
+                terminal.SetColor("cyan");
+                terminal.WriteLine($"  [{i + 1}] {spell.DisplayName} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
+            }
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
+            terminal.WriteLine("");
+
+            terminal.SetColor("white");
+            terminal.Write(Loc.Get("combat.choose_spell"));
+            var spellInput = await terminal.GetInput("");
+
+            if (!int.TryParse(spellInput, out int spellChoice) || spellChoice == 0)
+            {
+                return null;
+            }
+
+            if (spellChoice < 1 || spellChoice > healSpells.Count)
+            {
+                terminal.WriteLine(Loc.Get("combat.invalid_spell"), "red");
+                await Task.Delay(GetCombatDelay(500));
+                return null;
+            }
+
+            selectedSpell = healSpells[spellChoice - 1];
+
+            // Check mana
+            if (player.Mana < SpellSystem.CalculateManaCost(selectedSpell, player)) // v1.1.1: the list used the real cost; this check did not
+            {
+                terminal.WriteLine(Loc.Get("combat.not_enough_mana"), "red");
+                await Task.Delay(GetCombatDelay(1000));
+                return null;
+            }
+
+            if (selectedSpell.IsMultiTarget)
+                return new CombatAction { Type = CombatActionType.CastSpell, SpellIndex = selectedSpell.Level, FromAidMenu = true };
         }
 
         // For mana potions, show MP status; for HP, show HP status
@@ -18049,7 +18802,7 @@ public partial class CombatEngine
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
             int healPerPotion = 30 + player.Level * 5 + 20; // Average heal per potion
-            healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
+            healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, monsters); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
             int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
@@ -18099,7 +18852,7 @@ public partial class CombatEngine
             {
                 player.Healing--;
                 int healAmount = 30 + player.Level * 5 + random.Next(10, 30);
-                healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
+                healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount, monsters); // v1.1.11: the giver's Infirmary
                 targetAlly.HP = Math.Min(targetAlly.MaxHP, targetAlly.HP + healAmount);
             }
 
@@ -18119,6 +18872,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.aid_give_heal_potions", potionsToUse, targetAlly.DisplayName));
             }
             terminal.WriteLine(Loc.Get("combat.aid_recover_hp", targetAlly.DisplayName, totalHeal), "green");
+            if (totalHeal > 0) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
 
             if (targetAlly.HP >= targetAlly.MaxHP)
             {
@@ -18146,78 +18900,36 @@ public partial class CombatEngine
                 return null;
             }
 
-            // Show heal spells and let player choose
-            var healSpells = GetAvailableHealSpells(player);
-            if (healSpells.Count == 0)
-            {
-                terminal.WriteLine(Loc.Get("combat.aid_no_heal_spells"), "yellow");
-                await Task.Delay(GetCombatDelay(1000));
-                return null;
-            }
-
-            terminal.WriteLine("");
-            terminal.SetColor("bright_blue");
-            terminal.WriteLine(Loc.Get("combat.select_healing_spell"));
-            for (int i = 0; i < healSpells.Count; i++)
-            {
-                var spell = healSpells[i];
-                terminal.SetColor("cyan");
-                terminal.WriteLine($"  [{i + 1}] {spell.Name} - {Loc.Get("combat.mana_label")}: {SpellSystem.CalculateManaCost(spell, player)}"); // v1.1.1: real cost, not the table cost
-            }
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  {Loc.Get("combat.cancel_option")}");
-            terminal.WriteLine("");
-
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("combat.choose_spell"));
-            var spellInput = await terminal.GetInput("");
-
-            if (!int.TryParse(spellInput, out int spellChoice) || spellChoice == 0)
-            {
-                return null;
-            }
-
-            if (spellChoice < 1 || spellChoice > healSpells.Count)
-            {
-                terminal.WriteLine(Loc.Get("combat.invalid_spell"), "red");
-                await Task.Delay(GetCombatDelay(500));
-                return null;
-            }
-
-            var selectedSpell = healSpells[spellChoice - 1];
-
-            // Check mana
-            if (player.Mana < SpellSystem.CalculateManaCost(selectedSpell, player)) // v1.1.1: the list used the real cost; this check did not
-            {
-                terminal.WriteLine(Loc.Get("combat.not_enough_mana"), "red");
-                await Task.Delay(GetCombatDelay(1000));
-                return null;
-            }
-
-            // Cast the heal spell on the ally
-            var spellResult = SpellSystem.CastSpell(player, selectedSpell.Level, null);
+            // Cast the heal spell on the ally (picked above, before the ally)
+            var spellResult = SpellSystem.CastSpell(player, selectedSpell!.Level, null);
 
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.Name, targetAlly.DisplayName));
+            terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.DisplayName, targetAlly.DisplayName));
             terminal.WriteLine(spellResult.Message);
 
             if (spellResult.Success && spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus on ally heal-spell
-                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing);
+                spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
                 long oldHP = targetAlly.HP;
                 targetAlly.HP = Math.Min(targetAlly.MaxHP, targetAlly.HP + spellResult.Healing);
                 long actualHeal = targetAlly.HP - oldHP;
 
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("combat.aid_recover_hp", targetAlly.DisplayName, actualHeal));
+                if (actualHeal > 0) GodDeedSystem.Record(player, GodAct.AllyHealed, terminal);   // 1.2.0 Temple gods: Love deed
 
                 // Sync companion HP if this is a companion
                 if (targetAlly.IsCompanion && targetAlly.CompanionId.HasValue)
                 {
                     CompanionSystem.Instance.SyncCompanionHP(targetAlly);
                 }
+
+                // v1.1.15: a heal that carries a ward (Power Hat) wards the ally too, the same as
+                // the combat cast (ApplyHealTo) and a teammate's single-target heal.
+                if (spellResult.ProtectionBonus > 0)
+                    WardAlly(targetAlly, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
             }
             else if (!spellResult.Success)
             {
@@ -18450,6 +19162,11 @@ public partial class CombatEngine
 
         // v1.2: wounded, a teammate looks for a shield before it casts an attack spell
         if (IsWoundedForDefense(teammate, PolicyFor(teammate)) && await TryTeammateClassAbility(teammate, monsters, result))
+        {
+            return;
+        }
+        // v1.1.15: a Sage teammate wards the party and controls the enemy before it attacks
+        if (teammate.Class == CharacterClass.Sage && await TryTeammateSageSpell(teammate, monsters, result))
         {
             return;
         }
@@ -18688,53 +19405,36 @@ public partial class CombatEngine
 
         if (spellResult.Success && spellResult.Healing > 0)
         {
+            // 1.2.0: the healer spec bonus (an NPC healer's heal spell) and the gods' boons
+            spellResult.Healing = ApplyHealerSpecBonus(teammate, spellResult.Healing, result.Monsters);
             // Multi-target heal (e.g. Mass Cure) — heal entire party
             if (healSpell.IsMultiTarget)
             {
-                terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.Name));
+                terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, healSpell.DisplayName));
 
-                // Heal the player
-                long oldPlayerHP = currentPlayer.HP;
-                currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + spellResult.Healing);
-                long playerHeal = currentPlayer.HP - oldPlayerHP;
-                if (playerHeal > 0)
+                // v1.1.15: one list for the heal and the ward: the caster, every living teammate and
+                // the living combat owner (result.Player), the same set the player's own party heal
+                // covers. A fallen player is skipped. The combat owner is listed first.
+                var party = LivingPartyOf(teammate, result)
+                    .OrderBy(a => a == result.Player ? 0 : 1).ToList();
+                foreach (var ally in party)
                 {
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("combat.you_recover_hp", playerHeal));
-                }
-
-                // Heal the caster themselves
-                if (teammate != currentPlayer)
-                {
-                    long oldTmHP = teammate.HP;
-                    teammate.HP = Math.Min(teammate.MaxHP, teammate.HP + spellResult.Healing);
-                    long tmHeal = teammate.HP - oldTmHP;
-                    if (tmHeal > 0)
+                    long oldHP = ally.HP;
+                    ally.HP = Math.Min(ally.MaxHP, ally.HP + spellResult.Healing);
+                    long actualHeal = ally.HP - oldHP;
+                    if (actualHeal > 0)
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.ally_recovers_hp", teammate.DisplayName, tmHeal));
+                        terminal.WriteLine(ally == currentPlayer
+                            ? Loc.Get("combat.you_recover_hp", actualHeal)
+                            : Loc.Get("combat.ally_recovers_hp", ally.DisplayName, actualHeal));
                     }
-                    if (teammate.IsCompanion && teammate.CompanionId.HasValue)
-                        CompanionSystem.Instance.SyncCompanionHP(teammate);
+                    if (ally.IsCompanion && ally.CompanionId.HasValue)
+                        CompanionSystem.Instance.SyncCompanionHP(ally);
                 }
 
-                // Heal all other living teammates
-                if (currentTeammates != null)
-                {
-                    foreach (var tm in currentTeammates.Where(t => t.IsAlive && t != teammate))
-                    {
-                        long oldHP = tm.HP;
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + spellResult.Healing);
-                        long actualHeal = tm.HP - oldHP;
-                        if (actualHeal > 0)
-                        {
-                            terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("combat.ally_recovers_hp", tm.DisplayName, actualHeal));
-                            if (tm.IsCompanion && tm.CompanionId.HasValue)
-                                CompanionSystem.Instance.SyncCompanionHP(tm);
-                        }
-                    }
-                }
+                // v1.1.15: a party heal that carries a ward (Veloura's Embrace) wards the same party
+                WardPartyFromHeal(teammate, party, spellResult);
 
                 result.CombatLog.Add($"{teammate.DisplayName} casts {healSpell.Name} on the whole party.");
             }
@@ -18742,7 +19442,7 @@ public partial class CombatEngine
             {
                 // Single-target heal
                 string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
-                terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.Name, targetName));
+                terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
 
                 long oldHP = target.HP;
                 target.HP = Math.Min(target.MaxHP, target.HP + spellResult.Healing);
@@ -18760,13 +19460,18 @@ public partial class CombatEngine
                     CompanionSystem.Instance.SyncCompanionHP(target);
                 }
 
+                // v1.1.15: a single-target heal that carries a ward (Power Hat) wards the target too,
+                // the same as the player's own single-target cast (ApplyHealTo).
+                if (spellResult.ProtectionBonus > 0)
+                    WardAlly(target, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
+
                 result.CombatLog.Add($"{teammate.DisplayName} heals {target.DisplayName} for {actualHeal} HP.");
             }
         }
         else
         {
             string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
-            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.Name, targetName));
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("combat.spell_fizzles"));
             result.CombatLog.Add($"{teammate.DisplayName}'s healing spell fizzles.");
@@ -18806,7 +19511,7 @@ public partial class CombatEngine
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
         int healAmount = 30 + teammate.Level * 5 + random.Next(10, 30);
-        healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount); // v1.1.11: the potion owner's Infirmary
+        healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         long actualHeal = target.HP - oldHP;
@@ -18892,14 +19597,20 @@ public partial class CombatEngine
         {
             var companion = CompanionSystem.Instance.GetCompanion(caster.CompanionId.Value);
             if (companion?.DisabledSpells != null && companion.DisabledSpells.Count > 0)
+            {
+                SpellSystem.RemapLegacySageDisabledSpells(caster, companion.DisabledSpells); // v1.1.15
                 return companion.DisabledSpells;
+            }
             return new HashSet<string>();
         }
         // v0.65.1: non-companion teammates read the controlling player's spell toggles.
         if (currentPlayer != null
             && currentPlayer.TeammateDisabledSpells.TryGetValue(caster.GetSkillToggleKey(), out var disabledSpells)
             && disabledSpells.Count > 0)
+        {
+            SpellSystem.RemapLegacySageDisabledSpells(caster, disabledSpells); // v1.1.15: renamed Sage spells
             return new HashSet<string>(disabledSpells);
+        }
         return new HashSet<string>();
     }
 
@@ -18988,7 +19699,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.Name));
+        terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.DisplayName));
 
         if (!spellResult.Success)
         {
@@ -19019,6 +19730,8 @@ public partial class CombatEngine
                 // announce the immunity-absorbs message once per AoE cast.
                 long adjustedDamage = ApplyBossSpellProtections(monster, damagePerTarget, announce: !immunityAnnounced);
                 if (monster.IsMagicalImmune) immunityAnnounced = true;
+                // v1.1.15: a marked target takes the mark's bonus from a teammate's spell too
+                if (monster.IsMarked) adjustedDamage += MarkedBonusDamage(monster, adjustedDamage);
                 adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, monster.HP);
                 monster.HP -= actualDamage;
@@ -19056,6 +19769,8 @@ public partial class CombatEngine
                 // bypassed here, allowing e.g. a companion Power Word: Kill to hit Manwe at
                 // full damage despite magical immunity.
                 long adjustedDamage = ApplyBossSpellProtections(target, damage, announce: true);
+                // v1.1.15: a marked target takes the mark's bonus from a teammate's spell too
+                if (target.IsMarked) adjustedDamage += MarkedBonusDamage(target, adjustedDamage);
                 adjustedDamage = TeamHQBonus.ApplyAttack(teammate, adjustedDamage); // v1.1.11: Team HQ Armory, before the HP cap.
                 long actualDamage = Math.Min(adjustedDamage, target.HP);
                 target.HP -= actualDamage;
@@ -19079,6 +19794,160 @@ public partial class CombatEngine
 
                 result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name} on {target.Name} for {actualDamage} damage!");
             }
+        }
+
+        await Task.Delay(GetCombatDelay(800));
+        return true;
+    }
+
+    /// <summary>v1.1.15: the Sage's party wards by slot, strongest first, and what each one gives.</summary>
+    private static readonly (int slot, string kind)[] SageTeammateWards =
+    {
+        (20, "shadow"), (16, "mindblank"), (13, "shadow"), (1, "fog"), (22, "ocean_memory"),
+    };
+
+    /// <summary>v1.1.15: the Sage's area control by slot, strongest first. Psychic Scream is an attack spell and stays with the offensive path.</summary>
+    private static readonly (int slot, string effect)[] SageTeammateAreaControl =
+    {
+        (19, "mass_confusion"), (18, "unveil_pattern"), (14, "compel"), (10, "slumber_mist"), (5, "dulling_mist"),
+    };
+
+    /// <summary>v1.1.15: true when some living ally lacks what this kind of ward gives.</summary>
+    internal static bool PartyLacksWard(string kind, List<Character> party)
+    {
+        bool noWard = party.Any(c => c.MagicACBonus <= 0);
+        return kind switch
+        {
+            "fog" => noWard,
+            "shadow" => noWard || party.Any(c => !c.HasStatus(StatusEffect.Blur)),
+            "mindblank" => noWard || party.Any(c => !c.HasStatusImmunity),
+            "ocean_memory" => party.Any(c => !c.HasOceanMemory),
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// v1.1.15: a monster an area control effect would still do something to. Slumber skips bosses
+    /// (immune) and anything the hold budget refuses; Compel skips Old Gods.
+    /// </summary>
+    internal static bool SageControlWouldLand(Monster m, string effect)
+    {
+        if (m == null || !m.IsAlive) return false;
+        bool holdable = !m.IsHeld && m.StunImmunityRounds <= 0 && m.HoldsThisFight < 3;
+        return effect switch
+        {
+            "dulling_mist" => !m.IsSlowed,
+            "slumber_mist" => !(m.IsBoss || m.IsMiniBoss) && holdable,
+            "compel" => m.FamilyName != "OldGod" && m.TauntRoundsLeft <= 0,
+            "mass_confusion" or "confusion" => !m.IsConfused,
+            "unveil_pattern" or "scholars_mark" => !m.IsMarked,
+            "freeze" => holdable,
+            _ => false,
+        };
+    }
+
+    /// <summary>
+    /// v1.1.15: what a Sage teammate casts this turn, if anything besides an attack. In order: a party
+    /// ward the party lacks; area control on a pack of three or more when it still reaches at least
+    /// two enemies and at least half the pack; Freeze, Scholar's Mark or Confusion on one strong
+    /// target (a boss, a mini-boss, or a monster at least the Sage's level). Null when none applies.
+    /// </summary>
+    internal (SpellSystem.SpellInfo spell, Monster? target, bool isWard)? ChooseSageTeammateSpell(Character teammate, List<Monster> monsters, CombatResult? result)
+    {
+        if (teammate == null || teammate.Class != CharacterClass.Sage) return null;
+        var living = monsters.Where(m => m.IsAlive).ToList();
+        if (living.Count == 0) return null;
+        var disabled = GetDisabledSpellsFor(teammate);
+
+        SpellSystem.SpellInfo? Usable(int slot)
+        {
+            var s = SpellSystem.GetSpellInfo(CharacterClass.Sage, slot);
+            if (s == null) return null;
+            if (teammate.Level < SpellSystem.GetLevelRequired(CharacterClass.Sage, slot)) return null;
+            if (!SpellSystem.CanCastSpell(teammate, slot)) return null;
+            if (disabled.Contains(s.Name)) return null;
+            return s;
+        }
+
+        var party = LivingPartyOf(teammate, result);
+        foreach (var (slot, kind) in SageTeammateWards)
+        {
+            var s = Usable(slot);
+            if (s != null && PartyLacksWard(kind, party)) return (s, null, true);
+        }
+
+        if (living.Count >= 3)
+        {
+            foreach (var (slot, effect) in SageTeammateAreaControl)
+            {
+                var s = Usable(slot);
+                if (s == null) continue;
+                int reach = living.Count(m => SageControlWouldLand(m, effect));
+                if (reach >= 2 && reach * 2 >= living.Count) return (s, null, false);
+            }
+        }
+
+        var strong = living
+            .Where(m => m.IsBoss || m.IsMiniBoss || m.Level >= teammate.Level)
+            .OrderByDescending(m => m.HP)
+            .FirstOrDefault();
+        if (strong != null)
+        {
+            bool boss = strong.IsBoss || strong.IsMiniBoss;
+            var order = boss
+                ? new[] { (6, "scholars_mark"), (7, "confusion"), (4, "freeze") }
+                : new[] { (4, "freeze"), (6, "scholars_mark"), (7, "confusion") };
+            foreach (var (slot, effect) in order)
+            {
+                var s = Usable(slot);
+                if (s != null && SageControlWouldLand(strong, effect)) return (s, strong, false);
+            }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// v1.1.15: a Sage teammate casts a party ward, area control or single-target control (see
+    /// ChooseSageTeammateSpell). Holds go through HandleSpecialSpellEffectOnMonster, so the shared
+    /// hold budget applies. True when the turn was used.
+    /// </summary>
+    internal async Task<bool> TryTeammateSageSpell(Character teammate, List<Monster> monsters, CombatResult result)
+    {
+        var choice = ChooseSageTeammateSpell(teammate, monsters, result);
+        if (choice == null) return false;
+        var (spell, target, isWard) = choice.Value;
+
+        var spellResult = SpellSystem.CastSpell(teammate, spell.Level, null);
+        terminal.WriteLine("");
+        terminal.SetColor("magenta");
+        if (isWard)
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, spell.DisplayName));
+        else if (target != null)
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, spell.DisplayName, target.Name));
+        else
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.DisplayName));
+
+        if (!spellResult.Success)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("combat.spell_fizzles"));
+            result.CombatLog.Add($"{teammate.DisplayName}'s {spell.Name} fizzles.");
+            await Task.Delay(GetCombatDelay(600));
+            return true;
+        }
+
+        if (isWard)
+        {
+            ApplySagePartyWard(teammate, spellResult, result);
+            result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name} on the whole party.");
+        }
+        else
+        {
+            string effect = spellResult.SpecialEffect ?? "";
+            var targets = target != null ? new List<Monster> { target } : monsters.Where(m => m.IsAlive).ToList();
+            foreach (var m in targets.Where(m => m.IsAlive))
+                HandleSpecialSpellEffectOnMonster(m, effect, spellResult.Duration, teammate, spellResult.Damage, result);
+            result.CombatLog.Add($"{teammate.DisplayName} casts {spell.Name}.");
         }
 
         await Task.Delay(GetCombatDelay(800));
@@ -19247,14 +20116,7 @@ public partial class CombatEngine
                 SayWhyOnce(teammate, "combat.teammate_hangs_back");
             }
         }
-        bool isTankClass = teammate.Class == CharacterClass.Warrior || teammate.Class == CharacterClass.Paladin
-            || teammate.Class == CharacterClass.Barbarian;
-        bool isTankCompanion = teammate.IsCompanion && teammate.CompanionId.HasValue &&
-            UsurperRemake.Systems.CompanionSystem.Instance?.GetCompanion(teammate.CompanionId.Value)?.CombatRole == UsurperRemake.Systems.CombatRole.Tank;
-        // Spec-based tank detection (Protection Warrior, Juggernaut Barbarian)
-        bool isTankSpec = teammate is NPC tankNpc && UsurperRemake.Data.SpecializationData.IsTankSpec(tankNpc.Specialization);
-
-        if (isTankClass || isTankCompanion || isTankSpec)
+        if (IsPartyTank(teammate))
         {
             bool anyTaunted = livingMonsters.Any(m => !string.IsNullOrEmpty(m.TauntedBy) && m.TauntRoundsLeft > 0);
             if (!anyTaunted)
@@ -20056,6 +20918,16 @@ public partial class CombatEngine
             }
         }
 
+        // v1.1.15: Blur makes a monster miss a teammate 20% of the time, as it does the player
+        // (the Sage's Shadow Cloak and Noctura's Veil now blur the whole party)
+        if (companion.HasStatus(StatusEffect.Blur) && random.Next(100) < 20)
+        {
+            terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
+            result.CombatLog.Add($"{monster.Name} misses {companion.DisplayName} due to blur");
+            await Task.Delay(GetCombatDelay(500));
+            return;
+        }
+
         // Calculate monster damage
         long monsterAttack = monster.GetAttackPower();
         monsterAttack += random.Next(0, 10);
@@ -20199,6 +21071,8 @@ public partial class CombatEngine
         result.CombatLog.Add($"{monster.Name} attacks {companion.DisplayName} for {actualDamage} damage");
 
         CompanionDeathCheck:
+        // 1.2.0 Temple gods piece 5: a grouped follower of Mortis at Chosen cheats death once a day
+        if (!companion.IsAlive) TryMortisMiracleForFollower(companion, result);
         // Check if teammate died
         if (!companion.IsAlive)
         {
@@ -20258,6 +21132,7 @@ public partial class CombatEngine
                     companion.CombatInputChannel.Writer.TryComplete();
                     companion.CombatInputChannel = null;
                 }
+                ApplyMentalFollowerDeath(companion, result);   // v1.1.15: before Mark hands the death to their session
                 UsurperRemake.Server.GroupFollowerDeath.Mark(companion, monster.Name); // v1.2: their own session resolves the death
                 companion.IsAwaitingCombatInput = false;
             }
@@ -20300,6 +21175,7 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleTeammateDeathDispatch(Character tm, string killerName, CombatResult result)
     {
+        if (TryMortisMiracleForFollower(tm, result)) return;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
         if (tm.IsEcho)
         {
             terminal.SetColor("bright_cyan");
@@ -20326,6 +21202,7 @@ public partial class CombatEngine
                 tm.CombatInputChannel = null;
             }
             tm.IsAwaitingCombatInput = false;
+            ApplyMentalFollowerDeath(tm, result);   // v1.1.15: before Mark hands the death to their session
             UsurperRemake.Server.GroupFollowerDeath.Mark(tm, killerName); // v1.2: their own session resolves the death
         }
         else
@@ -20464,7 +21341,7 @@ public partial class CombatEngine
 
         if (isMeaningful && !npc.IsMercenary && wasPermadeath)
         {
-            UsurperRemake.Systems.GriefSystem.Instance.BeginNpcGrief(
+            bool griefBegan = UsurperRemake.Systems.GriefSystem.Instance.BeginNpcGrief(
                 npcId,
                 npc.DisplayName,
                 UsurperRemake.Systems.DeathType.Combat);
@@ -20474,6 +21351,15 @@ public partial class CombatEngine
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("combat.grief_combat_effect"));
             terminal.WriteLine("");
+
+            // v1.1.15: the Mental grief loss, once per death (a duplicate grief begins nothing)
+            if (griefBegan && result.Player != null)
+            {
+                int mentalBeforeGrief = result.Player.Mental;
+                MentalSystem.ApplyNpcGrief(result.Player);
+                MentalUi.AnnounceMentalChange(terminal, result.Player, mentalBeforeGrief);
+                GodDeedSystem.Record(result.Player, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
+            }
             await Task.Delay(1500);
         }
 
@@ -20691,6 +21577,7 @@ public partial class CombatEngine
                 result.Player.Fame += 2;
             }
         }
+        GodDeedSystem.RecordGroupVictory(result.Player, result.DefeatedMonsters, result.Teammates, terminal);   // 1.2.0 Temple gods: Light and War deeds, leader and grouped followers
 
         // Apply world event modifiers
         long adjustedExp = WorldEventSystem.Instance.GetAdjustedXP(totalExp);
@@ -20839,11 +21726,13 @@ public partial class CombatEngine
                 adjustedExp = xpMods.Note(adjustedExp, (long)(adjustedExp * guildMultMM), "guild");
         }
 
-        // Fatigue XP penalty — Exhausted tier only (single-player only)
+        // Fatigue XP penalty, Exhausted tier only (single-player only). v1.1.15: a cut, not a bonus
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.Player.Fatigue >= GameConfig.FatigueExhaustedThreshold)
-        {
-            adjustedExp = xpMods.Note(adjustedExp, adjustedExp - (long)(adjustedExp * GameConfig.FatigueExhaustedXPPenalty), "fatigue");
-        }
+            adjustedExp = xpMods.Note(adjustedExp, MentalSystem.ApplyFatigueXp(result.Player, adjustedExp, false), "fatigue");
+
+        // v1.1.15: the Broken affliction costs 25% of XP gained
+        if (result.Player.MentalBroken)
+            adjustedExp = xpMods.Note(adjustedExp, MentalSystem.ApplyBrokenXp(result.Player, adjustedExp), "mental_broken");
 
         // v0.64.1 early-game XP multiplier (multi-monster path). See
         // HandleVictory for the rationale; transparent at Lv 21+.
@@ -21645,6 +22534,179 @@ public partial class CombatEngine
     /// <summary>
     /// Handle player death with resurrection options
     /// </summary>
+    /// <summary>
+    /// v1.1.15: Mental fight-end losses for a monster fight. The leader and every living grouped
+    /// human follower each take one net change (MentalSystem.ApplyFightEnd) and one announcement;
+    /// NPC teammates, companions, echoes and pets are skipped. PvP (a result with an Opponent),
+    /// arrest and exhibition fights are exempt. A leader who died this fight (the death loss is
+    /// taken in HandlePlayerDeath) takes the strain and boss losses but not flee or near death.
+    /// leaderMentalBefore is the leader's Mental at fight start, so the one announcement also
+    /// covers the death loss.
+    /// </summary>
+    internal static void ApplyMentalFightEnd(CombatResult result, int floor, bool fled, bool oldGod,
+        TerminalEmulator? terminal, int leaderMentalBefore)
+    {
+        var leader = result?.Player;
+        if (leader == null || result!.Opponent != null || leader.IsArrestCombat || leader.IsExhibitionCombat) return;
+
+        bool boss = result.Monsters?.Any(m => m != null && (m.IsBoss || m.IsMiniBoss)) == true;
+        oldGod |= result.Monsters?.Any(m => m != null && m.FamilyName == "OldGod") == true;
+        int companions = MentalSystem.CountStoryCompanions(result.Teammates);
+        bool died = result.PlayerActuallyDied;
+
+        MentalSystem.ApplyFightEnd(leader, floor, companions, fled && !died, !died && MentalSystem.IsNearDeath(leader), boss, oldGod);
+        if (terminal != null) MentalUi.AnnounceMentalChange(terminal, leader, leaderMentalBefore);
+
+        if (result.Teammates == null) return;
+        foreach (var mate in result.Teammates.ToList())
+        {
+            if (mate == null || !mate.IsGroupedPlayer || !mate.IsAlive || mate.IsNPC || ReferenceEquals(mate, leader)) continue;
+            if (result.MentalDeadFollowers.Contains(mate)) continue;   // took the death share already
+            int before = mate.Mental;
+            MentalSystem.ApplyFightEnd(mate, floor, companions, fled, MentalSystem.IsNearDeath(mate), boss, oldGod);
+            if (mate.RemoteTerminal != null) MentalUi.AnnounceMentalChange(mate.RemoteTerminal, mate, before);
+            ApplyFollowerCollapse(mate, floor, terminal);
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: a grouped human follower whose Mental is 0 after the leader's fight collapses, the
+    /// same rules as a solo player (BaseLocation.HandleMentalCollapse). On the collapse death floor
+    /// or deeper it is a real death through the existing follower death path (GroupFollowerDeath.Mark,
+    /// resolved on their own session), with the Broken affliction and Mental 20 after. Shallower, the
+    /// rescue applies (Broken, Mental 20, the gold fee) and their session leaves the group for the
+    /// Healer (PendingMentalRescue). Each line goes to the follower's own terminal and a short line to
+    /// the leader's. Anyone else, or Mental above 0, does nothing.
+    /// </summary>
+    internal static void ApplyFollowerCollapse(Character follower, int floor, TerminalEmulator? leaderTerminal)
+    {
+        if (follower == null || !follower.IsGroupedPlayer || !MentalSystem.NeedsCollapse(follower)) return;
+        var own = follower.RemoteTerminal;
+        if (MentalSystem.IsCollapseDeath(floor))
+        {
+            follower.HP = 0;
+            if (own != null) { own.SetColor("bright_red"); own.WriteLine(Loc.Get("mental.collapse_death")); }
+            // the collapse is the Mental cost itself, so no death loss; Broken and 20 for after the death
+            MentalSystem.ApplyCollapseDeathAftermath(follower);
+            UsurperRemake.Server.GroupFollowerDeath.Mark(follower, Loc.Get("mental.collapse_killer"));
+        }
+        else
+        {
+            long fee = MentalSystem.ApplyCollapseRescue(follower);
+            if (own != null)
+            {
+                own.SetColor("bright_magenta");
+                own.WriteLine(Loc.Get("mental.collapse_rescue"));
+                if (fee > 0) own.WriteLine(Loc.Get("mental.collapse_fee", fee.ToString("N0")));
+            }
+            follower.PendingMentalRescue = true;
+            follower.IsAwaitingCombatInput = false;
+            var session = string.IsNullOrEmpty(follower.GroupPlayerUsername) ? null : GroupSystem.GetSession(follower.GroupPlayerUsername);
+            if (session != null) session.IsGroupFollower = false;   // GroupFollowerLoop leaves on its next read
+        }
+        if (leaderTerminal != null)
+        {
+            leaderTerminal.SetColor("magenta");
+            leaderTerminal.WriteLine(Loc.Get("mental.collapse_other", follower.DisplayName));
+        }
+    }
+
+    /// <summary>
+    /// v1.1.15: a Mental collapse on the collapse death floor or deeper is a real death under the
+    /// normal death rules: this runs the existing HandlePlayerDeath (permadeath, resurrection,
+    /// penalties, save) with no monster, skipping only the Last Stand rescue and the Mental death
+    /// loss (MentalCollapseDeath). Returns the result so the caller can follow ShouldReturnToTemple
+    /// and IsPermadeath as after any fight.
+    /// </summary>
+    internal async Task<CombatResult> HandleMentalCollapseDeath(Character player, List<Character>? teammates = null)
+    {
+        currentPlayer = player;
+        var result = new CombatResult
+        {
+            Player = player,
+            Teammates = teammates ?? new List<Character>(),
+            Outcome = CombatOutcome.PlayerDied,
+            MentalCollapseDeath = true,
+            MentalDeathApplied = true,
+        };
+        player.HP = 0;
+        await HandlePlayerDeath(result);
+        return result;
+    }
+
+    /// <summary>
+    /// v1.1.15: strain floor for a monster fight: the leader's dungeon floor (at least 1) in the
+    /// Dungeons, else 0 (no strain).
+    /// </summary>
+    internal static int MentalFightFloor(Character? leader) =>
+        leader != null && leader.Location == (int)GameLocation.Dungeons ? Math.Max(1, leader.LastDungeonFloor) : 0;
+
+    /// <summary>
+    /// v1.1.15: a grouped human follower died in the leader's monster fight. Same as a dead leader:
+    /// the death loss plus the fight's strain and boss or Old God loss, no flee or near death, as one
+    /// net change and one announcement on the follower's own terminal, once per fight. Runs on the
+    /// leader's combat thread at the death site, before GroupFollowerDeath.Mark hands the death to
+    /// the follower's session (resurrection, HP reset, save). NPC teammates, companions, echoes and
+    /// pets are skipped; PvP, arrest and exhibition fights are exempt.
+    /// </summary>
+    internal static void ApplyMentalFollowerDeath(CombatResult? result, Character? follower, int floor, bool oldGod)
+    {
+        var leader = result?.Player;
+        if (leader == null || follower == null || result!.Opponent != null || leader.IsArrestCombat || leader.IsExhibitionCombat) return;
+        if (!follower.IsGroupedPlayer || follower.IsNPC || ReferenceEquals(follower, leader)) return;
+        if (!result.MentalDeadFollowers.Add(follower)) return;
+
+        bool boss = result.Monsters?.Any(m => m != null && (m.IsBoss || m.IsMiniBoss)) == true;
+        oldGod |= result.Monsters?.Any(m => m != null && m.FamilyName == "OldGod") == true;
+        int companions = MentalSystem.CountStoryCompanions(result.Teammates);
+        int before = follower.Mental;
+        MentalSystem.ApplyFightEnd(follower, floor, companions, false, false, boss, oldGod, died: true);
+        if (follower.RemoteTerminal != null) MentalUi.AnnounceMentalChange(follower.RemoteTerminal, follower, before);
+    }
+
+    private void ApplyMentalFollowerDeath(Character follower, CombatResult result) =>
+        ApplyMentalFollowerDeath(result, follower, MentalFightFloor(result?.Player), BossContext != null);
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: Mortis's Miracle for the fight's leader, from HandlePlayerDeath.
+    /// When it fires the player is left at 1 HP, the day's Miracle is spent, the message is shown
+    /// (and broadcast to a group), and the outcome is rewritten as after Last Stand. Skipped for
+    /// arrest and exhibition fights and a Mental collapse death. True when it fired.
+    /// </summary>
+    private async Task<bool> TryMortisMiracle(CombatResult result)
+    {
+        var player = result.Player;
+        if (player == null || result.MentalCollapseDeath || player.IsArrestCombat || player.IsExhibitionCombat) return false;
+        if (!MiracleSystem.TryCheatDeath(player)) return false;
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires")}");
+        terminal.WriteLine("");
+        if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+            BroadcastGroupCombatEvent(result, $"\u001b[1;35m  {Loc.Get("miracle.mortis_fires_other", player.DisplayName)}\u001b[0m");
+        await Task.Delay(GetCombatDelay(1500));
+        result.Outcome = result.Monsters != null && !result.Monsters.Any(m => m.IsAlive)
+            ? CombatOutcome.Victory : CombatOutcome.PlayerEscaped;
+        return true;
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: Mortis's Miracle for a grouped follower at a death site, before
+    /// the follower is removed from the fight or their death is handed to their session. When it
+    /// fires they stay in the fight at 1 HP; the message goes to their own terminal and the leader's.
+    /// Only grouped human followers; not in a fight with no real death. True when it fired.
+    /// </summary>
+    private bool TryMortisMiracleForFollower(Character follower, CombatResult result)
+    {
+        var leader = result?.Player;
+        if (follower == null || !follower.IsGroupedPlayer || leader == null) return false;
+        if (leader.IsArrestCombat || leader.IsExhibitionCombat || result!.Opponent != null) return false;
+        if (!MiracleSystem.TryCheatDeath(follower)) return false;
+        follower.RemoteTerminal?.WriteLine($"  {Loc.Get("miracle.mortis_fires")}", "bright_magenta");
+        terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires_other", follower.DisplayName)}", "bright_magenta");
+        return true;
+    }
+
     private async Task HandlePlayerDeath(CombatResult result)
     {
         // v0.61.2 Last-Stand cap: every monster / boss / environmental damage
@@ -21656,7 +22718,8 @@ public partial class CombatEngine
         // 1 HP (the Outcome rewrite below).
         // Bypassed for Nightmare difficulty. PvP combat doesn't route through
         // this method (it has its own death path), so PvP is naturally excluded.
-        if (result.Player.LastStandCheckAndApply(isPvP: false))
+        // v1.1.15: a Mental collapse death is not a blow that Last Stand can turn aside
+        if (!result.MentalCollapseDeath && result.Player.LastStandCheckAndApply(isPvP: false))
         {
             // Render the flavor line in the player's local terminal. Group
             // followers see the broadcast version a few lines below.
@@ -21691,6 +22754,12 @@ public partial class CombatEngine
                 result.Outcome = CombatOutcome.PlayerEscaped;
             return;
         }
+
+        // 1.2.0 Temple gods piece 5: Mortis's Miracle cheats death once that day, after the free
+        // rescues (Last Stand, Death's Door) and before anything death-related runs. Not for a
+        // fight with no real death (arrest, exhibition) or a Mental collapse.
+        if (await TryMortisMiracle(result))
+            return;
 
         // v0.61.2: Last-Stand rescue did NOT fire, so the player is genuinely
         // entering the death pipeline. Mark the result so the outer Char.Combat.End
@@ -21739,6 +22808,14 @@ public partial class CombatEngine
             DebugLogger.Instance.LogInfo("EXHIBITION",
                 $"{result.Player.Name} dropped in exhibition combat (no resurrection consumed).");
             return;
+        }
+
+        // v1.1.15: Mental death loss, once per fight, before the save, permadeath and resurrection
+        // paths below. Announced with the other fight-end losses at the end of PlayerVsMonsters.
+        if (!result.MentalDeathApplied)
+        {
+            result.MentalDeathApplied = true;
+            MentalSystem.ApplyDeath(result.Player);
         }
 
         // v0.60.0 beta: track total deaths for stats/analytics. The cap that
@@ -21989,6 +23066,29 @@ public partial class CombatEngine
     /// <summary>
     /// Present resurrection choices to the player
     /// </summary>
+    /// <summary>
+    /// 1.2.0: the dark bargain resurrection's price, a lasting loss (a negative GrantPermanentStat)
+    /// that the next recalculation keeps. <paramref name="roll"/> (0 to 5) picks the stat; the Max HP
+    /// case costs five times <paramref name="statLoss"/>, which is updated for the summary line. The
+    /// helper's floors (1, and 10 for Max HP) replace the old Math.Max floors. Returns the stat's name.
+    /// </summary>
+    internal static string ApplyDarkBargainStatLoss(Character player, int roll, ref int statLoss)
+    {
+        switch (roll)
+        {
+            case 0: player.GrantPermanentStat(StatKind.Strength, -statLoss); return "Strength";
+            case 1: player.GrantPermanentStat(StatKind.Defence, -statLoss); return "Defence";
+            case 2: player.GrantPermanentStat(StatKind.Stamina, -statLoss); return "Stamina";
+            case 3: player.GrantPermanentStat(StatKind.Agility, -statLoss); return "Agility";
+            case 4: player.GrantPermanentStat(StatKind.Charisma, -statLoss); return "Charisma";
+            default:
+                player.GrantPermanentStat(StatKind.MaxHP, -(statLoss * 5));
+                string name = $"Max HP (-{statLoss * 5})";
+                statLoss *= 5;
+                return name;
+        }
+    }
+
     private async Task<ResurrectionResult> PresentResurrectionChoices(CombatResult result)
     {
         var player = result.Player;
@@ -22150,7 +23250,7 @@ public partial class CombatEngine
             }
 
             // Lose 75% gold
-            long goldLost = (long)(player.Gold * 0.75);
+            long goldLost = GodBoonSystem.DeathGoldLoss(player, (long)(player.Gold * 0.75));   // 1.2.0 Temple gods piece 2: Mortis's boon
             player.Gold -= goldLost;
 
             // Lose a random equipped item
@@ -22272,16 +23372,7 @@ public partial class CombatEngine
             int statLoss = 2 + random.Next(4);
 
             // Reduce a random stat permanently
-            string lostStatName;
-            switch (random.Next(6))
-            {
-                case 0: player.Strength = Math.Max(1, player.Strength - statLoss); lostStatName = "Strength"; break;
-                case 1: player.Defence = Math.Max(1, player.Defence - statLoss); lostStatName = "Defence"; break;
-                case 2: player.Stamina = Math.Max(1, player.Stamina - statLoss); lostStatName = "Stamina"; break;
-                case 3: player.Agility = Math.Max(1, player.Agility - statLoss); lostStatName = "Agility"; break;
-                case 4: player.Charisma = Math.Max(1, player.Charisma - statLoss); lostStatName = "Charisma"; break;
-                default: player.MaxHP = Math.Max(10, player.MaxHP - (statLoss * 5)); lostStatName = $"Max HP (-{statLoss * 5})"; statLoss = statLoss * 5; break;
-            }
+            string lostStatName = ApplyDarkBargainStatLoss(player, random.Next(6), ref statLoss);
 
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("combat.cold_presence"));
@@ -22358,6 +23449,7 @@ public partial class CombatEngine
         float taxExemption = FactionSystem.Instance?.GetTaxExemptionRate() ?? 0f;
         if (taxExemption > 0) goldLossRate *= (1.0 - taxExemption);
         long goldLoss = (long)(player.Gold * goldLossRate * penaltyMultiplier);
+        goldLoss = GodBoonSystem.DeathGoldLoss(player, goldLoss);   // 1.2.0 Temple gods piece 2: Mortis's boon
         player.Gold = Math.Max(0, player.Gold - goldLoss);
         if (goldLoss > 0)
         {
@@ -22641,7 +23733,7 @@ public partial class CombatEngine
 
         long hpNeeded = player.MaxHP - player.HP;
         int healPerPotion = 30 + player.Level * 5 + random.Next(10, 30);
-        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: Infirmary, so potionsNeeded shrinks too
+        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, result.Monsters); // v1.1.11: Infirmary, so potionsNeeded shrinks too
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
         long actualHealing = Math.Min((long)potionsNeeded * healPerPotion, hpNeeded);
@@ -23002,7 +24094,7 @@ public partial class CombatEngine
                 actualDamage = Math.Max(1, actualDamage - defense);
             }
 
-            // Marked target takes 30% bonus damage. Player report: Shield Bash (and
+            // Marked target takes bonus damage (30%, or what a Sage mark set). Player report: Shield Bash (and
             // every other single-target class ability) skipped the Marked bonus
             // because this path applies damage directly to monster.HP instead of
             // routing through ApplySingleMonsterDamage. Basic attacks honor Marked
@@ -23010,7 +24102,7 @@ public partial class CombatEngine
             // single-target ability path was the only damage path that didn't.
             if (monster.IsMarked)
             {
-                long markedBonus = (long)(actualDamage * 0.3);
+                long markedBonus = MarkedBonusDamage(monster, actualDamage);
                 actualDamage += markedBonus;
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.marked_bonus", markedBonus));
@@ -23103,7 +24195,7 @@ public partial class CombatEngine
         if (abilityResult.Healing > 0)
         {
             // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
-            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing);
+            abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monster != null ? new[] { monster } : null);
             long actualHealing = Math.Min(abilityResult.Healing, player.MaxHP - player.HP);
             player.HP += actualHealing;
 
@@ -23520,11 +24612,11 @@ public partial class CombatEngine
             case "freeze":
                 if (monster != null && monster.IsAlive)
                 {
-                    int freezeChance = monster.IsBoss ? 40 : 75;
-                    if (random.Next(100) < freezeChance)
+                    // v1.1.15: the freeze goes through the shared hold budget; its boss resist
+                    // replaces the old 40% boss chance (75% then half: about 37% on a boss)
+                    if (random.Next(100) < 75
+                        && TryHoldMonster(monster, HoldKind.Freeze, abilityResult.Duration > 0 ? abilityResult.Duration : 2))
                     {
-                        monster.IsFrozen = true;
-                        monster.FrozenDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 2;
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("combat.frozen_solid", monster.Name));
                     }
@@ -24230,7 +25322,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.HP = Math.Min(tm.MaxHP, tm.HP + 200);
+                        tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.CastHeal(player, 200, result.Monsters)); // 1.2.0: Amara and Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
                     }
                 }
@@ -24992,7 +26084,8 @@ public partial class CombatEngine
         // Regenerate mana for spellcasters each round
         if (SpellSystem.HasSpells(player) && player.Mana < player.MaxMana)
         {
-            int manaRegen = StatEffectsSystem.GetManaRegenPerRound(player.Wisdom);
+            // 1.2.0 Temple gods piece 2: Arcanus's boon on mana regeneration
+            int manaRegen = (int)Math.Min(GodBoonSystem.ManaRegen(player, StatEffectsSystem.GetManaRegenPerRound(player.Wisdom)), int.MaxValue);
             player.Mana = Math.Min(player.MaxMana, player.Mana + manaRegen);
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("combat.recover_mana", manaRegen, player.Mana, player.MaxMana));
@@ -25550,12 +26643,22 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.off_hand_strike"));
         }
 
+        if (PvPBlindedMiss(attacker))
+        {
+            result.CombatLog.Add($"{attacker.DisplayName} misses {defender.DisplayName} (blinded)");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
+
         long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
 
         // Weapon config modifier; the off-hand flag applies the same reduced-power
         // off-hand multiplier the PvE path uses.
         double damageModifier = GetWeaponConfigDamageModifier(attacker, isOffHand);
         attackPower = (long)(attackPower * damageModifier);
+
+        // 1.2.0 Temple gods piece 2: Discordia's boon on PvP damage
+        attackPower = GodBoonSystem.PvpDamage(attacker, attackPower);
 
         // Check for critical hit
         bool isCritical = random.Next(100) < 5 + (attacker.Dexterity / 10);
@@ -25666,7 +26769,7 @@ public partial class CombatEngine
             for (int i = 0; i < spells.Count; i++)
             {
                 var sp = spells[i];
-                terminal.WriteLine($"  [{i + 1}] {sp.Name} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {sp.ManaCost})", "white");
+                terminal.WriteLine($"  [{i + 1}] {sp.DisplayName} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {sp.ManaCost})", "white");
             }
 
             var choice = await terminal.GetInput(Loc.Get("combat.cast_which_spell"));
@@ -25699,6 +26802,8 @@ public partial class CombatEngine
             // Apply healing to self
             if (spellResult.Healing > 0)
             {
+                // 1.2.0: Amara's boon on a heal the attacker casts (no monsters, so Solarius's never fires)
+                spellResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(attacker, spellResult.Healing, null), int.MaxValue);
                 attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + spellResult.Healing);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("combat.you_recover_hp", spellResult.Healing));
@@ -25708,10 +26813,11 @@ public partial class CombatEngine
             if (spellResult.ProtectionBonus > 0)
             {
                 int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-                attacker.MagicACBonus = spellResult.ProtectionBonus;
+                int ward = SageWardStrength(attacker, spellResult.ProtectionBonus); // v1.1.15: a Sage's seals
+                attacker.MagicACBonus = ward;
                 attacker.ApplyStatus(StatusEffect.Blessed, dur);
                 string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
-                terminal.WriteLine(Loc.Get("combat.magically_protected", spellResult.ProtectionBonus, durText), "blue");
+                terminal.WriteLine(Loc.Get("combat.magically_protected", ward, durText), "blue");
             }
             if (spellResult.AttackBonus > 0)
             {
@@ -25945,6 +27051,8 @@ public partial class CombatEngine
         // Apply healing effects (self-heals)
         if (abilityResult.Healing > 0)
         {
+            // 1.2.0: Amara's boon on a heal the attacker casts (no monsters, so Solarius's never fires)
+            abilityResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(attacker, abilityResult.Healing, null), int.MaxValue);
             attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + abilityResult.Healing);
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("combat.you_recover_hp", abilityResult.Healing));
@@ -26100,6 +27208,8 @@ public partial class CombatEngine
                 }
                 if (abilityResult.Healing > 0)
                 {
+                    // 1.2.0: the gods' cast-heal boons (none for an NPC)
+                    abilityResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(computer, abilityResult.Healing, null), int.MaxValue);
                     computer.HP = Math.Min(computer.MaxHP, computer.HP + abilityResult.Healing);
                     terminal.WriteLine(Loc.Get("combat.ally_recovers_hp", computer.DisplayName, abilityResult.Healing), "green");
                 }
@@ -26123,6 +27233,12 @@ public partial class CombatEngine
         }
 
         // 3. Default attack (with weapon soft cap)
+        if (PvPBlindedMiss(computer))
+        {
+            result.CombatLog.Add($"{computer.DisplayName} misses {opponent.DisplayName} (blinded)");
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
         long attackPower = computer.Strength + GetEffectiveWeapPow(computer.WeapPow) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
@@ -26251,8 +27367,9 @@ public partial class CombatEngine
         // else defaults to Finish: the irreversible branch should require a
         // deliberate Spare, but a localized "yes" must not execute the NPC
         // the player meant to save.
-        bool spared = choice == "1" || choice == "S" || choice == "SPARE"
-            || choice == "Y" || choice == "O" || choice == "I" || choice == "SI" || choice == "IGEN";
+        // v1.1.15: yesno-exempt: displayed menu is [1] Spare / [2] Finish; Y/S/O/I/SI/IGEN are legacy aliases for "1", not a plain yes/no, and any junk must default to Finish (irreversible) on the first read, not re-ask
+        bool spared = choice == "1" || choice == "S" || choice == "SPARE" // v1.1.15: yesno-exempt
+            || choice == "Y" || choice == "O" || choice == "I" || choice == "SI" || choice == "IGEN"; // v1.1.15: yesno-exempt
         if (spared)
         {
             result.Outcome = CombatOutcome.OpponentSpared;
@@ -26312,7 +27429,7 @@ public partial class CombatEngine
             // v1.1.11: a Crown bounty on a player is paid to the duel's winner, lethal or not (a duel won).
             // Only a player loaded from a save; a hired guard or an echo may carry a player's name.
             var paid = QuestSystem.CollectBountiesOnPlayer(result.Player, result.Opponent);
-            bounty = paid.Sum(QuestSystem.BountyReward);
+            bounty = paid.Sum(q => GodBoonSystem.BountyReward(result.Player, QuestSystem.BountyReward(q)));   // as paid, with Judicar's boon
             if (paid.Count > 0 && UsurperRemake.BBS.DoorMode.IsOnlineMode && OnlineStateManager.IsActive)
             {
                 // v1.1.11: matched by claim key, so one id-less bounty does not take the other id-less quests with it
@@ -26589,7 +27706,7 @@ public partial class CombatEngine
             var color = canCast ? ConsoleColor.White : ConsoleColor.DarkGray;
 
             terminal.SetColor(color);
-            terminal.WriteLine($"{i + 1}. {spell.Name} ({Loc.Get("combat.level_label")} {spell.Level}) - {manaCost} {Loc.Get("combat.mana_label")}");
+            terminal.WriteLine($"{i + 1}. {spell.DisplayName} ({Loc.Get("combat.level_label")} {spell.Level}) - {manaCost} {Loc.Get("combat.mana_label")}");
             if (!canCast)
             {
                 terminal.WriteLine($"   {Loc.Get("combat.not_enough_mana")}");
@@ -26629,13 +27746,13 @@ public partial class CombatEngine
             }
 
             // Apply spell effects
-            ApplySpellEffects(player, monster, spellResult, result);
+            ApplySpellEffects(player, monster, spellResult, result, monster != null ? new[] { monster } : null);
 
             // Display training improvement message if spell proficiency increased
             if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedSpell.Name, spellResult.NewProficiencyLevel));
+                terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedSpell.DisplayName, spellResult.NewProficiencyLevel));
             }
 
             terminal.PressAnyKey();
@@ -26650,11 +27767,14 @@ public partial class CombatEngine
     /// <summary>
     /// Apply spell effects to combat
     /// </summary>
-    private void ApplySpellEffects(Character caster, Monster target, SpellSystem.SpellResult spellResult, CombatResult result = null)
+    private void ApplySpellEffects(Character caster, Monster target, SpellSystem.SpellResult spellResult, CombatResult result = null, IEnumerable<Monster>? monsters = null, Character? healer = null)
     {
         // Apply healing to caster
         if (spellResult.Healing > 0)
         {
+            // 1.2.0: Amara's and Solarius's boons on the heal, from the one who cast it (healer: a
+            // buff cast on an ally lands here with the ally as caster). No healer spec bonus here.
+            spellResult.Healing = (int)Math.Min(GodBoonSystem.CastHeal(healer ?? caster, spellResult.Healing, monsters), int.MaxValue);
             long oldHP = caster.HP;
             caster.HP = Math.Min(caster.HP + spellResult.Healing, caster.MaxHP);
             long actualHealing = caster.HP - oldHP;
@@ -26704,10 +27824,14 @@ public partial class CombatEngine
         if (spellResult.ProtectionBonus > 0)
         {
             int dur = spellResult.Duration > 0 ? spellResult.Duration : 999;
-            caster.MagicACBonus = spellResult.ProtectionBonus;
-            caster.ApplyStatus(StatusEffect.Blessed, dur);
-            string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
-            terminal.WriteLine(Loc.Get("combat.caster_protected", caster.DisplayName, spellResult.ProtectionBonus, durText), "blue");
+            // v1.1.15: a weaker ward no longer replaces a stronger one
+            if (ApplyWardHighestWins(caster, spellResult.ProtectionBonus, dur))
+            {
+                string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
+                terminal.WriteLine(Loc.Get("combat.caster_protected", caster.DisplayName, spellResult.ProtectionBonus, durText), "blue");
+            }
+            else
+                terminal.WriteLine(Loc.Get("combat.ward_stronger_holds", caster.DisplayName), "gray");
         }
 
         if (spellResult.AttackBonus > 0)
@@ -26731,6 +27855,9 @@ public partial class CombatEngine
     /// </summary>
     private void HandleSpecialSpellEffect(Character caster, Monster? target, string effect, int duration)
     {
+        // v1.1.15: the Sage's control spells, and the boss rules for Confusion and Mass Confusion
+        if (target != null && ApplySageControl(target, effect.ToLower(), duration, caster, null)) return;
+
         switch (effect.ToLower())
         {
             case "poison":
@@ -26745,18 +27872,20 @@ public partial class CombatEngine
             case "sleep":
                 if (target != null)
                 {
-                    target.IsSleeping = true;
-                    target.SleepDuration = duration > 0 ? duration : 3;
-                    terminal.WriteLine(Loc.Get("combat.magical_slumber", target.Name), "cyan");
+                    if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 3))
+                        terminal.WriteLine(Loc.Get("combat.magical_slumber", target.Name), "cyan");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
                 }
                 break;
 
             case "freeze":
                 if (target != null)
                 {
-                    target.IsFrozen = true;
-                    target.FrozenDuration = duration > 0 ? duration : 2;
-                    terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                    if (TryHoldMonster(target, HoldKind.Freeze, duration > 0 ? duration : 2))
+                        terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", target.Name), "cyan");
                 }
                 break;
 
@@ -27011,13 +28140,12 @@ public partial class CombatEngine
                 break;
 
             case "weaken":
-                // Reduce attack and defense — used by Siren's Lament, etc.
+                // Reduce attack and defense for a time; used by Siren's Lament, etc.
+                // v1.1.15: the timed cut only; base Strength and Defence stay as they were
                 if (target != null)
                 {
                     int atkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int defReduction = Math.Max(1, (int)(target.Defence * 0.20));
-                    target.Strength = Math.Max(0, target.Strength - atkReduction);
-                    target.Defence = Math.Max(0, target.Defence - defReduction);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, duration > 0 ? duration : 4);
                     terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, atkReduction, defReduction), "yellow");
                 }
@@ -27063,6 +28191,32 @@ public partial class CombatEngine
             case "freeze":
                 if (TryApplyPvPControl(target, StatusEffect.Frozen, duration))
                     terminal.WriteLine(Loc.Get("combat.is_frozen", target.DisplayName), "bright_cyan");
+                break;
+
+            // v1.1.15: the Sage's control spells in a duel. Slumber Mist is a hold, so it goes
+            // through the duel control rules; Dulling Mist slows, as frost does; Psychic Scream's
+            // accuracy loss is Blinded.
+            case "slumber_mist":
+                if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))
+                    terminal.WriteLine(Loc.Get("combat.magical_slumber", target.DisplayName), "cyan");
+                break;
+
+            case "dulling_mist":
+                target.ApplyStatus(StatusEffect.Slow, duration);
+                terminal.WriteLine(Loc.Get("combat.is_slowed", target.DisplayName), "gray");
+                break;
+
+            case "psychic_scream":
+                target.ApplyStatus(StatusEffect.Blinded, duration);
+                terminal.WriteLine(Loc.Get("combat.is_blinded", target.DisplayName), "gray");
+                break;
+
+            // v1.1.15: Scholar's Mark, Unveil the Pattern and Compel work through allies and the
+            // party's tank; a duel has neither, so they do nothing there.
+            case "scholars_mark":
+            case "unveil_pattern":
+            case "compel":
+                terminal.WriteLine(Loc.Get("combat.pvp_party_spell_no_effect"), "gray");
                 break;
 
             // v1.1.10: frost slows, as it does against a monster. Frost Touch and Ice Storm are the
@@ -28487,7 +29641,7 @@ public partial class CombatEngine
         {
             var spell = SpellSystem.GetSpellInfo(player.Class, spellLevel.Value);
             if (spell == null) { terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_empty", slot + 1)}", "gray"); return true; }
-            name = spell.Name; desc = spell.Description;
+            name = spell.DisplayName; desc = spell.DisplayDescription;
         }
         else
         {
@@ -28528,20 +29682,20 @@ public partial class CombatEngine
                 string displayName;
                 int cdRemaining = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
                 if (onCooldown)
-                    displayName = $"{spell.Name} (CD:{cdRemaining})";
+                    displayName = $"{spell.DisplayName} (CD:{cdRemaining})";
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
-                    displayName = Loc.Get("combat.qb_need_weapon", spell.Name, reqType);
+                    displayName = Loc.Get("combat.qb_need_weapon", spell.DisplayName, reqType);
                 }
                 else if (!player.CanCastSpells())
-                    displayName = Loc.Get("combat.qb_silenced", spell.Name);
+                    displayName = Loc.Get("combat.qb_silenced", spell.DisplayName);
                 else if (player.Mana < manaCost)
                     // v1.1.11: say why it cannot be cast (player report: a new Magician read "unavailable" and
                     // suspected the staff)
-                    displayName = Loc.Get("combat.qb_need_mana", spell.Name, manaCost, player.Mana);
+                    displayName = Loc.Get("combat.qb_need_mana", spell.DisplayName, manaCost, player.Mana);
                 else
-                    displayName = $"{spell.Name} ({manaCost} MP)";
+                    displayName = $"{spell.DisplayName} ({manaCost} MP)";
                 actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
             }
             else
@@ -28701,7 +29855,7 @@ public partial class CombatEngine
                     if (spellOnCD)
                     {
                         int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
-                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.Name, cdLeft), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.DisplayName, cdLeft), "red");
                     }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
@@ -28709,7 +29863,7 @@ public partial class CombatEngine
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
                     }
                     else if (!player.CanCastSpells())
-                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.Name), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.DisplayName), "red");
                     else
                         terminal.WriteLine(Loc.Get("combat.not_enough_mana_detail", manaCost, player.Mana), "red");
                 }
@@ -28825,7 +29979,7 @@ public partial class CombatEngine
                     if (spellOnCD)
                     {
                         int cdLeft = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
-                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.Name, cdLeft), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_on_cooldown", spell.DisplayName, cdLeft), "red");
                     }
                     else if (!SpellSystem.HasRequiredSpellWeapon(player))
                     {
@@ -28833,7 +29987,7 @@ public partial class CombatEngine
                         terminal.WriteLine(Loc.Get("combat.need_weapon_spell", reqType), "red");
                     }
                     else if (!player.CanCastSpells())
-                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.Name), "red");
+                        terminal.WriteLine(Loc.Get("combat.spell_silenced", spell.DisplayName), "red");
                     else
                         terminal.WriteLine(Loc.Get("combat.not_enough_mana_detail", manaCost, player.Mana), "red");
                 }
@@ -29391,14 +30545,18 @@ public partial class CombatEngine
 
     /// <summary>
     /// Apply the healer spec's +20% healing bonus, if the character has a healer specialization.
-    /// Used on ability healing and spell healing paths (v0.56.0).
+    /// Used on ability healing and spell healing paths (v0.56.0). The monsters list is the fight
+    /// the caster is in now, for Solarius's boon (null when not a monster fight); pass it whenever
+    /// it is in scope.
     /// </summary>
-    private static int ApplyHealerSpecBonus(Character caster, int baseHealing)
+    private static int ApplyHealerSpecBonus(Character caster, int baseHealing, IEnumerable<Monster>? monsters = null)
     {
         // v0.65.4: works for players too (Specialization moved to Character), not just NPC healers.
         if (baseHealing <= 0 || caster == null) return baseHealing;
-        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return baseHealing;
-        return (int)(baseHealing * (1.0 + GameConfig.HealerSpecHealBonus));
+        // 1.2.0: Amara's and Solarius's boons on the heals a follower casts, through the one helper
+        int healing = (int)Math.Min(GodBoonSystem.CastHeal(caster, baseHealing, monsters), int.MaxValue);
+        if (!UsurperRemake.Data.SpecializationData.IsHealerSpec(caster.Specialization)) return healing;
+        return (int)(healing * (1.0 + GameConfig.HealerSpecHealBonus));
     }
 
     /// <summary>
@@ -29674,6 +30832,7 @@ public partial class CombatEngine
         {
             foreach (var tm in result.Teammates.Where(t => !t.IsAlive).ToList())
             {
+                if (TryMortisMiracleForFollower(tm, result)) continue;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
                 string killerName = bossMonster.Name;
                 BroadcastGroupCombatEvent(result,
                     $"\u001b[1;31m  ═══ {tm.DisplayName} has fallen to {killerName}'s dark powers! ═══\u001b[0m");
@@ -29704,6 +30863,7 @@ public partial class CombatEngine
                         tm.CombatInputChannel = null;
                     }
                     tm.IsAwaitingCombatInput = false;
+                    ApplyMentalFollowerDeath(tm, result);   // v1.1.15: before Mark hands the death to their session
                     UsurperRemake.Server.GroupFollowerDeath.Mark(tm, killerName); // v1.2: their own session resolves the death
                 }
                 else
@@ -29931,6 +31091,12 @@ public partial class CombatEngine
             await Task.Delay(GetCombatDelay(800));
             return;
         }
+        // v1.1.15: Mental fear at combat start costs the follower their first action
+        if (ConsumeMentalFear(teammate, remoteTerminal))
+        {
+            await Task.Delay(GetCombatDelay(800));
+            return;
+        }
 
         // Announce this player's turn to the leader (on their terminal) and other followers
         string turnAnnounce = $"\u001b[1;36m  ── {teammate.DisplayName}'s turn ──\u001b[0m";
@@ -29962,17 +31128,18 @@ public partial class CombatEngine
             bool canHealAlly = hasTeammatesNeedingAid && (teammate.Healing > 0 || teammate.ManaPotions > 0 ||
                 (ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0));
             var classInfo = GetClassSpecificActions(teammate);
+            var miracleOffered = MiracleOffered(teammate, monsters, result);   // 1.2.0 Temple gods piece 5: each follower's own
             if (DoorMode.IsInDoorMode || GameConfig.CompactMode)
             {
-                ShowDungeonCombatMenuBBS(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true);
+                ShowDungeonCombatMenuBBS(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true, miracle: miracleOffered);
             }
             else if (teammate.ScreenReaderMode)
             {
-                ShowDungeonCombatMenuScreenReader(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true);
+                ShowDungeonCombatMenuScreenReader(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true, miracle: miracleOffered);
             }
             else
             {
-                ShowDungeonCombatMenuStandard(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true);
+                ShowDungeonCombatMenuStandard(teammate, hasTeammatesNeedingAid, canHealAlly, classInfo, isFollower: true, miracle: miracleOffered);
             }
 
             // Show available spells so followers know their C# options
@@ -29992,7 +31159,7 @@ public partial class CombatEngine
                         terminal.SetColor("bright_yellow");
                         terminal.Write($"C{si + 1}");
                         terminal.SetColor("darkgray");
-                        terminal.Write($"={sp.Name}({cost}mp) ");
+                        terminal.Write($"={sp.DisplayName}({cost}mp) ");
                     }
                     terminal.WriteLine("");
                 }
@@ -30064,6 +31231,27 @@ public partial class CombatEngine
             finally
             {
                 teammate.IsAwaitingCombatInput = false;
+            }
+
+            // 1.2.0 Temple gods piece 5: a follower's Umbrath Miracle is their own vanish, never the
+            // party's escape: the individual retreat below, certain and without a flee penalty
+            if (action.Type == CombatActionType.Miracle && MiracleSystem.GetMiracle(teammate) == GodDomain.Shadow)
+            {
+                if (MiracleSystem.TryConsume(teammate))
+                {
+                    terminal.SetColor("bright_magenta");
+                    terminal.WriteLine($"  {Loc.Get("miracle.vanish")}");
+                    result.Teammates?.Remove(teammate);
+                    if (teammate.CombatInputChannel != null)
+                    {
+                        teammate.CombatInputChannel.Writer.TryComplete();
+                        teammate.CombatInputChannel = null;
+                    }
+                    teammate.IsAwaitingCombatInput = false;
+                    BroadcastGroupedPlayerAction(
+                        $"\u001b[35m  {Loc.Get("miracle.vanish_other", teammate.DisplayName)}\u001b[0m", teammate);
+                }
+                return;
             }
 
             // Individual retreat for followers — handle BEFORE ProcessPlayerActionMultiMonster
@@ -30455,6 +31643,29 @@ public partial class CombatEngine
             return action;
         }
 
+        // 1.2.0 Temple gods piece 5: the follower's own Miracle (M, or M# on a foe)
+        if (trimmed.StartsWith("M"))
+        {
+            var miracle = MiracleOffered(teammate, monsters, result);
+            if (miracle != GodDomain.None)
+            {
+                action.Type = CombatActionType.Miracle;
+                action.FromAidMenu = miracle == GodDomain.Love;
+                if (MiracleSystem.NeedsTarget(miracle))
+                {
+                    int idx = trimmed.Length > 1 && int.TryParse(trimmed.Substring(1), out int mTarget) ? mTarget - 1 : -1;
+                    if (idx >= 0 && idx < monsters.Count && monsters[idx].IsAlive
+                        && (miracle != GodDomain.Light || MiracleSystem.CanBanish(monsters[idx])))
+                        action.TargetIndex = idx;
+                    else
+                        action.TargetIndex = null;   // ExecuteMiracle picks a fitting foe
+                }
+                return action;
+            }
+            action.Type = CombatActionType.Attack;
+            return action;
+        }
+
         // Boss Save (Old God encounters)
         if (trimmed == "V" && BossContext?.CanSave == true)
         {
@@ -30715,6 +31926,8 @@ public partial class CombatEngine
 
             // v1.1.11: Team HQ Training last, with the follower's own levels.
             playerExp = TeamHQBonus.ApplyXP(groupedPlayer, playerExp);
+            // v1.1.15: the follower's own Broken affliction costs 25% of XP gained
+            playerExp = MentalSystem.ApplyBrokenXp(groupedPlayer, playerExp);
 
             // Session XP diminishing returns removed in v0.54.7.
             groupedPlayer.SessionCombatCount++;
@@ -30918,7 +32131,8 @@ public enum CombatActionType
     HealAlly,       // Heal a teammate with potion or spell
     BossSave,       // Attempt to save an Old God boss mid-combat
     CoatBlade,      // Coat weapon with poison from vial inventory
-    UseHerb         // Use an herb from herb pouch
+    UseHerb,        // Use an herb from herb pouch
+    Miracle         // 1.2.0 Temple gods: call on the day's Miracle (MiracleSystem)
 }
 
 /// <summary>
@@ -30944,6 +32158,10 @@ public class CombatAction
     // The leader is NOT in currentTeammates during a follower's turn, so an index can't reach
     // them; a direct Character reference can, and is stable if HP changes between select and apply.
     public Character? HealTargetOverride { get; set; }
+
+    // v1.1.15: a party heal chosen from the Heal Ally menu, cast as a CastSpell. It still counts
+    // as aid to an ally (NoteOwnerTurn), as every Heal Ally choice does.
+    public bool FromAidMenu { get; set; }
 }
 
 /// <summary>
@@ -31004,6 +32222,19 @@ public class CombatResult
     // PlayerEscaped so callers don't apply double penalties. PlayerActuallyDied
     // stays true so GMCP / news / telemetry can report the truth.
     public bool PlayerActuallyDied { get; set; }
+    // v1.1.15: the Mental death loss was already taken this fight (applied once)
+    public bool MentalDeathApplied { get; set; }
+    // v1.1.15: this death is a Mental collapse (CombatEngine.HandleMentalCollapseDeath), no Last Stand
+    public bool MentalCollapseDeath { get; set; }
+    // v1.1.15: the leader ended this fight at Mental 0, or a fight was not entered for it; the location
+    // loop carries out the collapse (BaseLocation.HandleMentalCollapse)
+    public bool MentalCollapsePending { get; set; }
+    // v1.1.15: this fight was not entered for a Mental collapse (set only by the gate at the top of
+    // PlayerVsMonsters). The Outcome reads PlayerEscaped, but nothing was fled: callers skip their flee
+    // branch. A real flee that ends at Mental 0 has MentalCollapsePending alone.
+    public bool MentalCollapseNotFought { get; set; }
+    // v1.1.15: grouped followers who already took their Mental death loss this fight (applied once each)
+    public HashSet<Character> MentalDeadFollowers { get; } = new HashSet<Character>(ReferenceEqualityComparer.Instance);
 }
 
 /// <summary>

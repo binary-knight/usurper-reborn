@@ -1261,8 +1261,7 @@ namespace UsurperRemake.Systems
 
                 terminal.SetColor("white");
                 terminal.Write(Loc.Get("inventory.equip_confirm"));
-                var confirm = await terminal.GetInput("");
-                if (!GameConfig.IsAffirmative(confirm))
+                if (!await terminal.AskYesNoAsync(""))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("ui.cancelled"));
@@ -1276,7 +1275,7 @@ namespace UsurperRemake.Systems
                 // something is already equipped there
                 terminal.SetColor("white");
                 terminal.Write(Loc.Get("inventory.equip_confirm"));
-                if (!GameConfig.IsAffirmative(await terminal.GetInput("")))
+                if (!await terminal.AskYesNoAsync(""))
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("ui.cancelled"));

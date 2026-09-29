@@ -178,7 +178,7 @@ public class WorldBossLoopTests : IDisposable
         var rng = new Random(3);
         for (int i = 0; i < 300; i++)
         {
-            long d = (long)m.Invoke(_sys, new object[] { hero, def, data, rng, false })!;
+            long d = (long)m.Invoke(_sys, new object?[] { hero, def, data, rng, false, null })!;
             d.Should().BeLessThanOrEqualTo((long)(raw * 1.3) + 1, "no crit when the base roll is asked not to crit");
         }
     }

@@ -88,9 +88,9 @@ public class God
         int actualLevel = CalculateLevel();
         if (actualLevel >= 1 && actualLevel <= GameConfig.MaxGodLevel)
         {
-            return GameConfig.GodTitles[Math.Clamp(actualLevel - 1, 0, GameConfig.GodTitles.Length - 1)];
+            return UsurperRemake.Systems.GodText.Title(actualLevel);
         }
-        return "Lesser Spirit";
+        return UsurperRemake.Systems.GodText.Title(1);
     }
     
     /// <summary>
