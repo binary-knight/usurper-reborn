@@ -208,6 +208,8 @@ public class Monster
 
     // Enhanced monster family system properties
     public string FamilyName { get; set; } = "";            // Monster family (Goblinoid, Undead, etc.)
+    [System.Text.Json.Serialization.JsonIgnore]
+    public UsurperRemake.Systems.OldGodType? OldGod { get; set; }   // 1.2.0: the Old God this boss is (OldGodBossSystem), for the Old Gods link; run time only
     public string TierName { get; set; } = "";              // Tier name (Goblin, Hobgoblin, etc.)
     public string MonsterColor { get; set; } = "white";     // Color for display
     public string AttackType { get; set; } = "physical";    // Attack type (physical, fire, poison, etc.)

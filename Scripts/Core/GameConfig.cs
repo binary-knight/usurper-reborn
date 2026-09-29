@@ -1765,6 +1765,7 @@ public static partial class GameConfig
     public const int NpcFaithSharedRelationSteps = 1;         // First talk of the day with an NPC of the player's god: relation steps warmer
     public const int NpcFaithOpposedRelationSteps = 1;        // First talk of the day with an NPC whose god opposes the player's: steps cooler
     public const int GodWeeklyXpBonusPct = 5;                 // The week's strongest god (WeeklyGodSystem): its followers' XP gained
+    public const int GodEchoDamagePct = 10;                   // Zealot and Chosen: damage against the Old God their god echoes (OldGodEchoSystem)
     // Temple gods piece 5: Miracles (MiracleSystem). A Chosen follower has one a day, from the god's domain.
     public const int MiracleBanishBossDamagePct = 10;         // Solarius: a boss, mini-boss or Old God is not banished; it takes this percent of its max HP
     public const int MiracleBindRounds = 2;                   // Judicar: rounds a foe is bound (the monster hold rules and boss limits apply)

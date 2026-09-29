@@ -1422,10 +1422,8 @@ public partial class TempleLocation : BaseLocation
 
         foreach (var god in gods)
         {
-            // Get domain/title from properties or use GetTitle()
-            string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
-                : god.GetTitle();
+            // 1.2.0 Temple gods: the epithet in the player's language (GodText)
+            string domain = GodText.Epithet(god);
 
             // Color based on alignment
             string color = "yellow";
@@ -1481,10 +1479,8 @@ public partial class TempleLocation : BaseLocation
 
         foreach (var god in activeGods)
         {
-            // Get domain/title from properties or use GetTitle()
-            string domain = god.Properties.ContainsKey("Domain")
-                ? god.Properties["Domain"]?.ToString() ?? god.GetTitle()
-                : god.GetTitle();
+            // 1.2.0 Temple gods: the epithet in the player's language (GodText)
+            string domain = GodText.Epithet(god);
 
             // Color based on alignment
             string color = "yellow";
@@ -1495,10 +1491,11 @@ public partial class TempleLocation : BaseLocation
 
             terminal.WriteLine($"  {god.Name}, {domain}", color);
 
-            // Show description if available
-            if (god.Properties.ContainsKey("Description"))
+            // Show description if available (1.2.0: in the player's language, GodText)
+            string description = GodText.Description(god);
+            if (description.Length > 0)
             {
-                terminal.WriteLine($"    {god.Properties["Description"]}", "gray");
+                terminal.WriteLine($"    {description}", "gray");
             }
 
             terminal.WriteLine(Loc.Get("temple.god_list_stats", god.Believers, god.Experience.ToString("N0")), "white");

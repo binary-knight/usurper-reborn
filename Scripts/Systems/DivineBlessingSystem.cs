@@ -270,6 +270,9 @@ namespace UsurperRemake.Systems
             if (attacker.MaxHP > 0 && attacker.HP * 100 < attacker.MaxHP * GameConfig.GodBoonValorianHpThresholdPct)
                 bonusDamage += GodBoonSystem.Bonus(baseDamage, GodBoonSystem.Pct(attacker, GodDomain.War, GameConfig.GodBoonValorianLowHpDamagePct, gods));
 
+            // 1.2.0 Temple gods piece 6: a Zealot or Chosen against the Old God their god echoes
+            bonusDamage += OldGodEchoSystem.BonusDamage(attacker, defender, baseDamage, gods);
+
             return (int)Math.Min(bonusDamage, int.MaxValue);
         }
 
