@@ -5624,6 +5624,7 @@ public partial class GameEngine
             DaysSinceSpellCast = Math.Max(0, playerData.DaysSinceSpellCast),
             LastGodSwitchDay = Math.Max(-1, playerData.LastGodSwitchDay),
             MiracleUsedToday = playerData.MiracleUsedToday,
+            ChastisedToday = playerData.ChastisedToday?.ToList() ?? new List<string>(),
             GodStandingPenalties = playerData.GodStandingPenalties != null
                 ? new Dictionary<string, int>(playerData.GodStandingPenalties, StringComparer.OrdinalIgnoreCase)
                 : new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase),

@@ -291,6 +291,9 @@ internal static class PlayerSaveEditor
         p.DaysSinceSpellCast = EditorIO.PromptInt("Daily resets since the last spell cast (Arcanus taboo at 7)", p.DaysSinceSpellCast, min: 0);
         p.LastGodSwitchDay = EditorIO.PromptInt("Game day the character last left a god by choice (-1 never)", p.LastGodSwitchDay, min: -1);
         p.MiracleUsedToday = EditorIO.PromptBool("Today's Miracle already used (Chosen tier, cleared at the daily reset)", p.MiracleUsedToday);
+        EditorIO.Info("Immortal: followers chastised today: " + (p.ChastisedToday == null || p.ChastisedToday.Count == 0 ? "none" : string.Join(", ", p.ChastisedToday)));
+        if (EditorIO.PromptBool("Clear the followers chastised today", false))
+            p.ChastisedToday = new List<string>();
         EditorIO.Info($"Single-player desecration standing penalties (week {p.GodStandingPenaltyWeek}): " +
             (p.GodStandingPenalties == null || p.GodStandingPenalties.Count == 0 ? "none" : string.Join(", ", p.GodStandingPenalties.Select(kv => $"{kv.Key} -{kv.Value}"))));
         if (EditorIO.PromptBool("Clear the desecration standing penalties", false))

@@ -566,6 +566,7 @@ public class PantheonLocation : BaseLocation
         WriteMenuOption("4", Loc.Get("pantheon.menu_poison"), Loc.Get("pantheon.menu_poison_desc"));
         WriteMenuOption("5", Loc.Get("pantheon.menu_free"), Loc.Get("pantheon.menu_free_desc"));
         WriteMenuOption("6", Loc.Get("pantheon.menu_proclamation"), Loc.Get("pantheon.menu_proclamation_desc"));
+        WriteMenuOption("7", Loc.Get("pantheon.menu_chastise"), Loc.Get("pantheon.menu_chastise_desc"));
         terminal.WriteLine("");
         WriteMenuOption("0", Loc.Get("pantheon.menu_back"), Loc.Get("pantheon.menu_back_desc"));
 
@@ -580,6 +581,7 @@ public class PantheonLocation : BaseLocation
             case "4": await DeedPoisonRelationship(); break;
             case "5": await DeedFreePrisoner(); break;
             case "6": await DeedProclamation(); break;
+            case "7": await DeedChastiseFollower(); break;
         }
     }
 
@@ -886,6 +888,55 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("pantheon.exp_gain", expGain));
         RecalculateGodLevel();
+
+        await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5b: Chastise, one deed. A player follower (NPCs have no Favor) loses
+    /// GodChastiseFavorLoss Favor, once a day each (ImmortalDeedSystem.CanChastise, kept on the god).
+    /// No divine XP. A target who no longer follows the god is refused: no deed spent.
+    /// </summary>
+    private async Task DeedChastiseFollower()
+    {
+        var followers = (await GetBelieverListAsync(currentPlayer.DivineName))
+            .Where(b => b.IsPlayer && ImmortalDeedSystem.CanChastise(currentPlayer, b.Username))
+            .ToList();
+        if (followers.Count == 0)
+        {
+            terminal.WriteLine(Loc.Get("pantheon.no_followers_to_chastise"), "gray");
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
+            return;
+        }
+
+        var targets = followers.Select(b => new DeedTarget
+        {
+            Name = b.Name, Level = b.Level,
+            Status = b.Class + (b.IsOnline ? " [ONLINE]" : ""),
+            IsPlayer = true, Username = b.Username, IsOnline = b.IsOnline
+        }).ToList();
+
+        var target = await PickTarget(targets, Loc.Get("pantheon.chastise_title"), "dark_red", Loc.Get("pantheon.chastise_prompt"));
+        if (target == null) return;
+        if (!ImmortalDeedSystem.CanChastise(currentPlayer, target.Username)) return;
+
+        var outcome = await ApplyChastiseToPlayer(target, currentPlayer.DivineName);
+        if (outcome.Refused)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("pantheon.not_your_follower", target.Name), "gray");
+            await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_return"));
+            return;
+        }
+
+        currentPlayer.DeedsLeft--;
+        ImmortalDeedSystem.MarkChastised(currentPlayer, target.Username);
+
+        terminal.WriteLine("");
+        terminal.SetColor("dark_red");
+        terminal.WriteLine(Loc.Get("pantheon.chastise_success", target.Name));
+        terminal.SetColor("white");
+        terminal.WriteLine(Loc.Get("pantheon.chastise_favor", target.Name, outcome.FavorLost, outcome.FavorNow));
 
         await terminal.PressAnyKey(Loc.Get("pantheon.press_enter_continue"));
     }
@@ -1675,6 +1726,46 @@ public class PantheonLocation : BaseLocation
         string text = Loc.GetIn(s.Lang, "pantheon.bless_received", godName, (int)Math.Round(s.Outcome.Bonus * 100), s.Outcome.Combats);
         if (s.Outcome.FavorGained > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.gain", godName, s.Outcome.FavorGained, s.Outcome.FavorNow);
+        await backend.SendMessage(godName, target.Username, "divine", text);
+        return s.Outcome;
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5b: a chastise of a player follower. In the game in another session:
+    /// ImmortalDeedSystem.Chastise on the live character (Favor in memory, the tier's stat update left
+    /// to that session, which saves it), and the message and the Favor line are sent to that session
+    /// in its language. Not online: ImmortalDeedSystem.ChastiseSaved on the save in one SQL transaction
+    /// (only the Favor fields change), and the message is mailed in the save's language. Refused when
+    /// the player no longer follows the god.
+    /// </summary>
+    private async Task<ChastiseOutcome> ApplyChastiseToPlayer(DeedTarget target, string godName)
+    {
+        var refused = new ChastiseOutcome(true, 0, 0);
+        var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
+        if (backend == null) return refused;
+
+        if (LiveSessionOf(target.Username) is { } live)
+        {
+            var outcome = ImmortalDeedSystem.Chastise(live.Player, godName, otherSession: true);
+            if (!outcome.Refused)
+            {
+                string lang = live.Session.Context?.Language ?? "en";
+                live.Session.EnqueueMessage($"\u001b[1;31m  {Loc.GetIn(lang, "pantheon.chastise_received", godName)}\u001b[0m");
+                if (outcome.FavorLost > 0)
+                    live.Session.EnqueueMessage($"\u001b[0;31m  {Loc.GetIn(lang, "favor.loss", godName, outcome.FavorLost, outcome.FavorNow)}\u001b[0m");
+            }
+            return outcome;
+        }
+
+        var saved = await backend.UpdateFollowerSaveOffline<(ChastiseOutcome Outcome, string Lang)?>(target.Username, (p, gods) =>
+        {
+            var o = ImmortalDeedSystem.ChastiseSaved(p, gods, godName);
+            return (!o.Refused, (o, string.IsNullOrEmpty(p.Language) ? "en" : p.Language));
+        });
+        if (saved is not { } s || s.Outcome.Refused) return refused;
+        string text = Loc.GetIn(s.Lang, "pantheon.chastise_received", godName);
+        if (s.Outcome.FavorLost > 0)
+            text += " " + Loc.GetIn(s.Lang, "favor.loss", godName, s.Outcome.FavorLost, s.Outcome.FavorNow);
         await backend.SendMessage(godName, target.Username, "divine", text);
         return s.Outcome;
     }

@@ -1987,6 +1987,7 @@ public static partial class GameConfig
     public const float GodBlessBonusZealot = 0.10f;       // Zealot and Chosen tiers: 10%
     public const int GodBlessFavorGain = 2;               // Favor a bless gives the follower
     public const int GodBlessFavorDailyCap = 2;           // FavorSource.ImmortalBlessing: at most this much Favor a day
+    public const int GodChastiseFavorLoss = 5;            // Chastise: Favor a player-god takes from its own follower, once a day each
     public const float GodSmiteMinPercent = 0.10f;        // Smite deals 10-25% of target MaxHP
     public const float GodSmiteMaxPercent = 0.25f;
     public const float GodRecruitPlayerMultiplier = 0.75f;     // Players are harder to recruit than NPCs
