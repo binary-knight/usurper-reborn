@@ -17,6 +17,9 @@ public class StreetEncounterSystem
 
     private Random _random = Random.Shared;
 
+    /// <summary>1.2.1: the Monster the last FightNPC built (read by tests to check a rage buff).</summary>
+    internal Monster? LastFightMonster { get; private set; }
+
     /// <summary>
     /// Encounter chance modifiers by location
     /// </summary>
@@ -571,9 +574,8 @@ public class StreetEncounterSystem
             terminal.WriteLine(Loc.Get("street_encounter.challenge.pay_for_that", challenger.Name));
             await Pacing.Wait(1000);
 
-            // They attack with anger bonus
-            challenger.Strength += 5;
-            await FightNPC(player, challenger, result, terminal);
+            // They attack with anger bonus (1.2.1: on the fight's Monster only, never on the world NPC)
+            await FightNPC(player, challenger, result, terminal, rageStrengthFlat: 5);
         }
 
         await Pacing.Wait(1500);
@@ -1546,8 +1548,12 @@ public class StreetEncounterSystem
     /// Fight an NPC using the combat engine
     /// </summary>
     private async Task FightNPC(Character player, NPC npc, EncounterResult result, TerminalEmulator terminal,
-        bool isBrawl = false, bool isHonorDuel = false)
+        bool isBrawl = false, bool isHonorDuel = false, long rageStrengthFlat = 0, double rageStrengthMult = 1.0)
     {
+        // 1.2.1: a rage buff raises the Monster's strength (and its punch, which is half of it) for
+        // this fight only. It used to be written onto the world NPC and never undone.
+        long fightStrength = (long)(npc.Strength * rageStrengthMult) + rageStrengthFlat;
+
         // Convert NPC to Monster for combat engine
         // Pass NPC's level as the 'nr' parameter so the monster displays the correct level
         // v0.57.2 — use MaxHP (fallback to HP if MaxHP is somehow 0). Using current HP meant
@@ -1556,7 +1562,7 @@ public class StreetEncounterSystem
             nr: npc.Level,
             name: npc.Name,
             hps: (int)(npc.MaxHP > 0 ? npc.MaxHP : Math.Max(1, npc.HP)),
-            strength: (int)npc.Strength,
+            strength: (int)fightStrength,
             defence: (int)npc.Defence,
             phrase: GetHostilePhrase(npc),
             grabweap: false,
@@ -1565,12 +1571,13 @@ public class StreetEncounterSystem
             armor: GetRandomArmorName(npc.Level),
             poisoned: false,
             disease: false,
-            punch: (int)(npc.Strength / 2),
+            punch: (int)(fightStrength / 2),
             armpow: (int)npc.ArmPow,
             weappow: (int)npc.WeapPow
         );
         monster.IsProperName = true; // NPC — no "The" prefix
         monster.CanSpeak = true;     // NPCs can speak
+        LastFightMonster = monster;
 
         // Include player's companions and bodyguards in street combat
         var teammates = GetStreetCombatTeammates(player);
@@ -2495,8 +2502,8 @@ public class StreetEncounterSystem
         if (isMurderRevenge)
         {
             // === MURDER REVENGE — Rage buff, no bribe/apologize ===
-            // Apply rage buff
-            grudgeNpc.Strength = (long)(grudgeNpc.Strength * (1.0f + GameConfig.MurderGrudgeRageBonusSTR));
+            // Apply rage buff (1.2.1: the Strength part goes onto the fight's Monster, see FightNPC)
+            double murderRage = 1.0f + GameConfig.MurderGrudgeRageBonusSTR;
             grudgeNpc.HP = (long)Math.Min(grudgeNpc.MaxHP * (1.0f + GameConfig.MurderGrudgeRageBonusHP), grudgeNpc.MaxHP * 1.5f);
 
             UIHelper.DrawBoxTop(terminal, Loc.Get("street_encounter.grudge.murder_revenge_title"), "dark_red");
@@ -2529,14 +2536,14 @@ public class StreetEncounterSystem
                 {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("street_encounter.grudge.cuts_off_escape", grudgeNpc.Name2));
-                    await FightNPC(player, grudgeNpc, result, terminal);
+                    await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage);
                     fought = true;
                 }
             }
             else
             {
                 // Fight (default for any input)
-                await FightNPC(player, grudgeNpc, result, terminal);
+                await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage);
                 fought = true;
             }
 
@@ -2733,8 +2740,7 @@ public class StreetEncounterSystem
                         terminal.WriteLine(Loc.Get("street_encounter.grudge.sorry_not_enough"));
                         terminal.SetColor("white");
                         terminal.WriteLine(Loc.Get("street_encounter.grudge.attacks_fury", grudgeNpc.Name2));
-                        grudgeNpc.Strength = (long)(grudgeNpc.Strength * 1.15);
-                        await FightNPC(player, grudgeNpc, result, terminal);
+                        await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: 1.15);
                     }
                     break;
 
@@ -2909,8 +2915,7 @@ public class StreetEncounterSystem
                 terminal.WriteLine(Loc.Get("street_encounter.spouse.taunt_better", partnerName));
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("street_encounter.spouse.roars_fury", spouse.Name2));
-                spouse.Strength = (long)(spouse.Strength * 1.25);
-                await FightNPC(player, spouse, result, terminal);
+                await FightNPC(player, spouse, result, terminal, rageStrengthMult: 1.25);
 
                 player.Darkness += 10;
 

@@ -227,30 +227,31 @@ public class PrisonActivitySystem
         var activity = activities[random.Next(activities.Count)];
 
         // Silently perform the activity (no output needed for NPCs)
+        // 1.2.1: stat gains go through the Base fields, so they survive the NPC's next RecalculateStats
         switch (activity)
         {
             case PrisonActivity.Pushups:
-                prisoner.Strength += random.Next(1, 2);
+                prisoner.GrantPermanentStat(StatKind.Strength, random.Next(1, 2));
                 break;
             case PrisonActivity.Yoga:
-                prisoner.Dexterity += random.Next(1, 2);
+                prisoner.GrantPermanentStat(StatKind.Dexterity, random.Next(1, 2));
                 break;
             case PrisonActivity.Reading:
-                prisoner.Intelligence += random.Next(1, 2);
+                prisoner.GrantPermanentStat(StatKind.Intelligence, random.Next(1, 2));
                 break;
             case PrisonActivity.Meditation:
-                prisoner.Wisdom += 1;
+                prisoner.GrantPermanentStat(StatKind.Wisdom, 1);
                 prisoner.HP = Math.Min(prisoner.HP + prisoner.MaxHP / 10, prisoner.MaxHP);
                 break;
             case PrisonActivity.ShadowBoxing:
                 prisoner.BonusWeapPow += 1;
-                prisoner.BaseDefence += 1;
+                prisoner.GrantPermanentStat(StatKind.Defence, 1);
                 break;
             case PrisonActivity.Stretching:
-                prisoner.MaxHP += random.Next(3, 6);
+                prisoner.GrantPermanentStat(StatKind.MaxHP, random.Next(3, 6));
                 break;
             case PrisonActivity.Planning:
-                prisoner.Charisma += random.Next(1, 2);
+                prisoner.GrantPermanentStat(StatKind.Charisma, random.Next(1, 2));
                 break;
             case PrisonActivity.Praying:
                 if (prisoner.Chivalry > prisoner.Darkness)
