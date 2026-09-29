@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using UsurperRemake.Systems;
 
 /// <summary>
 /// Prison Activity System - Allows prisoners to do activities that improve their stats
@@ -61,11 +62,11 @@ public class PrisonActivitySystem
     public async Task<string> PerformActivity(Character prisoner, PrisonActivity activity)
     {
         if (activity == PrisonActivity.None)
-            return "You rest in your cell.";
+            return Loc.Get("prison.activity_rest");
 
         // Daily activity limit to prevent stat farming
         if (prisoner.PrisonActivitiesToday >= MaxActivitiesPerDay)
-            return "You're too exhausted for more exercise today. Rest until tomorrow.";
+            return Loc.Get("prison.activity_exhausted");
 
         string result = "";
 
@@ -114,7 +115,7 @@ public class PrisonActivitySystem
         int gain = 1;
         prisoner.GrantPermanentStat(StatKind.Strength, gain); // 1.2.0: lasting, written to Base
 
-        return $"You do pushups until your arms burn. Strength +{gain}!";
+        return Loc.Get("prison.activity_pushups", gain);
     }
 
     private string PerformYoga(Character prisoner)
@@ -124,12 +125,9 @@ public class PrisonActivitySystem
 
         prisoner.GrantPermanentStats((StatKind.Dexterity, dexGain), (StatKind.Agility, agiGain));
 
-        string result = $"You practice yoga poses. Dexterity +{dexGain}";
         if (agiGain > 0)
-            result += $", Agility +{agiGain}";
-        result += "!";
-
-        return result;
+            return Loc.Get("prison.activity_yoga_agility", dexGain, agiGain);
+        return Loc.Get("prison.activity_yoga", dexGain);
     }
 
     private string PerformReading(Character prisoner)
@@ -139,7 +137,7 @@ public class PrisonActivitySystem
         prisoner.GrantPermanentStat(StatKind.Intelligence, intGain);
         prisoner.Mana = Math.Min(prisoner.Mana + 5, prisoner.MaxMana);
 
-        return $"You read whatever materials you can find. Intelligence +{intGain}, Mana restored!";
+        return Loc.Get("prison.activity_reading", intGain);
     }
 
     private string PerformMeditation(Character prisoner)
@@ -149,7 +147,7 @@ public class PrisonActivitySystem
         prisoner.GrantPermanentStat(StatKind.Wisdom, 1);
         prisoner.HP = Math.Min(prisoner.HP + healAmount, prisoner.MaxHP);
 
-        return $"You meditate peacefully. Wisdom +1, HP +{healAmount}!";
+        return Loc.Get("prison.activity_meditation", healAmount);
     }
 
     private string PerformShadowBoxing(Character prisoner)
@@ -157,7 +155,7 @@ public class PrisonActivitySystem
         // No permanent stat gain — just restores stamina
         prisoner.CurrentCombatStamina = Math.Min(prisoner.CurrentCombatStamina + 10, 100);
 
-        return "You practice fighting an imaginary opponent. You feel sharper.";
+        return Loc.Get("prison.activity_shadow_boxing");
     }
 
     private string PerformStretching(Character prisoner)
@@ -168,14 +166,14 @@ public class PrisonActivitySystem
         prisoner.GrantPermanentStat(StatKind.Stamina, stamGain);
         prisoner.HP = Math.Min(prisoner.HP + healAmount, prisoner.MaxHP);
 
-        return $"You stretch and build endurance. Stamina +{stamGain}, HP +{healAmount}!";
+        return Loc.Get("prison.activity_stretching", stamGain, healAmount);
     }
 
     private string PerformPlanning(Character prisoner)
     {
         prisoner.GrantPermanentStat(StatKind.Charisma, 1);
 
-        return "You plan your future carefully. Charisma +1!";
+        return Loc.Get("prison.activity_planning");
     }
 
     private string PerformPraying(Character prisoner)
@@ -186,12 +184,12 @@ public class PrisonActivitySystem
         if (prisoner.Chivalry > prisoner.Darkness)
         {
             prisoner.Chivalry += gain;
-            return $"You pray for guidance and redemption. Chivalry +{gain}!";
+            return Loc.Get("prison.activity_pray_chivalry", gain);
         }
         else
         {
             prisoner.Darkness += gain;
-            return $"You pray to darker powers for strength. Darkness +{gain}!";
+            return Loc.Get("prison.activity_pray_darkness", gain);
         }
     }
 
