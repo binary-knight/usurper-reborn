@@ -9068,7 +9068,7 @@
   "temple.nave.header": "NAVE DE LOS DIOSES",
   "temple.nave.desc1": "Diez altares bordean la Nave, y junto a ellos los de los Ascendidos.",
   "temple.nave.desc2": "Los sacerdotes cuidan las velas y reciben las ofrendas de los fieles.",
-  "temple.nave.evil_unwelcome": "Los sacerdotes te miran con frialdad. No aceptan tus ofrendas a un dios bueno.",
+  "temple.nave.evil_unwelcome": "Los sacerdotes te miran con frialdad. No aceptan tus ofrendas a un dios bueno que no sea el tuyo.",
   "temple.nave.worship": "Adorar a un dios, o cambiar de dios",
   "temple.nave.pray": "Rezar a {0}",
   "temple.nave.prayed": "Rezar a {0} (ya has rezado hoy)",

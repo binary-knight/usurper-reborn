@@ -9076,7 +9076,7 @@
   "temple.nave.header": "ISTENEK HAJÓJA",
   "temple.nave.desc1": "Tíz oltár sorakozik a hajóban, mellettük a Felemelkedettekéi.",
   "temple.nave.desc2": "Papok gondozzák a gyertyákat, és fogadják a hívek áldozatait.",
-  "temple.nave.evil_unwelcome": "A papok hidegen néznek rád. Jó istennek szánt áldozatot nem fogadnak el tőled.",
+  "temple.nave.evil_unwelcome": "A papok hidegen néznek rád. Jó istennek szánt áldozatot csak a saját istenednek fogadnak el tőled.",
   "temple.nave.worship": "Imádj egy istent, vagy válts istent",
   "temple.nave.pray": "Imádkozz {0} istenhez",
   "temple.nave.prayed": "Imádkozz {0} istenhez (ma már imádkoztál)",

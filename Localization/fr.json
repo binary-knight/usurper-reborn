@@ -9068,7 +9068,7 @@
   "temple.nave.header": "NEF DES DIEUX",
   "temple.nave.desc1": "Dix autels bordent la Nef, et à leurs côtés ceux des Élevés.",
   "temple.nave.desc2": "Les prêtres veillent aux cierges et reçoivent les offrandes des fidèles.",
-  "temple.nave.evil_unwelcome": "Les prêtres vous toisent. Ils n'acceptent de vous aucune offrande à un dieu bon.",
+  "temple.nave.evil_unwelcome": "Les prêtres vous toisent. Ils n'acceptent de vous aucune offrande à un dieu bon autre que le vôtre.",
   "temple.nave.worship": "Adorer un dieu, ou changer de dieu",
   "temple.nave.pray": "Prier {0}",
   "temple.nave.prayed": "Prier {0} (vous avez déjà prié aujourd'hui)",

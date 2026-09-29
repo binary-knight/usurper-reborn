@@ -345,4 +345,22 @@ public class TempleLeftovers1115Tests
         NaveRefuses(hero, "Solarius", solarius).Should().BeFalse("an Evil follower may still offer to their own good god");
         NaveRefuses(hero, "Solarius", amara).Should().BeTrue("another good god is still refused");
     }
+
+    [Fact]
+    public void Nave_EvilLine_SaysTheOwnGodIsExempt_InEveryLanguage()
+    {
+        var expected = new Dictionary<string, string>
+        {
+            ["en"] = "other than your own",
+            ["es"] = "que no sea el tuyo",
+            ["fr"] = "autre que le v\u00f4tre",
+            ["hu"] = "csak a saj\u00e1t istenednek",
+            ["it"] = "che non sia il tuo",
+        };
+        foreach (var (lang, phrase) in expected)
+        {
+            var root = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(SourceRoot(), "Localization", lang + ".json"))).RootElement;
+            root.GetProperty("temple.nave.evil_unwelcome").GetString().Should().Contain(phrase, lang);
+        }
+    }
 }
