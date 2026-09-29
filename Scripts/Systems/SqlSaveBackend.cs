@@ -3904,30 +3904,6 @@ namespace UsurperRemake.Systems
             catch { return 0; }
         }
 
-        public async Task ApplyDivineBlessing(string username, int combats, float bonus)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    UPDATE players SET player_data = json_set(player_data,
-                        '$.player.divineBlessingCombats', @combats,
-                        '$.player.divineBlessingBonus', @bonus)
-                    WHERE LOWER(username) = LOWER(@username)
-                    AND player_data != '{}' AND LENGTH(player_data) > 2;
-                ";
-                cmd.Parameters.AddWithValue("@username", username);
-                cmd.Parameters.AddWithValue("@combats", combats);
-                cmd.Parameters.AddWithValue("@bonus", (double)bonus);
-                await Task.Run(() => cmd.ExecuteNonQuery());
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to apply divine blessing to {username}: {ex.Message}");
-            }
-        }
-
         public async Task ApplyDivineSmite(string username, float damagePercent)
         {
             try

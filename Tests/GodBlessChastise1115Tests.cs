@@ -75,14 +75,15 @@ public class GodBlessChastise1115Tests : IDisposable
     }
 
     [Fact]
-    public void Bless_OfAnNpc_GivesNoFavor_AndTheFollowerTierBonus()
+    public void Bless_OfAnNpc_GivesNoFavor_AndTheFullNpcBonus()
     {
         var npc = new Character { Name1 = "GbNpc", Name2 = "GbNpc", AI = CharacterAI.Computer, WorshippedGod = God };
         var o = ImmortalDeedSystem.Bless(npc, God, otherSession: false, new GodSystem());
         o.Refused.Should().BeFalse();
         o.FavorGained.Should().Be(0);
         npc.GodFavor.Should().Be(0);
-        npc.DivineBlessingBonus.Should().BeApproximately(GameConfig.GodBlessBonusFollower, 0.0001f);
+        npc.DivineBlessingBonus.Should().BeApproximately(GameConfig.GodBlessBonusNpc, 0.0001f);
+        GameConfig.GodBlessBonusNpc.Should().BeApproximately(0.10f, 0.0001f, "an NPC bless keeps the 10% it gave before tiers");
     }
 
     [Fact]
@@ -147,6 +148,13 @@ public class GodBlessChastise1115Tests : IDisposable
         own.GodBoonRecalcPending = false;
         ImmortalDeedSystem.Bless(own, God, otherSession: false, ownGods);
         own.GodBoonRecalcPending.Should().BeFalse();
+    }
+
+    [Fact]
+    public void TheOldOfflineBlessingWrite_IsGone()
+    {
+        Source("Scripts/Systems/IOnlineSaveBackend.cs").Should().NotContain("ApplyDivineBlessing");
+        Source("Scripts/Systems/SqlSaveBackend.cs").Should().NotContain("ApplyDivineBlessing");
     }
 
     [Fact]

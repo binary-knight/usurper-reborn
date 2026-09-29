@@ -19,7 +19,8 @@ public readonly record struct ChastiseOutcome(bool Refused, int FavorLost, int F
 /// 1.2.0 Temple gods piece 5b: the rules of an immortal's deeds on followers (Pantheon, Divine
 /// Deeds). Bless gives the follower GodBlessFavorGain Favor (FavorSource.ImmortalBlessing, at most
 /// GodBlessFavorDailyCap a day) and a combat blessing whose bonus follows the follower's Favor tier
-/// after that gain (BlessBonusFor). NPCs have no Favor, so an NPC follower is at the Follower tier.
+/// after that gain (BlessBonusFor). NPCs have no Favor; an NPC follower gets GodBlessBonusNpc (the full
+/// 10%, as before tiers existed; user ruling 2026-09-29).
 /// Smite never strikes the god's own follower (CanSmite). Three paths reach a follower: an NPC
 /// (Bless on the NPC), a player live in another session (Bless with otherSession: Favor is changed
 /// in memory and the tier's stat update is left to that session, GodBoonSystem.RequestRecalcForBoon;
@@ -129,7 +130,7 @@ public static class ImmortalDeedSystem
                 GameConfig.GodBlessFavorDailyCap, gods, deferBoonRecalc: otherSession);
         }
         int favor = FavorSystem.GetFavor(follower, gods);
-        float bonus = BlessBonusFor(FavorSystem.GetTier(favor));
+        float bonus = follower.IsNPC ? GameConfig.GodBlessBonusNpc : BlessBonusFor(FavorSystem.GetTier(favor));
         var (combats, merged) = MergeBlessing(follower.DivineBlessingCombats, follower.DivineBlessingBonus, bonus);
         follower.DivineBlessingCombats = combats;
         follower.DivineBlessingBonus = merged;
