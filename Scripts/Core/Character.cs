@@ -2353,6 +2353,7 @@ public class Character
     public int DaysSinceDevotion { get; set; }                                   // Daily resets since the last prayer or fitting deed (neglect)
     public int DaysSinceSpellCast { get; set; }                                  // 1.2.0 Temple gods: daily resets since the last spell cast (Arcanus taboo)
     public int LastGodSwitchDay { get; set; } = -1;                              // 1.2.0 Temple gods piece 4: game day the character last left a god by choice (-1 never)
+    public bool MiracleUsedToday { get; set; }                                   // 1.2.0 Temple gods piece 5: today's Miracle is spent (MiracleSystem); cleared by the daily reset
     // 1.2.0 Temple gods piece 4, single-player: standing lost by each god to desecration this week
     // (GodStandingPenalty). Kept for the week GodStandingPenaltyWeek only; online it is in SQL.
     public Dictionary<string, int> GodStandingPenalties { get; set; } = new();

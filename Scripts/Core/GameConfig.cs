@@ -1757,6 +1757,12 @@ public static partial class GameConfig
     // Temple gods piece 4: each desecration lowers that god's standing by this until the next weekly reset
     public const int GodDesecrationStandingPenalty = 5;
     public const int GodStandingWeekDays = 7;                 // The weekly reset: week = game day / this
+    // Temple gods piece 5: Miracles (MiracleSystem). A Chosen follower has one a day, from the god's domain.
+    public const int MiracleBanishBossDamagePct = 10;         // Solarius: a boss, mini-boss or Old God is not banished; it takes this percent of its max HP
+    public const int MiracleBindRounds = 2;                   // Judicar: rounds a foe is bound (the monster hold rules and boss limits apply)
+    public const int MiracleConfuseRounds = 3;                // Discordia: rounds each foe is confused (Mass Confusion's boss limits apply)
+    public const float MiracleCritMultiplier = 2.0f;          // Valorian: the guaranteed critical hit's damage multiplier (a natural 20's best)
+    public const string MiracleBeastId = "dire_wolf";         // Sylvana: the beast called (BeastData), at the follower's level
     // Temple gods piece 4: leaving a god costs all Favor with it; its wrath follows by the Favor lost
     // (GodSwitchSystem). A canon god's wrath is a DivineWrath level: 1 for Favor lost below
     // GodFavorTierDevoutMin, 2 below GodFavorTierZealotMin, 3 from there. A player-god smites at

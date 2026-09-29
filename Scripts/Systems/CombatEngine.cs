@@ -20864,6 +20864,8 @@ public partial class CombatEngine
         result.CombatLog.Add($"{monster.Name} attacks {companion.DisplayName} for {actualDamage} damage");
 
         CompanionDeathCheck:
+        // 1.2.0 Temple gods piece 5: a grouped follower of Mortis at Chosen cheats death once a day
+        if (!companion.IsAlive) TryMortisMiracleForFollower(companion, result);
         // Check if teammate died
         if (!companion.IsAlive)
         {
@@ -20966,6 +20968,7 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleTeammateDeathDispatch(Character tm, string killerName, CombatResult result)
     {
+        if (TryMortisMiracleForFollower(tm, result)) return;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
         if (tm.IsEcho)
         {
             terminal.SetColor("bright_cyan");
@@ -22457,6 +22460,46 @@ public partial class CombatEngine
     private void ApplyMentalFollowerDeath(Character follower, CombatResult result) =>
         ApplyMentalFollowerDeath(result, follower, MentalFightFloor(result?.Player), BossContext != null);
 
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: Mortis's Miracle for the fight's leader, from HandlePlayerDeath.
+    /// When it fires the player is left at 1 HP, the day's Miracle is spent, the message is shown
+    /// (and broadcast to a group), and the outcome is rewritten as after Last Stand. Skipped for
+    /// arrest and exhibition fights and a Mental collapse death. True when it fired.
+    /// </summary>
+    private async Task<bool> TryMortisMiracle(CombatResult result)
+    {
+        var player = result.Player;
+        if (player == null || result.MentalCollapseDeath || player.IsArrestCombat || player.IsExhibitionCombat) return false;
+        if (!MiracleSystem.TryCheatDeath(player)) return false;
+        terminal.SetColor("bright_magenta");
+        terminal.WriteLine("");
+        terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires")}");
+        terminal.WriteLine("");
+        if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+            BroadcastGroupCombatEvent(result, $"\u001b[1;35m  {Loc.Get("miracle.mortis_fires_other", player.DisplayName)}\u001b[0m");
+        await Task.Delay(GetCombatDelay(1500));
+        result.Outcome = result.Monsters != null && !result.Monsters.Any(m => m.IsAlive)
+            ? CombatOutcome.Victory : CombatOutcome.PlayerEscaped;
+        return true;
+    }
+
+    /// <summary>
+    /// 1.2.0 Temple gods piece 5: Mortis's Miracle for a grouped follower at a death site, before
+    /// the follower is removed from the fight or their death is handed to their session. When it
+    /// fires they stay in the fight at 1 HP; the message goes to their own terminal and the leader's.
+    /// Only grouped human followers; not in a fight with no real death. True when it fired.
+    /// </summary>
+    private bool TryMortisMiracleForFollower(Character follower, CombatResult result)
+    {
+        var leader = result?.Player;
+        if (follower == null || !follower.IsGroupedPlayer || leader == null) return false;
+        if (leader.IsArrestCombat || leader.IsExhibitionCombat || result!.Opponent != null) return false;
+        if (!MiracleSystem.TryCheatDeath(follower)) return false;
+        follower.RemoteTerminal?.WriteLine($"  {Loc.Get("miracle.mortis_fires")}", "bright_magenta");
+        terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires_other", follower.DisplayName)}", "bright_magenta");
+        return true;
+    }
+
     private async Task HandlePlayerDeath(CombatResult result)
     {
         // v0.61.2 Last-Stand cap: every monster / boss / environmental damage
@@ -22504,6 +22547,12 @@ public partial class CombatEngine
                 result.Outcome = CombatOutcome.PlayerEscaped;
             return;
         }
+
+        // 1.2.0 Temple gods piece 5: Mortis's Miracle cheats death once that day, after the free
+        // rescues (Last Stand, Death's Door) and before anything death-related runs. Not for a
+        // fight with no real death (arrest, exhibition) or a Mental collapse.
+        if (await TryMortisMiracle(result))
+            return;
 
         // v0.61.2: Last-Stand rescue did NOT fire, so the player is genuinely
         // entering the death pipeline. Mark the result so the outer Char.Combat.End
@@ -30576,6 +30625,7 @@ public partial class CombatEngine
         {
             foreach (var tm in result.Teammates.Where(t => !t.IsAlive).ToList())
             {
+                if (TryMortisMiracleForFollower(tm, result)) continue;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
                 string killerName = bossMonster.Name;
                 BroadcastGroupCombatEvent(result,
                     $"\u001b[1;31m  ═══ {tm.DisplayName} has fallen to {killerName}'s dark powers! ═══\u001b[0m");
