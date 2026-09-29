@@ -2187,6 +2187,9 @@ public class InnLocation : BaseLocation
                 // Found the next undefeated god
                 if (anyDefeated)
                 {
+                    // Aurelion's site is the Temple's Deep Temple, not a dungeon floor
+                    if (entry.God == OldGodType.Aurelion)
+                        return Loc.Get("inn.bartender_rumor_next_god_temple");
                     // Hint about the next god
                     return Loc.Get("inn.bartender_rumor_next_god", entry.Floor, entry.Name);
                 }

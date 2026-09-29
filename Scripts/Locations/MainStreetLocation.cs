@@ -1957,6 +1957,7 @@ public partial class MainStreetLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("main_street.gods_desc")}");
         terminal.WriteLine("");
 
+        // 1.2.0 Temple gods piece 7 leftover: Aurelion's site is the Deep Temple, not a dungeon floor.
         var allGods = new (OldGodType type, string name, int floor)[]
         {
             (OldGodType.Maelketh, "Maelketh",  25),
@@ -1970,6 +1971,7 @@ public partial class MainStreetLocation : BaseLocation
 
         foreach (var (godType, godName, floor) in allGods)
         {
+            string site = godType == OldGodType.Aurelion ? Loc.Get("temple.room.deep") : $"Fl.{floor}";
             if (story.OldGodStates.TryGetValue(godType, out var godState) &&
                 godState.HasBeenEncountered)
             {
@@ -1990,12 +1992,12 @@ public partial class MainStreetLocation : BaseLocation
                     _                                        => "bright_yellow",
                 };
                 terminal.SetColor(color);
-                terminal.WriteLine($"    Fl.{floor,-4} {godName,-10} [{statusText}]");
+                terminal.WriteLine($"    {site,-7} {godName,-10} [{statusText}]");
             }
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"    Fl.{floor,-4} {"????",-10} [{Loc.Get("main_street.god_unknown")}]");
+                terminal.WriteLine($"    {site,-7} {"????",-10} [{Loc.Get("main_street.god_unknown")}]");
             }
         }
         terminal.WriteLine("");
