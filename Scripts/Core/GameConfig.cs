@@ -1757,6 +1757,13 @@ public static partial class GameConfig
     // Temple gods piece 4: each desecration lowers that god's standing by this until the next weekly reset
     public const int GodDesecrationStandingPenalty = 5;
     public const int GodStandingWeekDays = 7;                 // The weekly reset: week = day / this (online the world day, DailySystemManager.WorldDayAt)
+    // Temple gods piece 6: NPC townsfolk worship a god (NpcFaithSystem), saved as the NPC's WorshippedGod
+    public const int GodNpcFollowerStanding = 5;              // Each living NPC follower adds this to its god's standing
+    public const int NpcFaithAlignedWeight = 3;               // Pick weight of a canon god of the NPC's own alignment
+    public const int NpcFaithNeutralWeight = 1;               // Pick weight of a god that neither shares nor opposes it
+    public const int NpcFaithClassWeight = 3;                 // Added for the god of the NPC's class (never to an opposed god)
+    public const int NpcFaithSharedRelationSteps = 1;         // First talk of the day with an NPC of the player's god: relation steps warmer
+    public const int NpcFaithOpposedRelationSteps = 1;        // First talk of the day with an NPC whose god opposes the player's: steps cooler
     // Temple gods piece 5: Miracles (MiracleSystem). A Chosen follower has one a day, from the god's domain.
     public const int MiracleBanishBossDamagePct = 10;         // Solarius: a boss, mini-boss or Old God is not banished; it takes this percent of its max HP
     public const int MiracleBindRounds = 2;                   // Judicar: rounds a foe is bound (the monster hold rules and boss limits apply)

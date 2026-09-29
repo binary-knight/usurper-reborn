@@ -8996,16 +8996,44 @@ namespace UsurperRemake.Systems
         public Dictionary<string, GodStanding> GetGodStandings() => GetGodStandings(GodStandingPenalty.CurrentWeek());
 
         /// <summary>
-        /// GetGodStandings for a week: the followers' Favor less that week's desecration penalties
-        /// (god_standing_penalties, read on the same connection), never below 0.
+        /// GetGodStandings for a week: the followers' Favor plus GodNpcFollowerStanding for each living
+        /// NPC follower in the world's NPC roster (world_state 'npcs'), less that week's desecration
+        /// penalties (god_standing_penalties), all read on the same connection, never below 0.
         /// </summary>
         public Dictionary<string, GodStanding> GetGodStandings(int week)
         {
             var entries = new List<(string God, int Favor)>();
             var penalties = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var npcCounts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 using var connection = OpenConnection();
+                try
+                {
+                    // 1.2.0 Temple gods piece 6: the world's living NPC followers per god, from the NPC
+                    // roster in world_state (one grouped read on this connection, no per-god scan)
+                    using var npcCmd = connection.CreateCommand();
+                    npcCmd.CommandText = @"
+                        SELECT json_extract(j.value, '$.worshippedGod') AS god, COUNT(*)
+                        FROM world_state w, json_each(w.value) j
+                        WHERE w.key = 'npcs' AND json_valid(w.value) AND json_type(w.value) = 'array'
+                          AND COALESCE(json_extract(j.value, '$.isDead'), 0) = 0
+                          AND json_extract(j.value, '$.worshippedGod') IS NOT NULL
+                          AND json_extract(j.value, '$.worshippedGod') != ''
+                        GROUP BY god;";
+                    using var nr = npcCmd.ExecuteReader();
+                    while (nr.Read())
+                    {
+                        string god = ReadJsonText(nr, 0).Trim();
+                        int count = nr.IsDBNull(1) ? 0 : nr.GetInt32(1);
+                        if (god.Length > 0 && count > 0)
+                        {
+                            string name = GodRegistry.CanonName(god) ?? god;
+                            npcCounts[name] = (npcCounts.TryGetValue(name, out int v) ? v : 0) + count;
+                        }
+                    }
+                }
+                catch (Exception npcEx) { DebugLogger.Instance.LogWarning("SQL", $"God standing NPC followers unavailable: {npcEx.Message}"); }
                 try
                 {
                     using var pen = connection.CreateCommand();
@@ -9067,7 +9095,7 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to read god standings: {ex.Message}");
             }
-            return GodStandingPenalty.Apply(GodRegistry.ComputeStandings(entries), penalties);
+            return GodStandingPenalty.Apply(GodRegistry.AddNpcFollowers(GodRegistry.ComputeStandings(entries), npcCounts), penalties);
         }
 
         /// <summary>

@@ -96,7 +96,7 @@ public static class EnhancedNPCBehaviors
         // NPCBelievers check removed - const 50 makes code unreachable
         if (random.Next(3) != 0) return; // Only 33% processed per cycle
 
-        if (!string.IsNullOrEmpty(npc.God))
+        if (!string.IsNullOrEmpty(npc.WorshippedGod))
         {
             // Existing believer actions (pray, offering, seek guidance, preach)
             ProcessBelieverActions(npc);
@@ -320,7 +320,7 @@ public static class EnhancedNPCBehaviors
         var candidates = allNPCs.Where(n =>
             n != believer &&
             !n.IsDead && n.IsAlive &&
-            string.IsNullOrEmpty(n.God) &&
+            string.IsNullOrEmpty(n.WorshippedGod) &&
             n.CurrentLocation == believer.CurrentLocation).ToList();
 
         if (candidates.Count == 0) return;
@@ -332,11 +332,11 @@ public static class EnhancedNPCBehaviors
         var conversionChance = CalculateSocialConversionChance(believer, target);
         if (random.NextDouble() < conversionChance)
         {
-            ConvertNPCToFaith(target, believer.God);
+            ConvertNPCToFaith(target, believer.WorshippedGod);
 
             // Generate news about the conversion
             NewsSystem.Instance?.Newsy(
-                $"{GameConfig.NewsColorPlayer}{target.Name2}{GameConfig.NewsColorDefault} was converted to the faith of {believer.God} by {GameConfig.NewsColorPlayer}{believer.Name2}{GameConfig.NewsColorDefault}",
+                $"{GameConfig.NewsColorPlayer}{target.Name2}{GameConfig.NewsColorDefault} was converted to the faith of {believer.WorshippedGod} by {GameConfig.NewsColorPlayer}{believer.Name2}{GameConfig.NewsColorDefault}",
                 true, GameConfig.NewsCategory.General);
         }
     }
@@ -378,12 +378,12 @@ public static class EnhancedNPCBehaviors
 
     private static void ConvertNPCToFaith(NPC npc, string deity)
     {
-        npc.God = deity;
+        npc.WorshippedGod = deity;
 
-        npc.Memory?.AddMemory($"I found faith in {npc.God}", "faith", DateTime.Now);
+        npc.Memory?.AddMemory($"I found faith in {npc.WorshippedGod}", "faith", DateTime.Now);
         npc.EmotionalState?.AdjustMood("spiritual", 0.3f);
 
-        // GD.Print($"[Faith] {npc.Name2} converted to {npc.God}");
+        // GD.Print($"[Faith] {npc.Name2} converted to {npc.WorshippedGod}");
     }
     
     private static void ProcessBelieverActions(NPC npc)
@@ -391,14 +391,14 @@ public static class EnhancedNPCBehaviors
         var actions = new[] { "pray", "make offering", "seek guidance", "preach" };
         var action = actions[random.Next(actions.Length)];
         
-        npc.Memory?.AddMemory($"I {action} to {npc.God}", "faith", DateTime.Now);
+        npc.Memory?.AddMemory($"I {action} to {npc.WorshippedGod}", "faith", DateTime.Now);
         
         // Faith actions can affect mood and goals
         npc.EmotionalState?.AdjustMood("spiritual", 0.1f);
         
         if (random.Next(10) == 0) // 10% chance to add faith-based goal
         {
-            npc.Goals?.AddGoal(new Goal($"Serve {npc.God}", GoalType.Social, 0.6f));
+            npc.Goals?.AddGoal(new Goal($"Serve {npc.WorshippedGod}", GoalType.Social, 0.6f));
         }
     }
     

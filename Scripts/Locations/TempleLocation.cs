@@ -1206,7 +1206,7 @@ public partial class TempleLocation : BaseLocation
             {
                 standings.TryGetValue(god.Name, out var standing);
                 terminal.WriteLine(Loc.Get("temple.altar_of", god.Name, god.GetTitle()), "yellow");
-                terminal.WriteLine(Loc.Get("temple.believers_count", standing.Followers + GodRegistry.CountNpcFollowers(god.Name)), "white");
+                terminal.WriteLine(Loc.Get("temple.believers_count", standing.AllFollowers), "white");
                 terminal.WriteLine(Loc.Get("temple.power_count", god.Experience), "cyan");
                 terminal.WriteLine("");
             }
@@ -1245,7 +1245,7 @@ public partial class TempleLocation : BaseLocation
                 title = GameConfig.GodTitles[Math.Clamp(level - 1, 0, GameConfig.GodTitles.Length - 1)];
             }
             standings.TryGetValue(entry.Name, out var standing);
-            ranking.Add((entry.Name, title, standing.Followers + GodRegistry.CountNpcFollowers(entry.Name), standing.Standing, !entry.IsCanon));
+            ranking.Add((entry.Name, title, standing.AllFollowers, standing.Standing, !entry.IsCanon));
         }
 
         ranking = ranking.OrderByDescending(r => r.Standing).ThenByDescending(r => r.Followers).ToList();

@@ -76,10 +76,10 @@ public class GodStanding1115Tests : IDisposable
     {
         var gods = new GodSystem();
         var c = new Character { Name1 = "GsSolo", Name2 = "GsSolo", AI = CharacterAI.Human };
-        GodRegistry.SinglePlayerStandings(c, gods).Should().BeEmpty();
+        GodRegistry.SinglePlayerStandings(c, gods, Array.Empty<NPC>()).Should().BeEmpty();
         GodRegistry.SetWorshippedGod(c, "Terran", gods);
         FavorSystem.Change(c, 27, gods);
-        GodRegistry.SinglePlayerStandings(c, gods).Should().ContainSingle()
+        GodRegistry.SinglePlayerStandings(c, gods, Array.Empty<NPC>()).Should().ContainSingle()
             .Which.Value.Should().Be(new GodStanding("Terran", 27, 1));
     }
 
@@ -339,12 +339,15 @@ public class GodStanding1115Tests : IDisposable
         var gods = UsurperRemake.GodSystemSingleton.Instance;
         GodRegistry.SetWorshippedGod(c, "Arcanus", gods);
         FavorSystem.Change(c, 19, gods);
+        var roster = NPCSpawnSystem.Instance.ActiveNPCs;
+        var rosterBefore = roster.ToList();
+        roster.Clear();   // piece 6: the NPC roster's followers count too; none here
         try
         {
             (await GodRegistry.GetStandingsAsync(c)).Should().ContainSingle()
                 .Which.Value.Should().Be(new GodStanding("Arcanus", 19, 1));
         }
-        finally { GodRegistry.SetWorshippedGod(c, "", gods); }
+        finally { GodRegistry.SetWorshippedGod(c, "", gods); roster.Clear(); roster.AddRange(rosterBefore); }
     }
 
     // ---------------- Temple ranking (source) ----------------

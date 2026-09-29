@@ -308,6 +308,10 @@ public class GodSwitching1115Tests
             ["Scripts/Locations/PantheonLocation.cs|target.NpcRef.WorshippedGod="] = 2,
             ["Scripts/Locations/PantheonLocation.cs|npc.WorshippedGod="] = 1,
             ["Scripts/Systems/WorldSimService.cs|npc.WorshippedGod="] = 1,
+            // Piece 6: NPC townsfolk faith (the pick and the Manwe clear), and the NPC faith behaviours
+            ["Scripts/Systems/NpcFaithSystem.cs|npc.WorshippedGod="] = 2,
+            ["Scripts/AI/EnhancedNPCBehaviorSystem.cs|npc.WorshippedGod="] = 1,
+            ["Scripts/AI/EnhancedNPCBehaviors.cs|npc.WorshippedGod="] = 1,
         };
         counts.Should().BeEquivalentTo(expected, "a new write of the worshipped god must go through GodSwitchSystem.Switch");
         Count(Source("Scripts/Systems/FaithSystem.cs"), "GodRegistry.SetWorshippedGod(c, newGod, gods, otherSession)").Should().Be(1);

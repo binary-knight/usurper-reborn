@@ -303,17 +303,17 @@ public class EnhancedNPCBehaviorSystem
             if (random.Next(3) != 0) continue; // Only process 33% of NPCs each cycle
             
             // Verify existing faith
-            if (!string.IsNullOrEmpty(npc.God))
+            if (!string.IsNullOrEmpty(npc.WorshippedGod))
             {
-                if (!DoesGodExist(npc.God))
+                if (!DoesGodExist(npc.WorshippedGod))
                 {
-                    npc.God = "";
+                    npc.WorshippedGod = "";
                     await SaveCharacter(npc);
                 }
             }
             
             // Process faith actions
-            if (!string.IsNullOrEmpty(npc.God))
+            if (!string.IsNullOrEmpty(npc.WorshippedGod))
             {
                 await ProcessExistingBeliever(npc);
             }

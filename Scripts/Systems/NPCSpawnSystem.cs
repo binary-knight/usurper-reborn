@@ -204,6 +204,7 @@ namespace UsurperRemake.Systems
                 foreach (var template in npcTemplates)
                 {
                     var npc = CreateNPCFromTemplate(template);
+                    NpcFaithSystem.EnsureAssigned(npc);   // 1.2.0 Temple gods: townsfolk worship a god
                     spawnedNPCs.Add(npc);
                     NPCNameRegistry.Reserve(npc.Name2);
                 }
@@ -1174,6 +1175,9 @@ namespace UsurperRemake.Systems
 
             // v1.0.4: every name that ever enters the roster is retired for good
             NPCNameRegistry.Reserve(npc.Name2);
+
+            // 1.2.0 Temple gods: an NPC with no god is given one (deterministic, so a reload gives the same)
+            NpcFaithSystem.EnsureAssigned(npc);
 
             _npcLock.EnterWriteLock();
             try
