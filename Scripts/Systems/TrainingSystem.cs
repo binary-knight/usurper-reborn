@@ -771,7 +771,7 @@ public static class TrainingSystem
         if (trainedSkills.Count == 0)
         {
             terminal.WriteLine(Loc.Get("ui.no_trained_skills"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -806,7 +806,7 @@ public static class TrainingSystem
             if (player.Gold < goldCost)
             {
                 terminal.WriteLine(Loc.Get("training.need_gold", $"{goldCost:N0}", $"{player.Gold:N0}"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -832,17 +832,17 @@ public static class TrainingSystem
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_1"), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_2"), "white");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_3"), "bright_cyan");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_4"), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_5"), "white");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_6", skillName.ToLower()), "bright_magenta");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             // v0.65.5 (T1-3): pass skillName to lore_7 as well. EN keeps the skill name in lore_8
             // ("training in {0} dissolve..."), but Hungarian word order moves it into lore_7
@@ -852,7 +852,7 @@ public static class TrainingSystem
             terminal.WriteLine(Loc.Get("training.single_reset_lore_8", skillName), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_9"), "white");
             terminal.WriteLine(Loc.Get("training.single_reset_lore_10"), "white");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.WriteLine("");
             UIHelper.WriteSectionHeader(terminal, Loc.Get("training.skill_reset_header"), "bright_yellow");
             terminal.WriteLine(Loc.Get("training.skill_reset_result", skillName, GetProficiencyName(defaultLevel)), "white");
@@ -890,14 +890,14 @@ public static class TrainingSystem
         if (totalRefund == 0)
         {
             terminal.WriteLine(Loc.Get("ui.no_trained_skills"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         if (player.Gold < goldCost)
         {
             terminal.WriteLine(Loc.Get("training.need_gold", $"{goldCost:N0}", $"{player.Gold:N0}"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -923,28 +923,28 @@ public static class TrainingSystem
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_1"), "white");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_2"), "white");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_3"), "bright_cyan");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_4"), "bright_cyan");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_5"), "white");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_6"), "white");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_7"), "bright_magenta");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_8"), "white");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_9"), "white");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_10"), "white");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_11"), "white");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_12"), "white");
         terminal.WriteLine(Loc.Get("training.all_reset_lore_13"), "bright_cyan");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         terminal.WriteLine("");
         UIHelper.WriteSectionHeader(terminal, Loc.Get("training.reset_all_header"), "bright_yellow");
         terminal.WriteLine(Loc.Get("training.reset_all_result"), "white");
@@ -1026,7 +1026,7 @@ public static class TrainingSystem
         if (proficiency >= ProficiencyLevel.Legendary)
         {
             terminal.WriteLine(Loc.Get("training.already_legendary", skillName), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1037,7 +1037,7 @@ public static class TrainingSystem
         {
             terminal.WriteLine(Loc.Get("training.need_points", costPerPoint), "red");
             terminal.WriteLine(Loc.Get("training.only_have_points", player.TrainingPoints), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -1156,7 +1156,7 @@ public static class TrainingSystem
         // Auto-save after training
         await SaveSystem.Instance.AutoSave(player);
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>

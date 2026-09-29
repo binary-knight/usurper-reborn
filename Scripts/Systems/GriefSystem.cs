@@ -312,7 +312,7 @@ namespace UsurperRemake.Systems
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("grief.attempt_resurrect", grief.CompanionName, method));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // ALL resurrection attempts fail
             string failureReason = GetResurrectionFailure(method, grief.ResurrectionAttempts);
@@ -320,7 +320,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(failureReason);
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Progressive philosophical messages based on attempts - varied metaphors
             if (grief.ResurrectionAttempts == 1)
@@ -367,7 +367,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("grief.grief_river_backward"));
                 terminal.WriteLine(Loc.Get("grief.rivers_one_direction"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("grief.let_go_downstream"));
                 terminal.WriteLine(Loc.Get("grief.waiting_at_sea"));
@@ -387,7 +387,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("grief.hurt_is_price"));
                 terminal.WriteLine(Loc.Get("grief.never_loved_at_all"));
                 terminal.WriteLine("");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("grief.change_permanent"));
                 terminal.WriteLine(Loc.Get("grief.they_are_immortal"));
@@ -527,7 +527,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  [{memory.CompanionName}]", "bright_cyan");
                 terminal.WriteLine($"  {memory.MemoryText}", "white");
                 terminal.WriteLine("");
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             // Get current grief state if any

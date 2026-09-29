@@ -243,7 +243,7 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("seals.header_discovered"), seal.IconColor, 66);
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             // Show collection progress — each slot maps to a specific seal, not ordinal count
             var story = StoryProgressionSystem.Instance;
@@ -276,13 +276,13 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  ({collected}/7)");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine($"  {seal.Name}", "bright_white");
             terminal.WriteLine($"  \"{seal.Title}\"", "cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("  ═══════════════════════════════════════", "dark_cyan");
@@ -306,7 +306,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.WriteLine($"  {displayLine}", "white");
                 }
-                await Task.Delay(150);
+                await Pacing.Wait(150);
             }
 
             terminal.WriteLine("");
@@ -327,20 +327,20 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("seals.header_all_found"), "bright_yellow", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("seals.resonate_power")}", "bright_cyan");
             terminal.WriteLine($"  {Loc.Get("seals.uncovered_history")}", "white");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  {Loc.Get("seals.knowledge_understanding")}", "green");
             terminal.WriteLine($"  {Loc.Get("seals.face_manwe_see_more")}", "green");
             terminal.WriteLine($"  {Loc.Get("seals.understand_choices")}", "green");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  {Loc.Get("seals.true_ending_possible")}", "bright_magenta");
             terminal.WriteLine("");

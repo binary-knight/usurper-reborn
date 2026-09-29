@@ -361,7 +361,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine($"[You] {message}");
                     terminal.SetColor("green");
                     terminal.WriteLine("  Message sent!");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return true;
             }
@@ -384,7 +384,7 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine(Loc.Get("chat.player_not_found", targetPlayer));
-                            await Task.Delay(1500);
+                            await Pacing.Wait(1500);
                         }
                         else
                         {
@@ -404,7 +404,7 @@ namespace UsurperRemake.Systems
                                 terminal.WriteLine("  Message sent!");
                             else
                                 terminal.WriteLine($"  Message sent to {targetPlayer} (offline - they'll see it next login).");
-                            await Task.Delay(1500);
+                            await Pacing.Wait(1500);
                         }
                     }
                 }

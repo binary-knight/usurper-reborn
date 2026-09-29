@@ -717,7 +717,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  ────────────────────────────────────────────", "dark_gray");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             foreach (var line in paradox.Setup)
             {
@@ -729,7 +729,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.WriteLine($"  {line}", "white");
                 }
-                await Task.Delay(100);
+                await Pacing.Wait(100);
             }
 
             terminal.WriteLine("");
@@ -737,7 +737,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  ────────────────────────────────────────────", "dark_gray");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
 
         /// <summary>
@@ -790,7 +790,7 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("moral.header_consequences"), "dark_cyan", 64);
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             foreach (var line in choice.Outcome)
             {
@@ -802,7 +802,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.WriteLine($"  {line}", "white");
                 }
-                await Task.Delay(200);
+                await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
@@ -907,7 +907,7 @@ namespace UsurperRemake.Systems
             foreach (var line in paradox.OceanPhilosophyReflection!)
             {
                 terminal.WriteLine($"  {line}", "bright_cyan");
-                await Task.Delay(400);
+                await Pacing.Wait(400);
             }
 
             terminal.WriteLine("");

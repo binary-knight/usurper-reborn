@@ -312,7 +312,7 @@ namespace UsurperRemake.Systems
             foreach (var line in dreamData.Lines)
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
 
             terminal.WriteLine("");
@@ -405,7 +405,7 @@ namespace UsurperRemake.Systems
             foreach (var line in data.Lines)
             {
                 terminal.WriteLine($"    {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             terminal.WriteLine("");

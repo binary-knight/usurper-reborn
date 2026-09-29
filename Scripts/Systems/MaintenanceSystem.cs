@@ -153,7 +153,7 @@ public class MaintenanceSystem
         terminal.WriteLine(Loc.Get("maint.injections"), "red");
         terminal.WriteLine("", "white");
         
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
     
     /// <summary>
@@ -197,7 +197,7 @@ public class MaintenanceSystem
         if (!silent)
         {
             terminal.WriteLine(Loc.Get("maint.player_complete"), "green");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
     }
     
@@ -254,7 +254,7 @@ public class MaintenanceSystem
 
             if (!silentMode)
             {
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
         }
     }
@@ -485,7 +485,7 @@ public class MaintenanceSystem
 
         WriteIfNotSilent("Royal system processing complete.", "green");
         if (!silentMode)
-            await Task.Delay(500);
+            await Pacing.Wait(500);
     }
     
     /// <summary>
@@ -507,7 +507,7 @@ public class MaintenanceSystem
 
         WriteIfNotSilent("Economic processing complete.", "green");
         if (!silentMode)
-            await Task.Delay(500);
+            await Pacing.Wait(500);
     }
 
     /// <summary>
@@ -577,7 +577,7 @@ public class MaintenanceSystem
 
         WriteIfNotSilent("System cleanup complete.", "green");
         if (!silentMode)
-            await Task.Delay(500);
+            await Pacing.Wait(500);
     }
     
     /// <summary>
@@ -616,7 +616,7 @@ public class MaintenanceSystem
         WriteIfNotSilent("  News files updated", "cyan");
 
         if (!silentMode)
-            await Task.Delay(500);
+            await Pacing.Wait(500);
     }
     
     /// <summary>
@@ -636,7 +636,7 @@ public class MaintenanceSystem
         terminal.WriteLine(Loc.Get("maint.next_maint", DateTime.Now.AddDays(1).ToString("MM-dd-yyyy")), "gray");
         terminal.WriteLine("", "white");
         
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     /// <summary>

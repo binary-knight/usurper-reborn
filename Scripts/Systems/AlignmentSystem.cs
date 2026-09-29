@@ -607,7 +607,7 @@ namespace UsurperRemake.Systems
                     // a gift item into the player's hand on top of the HP restoration. Mirror of
                     // the Dread bounty-hunter loot-roll on the Light side.
                     TryGrantRenownGift(player, terminal);
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     return true;
 
                 case AlignmentType.Good:
@@ -622,7 +622,7 @@ namespace UsurperRemake.Systems
                         // v0.62.x Phase 3: at Hero+ Renown the merchant's "thanks" is materially
                         // bigger -- they include a gift item with the gold.
                         TryGrantRenownGift(player, terminal);
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         return true;
                     }
                     break;
@@ -665,7 +665,7 @@ namespace UsurperRemake.Systems
                         int xpGain = Math.Max(50, playerLevel * 10);
                         player.Experience += xpGain;
                         terminal.WriteLine(Loc.Get("alignment.event_forbidden_xp", xpGain));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         return true;
                     }
                     break;
@@ -677,7 +677,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("alignment.event_wickedness_empowers"));
                     player.AddTimedStatBuff("alignment_evil", StatKind.Strength, 1, StatBuffEnd.Rest);   // 1.2.0: until the next rest
                     terminal.WriteLine(Loc.Get("alignment.event_str_temp"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     return true;
 
                 case AlignmentType.Balanced:
@@ -692,7 +692,7 @@ namespace UsurperRemake.Systems
                         int gold = _random.Next(20, 100);
                         terminal.WriteLine(Loc.Get("alignment.event_merchant_thanks", gold));
                         player.Gold += gold;
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         return true;
                     }
                     else
@@ -703,7 +703,7 @@ namespace UsurperRemake.Systems
                         int xpGain = Math.Max(50, player.Level * 10);
                         player.Experience += xpGain;
                         terminal.WriteLine(Loc.Get("alignment.event_forbidden_xp", xpGain));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         return true;
                     }
             }

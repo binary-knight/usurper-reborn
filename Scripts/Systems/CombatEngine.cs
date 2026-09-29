@@ -2571,7 +2571,7 @@ public partial class CombatEngine
                     _ => CombatSpeed.Normal
                 };
                 terminal.WriteLine(Loc.Get("combat.speed_set_to", player.CombatSpeed.ToString()), "cyan");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 continue; // Show menu again
             }
 
@@ -2602,7 +2602,7 @@ public partial class CombatEngine
                     action.Type == CombatActionType.BegForMercy)
                 {
                     terminal.WriteLine(Loc.Get("combat.pvp_action_unavailable"), "yellow");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue; // Show menu again
                 }
             }
@@ -20354,20 +20354,20 @@ public partial class CombatEngine
 
         // Companion sacrifices themselves!
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         UIHelper.WriteBoxHeader(terminal, "COMPANION SACRIFICE", "bright_red", 52);
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_white");
         terminal.WriteLine(Loc.Get("combat.sacrifice_killing_blow"));
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("combat.sacrifice_throws", sacrificingCompanion.Name));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Show their sacrifice dialogue
         string sacrificeLine = sacrificingCompanion.Id switch
@@ -20386,12 +20386,12 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.WriteLine(sacrificeLine);
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // The companion takes the full damage and dies
         terminal.SetColor("dark_red");
         terminal.WriteLine(Loc.Get("combat.sacrifice_blow_strikes", sacrificingCompanion.Name));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Remove companion from teammates
         var companionChar = companionTeammates.FirstOrDefault(t => t.CompanionId == sacrificingCompanion.Id);
@@ -20414,7 +20414,7 @@ public partial class CombatEngine
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("combat.alive_but_cost"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Increase loyalty with remaining companions (they witnessed the sacrifice)
         foreach (var remaining in companionSystem.GetActiveCompanions())
@@ -21230,7 +21230,7 @@ public partial class CombatEngine
         terminal.SetColor("dark_red");
         terminal.WriteLine(Loc.Get("combat.companion_falls", companion.DisplayName));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Remove from teammates
         result.Teammates?.Remove(companion);
@@ -21315,7 +21315,7 @@ public partial class CombatEngine
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════════════════════════");
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Mark the combat character reference as dead
         if (npc is NPC npcRef)
@@ -21360,7 +21360,7 @@ public partial class CombatEngine
                 MentalUi.AnnounceMentalChange(terminal, result.Player, mentalBeforeGrief);
                 GodDeedSystem.Record(result.Player, GodAct.DeathWitnessed, terminal);   // 1.2.0 Temple gods: Death deed
             }
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         // Check relationship type and handle accordingly.
@@ -21400,7 +21400,7 @@ public partial class CombatEngine
         }
 
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Generate death news for the realm
         string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? "the dungeons" : result.Player.CurrentLocation;
@@ -21432,7 +21432,7 @@ public partial class CombatEngine
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("combat.mercenary_gone"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Remove from player's mercenary list
         if (currentPlayer != null)
@@ -22424,26 +22424,26 @@ public partial class CombatEngine
             terminal.WriteLine("");
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("death.died_times", GameConfig.MaxPlaythroughDeaths + 1)}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("permadeath.threads")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.WriteLine($"  {Loc.Get("permadeath.no_temple")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.WriteLine($"  {Loc.Get("permadeath.no_coin")}");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
 
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
             terminal.WriteLine($"  {Loc.Get("permadeath.exhausted", player.Name2 ?? player.Name1 ?? "???")}");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("permadeath.veil_closes")}");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             terminal.WriteLine($"  {Loc.Get("permadeath.erasing")}");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
         }
         catch (Exception ex)
         {
@@ -22519,7 +22519,7 @@ public partial class CombatEngine
             terminal.WriteLine($"  {Loc.Get("permadeath.restore_hint2")}");
             terminal.WriteLine($"  {Loc.Get("permadeath.disconnecting")}");
             terminal.WriteLine("");
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
         }
         catch { /* ignore */ }
 
@@ -23019,7 +23019,7 @@ public partial class CombatEngine
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("death.lives_recover_hint")}");
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             resurrectionResult = new ResurrectionResult
             {
@@ -30171,7 +30171,7 @@ public partial class CombatEngine
         foreach (var line in dialogue)
         {
             OldGodBossSystem.Instance?.PrintDialogueLine(terminal, line, ctx.BossData?.ThemeColor ?? "red");
-            await Task.Delay(200);
+            await Pacing.Wait(200);
         }
 
         if (!string.IsNullOrEmpty(flavor))
@@ -30205,7 +30205,7 @@ public partial class CombatEngine
         }
 
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -30986,11 +30986,11 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("bright_magenta");
         terminal.WriteLine($"  {Loc.Get("combat.loom_glows")}");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         terminal.SetColor("white");
         terminal.WriteLine($"  {Loc.Get("combat.reach_essence", boss.Name)}");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Display save dialogue
         if (boss.SaveDialogue != null)
@@ -30999,7 +30999,7 @@ public partial class CombatEngine
             {
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine($"  \"{line}\"");
-                await Task.Delay(300);
+                await Pacing.Wait(300);
             }
         }
 

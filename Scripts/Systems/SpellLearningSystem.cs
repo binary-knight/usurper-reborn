@@ -21,7 +21,7 @@ public static class SpellLearningSystem
         if (!SpellSystem.HasSpells(player))
         {
             terminal.WriteLine(Loc.Get("spell_learning.no_magic"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -197,7 +197,7 @@ public static class SpellLearningSystem
                     ? Loc.Get("spell_learning.auto_filled")
                     : Loc.Get("spell_learning.no_spells_to_add"), "bright_green");
                 await SaveSystem.Instance.AutoSave(player);
-                await Task.Delay(800);
+                await Pacing.Wait(800);
                 continue;
             }
 
@@ -216,7 +216,7 @@ public static class SpellLearningSystem
                         player.Quickbar[clearSlot - 1] = null;
                         terminal.WriteLine(Loc.Get("spell_learning.removed_slot", spellName, clearSlot), "cyan");
                         await SaveSystem.Instance.AutoSave(player);
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                 }
                 continue;
@@ -229,20 +229,20 @@ public static class SpellLearningSystem
                 if (spell == null)
                 {
                     terminal.WriteLine(Loc.Get("spell_learning.invalid_spell"), "red");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
                 int reqLevel = SpellSystem.GetLevelRequired(player.Class, learnLevel);
                 if (player.Level < reqLevel)
                 {
                     terminal.WriteLine(Loc.Get("spell_learning.need_level", reqLevel), "red");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
                 if (IsSpellKnown(player, learnLevel))
                 {
                     terminal.WriteLine(Loc.Get("spell_learning.already_known", spell.DisplayName), "yellow");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
                 EnsureSpellSlot(player, learnLevel);
@@ -264,7 +264,7 @@ public static class SpellLearningSystem
                 MentalUi.ReportGain(terminal, player, mentalBeforeSpell, MentalSystem.ApplyLearning(player));
                 GodDeedSystem.Record(player, GodAct.SpellLearned, terminal);   // 1.2.0 Temple gods: Magic deed
                 await SaveSystem.Instance.AutoSave(player);
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
 
@@ -275,7 +275,7 @@ public static class SpellLearningSystem
                 if (spell == null || !IsSpellKnown(player, forgetLevel))
                 {
                     terminal.WriteLine(Loc.Get("spell_learning.dont_know"), "red");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
                 player.Spell[forgetLevel - 1][0] = false;
@@ -288,7 +288,7 @@ public static class SpellLearningSystem
                 }
                 terminal.WriteLine(Loc.Get("spell_learning.forgot", spell.DisplayName), "cyan");
                 await SaveSystem.Instance.AutoSave(player);
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
 
@@ -298,7 +298,7 @@ public static class SpellLearningSystem
                 if (knownUnequipped.Count == 0)
                 {
                     terminal.WriteLine(Loc.Get("spell_learning.no_spells_equip"), "yellow");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
 
@@ -356,7 +356,7 @@ public static class SpellLearningSystem
                     player.Quickbar[slotNum - 1] = qbId;
                     terminal.WriteLine(Loc.Get("spell_learning.equipped_slot", chosen.DisplayName, slotNum), "bright_green");
                     await SaveSystem.Instance.AutoSave(player);
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
                 continue;
             }

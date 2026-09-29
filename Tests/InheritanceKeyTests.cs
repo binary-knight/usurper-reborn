@@ -107,9 +107,19 @@ public class InheritanceKeyTests : IDisposable
         var output = new MemoryStream();
         var term = new TerminalEmulator(new MemoryStream(), output);
 
-        var clock = System.Diagnostics.Stopwatch.StartNew();
-        (await GameEngine.DeliverPendingInheritance(hero, term, _db)).Should().Be(0);
-        clock.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(1_400, "the line is held on screen before the /boss screen clears it");
+        // This test is about the pause itself, so pacing is switched back on for its duration.
+        bool pacingWas = UsurperRemake.Pacing.Disabled;
+        UsurperRemake.Pacing.Disabled = false;
+        try
+        {
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            (await GameEngine.DeliverPendingInheritance(hero, term, _db)).Should().Be(0);
+            clock.ElapsedMilliseconds.Should().BeGreaterThanOrEqualTo(1_400, "the line is held on screen before the /boss screen clears it");
+        }
+        finally
+        {
+            UsurperRemake.Pacing.Disabled = pacingWas;
+        }
         term.StreamWriterInternal!.Flush();
         string shown = System.Text.Encoding.UTF8.GetString(output.ToArray());
         shown.Should().Contain(Loc.Get("engine.inheritance_waiting", 2)).And.NotContain(Loc.Get("engine.inheritance_header"));

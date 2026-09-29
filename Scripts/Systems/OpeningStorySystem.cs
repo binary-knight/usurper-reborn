@@ -33,7 +33,7 @@ namespace UsurperRemake.Systems
         {
             if (_skipMode)
             {
-                await Task.Delay(10); // Minimal delay even in skip mode for readability
+                await Pacing.Wait(10); // Minimal delay even in skip mode for readability
                 return;
             }
 

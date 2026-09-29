@@ -42,7 +42,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("death.permadeath_disabled")}");
                 terminal.WriteLine("");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return true;
             }
 
@@ -74,7 +74,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("death.lives_recover_hint")}");
                 terminal.WriteLine("");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return true;
             }
 
@@ -98,19 +98,19 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("permadeath.no_rez")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine("");
                 terminal.WriteLine($"  {Loc.Get("permadeath.threads")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine($"  {Loc.Get("permadeath.no_temple")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine($"  {Loc.Get("permadeath.no_coin")}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
                 terminal.WriteLine($"  {Loc.Get("permadeath.exhausted", player.Name2 ?? player.Name1 ?? "???")}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 // v0.63.0 slice 3 D4: Inheritance. Before the Veil closes, if
                 // the player has at least one living adult child, half the gold
@@ -123,17 +123,17 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine($"  {Loc.Get("permadeath.legacy_recorded")}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 terminal.SetColor("cyan");
                 terminal.WriteLine($"  {Loc.Get("permadeath.legacy_heirloom_hint")}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {Loc.Get("permadeath.veil_closes")}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine($"  {Loc.Get("permadeath.erasing")}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
             }
             catch (Exception ex)
             {
@@ -253,7 +253,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("permadeath.contact_admin2")}");
                 terminal.WriteLine($"  {Loc.Get("permadeath.disconnecting")}");
                 terminal.WriteLine("");
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
             }
             catch { /* ignore */ }
 
@@ -335,11 +335,11 @@ namespace UsurperRemake.Systems
                 string heirName = heir.DisplayName ?? heir.Name2 ?? heir.Name1 ?? "your child";
                 terminal.WriteLine(
                     $"  {UsurperRemake.Systems.Loc.Get("permadeath.inheritance_estate", heirName, passed)}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 terminal.SetColor("gray");
                 terminal.WriteLine(
                     $"  {UsurperRemake.Systems.Loc.Get("permadeath.inheritance_legacy", heirName)}");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 // News entry so anyone else online (or returning later) sees
                 // the legacy as a real world event.

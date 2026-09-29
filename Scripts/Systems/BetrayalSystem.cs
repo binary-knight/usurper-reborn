@@ -371,20 +371,20 @@ namespace UsurperRemake.Systems
             }
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine($"  {Loc.Get("betrayal.turns_to_face", profile.NPCName)}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.eyes_changed")}", "gray");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             if (profile.BetrayalDialogue != null)
             {
                 foreach (var line in profile.BetrayalDialogue)
                 {
                     terminal.WriteLine($"  \"{line}\"", "yellow");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
             }
 
@@ -401,7 +401,7 @@ namespace UsurperRemake.Systems
                 foreach (var motivation in profile.Motivations)
                 {
                     terminal.WriteLine($"  - {motivation}", "gray");
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                 }
             }
 
@@ -555,20 +555,20 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("betrayal.header_forgiveness"), "bright_green", 64);
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("betrayal.approach_npc", profile.NPCName)}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.flinch_expecting")}", "gray");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  \"{Loc.Get("betrayal.forgive_understand")}\"", "bright_yellow");
             terminal.WriteLine($"  \"{Loc.Get("betrayal.forgive_disagree")}\"", "yellow");
             terminal.WriteLine($"  \"{Loc.Get("betrayal.forgive_let_go")}\"", "yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("betrayal.eyes_widen", profile.NPCName)}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.neither_speak")}", "gray");
@@ -581,7 +581,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  \"{Loc.Get("betrayal.choose_to_give")}\"", "yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine($"  {Loc.Get("betrayal.something_shifts")}", "bright_white");
             terminal.WriteLine($"  {Loc.Get("betrayal.not_reconciliation")}", "white");
@@ -607,13 +607,13 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("betrayal.header_revenge"), "dark_red", 64);
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine($"  {Loc.Get("betrayal.path_vengeance")}", "red");
             terminal.WriteLine($"  {Loc.Get("betrayal.eye_for_eye")}", "dark_red");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             if (betrayalProfiles.TryGetValue(npcId, out var profile))
             {
