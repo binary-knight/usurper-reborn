@@ -92,6 +92,10 @@ test("an exact entity name still returns that entity first", () => {
   assert.equal(top("Warrior's Belt", 1)[0], `${W}items/10003/`);
   assert.equal(top("warriors belt", 1)[0], `${W}items/10003/`);
   assert.equal(top("Terran", 1)[0], `${W}gods/terran/`);
+  // Names whose words also fill a guide: the guide must not take the named entity's place.
+  assert.equal(top("Prayer of Mending", 1)[0], `${W}characters/abilities/prayer_of_mending/`);
+  assert.equal(top("Boots of the Gods", 1)[0], `${W}items/9032/`);
+  assert.equal(top("Song of Rest", 1)[0], `${W}characters/abilities/song_of_rest/`);
   // A class named inside a question outranks items that merely share its name.
   const warrior = top("What stats matter for a warrior?", 5);
   assert.ok(
@@ -118,6 +122,13 @@ test("the excerpt shows the part of the page that answers the question", () => {
   const favor = pages.find((p) => p.path === `${W}gods/favor/`);
   const text = excerpt(favor, "What does praying at the Temple do?", 360);
   assert.match(text, /Daily Temple prayer gives \d+ Favor/);
+  // The best window, not the first mention: these terms appear early on each page too.
+  assert.match(excerpt(favor, "switching gods", 200), /Leaving a god discards/);
+  const mental = pages.find((p) => p.path === `${W}characters/mental/`);
+  assert.match(
+    excerpt(mental, "How does the Healer help Mental?", 200),
+    /the Healer\. Inn sleep restores/,
+  );
   const shops = pages.find((p) => p.path === `${W}items/shops/`);
   assert.match(excerpt(shops, "auction lots", 200), /Auction/);
   assert.ok(excerpt(shops, "auction lots", 200).length <= 206);

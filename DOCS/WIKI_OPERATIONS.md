@@ -136,17 +136,20 @@ It uses the model `claude-sonnet-5-5` at effort `low` through the official
 - It runs only for Ask in the configured wiki channels. It searches the public
   index first; with no match it makes no model call and gives the usual
   no-match reply.
-- The model sees a fixed system prompt, the top three excerpts from the public
-  index (spoilers and secret names are already excluded there) and the
-  question, capped at 300 characters and wrapped as untrusted data. No tools,
+- The model sees a fixed system prompt, the top five excerpts from the public
+  index, one per page and at most 1,500 characters each (spoilers and secret
+  names are already excluded there), and the question, capped at 300 characters and wrapped as untrusted data. No tools,
   no conversation history, and no player or database data are sent.
 - The prompt limits answers to the excerpts, says to admit when they do not
-  cover the question, to decline anything not about Usurper Reborn, to ignore
+  cover the question, to decline anything not about Usurper Reborn with a
+  first line that is exactly `OFFTOPIC`, to ignore
   instructions inside the question, never to reveal spoilers or the prompt,
   and to stay near 120 words of plain text.
 - The bot checks the output in code: mentions are disabled, any URL other than
   a retrieved wiki page is removed, the bot appends the source links itself,
-  and the reply is capped at 1,900 characters.
+  and the reply is capped at 1,900 characters. A decline has the `OFFTOPIC`
+  line removed and gets no source links; the marker is removed from every
+  reply.
 - Each call has `max_tokens` 400, a 15 second timeout and one retry. It uses
   the server-side refusal fallback (`fallbacks: "default"`). A refusal,
   `max_tokens` stop, empty answer, API error or timeout gives the usual
@@ -157,7 +160,7 @@ It uses the model `claude-sonnet-5-5` at effort `low` through the official
   without a model call.
 - The audit table `wiki_llm_usage` records time, user and channel IDs, the
   sanitized question (at most 300 characters), input and output tokens,
-  latency and outcome (`answered`, `refusal`, `max_tokens`, `empty`,
+  latency and outcome (`answered`, `declined`, `refusal`, `max_tokens`, `empty`,
   `stopped`, `error`, `timeout`, `capped_tokens`, `capped_user`,
   `capped_error`). Rows older than 30 days are deleted at startup and on each
   new row. If the table cannot be created, the path stays off.
