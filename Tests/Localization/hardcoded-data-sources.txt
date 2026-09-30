@@ -449,14 +449,6 @@ table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#0|amnesia dream titles
 table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#1|amnesia dream lines
 table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#0|memory fragment titles
 table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#1|memory fragment lines
-nouns|Scripts/Systems/CombatEngine.cs|decl:abilityName|boss AoE line
-table|Scripts/Systems/CombatEngine.cs|decl:actions|follower action bar
-table|Scripts/Systems/CombatEngine.cs|decl:catchUpLabel|xp reward line
-nouns|Scripts/Systems/CombatEngine.cs|decl:opponentName|spared news
-table|Scripts/Systems/CombatEngine.cs|decl:tag|group HP list tag
-table|Scripts/Systems/CombatEngine.cs|decl:tankTag|damage line tag
-nouns|Scripts/Systems/CombatEngine.cs|=displayName|quickbar label
-table|Scripts/Systems/CombatEngine.cs|return/tuple#1|holy damage flavour line
 names|Scripts/Systems/CombatEngine.cs|init.Name|unique boss name
 table|Scripts/Systems/CombatMessages.cs|init.[k]=|attack verbs
 table|Scripts/Systems/CompanionSystem.cs|decl:drop|companion drop line

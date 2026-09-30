@@ -26205,7 +26205,7 @@ public partial class CombatEngine
                 if (tmHeal > 0)
                 {
                     tm.HP += tmHeal;
-                    terminal.WriteLine($"  {tm.DisplayName} is healed for {tmHeal} HP!", "bright_magenta");
+                    terminal.WriteLine($"  {Loc.Get("combat.ally_healed_for", tm.DisplayName, tmHeal)}", "bright_magenta");
                 }
             }
         }
@@ -26294,7 +26294,7 @@ public partial class CombatEngine
                     if (allLiving.Count == 1)
                         terminal.WriteLine(Loc.Get("combat.shaman_totem_searing_pulse", totalSearingDmg), "bright_red");
                     else
-                        terminal.WriteLine($"  Searing Totem blasts {allLiving.Count} enemies for {totalSearingDmg} total fire damage!", "bright_red");
+                        terminal.WriteLine($"  {Loc.Get("combat.shaman_totem_searing_multi", allLiving.Count, totalSearingDmg)}", "bright_red");
                 }
                 break;
             }
@@ -26356,7 +26356,7 @@ public partial class CombatEngine
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_red");
-        terminal.WriteLine(GameConfig.ScreenReaderMode ? "PLAYER FIGHT:" : "═══ PLAYER FIGHT ═══");
+        terminal.WriteLine(GameConfig.ScreenReaderMode ? $"{Loc.Get("combat.pvp_title")}:" : $"═══ {Loc.Get("combat.pvp_title")} ═══");
         terminal.WriteLine("");
         
         terminal.SetColor("white");
@@ -27313,7 +27313,7 @@ public partial class CombatEngine
 
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("combat.you_spare_npc", npc.DisplayName ?? npc.Name1 ?? "your opponent")}");
+            terminal.WriteLine($"  {Loc.Get("combat.you_spare_npc", npc.DisplayName ?? npc.Name1 ?? Loc.Get("combat.your_opponent"))}");
             terminal.SetColor("white");
             await Pacing.Wait(GetCombatDelay(800));
             return true;
@@ -27326,7 +27326,7 @@ public partial class CombatEngine
         npc.HP = 0;
         terminal.WriteLine("");
         terminal.SetColor("dark_red");
-        terminal.WriteLine($"  {Loc.Get("combat.you_finish_npc", npc.DisplayName ?? npc.Name1 ?? "your opponent")}");
+        terminal.WriteLine($"  {Loc.Get("combat.you_finish_npc", npc.DisplayName ?? npc.Name1 ?? Loc.Get("combat.your_opponent"))}");
         terminal.SetColor("white");
         await Pacing.Wait(GetCombatDelay(800));
         return false;
@@ -27373,7 +27373,7 @@ public partial class CombatEngine
         if (result.Outcome == CombatOutcome.OpponentSpared)
         {
             terminal.WriteLine("", "white");
-            string opponentName = result.Opponent?.DisplayName ?? result.Opponent?.Name1 ?? "your opponent";
+            string opponentName = result.Opponent?.DisplayName ?? result.Opponent?.Name1 ?? Loc.Get("combat.your_opponent");
 
             // Sparing is a meaningfully good act -- Chivalry gain, alignment
             // shift toward Holy, relationship rebuild (cool acquaintance not
@@ -27410,9 +27410,8 @@ public partial class CombatEngine
             // Public news entry -- mercy is a visible deed.
             try
             {
-                string location = result.Opponent?.CurrentLocation ?? "battle";
-                NewsSystem.Instance?.Newsy(false,
-                    $"{result.Player.DisplayName} spared {opponentName}'s life at the {location}.");
+                string location = result.Opponent?.CurrentLocation ?? Loc.Get("combat.news_battle");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("combat.news_spared", result.Player.DisplayName, opponentName, location));
             }
             catch { /* news is decoration */ }
 
@@ -27595,7 +27594,7 @@ public partial class CombatEngine
     {
         terminal.ClearScreen();
         terminal.SetColor("white");
-        terminal.WriteLine(GameConfig.ScreenReaderMode ? "Spell Casting:" : "═══ Spell Casting ═══");
+        terminal.WriteLine(GameConfig.ScreenReaderMode ? $"{Loc.Get("combat.spell_casting_title")}:" : $"═══ {Loc.Get("combat.spell_casting_title")} ═══");
         
         // Check weapon requirement for spell casting
         if (!SpellSystem.HasRequiredSpellWeapon(player))
@@ -27982,7 +27981,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.examines_belongings", caster.DisplayName), "bright_white");
                 foreach (var itm in caster.Inventory)
                 {
-                    terminal.WriteLine($" - {itm.Name}  (Type: {itm.Type}, Pow: {itm.Attack}/{itm.Armor})", "white");
+                    terminal.WriteLine(Loc.Get("combat.identify_item_row", itm.Name, itm.Type, itm.Attack, itm.Armor), "white");
                 }
                 break;
 
@@ -28103,7 +28102,7 @@ public partial class CombatEngine
 
             case "sleep":
                 if (TryApplyPvPControl(target, StatusEffect.Sleeping, duration))
-                    terminal.WriteLine($"{target.DisplayName} falls into a magical slumber!", "cyan");
+                    terminal.WriteLine(Loc.Get("combat.magical_slumber", target.DisplayName), "cyan");
                 break;
 
             case "freeze":
@@ -28916,7 +28915,7 @@ public partial class CombatEngine
 
             // Show XP gain for all teammates (with catch-up indicator)
             terminal.SetColor("cyan");
-            string catchUpLabel = catchUp > 1.0 ? $" (+{teammateXP} catch-up {catchUp:F1}x)" : "";
+            string catchUpLabel = catchUp > 1.0 ? Loc.Get("combat.catch_up_label_xp", teammateXP, catchUp.ToString("F1")) : "";
             terminal.WriteLine($"  {teammate.DisplayName}: {teammate.Experience:N0}/{xpNeeded:N0}{catchUpLabel}");
             terminal.SetColor("white");
 
@@ -28940,7 +28939,7 @@ public partial class CombatEngine
                 teammate.HP = teammate.MaxHP;
 
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  {teammate.DisplayName} leveled up! (Lv {teammate.Level})");
+                terminal.WriteLine($"  {Loc.Get("combat.teammate_leveled_up", teammate.DisplayName, teammate.Level)}");
 
                 // Show stat changes
                 var sc = new System.Collections.Generic.List<string>();
@@ -28957,7 +28956,7 @@ public partial class CombatEngine
                 if (sc.Count > 0) terminal.WriteLine($"    {string.Join("  ", sc)}");
 
                 // Generate news for spouse/lover level ups
-                NewsSystem.Instance?.Newsy(true, $"{teammate.DisplayName} has achieved Level {teammate.Level}!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("combat.news_teammate_level", teammate.DisplayName, teammate.Level));
 
                 // Calculate next threshold
                 xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
@@ -29008,14 +29007,14 @@ public partial class CombatEngine
                 headerShown = true;
             }
 
-            string catchUpLabel = catchUp > 1.0 ? $" (catch-up {catchUp:F1}x)" : "";
+            string catchUpLabel = catchUp > 1.0 ? Loc.Get("combat.catch_up_label", catchUp.ToString("F1")) : "";
 
             if (teammate.IsCompanion)
             {
                 // Award to companion through CompanionSystem
                 CompanionSystem.Instance?.AwardSpecificCompanionXP(teammate.DisplayName, slotXP, terminal);
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  {teammate.DisplayName} ({percent}%): +{slotXP} XP{catchUpLabel}");
+                terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share", teammate.DisplayName, percent, slotXP, catchUpLabel)}");
             }
             else
             {
@@ -29023,7 +29022,7 @@ public partial class CombatEngine
                 teammate.Experience += slotXP;
                 long xpNeeded = GameConfig.GetExperienceForLevel(teammate.Level + 1);
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  {teammate.DisplayName} ({percent}%): +{slotXP} XP ({teammate.Experience:N0}/{xpNeeded:N0}){catchUpLabel}");
+                terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share_progress", teammate.DisplayName, percent, slotXP, teammate.Experience.ToString("N0"), xpNeeded.ToString("N0"), catchUpLabel)}");
 
                 // Check for level up
                 long xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
@@ -29039,7 +29038,7 @@ public partial class CombatEngine
                     teammate.RecalculateStats();
                     teammate.HP = teammate.MaxHP;
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  {teammate.DisplayName} leveled up! (Lv {teammate.Level})");
+                    terminal.WriteLine($"  {Loc.Get("combat.teammate_leveled_up", teammate.DisplayName, teammate.Level)}");
 
                     var sc = new System.Collections.Generic.List<string>();
                     if (teammate.BaseStrength - bStr > 0) sc.Add($"STR +{teammate.BaseStrength - bStr}");
@@ -29054,7 +29053,7 @@ public partial class CombatEngine
                     if (teammate.BaseMaxMana - bMana > 0) sc.Add($"MP +{teammate.BaseMaxMana - bMana}");
                     if (sc.Count > 0) terminal.WriteLine($"    {string.Join("  ", sc)}");
 
-                    NewsSystem.Instance?.Newsy(true, $"{teammate.DisplayName} has achieved Level {teammate.Level}!");
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("combat.news_teammate_level", teammate.DisplayName, teammate.Level));
                     xpForNextLevel = GameConfig.GetExperienceForLevel(teammate.Level + 1);
                 }
 
@@ -29373,7 +29372,7 @@ public partial class CombatEngine
                 {
                     // Holy Smite: +25% damage vs evil/undead
                     long holyBonus = (long)(baseDamage * 0.25);
-                    return (holyBonus, "Holy power burns the darkness!");
+                    return (holyBonus, Loc.Get("combat.align_holy_bonus"));
                 }
                 break;
 
@@ -29382,7 +29381,7 @@ public partial class CombatEngine
                 {
                     // Righteous Fury: +10% damage vs evil
                     long goodBonus = (long)(baseDamage * 0.10);
-                    return (goodBonus, "Righteous fury guides your strike!");
+                    return (goodBonus, Loc.Get("combat.align_good_bonus"));
                 }
                 break;
 
@@ -29390,14 +29389,14 @@ public partial class CombatEngine
                 // Soul Drain: 10% of damage dealt heals the attacker
                 long drainAmount = (long)(baseDamage * 0.10);
                 attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + drainAmount);
-                return (0, $"Dark energy heals you for {drainAmount} HP!");
+                return (0, Loc.Get("combat.align_evil_drain", drainAmount));
 
             case AlignmentSystem.AlignmentType.Dark:
                 // Shadow Strike: Chance for fear effect (simulated as bonus damage)
                 if (random.Next(100) < 15)
                 {
                     long fearBonus = (long)(baseDamage * 0.15);
-                    return (fearBonus, "Your dark presence terrifies the enemy!");
+                    return (fearBonus, Loc.Get("combat.align_dark_bonus"));
                 }
                 break;
 
@@ -29409,12 +29408,12 @@ public partial class CombatEngine
                 if (targetIsEvil)
                 {
                     long balancedEvilBonus = (long)(baseDamage * 0.10);
-                    return (balancedEvilBonus, "Your clarity between light and shadow guides your strike!");
+                    return (balancedEvilBonus, Loc.Get("combat.align_balanced_evil"));
                 }
                 if (random.Next(100) < 10)
                 {
                     long balancedInsightBonus = (long)(baseDamage * 0.10);
-                    return (balancedInsightBonus, "You see the path between — the enemy's weakness lies bare!");
+                    return (balancedInsightBonus, Loc.Get("combat.align_balanced_insight"));
                 }
                 break;
         }
@@ -29600,7 +29599,7 @@ public partial class CombatEngine
                 string displayName;
                 int cdRemaining = player.UnmakingCooldown > 0 ? player.UnmakingCooldown : player.DelugeCooldown;
                 if (onCooldown)
-                    displayName = $"{spell.DisplayName} (CD:{cdRemaining})";
+                    displayName = Loc.Get("combat.qb_cooldown", spell.DisplayName, cdRemaining);
                 else if (!SpellSystem.HasRequiredSpellWeapon(player))
                 {
                     var reqType = SpellSystem.GetSpellWeaponRequirement(player.Class);
@@ -29613,7 +29612,7 @@ public partial class CombatEngine
                     // suspected the staff)
                     displayName = Loc.Get("combat.qb_need_mana", spell.DisplayName, manaCost, player.Mana);
                 else
-                    displayName = $"{spell.DisplayName} ({manaCost} MP)";
+                    displayName = Loc.Get("combat.qb_mana", spell.DisplayName, manaCost);
                 actions.Add(((i + 1).ToString(), slotId, displayName, canCast));
             }
             else
@@ -29627,11 +29626,11 @@ public partial class CombatEngine
                 if (weaponReason != null)
                     displayName = $"{ability.Name} ({weaponReason})";
                 else if (CooldownsFor(player).TryGetValue(slotId, out int cd) && cd > 0)
-                    displayName = $"{ability.Name} (CD:{cd})";
+                    displayName = Loc.Get("combat.qb_cooldown", ability.Name, cd);
                 else if (ability.ManaCost > 0)
-                    displayName = $"{ability.Name} ({ability.StaminaCost} ST, {ability.ManaCost} MP)";
+                    displayName = Loc.Get("combat.qb_stamina_mana", ability.Name, ability.StaminaCost, ability.ManaCost);
                 else
-                    displayName = $"{ability.Name} ({ability.StaminaCost} ST)";
+                    displayName = Loc.Get("combat.qb_stamina", ability.Name, ability.StaminaCost);
                 // Check mana availability for shaman abilities
                 if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
                     canUse = false;
@@ -30083,7 +30082,8 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
-        terminal.WriteLine(GameConfig.ScreenReaderMode ? $"PHASE {newPhase}:" : $"═══ PHASE {newPhase} ═══");
+        string phaseTitle = Loc.Get("combat.boss_phase_title", newPhase);
+        terminal.WriteLine(GameConfig.ScreenReaderMode ? $"{phaseTitle}:" : $"═══ {phaseTitle} ═══");
         terminal.WriteLine("");
 
         foreach (var line in dialogue)
@@ -30156,7 +30156,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"  {count} Spectral Soldiers materialize from the shadows!");
+        terminal.WriteLine($"  {Loc.Get("combat.spectral_soldiers", count)}");
         return soldiers;
     }
 
@@ -30179,13 +30179,13 @@ public partial class CombatEngine
         if (roundNumber == warningRound50)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  {bossMonster.Name} grows impatient... {ctx.EnrageRound - roundNumber} rounds until enrage!");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_enrage_countdown", bossMonster.Name, ctx.EnrageRound - roundNumber)}");
         }
         else if (roundNumber == warningRound75)
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  {bossMonster.Name}'s power builds... the air crackles with fury!");
-            terminal.WriteLine($"  *** ENRAGE in {ctx.EnrageRound - roundNumber} rounds! ***");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_power_builds", bossMonster.Name)}");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_enrage_in", ctx.EnrageRound - roundNumber)} ***");
         }
 
         if (roundNumber >= ctx.EnrageRound)
@@ -30317,7 +30317,7 @@ public partial class CombatEngine
             int damage = BossContext?.ChannelDamage ?? (int)(boss.Strength * 3);
 
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  *** {boss.Name} unleashes {boss.ChannelingAbilityName}! ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, boss.ChannelingAbilityName)} ***");
 
             // Hit player
             if (player.IsAlive)
@@ -30327,7 +30327,7 @@ public partial class CombatEngine
                 playerDmg = ApplyFleeGrace(player, playerDmg);
                 playerDmg = TeamHQBonus.ApplyDefense(player, playerDmg); // v1.1.11: Team HQ Barracks, last
                 player.HP = Math.Max(0, player.HP - playerDmg);
-                terminal.WriteLine($"  {player.DisplayName} takes {playerDmg} damage!");
+                terminal.WriteLine(Loc.Get("combat.target_takes_damage", player.DisplayName, playerDmg));
             }
 
             // Hit all teammates
@@ -30340,14 +30340,14 @@ public partial class CombatEngine
                     tmDmg = TeamHQBonus.ApplyDefense(tm, tmDmg); // v1.1.11: Team HQ Barracks, last (0 for NPCs)
                     RecordAllyHit(tm, tmDmg); // v1.1.3: the channel hits everyone; not a targeting choice
                     tm.HP = Math.Max(0, tm.HP - tmDmg);
-                    terminal.WriteLine($"  {tm.DisplayName} takes {tmDmg} damage!");
+                    terminal.WriteLine(Loc.Get("combat.target_takes_damage", tm.DisplayName, tmDmg));
                 }
             }
         }
         else
         {
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"  {boss.Name} continues channeling {boss.ChannelingAbilityName}... ({boss.ChannelingRoundsLeft} rounds left!)");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_continues", boss.Name, boss.ChannelingAbilityName, boss.ChannelingRoundsLeft)}");
         }
     }
 
@@ -30374,7 +30374,7 @@ public partial class CombatEngine
             boss.IsChanneling = false;
             boss.ChannelingRoundsLeft = 0;
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  *** {interrupter.DisplayName} interrupts {boss.Name}'s {boss.ChannelingAbilityName}! ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_channel_interrupted", interrupter.DisplayName, boss.Name, boss.ChannelingAbilityName)} ***");
             return true;
         }
         return false;
@@ -30389,10 +30389,10 @@ public partial class CombatEngine
         if (BossContext == null) return;
 
         int baseDamage = BossContext.AoEDamage > 0 ? BossContext.AoEDamage : (int)(boss.Strength * 2);
-        string abilityName = !string.IsNullOrEmpty(BossContext.AoEAbilityName) ? BossContext.AoEAbilityName : "Devastating Blast";
+        string abilityName = !string.IsNullOrEmpty(BossContext.AoEAbilityName) ? BossContext.AoEAbilityName : Loc.Get("combat.boss_aoe_default");
 
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"  *** {boss.Name} unleashes {abilityName}! ***");
+        terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, abilityName)} ***");
 
         // Check if anyone is taunting (tank absorbing)
         Character? tank = null;
@@ -30443,8 +30443,9 @@ public partial class CombatEngine
                 dmg = ApplyFleeGrace(player, dmg);
             dmg = TeamHQBonus.ApplyDefense(target, dmg); // v1.1.11: Team HQ Barracks, last (0 for NPCs)
             target.HP = Math.Max(0, target.HP - dmg);
-            string tankTag = (tank != null && target == tank) ? " [ABSORBING]" : "";
-            terminal.WriteLine($"  {target.DisplayName} takes {dmg} damage!{tankTag}");
+            terminal.WriteLine(tank != null && target == tank
+                ? $"  {Loc.Get("combat.takes_damage_absorbing", target.DisplayName, dmg)}"
+                : Loc.Get("combat.target_takes_damage", target.DisplayName, dmg));
         }
 
         if (tank != null)
@@ -30598,7 +30599,7 @@ public partial class CombatEngine
             if (target == null) return false;
             target.DoomCountdown = 0;
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {healer.DisplayName} dispels DOOM from {target.DisplayName}!");
+            terminal.WriteLine($"  {Loc.Get("combat.dispels_doom", healer.DisplayName, target.DisplayName)}");
             return true;
         }
 
@@ -30615,7 +30616,7 @@ public partial class CombatEngine
             int removed = Math.Min(target.CorruptionStacks, 3 + healer.Level / 20);
             target.CorruptionStacks = Math.Max(0, target.CorruptionStacks - removed);
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {healer.DisplayName} cleanses {removed} corruption from {target.DisplayName}! ({target.CorruptionStacks} remaining)");
+            terminal.WriteLine($"  {Loc.Get("combat.cleanses_corruption", healer.DisplayName, removed, target.DisplayName, target.CorruptionStacks)}");
             return true;
         }
 
@@ -30632,11 +30633,10 @@ public partial class CombatEngine
         boss.IsMagicalImmune = !physical;
         boss.PhaseImmunityRounds = rounds;
 
-        string immunityType = physical ? "physical" : "magical";
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  {boss.Name} becomes immune to {immunityType} damage for {rounds} rounds!");
+        terminal.WriteLine($"  {Loc.Get(physical ? "combat.boss_immune_physical" : "combat.boss_immune_magical", boss.Name, rounds)}");
         terminal.SetColor("yellow");
-        terminal.WriteLine($"  Use {(physical ? "magical spells" : "physical attacks")} to deal damage!");
+        terminal.WriteLine($"  {Loc.Get(physical ? "combat.use_magical_spells" : "combat.use_physical_attacks")}");
     }
 
     /// <summary>
@@ -30771,7 +30771,7 @@ public partial class CombatEngine
                 else if (tm.IsGroupedPlayer)
                 {
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine($"  {tm.DisplayName} has been slain by {killerName}'s corruption!");
+                    terminal.WriteLine($"  {Loc.Get("combat.slain_by_corruption", tm.DisplayName, killerName)}");
                     result.Teammates.Remove(tm);
                     result.CombatLog.Add($"{tm.DisplayName} was slain by {killerName}");
                     if (tm.CombatInputChannel != null)
@@ -30806,7 +30806,7 @@ public partial class CombatEngine
                 bossMonster.IsPhysicalImmune = false;
                 bossMonster.IsMagicalImmune = false;
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  {bossMonster.Name}'s immunity fades!");
+                terminal.WriteLine($"  {Loc.Get("combat.boss_immunity_fades", bossMonster.Name)}");
             }
         }
 
@@ -30922,7 +30922,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {boss.Name} is cleansed of corruption!");
+        terminal.WriteLine($"  {Loc.Get("combat.boss_cleansed", boss.Name)}");
 
         return true;
     }
@@ -30951,17 +30951,18 @@ public partial class CombatEngine
                 if (t != null && t != self && t != leader) members.Add(t);
         if (members.Count <= 1) return; // nothing beyond the follower to show
 
+        string lang = self != null ? LanguageOf(self) : GameConfig.Language;   // v1.2.2: the follower's terminal
         term.SetColor("gray");
-        term.Write("  Party: ");
+        term.Write($"  {Loc.GetIn(lang, "combat.party_label")} ");
         for (int i = 0; i < members.Count; i++)
         {
             var m = members[i];
             if (i > 0) { term.SetColor("gray"); term.Write(" | "); }
-            string tag = m == self ? "You" : (m == leader ? $"{m.DisplayName} (leader)" : m.DisplayName);
+            string tag = m == self ? Loc.GetIn(lang, "combat.party_you") : (m == leader ? $"{m.DisplayName} {Loc.GetIn(lang, "party.tag_leader")}" : m.DisplayName);
             if (!m.IsAlive || m.HP <= 0)
             {
                 term.SetColor("darkgray");
-                term.Write($"{tag} DOWN");
+                term.Write(Loc.GetIn(lang, "combat.party_down", tag));
             }
             else
             {
@@ -31080,8 +31081,9 @@ public partial class CombatEngine
                     .ToList();
                 if (availSpells.Count > 0)
                 {
+                    string followerLang = LanguageOf(teammate);   // v1.2.2: the follower's terminal
                     terminal.SetColor("darkgray");
-                    terminal.Write(" Spells: ");
+                    terminal.Write($" {Loc.GetIn(followerLang, "combat.spells_label")}");
                     for (int si = 0; si < availSpells.Count; si++)
                     {
                         var sp = availSpells[si];
@@ -31089,7 +31091,7 @@ public partial class CombatEngine
                         terminal.SetColor("bright_yellow");
                         terminal.Write($"C{si + 1}");
                         terminal.SetColor("darkgray");
-                        terminal.Write($"={sp.DisplayName}({cost}mp) ");
+                        terminal.Write($"={Loc.GetIn(followerLang, "combat.follower_spell_cost", sp.DisplayName, cost)} ");
                     }
                     terminal.WriteLine("");
                 }
@@ -31235,47 +31237,6 @@ public partial class CombatEngine
             terminal = savedTerminal;
             currentPlayer = savedPlayer;
         }
-    }
-
-    /// <summary>
-    /// Show a simplified combat status and menu on a grouped player's terminal.
-    /// </summary>
-    private void ShowGroupCombatMenu(TerminalEmulator followerTerm, Character teammate,
-        List<Monster> monsters, CombatResult result)
-    {
-        followerTerm.SetColor("bright_cyan");
-        followerTerm.WriteLine(GameConfig.ScreenReaderMode ? $"\n{Loc.Get("combat.group_your_turn", teammate.DisplayName)}:" : $"\n  ═══ {Loc.Get("combat.group_your_turn", teammate.DisplayName)} ═══");
-
-        // Show alive monsters
-        followerTerm.SetColor("yellow");
-        var aliveMonsters = monsters.Where(m => m.IsAlive).ToList();
-        for (int i = 0; i < monsters.Count; i++)
-        {
-            if (!monsters[i].IsAlive) continue;
-            var m = monsters[i];
-            int hpPct = (int)(m.HP * 100 / Math.Max(1, m.MaxHP));
-            string hpColor = hpPct > 50 ? "\u001b[32m" : hpPct > 25 ? "\u001b[33m" : "\u001b[31m";
-            followerTerm.WriteLine($"  [{i + 1}] {m.Name} {hpColor}{hpPct}% HP\u001b[0m");
-        }
-
-        // Show player status
-        followerTerm.SetColor("cyan");
-        followerTerm.WriteLine($"  HP: {teammate.HP}/{teammate.MaxHP}  MP: {teammate.Mana}/{teammate.MaxMana}");
-
-        // Show available actions
-        followerTerm.SetColor("white");
-        var actions = new List<string> { "[A]ttack" };
-        if (teammate.Mana > 0 && SpellSystem.GetAvailableSpells(teammate).Count > 0)
-            actions.Add("[C]ast");
-        if (teammate.Healing > 0 && teammate.HP < teammate.MaxHP)
-            actions.Add("[I]tem");
-        actions.Add("[D]efend");
-        if (teammate.PoisonVials > 0)
-            actions.Add($"[B]Poison({teammate.PoisonVials})");
-        followerTerm.WriteLine($"  {string.Join("  ", actions)}");
-
-        followerTerm.SetColor("gray");
-        followerTerm.Write($"  {Loc.Get("combat.group_action_prompt")}");
     }
 
     /// <summary>

@@ -586,6 +586,186 @@ public class CombatLocB122Tests
         src.Should().Contain("Loc.Get(\"combat.news_permadeath\", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), killerName)");
     }
 
+    // ---------- 10. boss mechanics ----------
+
+    private static async Task<string> RenderBossMechanics()
+    {
+        var (engine, term, output) = Engine();
+        var hero = Hero();
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+        var ctx = new BossCombatContext { EnrageRound = 8, AoEDamage = 50, TankAbsorptionRate = 0.5, ChannelDamage = 60 };
+        engine.BossContext = ctx;
+        var boss = new Monster { Name = "Maelketh", Level = 50, HP = 5000, MaxHP = 5000, Strength = 100, IsBoss = true, IsActive = true };
+        var result = new CombatResult { Player = hero, Monster = boss, Teammates = new List<Character>() };
+        var check = typeof(CombatEngine).GetMethod("CheckBossEnrage", F)!;
+        check.Invoke(engine, new object?[] { ctx, boss, 4 });
+        check.Invoke(engine, new object?[] { ctx, boss, 6 });
+        typeof(CombatEngine).GetMethod("CreateSpectralSoldiers", F)!.Invoke(engine, new object?[] { 2, 50 });
+        boss.IsChanneling = true; boss.ChannelingRoundsLeft = 3; boss.ChannelingAbilityName = "Doomfire";
+        var channel = typeof(CombatEngine).GetMethod("ProcessBossChannel", F)!;
+        channel.Invoke(engine, new object?[] { boss, hero, result });
+        boss.ChannelingRoundsLeft = 1;
+        channel.Invoke(engine, new object?[] { boss, hero, result });
+        await (Task)typeof(CombatEngine).GetMethod("ProcessBossAoE", F)!.Invoke(engine, new object?[] { boss, hero, result })!;
+        var immune = typeof(CombatEngine).GetMethod("ApplyPhaseImmunity", F)!;
+        immune.Invoke(engine, new object?[] { boss, true, 2 });
+        immune.Invoke(engine, new object?[] { boss, false, 2 });
+        var healer = new Character { Name1 = "healer", Name2 = "Lyra", Class = CharacterClass.Cleric, Level = 40, HP = 100, MaxHP = 100 };
+        hero.DoomCountdown = 2;
+        typeof(CombatEngine).GetMethod("TryHealerCleanse", F)!.Invoke(engine, new object?[] { healer, hero, result });
+        hero.CorruptionStacks = 5;
+        typeof(CombatEngine).GetMethod("TryHealerCleanse", F)!.Invoke(engine, new object?[] { healer, hero, result });
+        return Shown(term, output);
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task BossMechanics_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, RenderBossMechanics);
+        Capture($"combat-b-boss-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.boss_enrage_countdown", "Maelketh", 4))
+            .And.Contain(Loc.GetIn(lang, "combat.boss_power_builds", "Maelketh"))
+            .And.Contain($"*** {Loc.GetIn(lang, "combat.boss_enrage_in", 2)} ***")
+            .And.Contain(Loc.GetIn(lang, "combat.spectral_soldiers", 2))
+            .And.Contain(Loc.GetIn(lang, "combat.boss_channeling_continues", "Maelketh", "Doomfire", 2))
+            .And.Contain($"*** {Loc.GetIn(lang, "combat.boss_unleashes", "Maelketh", "Doomfire")} ***")
+            .And.Contain($"*** {Loc.GetIn(lang, "combat.boss_unleashes", "Maelketh", Loc.GetIn(lang, "combat.boss_aoe_default"))} ***")
+            .And.Contain(Loc.GetIn(lang, "combat.boss_immune_physical", "Maelketh", 2))
+            .And.Contain(Loc.GetIn(lang, "combat.use_physical_attacks"))
+            .And.Contain(Loc.GetIn(lang, "combat.dispels_doom", "Lyra", "Tester"));
+        foreach (var piece in Pieces(lang, "combat.takes_damage_absorbing", "Tester", "#"))
+            text.Should().Contain(piece);
+        foreach (var piece in Pieces(lang, "combat.cleanses_corruption", "Lyra", "#", "Tester", "#"))
+            text.Should().Contain(piece);
+        foreach (var english in new[] { "grows impatient", "power builds", "ENRAGE in", "Spectral Soldiers", "continues channeling", "unleashes",
+                     "Devastating Blast", "[ABSORBING]", "becomes immune", "Use magical", "Use physical", "dispels DOOM", "cleanses", " takes " })
+            text.Should().NotContain(english);
+    }
+
+    // ---------- 11. the follower's party line and spell list, in the follower's language ----------
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("fr")]
+    public void FollowerPartyLine_IsInTheFollowersLanguage(string lang)
+    {
+        var prevLangOf = CombatEngine.LanguageOf;
+        var prev = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = "en";   // the leader
+            CombatEngine.LanguageOf = _ => lang;
+            var (engine, term, output) = Engine();
+            var self = new Character { Name1 = "f", Name2 = "Follower", HP = 50, MaxHP = 100 };
+            var leader = new Character { Name1 = "l", Name2 = "Leader", HP = 100, MaxHP = 100 };
+            var down = new Character { Name1 = "d", Name2 = "Lyra", HP = 0, MaxHP = 100 };
+            typeof(CombatEngine).GetMethod("RenderFollowerPartyLine", F)!.Invoke(engine, new object?[] { term, self, leader, new List<Character> { down } });
+            string text = Shown(term, output);
+            Capture($"combat-b-follower-party-{lang}.txt", text);
+            text.Should().StartWith($"  {Loc.GetIn(lang, "combat.party_label")} {Loc.GetIn(lang, "combat.party_you")} 50/100 (50%)");
+            text.Should().Contain($"Leader {Loc.GetIn(lang, "party.tag_leader")}").And.Contain(Loc.GetIn(lang, "combat.party_down", "Lyra"));
+            text.Should().NotContain("Party:").And.NotContain("(leader)").And.NotContain("DOWN");
+        }
+        finally { CombatEngine.LanguageOf = prevLangOf; GameConfig.Language = prev; }
+    }
+
+    // ---------- 12. teammate experience, alignment flavour, quickbar labels ----------
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task TeammateExperienceLines_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, () =>
+        {
+            var (engine, term, output) = Engine();
+            var mate = new Character { Name1 = "mate", Name2 = "Lyra", Class = CharacterClass.Warrior, Level = 2, HP = 50, MaxHP = 50, Experience = 0 };
+            typeof(CombatEngine).GetMethod("AwardTeammateExperience", F)!.Invoke(engine, new object?[] { new List<Character> { mate }, 100000L, term, 30 });
+            var hero = Hero();
+            var mate2 = new Character { Name1 = "mate2", Name2 = "Orin", Class = CharacterClass.Warrior, Level = 2, HP = 50, MaxHP = 50, Experience = 0 };
+            var mates = new List<Character> { mate2 };
+            typeof(CombatEngine).GetMethod("DistributeTeamSlotXP", F)!.Invoke(engine, new object?[] { hero, mates, 100000L, term, CombatEngine.ResolveTeamXPShares(hero, mates) });
+            return Shown(term, output);
+        });
+        Capture($"combat-b-teammate-xp-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.teammate_leveled_up", "Lyra", 3)).And.Contain(Loc.GetIn(lang, "combat.teammate_leveled_up", "Orin", 3));
+        foreach (var piece in Pieces(lang, "combat.catch_up_label", "#"))
+            text.Should().Contain(piece);
+        foreach (var piece in Pieces(lang, "combat.teammate_xp_share_progress", "Orin", "#", "#", "#", "#", ""))
+            text.Should().Contain(piece);
+        text.Should().NotContain("leveled up").And.NotContain("catch-up");
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("fr")]
+    public async Task AlignmentFlavourAndQuickbarLabels_AreLocalized(string lang)
+    {
+        var (desc, label) = await WithLanguage(lang, () =>
+        {
+            var (engine, _, _) = Engine();
+            var dark = Hero();
+            dark.Darkness = 1000;
+            dark.Chivalry = 0;
+            var target = new Monster { Name = "Kobold", Level = 3, HP = 10, MaxHP = 10 };
+            var bonus = ((long, string))typeof(CombatEngine).GetMethod("GetAlignmentBonusDamage", F)!.Invoke(engine, new object?[] { dark, target, 100L })!;
+            var hero = Hero();
+            hero.Level = 100;
+            var ability = ClassAbilitySystem.GetClassAbilities(CharacterClass.Warrior).First(a => a.ManaCost == 0 && a.LevelRequired <= 100);
+            hero.Quickbar = new List<string> { ability.Id };
+            var actions = (System.Collections.IList)typeof(CombatEngine).GetMethod("GetQuickbarActions", F)!.Invoke(engine, new object?[] { hero })!;
+            var first = ((string key, string slotId, string displayName, bool available))actions[0]!;
+            return (bonus.Item2, (ability.Name, ability.StaminaCost, first.displayName));
+        });
+        Capture($"combat-b-align-quickbar-{lang}.txt", desc + "\n" + label.displayName);
+        new[] { "combat.align_evil_drain", "combat.align_dark_bonus" }.Select(k => Loc.GetIn(lang, k, 10))
+            .Should().Contain(desc, "an evil or dark character gets a localized flavour line");
+        label.displayName.Should().Be(Loc.GetIn(lang, "combat.qb_stamina", label.Name, label.StaminaCost));
+        label.displayName.Should().NotContain(" ST)");
+    }
+
+    // ---------- 13. titles, the identify list and the ancestral heal ----------
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task TitlesAndSpellLines_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, async () =>
+        {
+            var (engine, term, output) = EngineWithInput("\n\n\n");
+            var hero = Hero();
+            var foe = new Character { Name1 = "foe", Name2 = "Rival", Class = CharacterClass.Warrior, Level = 30, HP = 500, MaxHP = 500 };
+            await (Task)typeof(CombatEngine).GetMethod("ShowPvPIntroduction", F)!.Invoke(engine, new object?[] { hero, foe, new CombatResult { Player = hero } })!;
+            var monster = new Monster { Name = "Kobold", Level = 3, HP = 10, MaxHP = 10, IsActive = true };
+            typeof(CombatEngine).GetMethod("ProcessSpellCasting", F)!.Invoke(engine, new object?[] { hero, monster, new CombatResult { Player = hero } });
+            hero.Inventory.Add(new Item { Name = "Old Ring", Type = ObjType.Fingers, Attack = 1, Armor = 2 });
+            typeof(CombatEngine).GetMethod("HandleSpecialSpellEffect", F)!.Invoke(engine, new object?[] { hero, monster, "identify", 0 });
+            var mate = new Character { Name1 = "mate", Name2 = "Lyra", HP = 10, MaxHP = 100 };
+            hero.HP = hero.MaxHP;
+            typeof(CombatEngine).GetMethod("ApplyAncestralGuidanceHealing", F)!.Invoke(engine, new object?[] { hero, 40L, new CombatResult { Teammates = new List<Character> { mate } } });
+            return Shown(term, output);
+        });
+        Capture($"combat-b-titles-{lang}.txt", text);
+        text.Should().Contain($"═══ {Loc.GetIn(lang, "combat.pvp_title")} ═══").And.Contain($"═══ {Loc.GetIn(lang, "combat.spell_casting_title")} ═══")
+            .And.Contain(Loc.GetIn(lang, "combat.identify_item_row", "Old Ring", ObjType.Fingers, 1, 2))
+            .And.Contain(Loc.GetIn(lang, "combat.ally_healed_for", "Lyra", 40));
+        text.Should().NotContain("PLAYER FIGHT").And.NotContain("Spell Casting").And.NotContain("(Type:").And.NotContain("is healed for");
+    }
+
+    [Fact]
+    public void RemainingNewsAndLines_UseLocKeys()
+    {
+        string src = Src();
+        foreach (var english in new[] { "spared {opponentName}'s life", "has achieved Level {teammate", "\"your opponent\"", "falls into a magical slumber",
+                     "Searing Totem blasts {", "the enemy's weakness lies bare", "private void ShowGroupCombatMenu(", "{ \"[A]ttack\" }", "(CD:{" })
+            src.Should().NotContain(english);
+        src.Should().Contain("NewsSystem.Instance?.Newsy(false, Loc.Get(\"combat.news_spared\", result.Player.DisplayName, opponentName, location));");
+        src.Should().Contain("terminal.Write($\"={Loc.GetIn(followerLang, \"combat.follower_spell_cost\", sp.DisplayName, cost)} \");");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
