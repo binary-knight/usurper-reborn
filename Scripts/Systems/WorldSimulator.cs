@@ -5449,11 +5449,12 @@ public class WorldSimulator
                 int statBoost = random.Next(1, 3);
                 switch (random.Next(3))
                 {
+                    // 1.2.1: through the Base fields, so the blessing survives a recalc and a world save
                     case 0:
-                        npc.Strength += statBoost;
+                        npc.GrantPermanentStat(StatKind.Strength, statBoost);
                         break;
                     case 1:
-                        npc.Wisdom += statBoost;
+                        npc.GrantPermanentStat(StatKind.Wisdom, statBoost);
                         break;
                     case 2:
                         npc.HP = Math.Min(npc.HP + npc.MaxHP / 4, npc.MaxHP);

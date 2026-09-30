@@ -1,7 +1,7 @@
 ---
 title: The Music Shop
 path: /wiki/en/world/music-shop/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/MusicShopLocation.cs, Scripts/Data/EquipmentData.cs
 ---
 The Music Shop specializes in instruments, performances and songs rather than general weapons. Instruments are equipment with their own weapon type and restrictions.

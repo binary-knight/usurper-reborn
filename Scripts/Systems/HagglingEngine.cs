@@ -48,7 +48,7 @@ public static class HagglingEngine
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("haggle.troll_already_discount"));
             terminal.WriteLine(Loc.Get("haggle.troll_get_out"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return new HaggleResult(originalCost, false);
         }
         
@@ -63,7 +63,7 @@ public static class HagglingEngine
         if (!long.TryParse(offerInput, out long offer) || offer <= 0 || offer >= originalCost)
         {
             terminal.WriteLine(Loc.Get("haggle.not_serious"), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return new HaggleResult(originalCost, false);
         }
         
@@ -184,14 +184,14 @@ public static class HagglingEngine
             string shopName = shopType == ShopType.Weapon ? "Weaponshop" : "Armor Shop";
             terminal.WriteLine(Loc.Get("haggle.kicked_news", player.DisplayName, shopName));
             
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
             return true;
         }
         else
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("haggle.end_discussion"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return false;
         }
     }
@@ -216,7 +216,7 @@ public static class HagglingEngine
                 break;
         }
         
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     /// <summary>

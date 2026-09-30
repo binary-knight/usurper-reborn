@@ -659,7 +659,7 @@ public partial class GameEngine
                 else
                 {
                     terminal.WriteLine(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     await RunBBSDoorMode();
                     return;
                 }
@@ -696,7 +696,7 @@ public partial class GameEngine
                     else
                     {
                         terminal.WriteLine(Loc.Get("engine.delete_cancelled"), "yellow");
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         await RunBBSDoorMode();
                         return;
                     }
@@ -768,7 +768,7 @@ public partial class GameEngine
                     terminal.WriteLine(Loc.Get("engine.sr_disabled"), "white");
                     terminal.WriteLine(Loc.Get("engine.sr_disabled_desc"), "white");
                 }
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 await RunBBSDoorMode();
                 return;
 
@@ -785,7 +785,7 @@ public partial class GameEngine
                     terminal.WriteLine(Loc.Get("engine.compact_disabled"), "white");
                     terminal.WriteLine(Loc.Get("engine.compact_disabled_desc"), "white");
                 }
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 await RunBBSDoorMode();
                 return;
 
@@ -827,7 +827,7 @@ public partial class GameEngine
                     GameConfig.Language = selectedLang;
                     _languageSetThisSession.Value = true;
                     terminal.WriteLine(Loc.Get("prefs.language_set", UsurperRemake.Systems.Loc.GetLanguageName(selectedLang)), "green");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
                 await RunBBSDoorMode();
                 return;
@@ -835,7 +835,7 @@ public partial class GameEngine
             case "Q":
                 IsIntentionalExit = true;
                 terminal.WriteLine(Loc.Get("engine.goodbye"), "cyan");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 break;
 
 #if !STEAM_BUILD
@@ -865,12 +865,12 @@ public partial class GameEngine
                             try { await sqlDel.UnregisterSleepingPlayer(altKey); } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[DeleteAltCharacter] Failed to unregister sleeping player '{altKey}': {ex.Message}"); }
                         }
                         terminal.WriteLine(Loc.Get("engine.delete_alt_done", altSave.PlayerName), "yellow");
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                     else
                     {
                         terminal.WriteLine(Loc.Get("engine.delete_alt_cancelled"), "gray");
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                     await RunBBSDoorMode();
                     return;
@@ -1660,7 +1660,7 @@ public partial class GameEngine
                         catch (System.Exception ex)
                         {
                             terminal.WriteLine($"Editor error: {ex.Message}", "red");
-                            await System.Threading.Tasks.Task.Delay(2000);
+                            await Pacing.Wait(2000);
                         }
                         finally
                         {
@@ -1694,7 +1694,7 @@ public partial class GameEngine
                         terminal.WriteLine(Loc.Get("engine.sr_disabled"), "white");
                         terminal.WriteLine(Loc.Get("engine.sr_disabled_desc"), "white");
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
                 case "Z":
                     GameConfig.CompactMode = !GameConfig.CompactMode;
@@ -1709,7 +1709,7 @@ public partial class GameEngine
                         terminal.WriteLine(Loc.Get("engine.compact_disabled"), "white");
                         terminal.WriteLine(Loc.Get("engine.compact_disabled_desc"), "white");
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
                 case "F":
                     if (BaseLocation.IsRunningInWezTerm())
@@ -1722,7 +1722,7 @@ public partial class GameEngine
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("engine.font_set", fonts[next]), "green");
                         terminal.WriteLine(Loc.Get("engine.font_update"), "white");
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                     break;
                 case "L":
@@ -1743,7 +1743,7 @@ public partial class GameEngine
                         GameConfig.Language = selectedLang;
                         _languageSetThisSession.Value = true;
                         terminal.WriteLine(Loc.Get("prefs.language_set", UsurperRemake.Systems.Loc.GetLanguageName(selectedLang)), "green");
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                     break;
                 case "Q":
@@ -1924,7 +1924,7 @@ public partial class GameEngine
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -2043,7 +2043,7 @@ public partial class GameEngine
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.spectator_invalid"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -2054,7 +2054,7 @@ public partial class GameEngine
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("engine.spectator_pending"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2110,7 +2110,7 @@ public partial class GameEngine
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("engine.spectator_denied"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -2118,7 +2118,7 @@ public partial class GameEngine
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("engine.spectator_accepted", target.Username));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         await RunSpectatorLoop(mySession, target);
     }
@@ -2227,7 +2227,7 @@ public partial class GameEngine
         terminal.SetColor("cyan");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("engine.spectator_ended"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -2412,7 +2412,7 @@ public partial class GameEngine
                         if (nameExists)
                         {
                             terminal.WriteLine(Loc.Get("engine.name_exists"), "red");
-                            await Task.Delay(2000);
+                            await Pacing.Wait(2000);
                         }
                         else
                         {
@@ -2427,7 +2427,7 @@ public partial class GameEngine
 
                 default:
                     terminal.WriteLine(Loc.Get("engine.invalid_choice"), "red");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
             }
         }
@@ -2464,7 +2464,7 @@ public partial class GameEngine
             if (saves.Count == 0)
             {
                 terminal.WriteLine(Loc.Get("engine.no_saves_for_char"), "red");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2574,7 +2574,7 @@ public partial class GameEngine
                         // is cleared by the character's Name2 as well as the save key.
                         SaveSystem.Instance.DeleteSaves(playerName, saves);
                         terminal.WriteLine(Loc.Get("engine.all_saves_deleted"), "green");
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         return;
                     }
                     break;
@@ -2584,7 +2584,7 @@ public partial class GameEngine
 
                 default:
                     terminal.WriteLine(Loc.Get("engine.invalid_choice"), "red");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
             }
         }
@@ -2633,7 +2633,7 @@ public partial class GameEngine
             }
 
             terminal.WriteLine(Loc.Get("engine.restoring_player", saveData.Player.Name2 ?? saveData.Player.Name1), "green");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // Log save data before restore
             DebugLogger.Instance.LogDebug("LOAD", $"Save file data - HP={saveData.Player.HP}/{saveData.Player.MaxHP}, BaseMaxHP={saveData.Player.BaseMaxHP}");
@@ -2645,7 +2645,7 @@ public partial class GameEngine
             {
                 DebugLogger.Instance.LogError("LOAD", "Failed to restore player data");
                 terminal.WriteLine(Loc.Get("engine.restore_failed"), "red");
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
                 return;
             }
 
@@ -2943,7 +2943,7 @@ public partial class GameEngine
             HealRelationshipStateOnLogin();
 
             terminal.WriteLine(Loc.Get("engine.save_loaded"), "bright_green");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Update online display name to character's Name2 (custom display name)
             if (OnlineStateManager.IsActive && currentPlayer != null)
@@ -2979,7 +2979,7 @@ public partial class GameEngine
                         currentPlayer.Team = "";
                         currentPlayer.TeamPW = "";
                         currentPlayer.CTurf = false;
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                 }
             }
@@ -3155,7 +3155,7 @@ public partial class GameEngine
                     terminal.WriteLine(Loc.Get("engine.session_incomplete"));
                     terminal.WriteLine(Loc.Get("engine.session_resuming"));
                     terminal.WriteLine("");
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
 
                     var endingType = EndingsSystem.Instance.DetermineEnding(currentPlayer);
                     await EndingsSystem.Instance.TriggerEnding(currentPlayer, endingType, terminal);
@@ -3262,7 +3262,7 @@ public partial class GameEngine
             terminal.WriteLine(Loc.Get("engine.error_loading", ex.Message), "red");
             UsurperRemake.Systems.DebugLogger.Instance.LogError("CRASH", $"Failed to load save {fileName}:\n{ex}");
             UsurperRemake.Systems.DebugLogger.Instance.Flush();
-            await Task.Delay(3000);
+            await Pacing.Wait(3000);
         }
     }
 
@@ -3467,7 +3467,7 @@ public partial class GameEngine
         {
             terminal.WriteLine("");
             terminal.WriteLine("Starting new character...", "yellow");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             await CreateNewGame(fileName);
             return;
         }
@@ -3478,7 +3478,7 @@ public partial class GameEngine
             var (label, path) = recoveryOptions[recoveryIndex - 1];
             terminal.WriteLine("");
             terminal.WriteLine($"Attempting to load {label}...", "yellow");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             // Use the filename (not full path) — SaveSystem loads from SaveDirectory.
             string recoveryFileName = System.IO.Path.GetFileName(path);
@@ -3508,13 +3508,13 @@ public partial class GameEngine
                 System.IO.File.Copy(path, primaryPath, overwrite: true);
                 terminal.WriteLine("Recovery file restored as primary save.", "bright_green");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 await LoadSaveByFileName(fileName);
             }
             catch (Exception ex)
             {
                 terminal.WriteLine($"Could not copy recovery file: {ex.Message}", "red");
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
             }
             return;
         }
@@ -3651,7 +3651,7 @@ public partial class GameEngine
 
             terminal.WriteLine("");
             terminal.WriteLine("Attempting to load the repaired save...", "yellow");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             // Verify it loads. LoadSaveByFileName runs the full restoration pipeline.
             // If the repaired file STILL fails (unrecognized bloat surface, malformed
@@ -3662,7 +3662,7 @@ public partial class GameEngine
             {
                 terminal.WriteLine("Repair succeeded — loading character now.", "bright_green");
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 await LoadSaveByFileName(fileName);
                 return;
             }
@@ -4279,7 +4279,7 @@ public partial class GameEngine
                 terminal.WriteLine(Loc.Get("engine.inheritance_waiting", pending.Count));
                 terminal.WriteLine("");
                 // the same pause the delivered path takes: the /boss screen clears right after this
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return 0;
             }
 
@@ -4354,7 +4354,7 @@ public partial class GameEngine
 
             backend.ClearInheritance(deliveredIds);
             deliveredCount = deliveredIds.Count;
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
         catch (Exception ex)
         {
@@ -4423,7 +4423,7 @@ public partial class GameEngine
 
             backend.ClearGoldTransfers(deliveredIds);
             DebugLogger.Instance.LogInfo("GOLD", $"WIRE DELIVERY: '{username}' received {totalReceived:N0}g to bank from {pending.Count} transfer(s)");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return totalReceived;
         }
         catch (Exception ex)
@@ -4710,7 +4710,7 @@ public partial class GameEngine
         if (saveData == null)
         {
             terminal.WriteLine(Loc.Get("engine.load_game_failed"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -4780,7 +4780,7 @@ public partial class GameEngine
 
 
         terminal.WriteLine(Loc.Get("engine.game_loaded", saveData.CurrentDay, saveData.Player.TurnsRemaining), "green");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // World sim catch-up: fast-forward the world based on time away (single-player only)
         await RunWorldSimCatchUp(saveData.SaveTime);
@@ -5089,7 +5089,7 @@ public partial class GameEngine
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("engine.legacy_claimed", fallenName, fallenLevel, heirloomGold), "bright_magenta");
                     terminal.WriteLine(Loc.Get("engine.legacy_claimed_hint"), "gray");
-                    await Task.Delay(2500);
+                    await Pacing.Wait(2500);
                     DebugLogger.Instance.LogInfo("GOLD",
                         $"Fallen-legacy heirloom +{heirloomGold}g to '{currentPlayer.Name1}' from '{fallenName}' (Lv.{fallenLevel} {fallenClass}).");
                 }
@@ -5132,7 +5132,7 @@ public partial class GameEngine
             terminal.WriteLine(Loc.Get("engine.save_warning"), "red");
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Online news: announce new adventurer and update display name
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
@@ -5307,7 +5307,7 @@ public partial class GameEngine
         if (!currentPlayer.Allowed)
         {
             terminal.WriteLine(Loc.Get("engine.not_allowed"), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -5315,7 +5315,7 @@ public partial class GameEngine
         if (dailyManager.CurrentMode != DailyCycleMode.Endless && !await CheckDailyLimits())
         {
             terminal.WriteLine(Loc.Get("engine.turns_used", currentPlayer.TurnsRemaining), "red");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -7505,7 +7505,7 @@ public partial class GameEngine
             terminal.WriteLine(Loc.Get("engine.save_failed"), "red");
         }
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
 
     /// <summary>
@@ -7646,7 +7646,7 @@ public partial class GameEngine
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("engine.death_vision"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // v0.60.0 beta: online mode = 3-resurrection cap, no penalty options.
         // Single-player keeps the Y/N prompt with XP/gold penalty fallback.
@@ -7677,7 +7677,7 @@ public partial class GameEngine
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("engine.divine_light"));
                 terminal.WriteLine(Loc.Get("engine.resurrected_no_penalty"));
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 // Return to the Inn
                 currentPlayer.Location = (int)GameLocation.TheInn;
@@ -7744,7 +7744,7 @@ public partial class GameEngine
         // Continue playing - don't mark as deleted!
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("engine.adventure_continues"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
     
     /// <summary>
@@ -8041,7 +8041,7 @@ public partial class GameEngine
         }
 
         terminal.WriteLine(Loc.Get("engine.goodbye"), "green");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Mark as intentional exit so bootstrap doesn't show warning
         IsIntentionalExit = true;

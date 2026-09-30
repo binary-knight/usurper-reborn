@@ -3007,7 +3007,7 @@ public static class ClassAbilitySystem
                     ? Loc.Get("ability.auto_filled")
                     : Loc.Get("ability.no_abilities_to_add"), "bright_green");
                 await SaveSystem.Instance.AutoSave(player);
-                await Task.Delay(800);
+                await Pacing.Wait(800);
                 continue;
             }
 
@@ -3024,7 +3024,7 @@ public static class ClassAbilitySystem
                         player.Quickbar[clearSlot - 1] = null;
                         terminal.WriteLine(Loc.Get("ability.removed_from_slot", clearedAbility?.Name ?? clearedId, clearSlot), "cyan");
                         await SaveSystem.Instance.AutoSave(player);
-                        await Task.Delay(800);
+                        await Pacing.Wait(800);
                     }
                 }
                 continue;
@@ -3036,7 +3036,7 @@ public static class ClassAbilitySystem
                 if (unequipped.Count == 0)
                 {
                     terminal.WriteLine(Loc.Get("ability.all_equipped"), "yellow");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
 
@@ -3092,7 +3092,7 @@ public static class ClassAbilitySystem
                     player.Quickbar[slotNum - 1] = chosen.Id;
                     terminal.WriteLine(Loc.Get("ability.equipped_to_slot", chosen.Name, slotNum), "bright_green");
                     await SaveSystem.Instance.AutoSave(player);
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
                 continue;
             }

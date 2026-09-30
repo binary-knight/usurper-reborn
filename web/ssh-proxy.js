@@ -3965,7 +3965,8 @@ function startDiscordBridge() {
       channels: wikiChannels,
       roleId: process.env.DISCORD_WIKI_HELPER_ROLE_ID || '',
       origin: process.env.WIKI_SITE_ORIGIN || 'https://usurper-reborn.net',
-      db: dbWrite
+      db: dbWrite,
+      env: process.env
     });
   } catch (err) {
     console.error('[Wiki] Configuration error:', err.message);

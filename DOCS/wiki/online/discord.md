@@ -1,14 +1,28 @@
 ---
 title: Discord wiki help
 path: /wiki/en/online/discord/
-checked: 1.2.0
+checked: 1.2.1
 sources: web/wiki-bot.js
 ---
 The Discord bot can answer from the published English wiki in channels enabled by the server owner. Mention the bot and ask a focused question, for example: `@UsurperBot how does Favor work?`
 
 ## What Ask does
 
-Ask searches the wiki and replies with short excerpts and links. It does not run a language model, inspect player saves or read private game data. If no page matches, it says so. Spoiler disclosure text is excluded.
+Ask searches the published wiki for pages that match your question. How it answers depends on the server:
+
+- **With the Claude API enabled.** The bot sends the best matching wiki excerpts and your question to Claude, a language model, and replies with a short plain-language answer of about 120 words, followed by links to the pages it used. The model may use only those excerpts. If they do not cover your question, the answer says so.
+- **Without it.** The bot replies with short excerpts and links from the matching pages.
+
+If no page matches, the bot says so and makes no model call. Ask never inspects player saves or private game data, and spoiler disclosure text is left out of what it can see.
+
+Questions that are not about Usurper Reborn, such as other games, programming or general chat, are declined without source links.
+
+## Limits
+
+- A question can be up to 300 characters.
+- Each user can ask once every ten seconds, and the server handles a limited number of questions per minute.
+- With the Claude API enabled, there are also daily limits per user and for the whole server. Past a limit, you get the excerpt reply instead.
+- If the model call fails or its answer runs too long, you also get the excerpt reply.
 
 Questions are not relayed into in-game gossip. Availability depends on the owner enabling allowed channels and deploying a built search index.
 

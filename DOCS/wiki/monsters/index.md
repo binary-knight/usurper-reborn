@@ -1,7 +1,7 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs
 ---
 Ordinary monsters are organized into families with level tiers and abilities. The generated family pages show normal non-boss stat samples at each tier's endpoints.

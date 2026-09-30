@@ -139,7 +139,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("feature.catches_attention"));
@@ -149,11 +149,11 @@ public class FeatureInteractionSystem
         foreach (var line in lore.Text)
         {
             terminal.WriteLine($"  {ResolveLoreLine(line)}");
-            await Task.Delay(400);
+            await Pacing.Wait(400);
         }
 
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Apply lore effects
         if (lore.GrantsExperience)
@@ -691,7 +691,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         // Determine difficulty based on dungeon level
         // DC scales gently: 8 at floor 1, 20 at floor 50, 33 at floor 100
@@ -713,7 +713,7 @@ public class FeatureInteractionSystem
         terminal.WriteLine(Loc.Get("feature.stat_check", statName, difficulty));
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("feature.roll_result", roll, statBonus, statName, total));
-        await Task.Delay(800);
+        await Pacing.Wait(800);
         terminal.WriteLine("");
 
         if (success)
@@ -750,7 +750,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("feature.success"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Better rewards for skill successes
         var rewardType = random.Next(100);
@@ -805,7 +805,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("feature.failed"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         var failureType = random.Next(100);
 
@@ -847,13 +847,13 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         terminal.SetColor("white");
         foreach (var line in choice.Situation)
         {
             terminal.WriteLine(line);
-            await Task.Delay(300);
+            await Pacing.Wait(300);
         }
 
         terminal.WriteLine("");
@@ -896,7 +896,7 @@ public class FeatureInteractionSystem
         terminal.SetColor(option.IsLight ? "bright_yellow" : "dark_magenta");
         terminal.WriteLine(option.ResultText);
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Apply alignment shift to Chivalry/Darkness
         if (option.AlignmentShift != 0)
@@ -1066,14 +1066,14 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         var className = player.Class.ToString();
         terminal.SetColor("bright_magenta");
         var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
         terminal.WriteLine(Loc.Get("feature.class_training_reveals", article, className));
         terminal.WriteLine("");
-        await Task.Delay(400);
+        await Pacing.Wait(400);
 
         await ApplyClassSpecificBonus(player, level, terminal, outcome, teammates);
 
@@ -1207,7 +1207,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("feature.looks_dangerous"));
@@ -1289,12 +1289,12 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("feature.feels_familiar"));
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // Trigger amnesia system memory
         var memory = GetMemoryFragment(level);
@@ -1307,11 +1307,11 @@ public class FeatureInteractionSystem
         foreach (var line in memory.Text)
         {
             terminal.WriteLine($"  \"{ResolveLoreLine(line)}\"");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
 
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // The memory system uses enum-based fragments, so just display the thematic text
         // This creates atmosphere without requiring tight integration
@@ -1406,12 +1406,12 @@ public class FeatureInteractionSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         terminal.SetColor("bright_blue");
         terminal.WriteLine(Loc.Get("feature.everything_stops"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         var insight = GetOceanInsight(level);
 
@@ -1419,11 +1419,11 @@ public class FeatureInteractionSystem
         foreach (var line in insight.Text)
         {
             terminal.WriteLine($"  {ResolveLoreLine(line)}");
-            await Task.Delay(600);
+            await Pacing.Wait(600);
         }
 
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // Trigger ocean philosophy awakening with insight points
         try
@@ -1528,7 +1528,7 @@ public class FeatureInteractionSystem
         terminal.SetColor("white");
         terminal.WriteLine(feature.Description);
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // Standard outcomes but still level-scaled
         var roll = random.Next(100);

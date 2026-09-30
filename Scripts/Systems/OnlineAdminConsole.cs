@@ -408,7 +408,7 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("ui.invalid_selection"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return null;
         }
 
@@ -893,7 +893,7 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("yellow");
                             terminal.WriteLine("No changes to save.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
                         saveData.Player = player;
@@ -942,6 +942,18 @@ namespace UsurperRemake.Systems
             var livePlayer = session.Context?.Engine?.CurrentPlayer;
             if (livePlayer == null) return;
 
+            ApplyEditsToPlayer(livePlayer, edited);
+
+            terminal.SetColor("cyan");
+            terminal.WriteLine("  (Live session updated)");
+        }
+
+        /// <summary>
+        /// Copy the edited fields onto a live player. The stats go to the Base fields, which the
+        /// RecalculateStats at the end rebuilds the derived stats from.
+        /// </summary>
+        internal static void ApplyEditsToPlayer(Character livePlayer, PlayerData edited)
+        {
             livePlayer.Level = edited.Level;
             livePlayer.Experience = edited.Experience;
             livePlayer.Gold = edited.Gold;
@@ -952,18 +964,15 @@ namespace UsurperRemake.Systems
             livePlayer.Mana = edited.Mana;
             livePlayer.BaseStrength = edited.Strength;
             livePlayer.BaseDefence = edited.Defence;
-            livePlayer.Stamina = edited.Stamina;
+            livePlayer.BaseStamina = edited.Stamina;
             livePlayer.BaseAgility = edited.Agility;
-            livePlayer.Charisma = edited.Charisma;
+            livePlayer.BaseCharisma = edited.Charisma;
             livePlayer.BaseDexterity = edited.Dexterity;
-            livePlayer.Wisdom = edited.Wisdom;
-            livePlayer.Intelligence = edited.Intelligence;
-            livePlayer.Constitution = edited.Constitution;
+            livePlayer.BaseWisdom = edited.Wisdom;
+            livePlayer.BaseIntelligence = edited.Intelligence;
+            livePlayer.BaseConstitution = edited.Constitution;
             livePlayer.TrainingPoints = edited.TrainingPoints;
             livePlayer.RecalculateStats();
-
-            terminal.SetColor("cyan");
-            terminal.WriteLine("  (Live session updated)");
         }
 
         // ──────────────────────────────────────────────────────────────
@@ -1081,14 +1090,14 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine("  No companion data found.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
                         if (!comp.IsDead)
                         {
                             terminal.SetColor("yellow");
                             terminal.WriteLine($"  {CompanionNames[idx]} is not dead.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
 
@@ -1116,7 +1125,7 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("gray");
                         terminal.WriteLine("  (Cleared: IsDead, FallenCompanions, ActiveGriefs, GriefMemories)");
                         changed = true;
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         break;
                     }
                     case "K":
@@ -1129,14 +1138,14 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine("  No companion data found.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
                         if (comp.IsDead)
                         {
                             terminal.SetColor("yellow");
                             terminal.WriteLine($"  {CompanionNames[idx]} is already dead.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
 
@@ -1162,7 +1171,7 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("dark_red");
                         terminal.WriteLine($"  {CompanionNames[idx]} has been killed.");
                         changed = true;
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         break;
                     }
                     case "U":
@@ -1175,14 +1184,14 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine("  No companion data found.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
                         if (!comp.IsRecruited && !comp.IsDead)
                         {
                             terminal.SetColor("yellow");
                             terminal.WriteLine($"  {CompanionNames[idx]} is already in factory state.");
-                            await Task.Delay(1000);
+                            await Pacing.Wait(1000);
                             break;
                         }
 
@@ -1209,7 +1218,7 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("gray");
                         terminal.WriteLine("  They can now be re-encountered and recruited.");
                         changed = true;
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         break;
                     }
                     case "Q":
@@ -1229,7 +1238,7 @@ namespace UsurperRemake.Systems
                 return idx;
             terminal.SetColor("red");
             terminal.WriteLine("  Invalid selection.");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             return -1;
         }
 
@@ -1286,7 +1295,7 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine("  Invalid selection.");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                     continue;
                 }
 
@@ -1315,13 +1324,13 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("green");
                     terminal.WriteLine($"  {GodNames[godIdx].Split('(')[0].Trim()}: {currentName} → {GodStatusNames[newStatus]}");
                     changed = true;
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 else
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine("  Invalid status.");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
             }
         }
@@ -1537,7 +1546,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine("  Cancelled.");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -1600,13 +1609,13 @@ namespace UsurperRemake.Systems
                 newValue = Math.Clamp(newValue, min, max);
                 terminal.SetColor("green");
                 terminal.WriteLine($"{fieldName} changed: {currentValue:N0} -> {newValue:N0}");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 return newValue;
             }
 
             terminal.SetColor("red");
             terminal.WriteLine("Invalid number. No change made.");
-            await Task.Delay(500);
+            await Pacing.Wait(500);
             return currentValue;
         }
 
@@ -1680,13 +1689,13 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine($"  (Affects new characters only. Existing players unchanged.)");
                         DebugLogger.Instance.LogInfo("ADMIN",
                             $"Starting resurrections changed {oldCount} -> {newCount} by {DoorMode.OnlineUsername}");
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                     else
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine("  Invalid number. Must be 0-99.");
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                 }
                 else if (choice == "2")
@@ -1709,7 +1718,7 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine("  Online deaths will consume a resurrection and erase at zero.");
                     DebugLogger.Instance.LogInfo("ADMIN",
                         $"Online permadeath {(newState ? "ENABLED" : "DISABLED")} by {DoorMode.OnlineUsername}");
-                    await Task.Delay(2500);
+                    await Pacing.Wait(2500);
                 }
             }
         }
@@ -1787,13 +1796,13 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("green");
                     terminal.WriteLine($"{settingName} changed: {currentValue:F1}x -> {newValue:F1}x");
                     DebugLogger.Instance.LogInfo("ADMIN", $"{settingName} changed to {newValue:F1}x by {DoorMode.OnlineUsername}");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 else
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine("Invalid number.");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
             }
         }

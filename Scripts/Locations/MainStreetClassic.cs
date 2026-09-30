@@ -525,12 +525,12 @@ public partial class MainStreetLocation
 
             case "T":
                 terminal.WriteLine(Loc.Get("main_street.nav_temple"), "cyan");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 throw new LocationExitException(GameLocation.Temple);
 
             case "X":
                 terminal.WriteLine(Loc.Get("main_street.nav_love_street"), "magenta");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 throw new LocationExitException(GameLocation.LoveCorner);
 
             case "J":
@@ -571,21 +571,21 @@ public partial class MainStreetLocation
 
             case "Y":
                 terminal.WriteLine(Loc.Get("main_street.nav_dark_alley"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 throw new LocationExitException(GameLocation.DarkAlley);
 
             case "+":
                 // v0.62.x Phase 6: The Sanctum -- Light activity hub (yin/yang mirror of Dark Alley).
                 // Evil players are wards-barred at the door inside AlignmentSystem.CanAccessLocation.
                 terminal.WriteLine(Loc.Get("main_street.nav_sanctum"), "bright_yellow");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 throw new LocationExitException(GameLocation.Sanctum);
 
             case ">":
                 if (UsurperRemake.Systems.SettlementSystem.Instance?.State.IsEstablished == true)
                 {
                     terminal.WriteLine(Loc.Get("main_street.nav_settlement"), "gray");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     throw new LocationExitException(GameLocation.Settlement);
                 }
                 return false;
@@ -624,7 +624,7 @@ public partial class MainStreetLocation
                         await OnlineChatSystem.Instance!.Say(chatMsg);
                         terminal.SetColor("cyan");
                         terminal.WriteLine(Loc.Get("main_street.say_you", chatMsg));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                 }
                 return false;
@@ -667,7 +667,7 @@ public partial class MainStreetLocation
 
             default:
                 terminal.WriteLine(Loc.Get("main_street.invalid_choice"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return false;
         }
     }

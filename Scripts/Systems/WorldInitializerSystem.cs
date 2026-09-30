@@ -477,10 +477,11 @@ public class WorldInitializerSystem
         int statChoice = random.Next(4);
         switch (statChoice)
         {
-            case 0: npc.Strength++; break;
-            case 1: npc.Defence++; break;
-            case 2: npc.Agility++; break;
-            case 3: npc.MaxHP += 5; npc.HP = Math.Min(npc.HP + 5, npc.MaxHP); break;
+            // 1.2.1: through the Base fields, so the gain survives the NPC's next RecalculateStats
+            case 0: npc.GrantPermanentStat(StatKind.Strength, 1); break;
+            case 1: npc.GrantPermanentStat(StatKind.Defence, 1); break;
+            case 2: npc.GrantPermanentStat(StatKind.Agility, 1); break;
+            case 3: npc.GrantPermanentStat(StatKind.MaxHP, 5, raisePool: true); break;
         }
     }
 
@@ -490,10 +491,12 @@ public class WorldInitializerSystem
         if (npc.Experience >= expForNextLevel && npc.Level < 100)
         {
             npc.Level++;
-            npc.MaxHP += 10 + random.Next(5, 15);
+            // 1.2.1: one recalc for the three gains, written to the Base fields so they last
+            long hpGain = 10 + random.Next(5, 15);
+            long strGain = random.Next(1, 3);
+            long defGain = random.Next(1, 2);
+            npc.GrantPermanentStats((StatKind.MaxHP, hpGain), (StatKind.Strength, strGain), (StatKind.Defence, defGain));
             npc.HP = npc.MaxHP;
-            npc.Strength += random.Next(1, 3);
-            npc.Defence += random.Next(1, 2);
 
             if (npc.Level % 10 == 0)
             {
@@ -598,6 +601,8 @@ public class WorldInitializerSystem
             Gold = random.Next(100, 500),
             CurrentLocation = "Main Street"
         };
+        // 1.2.1: the Base fields match, so a later RecalculateStats (or a grant) keeps these stats
+        npc.InitializeBaseStats();
 
         // Give basic personality with generated romance traits
         var profile = PersonalityProfile.GenerateForArchetype("adventurer");

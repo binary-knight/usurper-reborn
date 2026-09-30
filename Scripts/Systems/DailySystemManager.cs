@@ -303,7 +303,7 @@ public class DailySystemManager
         terminal.WriteLine(flavorText, "cyan");
         terminal.WriteLine("", "white");
         
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
     
     /// <summary>
@@ -1547,7 +1547,7 @@ public class DailySystemManager
 
         term.WriteLine("", "white");
         term.WriteLine(Loc.Get("daily.while_away_hours"), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         for (int i = 0; i < hoursToWait; i++)
         {
@@ -1565,7 +1565,7 @@ public class DailySystemManager
             if (i == 0 || (i + 1) == hoursToWait || (i % 3 == 0))
             {
                 term.WriteLine($"  ...{period}...", "gray");
-                await Task.Delay(400);
+                await Pacing.Wait(400);
             }
 
             // Run world sim tick for each hour

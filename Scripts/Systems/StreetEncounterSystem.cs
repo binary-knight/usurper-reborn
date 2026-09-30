@@ -17,6 +17,9 @@ public class StreetEncounterSystem
 
     private Random _random = Random.Shared;
 
+    /// <summary>1.2.1: the Monster the last FightNPC built (read by tests to check a rage buff).</summary>
+    internal Monster? LastFightMonster { get; private set; }
+
     /// <summary>
     /// Encounter chance modifiers by location
     /// </summary>
@@ -374,7 +377,7 @@ public class StreetEncounterSystem
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("street_encounter.pickpocket.grab_thief", thief.Name));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 await FightNPC(player, thief, result, terminal);
             }
@@ -415,7 +418,7 @@ public class StreetEncounterSystem
             }
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -461,7 +464,7 @@ public class StreetEncounterSystem
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("street_encounter.brawl.squares_up", brawler.Name));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             await FightNPC(player, brawler, result, terminal, isBrawl: true);
         }
@@ -504,7 +507,7 @@ public class StreetEncounterSystem
             }
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -549,7 +552,7 @@ public class StreetEncounterSystem
         {
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("street_encounter.challenge.accept_honor"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             await FightNPC(player, challenger, result, terminal, isHonorDuel: true);
         }
         else if (choice == "D")
@@ -569,14 +572,13 @@ public class StreetEncounterSystem
             terminal.WriteLine(Loc.Get("street_encounter.challenge.insult_honor"));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("street_encounter.challenge.pay_for_that", challenger.Name));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
-            // They attack with anger bonus
-            challenger.Strength += 5;
-            await FightNPC(player, challenger, result, terminal);
+            // They attack with anger bonus (1.2.1: on the fight's Monster only, never on the world NPC)
+            await FightNPC(player, challenger, result, terminal, rageStrengthFlat: 5);
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -612,7 +614,7 @@ public class StreetEncounterSystem
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("street_encounter.mugging.draw_weapon"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Create multiple monsters for multi-monster combat
             var muggers = new List<Monster>();
@@ -696,7 +698,7 @@ public class StreetEncounterSystem
             }
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -796,7 +798,7 @@ public class StreetEncounterSystem
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("street_encounter.gang.looks_you_over"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Check if this is an actual existing team with members
             bool isRealTeam = eligibleTeams != null && eligibleTeams.Any(t => t.Name == gangName);
@@ -874,7 +876,7 @@ public class StreetEncounterSystem
             }
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -913,7 +915,7 @@ public class StreetEncounterSystem
         {
             terminal.SetColor("magenta");
             terminal.WriteLine(Loc.Get("street_encounter.romance.pleasant_time"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Random outcomes
             int outcome = _random.Next(100);
@@ -1036,7 +1038,7 @@ public class StreetEncounterSystem
             result.Message = Loc.Get("street_encounter.merchant.msg_declined");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -1118,7 +1120,7 @@ public class StreetEncounterSystem
             result.Message = Loc.Get("street_encounter.beggar.msg_ignored");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -1208,7 +1210,7 @@ public class StreetEncounterSystem
                 int sentence = GameConfig.DefaultPrisonSentence;
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("street_encounter.guard.sentenced", sentence));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
 
                 player.DaysInPrison = (byte)Math.Min(255, sentence);
                 GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
@@ -1238,7 +1240,7 @@ public class StreetEncounterSystem
                     player.Darkness += 30;
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("street_encounter.guard.sentenced_resisting", sentence));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
 
                     player.DaysInPrison = (byte)Math.Min(255, sentence);
                     GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
@@ -1274,7 +1276,7 @@ public class StreetEncounterSystem
                     terminal.WriteLine(Loc.Get("street_encounter.guard.running_extra"));
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("street_encounter.guard.sentenced_days", sentence));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
 
                     player.DaysInPrison = (byte)Math.Min(255, sentence);
                     GodDeedSystem.Record(player, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
@@ -1291,7 +1293,7 @@ public class StreetEncounterSystem
             result.Message = Loc.Get("street_encounter.guard.msg_questioned");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -1322,7 +1324,7 @@ public class StreetEncounterSystem
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("street_encounter.ambush.first_strike", firstStrikeDamage));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         if (player.HP > 0)
         {
@@ -1342,7 +1344,7 @@ public class StreetEncounterSystem
             await FightNPC(player, assassin, result, terminal);
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -1372,7 +1374,7 @@ public class StreetEncounterSystem
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.stats", hunter.Name2, hunter.Level, hunter.HP, hunter.MaxHP));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // No pre-fight choice -- the hunter announces and engages. The CombatEngine's own
         // [R]un option is still available mid-fight, mirroring ProcessAmbushEncounter.
@@ -1414,7 +1416,7 @@ public class StreetEncounterSystem
             }
             catch { /* defensive: a loot-generator hiccup must not break the encounter */ }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -1546,8 +1548,12 @@ public class StreetEncounterSystem
     /// Fight an NPC using the combat engine
     /// </summary>
     private async Task FightNPC(Character player, NPC npc, EncounterResult result, TerminalEmulator terminal,
-        bool isBrawl = false, bool isHonorDuel = false)
+        bool isBrawl = false, bool isHonorDuel = false, long rageStrengthFlat = 0, double rageStrengthMult = 1.0)
     {
+        // 1.2.1: a rage buff raises the Monster's strength (and its punch, which is half of it) for
+        // this fight only. It used to be written onto the world NPC and never undone.
+        long fightStrength = (long)(npc.Strength * rageStrengthMult) + rageStrengthFlat;
+
         // Convert NPC to Monster for combat engine
         // Pass NPC's level as the 'nr' parameter so the monster displays the correct level
         // v0.57.2 — use MaxHP (fallback to HP if MaxHP is somehow 0). Using current HP meant
@@ -1556,7 +1562,7 @@ public class StreetEncounterSystem
             nr: npc.Level,
             name: npc.Name,
             hps: (int)(npc.MaxHP > 0 ? npc.MaxHP : Math.Max(1, npc.HP)),
-            strength: (int)npc.Strength,
+            strength: (int)fightStrength,
             defence: (int)npc.Defence,
             phrase: GetHostilePhrase(npc),
             grabweap: false,
@@ -1565,12 +1571,13 @@ public class StreetEncounterSystem
             armor: GetRandomArmorName(npc.Level),
             poisoned: false,
             disease: false,
-            punch: (int)(npc.Strength / 2),
+            punch: (int)(fightStrength / 2),
             armpow: (int)npc.ArmPow,
             weappow: (int)npc.WeapPow
         );
         monster.IsProperName = true; // NPC — no "The" prefix
         monster.CanSpeak = true;     // NPCs can speak
+        LastFightMonster = monster;
 
         // Include player's companions and bodyguards in street combat
         var teammates = GetStreetCombatTeammates(player);
@@ -1703,7 +1710,7 @@ public class StreetEncounterSystem
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("street_encounter.flee.try_run"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         if (_random.Next(100) < fleeChance)
         {
@@ -1722,7 +1729,7 @@ public class StreetEncounterSystem
             player.HP -= damage;
             terminal.WriteLine(Loc.Get("street_encounter.flee.take_damage", damage));
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             if (player.HP > 0)
             {
@@ -1740,14 +1747,14 @@ public class StreetEncounterSystem
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("street_encounter.bribe.offer", bribeAmount));
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         if (player.Gold < bribeAmount)
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("street_encounter.merchant.not_enough_gold"));
             terminal.WriteLine(Loc.Get("street_encounter.bribe.npc_attacks", npc.Name));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             await FightNPC(player, npc, result, terminal);
             return;
         }
@@ -1775,7 +1782,7 @@ public class StreetEncounterSystem
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("street_encounter.bribe.takes_gold_attacks", npc.Name));
                 result.GoldLost = bribeAmount;
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 await FightNPC(player, npc, result, terminal);
             }
         }
@@ -1792,7 +1799,7 @@ public class StreetEncounterSystem
     {
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("street_encounter.talk.try_reason"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         int talkChance = 20 + (int)(player.Charisma - 10) * 4;
         if (player.Class == CharacterClass.Bard) talkChance += 20;
@@ -1807,7 +1814,7 @@ public class StreetEncounterSystem
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("street_encounter.talk.not_interested", npc.Name));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             await FightNPC(player, npc, result, terminal);
         }
     }
@@ -2495,8 +2502,8 @@ public class StreetEncounterSystem
         if (isMurderRevenge)
         {
             // === MURDER REVENGE — Rage buff, no bribe/apologize ===
-            // Apply rage buff
-            grudgeNpc.Strength = (long)(grudgeNpc.Strength * (1.0f + GameConfig.MurderGrudgeRageBonusSTR));
+            // Apply rage buff (1.2.1: the Strength part goes onto the fight's Monster, see FightNPC)
+            double murderRage = 1.0f + GameConfig.MurderGrudgeRageBonusSTR;
             grudgeNpc.HP = (long)Math.Min(grudgeNpc.MaxHP * (1.0f + GameConfig.MurderGrudgeRageBonusHP), grudgeNpc.MaxHP * 1.5f);
 
             UIHelper.DrawBoxTop(terminal, Loc.Get("street_encounter.grudge.murder_revenge_title"), "dark_red");
@@ -2529,14 +2536,14 @@ public class StreetEncounterSystem
                 {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("street_encounter.grudge.cuts_off_escape", grudgeNpc.Name2));
-                    await FightNPC(player, grudgeNpc, result, terminal);
+                    await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage);
                     fought = true;
                 }
             }
             else
             {
                 // Fight (default for any input)
-                await FightNPC(player, grudgeNpc, result, terminal);
+                await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage);
                 fought = true;
             }
 
@@ -2733,8 +2740,7 @@ public class StreetEncounterSystem
                         terminal.WriteLine(Loc.Get("street_encounter.grudge.sorry_not_enough"));
                         terminal.SetColor("white");
                         terminal.WriteLine(Loc.Get("street_encounter.grudge.attacks_fury", grudgeNpc.Name2));
-                        grudgeNpc.Strength = (long)(grudgeNpc.Strength * 1.15);
-                        await FightNPC(player, grudgeNpc, result, terminal);
+                        await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: 1.15);
                     }
                     break;
 
@@ -2909,8 +2915,7 @@ public class StreetEncounterSystem
                 terminal.WriteLine(Loc.Get("street_encounter.spouse.taunt_better", partnerName));
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("street_encounter.spouse.roars_fury", spouse.Name2));
-                spouse.Strength = (long)(spouse.Strength * 1.25);
-                await FightNPC(player, spouse, result, terminal);
+                await FightNPC(player, spouse, result, terminal, rageStrengthMult: 1.25);
 
                 player.Darkness += 10;
 

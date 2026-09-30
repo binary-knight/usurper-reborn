@@ -433,7 +433,7 @@ public class LocationManager
                 if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {
                     terminal.WriteLine(Loc.Get("location.returning_main_menu"), "yellow");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
             }
         }
@@ -444,14 +444,14 @@ public class LocationManager
             if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
                 terminal.WriteLine(Loc.Get("location.returning_main_menu"), "yellow");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
         }
         catch (LocationChangeException ex)
         {
             // Handle legacy location change exception
             terminal.WriteLine(Loc.Get("location.navigating_to", ex.Destination), "yellow");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Convert string destination to GameLocation enum
             if (Enum.TryParse<GameLocation>(ex.Destination, true, out var destination))
@@ -461,7 +461,7 @@ public class LocationManager
             else
             {
                 terminal.WriteLine(Loc.Get("location.unknown_destination", ex.Destination), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
         }
     }
@@ -492,7 +492,7 @@ public class LocationManager
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("location.death_vision_fades"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // v0.60.0 beta: online mode uses the 3-resurrection cap with no
         // penalty options. PermadeathHelper handles auto-revive or final
@@ -524,7 +524,7 @@ public class LocationManager
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("location.divine_light"));
                 terminal.WriteLine(Loc.Get("location.resurrected_no_penalty"));
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 player.Location = (int)GameLocation.TheInn;
                 await SaveSystem.Instance.AutoSave(player);
@@ -581,7 +581,7 @@ public class LocationManager
 
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("location.adventure_continues"));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
     
     /// <summary>
@@ -594,7 +594,7 @@ public class LocationManager
         if (!CanNavigateTo(currentLocationId, destination))
         {
             terminal.WriteLine(Loc.Get("location.cannot_go", BaseLocation.GetLocationName(destination)), "red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return false;
         }
         
@@ -783,7 +783,7 @@ public class PlaceholderLocation : BaseLocation
                 
             default:
                 terminal.WriteLine(Loc.Get("location.not_implemented_press_m"), "yellow");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return false;
         }
     }

@@ -1491,7 +1491,7 @@ public static class AchievementSystem
         }
         terminal.WriteLine("");
 
-        await System.Threading.Tasks.Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -1585,6 +1585,6 @@ public static class AchievementSystem
         }
         terminal.WriteLine("");
 
-        await System.Threading.Tasks.Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 }

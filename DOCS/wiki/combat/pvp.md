@@ -1,7 +1,7 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Systems/CombatEngine.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 ---
 Player fights use a different rule context from ordinary monster encounters. Read the menu and confirmation before entering a duel, arena fight or street conflict.

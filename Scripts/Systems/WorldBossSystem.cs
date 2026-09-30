@@ -747,7 +747,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine($"\n  {Loc.Get("world_boss.online_only")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -755,7 +755,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine($"\n  {Loc.Get("world_boss.min_level", GameConfig.WorldBossMinLevel)}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -940,7 +940,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"\n  {Loc.Get("world_boss.death_cooldown", cooldownLeft)}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -948,7 +948,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"\n  {Loc.Get("world_boss.too_injured")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -959,7 +959,7 @@ namespace UsurperRemake.Systems
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"\n  {Loc.Get("world_boss.error_load")}");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -1018,7 +1018,7 @@ namespace UsurperRemake.Systems
             if (state.Ratio < 1.0)
                 terminal.WriteLine($"  {Loc.Get("world_boss.meets_at_level")}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Non-lethal "downed" outcome shared by the status-DoT path and the boss-damage
             // path. A world boss fight never consumes a resurrection: dropping to 0 HP ends the
@@ -1249,7 +1249,7 @@ namespace UsurperRemake.Systems
                     break;
                 }
 
-                await Task.Delay(300); // Brief pause between rounds
+                await Pacing.Wait(300); // Brief pause between rounds
             }
 
             // Max rounds reached
@@ -2098,7 +2098,7 @@ namespace UsurperRemake.Systems
                 foreach (var line in dialogue)
                 {
                     terminal.WriteLine($"  {line}");
-                    await Task.Delay(800);
+                    await Pacing.Wait(800);
                 }
             }
             terminal.WriteLine("");

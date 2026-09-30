@@ -114,7 +114,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("dungeon.prisoner_blocked"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await NavigateToLocation(GameLocation.Prison);
             return;
         }
@@ -506,7 +506,7 @@ public class DungeonLocation : BaseLocation
         if (!tutorialAns)
         {
             term.WriteLine(Loc.Get("dungeon.tut.declined"), "gray");
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
             return false;
         }
 
@@ -669,7 +669,7 @@ public class DungeonLocation : BaseLocation
         });
 
         term.WriteLine(Loc.Get("dungeon.tut.complete"), "bright_green");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         return true;
     }
 
@@ -739,7 +739,7 @@ public class DungeonLocation : BaseLocation
             // Player died and was resurrected — exit dungeon
             term.SetColor("yellow");
             term.WriteLine(Loc.Get("dungeon.awaken_temple"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
         // If fled, they'll encounter the guardian again next time (no flag set)
@@ -866,10 +866,10 @@ public class DungeonLocation : BaseLocation
                         term.WriteLine("");
                         term.SetColor("bright_yellow");
                         term.WriteLine(Loc.Get("dungeon.sunforged_corridor"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         term.SetColor("bright_cyan");
                         term.WriteLine(Loc.Get("dungeon.sunforged_humming"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         term.WriteLine("");
 
                         var saveResult = await OldGodBossSystem.Instance.CompleteSaveQuest(player, OldGodType.Aurelion, term);
@@ -1002,10 +1002,10 @@ public class DungeonLocation : BaseLocation
                         term.WriteLine("");
                         term.SetColor("bright_magenta");
                         term.WriteLine(Loc.Get("dungeon.veloura_warmth"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         term.SetColor("bright_cyan");
                         term.WriteLine(Loc.Get("dungeon.veloura_senses"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                         term.WriteLine("");
 
                         var saveResult = await OldGodBossSystem.Instance.CompleteSaveQuest(player, OldGodType.Veloura, term);
@@ -1058,7 +1058,7 @@ public class DungeonLocation : BaseLocation
                 {
                     term.WriteLine("");
                     term.WriteLine(Loc.Get("dungeon.ground_trembles"), "bright_red");
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
 
                     term.WriteLine(Loc.Get("dungeon.face_maelketh"), "yellow");
                     // v1.1.15: yesno-convert-a, strict (Y/N)
@@ -1230,7 +1230,7 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine($"{Loc.Get("combat.bar_hp")}: {companion.HP}/{companion.MaxHP}");
             }
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
     }
 
@@ -1320,7 +1320,7 @@ public class DungeonLocation : BaseLocation
             foreach (var name in arrestedNames)
                 term.WriteLine(Loc.Get("dungeon.teammate_arrested", name));
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         if (restoredCount > 0)
@@ -1330,7 +1330,7 @@ public class DungeonLocation : BaseLocation
             term.SetColor("green");
             term.WriteLine(Loc.Get("dungeon.allies_rejoin", restoredCount));
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         // Notify if some allies couldn't join due to party cap
@@ -1340,7 +1340,7 @@ public class DungeonLocation : BaseLocation
             term.WriteLine(Loc.Get("dungeon.allies_skipped", skippedCount, maxPartySize));
             term.WriteLine(Loc.Get("dungeon.use_party_management"));
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
     }
 
@@ -1439,7 +1439,7 @@ public class DungeonLocation : BaseLocation
             term.SetColor("gray");
             term.WriteLine(Loc.Get("dungeon.echoes_info"));
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         // Player report (Lv.68 Voidreaver): echoes recruited at Team Corner silently
@@ -1454,7 +1454,7 @@ public class DungeonLocation : BaseLocation
             term.WriteLine(Loc.Get("dungeon.echoes_skipped", skippedCount, maxPartySize));
             term.WriteLine(Loc.Get("dungeon.echoes_skipped_hint"));
             term.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         // Prune stuck echoes (save missing / team mismatch / load error) from the
@@ -1468,7 +1468,7 @@ public class DungeonLocation : BaseLocation
             term.SetColor("gray");
             term.WriteLine(Loc.Get("dungeon.echoes_pruned", stuckNames.Count));
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
     }
 
@@ -1782,7 +1782,7 @@ public class DungeonLocation : BaseLocation
             }
 
             SyncNPCTeammatesToGameEngine();
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return true; // Allow entry with whoever player can afford
         }
 
@@ -1796,7 +1796,7 @@ public class DungeonLocation : BaseLocation
             term.WriteLine(Loc.Get("dungeon.paid_allies_prepare", totalFee.ToString("N0")));
             term.SetColor("gray");
             term.WriteLine(Loc.Get("dungeon.remaining_gold", player.Gold.ToString("N0")));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return true;
         }
         else
@@ -1813,7 +1813,7 @@ public class DungeonLocation : BaseLocation
             }
 
             SyncNPCTeammatesToGameEngine();
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return true; // Still allow entry, just without the expensive teammates
         }
     }
@@ -1838,7 +1838,7 @@ public class DungeonLocation : BaseLocation
         }
         term.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         foreach (var line in lines)
         {
@@ -1851,7 +1851,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("white");
                 term.WriteLine($"  {line}");
             }
-            await Task.Delay(200);
+            await Pacing.Wait(200);
         }
 
         term.WriteLine("");
@@ -1875,10 +1875,10 @@ public class DungeonLocation : BaseLocation
         {
             term.SetColor("gray");
             term.WriteLine($"  {line}");
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
         }
         term.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Disguise
         var disguiseData = UsurperRemake.Systems.StrangerEncounterSystem.Disguises.GetValueOrDefault(encounter.Disguise);
@@ -1889,7 +1889,7 @@ public class DungeonLocation : BaseLocation
             term.SetColor("darkgray");
             term.WriteLine($"  {disguiseData.Description}");
             term.WriteLine("");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
         }
 
         // Dialogue
@@ -1898,15 +1898,15 @@ public class DungeonLocation : BaseLocation
             if (string.IsNullOrEmpty(line))
             {
                 term.WriteLine("");
-                await Task.Delay(400);
+                await Pacing.Wait(400);
                 continue;
             }
             term.SetColor("bright_magenta");
             term.WriteLine($"  {line}");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
         term.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Response choices
         var responseType = UsurperRemake.Systems.StrangerResponseType.Silent;
@@ -1946,10 +1946,10 @@ public class DungeonLocation : BaseLocation
                 {
                     term.SetColor("magenta");
                     term.WriteLine($"  {replyLine}");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 term.WriteLine("");
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
         }
 
@@ -1961,7 +1961,7 @@ public class DungeonLocation : BaseLocation
             {
                 term.SetColor("gray");
                 term.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
             term.WriteLine("");
         }
@@ -2103,7 +2103,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
 
         // Auto-return to town with reaction scene for resolved encounters (not Manwe — has own ending)
         if (result.God != OldGodType.Manwe &&
@@ -2118,7 +2118,7 @@ public class DungeonLocation : BaseLocation
             term.WriteLine("");
             term.SetColor("bright_yellow");
             term.WriteLine(Loc.Get("dungeon.god_slayer_buff", (int)(GameConfig.GodSlayerDamageBonus * 100), (int)(GameConfig.GodSlayerDefenseBonus * 100), GameConfig.GodSlayerBuffDuration));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Force save after Old God encounter — bypass autosave throttle
             // so buff, artifacts, and story state aren't lost on disconnect
@@ -2144,13 +2144,13 @@ public class DungeonLocation : BaseLocation
 
         // Beat 1: Emergence from the dungeon
         term.WriteLine(Loc.Get("dungeon.emerge_steps"), "white");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         term.WriteLine(Loc.Get("dungeon.emerge_sunlight"), "bright_yellow");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         term.WriteLine("");
 
         term.WriteLine(Loc.Get("dungeon.word_spread"), "gray");
-        await Task.Delay(1200);
+        await Pacing.Wait(1200);
 
         string outcomeWord = result.Outcome switch
         {
@@ -2161,7 +2161,7 @@ public class DungeonLocation : BaseLocation
             _ => Loc.Get("dungeon.outcome_faced")
         };
         term.WriteLine(Loc.Get("dungeon.they_know", outcomeWord, godData.Name), "gray");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         term.WriteLine("");
 
         // Beat 2: Crowd reactions
@@ -2169,11 +2169,11 @@ public class DungeonLocation : BaseLocation
         foreach (var (line, color) in reactions)
         {
             term.WriteLine($"  {line}", color);
-            await Task.Delay(1800);
+            await Pacing.Wait(1800);
         }
 
         term.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Beat 3: Closing reflection
         string closing = result.Outcome switch
@@ -2185,7 +2185,7 @@ public class DungeonLocation : BaseLocation
             _ => Loc.Get("dungeon.closing_default")
         };
         term.WriteLine($"  {closing}", "white");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Next god breadcrumb — hint at what lies deeper (v0.49.3)
         var nextGod = GetNextUnencounteredGod(result.God);
@@ -2193,13 +2193,13 @@ public class DungeonLocation : BaseLocation
         {
             var nextGodData = OldGodsData.GetGodBossData(nextGod.Value);
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             term.SetColor("dark_cyan");
             term.WriteLine(Loc.Get("dungeon.breadcrumb_old_woman"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             term.SetColor("gray");
             term.WriteLine(Loc.Get("dungeon.breadcrumb_next_god", nextGodData.Name));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         term.WriteLine("");
@@ -4085,7 +4085,7 @@ public class DungeonLocation : BaseLocation
                     }
                 }
                 terminal.WriteLine(Loc.Get("dungeon.entering_dungeon"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 // Rare encounter check on dungeon entry
                 var player = GetCurrentPlayer();
@@ -4136,7 +4136,7 @@ public class DungeonLocation : BaseLocation
 
             default:
                 terminal.WriteLine(Loc.Get("dungeon.invalid_choice"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return false;
         }
     }
@@ -4730,7 +4730,7 @@ public class DungeonLocation : BaseLocation
 
             default:
                 terminal.WriteLine(Loc.Get("dungeon.invalid_choice"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return false;
         }
     }
@@ -4799,7 +4799,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("mental.descend_refused"), "bright_red");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return false;
         }
         if (rule != MentalDescent.AskTwice) return true;
@@ -4808,7 +4808,7 @@ public class DungeonLocation : BaseLocation
             && await terminal.AskYesNoAsync(Loc.Get("mental.descend_confirm_2")))
             return true;
         terminal.WriteLine(Loc.Get(portal ? "mental.portal_turned_back" : "mental.descend_turned_back"), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         return false;
     }
 
@@ -4851,7 +4851,7 @@ public class DungeonLocation : BaseLocation
             terminal.ClearScreen();
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("dungeon.move_passage"));
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // Check for trap on entering unexplored room
         if (!targetRoom.IsExplored && targetRoom.HasTrap && !targetRoom.TrapTriggered)
@@ -4944,14 +4944,14 @@ public class DungeonLocation : BaseLocation
             ApplyRoomMentalStrain();
             // v1.1.15: a band's room line (Strained uneasy, Shaken and worse hallucinations), each from their own Mental
             ShowRoomMindLines();
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // Check for seal discovery on this floor
             var player = GetCurrentPlayer();
             if (player != null && await TryDiscoverSeal(player, targetRoom))
             {
                 // Seal was found - give player time to process
-                await Task.Delay(500);
+                await Pacing.Wait(500);
             }
 
             // Auto-trigger riddles and puzzles when entering special rooms for the first time
@@ -4977,7 +4977,7 @@ public class DungeonLocation : BaseLocation
                 if (hadEncounter)
                 {
                     // Give a brief pause after rare encounter before showing room
-                    await Task.Delay(500);
+                    await Pacing.Wait(500);
                 }
 
                 // Check for dungeon visions (narrative environmental beats)
@@ -5102,7 +5102,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.ambush"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 await FightRoomMonsters(targetRoom, isAmbush: true);
             }
         }
@@ -5130,7 +5130,7 @@ public class DungeonLocation : BaseLocation
         foreach (var line in vision.LocContentLines())
         {
             terminal.WriteLine($"  {line}");
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
         }
         terminal.WriteLine("");
 
@@ -5203,7 +5203,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine($"    \"{material.Description}\"");
         WriteThickDivider(42);
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -5350,7 +5350,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dungeon.trap_triggered"));
         BroadcastDungeonEvent("\u001b[1;31m  *** TRAP! ***\u001b[0m");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Check for evasion based on agility. v1.0.2: the odds are reported on
         // BOTH outcomes now -- a failure used to give no stat and no number, so
@@ -5362,13 +5362,13 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.trap_evade_reflexes"));
             terminal.WriteLine(Loc.Get("dungeon.trap_evade_agility", player.Agility, evadeChance));
             BroadcastDungeonEvent($"\u001b[32m  {player!.Name2}'s quick reflexes avoid the trap!\u001b[0m");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("dungeon.trap_no_react", player.Agility, evadeChance));
-        await Task.Delay(300);
+        await Pacing.Wait(300);
 
         var trapType = dungeonRandom.Next(6);
         switch (trapType)
@@ -5461,7 +5461,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -5567,7 +5567,7 @@ public class DungeonLocation : BaseLocation
                     currentFloor.BossDefeated = true;
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dungeon.chamber_empty"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     return;
                 }
                 else
@@ -5577,7 +5577,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.ancient_presence_sealed"));
                     terminal.WriteLine(Loc.Get("dungeon.prove_yourself_hint"), "gray");
                     terminal.WriteLine("");
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                 }
                 // Fall through to generate normal boss monsters as placeholder
             }
@@ -5588,7 +5588,7 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Straggler encounters: chance of weaker monsters from upper floors (v0.49.3)
         int effectiveMonsterLevel = currentDungeonLevel;
@@ -5699,7 +5699,7 @@ public class DungeonLocation : BaseLocation
                 : $"\u001b[1;33m  Combat! The group faces {monsterSummary}!\u001b[0m");
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Check for divine punishment before combat
         var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(player!);
@@ -5731,7 +5731,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await NavigateToLocation(GameLocation.Temple);
             return;
         }
@@ -5785,7 +5785,7 @@ public class DungeonLocation : BaseLocation
             bool hadMiniBoss = monsters.Any(m => m.IsMiniBoss);
             await CheckForMaterialDrop(player, hadBoss, hadMiniBoss);
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         RequestRedisplay();
@@ -5881,14 +5881,14 @@ public class DungeonLocation : BaseLocation
 
         // Display Old God encounter intro based on which god
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         switch (godType.Value)
         {
             case OldGodType.Maelketh:
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_maelketh_1"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_maelketh_2"), "bright_red");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_maelketh_3"), "yellow");
@@ -5898,7 +5898,7 @@ public class DungeonLocation : BaseLocation
             case OldGodType.Veloura:
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_veloura_1"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_veloura_2"), "bright_magenta");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_veloura_3"), "magenta");
@@ -5909,7 +5909,7 @@ public class DungeonLocation : BaseLocation
             case OldGodType.Thorgrim:
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_thorgrim_1"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_thorgrim_2"), "white");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_thorgrim_3"), "gray");
@@ -5920,7 +5920,7 @@ public class DungeonLocation : BaseLocation
             case OldGodType.Noctura:
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_noctura_1"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_noctura_2"), "bright_cyan");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_noctura_3"), "cyan");
@@ -5931,7 +5931,7 @@ public class DungeonLocation : BaseLocation
             case OldGodType.Aurelion:
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_aurelion_1"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_aurelion_2"), "bright_yellow");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_aurelion_3"), "yellow");
@@ -5942,7 +5942,7 @@ public class DungeonLocation : BaseLocation
             case OldGodType.Terravok:
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_terravok_1"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_terravok_2"), "bright_yellow");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_terravok_3"), "yellow");
@@ -5952,7 +5952,7 @@ public class DungeonLocation : BaseLocation
             case OldGodType.Manwe:
                 terminal.SetColor("bright_white");
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_manwe_1"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine(Loc.Get("dungeon.god_intro_manwe_2"), "bright_white");
                 terminal.WriteLine("");
                 terminal.SetColor("white");
@@ -5965,7 +5965,7 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         string godName = godType.Value switch
         {
@@ -6119,7 +6119,7 @@ public class DungeonLocation : BaseLocation
         // Auto-save after finding treasure
         await SaveSystem.Instance.AutoSave(player);
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
         await terminal.PressAnyKey();
     }
 
@@ -6167,7 +6167,7 @@ public class DungeonLocation : BaseLocation
     private async Task ExplainNoAction(string key)
     {
         terminal.WriteLine($"  {Loc.Get(key)}", "gray");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
     }
 
     /// <summary>
@@ -6975,7 +6975,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.floor_recleared"), "gray");
             terminal.WriteLine(Loc.Get("dungeon.first_clear_only"), "darkgray");
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -7032,7 +7032,7 @@ public class DungeonLocation : BaseLocation
         }
         bonusFloorState.CompletionBonusAwarded = true;
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -7052,7 +7052,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.defeat_old_god_first"), "yellow");
             terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
             terminal.WriteLine(Loc.Get("dungeon.may_ascend"), "cyan");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -7061,7 +7061,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.cannot_venture_deeper", maxAccessible), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.level_up_hint"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -7069,7 +7069,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.deepest_level"), "red");
             terminal.WriteLine(Loc.Get("dungeon.nowhere_descend"), "yellow");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -7119,7 +7119,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.descend_stairs"));
         terminal.WriteLine(Loc.Get("dungeon.darkness_deeper"));
         terminal.WriteLine(Loc.Get("dungeon.air_colder"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Generate or restore the next floor
         int nextLevel = currentDungeonLevel + 1;
@@ -7193,7 +7193,7 @@ public class DungeonLocation : BaseLocation
         // Check for story events (seals, narrative moments) on this new floor
         await CheckFloorStoryEvents(player, terminal);
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
         RequestRedisplay();
     }
 
@@ -7209,7 +7209,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("green");
         terminal.WriteLine(Loc.Get("dungeon.make_camp"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         player.OnRest();   // 1.2.0: a rest ends the rest buffs
 
@@ -7310,7 +7310,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("dark_magenta");
             terminal.WriteLine(Loc.Get("dungeon.dream_takes_shape"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine($"=== {dream.LocTitle()} ===");
@@ -7320,7 +7320,7 @@ public class DungeonLocation : BaseLocation
             foreach (var line in dream.LocContentLines())
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             if (!string.IsNullOrEmpty(dream.PhilosophicalHint))
@@ -7340,7 +7340,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.break_camp"));
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
         await terminal.PressAnyKey();
     }
 
@@ -7422,7 +7422,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.presence_blocks"), "bright_red");
             terminal.WriteLine(Loc.Get("dungeon.must_defeat_god_floor", godName, blockingFloor), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.may_still_ascend"), "cyan");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -7435,7 +7435,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.must_defeat_old_god_this_floor"), "yellow");
             terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
             terminal.WriteLine(Loc.Get("dungeon.may_still_ascend"), "cyan");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -7499,7 +7499,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.no_level_change"), "gray");
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         RequestRedisplay();
     }
 
@@ -7532,7 +7532,7 @@ public class DungeonLocation : BaseLocation
             await SpecialEventEncounter();
         }
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
         await terminal.PressAnyKey();
     }
     
@@ -7626,7 +7626,7 @@ public class DungeonLocation : BaseLocation
         ShowDifficultyAssessment(monsters, currentPlayer);
 
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Check for divine punishment before combat
         var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(currentPlayer);
@@ -7657,7 +7657,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await NavigateToLocation(GameLocation.Temple);
             return;
         }
@@ -7786,7 +7786,7 @@ public class DungeonLocation : BaseLocation
     {
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("dungeon.scroll_words_resonate"), "bright_white");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         switch (scrollType)
         {
@@ -7805,7 +7805,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dungeon.scroll_ground_trembles"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
 
                     // Create undead monster
                     var undead = CreateUndeadMonster();
@@ -7821,7 +7821,7 @@ public class DungeonLocation : BaseLocation
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         await NavigateToLocation(GameLocation.Temple);
                         return;
                     }
@@ -8022,7 +8022,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.corpse_animates"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 var undead = Monster.CreateMonster(
                     currentDungeonLevel, $"Undead {GameConfig.CapitalizeFirst(adventurerClass)}",
@@ -8040,7 +8040,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     await NavigateToLocation(GameLocation.Temple);
                     return;
                 }
@@ -8055,7 +8055,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.chivalry_increases_slightly"));
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -8071,7 +8071,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.whispers_echo"));
         terminal.WriteLine("");
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Different whispers based on floor and player state
         var currentPlayer = GetCurrentPlayer();
@@ -8117,7 +8117,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.encounter_wiser", xpGain));
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -8182,7 +8182,7 @@ public class DungeonLocation : BaseLocation
                 // Hostile dimension - fight
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.portal_hostile_dimension"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 var guardian = Monster.CreateMonster(
                     currentDungeonLevel + 5, "Portal Guardian",
@@ -8201,7 +8201,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     await NavigateToLocation(GameLocation.Temple);
                     return;
                 }
@@ -8233,7 +8233,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.portal_avoid"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -8308,7 +8308,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("dungeon.duelist_accept", duelist.Name));
             terminal.WriteLine(Loc.Get("dungeon.duelist_steel_clashes"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Duelist scales with player but gets stronger each encounter
             int duelistLevel = Math.Max(currentPlayer.Level, duelist.Level);
@@ -8333,7 +8333,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }
@@ -8436,7 +8436,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.duelist_insult_new_1", duelist.Name));
                 terminal.WriteLine(Loc.Get("dungeon.duelist_insult_new_2"));
             }
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 3, isGood: false, "dungeon.duelist_insult"); // v0.57.12: paired movement
             duelist.WasInsulted = true;
@@ -8461,7 +8461,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }
@@ -8495,7 +8495,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -8742,7 +8742,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("dungeon.chest_mimic"));
                 BroadcastDungeonEvent("\u001b[91m  The chest was a MIMIC!\u001b[0m");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 // Use MonsterGenerator stats so mimics scale like other mini-bosses
                 int mimicLevel = currentDungeonLevel;
@@ -8770,7 +8770,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     await NavigateToLocation(GameLocation.Temple);
                     return;
                 }
@@ -8781,7 +8781,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.chest_leave_alone"), "gray");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -8835,7 +8835,7 @@ public class DungeonLocation : BaseLocation
         if (choice.ToUpper() == "F")
         {
             terminal.WriteLine(Loc.Get("dungeon.strangers_draw_weapon"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Create the group
             int groupSize = dungeonRandom.Next(3, 6);
@@ -8867,7 +8867,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }
@@ -8885,7 +8885,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.WriteLine(Loc.Get("ui.not_enough_gold"), "red");
                 terminal.WriteLine(Loc.Get("dungeon.strangers_attack_anyway"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 // Trigger simplified combat
                 var monster = Monster.CreateMonster(
                     currentDungeonLevel, $"{groupName.Substring(0, 1).ToUpper()}{groupName.Substring(1)} Leader",
@@ -8901,7 +8901,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     await NavigateToLocation(GameLocation.Temple);
                     return;
                 }
@@ -8923,7 +8923,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -8947,7 +8947,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.damsel_rush_defense"), "green");
             terminal.WriteLine(Loc.Get("dungeon.damsel_unhand_her"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Fight ruffians
             var monsters = new List<Monster>();
@@ -8974,7 +8974,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }
@@ -9014,7 +9014,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.damsel_ignore_2"), "gray");
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -9094,7 +9094,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.wounded_leave_2"), "gray");
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -9129,7 +9129,7 @@ public class DungeonLocation : BaseLocation
         if (choice.ToUpper() == "P")
         {
             terminal.WriteLine(Loc.Get("dungeon.shrine_kneel"), "cyan");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Random blessing or curse
             var outcome = dungeonRandom.Next(6);
@@ -9195,7 +9195,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("dungeon.shrine_angry_spirit"), "bright_red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 var spirit = Monster.CreateMonster(
                     currentDungeonLevel + 5, "Vengeful Spirit",
@@ -9213,7 +9213,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     await NavigateToLocation(GameLocation.Temple);
                     return;
                 }
@@ -9224,7 +9224,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.shrine_leave"), "gray");
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -9253,25 +9253,25 @@ public class DungeonLocation : BaseLocation
         terminal.ClearScreen();
         WriteBoxHeader(Loc.Get("dungeon.forgotten_shrine"), "bright_magenta", 66);
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.intro_1"));
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.intro_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.woman_1"));
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.woman_2"));
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.woman_3"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine($"\"{lyris.DialogueHints[0]}\"");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.studies"));
@@ -9279,7 +9279,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.WriteLine($"\"{lyris.DialogueHints[1]}\"");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Show her details
         terminal.SetColor("yellow");
@@ -9291,7 +9291,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine(lyris.BackstoryBrief);
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_yellow");
         if (IsScreenReader)
@@ -9418,13 +9418,13 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.trap_reflexes_save"));
             terminal.WriteLine(Loc.Get("dungeon.trap_dodge_entirely", currentPlayer.Agility));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("dungeon.trap_no_react", currentPlayer.Agility, evadeChance));
-        await Task.Delay(300);
+        await Pacing.Wait(300);
 
         var trapType = dungeonRandom.Next(5);
 
@@ -9479,7 +9479,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -9519,7 +9519,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.ghost_no_gold"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.ghost_fades_disappointed"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -9530,19 +9530,19 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.ghost_coward"), "yellow");
             terminal.WriteLine(Loc.Get("dungeon.ghost_fades"), "gray");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
         terminal.WriteLine(Loc.Get("dungeon.ghost_you_bet", bet), "white");
         terminal.WriteLine(Loc.Get("dungeon.ghost_rolls"), "gray");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         var ghostRoll = dungeonRandom.Next(1, 7) + dungeonRandom.Next(1, 7);
         terminal.WriteLine(Loc.Get("dungeon.ghost_roll_result", ghostRoll), "cyan");
 
         terminal.WriteLine(Loc.Get("dungeon.ghost_your_turn"), "gray");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         var playerRoll = dungeonRandom.Next(1, 7) + dungeonRandom.Next(1, 7);
         terminal.WriteLine(Loc.Get("dungeon.ghost_player_roll", playerRoll), "yellow");
@@ -9569,7 +9569,7 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine(Loc.Get("dungeon.ghost_fades_shadows"), "gray");
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     /// <summary>
@@ -9637,7 +9637,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
     
     /// <summary>
@@ -9672,7 +9672,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("dungeon.merchant_rob"));
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Create merchant monster for combat
             var merchant = CreateMerchantMonster();
@@ -9684,7 +9684,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }
@@ -9872,7 +9872,7 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("ui.not_enough_gold_friend"));
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
 
                 case "2":
@@ -9889,7 +9889,7 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("ui.not_enough_gold_friend"));
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
 
                 case "3":
@@ -9922,7 +9922,7 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("ui.not_enough_gold_friend"));
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
 
                 case "4":
@@ -9961,7 +9961,7 @@ public class DungeonLocation : BaseLocation
                             }
                         }
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
 
                 case "A":
@@ -9980,13 +9980,13 @@ public class DungeonLocation : BaseLocation
                     trading = false;
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dungeon.merchant_safe_travels"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
 
                 default:
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dungeon.merchant_invalid"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
             }
         }
@@ -10160,7 +10160,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dungeon.merchant_item_sold"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -10169,7 +10169,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("dungeon.merchant_need_gold", item.Price, item.Name));
             terminal.WriteLine(Loc.Get("dungeon.merchant_come_back"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -10225,7 +10225,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.merchant_another_time"));
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     /// <summary>
@@ -10293,7 +10293,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.witch_doctor_no_gold"), "gray");
         }
         
-        await Task.Delay(3000);
+        await Pacing.Wait(3000);
     }
     
     /// <summary>
@@ -10464,7 +10464,7 @@ public class DungeonLocation : BaseLocation
         };
 
         terminal.WriteLine(explorationTexts[dungeonRandom.Next(explorationTexts.Length)], "gray");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
     
     private string GetTerrainDescription(DungeonTerrain terrain)
@@ -10494,7 +10494,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.presence_blocks"), "bright_red");
             terminal.WriteLine(Loc.Get("dungeon.must_defeat_old_god"), "yellow");
             terminal.WriteLine($"({GetRemainingClearInfo()})", "gray");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
             return;
         }
 
@@ -10527,7 +10527,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.deepest_level"), "red");
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         RequestRedisplay();
     }
 
@@ -10550,7 +10550,7 @@ public class DungeonLocation : BaseLocation
         {
             await NavigateToLocation(GameLocation.MainStreet);
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         RequestRedisplay();
     }
 
@@ -10789,7 +10789,7 @@ public class DungeonLocation : BaseLocation
                 if (teammates.Count >= 4)
                 {
                     terminal.WriteLine(Loc.Get("dungeon.party_full_max4"), "yellow");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 else
                 {
@@ -10799,7 +10799,7 @@ public class DungeonLocation : BaseLocation
             else
             {
                 terminal.WriteLine(Loc.Get("dungeon.invalid_companion"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
             return;
         }
@@ -10814,12 +10814,12 @@ public class DungeonLocation : BaseLocation
                 else if (teammates.Count >= 4)
                 {
                     terminal.WriteLine(Loc.Get("dungeon.party_full_max4"), "yellow");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 else
                 {
                     terminal.WriteLine(Loc.Get("dungeon.no_team_members"), "gray");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 break;
 
@@ -10831,7 +10831,7 @@ public class DungeonLocation : BaseLocation
                 else
                 {
                     terminal.WriteLine(Loc.Get("dungeon.no_teammates_remove"), "gray");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 break;
 
@@ -10841,7 +10841,7 @@ public class DungeonLocation : BaseLocation
                 else
                 {
                     terminal.WriteLine(Loc.Get("dungeon.no_teammates_skills"), "gray");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 return;
 
@@ -10885,7 +10885,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.could_not_add", companion.Name));
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -11010,7 +11010,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("dungeon.belt_set", Loc.Get(owner.SharedPotionBelt ? "ui.on" : "ui.off")));
                 try { await SaveSystem.Instance.AutoSave(owner); } catch { /* best-effort */ }
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 continue;
             }
 
@@ -11023,21 +11023,21 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.other_players_manage_own"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     continue;
                 }
                 if (selectedMember.IsEcho)
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.echo_cannot_manage"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     continue;
                 }
                 if (selectedMember.IsMercenary)
                 {
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.bodyguard_cannot_equip"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     continue;
                 }
 
@@ -11061,7 +11061,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.skills_no_members"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
         terminal.ClearScreen();
@@ -11085,7 +11085,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("dungeon.stance_set", member.DisplayName, Loc.Get(TeammateStances.NameKey(chosen.Value))));
         try { await SaveSystem.Instance.AutoSave(owner); } catch { /* best-effort */ }
-        await Task.Delay(1200);
+        await Pacing.Wait(1200);
     }
 
     /// <summary>The three presets with one line each; null when the player backs out.</summary>
@@ -11116,7 +11116,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.skills_no_members"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -11363,7 +11363,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.no_items_for_slot"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -11402,7 +11402,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("ui.cancelled"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 continue;
             }
 
@@ -11413,7 +11413,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.must_identify_first"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -11422,7 +11422,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  {Loc.Get("dungeon.cannot_use_item", target.DisplayName, equipReason)}");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -11433,7 +11433,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 continue;
             }
 
@@ -11476,7 +11476,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
     }
 
@@ -11502,7 +11502,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.no_equipment", target.DisplayName));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -11529,7 +11529,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -11542,7 +11542,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("team.unequip_failed"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
         target.RecalculateStats();
@@ -11554,7 +11554,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("dungeon.took_item_from", selectedItem.Name, target.DisplayName));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task AddTeammateToParty(List<NPC> available)
@@ -11587,7 +11587,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dungeon.cannot_afford_fee"));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                     return;
                 }
 
@@ -11598,7 +11598,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("dungeon.npc_shrugs", npc.DisplayName));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     return;
                 }
 
@@ -11642,7 +11642,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
         }
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task RemoveTeammateFromParty()
@@ -11671,7 +11671,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.grouped_player_leave", member.DisplayName));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -11726,7 +11726,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     private async Task ShowXPDistributionMenu()
@@ -11833,7 +11833,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("green");
                 terminal.WriteLine($"  {Loc.Get("dungeon.xp_auto_redist_toggled", newStatus)}");
                 await GameEngine.Instance.SaveCurrentGame();
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
             else if (input == "E")
             {
@@ -11844,7 +11844,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("dungeon.xp_even_split", partyEven[0], xpTeammates.Count > 0 ? partyEven[1] : 0));
                 await GameEngine.Instance.SaveCurrentGame();
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
             }
             else if (int.TryParse(input, out int slot) && slot >= 0 && slot < TeamXPConfig.MaxTeamSlots)
             {
@@ -11853,7 +11853,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dungeon.xp_slot_empty"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     continue;
                 }
 
@@ -11880,13 +11880,13 @@ public class DungeonLocation : BaseLocation
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("dungeon.xp_min_self"));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                     else if (newPct > maxAllowed)
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("dungeon.xp_total_exceeded", otherSlotsTotal + newPct));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                     }
                     else
                     {
@@ -11896,21 +11896,21 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("dungeon.xp_set_to", slotName, newPct));
                         await GameEngine.Instance.SaveCurrentGame();
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                 }
                 else
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("dungeon.invalid_percentage"));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
             }
             else
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("ui.invalid_choice"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
             }
         }
     }
@@ -12010,12 +12010,12 @@ public class DungeonLocation : BaseLocation
 
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("dungeon.member_leaves_party", memberToRemove.DisplayName));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 else
                 {
                     terminal.WriteLine(Loc.Get("dungeon.invalid_cancelled"), "red");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     return false;
                 }
             }
@@ -12023,7 +12023,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dungeon.recruitment_cancelled"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return false;
             }
         }
@@ -12351,7 +12351,7 @@ public class DungeonLocation : BaseLocation
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("dungeon.no_healing_potions"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                     break;
 
@@ -12390,19 +12390,19 @@ public class DungeonLocation : BaseLocation
                         player.Statistics?.RecordManaPotionUsed(manaRestored);
                         terminal.SetColor("bright_cyan");
                         terminal.WriteLine(Loc.Get("dungeon.mana_potion_used", manaRestored, player.Mana, player.MaxMana, player.ManaPotions));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                     else if (player.IsManaClass && player.ManaPotions > 0)
                     {
                         terminal.SetColor("cyan");
                         terminal.WriteLine(Loc.Get("dungeon.mana_full"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                     else if (player.IsManaClass && player.ManaPotions <= 0)
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("dungeon.no_mana_potions"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                     break;
 
@@ -12429,19 +12429,19 @@ public class DungeonLocation : BaseLocation
                         player.RemoveStatus(StatusEffect.Poisoned);
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("dungeon.antidote_cure_poison"));
-                        await Task.Delay(1500);
+                        await Pacing.Wait(1500);
                     }
                     else if (player.Antidotes > 0)
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("dungeon.not_poisoned"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                     else
                     {
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("dungeon.no_antidotes"));
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                     break;
 
@@ -12452,7 +12452,7 @@ public class DungeonLocation : BaseLocation
                 default:
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("ui.invalid_choice"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     break;
             }
         }
@@ -12500,7 +12500,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.no_teammates_need_mana"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -12576,7 +12576,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.give_mana_potion_one", target.DisplayName, totalRestore, target.Mana, target.MaxMana));
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("dungeon.mana_potions_remaining", player.ManaPotions));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>
@@ -12619,7 +12619,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("ui.invalid_choice"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -12637,7 +12637,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get(givingMana
                 ? "dungeon.issue_no_mana_candidates"
                 : "dungeon.issue_no_healing_candidates"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -12748,7 +12748,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("cyan");
         (int newStash, int newMax) = GetStashState(target, givingMana);
         terminal.WriteLine(Loc.Get("dungeon.issue_stash_now", target.DisplayName, newStash, newMax));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>v0.61.3 helper: read a teammate's potion stash + cap for the chosen type.</summary>
@@ -12815,7 +12815,7 @@ public class DungeonLocation : BaseLocation
         if (targetChoice < 1 || targetChoice > companions.Count)
         {
             terminal.WriteLine(Loc.Get("dungeon.merchant_invalid"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -12824,7 +12824,7 @@ public class DungeonLocation : BaseLocation
         if (target.HP >= target.MaxHP)
         {
             terminal.WriteLine(Loc.Get("dungeon.already_full_health_name", target.DisplayName), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -12886,7 +12886,7 @@ public class DungeonLocation : BaseLocation
         else if (potionChoice != "1")
         {
             terminal.WriteLine(Loc.Get("ui.invalid_choice"), "red");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -12927,7 +12927,7 @@ public class DungeonLocation : BaseLocation
             UsurperRemake.Systems.CompanionSystem.Instance.SyncCompanionHP(target);
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     /// <summary>
@@ -12959,7 +12959,7 @@ public class DungeonLocation : BaseLocation
         if (totalPotionsNeeded == 0)
         {
             terminal.WriteLine(Loc.Get("dungeon.everyone_full_health"), "yellow");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13071,7 +13071,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
     }
 
     private async Task UseHealingPotion(Character player)
@@ -13080,7 +13080,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("dungeon.no_healing_potions"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13088,7 +13088,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.already_full_health"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13113,7 +13113,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine($"{Loc.Get("ui.potions_remaining")}: {player.Healing}/{player.MaxPotions}");
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task HealToFull(Character player)
@@ -13122,7 +13122,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("dungeon.no_healing_potions"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13130,7 +13130,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.already_full_health"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13146,7 +13146,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("ui.cancelled"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
             return;
         }
 
@@ -13174,7 +13174,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine($"{Loc.Get("ui.potions_remaining")}: {player.Healing}/{player.MaxPotions}");
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task BuyPotionsFromMonk(Character player)
@@ -13264,14 +13264,14 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dungeon.monk_another_time"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("dungeon.monk_fades"));
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task MonkBuyPotionTypeInDungeon(Character player, string potionType, int costPerPotion,
@@ -13308,7 +13308,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dungeon.monk_cancel"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13339,7 +13339,7 @@ public class DungeonLocation : BaseLocation
         if (currentFloor == null)
         {
             terminal.WriteLine(Loc.Get("dungeon.no_floor_map"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13590,7 +13590,7 @@ public class DungeonLocation : BaseLocation
                 mapPlayer.DungeonAutoMap = !mapPlayer.DungeonAutoMap;
                 terminal.WriteLine(Loc.Get(mapPlayer.DungeonAutoMap ? "dungeon.automap_enabled" : "dungeon.automap_disabled"), "green");
                 await GameEngine.Instance.SaveCurrentGame();
-                await Task.Delay(800);
+                await Pacing.Wait(800);
             }
             return;
         }
@@ -13679,7 +13679,7 @@ public class DungeonLocation : BaseLocation
         if (currentFloor == null)
         {
             terminal.WriteLine(Loc.Get("dungeon.no_floor_data"), "gray");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -13936,7 +13936,7 @@ public class DungeonLocation : BaseLocation
         string line = Loc.Get($"{navPrefix}.{_companionCommentRng.Next(navCount)}", dir);
         terminal.SetColor("cyan");
         terminal.WriteLine($"{name}: \"{line}\"");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
     }
 
     /// <summary>
@@ -13962,7 +13962,7 @@ public class DungeonLocation : BaseLocation
         string line = Loc.Get($"{btPrefix}.{_companionCommentRng.Next(btCount)}");
         terminal.SetColor("cyan");
         terminal.WriteLine($"{name}: \"{line}\"");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
     }
 
     /// <summary>
@@ -14323,7 +14323,7 @@ public class DungeonLocation : BaseLocation
                         break;
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("ui.invalid_choice"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 // Exhausted tries cancel rather than letting the last bad key pick "leave".
                 if (pixieChoice != "C" && pixieChoice != "L")
@@ -14487,7 +14487,7 @@ public class DungeonLocation : BaseLocation
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                        await Task.Delay(2000);
+                        await Pacing.Wait(2000);
                         await NavigateToLocation(GameLocation.Temple);
                         return;
                     }
@@ -14593,7 +14593,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
         await terminal.PressAnyKey();
     }
 
@@ -15146,7 +15146,7 @@ public class DungeonLocation : BaseLocation
                     stayInSettlement = false;
                     terminal.SetColor("gray");
                     terminal.WriteLine($"\"{(settlement.Id == "last_hearth" ? Loc.Get("dungeon.settlement_farewell_hearth") : Loc.Get("dungeon.settlement_farewell"))}\"", "cyan");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     break;
             }
         }
@@ -15166,14 +15166,14 @@ public class DungeonLocation : BaseLocation
         if (player.Gold < cost)
         {
             terminal.WriteLine($"\"{(settlement.Id == "rat_king_market" ? Loc.Get("dungeon.settlement_no_gold_rat") : Loc.Get("dungeon.settlement_no_gold"))}\"", "yellow");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
         if (player.HP >= player.MaxHP && player.Mana >= player.MaxMana)
         {
             terminal.WriteLine(Loc.Get("dungeon.settlement_no_heal_needed"), "cyan");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -15203,7 +15203,7 @@ public class DungeonLocation : BaseLocation
         // Broadcast to group
         BroadcastDungeonEvent($"\u001b[32m  {player.Name} was healed at {settlement.Name}.\u001b[0m");
 
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
     }
 
     private async Task SettlementTrade(Character player, DungeonSettlement settlement)
@@ -15254,7 +15254,7 @@ public class DungeonLocation : BaseLocation
                 if (player.Gold < item.cost)
                 {
                     terminal.WriteLine(Loc.Get("ui.not_enough_gold"), "red");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
                 else
                 {
@@ -15264,7 +15264,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.settlement_purchased", item.name));
                     terminal.SetColor("gray");
                     terminal.WriteLine($"(-{item.cost} gold)");
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
             }
         }
@@ -15508,11 +15508,11 @@ public class DungeonLocation : BaseLocation
 
             // Trigger dream sequences through the Amnesia System
             // Dreams reveal the player's forgotten past as a fragment of Manwe
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dungeon.sanctuary_close_eyes"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             await AmnesiaSystem.Instance.OnPlayerRest(terminal, player);
 
@@ -15526,10 +15526,10 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine("");
                     terminal.SetColor("dark_cyan");
                     terminal.WriteLine(Loc.Get("dungeon.ghost_companion_appears"));
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_fighting")}\"");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
 
                     // Grant a small combat buff
                     var ghostBuff = dungeonRandom.Next(3);
@@ -15557,7 +15557,7 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("dungeon.ghost_companion_hp_buff", ghostHeal));
                     }
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                 }
             }
 
@@ -15567,11 +15567,11 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("bright_white");
                 terminal.WriteLine(Loc.Get("dungeon.alethia_warmth"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("dungeon.alethia_appears_1"));
                 terminal.WriteLine(Loc.Get("dungeon.alethia_appears_2"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 var alethiaLines = new[]
                 {
@@ -15602,7 +15602,7 @@ public class DungeonLocation : BaseLocation
                 foreach (var line in lines)
                 {
                     terminal.WriteLine(line);
-                    await Task.Delay(1200);
+                    await Pacing.Wait(1200);
                 }
 
                 // Grant healing and a small buff
@@ -15611,12 +15611,12 @@ public class DungeonLocation : BaseLocation
                 if (player.MaxMana > 0)
                     player.Mana = Math.Min(player.MaxMana, player.Mana + player.MaxMana / 3);
 
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.SetColor("bright_white");
                 terminal.WriteLine(Loc.Get("dungeon.alethia_touch"));
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("dungeon.alethia_restore", alethiaHeal));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("dungeon.alethia_fades"));
@@ -15629,7 +15629,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dungeon.sanctuary_sleep_deep"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 await DailySystemManager.Instance.RestAndAdvanceToMorning(player);
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.sanctuary_new_day", DailySystemManager.Instance.CurrentDay));
@@ -15643,7 +15643,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.rest_once_per_floor"), "gray");
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
         await terminal.PressAnyKey();
     }
 
@@ -15664,7 +15664,7 @@ public class DungeonLocation : BaseLocation
         {
             case 0: // Vision
                 terminal.WriteLine(Loc.Get("dungeon.vision_overtakes"), "cyan");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.vision_layout"), "yellow");
                 foreach (var room in currentFloor.Rooms)
                 {
@@ -15693,7 +15693,7 @@ public class DungeonLocation : BaseLocation
 
             case 1: // Time warp
                 terminal.WriteLine(Loc.Get("dungeon.reality_warps"), "red");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("dungeon.feel_stronger"));
                 // XP equivalent to about 1.5 monster kills
@@ -15708,13 +15708,13 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.ghost_appears_room"), "white");
                 terminal.WriteLine(Loc.Get("dungeon.ghost_seek_chamber"), "yellow");
                 terminal.WriteLine(Loc.Get("dungeon.ghost_find_seek"), "yellow");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine(Loc.Get("dungeon.ghost_points"), "gray");
                 break;
 
             case 3: // Random teleport
                 terminal.WriteLine(Loc.Get("dungeon.portal_opens"), "bright_magenta");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 var randomRoom = currentFloor.Rooms[dungeonRandom.Next(currentFloor.Rooms.Count)];
                 currentFloor.CurrentRoomId = randomRoom.Id;
                 randomRoom.IsExplored = true;
@@ -15736,7 +15736,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(2500);
+        await Pacing.Wait(2500);
         await terminal.PressAnyKey();
     }
 
@@ -15791,7 +15791,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.lore_library_1"));
         terminal.WriteLine(Loc.Get("dungeon.lore_library_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Determine which fragment to reveal based on awakening level
         var availableFragments = OceanPhilosophySystem.FragmentData
@@ -15807,7 +15807,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("dungeon.lore_library_tome"));
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("yellow");
             terminal.WriteLine($"  \"{fragmentData.Title}\"");
@@ -15833,7 +15833,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(currentLine);
 
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Collect the fragment
             ocean.CollectFragment(fragment.Key);
@@ -15890,7 +15890,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.memory_mirrors_1"));
         terminal.WriteLine(Loc.Get("dungeon.memory_mirrors_2"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Check for floor-based memory triggers (only if player is valid)
         if (player != null)
@@ -15929,7 +15929,7 @@ public class DungeonLocation : BaseLocation
             foreach (var line in newMemory.Value.Lines)
             {
                 terminal.WriteLine($"  {line}");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
             }
 
             terminal.WriteLine("");
@@ -15968,12 +15968,12 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.stone_door"));
         terminal.WriteLine(Loc.Get("dungeon.stone_face"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("dungeon.stone_riddle"));
         terminal.WriteLine("");
-        await Task.Delay(500);
+        await Pacing.Wait(500);
 
         // Get appropriate riddle based on level
         int difficulty = Math.Min(5, currentDungeonLevel / 20 + 1);
@@ -16035,7 +16035,7 @@ public class DungeonLocation : BaseLocation
             // Trigger combat with a guardian
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("dungeon.gate_guardian"));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Create a riddle guardian monster and fight
             var guardian = CreateRiddleGuardian();
@@ -16047,7 +16047,7 @@ public class DungeonLocation : BaseLocation
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 await NavigateToLocation(GameLocation.Temple);
                 return;
             }
@@ -16172,7 +16172,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dungeon.awaken_temple"));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             await NavigateToLocation(GameLocation.Temple);
             return;
         }
@@ -16199,11 +16199,11 @@ public class DungeonLocation : BaseLocation
             var bossData = bossMgr.GetBoss(bossType);
             if (bossData?.TriggersMemoryFlash == true)
             {
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 terminal.ClearScreen();
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("dungeon.battle_breaks_open"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 AmnesiaSystem.Instance.CheckMemoryTrigger(TriggerType.SecretBossDefeated, player);
             }
             return;
@@ -16337,7 +16337,7 @@ public class DungeonLocation : BaseLocation
             }
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
     
     // Additional encounter methods
@@ -16497,7 +16497,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         WriteThickDivider(62);
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("dungeon.seal_stone_tablet"));
@@ -16505,7 +16505,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("dungeon.seal_seven_seals"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("gray");
         await terminal.PressAnyKey(Loc.Get("dungeon.seal_press_enter"));
@@ -16653,7 +16653,7 @@ public class DungeonLocation : BaseLocation
         for (int i = 0; i < def.IntroLines; i++)
         {
             terminal.WriteLine($"  {Loc.Get($"{k}.i{i}")}");
-            await Task.Delay(600);
+            await Pacing.Wait(600);
         }
 
         if (def.HasFight)
@@ -16685,7 +16685,7 @@ public class DungeonLocation : BaseLocation
             if (companion.Id == UsurperRemake.Systems.CompanionId.Mira && beat == 2 && i == 4 && IsVelouraResolved())
                 lineKey = $"{k}.p4_alt";
             terminal.WriteLine($"  {Loc.Get(lineKey)}");
-            await Task.Delay(600);
+            await Pacing.Wait(600);
         }
 
         // Choice
@@ -16703,7 +16703,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("cyan");
         terminal.WriteLine($"  {Loc.Get($"{k}.r{choice}a")}");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
         terminal.WriteLine($"  {Loc.Get($"{k}.r{choice}b")}");
         terminal.WriteLine("");
 
@@ -16800,7 +16800,7 @@ public class DungeonLocation : BaseLocation
 
             if (triggered)
             {
-                await Task.Delay(500);
+                await Pacing.Wait(500);
                 break; // Only one quest encounter per room
             }
         }
@@ -16833,35 +16833,35 @@ public class DungeonLocation : BaseLocation
         WriteThickDivider();
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.lyris_light.stops"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("quest.lyris_light.feels_it"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.lyris_light.wall_1"));
         terminal.WriteLine(Loc.Get("quest.lyris_light.wall_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("quest.lyris_light.chamber_1"));
         terminal.WriteLine(Loc.Get("quest.lyris_light.chamber_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("quest.lyris_light.heart_1"));
         terminal.WriteLine(Loc.Get("quest.lyris_light.heart_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.lyris_light.hesitates"));
@@ -16902,13 +16902,13 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c1_encourage"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c1_lifts"));
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c1_once_was"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c1_feel_1"));
@@ -16925,13 +16925,13 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c2_careful"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c2_right"));
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c2_worth"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c2_lifts"));
@@ -16947,7 +16947,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c3_reach"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c3_pain"));
@@ -16955,7 +16955,7 @@ public class DungeonLocation : BaseLocation
                 player.HP = Math.Max(1, player.HP - orbDmg);
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c3_damage", orbDmg));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.lyris_light.c3_responds_1"));
@@ -16967,7 +16967,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_green");
         WriteThickDivider();
@@ -17014,31 +17014,31 @@ public class DungeonLocation : BaseLocation
         WriteThickDivider();
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.freezes"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.smell_1"));
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.smell_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.emerges_1"));
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.emerges_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.malachar_speaks"));
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.malachar_1"));
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.malachar_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.trembles"));
@@ -17080,7 +17080,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.c1_together"));
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.c1_wont_fail"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 await FightMalachar(player, aldric, true);
 
@@ -17094,7 +17094,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.c2_understand"));
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.c2_thanks"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 await FightMalachar(player, aldric, false);
 
@@ -17108,7 +17108,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.c3_no"));
                 terminal.WriteLine(Loc.Get("quest.aldric_ghosts.c3_ends"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 await FightMalachar(player, aldric, true);
 
@@ -17151,7 +17151,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("quest.aldric_ghosts.malachar_hp", malachar.HP, malachar.MaxHP));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Simplified boss fight
         int rounds = 0;
@@ -17185,7 +17185,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.malachar_hp", Math.Max(0, malachar.HP), malachar.MaxHP), "red");
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.aldric_hp", Math.Max(0, aldricHP)), "yellow");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
             terminal.WriteLine("");
         }
 
@@ -17195,18 +17195,18 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.falls"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.tears"));
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.done_1"));
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.done_2"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("quest.aldric_ghosts.peace_1"));
@@ -17261,27 +17261,27 @@ public class DungeonLocation : BaseLocation
         WriteThickDivider();
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.mira_mercy.scene_1"));
         terminal.WriteLine(Loc.Get("quest.mira_mercy.scene_2"));
         terminal.WriteLine(Loc.Get("quest.mira_mercy.scene_3"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("quest.mira_mercy.kneels_1"));
         terminal.WriteLine(Loc.Get("quest.mira_mercy.kneels_2"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.mira_mercy.save_1"));
         terminal.WriteLine(Loc.Get("quest.mira_mercy.save_2"));
         terminal.WriteLine(Loc.Get("quest.mira_mercy.save_3"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("quest.mira_mercy.mother"));
@@ -17324,13 +17324,13 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c1_nods"));
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c1_gasps"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c1_sobs"));
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c1_broken"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c1_saved"));
@@ -17343,18 +17343,18 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c2_fades"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c2_here"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c2_smiles"));
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c2_wails"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c2_kindest_1"));
@@ -17368,13 +17368,13 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c3_looks"));
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c3_noone"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c3_healer_1"));
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c3_healer_2"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("quest.mira_mercy.c3_heals"));
@@ -17384,7 +17384,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_green");
         WriteThickDivider();
@@ -17476,7 +17476,7 @@ public class DungeonLocation : BaseLocation
         WriteThickDivider();
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Determine which event to trigger
         if (!story.HasStoryFlag("vex_bucket_treasure"))
@@ -17526,13 +17526,13 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.t_stops"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.t_wanted_1"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.t_wanted_2"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.t_points_1"));
@@ -17599,30 +17599,30 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_encounter"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_steps"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_joke_1"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_confused"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_what"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_punchline_1"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_punchline_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_stare"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_laughing"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.j_terrible"));
@@ -17649,7 +17649,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_quiet"));
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_tell_1"));
@@ -17687,13 +17687,13 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_need"));
         }
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_act_1"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_act_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_cracks"));
@@ -17704,7 +17704,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_want_1"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_want_2"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_laughs"));
@@ -17714,7 +17714,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_jokes_1"));
         terminal.WriteLine(Loc.Get("quest.vex_sunrise.truth_jokes_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         if (choice == "1")
         {
@@ -17765,40 +17765,40 @@ public class DungeonLocation : BaseLocation
         WriteThickDivider();
         terminal.WriteLine("");
 
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.melodia_opus.melody_1"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.melody_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("quest.melodia_opus.hear_1"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.hear_2"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.melodia_opus.follows_1"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.follows_2"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.follows_3"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("quest.melodia_opus.chamber_1"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.chamber_2"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.chamber_3"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("quest.melodia_opus.breathes_1"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.breathes_2"));
         terminal.WriteLine(Loc.Get("quest.melodia_opus.breathes_3"));
         terminal.WriteLine("");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("quest.melodia_opus.reaches_1"));
@@ -17841,14 +17841,14 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c1_take"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c1_lifts_1"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c1_lifts_2"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c1_lifts_3"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c1_hear_1"));
@@ -17865,21 +17865,21 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_work"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_brilliant_1"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_brilliant_2"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_brilliant_3"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_plays_1"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_plays_2"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_plays_3"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c2_saved_1"));
@@ -17897,14 +17897,14 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c3_reach_1"));
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c3_reach_2"));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("red");
                 var opusDmg = player.MaxHP / 5;
                 player.HP = Math.Max(1, player.HP - opusDmg);
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c3_damage", opusDmg));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("quest.melodia_opus.c3_takes_1"));
@@ -17917,7 +17917,7 @@ public class DungeonLocation : BaseLocation
                 break;
         }
 
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_green");
         WriteThickDivider();
@@ -17967,7 +17967,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         WriteBoxHeader(Loc.Get("dungeon.divine_wrath"), "bright_red", 64);
         terminal.WriteLine("");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Choose punishment based on wrath level
         int damageModifier = 0;
@@ -17998,7 +17998,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.WriteLine($"(Combat penalties: {damageModifier}% damage, {defenseModifier}% defense)");
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         // Clear the wrath after punishment (or reduce level for severe cases)
         if (player.DivineWrathLevel >= 3)
@@ -18021,11 +18021,11 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dungeon.divine_cold_presence"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("dungeon.divine_dare_worship", player.Name2));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("red");
         var punishments = new[]
@@ -18035,7 +18035,7 @@ public class DungeonLocation : BaseLocation
             Loc.Get("dungeon.divine_minor_3", godName)
         };
         terminal.WriteLine(punishments[dungeonRandom.Next(punishments.Length)]);
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("dungeon.divine_attacks_weakened"));
@@ -18048,11 +18048,11 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("dungeon.divine_moderate_trembles"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("dungeon.divine_moderate_faithless", betrayedFor));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Deal HP damage
         long damage = Math.Max(1, player.HP / 4); // 25% current HP
@@ -18061,11 +18061,11 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dungeon.divine_lightning_damage", damage));
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("dungeon.divine_broken_vows"));
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("dungeon.divine_strength_defense_reduced"));
@@ -18081,11 +18081,11 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("bright_red");
         terminal.WriteLine($"              {Loc.Get("dungeon.divine_heavens_rage")}");
         WriteThickDivider(66, "bright_red");
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("dungeon.divine_severe_traitor", betrayedFor.ToUpper()));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         // Severe HP damage
         long damage = Math.Max(1, player.HP / 2); // 50% current HP
@@ -18094,7 +18094,7 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dungeon.divine_fire_damage", damage));
         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {player.HP}/{player.MaxHP}");
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Mana drain
         if (player.Mana > 0)
@@ -18103,7 +18103,7 @@ public class DungeonLocation : BaseLocation
             player.Mana = Math.Max(0, player.Mana - manaDrain);
             terminal.WriteLine(Loc.Get("dungeon.divine_mana_torn", manaDrain));
         }
-        await Task.Delay(1000);
+        await Pacing.Wait(1000);
 
         // Random disease or curse
         if (dungeonRandom.Next(100) < 50)
@@ -18125,12 +18125,12 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.divine_measles"));
                     break;
             }
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
         }
 
         terminal.SetColor("bright_magenta");
         terminal.WriteLine(Loc.Get("dungeon.divine_remember_agony", player.Name2));
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dungeon.divine_severely_weakened"));
@@ -19052,7 +19052,7 @@ public class DungeonLocation : BaseLocation
                 {
                     term.SetColor("red");
                     term.WriteLine(Loc.Get("dungeon.cannot_equip_item", item.Name));
-                    await Task.Delay(1500);
+                    await Pacing.Wait(1500);
                     continue;
                 }
 
@@ -19083,7 +19083,7 @@ public class DungeonLocation : BaseLocation
                     term.SetColor("red");
                     term.WriteLine($"  {item.Name} cannot be equipped.");
                 }
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 continue;
             }
 
@@ -19123,7 +19123,7 @@ public class DungeonLocation : BaseLocation
                         term.SetColor("red");
                         term.WriteLine("  Cannot unequip (item may be cursed).");
                     }
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
                 }
                 continue;
             }
@@ -19152,7 +19152,7 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("green");
                 term.WriteLine("  HP and Mana are already full.");
             }
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -19199,7 +19199,7 @@ public class DungeonLocation : BaseLocation
             term.SetColor("cyan");
             term.WriteLine($"  {Loc.Get("dungeon.hp_label")}: {player.HP}/{player.MaxHP}    {Loc.Get("dungeon.potions_label")}: {player.Healing}/{player.MaxPotions}");
         }
-        await Task.Delay(1500);
+        await Pacing.Wait(1500);
     }
 
     /// <summary>

@@ -723,7 +723,7 @@ namespace UsurperRemake.Locations
             if (currentPlayer.Gold < finalPrice)
             {
                 terminal.WriteLine(Loc.Get("dark_alley.drug_no_gold"), "red");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -732,7 +732,7 @@ namespace UsurperRemake.Locations
             if (!await terminal.AskYesNoAsync("> "))
             {
                 terminal.WriteLine(Loc.Get("dark_alley.drug_back_away"), "gray");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -783,7 +783,7 @@ namespace UsurperRemake.Locations
                 MentalUi.AnnounceMentalChange(terminal, currentPlayer, mentalBeforeDrug);   // v1.1.15: the overdose loss
             }
 
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
         }
 
         private async Task VisitSteroidShop()
@@ -797,7 +797,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.steroid_limit"));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.steroid_max_reached", GameConfig.MaxSteroidShopPurchases));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -811,7 +811,7 @@ namespace UsurperRemake.Locations
             if (currentPlayer.Gold < price)
             {
                 terminal.WriteLine(Loc.Get("dark_alley.steroid_no_gold"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -824,7 +824,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.steroid_muscles"), "bright_green");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.steroid_remaining", GameConfig.MaxSteroidShopPurchases - currentPlayer.SteroidShopPurchases));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         private async Task VisitOrbsHealthClub()
@@ -839,14 +839,14 @@ namespace UsurperRemake.Locations
             if (currentPlayer.Gold < price)
             {
                 terminal.WriteLine(Loc.Get("dark_alley.orbs_no_gold"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
             currentPlayer.Gold -= price;
             currentPlayer.HP = currentPlayer.MaxHP;
             terminal.WriteLine(Loc.Get("dark_alley.orbs_healed"), "bright_green");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         private async Task VisitGroggoMagic()
@@ -932,7 +932,7 @@ namespace UsurperRemake.Locations
                     break;
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         private async Task VisitBeerHut()
@@ -948,7 +948,7 @@ namespace UsurperRemake.Locations
             if (currentPlayer.Gold < price)
             {
                 terminal.WriteLine(Loc.Get("dark_alley.bob_no_gold"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
             currentPlayer.Gold -= price;
@@ -972,7 +972,7 @@ namespace UsurperRemake.Locations
                     terminal.WriteLine(Loc.Get("dark_alley.bob_burns"), "yellow");
                     break;
             }
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         private async Task VisitAlchemistHeaven()
@@ -987,7 +987,7 @@ namespace UsurperRemake.Locations
             if (currentPlayer.Gold < price)
             {
                 terminal.WriteLine(Loc.Get("dark_alley.alchemist_no_gold"), "red");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -1016,7 +1016,7 @@ namespace UsurperRemake.Locations
                     terminal.WriteLine(Loc.Get("dark_alley.alchemist_fizzle"), "yellow");
                     break;
             }
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -1060,19 +1060,19 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.shadows_intro1"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_intro2"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_figure1"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_figure2"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_noticed"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_attention"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Check if already in a faction
             if (factionSystem.PlayerFaction != null)
@@ -1125,14 +1125,14 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.shadows_crown"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_demand"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_currency"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_know"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_unseen"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Show faction benefits
             terminal.SetColor("bright_yellow");
@@ -1219,35 +1219,35 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.shadows_ritual2"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_ritual3"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_ritual4"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_ritual5"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_ritual6"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_no_oath"));
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("dark_alley.shadows_understanding"));
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_coin1"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_coin2"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("dark_alley.shadows_keep"));
             terminal.WriteLine(Loc.Get("dark_alley.shadows_know_you"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Actually join the faction
             factionSystem.JoinFaction(Faction.TheShadows, currentPlayer);
@@ -1293,26 +1293,26 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("dark_alley.easter_squint"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.easter_nothing"));
             terminal.WriteLine(Loc.Get("dark_alley.easter_adjust"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dark_alley.easter_letters"));
             terminal.WriteLine(Loc.Get("dark_alley.easter_shift"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("dark_alley.easter_wave"));
             terminal.WriteLine(Loc.Get("dark_alley.easter_shadow"));
             terminal.WriteLine(Loc.Get("dark_alley.easter_jakob"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("dark_alley.easter_discovered"));
@@ -1342,7 +1342,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("red");
                 terminal.WriteLine("\n" + Loc.Get("dark_alley.bm_no_access"));
                 terminal.WriteLine(Loc.Get("dark_alley.bm_join_first"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1484,7 +1484,7 @@ namespace UsurperRemake.Locations
                     break;
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             } // end while -- redisplay the market after each action until the player leaves
         }
 
@@ -1761,7 +1761,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("red");
                 terminal.WriteLine("\n" + Loc.Get("dark_alley.informant_no_access"));
                 terminal.WriteLine(Loc.Get("dark_alley.informant_join_first"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1786,7 +1786,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dark_alley.informant_no_gold"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1798,7 +1798,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.informant_quiet"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1893,7 +1893,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.gambling_limit"));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.gambling_limit_count"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -1918,7 +1918,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dark_alley.gambling_min_gold"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -1995,7 +1995,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.gambling_rounds_left", 10 - currentPlayer.GamblingRoundsToday));
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -2017,7 +2017,7 @@ namespace UsurperRemake.Locations
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("dark_alley.spot_intro"));
             terminal.WriteLine("");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             // Per-round payout and DC. Earlier rounds: bigger payout, harder DC. Later rounds:
             // smaller payout, easier DC. Round 3 is forced-call (no Wait option).
@@ -2056,7 +2056,7 @@ namespace UsurperRemake.Locations
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("dark_alley.spot_round_result", roundIdx + 1, die1, die2, total));
-                await Task.Delay(600);
+                await Pacing.Wait(600);
 
                 // Last round: forced call (no Wait option). Otherwise let the player decide.
                 bool isFinalRound = roundIdx == 2;
@@ -2093,11 +2093,11 @@ namespace UsurperRemake.Locations
 
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.spot_check_line", d20, wisBonus, totalRoll, dc));
-                await Task.Delay(800);
+                await Pacing.Wait(800);
 
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get(dealerLoadsHigh ? "dark_alley.spot_reveal_high" : "dark_alley.spot_reveal_low"));
-                await Task.Delay(500);
+                await Pacing.Wait(500);
 
                 if (won)
                 {
@@ -2135,17 +2135,17 @@ namespace UsurperRemake.Locations
             terminal.WriteLine(Loc.Get("dark_alley.cards_intro"));
             terminal.WriteLine(Loc.Get("dark_alley.cards_shuffle"));
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             WriteSRMenuOption("1", Loc.Get("dark_alley.card_left"));
             WriteSRMenuOption("2", Loc.Get("dark_alley.card_middle"));
             WriteSRMenuOption("3", Loc.Get("dark_alley.card_right"));
             var pick = await terminal.GetInput("> ");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dark_alley.cards_flip"));
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             // 33% base + DEX/500 bonus
             float dexBonus = currentPlayer.Dexterity / 500f;
@@ -2209,10 +2209,10 @@ namespace UsurperRemake.Locations
                     break;
             }
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dark_alley.skull_jaw"));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             float roll = (float)Random.Shared.NextDouble();
             if (roll < winChance)
@@ -2247,7 +2247,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.pick_used_up"));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.pick_streets_hot"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2269,7 +2269,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.pick_empty"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2291,7 +2291,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.pick_slip_away"));
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
                 return;
             }
 
@@ -2300,7 +2300,7 @@ namespace UsurperRemake.Locations
 
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.pick_approach", target.Name2));
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // DEX check
             // 1.2.0 Temple gods piece 2: Umbrath's boon adds to the chance and raises its cap the same
@@ -2323,7 +2323,7 @@ namespace UsurperRemake.Locations
                 currentPlayer.DaysInPrison = 1;
                 GodDeedSystem.Record(currentPlayer, GodAct.Imprisoned, terminal);   // 1.2.0 Temple gods: Law taboo
                 currentPlayer.Statistics?.RecordPickpocketAttempt(false);
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 throw new LocationExitException(GameLocation.Prison);
             }
             else if (roll >= (1.0f - chance))
@@ -2361,7 +2361,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("dark_alley.pick_rob_me"));
                 terminal.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
 
                 currentPlayer.Statistics?.RecordPickpocketAttempt(false);
 
@@ -2373,11 +2373,11 @@ namespace UsurperRemake.Locations
                 {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("dark_alley.pick_gutter", target.Name2));
-                    await Task.Delay(2000);
+                    await Pacing.Wait(2000);
                 }
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -2401,7 +2401,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.pit_limit"));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.pit_limit_count"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2445,7 +2445,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.pit_monster_stats", monster.Level, monster.HP));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Save armor, zero it for bare-knuckle fight. v0.60.8: mark the
             // fight as exhibition so a loss doesn't burn a resurrection on
@@ -2510,7 +2510,7 @@ namespace UsurperRemake.Locations
                 currentPlayer.IsExhibitionCombat = false;
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         private async Task PitFightNPC()
@@ -2528,7 +2528,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.pit_no_fighters"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2559,7 +2559,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.pit_no_mercy"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Save armor, zero it
             long savedArmPow = currentPlayer.ArmPow;
@@ -2637,7 +2637,7 @@ namespace UsurperRemake.Locations
                 opponent.ArmPow = savedOpponentArmPow;
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         private async Task<(long betAmount, float multiplier)> OfferSpectatorBet()
@@ -2859,7 +2859,7 @@ namespace UsurperRemake.Locations
                 }
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -2911,7 +2911,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.fence_nothing"));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2953,7 +2953,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.fence_cursed"));
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -2975,7 +2975,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.safe_locked3"));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.safe_darkness_req", currentPlayer.Darkness));
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 return;
             }
 
@@ -2999,7 +2999,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dark_alley.safe_no_gold"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -3057,7 +3057,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.safe_shadow_watch"));
             }
 
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -3115,7 +3115,7 @@ namespace UsurperRemake.Locations
             {
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dark_alley.tribute_no_gold"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -3139,7 +3139,7 @@ namespace UsurperRemake.Locations
             }
 
             currentPlayer.DarkAlleyReputation = Math.Min(1000, currentPlayer.DarkAlleyReputation + 5);
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
         }
 
         /// <summary>
@@ -3197,7 +3197,7 @@ namespace UsurperRemake.Locations
                     term.SetColor("bright_red");
                     term.WriteLine(Loc.Get("dark_alley.enc_mugger_wrong"));
                     term.WriteLine("");
-                    await Task.Delay(1000);
+                    await Pacing.Wait(1000);
 
                     // Create a mugger monster at player's level
                     var mugger = MonsterGenerator.GenerateMonster(player.Level);
@@ -3245,7 +3245,7 @@ namespace UsurperRemake.Locations
                         term.WriteLine(Loc.Get("dark_alley.enc_guard_prison"));
                         player.DaysInPrison = 1;
                         GodDeedSystem.Record(player, GodAct.Imprisoned, term);   // 1.2.0 Temple gods: Law taboo
-                        await Task.Delay(2500);
+                        await Pacing.Wait(2500);
                         throw new LocationExitException(GameLocation.Prison);
                     }
                     else
@@ -3341,7 +3341,7 @@ namespace UsurperRemake.Locations
             }
 
             term.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
 
         /// <summary>
@@ -3358,7 +3358,7 @@ namespace UsurperRemake.Locations
             term.SetColor("bright_red");
             term.WriteLine(Loc.Get("dark_alley.enforcer_demand"));
             term.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             // Generate enforcer at playerLevel + 5
             var enforcer = MonsterGenerator.GenerateMonster(player.Level + 5);
@@ -3375,7 +3375,7 @@ namespace UsurperRemake.Locations
                 term.SetColor("gray");
                 term.WriteLine(Loc.Get("mental.collapse_before_fight"));
                 term.WriteLine("");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return;
             }
 
@@ -3426,7 +3426,7 @@ namespace UsurperRemake.Locations
             }
 
             term.WriteLine("");
-            await Task.Delay(2500);
+            await Pacing.Wait(2500);
         }
 
         #endregion

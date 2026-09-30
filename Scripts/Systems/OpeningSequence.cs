@@ -121,22 +121,22 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("═══════════════════════════════════════════════════", "dark_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("opening.air_grows_cold"), "gray");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("opening.shadows_lengthen"), "dark_gray");
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("opening.time_pauses"), "white");
-            await Task.Delay(1200);
+            await Pacing.Wait(1200);
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("opening.not_alone"), "bright_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Run the dialogue
             var dialogue = DialogueSystem.Instance;
@@ -188,25 +188,25 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("opening.priest_approaches"), "cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine(Loc.Get("opening.priest_mark"), "yellow");
             terminal.WriteLine(Loc.Get("opening.priest_visions"), "yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("opening.priest_first_seal"), "white");
             terminal.WriteLine(Loc.Get("opening.priest_25th_level"), "white");
             terminal.WriteLine(Loc.Get("opening.priest_god_of_war"), "white");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("opening.priest_be_ready"), "cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine(Loc.Get("opening.priest_fades"), "gray");
             terminal.WriteLine("");
@@ -226,14 +226,14 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("opening.tankards_rattle"), "white");
             terminal.WriteLine("");
 
-            await Task.Delay(800);
+            await Pacing.Wait(800);
 
             terminal.WriteLine(Loc.Get("opening.veteran_turns"), "gray");
             terminal.WriteLine(Loc.Get("opening.veteran_feel_that"), "yellow");
             terminal.WriteLine(Loc.Get("opening.veteran_god_awakens", godName), "yellow");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("opening.veteran_dangerous"), "white");
             terminal.WriteLine(Loc.Get("opening.veteran_do_it_soon"), "white");
@@ -304,22 +304,22 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("opening.eternal_cycle"), "bright_yellow", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("opening.world_fades"), "white");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("opening.familiar_voice"), "bright_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("opening.cycle_never_ends"), "bright_magenta");
             terminal.WriteLine(Loc.Get("opening.wheel_turns"), "bright_magenta");
             terminal.WriteLine(Loc.Get("opening.you_remember"), "bright_magenta");
             terminal.WriteLine("");
 
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Calculate bonuses based on ending
             var bonuses = CalculateCycleBonuses(player, endingAchieved, currentCycle);

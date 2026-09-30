@@ -372,7 +372,7 @@ public class AnchorRoadLocation : BaseLocation
             default:
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("anchor_road.invalid_choice"));
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 return false;
         }
     }
@@ -472,7 +472,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("anchor_road.tracking_target", target.DisplayName));
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Real combat using CombatEngine
             var combatEngine = new CombatEngine(terminal);
@@ -641,7 +641,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.team_challenges", targetTeam.TeamName));
             terminal.WriteLine(Loc.Get("anchor_road.defeat_one_by_one"));
             terminal.WriteLine("");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             // Get player's NPC team members.
             // `playerTeamFighters` (alive only) is used for combat participation.
@@ -709,7 +709,7 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("anchor_road.face_opponent", enemy.DisplayName, enemy.Level, GameConfig.GetLocalizedClassName(enemy.Class)));
                 terminal.WriteLine("");
-                await Task.Delay(1000);
+                await Pacing.Wait(1000);
 
                 var combatEngine = new CombatEngine(terminal);
                 var result = await combatEngine.PlayerVsPlayer(currentPlayer, enemy, allowSurrender: false); // v0.64.1: gang war chain treats non-Victory as forfeit
@@ -730,7 +730,7 @@ public class AnchorRoadLocation : BaseLocation
                         terminal.WriteLine(Loc.Get("anchor_road.breath_recover", healAmount));
                         terminal.WriteLine($"{Loc.Get("combat.bar_hp")}: {currentPlayer.HP}/{currentPlayer.MaxHP}");
                         terminal.WriteLine("");
-                        await Task.Delay(1000);
+                        await Pacing.Wait(1000);
                     }
                 }
                 else
@@ -933,7 +933,7 @@ public class AnchorRoadLocation : BaseLocation
         terminal.WriteLine(Loc.Get("anchor_road.gates_slam"));
         terminal.WriteLine(Loc.Get("anchor_road.crowd_roars"));
         terminal.WriteLine("");
-        await Task.Delay(2000);
+        await Pacing.Wait(2000);
 
         int wavesCompleted = 0;
         long totalGoldEarned = 0;
@@ -1019,7 +1019,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.SetColor(currentPlayer.HP > currentPlayer.MaxHP / 2 ? "bright_green" : "red");
             terminal.WriteLine($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
             terminal.WriteLine("");
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             // Real combat. v0.60.8: mark as exhibition so a wave loss doesn't
             // burn a resurrection -- the entry fee + daily PFight slot are
@@ -1301,7 +1301,7 @@ public class AnchorRoadLocation : BaseLocation
         foreach (var line in champion.LocEntrance())
         {
             terminal.WriteLine(line);
-            await Task.Delay(600);
+            await Pacing.Wait(600);
         }
         terminal.WriteLine("");
 
@@ -1309,13 +1309,13 @@ public class AnchorRoadLocation : BaseLocation
         terminal.SetColor("dark_gray");
         terminal.WriteLine($"  {champion.LocLore()}");
         terminal.WriteLine("");
-        await Task.Delay(800);
+        await Pacing.Wait(800);
 
         // Crowd reaction (sets the mood for this specific fight).
         terminal.SetColor("white");
         terminal.WriteLine(champion.LocCrowd());
         terminal.WriteLine("");
-        await Task.Delay(600);
+        await Pacing.Wait(600);
 
         // Stat banner: the champion's title, the patron god, the level.
         terminal.SetColor("bright_red");
@@ -1647,7 +1647,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("anchor_road.no_town_control"));
             terminal.WriteLine("");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
             return;
         }
 
@@ -1957,7 +1957,7 @@ public class AnchorRoadLocation : BaseLocation
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("merc.hall_invalid_choice"));
-            await Task.Delay(900);
+            await Pacing.Wait(900);
         }
     }
 
@@ -2037,7 +2037,7 @@ public class AnchorRoadLocation : BaseLocation
 
             terminal.SetColor("bright_green");
             terminal.WriteLine($"  {Loc.Get("merc.contract_claimed_msg")}");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
         }
     }
 
@@ -2052,7 +2052,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("merc.turnin_nothing_ready")}");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
             return;
         }
 
@@ -2084,7 +2084,7 @@ public class AnchorRoadLocation : BaseLocation
         {
             terminal.SetColor("red");
             terminal.WriteLine($"  {Loc.Get("merc.turnin_failed", reason)}");
-            await Task.Delay(1800);
+            await Pacing.Wait(1800);
             return;
         }
 

@@ -1,7 +1,7 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/TempleLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 ---
 The Temple is organized into rooms. Legacy shortcuts can point you to the new location for an action.

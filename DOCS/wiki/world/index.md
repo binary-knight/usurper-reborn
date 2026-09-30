@@ -1,7 +1,7 @@
 ---
 title: World and locations
 path: /wiki/en/world/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/MainStreetDistricts.cs
 ---
 Main Street is the hub. Location keys depend on the current district and menu presentation, so read the menu in front of you.
@@ -11,7 +11,11 @@ Main Street is the hub. Location keys depend on the current district and menu pr
 - [Wilderness](/wiki/en/world/wilderness/)
 - [Temple rooms](/wiki/en/world/temple/)
 - [Home and the Inn](/wiki/en/world/rest/)
-- [Castle, crime and prison](/wiki/en/world/law/)
+- [Castle, king and throne](/wiki/en/world/castle/)
+- [Crime, prison and the law](/wiki/en/world/law/)
+- [Home and family](/wiki/en/world/home/)
+- [Anchor Road challenges](/wiki/en/world/anchor-road/)
+- [The story, Old Gods and endings](/wiki/en/world/story/)
 - [Quests and exploration](/wiki/en/world/quests/)
 - [The Healer](/wiki/en/world/healer/), [Church](/wiki/en/world/church/) and [Sanctum](/wiki/en/world/sanctum/)
 - [The Outskirts settlement](/wiki/en/world/settlement/)

@@ -311,33 +311,33 @@ namespace UsurperRemake.Systems
             UIHelper.WriteBoxHeader(terminal, Loc.Get("artifact.header_acquired"), artifact.IconColor, 67);
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine($"  {artifact.Name}", "bright_white");
             terminal.WriteLine("");
 
-            await Task.Delay(300);
+            await Pacing.Wait(300);
 
             terminal.WriteLine($"  \"{artifact.Description}\"", "cyan");
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine($"  --- {Loc.Get("artifact.lore")} ---", "dark_cyan");
             foreach (var line in artifact.LoreText)
             {
                 terminal.WriteLine($"  {line}", "white");
-                await Task.Delay(100);
+                await Pacing.Wait(100);
             }
             terminal.WriteLine("");
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
 
             terminal.WriteLine($"  --- {Loc.Get("artifact.powers_granted")} ---", "bright_green");
             foreach (var bonus in artifact.StatBonuses)
             {
                 terminal.WriteLine($"  +{bonus.Value} {bonus.Key}", "green");
-                await Task.Delay(100);
+                await Pacing.Wait(100);
             }
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("artifact.special")}: {artifact.SpecialAbility}", "bright_yellow");
@@ -474,24 +474,24 @@ namespace UsurperRemake.Systems
             terminal.Clear();
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("artifact.stirs_depths"), "dark_magenta");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("artifact.artifacts_resonate"), "bright_cyan");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine(Loc.Get("artifact.light_shadow_dance"), "white");
-            await Task.Delay(1500);
+            await Pacing.Wait(1500);
 
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("artifact.tear_opens"), "bright_magenta");
-            await Task.Delay(2000);
+            await Pacing.Wait(2000);
 
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("artifact.header_void_key"), "white", 67);
             terminal.WriteLine("");
 
-            await Task.Delay(1000);
+            await Pacing.Wait(1000);
 
             terminal.WriteLine(Loc.Get("artifact.void_key_desc1"), "white");
             terminal.WriteLine(Loc.Get("artifact.void_key_desc2"), "white");

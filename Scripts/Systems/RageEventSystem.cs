@@ -111,71 +111,71 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine("");
                 terminal.WriteLine("  The world holds its breath.");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 terminal.WriteLine("");
                 terminal.WriteLine("  A presence forms in the void.");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.WriteLine("  Vast.");
-                await Task.Delay(800);
+                await Pacing.Wait(800);
                 terminal.WriteLine("  Ancient.");
-                await Task.Delay(800);
+                await Pacing.Wait(800);
                 terminal.WriteLine("  Furious.");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("  The god RAGE strides into Usurper's realm,");
                 terminal.WriteLine("  his eyes burning with the heat of a thousand reborn worlds.");
                 terminal.WriteLine("  He has been silent for centuries, watching.");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
                 terminal.WriteLine("");
                 terminal.WriteLine("  Tonight, the watching ends.");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  He looks upon you, {player?.Name2 ?? player?.Name1 ?? "mortal"}.");
                 terminal.WriteLine("  He sees every choice. Every grudge. Every shortcut.");
                 terminal.WriteLine("  Every cheese. Every petty victory and every act of cowardice.");
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
                 terminal.WriteLine("");
                 terminal.SetColor("dark_red");
                 terminal.WriteLine("  He is not impressed.");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("  \"Mortal,\" Rage rumbles, and the sky cracks open.");
                 terminal.WriteLine("  \"You have lived as you saw fit.\"");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
                 terminal.WriteLine("  \"Now you will die as I see fit.\"");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("white");
                 terminal.WriteLine("  You raise your sword.");
-                await Task.Delay(1500);
+                await Pacing.Wait(1500);
                 terminal.SetColor("dark_red");
                 terminal.WriteLine("  He laughs.");
                 terminal.WriteLine("  The laugh sounds like the end of an age.");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
                 terminal.WriteLine("  A blow falls.");
-                await Task.Delay(1200);
+                await Pacing.Wait(1200);
                 terminal.WriteLine("  Just one.");
-                await Task.Delay(2000);
+                await Pacing.Wait(2000);
 
                 terminal.WriteLine("");
                 terminal.SetColor("dark_gray");
                 terminal.WriteLine("  You are unmade.");
-                await Task.Delay(3000);
+                await Pacing.Wait(3000);
 
                 terminal.WriteLine("");
                 terminal.WriteLine("  When the sun rises on the new world,");
                 terminal.WriteLine("  no one will remember your name.");
-                await Task.Delay(3500);
+                await Pacing.Wait(3500);
             }
             catch (Exception ex)
             {
@@ -212,7 +212,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("  Your name will not answer the door again.");
                 terminal.WriteLine("  Disconnecting.");
                 terminal.WriteLine("");
-                await Task.Delay(2500);
+                await Pacing.Wait(2500);
             }
             catch { /* ignore */ }
         }

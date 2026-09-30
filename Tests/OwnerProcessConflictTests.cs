@@ -534,7 +534,7 @@ public partial class OwnerProcessConflictTests : IDisposable
         foreach (var method in new[] { "private async Task WithdrawFromTreasury()", "private async Task DepositToTreasury()" })
         {
             int at = src.IndexOf(method, StringComparison.Ordinal);
-            var body = src.Substring(at, src.IndexOf("await Task.Delay(2000);\n    }", at, StringComparison.Ordinal) - at);
+            var body = src.Substring(at, src.IndexOf("await Pacing.Wait(2000);\n    }", at, StringComparison.Ordinal) - at);
             body.Should().Contain("await MoveTreasuryGoldAsync(TreasuryOsm(), currentPlayer,");
             body.Should().NotContain("currentPlayer.Gold +=").And.NotContain("currentPlayer.Gold -=")
                 .And.NotContain("currentKing.Treasury +=").And.NotContain("currentKing.Treasury -=");

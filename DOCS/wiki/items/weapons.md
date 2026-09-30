@@ -1,12 +1,14 @@
 ---
 title: Weapons and restrictions
 path: /wiki/en/items/weapons/
-checked: 1.2.0
-sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs
+checked: 1.2.1
+sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs
 ---
 Weapon power is only one input to damage. Weapon type, handedness, class compatibility and ability requirements can change whether a weapon fits your build.
 
-A two-handed weapon and a shield are not a free combination. Check the equip result rather than assuming that owning both grants both bonuses.
+## Weapon slots
+
+A character has two weapon slots: Main Hand and Off Hand. The off hand takes a second one-handed weapon or a shield. A two-handed weapon fills both slots, so a two-handed weapon and a shield are not a free combination. See [equipment slots](/wiki/en/items/equipment-slots/) for every slot and the handedness rules.
 
 {{table:items slot=MainHand}}
 

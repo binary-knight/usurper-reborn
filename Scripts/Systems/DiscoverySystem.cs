@@ -237,7 +237,7 @@ namespace UsurperRemake.Systems
             {
                 try { ApplyEffect(discoveryId, e, player, floor, terminal, outcome, teammates); }
                 catch (Exception ex) { DebugLogger.Instance?.LogError("DISCOVERY", $"effect {e.Type} failed: {ex.Message}"); }
-                await Task.Delay(250);
+                await Pacing.Wait(250);
             }
         }
 

@@ -922,7 +922,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("puzzle.exhausted"), "dark_red");
             }
 
-            await Task.Delay(500);
+            await Pacing.Wait(500);
         }
 
         private int CalculateFailureDamage(PuzzleInstance puzzle, Character player)
