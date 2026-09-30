@@ -26,6 +26,10 @@ Questions that are not about Usurper Reborn, such as other games, programming or
 
 Questions are not relayed into in-game gossip. Availability depends on the owner enabling allowed channels and deploying a built search index.
 
+## Report a bug
+
+Ask and Suggest are for the wiki, not for game bugs. To report a bug, press `!` or type `/bug` in the game, or open a GitHub issue; see [reporting bugs](/wiki/en/getting-started/reporting-bugs/).
+
 ## Suggest an improvement
 
 Trusted helpers with the owner's configured role can use `@UsurperBot suggest: ...`. Describe a missing explanation or incorrect claim, not instructions to execute code.
