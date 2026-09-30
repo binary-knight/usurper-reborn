@@ -537,17 +537,11 @@ public partial class TempleLocation : BaseLocation
     /// <summary>
     /// Gold at a canon god's altar (Pascal TEMPLE.PAS contribute_to_god). 1.2.0 Temple gods piece 7:
     /// the altar is chosen in the Nave's or the Undercroft's offering (ProcessOffering).
+    /// 1.2.2: no good deed is needed; the offering follows only the Favor rules.
     /// </summary>
     private async Task ProcessContribute(God selectedGod)
     {
         terminal.WriteLine("");
-
-        if (currentPlayer.ChivNr < 1)
-        {
-            terminal.WriteLine(Loc.Get("temple.no_good_deeds"), "red");
-            await Pacing.Wait(2000);
-            return;
-        }
 
         string playerGod = godSystem.GetPlayerGod(currentPlayer.Name2);
         bool wrongGod = false;
