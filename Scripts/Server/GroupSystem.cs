@@ -171,6 +171,29 @@ public class GroupSystem
     }
 
     /// <summary>
+    /// 1.2.3: NotifyGroup rendered per member. `buildMessage` receives each member's language
+    /// code, so every group member reads the notice in their own language.
+    /// </summary>
+    public void NotifyGroup(DungeonGroup group, Func<string, string> buildMessage, string? excludeUsername = null)
+    {
+        List<string> members;
+        lock (group.MemberUsernames)
+        {
+            members = new List<string>(group.MemberUsernames);
+        }
+
+        foreach (var member in members)
+        {
+            if (excludeUsername != null && member.Equals(excludeUsername, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var session = MudServer.Instance?.ActiveSessions
+                .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
+            session?.EnqueueMessage(buildMessage(session.Context?.Language ?? "en"));
+        }
+    }
+
+    /// <summary>
     /// True when this group member is currently part of the active dungeon session
     /// (the leader running combat, or a follower whose GroupFollowerLoop is still
     /// listening). False for members who are still in the group bookkeeping but have

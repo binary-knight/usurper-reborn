@@ -136,24 +136,18 @@ keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#1|dark_alley.deed_{
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#2|dark_alley.deed_{id}_desc
 table|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#17|deed news text, Newsy
 names|Scripts/Locations/DungeonLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/DungeonLocation.cs|call:Add#0/tuple#1|merchant item names
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#2/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#3/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#4/tuple#1|event choice label
 names|Scripts/Locations/DungeonLocation.cs|decl:duelistTemplates/tuple#0|duelist names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#0|NPC names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#1|NPC names with titles
-nouns|Scripts/Locations/DungeonLocation.cs|decl:slotNames/tuple#1|equipment slot names
 names|Scripts/Locations/DungeonLocation.cs|=currentPlayer.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player!.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/DungeonLocation.cs|decl:legend|map legend
 nouns|Scripts/Locations/DungeonLocation.cs|decl:name|monster name
 nouns|Scripts/Locations/DungeonLocation.cs|decl:names|undead monster names
-table|Scripts/Locations/DungeonLocation.cs|decl:stats|merchant item description
-table|Scripts/Locations/DungeonLocation.cs|decl:status|party status suffix
 table|Scripts/Locations/DungeonLocation.cs|dictpair#1|boss name pool, monster names
-table|Scripts/Locations/DungeonLocation.cs|init.Description|merchant item description
 names|Scripts/Locations/DungeonLocation.cs|init.Name|unique NPC name
 table|Scripts/Locations/DungeonLocation.cs|=memberTypes|monster names
 nouns|Scripts/Locations/DungeonLocation.cs|=name|monster name

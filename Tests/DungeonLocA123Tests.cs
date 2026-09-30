@@ -443,7 +443,7 @@ public class DungeonLocA123Tests
         string src = Src();
         foreach (var (key, _) in Broadcasts.Where(b => b.key.StartsWith("dungeon.bc_")))
             src.Should().Contain($"Loc.GetIn(lang, \"{key}\"", key);
-        src.Should().Contain("BroadcastToAllGroupSessionsLocalized(group, buildMessage");
+        src.Should().Contain("BroadcastToAllGroupSessionsLocalized(group, FollowerMessage(buildMessage)");
         src.Should().Contain("Loc.GetIn(shareLang, \"dungeon.feature_your_share\"");
         foreach (var english in new[] { "*** TRAP! ***", "quick reflexes avoid", "falls into a pit", "prays at a shrine",
                      "BOSS ENCOUNTER:", "The group faces", "The party found treasure", "FLOOR CLEARED ═══",
