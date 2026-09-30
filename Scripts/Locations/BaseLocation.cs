@@ -10688,13 +10688,15 @@ public abstract class BaseLocation
         // Slot name is derived from the slot (localized) rather than the caller-passed English
         // `label`, so every equip-management surface (Home/Inn/TeamCorner/Dungeon) shows translated
         // slot names. The `label` param is kept for call-site compatibility but no longer displayed.
-        terminal.Write($"  {GameConfig.GetLocalizedSlotName(slot),-12}: ");
+        // v1.2.2: padded to the longest slot name in the player's language (12 in English, as before),
+        // so the colons line up where a slot name runs past 12 letters.
+        terminal.Write($"  {GameConfig.GetLocalizedSlotName(slot).PadRight(Math.Max(12, LongestSlotLabel()))}: ");
         if (item != null)
         {
             if (!item.IsIdentified)
             {
                 terminal.SetColor("magenta");
-                terminal.WriteLine($"Unidentified {slot.GetDisplayName()}");
+                terminal.WriteLine(Loc.Get("inn.equip_slot_unidentified"));
             }
             else
             {
@@ -10722,6 +10724,30 @@ public abstract class BaseLocation
         }
     }
 
+    /// <summary>v1.2.2: the length of the longest equipment slot name in the player's language.</summary>
+    private static int LongestSlotLabel()
+    {
+        int longest = 0;
+        foreach (EquipmentSlot s in Enum.GetValues(typeof(EquipmentSlot)))
+            if (s != EquipmentSlot.None) longest = Math.Max(longest, GameConfig.GetLocalizedSlotName(s).Length);
+        return longest;
+    }
+
+    /// <summary>
+    /// v1.2.2: column widths for the slot picker row "  NN. label left-name NN. label right-name" so it
+    /// fits 80 columns: labels one wider than the longest slot name (at least 12), the left item name
+    /// 20 wide, the right item name the rest, never under 15 (the left name gives way first).
+    /// </summary>
+    internal static (int label, int leftName, int rightName) SlotPickerColumns(int longestLabel)
+    {
+        const int width = 80, fixedParts = 6 + 5; // "  NN. " and " NN. "
+        int label = Math.Max(12, longestLabel + 1);
+        int left = 20;
+        int right = width - fixedParts - 2 * label - left;
+        if (right < 15) { left -= 15 - right; right = 15; }
+        return (label, left, right);
+    }
+
     /// <summary>
     /// Slot picker for equipment management. Returns selected slot, or null if cancelled.
     /// Shows current equipment in each slot for context.
@@ -10744,6 +10770,11 @@ public abstract class BaseLocation
         terminal.WriteLine($"  {Loc.Get("base.choose_slot")}");
         terminal.WriteLine("");
 
+        // v1.2.2: the columns are sized from the longest slot name in the player's language and the
+        // item names are cut to fit, so a row stays within 80 columns in every language (Spanish and
+        // French slot names run to 16 letters; English keeps its 12-wide labels and 20-wide left names).
+        var (labelWidth, leftNameWidth, rightNameWidth) = SlotPickerColumns(slots.Max(s => s.label.Length));
+
         // Two-column layout: 1-7 left, 8-14 right
         for (int row = 0; row < 7; row++)
         {
@@ -10754,16 +10785,16 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($"  {li + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write($"{lLabel,-12}");
+            terminal.Write(lLabel.PadRight(labelWidth));
             if (lItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write($"{(lItem.IsIdentified ? lItem.Name : "???"),-20}");
+                terminal.Write(Truncate(lItem.IsIdentified ? lItem.Name : "???", leftNameWidth - 1).PadRight(leftNameWidth));
             }
             else
             {
                 terminal.SetColor("darkgray");
-                terminal.Write($"{"---",-20}");
+                terminal.Write("---".PadRight(leftNameWidth));
             }
 
             // Right column
@@ -10773,11 +10804,11 @@ public abstract class BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write($" {ri + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write($"{rLabel,-12}");
+            terminal.Write(rLabel.PadRight(labelWidth));
             if (rItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(rItem.IsIdentified ? rItem.Name : "???");
+                terminal.Write(Truncate(rItem.IsIdentified ? rItem.Name : "???", rightNameWidth));
             }
             else
             {

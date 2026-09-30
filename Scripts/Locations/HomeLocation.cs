@@ -4670,20 +4670,20 @@ public class HomeLocation : BaseLocation
             terminal.WriteLine(Loc.Get("home.current_equipment"));
             terminal.SetColor("white");
 
-            DisplayEquipmentSlot(target, EquipmentSlot.MainHand, "Main Hand");
-            DisplayEquipmentSlot(target, EquipmentSlot.OffHand, "Off Hand");
-            DisplayEquipmentSlot(target, EquipmentSlot.Head, "Head");
-            DisplayEquipmentSlot(target, EquipmentSlot.Body, "Body");
-            DisplayEquipmentSlot(target, EquipmentSlot.Arms, "Arms");
-            DisplayEquipmentSlot(target, EquipmentSlot.Hands, "Hands");
-            DisplayEquipmentSlot(target, EquipmentSlot.Legs, "Legs");
-            DisplayEquipmentSlot(target, EquipmentSlot.Feet, "Feet");
-            DisplayEquipmentSlot(target, EquipmentSlot.Waist, "Belt");
-            DisplayEquipmentSlot(target, EquipmentSlot.Face, "Face");
-            DisplayEquipmentSlot(target, EquipmentSlot.Cloak, "Cloak");
-            DisplayEquipmentSlot(target, EquipmentSlot.Neck, "Neck");
-            DisplayEquipmentSlot(target, EquipmentSlot.LFinger, "Left Ring");
-            DisplayEquipmentSlot(target, EquipmentSlot.RFinger, "Right Ring");
+            DisplayEquipmentSlot(target, EquipmentSlot.MainHand, GameConfig.GetLocalizedSlotName(EquipmentSlot.MainHand));
+            DisplayEquipmentSlot(target, EquipmentSlot.OffHand, GameConfig.GetLocalizedSlotName(EquipmentSlot.OffHand));
+            DisplayEquipmentSlot(target, EquipmentSlot.Head, GameConfig.GetLocalizedSlotName(EquipmentSlot.Head));
+            DisplayEquipmentSlot(target, EquipmentSlot.Body, GameConfig.GetLocalizedSlotName(EquipmentSlot.Body));
+            DisplayEquipmentSlot(target, EquipmentSlot.Arms, GameConfig.GetLocalizedSlotName(EquipmentSlot.Arms));
+            DisplayEquipmentSlot(target, EquipmentSlot.Hands, GameConfig.GetLocalizedSlotName(EquipmentSlot.Hands));
+            DisplayEquipmentSlot(target, EquipmentSlot.Legs, GameConfig.GetLocalizedSlotName(EquipmentSlot.Legs));
+            DisplayEquipmentSlot(target, EquipmentSlot.Feet, GameConfig.GetLocalizedSlotName(EquipmentSlot.Feet));
+            DisplayEquipmentSlot(target, EquipmentSlot.Waist, GameConfig.GetLocalizedSlotName(EquipmentSlot.Waist));
+            DisplayEquipmentSlot(target, EquipmentSlot.Face, GameConfig.GetLocalizedSlotName(EquipmentSlot.Face));
+            DisplayEquipmentSlot(target, EquipmentSlot.Cloak, GameConfig.GetLocalizedSlotName(EquipmentSlot.Cloak));
+            DisplayEquipmentSlot(target, EquipmentSlot.Neck, GameConfig.GetLocalizedSlotName(EquipmentSlot.Neck));
+            DisplayEquipmentSlot(target, EquipmentSlot.LFinger, GameConfig.GetLocalizedSlotName(EquipmentSlot.LFinger));
+            DisplayEquipmentSlot(target, EquipmentSlot.RFinger, GameConfig.GetLocalizedSlotName(EquipmentSlot.RFinger));
             terminal.WriteLine("");
 
             // Show options

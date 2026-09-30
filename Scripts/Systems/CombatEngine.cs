@@ -10470,19 +10470,19 @@ public partial class CombatEngine
             }
 
             var bonuses = new List<string>();
-            if (lootItem.Strength != 0) bonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
-            if (lootItem.Dexterity != 0) bonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
-            if (lootItem.Agility != 0) bonuses.Add($"Agi {lootItem.Agility:+#;-#;0}");
-            if (lootItem.Wisdom != 0) bonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
-            if (lootItem.Charisma != 0) bonuses.Add($"Cha {lootItem.Charisma:+#;-#;0}");
-            if (lootItem.Defence != 0) bonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
+            if (lootItem.Strength != 0) bonuses.Add($"{Loc.Get("ui.stat_str")} {lootItem.Strength:+#;-#;0}");
+            if (lootItem.Dexterity != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")} {lootItem.Dexterity:+#;-#;0}");
+            if (lootItem.Agility != 0) bonuses.Add($"{Loc.Get("ui.stat_agi")} {lootItem.Agility:+#;-#;0}");
+            if (lootItem.Wisdom != 0) bonuses.Add($"{Loc.Get("ui.stat_wis")} {lootItem.Wisdom:+#;-#;0}");
+            if (lootItem.Charisma != 0) bonuses.Add($"{Loc.Get("ui.stat_cha")} {lootItem.Charisma:+#;-#;0}");
+            if (lootItem.Defence != 0) bonuses.Add($"{Loc.Get("ui.stat_def")} {lootItem.Defence:+#;-#;0}");
             int conFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
             int intFromEffects = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
-            if (conFromEffects != 0) bonuses.Add($"Con {conFromEffects:+#;-#;0}");
-            if (intFromEffects != 0) bonuses.Add($"Int {intFromEffects:+#;-#;0}");
-            if (lootItem.HP != 0) bonuses.Add($"HP {lootItem.HP:+#;-#;0}");
-            if (lootItem.Mana != 0) bonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
-            if (lootItem.Stamina != 0) bonuses.Add($"Sta {lootItem.Stamina:+#;-#;0}");
+            if (conFromEffects != 0) bonuses.Add($"{Loc.Get("ui.stat_con")} {conFromEffects:+#;-#;0}");
+            if (intFromEffects != 0) bonuses.Add($"{Loc.Get("ui.stat_int")} {intFromEffects:+#;-#;0}");
+            if (lootItem.HP != 0) bonuses.Add($"{Loc.Get("ui.stat_hp")} {lootItem.HP:+#;-#;0}");
+            if (lootItem.Mana != 0) bonuses.Add($"{Loc.Get("ui.stat_mana")} {lootItem.Mana:+#;-#;0}");
+            if (lootItem.Stamina != 0) bonuses.Add($"{Loc.Get("ui.stat_sta")} {lootItem.Stamina:+#;-#;0}");
 
             // v0.62.1 stat-order consistency.
             bonuses.Sort(System.StringComparer.Ordinal);
@@ -11565,18 +11565,18 @@ public partial class CombatEngine
 
             otherTerm.SetColor("bright_yellow");
             otherTerm.WriteLine("");
-            otherTerm.WriteLine(GameConfig.ScreenReaderMode ? $"  LOOT PASSED to you from {monster.Name}:" : $"  ── LOOT PASSED to you from {monster.Name} ──");
+            otherTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("combat.loot_passed_from_sr", monster.Name) : Loc.Get("combat.loot_passed_from", monster.Name));
             if (lootItem.IsIdentified)
             {
                 otherTerm.SetColor(rarityColor);
                 otherTerm.WriteLine($"  {lootItem.Name}");
                 otherTerm.SetColor("white");
                 if (lootItem.Type == global::ObjType.Weapon)
-                    otherTerm.WriteLine($"  Attack Power: +{lootItem.Attack}");
+                    otherTerm.WriteLine(Loc.Get("combat.loot_attack_power", lootItem.Attack));
                 else
-                    otherTerm.WriteLine($"  Armor Power: +{lootItem.Armor}");
+                    otherTerm.WriteLine(Loc.Get("combat.loot_armor_power", lootItem.Armor));
                 otherTerm.SetColor("yellow");
-                otherTerm.WriteLine($"  Value: {lootItem.Value:N0} gold");
+                otherTerm.WriteLine(Loc.Get("combat.loot_value", $"{lootItem.Value:N0}"));
             }
             else
             {
