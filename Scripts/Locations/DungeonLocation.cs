@@ -2168,7 +2168,9 @@ public class DungeonLocation : BaseLocation
             BossOutcome.Spared => Loc.Get("dungeon.outcome_mercy"),
             _ => Loc.Get("dungeon.outcome_faced")
         };
-        term.WriteLine(Loc.Get("dungeon.they_know", outcomeWord, godData.Name), "gray");
+        // 1.2.3: two lines, so the longest outcome and god name fit in 79 columns
+        term.WriteLine(Loc.Get("dungeon.they_know_what_you_did"), "gray");
+        term.WriteLine(Loc.Get("dungeon.they_know_you_outcome", outcomeWord, godData.Name), "gray");
         await Pacing.Wait(2000);
         term.WriteLine("");
 
@@ -2803,22 +2805,22 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red");
         terminal.Write($"{player.HP}/{player.MaxHP}");
         terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("dungeon.bbs_potions")}:");
+        terminal.Write(Loc.Get("dungeon.bbs_potions")); // the key carries its own leading space and colon
         terminal.SetColor("green");
         terminal.Write($"{player.Healing}/{player.MaxPotions}");
         terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("dungeon.bbs_gold")}:");
+        terminal.Write(Loc.Get("dungeon.bbs_gold")); // the key carries its own leading space and colon
         terminal.SetColor("yellow");
         terminal.Write($"{player.Gold:N0}");
         if (player.MaxMana > 0)
         {
             terminal.SetColor("gray");
-            terminal.Write($" {Loc.Get("dungeon.bbs_mana")}:");
+            terminal.Write(Loc.Get("dungeon.bbs_mana")); // the key carries its own leading space and colon
             terminal.SetColor("blue");
             terminal.Write($"{player.Mana}/{player.MaxMana}");
         }
         terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("dungeon.bbs_lv")}:");
+        terminal.Write(Loc.Get("dungeon.bbs_lv")); // the key carries its own leading space and colon
         terminal.SetColor("cyan");
         terminal.WriteLine($"{player.Level}");
 

@@ -8,6 +8,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
 using UsurperRemake;
+using UsurperRemake.Data;
 using UsurperRemake.Systems;
 using UsurperReborn.Tests.Localization;
 using Xunit;
@@ -61,13 +62,15 @@ public class DungeonLocA123Tests
         }
     }
 
-    private static async Task<T> InHungarian<T>(Func<Task<T>> body)
+    private static Task<T> InHungarian<T>(Func<Task<T>> body) => InLanguage("hu", body);
+
+    private static async Task<T> InLanguage<T>(string lang, Func<Task<T>> body)
     {
         var prev = GameConfig.Language;
         bool sr = GameConfig.ScreenReaderMode;
         try
         {
-            GameConfig.Language = "hu";
+            GameConfig.Language = lang;
             GameConfig.ScreenReaderMode = false;
             return await body();
         }
@@ -155,14 +158,16 @@ public class DungeonLocA123Tests
         return floor;
     }
 
-    private static async Task<string> RoomView(bool screenReader)
+    private static async Task<string> RoomView(bool screenReader, string lang = "hu", bool mana = false)
     {
-        return await InHungarian(() =>
+        return await InLanguage(lang, () =>
         {
             GameConfig.ScreenReaderMode = screenReader;
             var (term, output) = Term();
             var floor = ExitFloor();
-            var d = Dungeon(term, Hero(), 6, floor);
+            var hero = Hero();
+            if (mana) { hero.MaxMana = 250; hero.Mana = 120; }
+            var d = Dungeon(term, hero, 6, floor);
             typeof(DungeonLocation).GetMethod("DisplayRoomViewBBS", F)!.Invoke(d, new object[] { floor.Rooms[0] });
             return Task.FromResult(Shown(term, output));
         });
@@ -189,6 +194,24 @@ public class DungeonLocA123Tests
         text.Should().Contain("]" + Hu("dungeon.exit_all_clear"));
         text.Should().NotContain("(all clear)");
         EveryRowFits(text, "screen reader room view");
+    }
+
+    // ---------- 3b. the status row under the room view ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task StatusRow_HasOneColonPerLabel_AndFits(string lang)
+    {
+        string text = await RoomView(screenReader: false, lang: lang, mana: true);
+        Capture($"dungeon-a-status-row-{lang}.txt", text);
+        string status = Rows(text).Single(r => r.Contains(Loc.GetIn(lang, "dungeon.bbs_potions").Trim()));
+        text.Should().NotContain("::", "each status label ends in exactly one colon");
+        status.Should().Contain(Loc.GetIn(lang, "dungeon.bbs_potions").Trim() + "0/")
+            .And.Contain(Loc.GetIn(lang, "dungeon.bbs_gold").Trim() + "0")
+            .And.Contain(Loc.GetIn(lang, "dungeon.bbs_mana").Trim() + "120/250")
+            .And.Contain(Loc.GetIn(lang, "dungeon.bbs_lv").Trim() + "20");
+        EveryRowFits(text, "room view");
     }
 
     // ---------- 4. the floor 90 hint ----------
@@ -260,6 +283,44 @@ public class DungeonLocA123Tests
         }
     }
 
+    // ---------- 5b. "They know what you did": the longest god name with the longest outcome word ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task TheyKnowLine_LongestGodAndOutcome_FitsIn79(string lang)
+    {
+        var god = Enum.GetValues<OldGodType>()
+            .Select(g => { try { return (g, name: OldGodsData.GetGodBossData(g).Name); } catch { return (g, name: ""); } })
+            .OrderByDescending(x => x.name.Length).First();
+        var outcomes = new (BossOutcome outcome, string key)[]
+        {
+            (BossOutcome.Defeated, "dungeon.outcome_slain"), (BossOutcome.Saved, "dungeon.outcome_saved"),
+            (BossOutcome.Allied, "dungeon.outcome_allied"), (BossOutcome.Spared, "dungeon.outcome_mercy"),
+        };
+        var longest = outcomes.OrderByDescending(o => Loc.GetIn(lang, o.key).Length).First();
+        Loc.GetIn(lang, longest.key).Length.Should().BeGreaterOrEqualTo(Loc.GetIn(lang, "dungeon.outcome_faced").Length);
+
+        string text = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term("\n\n\n");
+            var hero = Hero(60);
+            var d = Dungeon(term, hero, 40);
+            var result = new BossEncounterResult { Success = true, God = god.g, Outcome = longest.outcome, ApproachType = "merciful" };
+            await (Task)typeof(DungeonLocation).GetMethod("ShowTownReactionScene", F)!.Invoke(d, new object[] { result, hero, term })!;
+            return Shown(term, output);
+        });
+        Capture($"dungeon-a-they-know-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "dungeon.they_know_what_you_did"));
+        string second = Loc.GetIn(lang, "dungeon.they_know_you_outcome", Loc.GetIn(lang, longest.key), god.name);
+        text.Should().Contain(second);
+        second.Length.Should().BeLessOrEqualTo(MaxWidth, $"{god.name} with \"{Loc.GetIn(lang, longest.key)}\"");
+        EveryRowFits(text, "town reaction");
+        if (lang == "en")
+            (Loc.GetIn("en", "dungeon.they_know_what_you_did") + Loc.GetIn("en", "dungeon.they_know_you_outcome", "{0}", "{1}").Substring(1))
+                .Should().Be("  They know what you did down there. You {0} {1}.", "the English words are unchanged, only split in two lines");
+    }
+
     // ---------- 6. the fallen adventurer's journal and 7. the echoing whispers ----------
 
     private static string[] Keys(string prefix, int n) => Enumerable.Range(1, n).Select(i => $"{prefix}{i}").ToArray();
@@ -328,7 +389,8 @@ public class DungeonLocA123Tests
 
     // Follower lines as BroadcastDungeonEvent sends them: two spaces, then the text. The sample
     // name is a long player name and the numbers are six digits, so the check is a worst case.
-    private const string LongName = "Hosszunevu Kalandor";
+    // GameConfig.MaxNameLength (30) characters, the longest name a player can have.
+    private const string LongName = "Aranyszivu Hosszunevu Kalandor";
     private const int Big = 123456;
 
     private static readonly (string key, object[] args)[] Broadcasts =
@@ -361,6 +423,7 @@ public class DungeonLocA123Tests
     [Fact]
     public void GroupBroadcasts_RenderInHungarian_AndFit()
     {
+        LongName.Length.Should().Be(GameConfig.MaxNameLength, "the check uses the longest player name");
         var sb = new StringBuilder();
         foreach (var (key, args) in Broadcasts)
         {
