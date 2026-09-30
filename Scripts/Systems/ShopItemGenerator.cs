@@ -274,6 +274,7 @@ public static class ShopItemGenerator
             };
             ApplyAccessoryBonuses(equip, template.Name, level);
             ApplyNameThematicBonuses(equip, template.Name, power);
+            ApplyAccessoryStatFloor(equip, level);
             results.Add(equip);
         }
 
@@ -556,6 +557,25 @@ public static class ShopItemGenerator
             equip.DefenceBonus = (int)(s * 2);
         }
     }
+
+    /// <summary>
+    /// v1.2.3: the basic material accessories (Leather Cord, Copper Ring and the like) got no stat
+    /// bonus below about level 53, only armor. Any ring or necklace still without one gets a very
+    /// small floor: Dexterity on rings, Wisdom on necklaces, +1 (+2 from level 30).
+    /// </summary>
+    internal static void ApplyAccessoryStatFloor(Equipment equip, int level)
+    {
+        if (HasStatBonus(equip)) return;
+        int floor = level >= 30 ? 2 : 1;
+        if (equip.Slot == EquipmentSlot.Neck) equip.WisdomBonus = floor;
+        else equip.DexterityBonus = floor;
+    }
+
+    internal static bool HasStatBonus(Equipment e) =>
+        e.StrengthBonus != 0 || e.DexterityBonus != 0 || e.AgilityBonus != 0 || e.ConstitutionBonus != 0 ||
+        e.IntelligenceBonus != 0 || e.WisdomBonus != 0 || e.CharismaBonus != 0 || e.DefenceBonus != 0 ||
+        e.MaxHPBonus != 0 || e.MaxManaBonus != 0 || e.StaminaBonus != 0 || e.MagicResistance != 0 ||
+        e.CriticalChanceBonus != 0 || e.CriticalDamageBonus != 0 || e.LifeSteal != 0;
 
     #endregion
 
