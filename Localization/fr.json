@@ -15430,7 +15430,7 @@
   "town_hall.earned_lifetime": "Taxes perçues au total : {0} or",
   "town_hall.earnings_note": "Les revenus fiscaux sont déposés automatiquement sur votre compte bancaire à chaque vente en boutique.",
   "base.help_compact": "- Activer/désactiver mode compact (mobile/petit écran)",
-  "base.help_bug": "- Rapporter un bug (ouvre GitHub)",
+  "base.help_bug": "- Rapporter un bug (envoie un rapport au développeur)",
   "base.help_quick_keys": "  Raccourcis (une seule lettre):",
   "base.help_key_inventory": "- Inventaire",
   "base.help_key_prefs": "- Préférences",

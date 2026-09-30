@@ -61,6 +61,21 @@ for (const [question, expected] of guides121)
     assert.ok(top(question, 3).includes(expected), top(question, 5).join(" "));
   });
 
+// 1.2.2: bug reporting questions must retrieve the reporting guide in the top 3.
+const bugReports = [
+  "I found a bug, where do I report it?",
+  "how do I report a bug",
+  "bug report",
+  "where do I submit an issue",
+];
+for (const question of bugReports)
+  test(`bug guide: "${question}" finds ${W}getting-started/reporting-bugs/ in the top 3`, () => {
+    assert.ok(
+      top(question, 3).includes(`${W}getting-started/reporting-bugs/`),
+      top(question, 5).join(" "),
+    );
+  });
+
 // Sentences written inside :::spoiler blocks of the 1.2.1 guides, as plain text.
 function spoilerSentences(file) {
   const md = fs.readFileSync(

@@ -15438,7 +15438,7 @@
   "town_hall.earned_lifetime": "Összes adóbevétel: {0} arany",
   "town_hall.earnings_note": "Az adóbevétel automatikusan a bankszámládra kerül minden bolti eladás után.",
   "base.help_compact": "- Kompakt mód ki/be kapcsolása (mobil/kis képernyő)",
-  "base.help_bug": "- Hiba jelentése (megnyitja a GitHub-ot)",
+  "base.help_bug": "- Hiba jelentése (jelentést küld a fejlesztőnek)",
   "base.help_quick_keys": "Gyorsbillentyűk (egyetlen karakter):",
   "base.help_key_inventory": "- Felszerelés",
   "base.help_key_prefs": "- Beállítások",

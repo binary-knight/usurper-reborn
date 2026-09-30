@@ -15430,7 +15430,7 @@
   "town_hall.earned_lifetime": "Impuestos cobrados en total: {0} oro",
   "town_hall.earnings_note": "Los ingresos por impuestos se depositan automáticamente en tu cuenta bancaria al realizarse ventas en las tiendas.",
   "base.help_compact": "- Alternar modo compacto (móvil/pantallas pequeñas)",
-  "base.help_bug": "- Reportar un error (abre GitHub)",
+  "base.help_bug": "- Reportar un error (envía un informe al desarrollador)",
   "base.help_quick_keys": "  Teclas rápidas (un caracter):",
   "base.help_key_inventory": "- Inventario",
   "base.help_key_prefs": "- Preferencias",
