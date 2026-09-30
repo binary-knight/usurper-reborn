@@ -277,6 +277,15 @@ public static class EquipmentDatabase
         lock (_lock) { return _allEquipment.Values.ToList(); }
     }
 
+    /// <summary>Built-in equipment templates only, excluding shop-generated and dynamic items.</summary>
+    public static List<Equipment> GetBuiltInTemplates()
+    {
+        EnsureInitialized();
+        lock (_lock)
+            return _allEquipment.Values.Where(e => e.Id >= OneHandedWeaponStart && e.Id < ShopGeneratedStart)
+                .OrderBy(e => e.Id).ToList();
+    }
+
     public static List<Equipment> GetAllArmor()
     {
         EnsureInitialized();

@@ -2509,6 +2509,17 @@ public static class ClassAbilitySystem
         return applied;
     }
 
+    /// <summary>Built-in ability numbers captured at type initialization, before any override can apply.
+    /// Declared after AllAbilities so the field initializer sees it filled.</summary>
+    private static readonly List<UsurperRemake.Data.AbilityOverride> BuiltInValues = ExportOverrideTemplate();
+
+    /// <summary>Every built-in ability with its shipped numbers, ignoring abilities.json overrides.</summary>
+    public static List<UsurperRemake.Data.AbilityOverride> BuiltInTemplate() => BuiltInValues.Select(a => new UsurperRemake.Data.AbilityOverride
+    {
+        Id = a.Id, Cooldown = a.Cooldown, StaminaCost = a.StaminaCost, ManaCost = a.ManaCost, LevelRequired = a.LevelRequired,
+        BaseDamage = a.BaseDamage, BaseHealing = a.BaseHealing, DefenseBonus = a.DefenseBonus, AttackBonus = a.AttackBonus, Duration = a.Duration,
+    }).ToList();
+
     /// <summary>v1.2 (design item H2): every built-in ability with its current numbers.</summary>
     public static List<UsurperRemake.Data.AbilityOverride> ExportOverrideTemplate() =>
         AllAbilities.Values.OrderBy(a => a.Id).Select(a => new UsurperRemake.Data.AbilityOverride
