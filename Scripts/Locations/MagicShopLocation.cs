@@ -2899,19 +2899,16 @@ public partial class MagicShopLocation : BaseLocation
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (await terminal.AskYesNoAsync(""))
             {
-                // Remove all sold items from inventory (reverse to preserve indices)
+                // v1.2.3: sell only the listed rows. This loop used to take every accessory,
+                // including the cursed and unidentified ones the list skips, and pay more than it quoted.
                 int soldCount = 0;
-                for (int i = player.Inventory.Count - 1; i >= 0; i--)
+                for (int i = 0; i < sellableSource.Count; i++)
                 {
-                    var invItem = player.Inventory[i];
-                    if (invItem.Type == ObjType.Magic || invItem.Type == ObjType.Fingers || invItem.Type == ObjType.Neck)
-                    {
-                        long sellPrice = (long)(Math.Max(1, invItem.Value / 2) * fenceModifier);
-                        player.Gold += sellPrice;
-                        player.Statistics?.RecordSale(sellPrice);
-                        player.Inventory.RemoveAt(i);
-                        soldCount++;
-                    }
+                    if (!player.Inventory.Remove(sellableSource[i])) continue;
+                    long sellPrice = sellable[i].sellPrice;
+                    player.Gold += sellPrice;
+                    player.Statistics?.RecordSale(sellPrice);
+                    soldCount++;
                 }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"  {Loc.Get("shop.sold_accessories", soldCount, $"{totalGold:N0}")}");
