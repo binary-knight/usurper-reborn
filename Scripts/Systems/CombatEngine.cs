@@ -2359,9 +2359,9 @@ public partial class CombatEngine
         }
         finally
         {
-            player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close
             ConsumeCombatBuffs(player);
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
+            player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
         }
 
         return result;
