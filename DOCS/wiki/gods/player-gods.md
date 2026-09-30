@@ -1,8 +1,8 @@
 ---
 title: Player-gods and the Pantheon
 path: /wiki/en/gods/player-gods/
-checked: 1.2.0
-sources: Scripts/Systems/GodBoonSystem.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+checked: 1.2.1
+sources: Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/PantheonLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 ---
 An immortal player-god chooses a domain. Followers receive its domain boon, scaled by the god's standing against the strongest Temple god, alongside configured immortal boons. Activity matters: a player-god's boon can fade when the immortal stops playing.
 

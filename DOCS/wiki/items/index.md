@@ -1,7 +1,7 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs
 ---
 This catalog lists fixed built-in equipment templates. Shops can generate stock that is not in this list, and server mods can replace definitions. A catalog entry does not promise a drop source or current stock.

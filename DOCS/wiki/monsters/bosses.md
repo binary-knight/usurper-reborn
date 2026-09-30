@@ -1,7 +1,7 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Data/WorldBossData.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs
 ---
 Boss phases can change abilities and danger during the fight. Base definitions below are not a prediction of a live scaled encounter.
