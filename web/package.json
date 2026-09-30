@@ -7,10 +7,11 @@
     "start": "node ssh-proxy.js"
   },
   "dependencies": {
-    "ws": "^8.18.0",
-    "ssh2": "^1.16.0",
-    "better-sqlite3": "^11.0.0",
+    "@anthropic-ai/sdk": "^0.129.0",
     "bcryptjs": "^2.4.3",
-    "discord.js": "^14.16.0"
+    "better-sqlite3": "^11.0.0",
+    "discord.js": "^14.16.0",
+    "ssh2": "^1.16.0",
+    "ws": "^8.18.0"
   }
 }
