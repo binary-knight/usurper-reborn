@@ -90,7 +90,7 @@ function recordSuggestion(db, message, text, now) {
 // Optional plain-language Ask through the Claude API. Off unless DISCORD_WIKI_LLM is exactly
 // "on", ANTHROPIC_API_KEY is set, the SDK is installed and the usage table is ready.
 const LLM_MODEL = "claude-sonnet-5-5";
-const LLM_MAX_TOKENS = 400;
+const LLM_MAX_TOKENS = 700;
 const LLM_TIMEOUT_MS = 15000;
 const LLM_EXCERPTS = 5;
 const LLM_EXCERPT_CHARS = 1500;

@@ -150,7 +150,7 @@ It uses the model `claude-sonnet-5-5` at effort `low` through the official
   and the reply is capped at 1,900 characters. A decline has the `OFFTOPIC`
   line removed and gets no source links; the marker is removed from every
   reply.
-- Each call has `max_tokens` 400, a 15 second timeout and one retry. It uses
+- Each call has `max_tokens` 700, a 15 second timeout and one retry. It uses
   the server-side refusal fallback (`fallbacks: "default"`). A refusal,
   `max_tokens` stop, empty answer, API error or timeout gives the usual
   excerpt reply.
@@ -254,7 +254,7 @@ ANTHROPIC_API_KEY=... node tools/wiki-build/eval-ask.js
 Check that wiki answers match the pages, that every adversarial question is
 declined or answered only from the excerpts, that no spoiler, prompt text,
 foreign link or mention appears, and how many replies stopped at `max_tokens`.
-Thinking counts toward the 400-token limit, so a high `max_tokens` share is the
+Thinking counts toward the 700-token limit, so a high `max_tokens` share is the
 first thing to look for; those replies fall back to excerpts.
 
 Suggest requires a guild message in an allowed channel and the configured
