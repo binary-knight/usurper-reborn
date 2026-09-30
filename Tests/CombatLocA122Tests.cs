@@ -277,6 +277,212 @@ public class CombatLocA122Tests
         if (lang == "hu") text.Should().Contain("Lángok törnek elő Lyra fegyveréből!").And.Contain("Villámok cikáznak Lyra csapásától!");
     }
 
+    // ---------- 7. loot lines on another player's terminal, in that player's language ----------
+
+    private static async Task<string> RenderLootWinnerInventoryFull(string winnerLang)
+    {
+        var prevLangOf = CombatEngine.LanguageOf;
+        try
+        {
+            CombatEngine.LanguageOf = c => c.Name2 == "Winner" ? winnerLang : GameConfig.Language;
+            var (engine, _, leaderOut) = Engine();
+            var winnerOut = new MemoryStream();
+            var winnerTerm = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes("T\n")), winnerOut);
+            var winner = new Character { Name1 = "winner", Name2 = "Winner", Class = CharacterClass.Warrior, Level = 10, HP = 100, MaxHP = 100 };
+            for (int i = 0; i < GameConfig.MaxInventoryItems; i++) winner.Inventory.Add(new Item { Name = $"Rock {i}", Type = ObjType.Body });
+            var loot = new Item { Name = "Fine Blade", Type = ObjType.Weapon, Attack = 5, Value = 10, IsIdentified = true };
+            var monster = new Monster { Name = "Kobold", Level = 3, HP = 0, MaxHP = 10 };
+            await (Task)typeof(CombatEngine).GetMethod("PromptLootWinner", F)!.Invoke(engine, new object?[] { loot, monster, winner, winnerTerm })!;
+            return Shown(winnerTerm, winnerOut);
+        }
+        finally { CombatEngine.LanguageOf = prevLangOf; }
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task LootInventoryFull_IsInTheWinnersLanguage(string winnerLang)
+    {
+        // the leader plays in English; the winner's terminal shows the winner's language
+        string text = await WithLanguage("en", () => RenderLootWinnerInventoryFull(winnerLang));
+        Capture($"combat-a-loot-full-{winnerLang}.txt", text);
+        int max = GameConfig.MaxInventoryItems;
+        text.Should().Contain(Loc.GetIn(winnerLang, "combat.loot_inventory_full_dropped", max, max));
+        text.Should().NotContain("Your inventory is full").And.NotContain("Item dropped");
+        if (winnerLang == "hu") text.Should().Contain($"A felszerelésed megtelt ({max}/{max})! A tárgy elveszett.");
+    }
+
+    [Fact]
+    public void LanguageOf_FallsBackToTheSessionLanguageOutsideAGroup()
+    {
+        var prev = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = "fr";
+            CombatEngine.LanguageOf(new Character { Name2 = "Solo" }).Should().Be("fr");
+        }
+        finally { GameConfig.Language = prev; }
+    }
+
+    [Fact]
+    public void TheOtherPlayerLootLines_UseTheirLanguage()
+    {
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        src.Should().NotContain("Could not equip: {equipMsg}").And.NotContain("Your inventory is full ({GameConfig");
+        Regex.Matches(src, "winnerTerm\\.WriteLine\\(Loc\\.GetIn\\(winnerLang, \"combat\\.inventory_full_item_dropped\"\\)\\)").Count.Should().Be(2);
+        src.Should().Contain("otherTerm.WriteLine(Loc.GetIn(otherLang, \"combat.loot_equip_failed_inventory\", equipMsg))");
+        src.Should().Contain("string winnerLang = LanguageOf(winner);").And.Contain("string otherLang = LanguageOf(otherPlayer);");
+        // nothing on the winner's or the other player's terminal falls back to the leader's language
+        foreach (Match m in Regex.Matches(src, "(winnerTerm|otherTerm)\\.Write(Line)?\\([^\\n]*"))
+            m.Value.Should().NotContain("Loc.Get(");
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task LootPromptOnTheWinnersTerminal_IsInTheirLanguage(string winnerLang)
+    {
+        string text = await WithLanguage("en", () => RenderLootWinnerInventoryFull(winnerLang));
+        text.Should().Contain(Loc.GetIn(winnerLang, "combat.loot_won_roll", "Kobold")).And.Contain(Loc.GetIn(winnerLang, "combat.loot_take_option"));
+        text.Should().NotContain("You won the roll");
+    }
+
+    // ---------- 8. the combat status panels ----------
+
+    private static string RenderStatusPanels(bool bbs)
+    {
+        var (engine, term, output) = Engine();
+        var hero = Hero();
+        hero.DamageAbsorptionPool = 25;
+        hero.MagicACBonus = 4;
+        var boss = new Monster { Name = "Maelketh", Level = 30, HP = 900, MaxHP = 1000, IsActive = true, IsBoss = true };
+        engine.BossContext = new BossCombatContext { CurrentPhase = 2 };
+        var ally = new Character { Name1 = "ally", Name2 = "Lyra", Class = CharacterClass.Cleric, Level = 10, HP = 80, MaxHP = 100 };
+        typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(engine, new List<Character> { ally });
+        string method = bbs ? "DisplayCombatStatusBBS" : "DisplayCombatStatus";
+        typeof(CombatEngine).GetMethod(method, F)!.Invoke(engine, new object?[] { new List<Monster> { boss }, hero, 0 });
+        typeof(CombatEngine).GetMethod(method, F)!.Invoke(engine, new object?[] { new List<Monster> { boss }, hero, 3 });
+        if (!bbs)
+            typeof(CombatEngine).GetMethod("DisplayCombatStatusScreenReader", F)!.Invoke(engine, new object?[] { new List<Monster> { boss }, hero, 3 });
+        return Shown(term, output);
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task StatusPanel_IsLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, () => RenderStatusPanels(bbs: false));
+        Capture($"combat-a-status-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.combat_status_header")).And.Contain(Loc.GetIn(lang, "combat.allies_header"))
+            .And.Contain(Loc.GetIn(lang, "combat.boss_phase_tag", 2)).And.Contain(Loc.GetIn(lang, "combat.bar_st") + ":")
+            .And.Contain(Loc.GetIn(lang, "combat.bar_shield") + ": ")
+            .And.Contain(Loc.GetIn(lang, "combat.bar_atk") + ": ").And.Contain(Loc.GetIn(lang, "combat.bar_def") + ": ");
+        var h = Hero();
+        text.Should().Contain(Loc.GetIn(lang, "combat.sr_attack_defense_shield", h.Strength + h.WeapPow, h.Defence + h.ArmPow + 4, 4));
+        foreach (var english in new[] { "COMBAT STATUS", "ALLIES", "[Phase", "ST:", "ATK:", "DEF:", "Shield:", "magic shield" })
+            text.Should().NotContain(english);
+        // the box keeps its width
+        foreach (var line in text.Split('\n'))
+            if (line.StartsWith("║") && line.Contains(Loc.GetIn(lang, "combat.combat_status_header"))) line.TrimEnd('\r').Length.Should().Be(60);
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task BbsStatusPanel_IsLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, () => RenderStatusPanels(bbs: true));
+        Capture($"combat-a-status-bbs-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.bbs_header_round", Loc.GetIn(lang, "combat.round_label", 3)))
+            .And.Contain(" " + Loc.GetIn(lang, "combat.bbs_header") + " ")
+            .And.Contain(Loc.GetIn(lang, "combat.boss_phase_line", 2));
+        text.Should().NotContain(" COMBAT ").And.NotContain("Boss Phase");
+    }
+
+    [Fact]
+    public async Task StatusPanels_EnglishKeepsItsWidths()
+    {
+        string text = await WithLanguage("en", () => RenderStatusPanels(bbs: true));
+        text.Should().Contain("═══════════════════════════════ COMBAT ═══════════════════════════════════════")
+            .And.Contain("══════════════════════ COMBAT - Round 3 ══════════════════════").And.Contain(" Boss Phase 2");
+        CombatEngine.TipBoxTop("TIP").Should().Be("┌─── TIP ────────────────────────────────────────────────────────────────────┐");
+        CombatEngine.BoxTitleLine("ALLIES").Length.Should().Be(60);
+        CombatEngine.TipBoxTop(await WithLanguage("it", () => Loc.Get("combat.tip_label"))).Length.Should().Be(78);
+    }
+
+    // ---------- 9. damage lines, the monster kill sent to the group, and the heal target prompt ----------
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task AoEDamageLine_IsLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, async () =>
+        {
+            var (engine, term, output) = Engine();
+            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, Hero());
+            var monsters = new List<Monster> { new() { Name = "Kobold", Level = 3, HP = 5000, MaxHP = 5000, IsActive = true } };
+            await (Task)typeof(CombatEngine).GetMethod("ApplyAoEDamage", F)!
+                .Invoke(engine, new object?[] { monsters, 100L, new CombatResult(), "AoE attack", false, null, null })!;
+            return Shown(term, output);
+        });
+        Capture($"combat-a-aoe-{lang}.txt", text);
+        text.Should().Contain("Kobold: ").And.Contain(" " + Loc.GetIn(lang, "combat.bar_hp"));
+        text.Should().NotMatchRegex("-[0-9]+ HP");
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task HolyAndCorrosiveAbilityLines_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, async () =>
+        {
+            var (engine, term, output) = Engine();
+            var hero = Hero();
+            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+            foreach (var (id, effect) in new[] { ("judgment_day", "aoe_holy"), ("corrosive_cloud", "aoe_corrode") })
+            {
+                var undead = new Monster { Name = "Ghoul", Level = 3, HP = 5, MaxHP = 50, IsActive = true, Undead = 1 };
+                var monsters = new List<Monster> { undead };
+                var ability = new ClassAbilityResult { AbilityUsed = ClassAbilitySystem.GetAbility(id), SpecialEffect = effect, Damage = 100, Success = true };
+                await (Task)typeof(CombatEngine).GetMethod("ApplyAbilityEffectsMultiMonster", F)!
+                    .Invoke(engine, new object?[] { hero, undead, monsters, ability, new CombatResult() })!;
+            }
+            return Shown(term, output);
+        });
+        Capture($"combat-a-holy-corrode-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.ability_purified", "Ghoul"));
+        text.Should().Contain(Loc.GetIn(lang, "combat.hp_loss_holy", 0).Split(' ')[1]);
+        text.Should().NotContain("(HOLY!)").And.NotContain("is purified!").And.NotContain("Corrosive cloud hits");
+    }
+
+    [Fact]
+    public void MonsterKillSentToTheGroup_IsInTheRecipientsLanguage()
+    {
+        string hu = CombatEngine.GroupLine("hu", "\u001b[1;32m", "combat.group_slays", "Tester", "Kobold");
+        hu.Should().Contain("Tester legyőzi: Kobold!").And.NotContain("slays the");
+        string it = CombatEngine.GroupLine("it", "\u001b[1;32m", "combat.group_slays", Loc.GetIn("it", "combat.group_someone"), "Kobold");
+        it.Should().Contain("Qualcuno abbatte Kobold!").And.NotContain("Someone");
+        CombatEngine.GroupLine("en", "\u001b[1;32m", "combat.group_slays", "Tester", "Kobold")
+            .Should().Be("\u001b[1;32m  Tester slays the Kobold!\u001b[0m");
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        src.Should().Contain("killerName ?? Loc.GetIn(lang, \"combat.group_someone\"), target.Name));");
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("fr")]
+    public async Task HealTargetPromptAndTip_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, () => Loc.Get("combat.heal_target_prompt") + "\n" + CombatEngine.TipBoxTop(Loc.Get("combat.tip_label")));
+        text.Should().NotContain("Target (ENTER=self)").And.NotContain("TIP ");
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        src.Should().Contain("await terminal.GetInput(\"  \" + Loc.Get(\"combat.heal_target_prompt\"))");
+        src.Should().Contain("terminal.WriteLine(TipBoxTop(Loc.Get(\"combat.tip_label\")))");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
