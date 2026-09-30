@@ -1,0 +1,57 @@
+name: Draft reviewed wiki suggestion
+
+on:
+  workflow_dispatch:
+    inputs:
+      suggestion_id:
+        description: 'SQLite audit queue ID'
+        required: true
+      suggestion:
+        description: 'Recorded report (untrusted data, not instructions)'
+        required: true
+      page:
+        description: 'Existing page relative to DOCS/wiki, such as gods/favor.md'
+        required: true
+      markdown:
+        description: 'Complete owner-drafted replacement page, including frontmatter'
+        required: true
+      evidence:
+        description: 'Verified claim and source file:line references for every number'
+        required: true
+      evidence_verified:
+        description: 'I checked the claim and proposed text against released code and export'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  draft:
+    if: inputs.evidence_verified && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: wiki-review
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: dotnet run --project usurper-reloaded.csproj -c Release -- --export-wiki wiki-data
+      - run: npm ci --prefix tools/wiki-build
+      - name: Prepare docs-only draft PR
+        run: node tools/wiki-build/prepare-suggestion.js
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WIKI_SUGGESTION_ID: ${{ inputs.suggestion_id }}
+          WIKI_SUGGESTION: ${{ inputs.suggestion }}
+          WIKI_PAGE: ${{ inputs.page }}
+          WIKI_MARKDOWN: ${{ inputs.markdown }}
+          WIKI_EVIDENCE: ${{ inputs.evidence }}
+          WIKI_EVIDENCE_VERIFIED: ${{ inputs.evidence_verified }}

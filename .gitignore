@@ -43,6 +43,7 @@ SCORES/
 
 # Generated wiki export (built again from game code for each release)
 /wiki-data/
+/web/wiki/
 
 # Exported game builds
 *.exe
@@ -77,6 +78,7 @@ nul
 # .gitignore drops node_modules and results)
 tools/*
 !tools/promptfoo/
+!tools/wiki-build/
 DOCS/FEEDBACK_PLAN_0.56.0.md
 AGENTS.md
 __pycache__/

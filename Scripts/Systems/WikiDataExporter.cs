@@ -172,6 +172,9 @@ public static class WikiDataExporter
             id = entry.Key.ToString(),
             name = Names("class." + KeyPart(entry.Key.ToString()), GameConfig.ClassNames[(int)entry.Key]),
             prestige = entry.Key >= CharacterClass.Tidesworn && entry.Key <= CharacterClass.Voidreaver,
+            allowedRaces = Enum.GetValues<CharacterRace>()
+                .Where(race => !GameConfig.InvalidCombinations.GetValueOrDefault(race, []).Contains(entry.Key))
+                .ToArray(),
             startingAttributes = entry.Value,
             growthPerLevel = ClassGrowth(entry.Key),
             specializations = SpecializationData.GetSpecsForClass(entry.Key).OrderBy(s => s.Spec)
@@ -316,6 +319,7 @@ public static class WikiDataExporter
     private static object Balance() => new
     {
         moddableDefaults = new BalanceConfig(),
+        characterConstants = Constants("Specialization"),
         combatConstants = Constants("CriticalHit", "Backstab", "Berserk", "BaseMonster", "EarlyFloor"),
         godConstants = Constants("GodBoon", "GodWard", "GodDeed", "GodTaboo"),
         mentalConstants = Constants("Mental")

@@ -1,0 +1,23 @@
+name: Wiki suggestion path guard
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  docs-only:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Restrict suggestion PRs to wiki prose
+        env:
+          HEAD_BRANCH: ${{ github.head_ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          REPOSITORY: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ "$HEAD_BRANCH" == wiki/suggestion-* ]]; then
+            gh api "repos/$REPOSITORY/pulls/$PR_NUMBER/files" --paginate --slurp > /tmp/wiki-changed-paths.json
+            node -e 'const fs=require("fs"); const files=JSON.parse(fs.readFileSync("/tmp/wiki-changed-paths.json","utf8")).flat(); const allowed=/^DOCS\/wiki\/(?:[a-z0-9-]+\/)*[a-z0-9-]+\.md$/; if(!files.length || files.some(f=>!allowed.test(f.filename) || (f.previous_filename && !allowed.test(f.previous_filename)))) process.exit(1);'
+          fi

@@ -151,8 +151,8 @@ Phase 4 adds Suggest with a role gate, per-user and global limits, and an audit
 record. The production Node process only records or dispatches a suggestion.
 A drafting agent off the server treats the suggestion as untrusted data, checks
 claims against code and exported facts, edits only `DOCS/wiki/` on a branch,
-and opens a pull request for owner review. The production process holds no
-repository write token. No suggestion publishes automatically.
+and opens a pull request for owner review. The wiki features on the production
+process use no GitHub token. No suggestion publishes automatically.
 
 ## Reviewable implementation phases
 
@@ -187,3 +187,19 @@ and tests without an attribution footer.
 - **D5, URL:** Host the wiki at `/wiki/` on the existing website.
 
 No production publication is authorized by this design plan.
+
+## Implementation handoff
+
+The launch implementation includes the static builder, all nine content
+sections, generated entity references, search, release packaging and CI checks.
+Spell and ability detail pages expose costs, numeric templates and equipment
+requirements. Race compatibility and specialization gates are also exported
+from the character rules rather than inferred by the prose.
+Discord Ask and the role-gated Suggest audit queue are implemented but require
+owner-provided environment configuration after review. The off-server
+owner-triggered drafting workflow opens docs-only draft pull requests. No
+autonomous drafting agent is enabled; D4 reserves that as a later extension.
+
+See `DOCS/WIKI_OPERATIONS.md` for build commands, content rules, validation,
+configuration and the complete suggestion review procedure. Nothing has been
+merged to `main` or deployed by hand.
