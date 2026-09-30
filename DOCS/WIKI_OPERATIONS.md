@@ -304,7 +304,9 @@ Thinking counts toward the 700-token limit, so a high `max_tokens` share is the
 first thing to look for; those replies fall back to excerpts.
 
 Suggest requires a guild message in an allowed channel and the configured
-role. The audit table `wiki_suggestions` stores message, author, guild and
+role. The message after the bot mention starts with `suggest:` or
+`suggestion:`, in any case, with optional space before the colon; any other
+text is an Ask question. The audit table `wiki_suggestions` stores message, author, guild and
 channel IDs, sanitized report text, timestamps, status and outcome. Text is
 capped at 800 characters. Limits are three accepted reports per user and
 thirty globally per rolling 24 hours, enforced in a SQLite transaction and

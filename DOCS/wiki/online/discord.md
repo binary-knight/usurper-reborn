@@ -32,7 +32,7 @@ Ask and Suggest are for the wiki, not for game bugs. To report a bug, press `!` 
 
 ## Suggest an improvement
 
-Trusted helpers with the owner's configured role can use `@UsurperBot suggest: ...`. Describe a missing explanation or incorrect claim, not instructions to execute code.
+Trusted helpers with the owner's configured role can use `@UsurperBot suggest: ...` or `@UsurperBot suggestion: ...`. Either word works in any case, with or without a space before the colon. Describe a missing explanation or incorrect claim, not instructions to execute code.
 
 Suggestions enter an audit queue. They do not edit the production site or publish a page. The owner reviews the claim against game code and exported data, then prepares a docs-only pull request. The next reviewed release or approved deployment publishes it.
 
