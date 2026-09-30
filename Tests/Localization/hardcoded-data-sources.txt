@@ -452,7 +452,6 @@ table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#1|memory fragment 
 table|Scripts/Systems/CombatEngine.cs|=attackMessage|combat damage line
 nouns|Scripts/Systems/CombatEngine.cs|decl:abilityName|boss AoE line
 table|Scripts/Systems/CombatEngine.cs|decl:actions|follower action bar
-nouns|Scripts/Systems/CombatEngine.cs|decl:actorName|name in combat.ability_last_stand
 table|Scripts/Systems/CombatEngine.cs|decl:actualKiller|killer in the permadeath eulogy
 table|Scripts/Systems/CombatEngine.cs|decl:bcast|group combat broadcast
 table|Scripts/Systems/CombatEngine.cs|decl:bonusLine|first kill bonus box
@@ -465,7 +464,6 @@ table|Scripts/Systems/CombatEngine.cs|decl:deathLocation|death news location
 table|Scripts/Systems/CombatEngine.cs|decl:divineMsg|message to a god player
 table|Scripts/Systems/CombatEngine.cs|decl:gpDivineMsg|message to a god player
 table|Scripts/Systems/CombatEngine.cs|decl:gpSacMsg|message to a god player
-table|Scripts/Systems/CombatEngine.cs|decl:hpStatus|combat status bar
 nouns|Scripts/Systems/CombatEngine.cs|decl:killerName|group broadcast and death news fallback
 table|Scripts/Systems/CombatEngine.cs|decl:location|death news location
 table|Scripts/Systems/CombatEngine.cs|decl:name|lost stat name
