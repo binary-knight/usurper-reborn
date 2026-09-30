@@ -420,7 +420,7 @@ public class SageSpells1115Tests
         string combat = File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "CombatEngine.cs"));
         combat.Should().Contain("Loc.Get(\"combat.you_cast_spell\", spellInfo.DisplayName)");
         combat.Should().Contain("Loc.Get(\"combat.teammate_casts_spell\", teammate.DisplayName, spell.DisplayName)");
-        combat.Should().Contain("displayName = $\"{spell.DisplayName} ({manaCost} MP)\";");
+        combat.Should().Contain("displayName = Loc.Get(\"combat.qb_mana\", spell.DisplayName, manaCost);");
         string library = File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "SpellLearningSystem.cs"));
         Regex.IsMatch(library, @"\b(spell|chosen|currentSpell\?|knownUnequipped\[i\])\.(Name|Description)\b")
             .Should().BeFalse("the spell library shows the display name and description");

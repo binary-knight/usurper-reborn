@@ -143,6 +143,13 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static string Get(string key)
         {
+            string text = Resolve(key);
+            _recording.Value?.Add(text, key, Array.Empty<object>());
+            return text;
+        }
+
+        private static string Resolve(string key)
+        {
             if (!_loaded) Initialize();
 
             var lang = GameConfig.Language;
@@ -165,17 +172,36 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static string Get(string key, params object[] args)
         {
-            var template = Get(key);
+            var template = Resolve(key);
+            string text;
             try
             {
-                return string.Format(template, args);
+                text = string.Format(template, args);
             }
             catch (FormatException)
             {
                 // If format string is malformed, return template with args appended
-                return template;
+                text = template;
             }
+            _recording.Value?.Add(text, key, args);
+            return text;
         }
+
+        private static readonly System.Threading.AsyncLocal<LocRecording?> _recording = new();
+
+        /// <summary>
+        /// v1.2.2: starts recording the Get calls of this session's flow, so text already written in the
+        /// session's language can be re-rendered in another one (LocRecording.Render). Used for captured
+        /// combat output that is sent to group members who read another language. Stop with EndRecording.
+        /// </summary>
+        public static LocRecording BeginRecording()
+        {
+            var rec = new LocRecording(GameConfig.Language);
+            _recording.Value = rec;
+            return rec;
+        }
+
+        public static void EndRecording() => _recording.Value = null;
 
         /// <summary>
         /// Get a localized string in an explicitly specified language, independent of the current
@@ -331,6 +357,58 @@ namespace UsurperRemake.Systems
                 { "dungeon.status", "Status" },
                 { "dungeon.inventory", "Inventory" },
             };
+        }
+    }
+
+    /// <summary>
+    /// v1.2.2: the Loc.Get calls made while a recording was active (Loc.BeginRecording), in call order.
+    /// Render swaps each recorded text in a captured screen for the same key rendered in another
+    /// language; a string argument that is itself a recorded text is translated first, so nested
+    /// lookups (a status name inside a status line) follow. Text not produced by Loc stays as written.
+    /// </summary>
+    public sealed class LocRecording
+    {
+        private const int MaxCalls = 500;   // a recording left open cannot grow without bound
+        private readonly List<(string text, string key, object[] args)> _calls = new();
+        private readonly object _lock = new();
+
+        public LocRecording(string language) { Language = language; }
+
+        /// <summary>The language the recorded text was written in.</summary>
+        public string Language { get; }
+
+        internal void Add(string text, string key, object[] args)
+        {
+            lock (_lock)
+            {
+                if (_calls.Count < MaxCalls) _calls.Add((text, key, args));
+            }
+        }
+
+        /// <summary>`captured` with each recorded text replaced by its rendering in `lang`.</summary>
+        public string Render(string captured, string lang)
+        {
+            if (string.IsNullOrEmpty(captured) || lang == Language) return captured;
+            List<(string text, string key, object[] args)> calls;
+            lock (_lock) calls = new List<(string, string, object[])>(_calls);
+
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var (text, key, args) in calls)
+            {
+                if (string.IsNullOrWhiteSpace(text) || map.ContainsKey(text)) continue;
+                var translatedArgs = new object[args.Length];
+                for (int i = 0; i < args.Length; i++)
+                    translatedArgs[i] = args[i] is string s && map.TryGetValue(s, out var t) ? t : args[i];
+                string rendered = args.Length == 0 ? Loc.GetIn(lang, key) : Loc.GetIn(lang, key, translatedArgs);
+                if (rendered != text) map[text] = rendered;
+            }
+            if (map.Count == 0) return captured;
+
+            // one pass, longest text first, so a replacement is never replaced again
+            var keys = new List<string>(map.Keys);
+            keys.Sort((a, b) => b.Length.CompareTo(a.Length));
+            var pattern = string.Join("|", keys.ConvertAll(System.Text.RegularExpressions.Regex.Escape));
+            return System.Text.RegularExpressions.Regex.Replace(captured, pattern, m => map[m.Value]);
         }
     }
 }

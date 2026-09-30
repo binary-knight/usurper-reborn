@@ -449,44 +449,6 @@ table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#0|amnesia dream titles
 table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#1|amnesia dream lines
 table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#0|memory fragment titles
 table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#1|memory fragment lines
-table|Scripts/Systems/CombatEngine.cs|=attackMessage|combat damage line
-nouns|Scripts/Systems/CombatEngine.cs|decl:abilityName|boss AoE line
-table|Scripts/Systems/CombatEngine.cs|decl:actions|follower action bar
-table|Scripts/Systems/CombatEngine.cs|decl:actualKiller|killer in the permadeath eulogy
-table|Scripts/Systems/CombatEngine.cs|decl:bcast|group combat broadcast
-table|Scripts/Systems/CombatEngine.cs|decl:bonusLine|first kill bonus box
-nouns|Scripts/Systems/CombatEngine.cs|decl:bossName|fallback in combat.boss_blocks_escape
-table|Scripts/Systems/CombatEngine.cs|decl:catchUpLabel|xp reward line
-table|Scripts/Systems/CombatEngine.cs|decl:costDisplay|ability menu cost
-table|Scripts/Systems/CombatEngine.cs|decl:costDisplayPvP|ability menu cost
-table|Scripts/Systems/CombatEngine.cs|decl:costDisplaySM|ability menu cost
-table|Scripts/Systems/CombatEngine.cs|decl:deathLocation|death news location
-table|Scripts/Systems/CombatEngine.cs|decl:divineMsg|message to a god player
-table|Scripts/Systems/CombatEngine.cs|decl:gpDivineMsg|message to a god player
-table|Scripts/Systems/CombatEngine.cs|decl:gpSacMsg|message to a god player
-nouns|Scripts/Systems/CombatEngine.cs|decl:killerName|group broadcast and death news fallback
-table|Scripts/Systems/CombatEngine.cs|decl:location|death news location
-table|Scripts/Systems/CombatEngine.cs|decl:name|lost stat name
-nouns|Scripts/Systems/CombatEngine.cs|decl:opponentName|spared news
-nouns|Scripts/Systems/CombatEngine.cs|decl:otherName|name in combat.offering_loot
-nouns|Scripts/Systems/CombatEngine.cs|decl:playerName|boss summary fallback
-nouns|Scripts/Systems/CombatEngine.cs|decl:recipientName|name in combat.loot_group_drop_for
-table|Scripts/Systems/CombatEngine.cs|decl:rewardHeader|grouped player reward message
-table|Scripts/Systems/CombatEngine.cs|decl:rewardMsg|grouped player reward message
-table|Scripts/Systems/CombatEngine.cs|decl:sacMsg|message to a god player
-table|Scripts/Systems/CombatEngine.cs|decl:shareLine|share line
-table|Scripts/Systems/CombatEngine.cs|decl:status|ally MP list
-table|Scripts/Systems/CombatEngine.cs|decl:summaryLine|summary line
-table|Scripts/Systems/CombatEngine.cs|decl:tag|group HP list tag
-table|Scripts/Systems/CombatEngine.cs|decl:tankTag|damage line tag
-nouns|Scripts/Systems/CombatEngine.cs|decl:teammateName|name in combat.loot_ally_approved
-table|Scripts/Systems/CombatEngine.cs|decl:tname|name in combat.loot_ally_upgrade_prompt
-table|Scripts/Systems/CombatEngine.cs|decl:turnAnnounce|teammate turn broadcast
-nouns|Scripts/Systems/CombatEngine.cs|=displayName|quickbar label
-table|Scripts/Systems/CombatEngine.cs|EqualsValueClause|damage source in combat.hits_all_enemies
-table|Scripts/Systems/CombatEngine.cs|=rewardMsg|grouped player reward message
-table|Scripts/Systems/CombatEngine.cs|=statusText|ability menu cooldown
-table|Scripts/Systems/CombatEngine.cs|return/tuple#1|holy damage flavour line
 names|Scripts/Systems/CombatEngine.cs|init.Name|unique boss name
 table|Scripts/Systems/CombatMessages.cs|init.[k]=|attack verbs
 table|Scripts/Systems/CompanionSystem.cs|decl:drop|companion drop line
