@@ -218,7 +218,7 @@ public class StatusLoc122Tests
         foreach (var english in new[] { "has succumbed to status effects!", "has fallen to status effects!",
                      "has been consumed by dark powers!", "has fallen to dark powers!" })
             src.Should().NotContain(english);
-        Regex.Matches(src, "BroadcastGroupDeathLine\\(result, \"combat\\.group_").Count.Should().Be(4);
+        Regex.Matches(src, "BroadcastGroupDeathLine\\(result, \"combat\\.group_(consumed_dark|fallen_dark|succumbed_status|fallen_status)\"").Count.Should().Be(4);
     }
 
     private static string RepoRoot()
