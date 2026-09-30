@@ -51,3 +51,18 @@ test("suggestion workflow is manual, owner-verified, off-server and draft-only",
   assert.equal(guard.permissions.contents, "read");
   assert.ok(!guard.jobs["docs-only"].steps.some((s) => s.uses));
 });
+test("wiki job runs the drift check with full history, failing only for releases", () => {
+  const pipeline = load("ci-cd.yml");
+  const wiki = pipeline.jobs.wiki;
+  const checkout = wiki.steps.find((s) => s.uses === "actions/checkout@v4");
+  assert.equal(checkout.with?.["fetch-depth"], 0);
+  const drift = wiki.steps.find((s) => s.name === "Wiki drift check");
+  assert.ok(drift, "drift step missing");
+  assert.equal(drift.run, 'node tools/wiki-build/drift.js --mode "$DRIFT_MODE"');
+  const mode = drift.env.DRIFT_MODE;
+  assert.match(mode, /github\.event_name == 'release'/);
+  assert.match(mode, /workflow_dispatch/);
+  assert.match(mode, /startsWith\(github\.head_ref, 'release-'\)/);
+  assert.match(mode, /&& 'fail' \|\| 'warn'/);
+  assert.ok(pipeline.jobs["deploy-server"].needs.includes("wiki"));
+});

@@ -1,0 +1,5 @@
+# Scripts/Locations/*Location.cs files that need no wiki guide.
+# One entry per line: the file name, then a short reason.
+SysOpLocation.cs  BBS door operator console, only for SysOp security level, not a player place
+GodWorldLocation.cs  empty file with no class; the immortal realm is PantheonLocation
+LoveCornerLocation.cs  never constructed; GameLocation.LoveCorner opens LoveStreetLocation
