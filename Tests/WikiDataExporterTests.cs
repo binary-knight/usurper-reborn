@@ -129,6 +129,9 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.NotEmpty(achievements);
         var firstBlood = Assert.Single(achievements.Where(a => a.GetProperty("id").GetString() == "first_blood"));
         Assert.Equal(5, firstBlood.GetProperty("pointValue").GetInt32());
+        Assert.False(firstBlood.GetProperty("spoiler").GetBoolean());
+        Assert.All(achievements, a => Assert.Equal(a.GetProperty("isSecret").GetBoolean(), a.GetProperty("spoiler").GetBoolean()));
+        Assert.Contains(achievements, a => a.GetProperty("spoiler").GetBoolean());
     }
 
     [Fact]
@@ -153,5 +156,96 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(GameConfig.Version, document.RootElement.GetProperty("gameVersion").GetString());
         Assert.True(DateTimeOffset.TryParse(document.RootElement.GetProperty("generatedAtUtc").GetString(), out _));
         Assert.Equal(5, document.RootElement.GetProperty("languages").GetArrayLength());
+    }
+}
+
+[Collection("SharedGameSingletons")]
+public class WikiDataExporterIsolationTests
+{
+    private static JsonElement Data(string dir, string file)
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, file + ".json")));
+        return document.RootElement.GetProperty("data").Clone();
+    }
+
+    private static long GoblinHp(string dir) => Data(dir, "monsters").EnumerateArray()
+        .Single(f => f.GetProperty("id").GetString() == "goblinoid").GetProperty("tiers")[0]
+        .GetProperty("normalStatsAtMinLevel").GetProperty("hp").GetInt64();
+
+    private static JsonElement Entry(string dir, string file, string id) => Data(dir, file).EnumerateArray()
+        .Single(e => e.GetProperty("id").GetString() == id);
+
+    [Fact]
+    public void ExportIgnoresDifficultyServerMultiplierAndLoadedOverrides()
+    {
+        var baseline = Path.Combine(Path.GetTempPath(), "usurper-wiki-base-" + Guid.NewGuid().ToString("N"));
+        var changed = Path.Combine(Path.GetTempPath(), "usurper-wiki-changed-" + Guid.NewGuid().ToString("N"));
+        var oldHp = GameConfig.MonsterHPMultiplier;
+        var oldDifficulty = DifficultySystem.CurrentDifficulty;
+        var spell = SpellSystem.BuiltInTemplate()[0];
+        var ability = ClassAbilitySystem.BuiltInTemplate().Single(a => a.Id == "power_strike");
+        var spellId = spell.Class + ":" + spell.Level;
+        var baseMana = spell.ManaCost!.Value;
+        var baseCooldown = ability.Cooldown!.Value;
+        try
+        {
+            WikiDataExporter.Export(baseline);
+
+            GameConfig.MonsterHPMultiplier = 3.0f;
+            DifficultySystem.CurrentDifficulty = DifficultyMode.Nightmare;
+            SpellSystem.ApplyOverrides(new[] { new UsurperRemake.Data.SpellOverride
+                { Class = spell.Class, Level = spell.Level, ManaCost = baseMana + 77 } });
+            ClassAbilitySystem.ApplyOverrides(new[] { new UsurperRemake.Data.AbilityOverride
+                { Id = ability.Id, Cooldown = baseCooldown + 7 } });
+            Assert.Equal(baseMana + 77, SpellSystem.GetSpellInfo(spell.Class, spell.Level).ManaCost);
+            Assert.Equal(baseCooldown + 7, ClassAbilitySystem.GetAbility(ability.Id)!.Cooldown);
+
+            WikiDataExporter.Export(changed);
+
+            Assert.Equal(GoblinHp(baseline), GoblinHp(changed));
+            Assert.Equal(baseMana, Entry(changed, "spells", spellId).GetProperty("manaCost").GetInt32());
+            Assert.Equal(baseCooldown, Entry(changed, "abilities", ability.Id).GetProperty("cooldown").GetInt32());
+        }
+        finally
+        {
+            GameConfig.MonsterHPMultiplier = oldHp;
+            DifficultySystem.CurrentDifficulty = oldDifficulty;
+            SpellSystem.ApplyOverrides(new[] { spell });
+            ClassAbilitySystem.ApplyOverrides(new[] { ability });
+            foreach (var dir in new[] { baseline, changed })
+                if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Theory]
+    [InlineData(new object[] { new[] { "--export-wiki" } })]
+    [InlineData(new object[] { new[] { "--export-wiki", "--local" } })]
+    [InlineData(new object[] { new[] { "--export-wiki", " " } })]
+    public void CommandLineWithoutDirectoryPrintsUsageAndFails(string[] args)
+    {
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+        var exit = WikiDataExporter.RunCommandLine(args, stdout, stderr);
+        Assert.Equal(2, exit);
+        Assert.Contains("Usage: UsurperReborn --export-wiki <output directory>", stderr.ToString());
+        Assert.Equal("", stdout.ToString());
+    }
+
+    [Fact]
+    public void CommandLineWithoutFlagIsIgnoredAndWithDirectoryExports()
+    {
+        Assert.Null(WikiDataExporter.RunCommandLine(new[] { "--local" }, TextWriter.Null, TextWriter.Null));
+        var dir = Path.Combine(Path.GetTempPath(), "usurper-wiki-cli-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var stdout = new StringWriter();
+            Assert.Equal(0, WikiDataExporter.RunCommandLine(new[] { "--export-wiki", dir }, stdout, TextWriter.Null));
+            Assert.True(File.Exists(Path.Combine(dir, "meta.json")));
+            Assert.Contains(dir, stdout.ToString());
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
     }
 }

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -19,6 +20,24 @@ public static class WikiDataExporter
         Converters = { new JsonStringEnumConverter() }
     };
 
+    /// <summary>Handles <c>--export-wiki &lt;dir&gt;</c>. Returns null when the flag is absent, otherwise the exit code.</summary>
+    public static int? RunCommandLine(string[] args, TextWriter stdout, TextWriter stderr)
+    {
+        var flag = Array.IndexOf(args, "--export-wiki");
+        if (flag < 0) return null;
+        if (flag + 1 >= args.Length || string.IsNullOrWhiteSpace(args[flag + 1]) || args[flag + 1].StartsWith("--"))
+        {
+            stderr.WriteLine("Usage: UsurperReborn --export-wiki <output directory>");
+            return 2;
+        }
+        var outputDir = Path.GetFullPath(args[flag + 1]);
+        Export(outputDir);
+        stdout.WriteLine($"Wiki data exported to: {outputDir}");
+        return 0;
+    }
+
+    /// <summary>Writes the built-in datasets. Values come from shipped defaults, not from the current
+    /// difficulty, server multipliers or loaded spell and ability overrides.</summary>
     public static void Export(string outputDir)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDir);
@@ -42,9 +61,30 @@ public static class WikiDataExporter
             schemaVersion = SchemaVersion,
             gameVersion = GameConfig.Version,
             generatedAtUtc = DateTimeOffset.UtcNow,
-            commit = Environment.GetEnvironmentVariable("GITHUB_SHA"),
+            commit = Commit(),
             languages = Languages
         }, JsonOptions));
+    }
+
+    private static string? Commit()
+    {
+        var sha = Environment.GetEnvironmentVariable("GITHUB_SHA");
+        if (!string.IsNullOrWhiteSpace(sha)) return sha.Trim();
+        try
+        {
+            using var git = Process.Start(new ProcessStartInfo("git", "rev-parse HEAD")
+            {
+                RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false
+            });
+            if (git == null) return null;
+            var output = git.StandardOutput.ReadToEnd().Trim();
+            if (!git.WaitForExit(5000) || git.ExitCode != 0) return null;
+            return Regex.IsMatch(output, "^[0-9a-f]{40}$") ? output : null;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static void Write<T>(string outputDir, string fileName, T data)
@@ -189,7 +229,7 @@ public static class WikiDataExporter
             npcLifespanYears = GameConfig.RaceLifespan[entry.Key]
         }).ToArray();
 
-    private static object Spells() => SpellSystem.ExportOverrideTemplate().Select(spell =>
+    private static object Spells() => SpellSystem.BuiltInTemplate().Select(spell =>
     {
         var info = SpellSystem.GetSpellInfo(spell.Class, spell.Level);
         var key = "spell." + spell.Class.ToString().ToLowerInvariant() + "." + spell.Level;
@@ -205,7 +245,7 @@ public static class WikiDataExporter
         };
     }).ToArray();
 
-    private static object Abilities() => ClassAbilitySystem.ExportOverrideTemplate().Select(values =>
+    private static object Abilities() => ClassAbilitySystem.BuiltInTemplate().Select(values =>
     {
         var ability = ClassAbilitySystem.GetAbility(values.Id)!;
         return new
@@ -291,7 +331,7 @@ public static class WikiDataExporter
         .OrderBy(a => a.Id).Select(a => new
         {
             id = a.Id, name = Names(null, a.Name), description = Names(null, a.Description),
-            a.Category, a.Tier, a.IsSecret, a.SecretHint, a.PointValue,
+            a.Category, a.Tier, a.IsSecret, spoiler = a.IsSecret, a.SecretHint, a.PointValue,
             a.GoldReward, a.ExperienceReward
         }).ToArray();
 
