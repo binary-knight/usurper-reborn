@@ -3856,7 +3856,7 @@ public class InnLocation : BaseLocation
         while (true)
         {
             terminal.ClearScreen();
-            WriteBoxHeader($"EQUIPMENT: {target.DisplayName.ToUpper()}", "bright_cyan");
+            WriteBoxHeader(Loc.Get("team.equip_header_label", target.DisplayName.ToUpper()), "bright_cyan");
             terminal.WriteLine("");
 
             // Show target's stats
@@ -4205,7 +4205,7 @@ public class InnLocation : BaseLocation
     private async Task CompanionUnequipItemFromCharacter(Character target)
     {
         terminal.ClearScreen();
-        WriteSectionHeader($"UNEQUIP FROM {target.DisplayName.ToUpper()}", "bright_cyan");
+        WriteSectionHeader(Loc.Get("team.unequip_header", target.DisplayName.ToUpper()), "bright_cyan");
         terminal.WriteLine("");
 
         // Get all equipped slots
@@ -4223,7 +4223,7 @@ public class InnLocation : BaseLocation
         if (equippedSlots.Count == 0)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"{target.DisplayName} has no equipment to unequip.");
+            terminal.WriteLine(Loc.Get("team.no_equipment_unequip", target.DisplayName));
             await Pacing.Wait(2000);
             return;
         }

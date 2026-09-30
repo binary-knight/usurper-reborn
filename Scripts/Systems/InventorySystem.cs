@@ -730,10 +730,12 @@ namespace UsurperRemake.Systems
         private void DisplayStatsSummary()
         {
             terminal.SetColor("yellow");
+            // v1.2.2: the key carries its own frame and the labels below their own colon; the code
+            // added a second of each ("═══ ═══ EQUIPMENT BONUSES ═══ ═══", "Stats: : ").
             if (!GameConfig.ScreenReaderMode)
-                terminal.WriteLine($"═══ {Loc.Get("inventory.equipment_bonuses")} ═══");
-            else
                 terminal.WriteLine(Loc.Get("inventory.equipment_bonuses"));
+            else
+                terminal.WriteLine(Loc.Get("inventory.equipment_bonuses").Trim('═', '=', ' '));
 
             // Calculate total bonuses from equipment
             int totalWeapPow = 0, totalArmPow = 0;
@@ -776,26 +778,26 @@ namespace UsurperRemake.Systems
                 totalInt != 0 || totalWis != 0 || totalCha != 0)
             {
                 terminal.SetColor("white");
-                terminal.Write($"{Loc.Get("inventory.stats")}: ");
-                if (totalStr != 0) { terminal.SetColor("green"); terminal.Write($"Str {totalStr:+#;-#;0}  "); }
-                if (totalDex != 0) { terminal.SetColor("green"); terminal.Write($"Dex {totalDex:+#;-#;0}  "); }
-                if (totalAgi != 0) { terminal.SetColor("green"); terminal.Write($"Agi {totalAgi:+#;-#;0}  "); }
-                if (totalCon != 0) { terminal.SetColor("green"); terminal.Write($"Con {totalCon:+#;-#;0}  "); }
-                if (totalInt != 0) { terminal.SetColor("cyan"); terminal.Write($"Int {totalInt:+#;-#;0}  "); }
-                if (totalWis != 0) { terminal.SetColor("cyan"); terminal.Write($"Wis {totalWis:+#;-#;0}  "); }
-                if (totalCha != 0) { terminal.SetColor("cyan"); terminal.Write($"Cha {totalCha:+#;-#;0}  "); }
+                terminal.Write(Loc.Get("inventory.stats"));
+                if (totalStr != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_str")} {totalStr:+#;-#;0}  "); }
+                if (totalDex != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_dex")} {totalDex:+#;-#;0}  "); }
+                if (totalAgi != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_agi")} {totalAgi:+#;-#;0}  "); }
+                if (totalCon != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_con")} {totalCon:+#;-#;0}  "); }
+                if (totalInt != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_int")} {totalInt:+#;-#;0}  "); }
+                if (totalWis != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_wis")} {totalWis:+#;-#;0}  "); }
+                if (totalCha != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_cha")} {totalCha:+#;-#;0}  "); }
                 terminal.WriteLine("");
             }
 
             if (totalMaxHP != 0 || totalMaxMana != 0 || totalMR != 0 || totalDef != 0 || totalSta != 0)
             {
                 terminal.SetColor("white");
-                terminal.Write($"{Loc.Get("inventory.other")}: ");
-                if (totalMaxHP != 0) { terminal.SetColor("red"); terminal.Write($"MaxHP {totalMaxHP:+#;-#;0}  "); }
-                if (totalMaxMana != 0) { terminal.SetColor("blue"); terminal.Write($"MaxMP {totalMaxMana:+#;-#;0}  "); }
-                if (totalMR != 0) { terminal.SetColor("magenta"); terminal.Write($"MagicRes {totalMR:+#;-#;0}  "); }
-                if (totalDef != 0) { terminal.SetColor("cyan"); terminal.Write($"Def {totalDef:+#;-#;0}  "); }
-                if (totalSta != 0) { terminal.SetColor("yellow"); terminal.Write($"Sta {totalSta:+#;-#;0}  "); }
+                terminal.Write(Loc.Get("inventory.other"));
+                if (totalMaxHP != 0) { terminal.SetColor("red"); terminal.Write($"{Loc.Get("ui.max_hp")} {totalMaxHP:+#;-#;0}  "); }
+                if (totalMaxMana != 0) { terminal.SetColor("blue"); terminal.Write($"{Loc.Get("ui.max_mana")} {totalMaxMana:+#;-#;0}  "); }
+                if (totalMR != 0) { terminal.SetColor("magenta"); terminal.Write($"{Loc.Get("ui.stat_mr")} {totalMR:+#;-#;0}  "); }
+                if (totalDef != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_def")} {totalDef:+#;-#;0}  "); }
+                if (totalSta != 0) { terminal.SetColor("yellow"); terminal.Write($"{Loc.Get("ui.stat_sta")} {totalSta:+#;-#;0}  "); }
                 terminal.WriteLine("");
             }
 
@@ -1667,7 +1669,7 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>v1.2.2: the localized tier name of a rarity, for the slot screen.</summary>
-        private static string GetRarityName(EquipmentRarity rarity) => rarity switch
+        internal static string GetRarityName(EquipmentRarity rarity) => rarity switch
         {
             EquipmentRarity.Uncommon => Loc.Get("inventory.rarity_uncommon"),
             EquipmentRarity.Rare => Loc.Get("inventory.rarity_rare"),

@@ -2602,43 +2602,43 @@ public class Character
                     // Poison scales with level: 2-5 base + 1 per 10 levels
                     dmg = rnd.Next(2, 6) + (int)(Level / 10);
                     HP = Math.Max(0, HP - dmg);
-                    messages.Add(($"{DisplayName} takes {dmg} poison damage!", "green"));
+                    messages.Add((Loc.Get("status.tick_poison", DisplayName, dmg), "green"));
                     break;
 
                 case StatusEffect.Bleeding:
                     dmg = rnd.Next(1, 7) + (int)(Level / 5); // 1d6 + level scaling
                     HP = Math.Max(0, HP - dmg);
-                    messages.Add(($"{DisplayName} bleeds for {dmg} damage!", "red"));
+                    messages.Add((Loc.Get("status.tick_bleed", DisplayName, dmg), "red"));
                     break;
 
                 case StatusEffect.Burning:
                     dmg = rnd.Next(2, 9) + (int)(Level / 4); // 2d4 + level scaling
                     HP = Math.Max(0, HP - dmg);
-                    messages.Add(($"{DisplayName} burns for {dmg} fire damage!", "bright_red"));
+                    messages.Add((Loc.Get("status.tick_burn", DisplayName, dmg), "bright_red"));
                     break;
 
                 case StatusEffect.Frozen:
                     dmg = rnd.Next(1, 4) + (int)(Level / 8); // 1d3 + level scaling
                     HP = Math.Max(0, HP - dmg);
-                    messages.Add(($"{DisplayName} takes {dmg} cold damage from the frost!", "bright_cyan"));
+                    messages.Add((Loc.Get("status.tick_frost", DisplayName, dmg), "bright_cyan"));
                     break;
 
                 case StatusEffect.Cursed:
                     dmg = rnd.Next(1, 3) + (int)(Level / 10); // 1d2 + level scaling
                     HP = Math.Max(0, HP - dmg);
-                    messages.Add(($"{DisplayName} suffers {dmg} curse damage!", "magenta"));
+                    messages.Add((Loc.Get("status.tick_curse", DisplayName, dmg), "magenta"));
                     break;
 
                 case StatusEffect.Diseased:
                     dmg = 1 + (int)(Level / 15); // scales slightly with level
                     HP = Math.Max(0, HP - dmg);
-                    messages.Add(($"{DisplayName} suffers from disease! (-{dmg} HP)", "yellow"));
+                    messages.Add((Loc.Get("status.tick_disease", DisplayName, dmg), "yellow"));
                     break;
 
                 case StatusEffect.Regenerating:
                     var heal = rnd.Next(1, 7); // 1d6
                     HP = Math.Min(HP + heal, MaxHP);
-                    messages.Add(($"{DisplayName} regenerates {heal} HP!", "bright_green"));
+                    messages.Add((Loc.Get("status.tick_regen", DisplayName, heal), "bright_green"));
                     break;
 
                 case StatusEffect.Reflecting:
@@ -2670,34 +2670,34 @@ public class Character
                 case StatusEffect.Defending:
                 case StatusEffect.Protected:
                     MagicACBonus = 0;
-                    messages.Add(($"{DisplayName}'s {effectName} effect fades.", ColorRole.Notice));
+                    messages.Add((Loc.Get("status.end_effect_fades", DisplayName, effectName), ColorRole.Notice));
                     break;
                 case StatusEffect.Stoneskin:
                     DamageAbsorptionPool = 0;
-                    messages.Add(($"{DisplayName}'s stoneskin crumbles away.", ColorRole.Notice));
+                    messages.Add((Loc.Get("status.end_stoneskin", DisplayName), ColorRole.Notice));
                     break;
                 case StatusEffect.Raging:
                     IsRaging = false;
-                    messages.Add(($"{DisplayName}'s rage subsides.", ColorRole.Notice));
+                    messages.Add((Loc.Get("status.end_rage", DisplayName), ColorRole.Notice));
                     break;
                 case StatusEffect.Haste:
-                    messages.Add(($"{DisplayName} slows to normal speed.", ColorRole.Notice));
+                    messages.Add((Loc.Get("status.end_haste", DisplayName), ColorRole.Notice));
                     break;
                 case StatusEffect.Slow:
-                    messages.Add(($"{DisplayName} can move normally again.", ColorRole.Success));
+                    messages.Add((Loc.Get("status.end_slow", DisplayName), ColorRole.Success));
                     break;
                 case StatusEffect.Stunned:
                 case StatusEffect.Paralyzed:
-                    messages.Add(($"{DisplayName} recovers and can act again!", "white"));
+                    messages.Add((Loc.Get("status.end_stun", DisplayName), "white"));
                     break;
                 case StatusEffect.Silenced:
-                    messages.Add(($"{DisplayName} can cast spells again.", "bright_cyan"));
+                    messages.Add((Loc.Get("status.end_silence", DisplayName), "bright_cyan"));
                     break;
                 case StatusEffect.Blinded:
-                    messages.Add(($"{DisplayName}'s vision clears.", "white"));
+                    messages.Add((Loc.Get("status.end_blind", DisplayName), "white"));
                     break;
                 case StatusEffect.Sleeping:
-                    messages.Add(($"{DisplayName} wakes up!", "white"));
+                    messages.Add((Loc.Get("status.end_sleep", DisplayName), "white"));
                     break;
                 case StatusEffect.Poisoned:
                 case StatusEffect.Bleeding:
@@ -2705,14 +2705,14 @@ public class Character
                 case StatusEffect.Frozen:
                 case StatusEffect.Cursed:
                 case StatusEffect.Diseased:
-                    messages.Add(($"{DisplayName} is no longer {s.ToString().ToLower()}.", ColorRole.Success));
+                    messages.Add((Loc.Get($"status.end_{s.ToString().ToLowerInvariant()}", DisplayName), ColorRole.Success));
                     break;
                 case StatusEffect.Lifesteal:
                     StatusLifestealPercent = 0;
-                    messages.Add(($"{DisplayName}'s lifesteal fades.", ColorRole.Notice));
+                    messages.Add((Loc.Get("status.end_lifesteal", DisplayName), ColorRole.Notice));
                     break;
                 default:
-                    messages.Add(($"{DisplayName}'s {effectName} wears off.", ColorRole.Notice));
+                    messages.Add((Loc.Get("status.end_wears_off", DisplayName, effectName), ColorRole.Notice));
                     break;
             }
         }

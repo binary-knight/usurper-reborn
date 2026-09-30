@@ -2557,7 +2557,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("#");
         terminal.SetColor("darkgray");
-        terminal.Write("]Buy  ");
+        terminal.Write($"]{Loc.Get("shop.buy")}  ");
 
         if (_accessoryPage > 0)
         {
@@ -2566,7 +2566,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write("P");
             terminal.SetColor("darkgray");
-            terminal.Write("]Prev  ");
+            terminal.Write($"]{Loc.Get("magic_shop.menu_prev")}  ");
         }
 
         if (_accessoryPage < totalPages - 1)
@@ -2576,7 +2576,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_yellow");
             terminal.Write("N");
             terminal.SetColor("darkgray");
-            terminal.Write("]Next  ");
+            terminal.Write($"]{Loc.Get("magic_shop.menu_next")}  ");
         }
 
         terminal.SetColor("darkgray");
@@ -2584,7 +2584,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write("S");
         terminal.SetColor("darkgray");
-        terminal.Write("]Sell  ");
+        terminal.Write($"]{Loc.Get("shop.sell")}  ");
 
         terminal.SetColor("darkgray");
         terminal.Write("[");
@@ -2593,7 +2593,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("red");
-        terminal.WriteLine("Back");
+        terminal.WriteLine(Loc.Get("inventory.back"));
         terminal.WriteLine("");
 
         ShowStatusLine();
@@ -2682,13 +2682,13 @@ public partial class MagicShopLocation : BaseLocation
         terminal.SetColor("bright_white");
         terminal.WriteLine($"  {item.Name}");
         terminal.SetColor("gray");
-        terminal.Write($"  Rarity: ");
+        terminal.Write($"  {Loc.Get("weapon_shop.reforge_rarity")}: ");
         terminal.SetColor(item.GetRarityColor());
-        terminal.Write($"{item.Rarity}");
+        terminal.Write(InventorySystem.GetRarityName(item.Rarity));
         if (item.MinLevel > 0)
         {
             terminal.SetColor("gray");
-            terminal.Write($"   Level: {item.MinLevel}+");
+            terminal.Write($"   {Loc.Get("ui.level")}: {item.MinLevel}+");
         }
         terminal.WriteLine("");
         var detailStats = GetAccessoryDetailedStats(item);
@@ -2730,17 +2730,21 @@ public partial class MagicShopLocation : BaseLocation
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"  {Loc.Get("magic_shop.both_rings_occupied")}");
                         terminal.SetColor("white");
+                        // the two labels share one width so the ring names line up in every language
+                        string leftLabel = Loc.Get("magic_shop.ring_left") + ":";
+                        string rightLabel = Loc.Get("magic_shop.ring_right") + ":";
+                        int labelWidth = Math.Max(leftLabel.Length, rightLabel.Length) + 1;
                         if (IsScreenReader)
                         {
-                            terminal.WriteLine($"    L. Left:  {lf.Name}");
-                            terminal.WriteLine($"    R. Right: {rf.Name}");
-                            terminal.WriteLine($"    C. Cancel purchase");
+                            terminal.WriteLine($"    L. {leftLabel.PadRight(labelWidth)}{lf.Name}");
+                            terminal.WriteLine($"    R. {rightLabel.PadRight(labelWidth)}{rf.Name}");
+                            terminal.WriteLine($"    C. {Loc.Get("magic_shop.cancel_purchase")}");
                         }
                         else
                         {
-                            terminal.WriteLine($"    [L] Left:  {lf.Name}");
-                            terminal.WriteLine($"    [R] Right: {rf.Name}");
-                            terminal.WriteLine($"    [C] Cancel purchase");
+                            terminal.WriteLine($"    [L] {leftLabel.PadRight(labelWidth)}{lf.Name}");
+                            terminal.WriteLine($"    [R] {rightLabel.PadRight(labelWidth)}{rf.Name}");
+                            terminal.WriteLine($"    [C] {Loc.Get("magic_shop.cancel_purchase")}");
                         }
                         var fingerChoice = await terminal.GetInput($"  {Loc.Get("magic_shop.replace_which_ring")}");
                         var fc = fingerChoice.Trim().ToUpper();
@@ -2969,21 +2973,21 @@ public partial class MagicShopLocation : BaseLocation
     private static string GetAccessoryDetailedStats(Equipment item)
     {
         var bonuses = new List<string>();
-        if (item.StrengthBonus != 0) bonuses.Add($"Str{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
-        if (item.DexterityBonus != 0) bonuses.Add($"Dex{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
-        if (item.ConstitutionBonus != 0) bonuses.Add($"Con{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
-        if (item.IntelligenceBonus != 0) bonuses.Add($"Int{(item.IntelligenceBonus > 0 ? "+" : "")}{item.IntelligenceBonus}");
-        if (item.WisdomBonus != 0) bonuses.Add($"Wis{(item.WisdomBonus > 0 ? "+" : "")}{item.WisdomBonus}");
-        if (item.DefenceBonus != 0) bonuses.Add($"Def{(item.DefenceBonus > 0 ? "+" : "")}{item.DefenceBonus}");
-        if (item.AgilityBonus != 0) bonuses.Add($"Agi{(item.AgilityBonus > 0 ? "+" : "")}{item.AgilityBonus}");
-        if (item.CharismaBonus != 0) bonuses.Add($"Cha{(item.CharismaBonus > 0 ? "+" : "")}{item.CharismaBonus}");
-        if (item.MaxHPBonus != 0) bonuses.Add($"HP+{item.MaxHPBonus}");
-        if (item.MaxManaBonus != 0) bonuses.Add($"MP+{item.MaxManaBonus}");
-        if (item.StaminaBonus != 0) bonuses.Add($"Sta{(item.StaminaBonus > 0 ? "+" : "")}{item.StaminaBonus}");
-        if (item.MagicResistance != 0) bonuses.Add($"MR+{item.MagicResistance}");
-        if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
-        if (item.CriticalDamageBonus != 0) bonuses.Add($"CritDmg+{item.CriticalDamageBonus}%");
-        if (item.LifeSteal != 0) bonuses.Add($"Lifesteal+{item.LifeSteal}%");
+        if (item.StrengthBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_str")}{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
+        if (item.DexterityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")}{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
+        if (item.ConstitutionBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_con")}{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
+        if (item.IntelligenceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_int")}{(item.IntelligenceBonus > 0 ? "+" : "")}{item.IntelligenceBonus}");
+        if (item.WisdomBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_wis")}{(item.WisdomBonus > 0 ? "+" : "")}{item.WisdomBonus}");
+        if (item.DefenceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_def")}{(item.DefenceBonus > 0 ? "+" : "")}{item.DefenceBonus}");
+        if (item.AgilityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_agi")}{(item.AgilityBonus > 0 ? "+" : "")}{item.AgilityBonus}");
+        if (item.CharismaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_cha")}{(item.CharismaBonus > 0 ? "+" : "")}{item.CharismaBonus}");
+        if (item.MaxHPBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_hp")}+{item.MaxHPBonus}");
+        if (item.MaxManaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_mp")}+{item.MaxManaBonus}");
+        if (item.StaminaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_sta")}{(item.StaminaBonus > 0 ? "+" : "")}{item.StaminaBonus}");
+        if (item.MagicResistance != 0) bonuses.Add($"{Loc.Get("ui.stat_mr")}+{item.MagicResistance}");
+        if (item.CriticalChanceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_crit")}+{item.CriticalChanceBonus}%");
+        if (item.CriticalDamageBonus != 0) bonuses.Add($"{Loc.Get("ui.crit_damage")}+{item.CriticalDamageBonus}%");
+        if (item.LifeSteal != 0) bonuses.Add($"{Loc.Get("ui.life_steal")}+{item.LifeSteal}%");
         // v0.62.1 stat-order consistency.
         bonuses.Sort(System.StringComparer.Ordinal);
         return string.Join("  ", bonuses);
