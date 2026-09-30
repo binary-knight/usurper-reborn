@@ -114,8 +114,14 @@ Wiki-only operation does not require a gossip channel. Do not test by sending
 unsolicited messages to a live channel. Local tests use fake Discord messages
 and an isolated SQLite database.
 
-Ask consumes bot mentions before gossip routing, even in a disallowed channel
-or when configuration fails. It reads only the built public index, returns
+Ask handles a bot mention only when the wiki bot is enabled (at least one
+channel in `DISCORD_WIKI_CHANNEL_IDS`) and the message is a guild message in one
+of those channels. It then consumes the mention and never relays it to game
+gossip, including when the request fails. Every other message, including a bot
+mention in the gossip channel or any message while no wiki channel is set, goes
+through gossip routing unchanged. Use a wiki channel separate from the gossip
+channel. If the wiki bot fails to start, mentions in the wiki channels are
+dropped rather than relayed. Ask reads only the built public index, returns
 excerpts and links, and says when no match exists. No model or GitHub token is
 used. Ask permits one request per user per ten seconds and at most thirty
 handled requests per minute globally, with a 300-character question cap.
@@ -128,8 +134,8 @@ thirty globally per rolling 24 hours, enforced in a SQLite transaction and
 preserved across restarts. Duplicate message IDs do not create another report.
 Database or Discord failures are consumed, never relayed as game gossip.
 
-No repository writer, agent or workflow-dispatch token is installed on the
-production server. The owner manually moves a report into the off-server
+The wiki features use no GitHub token on the production server and do not
+write to the repository. The owner manually moves a report into the off-server
 review workflow. This implements the approved initial queue/review option;
 autonomous agent drafting remains a later, separately configured extension.
 
@@ -157,9 +163,12 @@ autonomous agent drafting remains a later, separately configured extension.
 Supply multi-line Markdown through a file input rather than a single-line web
 form, for example `gh workflow run wiki-suggestion.yml --ref main -F
 markdown=@/path/to/reviewed-page.md` along with the other required inputs.
-The workflow's GitHub token cannot automatically trigger another PR workflow.
-After it opens the draft, mark it ready for review as the owner to start the
-normal CI and path-guard checks. Do not merge an unchecked draft.
+The workflow opens the draft with its `GITHUB_TOKEN`, and GitHub does not
+start other workflows for events caused by that token, so no CI or path-guard
+check runs when the draft opens. Mark the draft ready for review as the owner:
+the CI pipeline and the path guard both trigger on `ready_for_review` (and on
+`opened`, `synchronize` and `reopened` from other actors), so that action runs
+them. Do not merge a draft whose checks have not run.
 
 For queue inspection and outcome recording with an explicitly selected
 database:
@@ -175,8 +184,11 @@ the final outcome on the authoritative audit database; this tool is never
 invoked by the production web process. No automated token or repository write
 is needed there.
 
-Create a protected GitHub environment named `wiki-review` with the owner as a
-required reviewer, and allow GitHub Actions to create pull requests. Make the
+Before the first run of **Draft reviewed wiki suggestion**, create the GitHub
+environment `wiki-review` with the owner as a required reviewer. A workflow
+that names a missing environment makes GitHub create it with no protection
+rules, so the first run would not wait for approval. Also allow GitHub Actions
+to create pull requests. Make the
 wiki build and suggestion path-guard checks required before merge. The path
 guard uses the base repository's workflow and the PR files API; it never
 checks out or executes the proposed code. PRs from `wiki/suggestion-*` branches

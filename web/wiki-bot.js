@@ -134,8 +134,9 @@ function createWikiBot({
     if (message.author.bot || !botId) return false;
     const mention = new RegExp(`<@!?${botId}>`, "g");
     if (!mention.test(message.content || "")) return false;
-    // Every bot mention is consumed, including disallowed channels. Never relay it.
-    if (!message.guildId || !allowed.has(message.channelId)) return true;
+    // Only a guild mention in a configured wiki channel is the wiki bot's. Anything else,
+    // including every message while no wiki channel is configured, goes on to gossip routing.
+    if (!message.guildId || !allowed.has(message.channelId)) return false;
     const send = (content) =>
       message.channel.send({
         content: content.slice(0, 1900),

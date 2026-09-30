@@ -39,7 +39,15 @@ test("suggestion workflow is manual, owner-verified, off-server and draft-only",
     ),
   );
   const guard = load("wiki-suggestion-guard.yml");
-  assert.ok(guard.on.pull_request_target);
+  assert.deepEqual(
+    [...guard.on.pull_request_target.types].sort(),
+    ["opened", "ready_for_review", "reopened", "synchronize"],
+  );
+  assert.deepEqual(Object.keys(guard.on), ["pull_request_target"]);
+  assert.deepEqual(guard.permissions, {
+    contents: "read",
+    "pull-requests": "read",
+  });
   assert.equal(guard.permissions.contents, "read");
   assert.ok(!guard.jobs["docs-only"].steps.some((s) => s.uses));
 });

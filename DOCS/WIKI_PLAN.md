@@ -151,8 +151,8 @@ Phase 4 adds Suggest with a role gate, per-user and global limits, and an audit
 record. The production Node process only records or dispatches a suggestion.
 A drafting agent off the server treats the suggestion as untrusted data, checks
 claims against code and exported facts, edits only `DOCS/wiki/` on a branch,
-and opens a pull request for owner review. The production process holds no
-repository write token. No suggestion publishes automatically.
+and opens a pull request for owner review. The wiki features on the production
+process use no GitHub token. No suggestion publishes automatically.
 
 ## Reviewable implementation phases
 

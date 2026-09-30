@@ -60,17 +60,35 @@ test("Ask uses cited excerpts, disables mentions, and consumes bot questions", a
   assert.match(f.sent[0].content, /Prayer at the Temple/);
   assert.deepEqual(f.sent[0].allowedMentions.parse, []);
   assert.equal(await f.bot.handle(f.message("ordinary gossip"), "123"), false);
+  assert.equal(f.sent.length, 1);
+});
+test("Mentions outside the wiki channels are left for gossip routing", async () => {
+  const f = fixture();
   assert.equal(
     await f.bot.handle(
-      f.message("<@123> question", { channelId: "not-allowed" }),
+      f.message("<@123> anyone online?", { channelId: "gossip" }),
       "123",
     ),
-    true,
+    false,
   );
   assert.equal(
     await f.bot.handle(f.message("<@123> question", { guildId: null }), "123"),
-    true,
+    false,
   );
+  const disabled = fixture({ channels: [] });
+  assert.equal(
+    await disabled.bot.handle(
+      disabled.message("<@123> anyone online?", { channelId: "gossip" }),
+      "123",
+    ),
+    false,
+  );
+  assert.equal(
+    await disabled.bot.handle(disabled.message("<@123> how does Favor work?"), "123"),
+    false,
+  );
+  assert.equal(f.sent.length + disabled.sent.length, 0);
+  assert.equal(await f.bot.handle(f.message("<@123> Favor"), "123"), true);
   assert.equal(f.sent.length, 1);
 });
 test("Ask says no match and enforces request length and cooldown", async () => {

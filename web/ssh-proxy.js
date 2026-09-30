@@ -4028,8 +4028,10 @@ function startDiscordBridge() {
   discordClient.on(Events.MessageCreate, async message => {
     if (message.author.bot) return;
     if (wikiBot && await wikiBot.handle(message, discordClient.user?.id)) return;
-    // A configuration failure must not leak a wiki question into game gossip.
-    if (discordClient.user && new RegExp(`<@!?${discordClient.user.id}>`).test(message.content || '')) return;
+    // A wiki bot that failed to start must not leak a wiki-channel question into game gossip.
+    // Mentions outside the wiki channels route exactly as before.
+    if (!wikiBot && wikiChannels.includes(message.channelId) && discordClient.user &&
+        new RegExp(`<@!?${discordClient.user.id}>`).test(message.content || '')) return;
     if (message.channelId !== DISCORD_GOSSIP_CHANNEL_ID) return;
 
     // v0.57.13: intercept Discord-side commands (prefixed with `!`) BEFORE the
