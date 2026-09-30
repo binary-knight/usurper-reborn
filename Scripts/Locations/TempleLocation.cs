@@ -970,7 +970,7 @@ public partial class TempleLocation : BaseLocation
         if (isEvilGod)
         {
             // Evil god sacrifice - dark act — v0.57.12: paired movement
-            currentPlayer.DarkNr++;
+            // 1.2.2: an offering is not a deed, so no good or dark deed count is refunded
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, standingGain, isGood: false, "temple.evil_sacrifice");
             UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheShadows, standingGain);
             terminal.SetColor("bright_magenta");
@@ -979,7 +979,7 @@ public partial class TempleLocation : BaseLocation
         else
         {
             // Good god sacrifice - light act — v0.57.12: paired movement
-            currentPlayer.ChivNr++;
+            // 1.2.2: an offering is not a deed, so no good or dark deed count is refunded
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, standingGain, isGood: true, "temple.good_sacrifice");
             UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, standingGain);
             terminal.SetColor("bright_cyan");
@@ -1689,7 +1689,7 @@ public partial class TempleLocation : BaseLocation
         if (isEvilGod)
         {
             // v0.57.12: paired movement
-            currentPlayer.DarkNr++;
+            // 1.2.2: an offering is not a deed, so no good or dark deed count is refunded
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, amount, isGood: false, "temple.evil_devotion");
             UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheShadows, amount);
             terminal.SetColor("bright_magenta");
@@ -1698,7 +1698,7 @@ public partial class TempleLocation : BaseLocation
         else
         {
             // v0.57.12: paired movement
-            currentPlayer.ChivNr++;
+            // 1.2.2: an offering is not a deed, so no good or dark deed count is refunded
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, amount, isGood: true, "temple.good_devotion");
             UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, amount);
             terminal.SetColor("bright_cyan");
@@ -2960,7 +2960,7 @@ public partial class TempleLocation : BaseLocation
             Math.Max(1, (int)(amount / 100)));
         if (standingGain > 0)
         {
-            currentPlayer.ChivNr++;
+            // 1.2.2: an offering is not a deed, so no good or dark deed count is refunded
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, standingGain, isGood: true, "temple.immortal_sacrifice");
             UsurperRemake.Systems.FactionSystem.Instance.ModifyReputation(UsurperRemake.Systems.Faction.TheFaith, standingGain);
             terminal.SetColor("bright_cyan");
