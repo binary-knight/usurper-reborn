@@ -12170,30 +12170,30 @@ public partial class CombatEngine
             var newBonuses = new List<string>();
 
             // Current item bonuses
-            if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"Str {currentEquip.StrengthBonus:+#;-#;0}");
-            if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"Dex {currentEquip.DexterityBonus:+#;-#;0}");
-            if (currentEquip.AgilityBonus != 0) currentBonuses.Add($"Agi {currentEquip.AgilityBonus:+#;-#;0}");
-            if (currentEquip.ConstitutionBonus != 0) currentBonuses.Add($"Con {currentEquip.ConstitutionBonus:+#;-#;0}");
-            if (currentEquip.IntelligenceBonus != 0) currentBonuses.Add($"Int {currentEquip.IntelligenceBonus:+#;-#;0}");
-            if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"Wis {currentEquip.WisdomBonus:+#;-#;0}");
-            if (currentEquip.CharismaBonus != 0) currentBonuses.Add($"Cha {currentEquip.CharismaBonus:+#;-#;0}");
-            if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"HP {currentEquip.MaxHPBonus:+#;-#;0}");
-            if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"Mana {currentEquip.MaxManaBonus:+#;-#;0}");
-            if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"Def {currentEquip.DefenceBonus:+#;-#;0}");
+            if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_str")} {currentEquip.StrengthBonus:+#;-#;0}");
+            if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_dex")} {currentEquip.DexterityBonus:+#;-#;0}");
+            if (currentEquip.AgilityBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_agi")} {currentEquip.AgilityBonus:+#;-#;0}");
+            if (currentEquip.ConstitutionBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_con")} {currentEquip.ConstitutionBonus:+#;-#;0}");
+            if (currentEquip.IntelligenceBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_int")} {currentEquip.IntelligenceBonus:+#;-#;0}");
+            if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_wis")} {currentEquip.WisdomBonus:+#;-#;0}");
+            if (currentEquip.CharismaBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_cha")} {currentEquip.CharismaBonus:+#;-#;0}");
+            if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_hp")} {currentEquip.MaxHPBonus:+#;-#;0}");
+            if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_mana")} {currentEquip.MaxManaBonus:+#;-#;0}");
+            if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_def")} {currentEquip.DefenceBonus:+#;-#;0}");
 
             // New item bonuses
-            if (lootItem.Strength != 0) newBonuses.Add($"Str {lootItem.Strength:+#;-#;0}");
-            if (lootItem.Dexterity != 0) newBonuses.Add($"Dex {lootItem.Dexterity:+#;-#;0}");
-            if (lootItem.Agility != 0) newBonuses.Add($"Agi {lootItem.Agility:+#;-#;0}");
-            if (lootItem.Wisdom != 0) newBonuses.Add($"Wis {lootItem.Wisdom:+#;-#;0}");
-            if (lootItem.Charisma != 0) newBonuses.Add($"Cha {lootItem.Charisma:+#;-#;0}");
-            if (lootItem.Defence != 0) newBonuses.Add($"Def {lootItem.Defence:+#;-#;0}");
+            if (lootItem.Strength != 0) newBonuses.Add($"{Loc.Get("ui.stat_str")} {lootItem.Strength:+#;-#;0}");
+            if (lootItem.Dexterity != 0) newBonuses.Add($"{Loc.Get("ui.stat_dex")} {lootItem.Dexterity:+#;-#;0}");
+            if (lootItem.Agility != 0) newBonuses.Add($"{Loc.Get("ui.stat_agi")} {lootItem.Agility:+#;-#;0}");
+            if (lootItem.Wisdom != 0) newBonuses.Add($"{Loc.Get("ui.stat_wis")} {lootItem.Wisdom:+#;-#;0}");
+            if (lootItem.Charisma != 0) newBonuses.Add($"{Loc.Get("ui.stat_cha")} {lootItem.Charisma:+#;-#;0}");
+            if (lootItem.Defence != 0) newBonuses.Add($"{Loc.Get("ui.stat_def")} {lootItem.Defence:+#;-#;0}");
             int lootConBonus = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Item2) ?? 0;
             int lootIntBonus = lootItem.LootEffects?.Where(e => e.Item1 == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Item2) ?? 0;
-            if (lootConBonus != 0) newBonuses.Add($"Con {lootConBonus:+#;-#;0}");
-            if (lootIntBonus != 0) newBonuses.Add($"Int {lootIntBonus:+#;-#;0}");
-            if (lootItem.HP != 0) newBonuses.Add($"HP {lootItem.HP:+#;-#;0}");
-            if (lootItem.Mana != 0) newBonuses.Add($"Mana {lootItem.Mana:+#;-#;0}");
+            if (lootConBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_con")} {lootConBonus:+#;-#;0}");
+            if (lootIntBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_int")} {lootIntBonus:+#;-#;0}");
+            if (lootItem.HP != 0) newBonuses.Add($"{Loc.Get("ui.stat_hp")} {lootItem.HP:+#;-#;0}");
+            if (lootItem.Mana != 0) newBonuses.Add($"{Loc.Get("ui.stat_mana")} {lootItem.Mana:+#;-#;0}");
 
             // v0.62.1 (player report Lv.6 Human Sage): the two bonus lists above are
             // populated in different orders -- current item walks Str/Dex/Agi/Con/Int/Wis/Cha/HP/Mana/Def
