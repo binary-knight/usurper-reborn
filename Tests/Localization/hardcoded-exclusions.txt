@@ -1,0 +1,21 @@
+# Files, folders and classes the hardcoded text scanner leaves out, one per line: kind|target|reason
+# kind is file (repo relative path), folder (path prefix) or class (type name, any file).
+# Everything else under Scripts/ is scanned.
+file|Scripts/Systems/SysOpConsoleManager.cs|BBS door SysOp administration console, SysOp security level only
+file|Scripts/Systems/OnlineAdminConsole.cs|online server admin console, admin accounts only
+file|Scripts/Systems/SysOpConfigSystem.cs|SysOp configuration storage and its admin screens
+file|Scripts/Systems/ServerSettingsRegistry.cs|server settings edited from the admin consoles
+file|Scripts/Locations/SysOpLocation.cs|SysOp location, reachable only with SysOp security level
+file|Scripts/Server/WizardCommandSystem.cs|MUD wizard (staff) commands
+file|Scripts/Server/WizNet.cs|wizard only chat channel
+file|Scripts/Systems/DebugLogger.cs|debug log writer, output goes to log files
+file|Scripts/Systems/WikiDataExporter.cs|developer export for the wiki build, not shown in game
+folder|Scripts/Editor/|offline modding and save editor (--editor), Console and Spectre output for the operator
+class|SysOpConsoleManager|admin console, also matched if code moves to another file
+class|OnlineAdminConsole|admin console, also matched if code moves to another file
+class|WizardCommandSystem|wizard commands, also matched if code moves to another file
+# Not files, but rules the scanner applies everywhere:
+#   Console.*, Console.Error.*, Console.Out.*, DebugLogger.*, GD.*, logger/Log/Debug/Trace calls: not sinks (launcher, door startup and log output).
+#   throw new X("..."): not a sink; where ex.Message is written to a terminal the surrounding literal counts.
+#   Loc.Get(...) and any other call inside a text argument: not followed, so keys and their arguments do not count.
+#   Colour name arguments ("dark_green") and Loc key shaped strings ("combat.menu.attack"): not counted.
