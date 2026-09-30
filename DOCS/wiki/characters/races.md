@@ -1,7 +1,7 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Core/GameConfig.cs
 ---
 Race contributes bonuses at character creation and limits some class choices. Race also affects dungeon Mental strain; inspect your Status rather than assuming two equally leveled characters recover or strain identically.
