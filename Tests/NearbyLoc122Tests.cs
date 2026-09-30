@@ -112,7 +112,7 @@ public class NearbyLoc122Tests
             var loot = new Item { Name = "Test Plate", Type = ObjType.Body, Armor = 9, Strength = 3, Wisdom = 2, HP = 4, Stamina = 1, Value = 100, IsIdentified = true };
             var monster = new Monster { Name = "Kobold", Level = 3, HP = 0, MaxHP = 10 };
             await (Task)typeof(CombatEngine).GetMethod("RenderEquipment", F)!
-                .Invoke(engine, new object?[] { loot, monster, Hero(), new StringBuilder() })!;
+                .Invoke(engine, new object?[] { loot, monster, Hero(), new CombatEngine.LocalizedLines() })!;
             string t = Shown(term, output);
             Capture($"nearby-loot-{lang}.txt", t);
             t.Should().Contain($"{Loc.Get("ui.stat_str")} +3").And.Contain($"{Loc.Get("ui.stat_hp")} +4");
