@@ -26,7 +26,7 @@
   },
   "Scripts/Core/GameConfig.cs": {
     "data": {
-      "count": 103,
+      "count": 101,
       "sites": [
         "0127b41029",
         "016e790b0e",
@@ -72,7 +72,6 @@
         "6a1a02b959",
         "6c7c994234",
         "6d59f71748",
-        "6dfd813d77",
         "6f1cdaa124",
         "705fd743f4",
         "763dc099dc",
@@ -85,7 +84,6 @@
         "8c7596c110",
         "8edd90751c",
         "901982d528",
-        "91f27c9053",
         "9f03bc6226",
         "a00f03a542",
         "a691b37b3c",
@@ -136,39 +134,27 @@
   },
   "Scripts/Core/GameEngine.cs": {
     "data": {
-      "count": 31,
+      "count": 19,
       "sites": [
         "0b7a6165e1",
         "1f5009cf50",
         "20283e6fa7",
         "2135338442",
         "21cae8bb45",
-        "29e7ba551f",
-        "388ce5264c",
         "3ebe50a789",
         "431804ea3b",
         "434c1fe28e",
-        "4394895962",
-        "56de0f812f",
-        "5f1f667079",
         "72bc23956a",
         "79a0117cb2",
-        "88ed948d14",
-        "8c990a8cf5",
         "923ee380ce",
         "9657a6a142",
-        "9e7d2a3974",
         "b06b8af627",
-        "b86341bc00",
         "c19ab24457",
         "c2a84ccd48",
         "c314c0635c",
-        "d3c9702277",
-        "db13d9c728",
         "e6ecd0113b",
         "e8dc89e697",
-        "f3552e998c",
-        "ffbaff8bbd"
+        "f3552e998c"
       ]
     },
     "electron": {
@@ -258,7 +244,7 @@
   },
   "Scripts/Core/King.cs": {
     "data": {
-      "count": 22,
+      "count": 21,
       "sites": [
         "0914d79e96",
         "0aaffbe643",
@@ -275,7 +261,6 @@
         "a013eff7f7",
         "a0237fe0da",
         "bac6ba58f7",
-        "c60ed1d824",
         "ca18507100",
         "ce7c1f963e",
         "e2f4a99d6a",
@@ -299,25 +284,14 @@
   },
   "Scripts/Core/NPC.cs": {
     "data": {
-      "count": 17,
+      "count": 6,
       "sites": [
         "1a466df669",
         "28acccab09",
         "2a91bfdc5f",
-        "3c0085ef73",
-        "4394895962",
-        "5da38aee07",
-        "5f1f667079",
         "6336d1906d",
-        "63c0e75475",
-        "7c822936e2",
         "8b47086d82",
-        "8c990a8cf5",
-        "a429f82db1",
-        "b7cc2e3615",
-        "f19dc7eb55",
-        "f402b681a3",
-        "f402b681a3"
+        "f19dc7eb55"
       ]
     }
   },
@@ -1938,17 +1912,9 @@
       ]
     }
   },
-  "Scripts/Locations/AnchorRoadLocation.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "0334c96ac1"
-      ]
-    }
-  },
   "Scripts/Locations/ArenaLocation.cs": {
     "data": {
-      "count": 18,
+      "count": 17,
       "sites": [
         "016e790b0e",
         "24660de1fb",
@@ -1964,7 +1930,6 @@
         "8306dfab4d",
         "8edd90751c",
         "b7b51770e5",
-        "bdb94954af",
         "d9cbce3516",
         "e25f1c5eff",
         "e8c224d6ae"
@@ -1982,9 +1947,8 @@
   },
   "Scripts/Locations/ArmorShopLocation.cs": {
     "data": {
-      "count": 3,
+      "count": 2,
       "sites": [
-        "68ea8d9fd8",
         "f7eb4bbdec",
         "f7eb4bbdec"
       ]
@@ -2008,11 +1972,10 @@
   },
   "Scripts/Locations/BankLocation.cs": {
     "data": {
-      "count": 4,
+      "count": 3,
       "sites": [
         "48e1ad3e66",
         "4fac5bf74c",
-        "5ad8a7904c",
         "86f8a15a74"
       ]
     }
@@ -2132,12 +2095,6 @@
     }
   },
   "Scripts/Locations/ChurchLocation.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "2eba6c73b7"
-      ]
-    },
     "electron": {
       "count": 7,
       "sites": [
@@ -2153,7 +2110,7 @@
   },
   "Scripts/Locations/DarkAlleyLocation.cs": {
     "data": {
-      "count": 11,
+      "count": 10,
       "sites": [
         "35e5c84d26",
         "3e34a81348",
@@ -2164,8 +2121,7 @@
         "b3742bdd5d",
         "b6d12e7334",
         "bee166c6e4",
-        "e38fb8ff6e",
-        "fc42289c72"
+        "e38fb8ff6e"
       ]
     },
     "electron": {
@@ -2192,15 +2148,12 @@
   },
   "Scripts/Locations/DungeonLocation.cs": {
     "data": {
-      "count": 187,
+      "count": 179,
       "sites": [
         "017209f11e",
         "017a961546",
         "0239a442df",
         "023d23346f",
-        "056cf7c5d1",
-        "056cf7c5d1",
-        "056cf7c5d1",
         "075507b90f",
         "078bbae720",
         "07e1682f82",
@@ -2274,9 +2227,6 @@
         "5ead315d35",
         "5ecaf5caab",
         "5ecda76b10",
-        "605226b050",
-        "605226b050",
-        "605226b050",
         "60f0cc2065",
         "63eaae98c9",
         "63ef064774",
@@ -2304,7 +2254,6 @@
         "8c8046b1e6",
         "8d1cc1fa76",
         "8dc624dac8",
-        "8dea42f688",
         "8f16bbbe4c",
         "9395564b83",
         "95cb8373a6",
@@ -2346,7 +2295,6 @@
         "c8ea18ebaf",
         "c930986586",
         "ca719fe9ff",
-        "cb2ba02223",
         "cc7b2e2458",
         "d09de39fb5",
         "d1c9dd0343",
@@ -2393,12 +2341,11 @@
   },
   "Scripts/Locations/HealerLocation.cs": {
     "data": {
-      "count": 4,
+      "count": 3,
       "sites": [
         "2b503ba6e0",
         "b8cc18a908",
-        "c7f8f701b5",
-        "e7a2e19f06"
+        "c7f8f701b5"
       ]
     },
     "electron": {
@@ -2417,12 +2364,11 @@
   },
   "Scripts/Locations/HomeLocation.cs": {
     "data": {
-      "count": 6,
+      "count": 5,
       "sites": [
         "091f7513ae",
         "1484a73975",
         "375eaec2f1",
-        "4aad045f16",
         "724fb797f7",
         "e5929adfd6"
       ]
@@ -2506,7 +2452,7 @@
   },
   "Scripts/Locations/LoveStreetLocation.cs": {
     "data": {
-      "count": 67,
+      "count": 66,
       "sites": [
         "03b4edacdb",
         "0902a5af91",
@@ -2567,7 +2513,6 @@
         "e01fbee008",
         "e28cb45e05",
         "e2dbfb00c1",
-        "e68a5a475c",
         "e733ebbeb0",
         "e930c36a27",
         "ea99d53e48",
@@ -2592,7 +2537,7 @@
   },
   "Scripts/Locations/MagicShopLocation.cs": {
     "data": {
-      "count": 72,
+      "count": 71,
       "sites": [
         "022d7dd097",
         "03ba324067",
@@ -2619,7 +2564,6 @@
         "5d3df72347",
         "5d579edc57",
         "62f1a0f7e3",
-        "69a28daba9",
         "6ba1f00952",
         "7212589938",
         "757f26212d",
@@ -2683,9 +2627,8 @@
   },
   "Scripts/Locations/MainStreetLocation.cs": {
     "data": {
-      "count": 4,
+      "count": 3,
       "sites": [
-        "1f817aa6b9",
         "71d36a3ba6",
         "e1b06b1921",
         "f74c99ef10"
@@ -2700,12 +2643,6 @@
     }
   },
   "Scripts/Locations/MusicShopLocation.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "23c765e879"
-      ]
-    },
     "electron": {
       "count": 4,
       "sites": [
@@ -2813,7 +2750,7 @@
   },
   "Scripts/Locations/TempleLocation.cs": {
     "data": {
-      "count": 23,
+      "count": 22,
       "sites": [
         "0743c1cf9f",
         "2bcb4ef0ca",
@@ -2830,7 +2767,6 @@
         "902a672ebe",
         "a38662e0a8",
         "a5149779f5",
-        "a87665431a",
         "a8a07c75fe",
         "afb5cd9944",
         "b9ed30a538",
@@ -5389,38 +5325,6 @@
       ]
     }
   },
-  "Scripts/Systems/NPCSpawnSystem.cs": {
-    "data": {
-      "count": 17,
-      "sites": [
-        "29e7ba551f",
-        "324902522e",
-        "388ce5264c",
-        "4394895962",
-        "4394895962",
-        "56de0f812f",
-        "56de0f812f",
-        "5f1f667079",
-        "876043d4a9",
-        "88ed948d14",
-        "8c990a8cf5",
-        "8c990a8cf5",
-        "9e7d2a3974",
-        "b86341bc00",
-        "d3c9702277",
-        "db13d9c728",
-        "ffbaff8bbd"
-      ]
-    }
-  },
-  "Scripts/Systems/NewsSystem.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "cb03e58a16"
-      ]
-    }
-  },
   "Scripts/Systems/OceanPhilosophySystem.cs": {
     "data": {
       "count": 64,
@@ -5720,9 +5624,8 @@
   },
   "Scripts/Systems/SqlSaveBackend.cs": {
     "data": {
-      "count": 11,
+      "count": 10,
       "sites": [
-        "52aba2602e",
         "567338fc22",
         "567338fc22",
         "a1972b1dff",
