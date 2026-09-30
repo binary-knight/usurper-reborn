@@ -655,9 +655,11 @@ public class DungeonLocB123Tests
         L("en", "shop.filter_more", 3).Should().Be("  ... and 3 more");
     }
 
+    // Spanish too: its "Mano secundaria" is longer than ten columns, so the slot column widens.
     [Theory]
     [InlineData("en")]
     [InlineData("hu")]
+    [InlineData("es")]
     public async Task FollowerInventory_RendersInLanguage_AndFits(string lang)
     {
         // Every slot holds the equipment with the longest name; the backpack holds it too.
@@ -685,6 +687,7 @@ public class DungeonLocB123Tests
         var slotNames = new[] { "inn.equip_slot_weapon", "inn.equip_slot_off_hand", "ui.head", "ui.body", "ui.arms", "ui.hands", "ui.legs",
             "ui.feet", "ui.cloak", "ui.waist", "ui.neck", "dungeon.slot_l_ring", "dungeon.slot_r_ring" }.Select(k => L(lang, k)).ToList();
         int width = Math.Max(10, slotNames.Max(n => n.Length) + 1);
+        if (lang == "es") width.Should().BeGreaterThan(10, "a Spanish slot name runs past ten columns");
         text.Should().Contain("    " + L(lang, "inn.equip_slot_weapon").PadRight(width) + longest.Name);
         if (lang == "en") text.Should().Contain("    Weapon    " + longest.Name, "the English column is ten wide as before");
         if (lang == "hu") text.Should().NotContain("Equipped:").And.NotContain("Backpack:").And.NotContain("L.Ring").And.NotContain("HP Potions");
