@@ -1,7 +1,7 @@
 ---
 title: Reporting bugs
 path: /wiki/en/getting-started/reporting-bugs/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Systems/BugReportSystem.cs, Scripts/Locations/BaseLocation.cs
 ---
 Found a bug? There are two ways to report it: the in-game bug report, or an issue on the project's GitHub page. Either one reaches the developer.

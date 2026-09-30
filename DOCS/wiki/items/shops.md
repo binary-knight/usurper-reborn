@@ -1,7 +1,7 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs
 ---
 Weapon and armor shops inspect and sell different equipment. A shop's generated stock is not identical to the fixed [equipment catalog](/wiki/en/items/).
