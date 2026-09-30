@@ -320,6 +320,272 @@ public class CombatLocB122Tests
             .And.Contain("string gpLang = gpSession.Context?.Language ?? \"en\";");
     }
 
+    // ---------- 5. the ability menus ----------
+
+    private static (CombatEngine engine, TerminalEmulator term, MemoryStream output) EngineWithInput(string input)
+    {
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes(input)), output);
+        return (new CombatEngine(term), term, output);
+    }
+
+    /// <summary>Both ability menus for a level 100 character of `cls` with no stamina left, so every row carries a need tag.</summary>
+    private static async Task<string> RenderAbilityMenus(CharacterClass cls)
+    {
+        var hero = Hero();
+        hero.Class = cls;
+        hero.Level = 100;
+        hero.CurrentCombatStamina = 0;
+        hero.Mana = 0;
+        hero.MaxMana = 100;
+        var monster = new Monster { Name = "Kobold", Level = 3, HP = 10, MaxHP = 10, IsActive = true };
+        var (e1, t1, o1) = EngineWithInput("\n");
+        await (Task)typeof(CombatEngine).GetMethod("ShowAbilityMenuAndExecute", F)!
+            .Invoke(e1, new object?[] { hero, new List<Monster> { monster }, new CombatResult() })!;
+        var (e2, t2, o2) = EngineWithInput("\n");
+        await (Task)typeof(CombatEngine).GetMethod("ExecuteUseAbility", F)!
+            .Invoke(e2, new object?[] { hero, monster, new CombatResult() })!;
+        return Shown(t1, o1) + Shown(t2, o2);
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("fr")]
+    public async Task AbilityMenus_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, () => RenderAbilityMenus(CharacterClass.Warrior));
+        Capture($"combat-b-ability-menu-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.ability_cost_stamina", 10).Split(' ')[1]);
+        text.Should().Contain(Loc.GetIn(lang, "combat.ability_tag_need_stamina", "X").Split('X')[0]);
+        text.Should().Contain(Loc.GetIn(lang, "combat.ability_tag_need_stamina_have", "X", 0).Split('X')[1]);
+        text.Should().NotContain(" stamina]").And.NotContain("stamina, have").And.NotMatchRegex(" - [0-9]+ stamina");
+    }
+
+    [Theory]
+    [MemberData(nameof(AllLanguages))]
+    public async Task AbilityMenuRows_StayWithin80Columns(string lang)
+    {
+        foreach (CharacterClass cls in Enum.GetValues(typeof(CharacterClass)))
+        {
+            string text = await WithLanguage(lang, () => RenderAbilityMenus(cls));
+            foreach (var row in Rows(text).Where(r => Regex.IsMatch(r, "^  [0-9]+\\. ")))
+                row.Length.Should().BeLessOrEqualTo(80, $"{lang} {cls} row \"{row}\"");
+        }
+    }
+
+    private static string[] Rows(string text) => text.Replace("\r", "").Split('\n');
+
+    // ---------- 6. the aid ally and heal target lists ----------
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task AidAllyLists_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, async () =>
+        {
+            var hero = Hero();
+            hero.Healing = 0;
+            hero.ManaPotions = 2;
+            var ally = new Character { Name1 = "ally", Name2 = "Lyra", Class = CharacterClass.Cleric, Level = 10, HP = 40, MaxHP = 100, Mana = 50, MaxMana = 50 };
+            var (engine, term, output) = EngineWithInput("1\n0\n");
+            typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(engine, new List<Character> { ally });
+            await (Task<CombatAction?>)typeof(CombatEngine).GetMethod("HandleHealAlly", F)!.Invoke(engine, new object?[] { hero, new List<Monster>() })!;
+            var (e2, t2, o2) = EngineWithInput("0\n");
+            typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(e2, new List<Character> { ally });
+            await (Task<int?>)typeof(CombatEngine).GetMethod("SelectHealTarget", F)!.Invoke(e2, new object?[] { hero })!;
+            var (e3, t3, o3) = EngineWithInput("0\n");
+            typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(e3, new List<Character> { ally });
+            await (Task<int?>)typeof(CombatEngine).GetMethod("SelectBuffTarget", F)!.Invoke(e3, new object?[] { hero })!;
+            return Shown(term, output) + Shown(t2, o2) + Shown(t3, o3);
+        });
+        Capture($"combat-b-aid-ally-{lang}.txt", text);
+        text.Should().Contain($"═══ {Loc.GetIn(lang, "combat.aid_ally_title")} ═══");
+        text.Should().Contain(Loc.GetIn(lang, "combat.ally_mp_row", 1, "Lyra", 50, 50, 100, Loc.GetIn(lang, "combat.full_status")));
+        text.Should().Contain(Loc.GetIn(lang, "combat.ally_hp_row", 1, "Lyra", 40, 100, 40, ""));
+        text.Should().Contain(Loc.GetIn(lang, "combat.ally_hp_row_short", 1, "Lyra", 40, 100));
+        text.Should().NotContain("AID ALLY").And.NotContain("- HP:").And.NotContain("(Full)");
+    }
+
+    // ---------- 7. a monster hitting a companion ----------
+
+    /// <summary>The literal pieces of a localized line around its arguments, for lines with rolled numbers.</summary>
+    private static IEnumerable<string> Pieces(string lang, string key, params object[] args)
+        => Regex.Split(Loc.GetIn(lang, key, args), "#").Select(p => p.Trim()).Where(p => p.Length > 2);
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task MonsterHittingACompanion_IsLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, async () =>
+        {
+            var (engine, term, output) = Engine();
+            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, Hero());
+            var companion = new Character { Name1 = "ally", Name2 = "Lyra", Class = CharacterClass.Warrior, Level = 10, HP = 5000, MaxHP = 5000, Defence = 5 };
+            companion.ApplyStatus(StatusEffect.Reflecting, 3);
+            var monster = new Monster { Name = "Kobold", Level = 20, HP = 1, MaxHP = 400, Strength = 200, IsActive = true };
+            await (Task)typeof(CombatEngine).GetMethod("MonsterAttacksCompanion", F)!
+                .Invoke(engine, new object?[] { monster, companion, new CombatResult(), null })!;
+            return Shown(term, output);
+        });
+        Capture($"combat-b-companion-hit-{lang}.txt", text);
+        foreach (var piece in Pieces(lang, "combat.monster_hits_companion_hp", "#", "Lyra", "#", "#"))
+            text.Should().Contain(piece);
+        foreach (var piece in Pieces(lang, "combat.tidal_barrier_reflects", "Lyra", "#", "Kobold"))
+            text.Should().Contain(piece);
+        text.Should().NotContain(" HP)").And.NotContain("tidal barrier").And.NotContain("damage vs");
+    }
+
+    // ---------- 8. the first kill box, the boss and death summaries ----------
+
+    private static async Task<string> RenderSummaries(bool screenReader)
+    {
+        var prevSr = GameConfig.ScreenReaderMode;
+        try
+        {
+            GameConfig.ScreenReaderMode = screenReader;
+            var hero = Hero();
+            hero.Class = CharacterClass.Magician;
+            var monster = new Monster { Name = "Kobold King", Level = 12, HP = 0, MaxHP = 900, IsBoss = true };
+            var ally = new Character { Name1 = "ally", Name2 = "Lyra", Level = 10, HP = 50, MaxHP = 100 };
+            var result = new CombatResult { Player = hero, Monster = monster, CurrentRound = 7, TotalDamageDealt = 12345 };
+            result.Teammates = new List<Character> { ally };
+            var (engine, term, output) = EngineWithInput("\n\n\n\n");
+            await (Task)typeof(CombatEngine).GetMethod("ShowFirstKillBonus", F)!.Invoke(engine, new object?[] { hero, term })!;
+            await (Task)typeof(CombatEngine).GetMethod("ShowBossKillSummary", F)!.Invoke(engine, new object?[] { result, 4321L, 99L })!;
+            await (Task)typeof(CombatEngine).GetMethod("ShowDeathSummary", F)!.Invoke(engine, new object?[] { result })!;
+            return Shown(term, output);
+        }
+        finally { GameConfig.ScreenReaderMode = prevSr; }
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task FirstKillBossAndDeathSummaries_AreLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, () => RenderSummaries(false));
+        Capture($"combat-b-summaries-{lang}.txt", text);
+        string cls = Loc.GetIn(lang, "class.magician");
+        text.Should().Contain(Loc.GetIn(lang, "combat.first_blood_title")).And.Contain(Loc.GetIn(lang, "combat.first_blood_message"))
+            .And.Contain(Loc.GetIn(lang, "combat.first_blood_bonus", GameConfig.FirstKillGoldBonus));
+        text.Should().Contain(Loc.GetIn(lang, "combat.boss_summary_title"))
+            .And.Contain(Loc.GetIn(lang, "combat.boss_summary_line", "Tester", 30, cls, "Kobold King"))
+            .And.Contain(Loc.GetIn(lang, "combat.boss_summary_rounds_many", 7, 12345.ToString("N0")))
+            .And.Contain(Loc.GetIn(lang, "combat.boss_summary_earned", 4321.ToString("N0"), 99))
+            .And.Contain(Loc.GetIn(lang, "combat.share_label", Loc.GetIn(lang, "combat.share_boss_allies", "Tester", cls, 30, "Kobold King", 7, 1, 12345.ToString("N0"))));
+        text.Should().Contain(Loc.GetIn(lang, "combat.death_story_title"))
+            .And.Contain(Loc.GetIn(lang, "combat.death_story_who", "Tester", 30, cls))
+            .And.Contain(Loc.GetIn(lang, "combat.death_story_fell", 12, "Kobold King"))
+            .And.Contain(Loc.GetIn(lang, "combat.death_story_companions", "Lyra"));
+        foreach (var english in new[] { "You slew your first", "Bonus reward", "BOSS KILL SUMMARY", "Fought alongside", "Earned ", "Share: ",
+                     "DEATH STORY", "fell on Floor", "They explored", "Their companions", " the Lv", "Magician" })
+            text.Should().NotContain(english);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllLanguages))]
+    public async Task SummaryBoxes_KeepTheirWidth(string lang)
+    {
+        string text = await WithLanguage(lang, () => RenderSummaries(false));
+        foreach (var row in Rows(text).Where(r => r.Contains('║') || r.Contains('╔') || r.Contains('╚') || r.Contains('╠')))
+        {
+            if (row.Contains('╚') || row.Contains('╔') || row.Contains('╠') || row.TrimEnd().EndsWith("║"))
+                row.TrimEnd().Length.Should().Be(54, $"{lang} row \"{row}\"");
+        }
+        Loc.GetIn(lang, "combat.berserker_rage_title").Length.Should().BeLessOrEqualTo(40, "the berserker box is 40 wide");
+        Loc.GetIn(lang, "combat.companion_sacrifice_title").Length.Should().BeLessOrEqualTo(52, "the sacrifice box is 52 wide");
+        string sr = await WithLanguage(lang, () => RenderSummaries(true));
+        sr.Should().Contain($"--- {Loc.GetIn(lang, "combat.boss_summary_title")} ---").And.Contain($"--- {Loc.GetIn(lang, "combat.death_story_title")} ---");
+    }
+
+    [Fact]
+    public async Task Summaries_EnglishKeepsItsWording()
+    {
+        string text = await WithLanguage("en", () => RenderSummaries(false));
+        text.Should().Contain("  ║            ★  FIRST BLOOD!  ★                    ║")
+            .And.Contain("  ║  You slew your first monster!                    ║")
+            .And.Contain("  ║  The dungeons hold many more challenges...       ║")
+            .And.Contain("  Tester the Lv30 Magician defeated Kobold King")
+            .And.Contain("  in 7 rounds, dealing 12,345 total damage.")
+            .And.Contain("  Share: Tester the Magician (Lv30) defeated Kobold King in 7 rounds with 1 allies! [12,345 dmg] #UsurperReborn")
+            .And.Contain("  fell on Floor 12 to Kobold King.");
+    }
+
+    // ---------- 9. resurrection, death count and dark bargain ----------
+
+    private static string RenderDeathLines(int deaths, int rezLeft)
+    {
+        var (engine, term, output) = Engine();
+        var hero = Hero();
+        hero.PlaythroughDeaths = deaths;
+        typeof(CombatEngine).GetMethod("ShowDeathCountWarning", F)!.Invoke(engine, new object?[] { hero });
+        typeof(CombatEngine).GetMethod("ShowDivineRestore", F)!.Invoke(engine, new object?[] { 250, 500L, rezLeft, 3 });
+        return Shown(term, output);
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("fr")]
+    public async Task DeathCountAndResurrectionLines_AreLocalized(string lang)
+    {
+        int max = GameConfig.MaxPlaythroughDeaths;
+        string text = await WithLanguage(lang, () => string.Join("\n", RenderDeathLines(max, 0), RenderDeathLines(max - 1, 2),
+            RenderDeathLines(max - 2, 1), RenderDeathLines(0, 1)));
+        Capture($"combat-b-death-lines-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.final_death_warning")).And.Contain(Loc.GetIn(lang, "combat.final_death_times", max))
+            .And.Contain(Loc.GetIn(lang, "combat.deaths_remaining_one", max - 1, max, 1))
+            .And.Contain(Loc.GetIn(lang, "combat.deaths_remaining_many", max - 2, max, 2))
+            .And.Contain(Loc.GetIn(lang, "combat.deaths_used", 0, max))
+            .And.Contain(Loc.GetIn(lang, "death.divine_restore", 250, 500)).And.Contain(Loc.GetIn(lang, "death.final_warning2"))
+            .And.Contain(Loc.GetIn(lang, "death.rez_remaining", 2, 3));
+        foreach (var english in new[] { "FINAL DEATH WARNING", "You have died", "deaths used", "Divine intervention", "Resurrections remaining", "death(s)" })
+            text.Should().NotContain(english);
+    }
+
+    [Fact]
+    public async Task DarkBargainStatName_IsLocalized()
+    {
+        var (hu1, hu2) = await WithLanguage("hu", () =>
+        {
+            int a = 2, b = 4;
+            var c = Hero();
+            return (CombatEngine.ApplyDarkBargainStatLoss(c, 0, ref a), CombatEngine.ApplyDarkBargainStatLoss(c, 5, ref b));
+        });
+        hu1.Should().Be(Loc.GetIn("hu", "ui.stat_strength"));
+        hu2.Should().Be(Loc.GetIn("hu", "combat.stat_max_hp_loss", 20)).And.NotContain("HP");
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task BerserkerRage_IsLocalized(string lang)
+    {
+        string text = await WithLanguage(lang, async () =>
+        {
+            var (engine, term, output) = Engine();
+            var hero = Hero();
+            typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(engine, hero);
+            var monster = new Monster { Name = "Kobold", Level = 1, HP = 1, MaxHP = 1, IsActive = true };
+            await (Task)typeof(CombatEngine).GetMethod("ExecuteFightToDeath", F)!.Invoke(engine, new object?[] { hero, monster, new CombatResult { Player = hero, Monster = monster } })!;
+            return Shown(term, output);
+        });
+        Capture($"combat-b-rage-{lang}.txt", text);
+        text.Should().Contain(Loc.GetIn(lang, "combat.berserker_rage_title")).And.Contain($"═══ {Loc.GetIn(lang, "combat.rage_round", 1)} ═══");
+        text.Should().NotContain("BERSERKER RAGE!").And.NotContain("RAGE ROUND");
+    }
+
+    [Fact]
+    public void NewsAndFallbacks_UseLocKeys()
+    {
+        string src = Src();
+        foreach (var english in new[] { "\"the dungeons\"", "\"an unknown end\"", "\"unknown forces\"", "\"the unknown\"", "\"Hero\"", "\"Ally\"",
+                     "fell forever to", "COMPANION SACRIFICE", "is afflicted with {", "echo dissipates...\"" })
+            src.Should().NotContain(english);
+        src.Should().Contain("Loc.Get(\"combat.news_permadeath\", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), killerName)");
+    }
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
