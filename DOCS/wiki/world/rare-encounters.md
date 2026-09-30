@@ -27,7 +27,7 @@ Each check starts a rare encounter 5% of the time. When the floor's theme has it
 - **Usurper's Ghost**: a ghost from the original game who will share lore, answer a question or befriend you.
 - **Ancient Library**: a hidden library with several books to study.
 - **Wishing Well**: toss a coin, drink from the well or leave.
-- **Arena Portal**: a portal to a fight against a foe suited to your level.
+- **Arena Portal**: a portal to a fight against a monster suited to your level.
 
 ## Encounters by theme
 

@@ -85,11 +85,18 @@
     const body = new Map();
     for (const w of words(page.text)) body.set(w, (body.get(w) || 0) + 1);
     const titleWords = words(page.title);
+    // Adjacent word pairs within each field, so a query phrase can match as a phrase.
+    const pairs = new Set();
+    for (const field of [page.title, ...(page.headings || []), page.text]) {
+      const w = words(field);
+      for (let i = 1; i < w.length; i++) pairs.add(w[i - 1] + " " + w[i]);
+    }
     p = {
       title: new Set(titleWords),
       titleWords,
       headings: new Set(words((page.headings || []).join(" "))),
       body,
+      pairs,
     };
     prepared.set(page, p);
     return p;
@@ -120,6 +127,7 @@
   const ENTITY_TITLE_WEIGHT = 3;
   const HEADING_WEIGHT = 3;
   const GUIDE_WEIGHT = 2.5;
+  const PHRASE_WEIGHT = 3;
   function search(pages, query, limit = 8) {
     const terms = queryTerms(query);
     if (!terms.length) return [];
@@ -127,6 +135,12 @@
     const total = pages.length;
     const queryWords = words(query);
     const meaningful = queryWords.filter((w) => !stop.has(w)).length;
+    // Adjacent pairs of meaningful query words, in query order.
+    const phrases = [];
+    for (let i = 1; i < queryWords.length; i++) {
+      const [a, b] = [queryWords[i - 1], queryWords[i]];
+      if (!stop.has(a) && !stop.has(b) && a !== b) phrases.push([a, b]);
+    }
     return pages
       .map((page) => {
         const p = prepare(page);
@@ -150,6 +164,14 @@
               (inHeading ? HEADING_WEIGHT : 0) +
               (count ? (count >= 3 ? 1.5 : 1) : 0));
         }
+        // A query phrase found as adjacent words on the page counts like a heading match
+        // for both words: "monster families" beats pages that only mention each word apart.
+        for (const [a, b] of phrases)
+          if (p.pairs.has(a + " " + b))
+            score +=
+              PHRASE_WEIGHT *
+              (Math.log(1 + total / (df.get(a) || 1)) +
+                Math.log(1 + total / (df.get(b) || 1)));
         score *= 0.5 + (0.5 * matched) / terms.length;
         if (page.guide) score *= GUIDE_WEIGHT;
         // Naming a whole title ranks that page first; a title named inside a longer

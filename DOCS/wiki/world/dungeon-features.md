@@ -4,13 +4,13 @@ path: /wiki/en/world/dungeon-features/
 checked: 1.2.1
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs
 ---
-Every dungeon floor is a set of connected rooms. A room can hold guards, treasure, a random event, a trap, features you can examine and stairs deeper. This page covers what you can meet in a room and how to deal with it. For supplies, Mental and outposts see [dungeon travel](/wiki/en/world/dungeon/); for the rarest events see [rare encounters](/wiki/en/world/rare-encounters/).
+Every dungeon floor is a set of connected rooms. A room can hold monsters, treasure, a random event, a trap, features you can examine and stairs deeper. This page covers what you can meet in a room and how to deal with it. For supplies, Mental and outposts see [dungeon travel](/wiki/en/world/dungeon/); for the rarest events see [rare encounters](/wiki/en/world/rare-encounters/).
 
 ## The room menu
 
 The room view lists exits and hints about what the room holds. The menu then shows only the actions that apply:
 
-- **Fight** when the room is guarded.
+- **Fight the monsters** when the room is guarded.
 - **Collect treasure** once the room is cleared or was never guarded.
 - **Investigate the event** when the room has a random event you have not resolved.
 - **Examine features** to list the objects in the room you can interact with.
@@ -18,7 +18,7 @@ The room view lists exits and hints about what the room holds. The menu then sho
 - **Make camp and recover** in a cleared room, once per floor.
 - Map, the dungeon guide, inventory, potions, herbs, Willow Draught, party and status are always at hand.
 
-Guards block treasure and stairs, so a guarded room must be cleared first. Leaving the dungeon returns you to the floor overview, where you can change level or return to town.
+Monsters guard treasure and stairs, so a guarded room must be cleared first. Leaving the dungeon returns you to the floor overview, where you can change level or return to town.
 
 ## Random room events
 
@@ -90,7 +90,7 @@ A pixie is caught more easily with higher Dexterity. A vision reveals the whole 
 
 Each band of floors has a theme that changes the rooms, features and encounters: Catacombs, Sewers, Caverns, Ancient Ruins, Demon Lair, Frozen Depths, Volcanic Pit and the Abyssal Void, in that order going down. Crypt rooms appear only in the Catacombs and Ancient Ruins.
 
-A floor always starts in a hall and ends in the boss room. One room holds guarded treasure of better quality. Deeper floors add special rooms: an arena room with several foes and treasure, a meditation chamber that works as a resting place, a lore library, and secret vaults. Some floors also hold story discoveries; see [the story](/wiki/en/world/story/) and [boss references](/wiki/en/monsters/bosses/).
+A floor always starts in a hall and ends in the boss room. One room holds guarded treasure of better quality. Deeper floors add special rooms: an arena room with several monsters and treasure, a meditation chamber that works as a resting place, a lore library, and secret vaults. Some floors also hold story discoveries; see [the story](/wiki/en/world/story/) and [boss references](/wiki/en/monsters/bosses/).
 
 :::spoiler Spoiler: floor bands and room counts
 The Catacombs cover floors 1 to 10, the Sewers 11 to 20, the Caverns 21 to 35, the Ancient Ruins 36 to 50, the Demon Lair 51 to 65, the Frozen Depths 66 to 80, the Volcanic Pit 81 to 90 and the Abyssal Void 91 and below. A floor has 15 to 25 rooms. Arena rooms appear from floor 5, meditation chambers from floor 10 and lore libraries from floor 15. The guarded treasure room has two or three monsters and a trap. Each floor's layout is the same every time you visit it.

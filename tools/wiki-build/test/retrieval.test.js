@@ -196,6 +196,13 @@ test("title and headings weigh more than body text", () => {
   assert.equal(shops[0].path, `${W}items/shops/`);
 });
 
+test("a query phrase found as adjacent words outranks pages with the words apart", () => {
+  // Only the monsters page has "Monster families"; the dungeon guides mention monsters
+  // and the dungeon separately, and the home page has "family" in its title.
+  assert.equal(top("What monster families are in the dungeon?", 1)[0], `${W}monsters/`);
+  assert.equal(top("monster families", 1)[0], `${W}monsters/`);
+});
+
 test("plurals and -ing forms match their base word", () => {
   assert.ok(top("monster family", 3).includes(`${W}monsters/`));
   assert.ok(top("buying armour", 3).includes(`${W}items/shops/`));
