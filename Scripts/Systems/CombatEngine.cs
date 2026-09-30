@@ -1572,15 +1572,13 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.succumb_wounds"));
                 if (!anyGroupedAlive())
                 {
-                    BroadcastGroupCombatEvent(result,
-                        $"\u001b[1;31m  {player.DisplayName} has been consumed by dark powers!\u001b[0m");
+                    BroadcastGroupDeathLine(result, "combat.group_consumed_dark", player.DisplayName);
                     break;
                 }
                 if (!leaderDeathAnnounced)
                 {
                     leaderDeathAnnounced = true;
-                    BroadcastGroupCombatEvent(result,
-                        $"\u001b[1;31m  {player.DisplayName} has fallen to dark powers! The party fights on!\u001b[0m");
+                    BroadcastGroupDeathLine(result, "combat.group_fallen_dark", player.DisplayName);
                 }
             }
 
@@ -1715,16 +1713,14 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.succumb_wounds"));
                 if (!anyGroupedAlive())
                 {
-                    BroadcastGroupCombatEvent(result,
-                        $"\u001b[1;31m  {player.DisplayName} has succumbed to status effects!\u001b[0m");
+                    BroadcastGroupDeathLine(result, "combat.group_succumbed_status", player.DisplayName);
                     break;
                 }
                 // Leader died but grouped players carry on
                 if (!leaderDeathAnnounced)
                 {
                     leaderDeathAnnounced = true;
-                    BroadcastGroupCombatEvent(result,
-                        $"\u001b[1;31m  {player.DisplayName} has fallen to status effects! The party fights on!\u001b[0m");
+                    BroadcastGroupDeathLine(result, "combat.group_fallen_status", player.DisplayName);
                 }
             }
 
@@ -5012,7 +5008,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.fire_burn", monster.Name, dmg), "red");
             if (!monster.IsAlive)
             {
-                terminal.WriteLine($"{monster.Name} is consumed by flames!", "red");
+                terminal.WriteLine(Loc.Get("combat.monster_burn_death", monster.Name), "red");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 return;
@@ -5030,7 +5026,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.poison_burn", monster.Name, dmg), "dark_green");
             if (!monster.IsAlive)
             {
-                terminal.WriteLine($"{monster.Name} succumbs to poison!", "dark_green");
+                terminal.WriteLine(Loc.Get("combat.monster_poison_death", monster.Name), "dark_green");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 return;
@@ -7163,7 +7159,7 @@ public partial class CombatEngine
         {
             var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower()));
+            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus)));
             await Pacing.Wait(GetCombatDelay(800));
             return;
         }
@@ -19112,7 +19108,7 @@ public partial class CombatEngine
         {
             var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower()));
+            terminal.WriteLine(Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus)));
             await Pacing.Wait(GetCombatDelay(800));
             return;
         }
@@ -29525,31 +29521,31 @@ public partial class CombatEngine
 
         // Calculate damage based on disease type and world plague
         long plagueDamage = 0;
-        string diseaseMessage = "";
+        string diseaseKey = "";
 
         if (player.Plague)
         {
             // Plague: 3-5% of max HP per round
             plagueDamage += (long)(player.MaxHP * (0.03 + random.NextDouble() * 0.02));
-            diseaseMessage = "The plague ravages your body!";
+            diseaseKey = "combat.disease_plague";
         }
         else if (player.Leprosy)
         {
             // Leprosy: 2-3% of max HP per round
             plagueDamage += (long)(player.MaxHP * (0.02 + random.NextDouble() * 0.01));
-            diseaseMessage = "Leprosy weakens your limbs!";
+            diseaseKey = "combat.disease_leprosy";
         }
         else if (player.Smallpox)
         {
             // Smallpox: 1-2% of max HP per round
             plagueDamage += (long)(player.MaxHP * (0.01 + random.NextDouble() * 0.01));
-            diseaseMessage = "Smallpox saps your strength!";
+            diseaseKey = "combat.disease_smallpox";
         }
         else if (player.Measles)
         {
             // Measles: 1% of max HP per round
             plagueDamage += (long)(player.MaxHP * 0.01);
-            diseaseMessage = "Measles makes you feverish!";
+            diseaseKey = "combat.disease_measles";
         }
 
         // World plague adds extra damage if active (even to healthy characters)
@@ -29559,7 +29555,7 @@ public partial class CombatEngine
             if (random.Next(100) < 10)
             {
                 plagueDamage += (long)(player.MaxHP * 0.01);
-                diseaseMessage = "The plague in the air sickens you!";
+                diseaseKey = "combat.disease_world_plague";
 
                 // Small chance to contract the plague during combat
                 if (random.Next(100) < 5)
@@ -29584,7 +29580,7 @@ public partial class CombatEngine
             player.HP = Math.Max(0, player.HP - plagueDamage); // hq-barracks: out (disease tick, not an enemy hit)
 
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  {diseaseMessage} (-{plagueDamage} HP)");
+            terminal.WriteLine($"  {Loc.Get(diseaseKey, plagueDamage)}");
             result.CombatLog.Add($"Disease damage: {plagueDamage}");
         }
 
@@ -30292,12 +30288,12 @@ public partial class CombatEngine
         target.HP = Math.Max(0, target.HP - corruptionDamage);
 
         terminal.SetColor("dark_magenta");
-        terminal.WriteLine($"  Corruption burns {target.DisplayName} for {corruptionDamage} damage! ({target.CorruptionStacks} stacks)");
+        terminal.WriteLine($"  {Loc.Get("combat.corruption_tick", target.DisplayName, corruptionDamage, target.CorruptionStacks)}");
 
         if (!target.IsAlive)
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  {target.DisplayName} has been consumed by corruption!");
+            terminal.WriteLine($"  {Loc.Get("combat.corruption_consumed", target.DisplayName)}");
         }
     }
 
@@ -30309,7 +30305,7 @@ public partial class CombatEngine
         if (target == null || !target.IsAlive) return;
         target.CorruptionStacks = Math.Min(target.CorruptionStacks + stacks, GameConfig.ModBossCorruptionMaxStacks);
         terminal.SetColor("dark_magenta");
-        terminal.WriteLine($"  {target.DisplayName} gains {stacks} corruption! (Total: {target.CorruptionStacks})");
+        terminal.WriteLine($"  {Loc.Get("combat.corruption_gain", target.DisplayName, stacks, target.CorruptionStacks)}");
     }
 
     /// <summary>
@@ -30324,13 +30320,13 @@ public partial class CombatEngine
         if (target.DoomCountdown <= 0)
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  *** DOOM claims {target.DisplayName}! ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.doom_claims", target.DisplayName)} ***");
             target.HP = 0;
         }
         else
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  Doom ticks on {target.DisplayName}... {target.DoomCountdown} rounds remaining!");
+            terminal.WriteLine($"  {Loc.Get("combat.doom_tick", target.DisplayName, target.DoomCountdown)}");
         }
     }
 
@@ -31069,7 +31065,7 @@ public partial class CombatEngine
         if (!teammate.CanAct())
         {
             var preventingStatus = teammate.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
-            string prevented = Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, preventingStatus.ToString().ToLower());
+            string prevented = Loc.Get("combat.teammate_status_prevented", teammate.DisplayName, StatusWord(preventingStatus));
             terminal.WriteLine(prevented, "yellow");
             remoteTerminal.WriteLine(prevented, "yellow");
             await Pacing.Wait(GetCombatDelay(800));
@@ -32079,6 +32075,34 @@ public partial class CombatEngine
         // inDungeonOnly: skip group members who left the dungeon — combat shouldn't
         // spam them in town. Group bookkeeping stays intact for regrouping.
         GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message,
+            excludeUsername: ctx.Username, inDungeonOnly: true);
+    }
+
+    /// <summary>
+    /// v1.2.2: a status as the lower-case word in the player's language, for the "is stunned and cannot act" line.
+    /// </summary>
+    internal static string StatusWord(StatusEffect status)
+    {
+        string key = $"status.{status.ToString().ToLowerInvariant()}";
+        return Loc.Has(key) ? Loc.Get(key).ToLower() : status.ToString().ToLower();
+    }
+
+    /// <summary>
+    /// v1.2.2: the leader's death line for the group, rendered in the recipient's language.
+    /// </summary>
+    internal static string GroupDeathLine(string lang, string key, string name)
+        => $"\u001b[1;31m  {Loc.GetIn(lang, key, name)}\u001b[0m";
+
+    /// <summary>
+    /// v1.2.2: BroadcastGroupCombatEvent for a death line, each group member reading it in their own language.
+    /// </summary>
+    private void BroadcastGroupDeathLine(CombatResult result, string key, string name)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null) return;
+        GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(group, lang => GroupDeathLine(lang, key, name),
             excludeUsername: ctx.Username, inDungeonOnly: true);
     }
 
