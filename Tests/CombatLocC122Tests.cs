@@ -372,7 +372,7 @@ public class CombatLocC122Tests
             GameConfig.Language = "hu";
             ClassAbilitySystem.UseAbility(Warrior(), "no_such_ability").Message.Should().Be(Loc.GetIn("hu", "combat.unknown_ability"));
             var strike = ClassAbilitySystem.GetAbility("power_strike")!;
-            ClassAbilitySystem.UseAbility(Warrior(), "power_strike").Message.Should().Be(Loc.GetIn("hu", "combat.monster_uses_ability", "Tester", strike.Name));
+            ClassAbilitySystem.UseAbility(Warrior(), "power_strike").Message.Should().Be(Loc.GetIn("hu", "combat.monster_uses_ability", "Tester", strike.DisplayName));
         }
         finally { GameConfig.Language = prev; }
     }
@@ -434,6 +434,91 @@ public class CombatLocC122Tests
             foreach (var l in Langs)
                 Loc.HasIn(l, "spell_learning.type." + t.ToLowerInvariant()).Should().BeTrue($"{t} {l}");
         SpellLearningSystem.SpellTypeLabel("Mystery").Should().Be("Mystery");
+    }
+
+    // ---------- 6. class ability names and descriptions ----------
+
+    private static List<ClassAbilitySystem.ClassAbility> AllAbilities() =>
+        ClassAbilitySystem.GetAllAbilities().ToList();
+
+    [Fact]
+    public void AbilityNamesAndDescriptions_HaveAKeyInEveryLanguage()
+    {
+        var all = AllAbilities();
+        all.Count.Should().Be(179);
+        foreach (var a in all)
+        {
+            Loc.GetIn("en", $"ability.{a.Id}.name").Should().Be(a.Name, "the English key matches the table");
+            Loc.GetIn("en", $"ability.{a.Id}.desc").Should().Be(a.Description, "the English key matches the table");
+            foreach (var l in Langs)
+            {
+                Loc.HasIn(l, $"ability.{a.Id}.name").Should().BeTrue($"{a.Id} name {l}");
+                Loc.HasIn(l, $"ability.{a.Id}.desc").Should().BeTrue($"{a.Id} desc {l}");
+                Loc.GetIn(l, $"ability.{a.Id}.desc").Should().NotBeNullOrWhiteSpace();
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(AllLanguages))]
+    public void AbilityNames_FitTheirMenuColumn(string lang)
+    {
+        // the quickbar menus pad names to 24 columns (Level Master, companion skills) and 22 (spell quickbar)
+        foreach (var a in AllAbilities().Where(a => a.Id != "maelstrom_faithful" || lang != "en"))
+            Loc.GetIn(lang, $"ability.{a.Id}.name").Length.Should().BeLessOrEqualTo(24, $"{lang} {a.Id} \"{Loc.GetIn(lang, $"ability.{a.Id}.name")}\"");
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public async Task AbilityMenu_NamesAndDescriptionsAreInThePlayersLanguage(string lang)
+    {
+        var player = Warrior();
+        string text = await WithLanguage(lang, () => RenderAbilityMenu(player));
+        Capture($"combat-c-ability-names-{lang}.txt", text);
+        var strike = ClassAbilitySystem.GetAbility("power_strike")!;
+        text.Should().Contain(Loc.GetIn(lang, "ability.power_strike.name")).And.Contain(Loc.GetIn(lang, "ability.power_strike.desc"));
+        var other = ClassAbilitySystem.GetAvailableAbilities(player).First(a => a.Id != "power_strike");
+        text.Should().Contain(Loc.GetIn(lang, $"ability.{other.Id}.name")).And.Contain(Loc.GetIn(lang, $"ability.{other.Id}.desc"));
+        text.Should().NotContain(strike.Name).And.NotContain(strike.Description).And.NotContain(other.Description);
+        string used = await WithLanguage(lang, () => Task.FromResult(ClassAbilitySystem.UseAbility(Warrior(), "power_strike").Message));
+        used.Should().Be(Loc.GetIn(lang, "combat.monster_uses_ability", "Tester", Loc.GetIn(lang, "ability.power_strike.name")));
+    }
+
+    [Theory]
+    [InlineData("it")]
+    [InlineData("en")]
+    public void AbilityNames_ReachEachGroupMemberInTheirLanguage(string lang)
+    {
+        var prev = GameConfig.Language;
+        LocRecording rec;
+        string captured;
+        try
+        {
+            GameConfig.Language = "hu";
+            var (term, _) = Term();
+            term.StartCapture();
+            rec = Loc.BeginRecording();
+            try
+            {
+                var strike = ClassAbilitySystem.GetAbility("power_strike")!;
+                term.WriteLine(Loc.Get("combat.teammate_uses_ability_stamina", "Lyra", strike.DisplayName, strike.StaminaCost));
+            }
+            finally { Loc.EndRecording(); }
+            captured = term.StopCapture()!;
+        }
+        finally { GameConfig.Language = prev; }
+        string shown = Strip(CombatEngine.CapturedInLanguage(rec, captured, lang, "Tester"));
+        shown.Should().Contain(Loc.GetIn(lang, "combat.teammate_uses_ability_stamina", "Lyra", Loc.GetIn(lang, "ability.power_strike.name"), 15));
+        shown.Should().NotContain(Loc.GetIn("hu", "ability.power_strike.name"));
+    }
+
+    [Fact]
+    public void AbilityDisplayName_FallsBackToTheTableWithoutAKey()
+    {
+        var custom = new ClassAbilitySystem.ClassAbility { Id = "not_a_real_ability", Name = "Custom", Description = "Custom text." };
+        custom.DisplayName.Should().Be("Custom");
+        custom.DisplayDescription.Should().Be("Custom text.");
     }
 
     private static string RepoRoot()

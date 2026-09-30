@@ -1903,7 +1903,7 @@ namespace UsurperRemake.Systems
 
                 string cdStr = onCooldown ? $" (CD: {cooldowns[ab.Id]})" : "";
                 terminal.SetColor(canUse ? "cyan" : "darkgray");
-                terminal.WriteLine($"  [{i + 1}] {ab.Name}{cdStr}");
+                terminal.WriteLine($"  [{i + 1}] {ab.DisplayName}{cdStr}");
                 if (canUse) usable.Add((i + 1, ab));
             }
 

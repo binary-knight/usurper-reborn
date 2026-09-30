@@ -717,7 +717,7 @@ public class CombatLocB122Tests
             hero.Quickbar = new List<string> { ability.Id };
             var actions = (System.Collections.IList)typeof(CombatEngine).GetMethod("GetQuickbarActions", F)!.Invoke(engine, new object?[] { hero })!;
             var first = ((string key, string slotId, string displayName, bool available))actions[0]!;
-            return (bonus.Item2, (ability.Name, ability.StaminaCost, first.displayName));
+            return (bonus.Item2, (Name: ability.DisplayName, ability.StaminaCost, first.displayName));
         });
         Capture($"combat-b-align-quickbar-{lang}.txt", desc + "\n" + label.displayName);
         new[] { "combat.align_evil_drain", "combat.align_dark_bonus" }.Select(k => Loc.GetIn(lang, k, 10))

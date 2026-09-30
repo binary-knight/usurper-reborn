@@ -14901,7 +14901,7 @@ public partial class CombatEngine
             // Check cooldown
             if (CooldownsFor(player).TryGetValue(action.AbilityId, out int cd) && cd > 0)
             {
-                terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.Name, cd), "red");
+                terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.DisplayName, cd), "red");
                 await Pacing.Wait(GetCombatDelay(1000));
                 return;
             }
@@ -14930,13 +14930,13 @@ public partial class CombatEngine
             terminal.SetColor("bright_cyan");
             if (ability.ManaCost > 0)
             {
-                terminal.WriteLine(Loc.Get("combat.ability_use_mana", player.Name2, ability.Name, ability.ManaCost));
+                terminal.WriteLine(Loc.Get("combat.ability_use_mana", player.Name2, ability.DisplayName, ability.ManaCost));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("combat.ability_mana_display", player.Mana, player.MaxMana));
             }
             else
             {
-                terminal.WriteLine(Loc.Get("combat.ability_use", player.Name2, ability.Name, ability.StaminaCost));
+                terminal.WriteLine(Loc.Get("combat.ability_use", player.Name2, ability.DisplayName, ability.StaminaCost));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("combat.ability_stamina", player.CurrentCombatStamina, player.MaxCombatStamina));
             }
@@ -14965,14 +14965,14 @@ public partial class CombatEngine
             {
                 CooldownsFor(player)[action.AbilityId] = abilityResult.CooldownApplied;
                 terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("combat.ability_cooldown_set", ability.Name, abilityResult.CooldownApplied));
+                terminal.WriteLine(Loc.Get("combat.ability_cooldown_set", ability.DisplayName, abilityResult.CooldownApplied));
             }
 
             // Display training improvement message if ability proficiency increased
             if (abilityResult.SkillImproved && !string.IsNullOrEmpty(abilityResult.NewProficiencyLevel))
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine(Loc.Get("combat.ability_proficiency_up", ability.Name, abilityResult.NewProficiencyLevel));
+                terminal.WriteLine(Loc.Get("combat.ability_proficiency_up", ability.DisplayName, abilityResult.NewProficiencyLevel));
                 await Pacing.Wait(GetCombatDelay(800));
             }
 
@@ -15126,7 +15126,7 @@ public partial class CombatEngine
                 // AoE abilities hit all monsters
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.ability_aoe_all"));
-                await ApplyAoEDamage(monsters, actualDamage, result, ability.Name, attacker: player);
+                await ApplyAoEDamage(monsters, actualDamage, result, ability.DisplayName, attacker: player);
                 // AoE confusion: confuse surviving monsters
                 if (abilityResult.SpecialEffect == "aoe_confusion")
                 {
@@ -16284,7 +16284,7 @@ public partial class CombatEngine
                 {
                     // v0.65.5: Maelstrom of the Faithful is a magical faith ability, so it routes
                     // through the magical-immunity branch (not physical) when it hits an Old God phase.
-                    await ApplyAoEDamage(monsters, abilityResult.Damage, result, abilityResult.AbilityUsed?.Name ?? "Maelstrom", isSpellDamage: true, attacker: player);
+                    await ApplyAoEDamage(monsters, abilityResult.Damage, result, abilityResult.AbilityUsed?.DisplayName ?? "Maelstrom", isSpellDamage: true, attacker: player);
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         m.WeakenRounds = Math.Max(m.WeakenRounds, 2);
@@ -17581,9 +17581,9 @@ public partial class CombatEngine
 
             string costDisplay = AbilityCostText(ability);
             terminal.SetColor(color);
-            terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplay}{statusText}");
+            terminal.WriteLine($"  {displayIndex}. {ability.DisplayName} - {costDisplay}{statusText}");
             terminal.SetColor(ColorRole.Narration);
-            terminal.WriteLine($"     {ability.Description}");
+            terminal.WriteLine($"     {ability.DisplayDescription}");
 
             selectableAbilities.Add(ability);
             displayIndex++;
@@ -20187,9 +20187,9 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         if (chosenAbility.ManaCost > 0)
-            terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_mana", teammate.DisplayName, chosenAbility.Name, chosenAbility.ManaCost));
+            terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_mana", teammate.DisplayName, chosenAbility.DisplayName, chosenAbility.ManaCost));
         else
-            terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_stamina", teammate.DisplayName, chosenAbility.Name, chosenAbility.StaminaCost));
+            terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_stamina", teammate.DisplayName, chosenAbility.DisplayName, chosenAbility.StaminaCost));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Get target for the ability
@@ -23793,9 +23793,9 @@ public partial class CombatEngine
 
             string costDisplaySM = AbilityCostText(ability);
             terminal.SetColor(color);
-            terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplaySM}{statusText}");
+            terminal.WriteLine($"  {displayIndex}. {ability.DisplayName} - {costDisplaySM}{statusText}");
             terminal.SetColor(ColorRole.Narration);
-            terminal.WriteLine($"     {ability.Description}");
+            terminal.WriteLine($"     {ability.DisplayDescription}");
 
             selectableAbilities.Add(ability);
             displayIndex++;
@@ -23820,7 +23820,7 @@ public partial class CombatEngine
         {
             if (CooldownsFor(player).TryGetValue(selectedAbility.Id, out int cd) && cd > 0)
             {
-                terminal.WriteLine(Loc.Get("combat.ability_cooldown", selectedAbility.Name, cd), "red");
+                terminal.WriteLine(Loc.Get("combat.ability_cooldown", selectedAbility.DisplayName, cd), "red");
             }
             await Pacing.Wait(GetCombatDelay(1500));
             return;
@@ -23885,7 +23885,7 @@ public partial class CombatEngine
         if (abilityResult.SkillImproved && !string.IsNullOrEmpty(abilityResult.NewProficiencyLevel))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedAbility.Name, abilityResult.NewProficiencyLevel));
+            terminal.WriteLine(Loc.Get("combat.proficiency_improved", selectedAbility.DisplayName, abilityResult.NewProficiencyLevel));
             await Pacing.Wait(GetCombatDelay(800));
         }
 
@@ -26822,9 +26822,9 @@ public partial class CombatEngine
 
                 string costDisplayPvP = AbilityCostText(ability);
                 terminal.SetColor(color);
-                terminal.WriteLine($"  {displayIndex}. {ability.Name} - {costDisplayPvP}{statusText}");
+                terminal.WriteLine($"  {displayIndex}. {ability.DisplayName} - {costDisplayPvP}{statusText}");
                 terminal.SetColor(ColorRole.Narration);
-                terminal.WriteLine($"     {ability.Description}");
+                terminal.WriteLine($"     {ability.DisplayDescription}");
 
                 selectableAbilities.Add(ability);
                 displayIndex++;
@@ -26848,7 +26848,7 @@ public partial class CombatEngine
         if (!ClassAbilitySystem.CanUseAbility(attacker, selectedAbility.Id, abilityCooldowns))
         {
             if (abilityCooldowns.TryGetValue(selectedAbility.Id, out int cd) && cd > 0)
-                terminal.WriteLine(Loc.Get("combat.ability_cooldown", selectedAbility.Name, cd), "red");
+                terminal.WriteLine(Loc.Get("combat.ability_cooldown", selectedAbility.DisplayName, cd), "red");
             else
                 terminal.WriteLine(Loc.Get("combat.cant_use_ability"), "red");
             await Pacing.Wait(GetCombatDelay(1000));
@@ -27122,7 +27122,7 @@ public partial class CombatEngine
                     actualDamage = TeamHQBonus.ApplyAttack(computer, actualDamage); // v1.1.11: Team HQ Armory, last.
                     actualDamage = TeamHQBonus.ApplyDefense(opponent, actualDamage); // v1.1.11: then the human's Barracks.
                     opponent.HP = Math.Max(0, opponent.HP - actualDamage);
-                    terminal.WriteLine(Loc.Get("combat.pvp_ai_uses_ability", computer.DisplayName, chosen.Name, actualDamage), "bright_red");
+                    terminal.WriteLine(Loc.Get("combat.pvp_ai_uses_ability", computer.DisplayName, chosen.DisplayName, actualDamage), "bright_red");
                 }
                 if (abilityResult.Healing > 0)
                 {
@@ -29564,7 +29564,7 @@ public partial class CombatEngine
         {
             var ability = ClassAbilitySystem.GetAbility(slotId);
             if (ability == null) { terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_empty", slot + 1)}", "gray"); return true; }
-            name = ability.Name; desc = ability.Description;
+            name = ability.DisplayName; desc = ability.DisplayDescription;
         }
 
         terminal.SetColor("bright_cyan");
@@ -29624,13 +29624,13 @@ public partial class CombatEngine
                 string displayName;
                 var weaponReason = ClassAbilitySystem.GetWeaponRequirementReason(player, ability);
                 if (weaponReason != null)
-                    displayName = $"{ability.Name} ({weaponReason})";
+                    displayName = $"{ability.DisplayName} ({weaponReason})";
                 else if (CooldownsFor(player).TryGetValue(slotId, out int cd) && cd > 0)
-                    displayName = Loc.Get("combat.qb_cooldown", ability.Name, cd);
+                    displayName = Loc.Get("combat.qb_cooldown", ability.DisplayName, cd);
                 else if (ability.ManaCost > 0)
-                    displayName = Loc.Get("combat.qb_stamina_mana", ability.Name, ability.StaminaCost, ability.ManaCost);
+                    displayName = Loc.Get("combat.qb_stamina_mana", ability.DisplayName, ability.StaminaCost, ability.ManaCost);
                 else
-                    displayName = Loc.Get("combat.qb_stamina", ability.Name, ability.StaminaCost);
+                    displayName = Loc.Get("combat.qb_stamina", ability.DisplayName, ability.StaminaCost);
                 // Check mana availability for shaman abilities
                 if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
                     canUse = false;
@@ -29792,11 +29792,11 @@ public partial class CombatEngine
                 {
                     var weaponReason = ClassAbilitySystem.GetWeaponRequirementReason(player, ability);
                     if (weaponReason != null)
-                        terminal.WriteLine(Loc.Get("combat.ability_weapon_reason", ability.Name, weaponReason), "red");
+                        terminal.WriteLine(Loc.Get("combat.ability_weapon_reason", ability.DisplayName, weaponReason), "red");
                     else if (player.CurrentCombatStamina < ability.StaminaCost)
                         terminal.WriteLine(Loc.Get("combat.not_enough_stamina", ability.StaminaCost, player.CurrentCombatStamina), "red");
                     else if (CooldownsFor(player).TryGetValue(matched.slotId, out int cd) && cd > 0)
-                        terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.Name, cd), "red");
+                        terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.DisplayName, cd), "red");
                 }
             }
             await Pacing.Wait(GetCombatDelay(1000));
@@ -29916,11 +29916,11 @@ public partial class CombatEngine
                 {
                     var weaponReason = ClassAbilitySystem.GetWeaponRequirementReason(player, ability);
                     if (weaponReason != null)
-                        terminal.WriteLine(Loc.Get("combat.ability_weapon_reason", ability.Name, weaponReason), "red");
+                        terminal.WriteLine(Loc.Get("combat.ability_weapon_reason", ability.DisplayName, weaponReason), "red");
                     else if (player.CurrentCombatStamina < ability.StaminaCost)
                         terminal.WriteLine(Loc.Get("combat.not_enough_stamina", ability.StaminaCost, player.CurrentCombatStamina), "red");
                     else if (CooldownsFor(player).TryGetValue(matched.slotId, out int cd) && cd > 0)
-                        terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.Name, cd), "red");
+                        terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.DisplayName, cd), "red");
                 }
             }
             await Pacing.Wait(GetCombatDelay(1000));
@@ -29968,7 +29968,7 @@ public partial class CombatEngine
         var abilityResult = ClassAbilitySystem.UseAbility(player, abilityId, random);
 
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("combat.uses_ability", player.Name2, ability.Name));
+        terminal.WriteLine(Loc.Get("combat.uses_ability", player.Name2, ability.DisplayName));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Apply effects based on ability type
@@ -30036,7 +30036,7 @@ public partial class CombatEngine
         if (abilityResult.SkillImproved && !string.IsNullOrEmpty(abilityResult.NewProficiencyLevel))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine(Loc.Get("combat.proficiency_improved", ability.Name, abilityResult.NewProficiencyLevel));
+            terminal.WriteLine(Loc.Get("combat.proficiency_improved", ability.DisplayName, abilityResult.NewProficiencyLevel));
         }
 
         await Pacing.Wait(GetCombatDelay(800));

@@ -80,7 +80,7 @@ public static class SpellLearningSystem
                     terminal.SetColor("bright_yellow");
                     terminal.Write($"  [{i + 1}] ");
                     terminal.SetColor("yellow");
-                    terminal.Write($"{(ability?.Name ?? slotId),-22}");
+                    terminal.Write($"{(ability?.DisplayName ?? slotId),-22}");
                     terminal.SetColor("darkgray");
                     terminal.Write($"  {Loc.Get("spell_learning.tag_ability")}");
                     terminal.WriteLine("");

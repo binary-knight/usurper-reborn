@@ -1175,7 +1175,7 @@ public static class TrainingSystem
         {
             if (character.Level >= ability.LevelRequired)
             {
-                skills.Add((ability.Id, ability.Name));
+                skills.Add((ability.Id, ability.DisplayName));
             }
         }
 

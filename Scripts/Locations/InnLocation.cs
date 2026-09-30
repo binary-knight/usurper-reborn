@@ -3351,7 +3351,7 @@ public class InnLocation : BaseLocation
         if (companionAbilities.Count > 0)
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"  Abilities ({companionAbilities.Count}): {string.Join(", ", companionAbilities.Select(a => a.Name))}");
+            terminal.WriteLine($"  Abilities ({companionAbilities.Count}): {string.Join(", ", companionAbilities.Select(a => a.DisplayName))}");
         }
         else
         {
@@ -4468,21 +4468,22 @@ public class InnLocation : BaseLocation
                     terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
                     terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
                     terminal.SetColor(isDisabled ? "gray" : "white");
-                    terminal.Write($"{ability.Name,-24}");
+                    terminal.Write($"{ability.DisplayName,-24}");
                     terminal.SetColor("darkgray");
                     terminal.Write($" {ClassAbilitySystem.GetEffectiveStaminaCost(ability),2} ST  Lv{ability.LevelRequired,-3}  ");
                     terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                    if (IsScreenReader || ability.Description.Length <= 35)
+                    string abilityDesc = ability.DisplayDescription;
+                    if (IsScreenReader || abilityDesc.Length <= 35)
                     {
-                        terminal.WriteLine(ability.Description);
+                        terminal.WriteLine(abilityDesc);
                     }
                     else
                     {
-                        int breakAt = ability.Description.LastIndexOf(' ', 35);
+                        int breakAt = abilityDesc.LastIndexOf(' ', 35);
                         if (breakAt <= 10) breakAt = 35;
-                        terminal.WriteLine(ability.Description[..breakAt]);
+                        terminal.WriteLine(abilityDesc[..breakAt]);
                         terminal.SetColor("dark_gray");
-                        terminal.WriteLine($"        {ability.Description[breakAt..].TrimStart()}");
+                        terminal.WriteLine($"        {abilityDesc[breakAt..].TrimStart()}");
                     }
                 }
             }
@@ -4565,13 +4566,13 @@ public class InnLocation : BaseLocation
                     {
                         companion.DisabledAbilities.Remove(ability.Id);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  Enabled: {ability.Name}");
+                        terminal.WriteLine($"  Enabled: {ability.DisplayName}");
                     }
                     else
                     {
                         companion.DisabledAbilities.Add(ability.Id);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  Disabled: {ability.Name}");
+                        terminal.WriteLine($"  Disabled: {ability.DisplayName}");
                     }
                 }
                 else

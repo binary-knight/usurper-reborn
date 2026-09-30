@@ -213,8 +213,8 @@ names|Scripts/Systems/BetrayalSystem.cs|init.NPCName|NPC names
 table|Scripts/Systems/CharacterCreationSystem.cs|dictpair#1|class abbreviations in the race list
 table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|starter weapon description
 table|Scripts/Systems/CharacterCreationSystem.cs|switcharm/tuple#0|starter weapon names
-table|Scripts/Systems/ClassAbilitySystem.cs|init.Description|class ability descriptions
-nouns|Scripts/Systems/ClassAbilitySystem.cs|init.Name|class ability names
+keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Description|ability.{id}.desc
+keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Name|ability.{id}.name
 table|Scripts/Systems/DialogueSystem.cs|init.Text|dialogue tree node text
 names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names
 table|Scripts/Systems/FactionSystem.cs|return/tuple#1|faction join refusal
