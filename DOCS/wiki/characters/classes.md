@@ -1,7 +1,7 @@
 ---
 title: Classes
 path: /wiki/en/characters/classes/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
 ---
 Choose a class for the actions you want to take, not just its starting numbers. Compare the per-level growth and specialization options on each class page.

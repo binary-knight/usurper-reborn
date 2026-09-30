@@ -1,7 +1,7 @@
 ---
 title: Crime, prison and the law
 path: /wiki/en/world/law/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs
 ---
 Crime has consequences in town. Theft and murder can be taboos for your god, and a high Darkness makes you a wanted character. The ruler at the [Castle](/wiki/en/world/castle/) controls the prison.

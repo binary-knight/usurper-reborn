@@ -1,7 +1,7 @@
 ---
 title: Discord wiki help
 path: /wiki/en/online/discord/
-checked: 1.2.1
+checked: 1.2.2
 sources: web/wiki-bot.js
 ---
 The Discord bot can answer from the published English wiki in channels enabled by the server owner. Mention the bot and ask a focused question, for example: `@UsurperBot how does Favor work?`

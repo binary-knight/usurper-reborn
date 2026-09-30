@@ -1,7 +1,7 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs
 ---
 ## Offensive and defensive attributes
