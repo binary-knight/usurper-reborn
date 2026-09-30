@@ -4060,7 +4060,7 @@ public class InnLocation : BaseLocation
         {
 
             terminal.ClearScreen();
-            WriteSectionHeader($"EQUIP ITEM TO {target.DisplayName.ToUpper()}", "bright_cyan");
+            WriteSectionHeader(Loc.Get("home.equip_to_header", target.DisplayName.ToUpper()), "bright_cyan");
             terminal.WriteLine("");
 
             // Step 1: Pick a slot
@@ -4074,7 +4074,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine("  No items available for this slot.");
+                terminal.WriteLine($"  {Loc.Get("home.no_items_slot")}");
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -4083,7 +4083,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("");
             var currentItem = target.GetEquipment(selectedSlot.Value);
             terminal.SetColor("white");
-            terminal.Write($"  Current: ");
+            terminal.Write($"  {Loc.Get("home.equip_current")} ");
             if (currentItem != null)
             {
                 if (!currentItem.IsIdentified)

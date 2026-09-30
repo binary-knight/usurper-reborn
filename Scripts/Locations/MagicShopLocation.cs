@@ -2415,7 +2415,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Gold + item count + page
         terminal.SetColor("yellow");
-        terminal.Write("  Gold: ");
+        terminal.Write($"  {Loc.Get("ui.gold")}: ");
         terminal.SetColor("bright_yellow");
         terminal.Write($"{player.Gold:N0}");
         terminal.SetColor("gray");
@@ -2431,7 +2431,7 @@ public partial class MagicShopLocation : BaseLocation
             if (lf != null)
             {
                 terminal.SetColor("cyan");
-                terminal.Write("  L.Finger: ");
+                terminal.Write($"  {Loc.Get("inventory.slot_left_ring")}: ");
                 terminal.SetColor("bright_white");
                 terminal.Write(lf.Name);
                 var lfStats = GetAccessoryBonusDescription(lf);
@@ -2441,7 +2441,7 @@ public partial class MagicShopLocation : BaseLocation
             if (rf != null)
             {
                 terminal.SetColor("cyan");
-                terminal.Write("  R.Finger: ");
+                terminal.Write($"  {Loc.Get("inventory.slot_right_ring")}: ");
                 terminal.SetColor("bright_white");
                 terminal.Write(rf.Name);
                 var rfStats = GetAccessoryBonusDescription(rf);
@@ -2456,7 +2456,7 @@ public partial class MagicShopLocation : BaseLocation
             if (currentItem != null)
             {
                 terminal.SetColor("cyan");
-                terminal.Write("  Equipped: ");
+                terminal.Write($"  {Loc.Get("magic_shop.equipped_label")} ");
                 terminal.SetColor("bright_white");
                 terminal.Write(currentItem.Name);
                 var eqStats = GetAccessoryBonusDescription(currentItem);
@@ -2477,11 +2477,11 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_green");
             terminal.Write("[+]");
             terminal.SetColor("darkgray");
-            terminal.Write(" upgrade  ");
+            terminal.Write($" {Loc.Get("magic_shop.legend_upgrade")}  ");
             terminal.SetColor("red");
             terminal.Write("[-]");
             terminal.SetColor("darkgray");
-            terminal.WriteLine(" downgrade vs equipped");
+            terminal.WriteLine($" {Loc.Get("magic_shop.legend_downgrade")}");
         }
 
         // Items on this page
@@ -2945,21 +2945,21 @@ public partial class MagicShopLocation : BaseLocation
     private static string GetAccessoryBonusDescription(Equipment item)
     {
         var bonuses = new List<string>();
-        if (item.StrengthBonus != 0) bonuses.Add($"Str{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
-        if (item.DexterityBonus != 0) bonuses.Add($"Dex{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
-        if (item.AgilityBonus != 0) bonuses.Add($"Agi{(item.AgilityBonus > 0 ? "+" : "")}{item.AgilityBonus}");
-        if (item.ConstitutionBonus != 0) bonuses.Add($"Con{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
-        if (item.IntelligenceBonus != 0) bonuses.Add($"Int{(item.IntelligenceBonus > 0 ? "+" : "")}{item.IntelligenceBonus}");
-        if (item.WisdomBonus != 0) bonuses.Add($"Wis{(item.WisdomBonus > 0 ? "+" : "")}{item.WisdomBonus}");
-        if (item.CharismaBonus != 0) bonuses.Add($"Cha{(item.CharismaBonus > 0 ? "+" : "")}{item.CharismaBonus}");
-        if (item.DefenceBonus != 0) bonuses.Add($"Def{(item.DefenceBonus > 0 ? "+" : "")}{item.DefenceBonus}");
-        if (item.MaxHPBonus != 0) bonuses.Add($"HP+{item.MaxHPBonus}");
-        if (item.MaxManaBonus != 0) bonuses.Add($"MP+{item.MaxManaBonus}");
-        if (item.StaminaBonus != 0) bonuses.Add($"Sta+{item.StaminaBonus}");
-        if (item.MagicResistance != 0) bonuses.Add($"MR+{item.MagicResistance}");
-        if (item.CriticalChanceBonus != 0) bonuses.Add($"Crit+{item.CriticalChanceBonus}%");
-        if (item.CriticalDamageBonus != 0) bonuses.Add($"CritD+{item.CriticalDamageBonus}%");
-        if (item.LifeSteal != 0) bonuses.Add($"LS+{item.LifeSteal}%");
+        if (item.StrengthBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_str")}{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
+        if (item.DexterityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")}{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
+        if (item.AgilityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_agi")}{(item.AgilityBonus > 0 ? "+" : "")}{item.AgilityBonus}");
+        if (item.ConstitutionBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_con")}{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
+        if (item.IntelligenceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_int")}{(item.IntelligenceBonus > 0 ? "+" : "")}{item.IntelligenceBonus}");
+        if (item.WisdomBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_wis")}{(item.WisdomBonus > 0 ? "+" : "")}{item.WisdomBonus}");
+        if (item.CharismaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_cha")}{(item.CharismaBonus > 0 ? "+" : "")}{item.CharismaBonus}");
+        if (item.DefenceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_def")}{(item.DefenceBonus > 0 ? "+" : "")}{item.DefenceBonus}");
+        if (item.MaxHPBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_hp")}+{item.MaxHPBonus}");
+        if (item.MaxManaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_mp")}+{item.MaxManaBonus}");
+        if (item.StaminaBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_sta")}+{item.StaminaBonus}");
+        if (item.MagicResistance != 0) bonuses.Add($"{Loc.Get("ui.stat_mr")}+{item.MagicResistance}");
+        if (item.CriticalChanceBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_crit")}+{item.CriticalChanceBonus}%");
+        if (item.CriticalDamageBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_critd")}+{item.CriticalDamageBonus}%");
+        if (item.LifeSteal != 0) bonuses.Add($"{Loc.Get("ui.stat_ls")}+{item.LifeSteal}%");
         return string.Join(" ", bonuses.Take(4));
     }
 
