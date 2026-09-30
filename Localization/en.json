@@ -15615,7 +15615,7 @@
   "town_hall.earned_lifetime": "City tax earned lifetime: {0} gold",
   "town_hall.earnings_note": "Tax income auto-deposits to your bank account as shops make sales.",
   "base.help_compact": "- Toggle compact mode (mobile/small screens)",
-  "base.help_bug": "- Report a bug (opens GitHub)",
+  "base.help_bug": "- Report a bug (sends a report to the developer)",
   "base.help_quick_keys": "  Quick keys (single character):",
   "base.help_key_inventory": "- Inventory",
   "base.help_key_prefs": "- Preferences",

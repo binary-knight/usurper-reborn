@@ -15430,7 +15430,7 @@
   "town_hall.earned_lifetime": "Tasse riscosse in totale: {0} oro",
   "town_hall.earnings_note": "Le tasse vengono depositate automaticamente nel tuo conto in banca quando i negozi effettuano vendite.",
   "base.help_compact": "- Attiva/disattiva modalità compatta (mobile/schermi piccoli)",
-  "base.help_bug": "- Segnala un bug (apre GitHub)",
+  "base.help_bug": "- Segnala un bug (invia una segnalazione allo sviluppatore)",
   "base.help_quick_keys": "  Tasti rapidi (singolo carattere):",
   "base.help_key_inventory": "- Inventario",
   "base.help_key_prefs": "- Preferenze",
