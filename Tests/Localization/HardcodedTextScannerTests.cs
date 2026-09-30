@@ -11,7 +11,8 @@ namespace UsurperReborn.Tests.Localization;
 /// Checks the hardcoded text scanner on a fixture with known hits and misses, and holds the command
 /// that prints the full inventory:
 ///   Tests/Localization/loc-scan.sh [out-dir]
-/// (runs this class's Inventory test with LOC_SCAN_OUT set).
+/// (runs this class's Inventory test with LOC_SCAN_OUT set), and with --write-baseline also rewrites
+/// Tests/Localization/hardcoded-baseline.json for HardcodedTextRatchetTests.
 /// </summary>
 public class HardcodedTextScannerTests
 {
@@ -90,7 +91,7 @@ public class HardcodedTextScannerTests
 
     /// <summary>
     /// The command. Does nothing unless LOC_SCAN_OUT names a folder; then writes inventory.md and
-    /// rollup.md there.
+    /// rollup.md there. With LOC_SCAN_WRITE_BASELINE=1 it also rewrites the ratchet baseline.
     /// </summary>
     [Fact]
     public void Inventory()
@@ -103,5 +104,8 @@ public class HardcodedTextScannerTests
         Directory.CreateDirectory(outDir);
         File.WriteAllText(Path.Combine(outDir, "inventory.md"), HardcodedTextScanner.InventoryMarkdown(sites, files));
         File.WriteAllText(Path.Combine(outDir, "rollup.md"), HardcodedTextScanner.RollupMarkdown(sites));
+        if (Environment.GetEnvironmentVariable("LOC_SCAN_WRITE_BASELINE") == "1")
+            File.WriteAllText(Path.Combine(root, HardcodedTextRatchetTests.BaselinePath),
+                HardcodedTextRatchetTests.SerializeBaseline(HardcodedTextRatchetTests.BuildBaseline(sites)));
     }
 }
