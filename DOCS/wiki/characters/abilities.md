@@ -1,7 +1,7 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Systems/ClassAbilitySystem.cs
 ---
 Abilities belong to particular classes and can require a weapon type, a shield or a valid target. Costs below are template costs; a description does not override an equipment requirement checked by the game.

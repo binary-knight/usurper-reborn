@@ -38,7 +38,11 @@ jobs:
     name: Wiki build, links, bot and accessibility
     runs-on: ubuntu-latest
     steps:
+      # Full history and tags: the drift check diffs guide sources against release tags.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
@@ -55,6 +59,16 @@ jobs:
           npm run build --prefix tools/wiki-build
           npm test --prefix tools/wiki-build
           node --check web/ssh-proxy.js
+      # Stale guides warn on ordinary PRs and pushes. They fail release PRs
+      # (head branch release-*), releases and manual deploys, which blocks deploy-server.
+      - name: Wiki drift check
+        env:
+          DRIFT_MODE: >-
+            ${{ (github.event_name == 'release'
+              || (github.event_name == 'workflow_dispatch' && (inputs.deploy_server == true || inputs.deploy_server == 'true'))
+              || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-')))
+              && 'fail' || 'warn' }}
+        run: node tools/wiki-build/drift.js --mode "$DRIFT_MODE"
       - name: Install browser for accessibility checks
         working-directory: tools/wiki-build
         run: npx playwright install --with-deps chromium

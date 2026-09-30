@@ -1,7 +1,7 @@
 ---
 title: Specializations
 path: /wiki/en/characters/specializations/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/LevelMasterLocation.cs, Scripts/Data/SpecializationData.cs
 ---
 Specialization becomes available at the Level Master from level {{balance:SpecializationUnlockLevel}}, for classes that have defined options. The first choice is free; changing it later costs {{balance:SpecializationRespecCost}} gold.

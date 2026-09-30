@@ -1,7 +1,7 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs
 ---
 Quests have different origins: the Quest Hall, royal work, conversations and exploration can each lead to a goal. Check the active quest text rather than interpreting every rumor as an accepted task.

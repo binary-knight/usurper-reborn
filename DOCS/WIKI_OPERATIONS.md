@@ -94,6 +94,52 @@ descriptions and Discord answers. Known secret names are also redacted from
 public search text. Spoilers are discoverable by viewing page HTML; this is a
 reader preference, not access control.
 
+## Drift check
+
+`tools/wiki-build/drift.js` checks that hand-written guides still match the
+game. The game version is `GameConfig.Version` in
+`Scripts/Core/GameConfig.cs`; `--version X` overrides it. For each guide:
+
+- `checked` equal to the game version: current.
+- `checked` older than the game version: every file in `sources` is compared
+  with `git diff v<checked> HEAD`. A changed file, or one that did not exist at
+  that tag, makes the guide stale. The tag `v<checked>` must exist; a missing
+  tag is an error.
+- `checked` newer than the game version: an error.
+- A `sources` file that no longer exists makes the guide stale.
+
+It also checks coverage: every `Scripts/Locations/*Location.cs` must appear in
+some guide's `sources` or in `tools/wiki-build/coverage-allowlist.txt`, one file
+name per line followed by the reason it needs no guide.
+
+The report lists each stale guide with its changed files and the command that
+shows each diff, each uncovered location and each error.
+
+```sh
+node tools/wiki-build/drift.js --warn
+node tools/wiki-build/drift.js --fail --version 1.2.1
+```
+
+Run it from a clone with full history and tags (`git fetch --tags origin`).
+Warn mode always exits 0. Fail mode exits 1 when anything is listed. In CI the
+`wiki` job fetches full history and runs the check after the build. Ordinary
+pull requests and pushes get warning annotations and pass. Pull requests whose
+head branch starts with `release-`, `release` events and manual deploys run in
+fail mode, so a stale guide fails the `wiki` job and blocks `deploy-server`.
+
+To re-check a stale guide:
+
+1. Read each diff the report prints.
+2. Update the prose where the change affects what the guide says. Facts come
+   from code; the content rules above apply.
+3. Set `checked` to the game version, even if no prose changed. Add or remove
+   `sources` entries if the guide's subject moved to another file.
+
+Release prep, before opening the release pull request: set
+`GameConfig.Version` to the new version (or pass `--version` with it until the
+bump lands), run `node tools/wiki-build/drift.js --fail`, re-check every stale
+guide, resolve every uncovered location, and repeat until the check passes.
+
 Shared website labels live in `web/lang/`. Launch guides are English only.
 Generated translated names are included only where the exporter found a real
 localization key; English fallback is not advertised as a translation.

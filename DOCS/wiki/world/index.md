@@ -1,7 +1,7 @@
 ---
 title: World and locations
 path: /wiki/en/world/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/MainStreetDistricts.cs
 ---
 Main Street is the hub. Location keys depend on the current district and menu presentation, so read the menu in front of you.

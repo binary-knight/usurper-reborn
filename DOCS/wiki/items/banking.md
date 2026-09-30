@@ -1,7 +1,7 @@
 ---
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs
 ---
 Gold on hand and bank gold are separate balances. The Bank offers deposits, withdrawals and transfers alongside other banking activities.
