@@ -426,6 +426,17 @@ public static class SpellSystem
         return applied;
     }
 
+    /// <summary>Built-in spell values captured at type initialization, before any override can apply.
+    /// Declared after SpellBook so the field initializer sees it filled.</summary>
+    private static readonly List<UsurperRemake.Data.SpellOverride> BuiltInValues = ExportOverrideTemplate();
+
+    /// <summary>Every built-in spell with its shipped values, ignoring spells.json overrides.</summary>
+    public static List<UsurperRemake.Data.SpellOverride> BuiltInTemplate() => BuiltInValues.Select(x => new UsurperRemake.Data.SpellOverride
+    {
+        Class = x.Class, Level = x.Level, Name = x.Name, Description = x.Description,
+        ManaCost = x.ManaCost, LevelRequired = x.LevelRequired, MagicWords = x.MagicWords,
+    }).ToList();
+
     /// <summary>v1.2 (design item H2): every built-in spell with its current values.</summary>
     public static List<UsurperRemake.Data.SpellOverride> ExportOverrideTemplate() =>
         SpellBook.OrderBy(kv => kv.Key).SelectMany(kv => kv.Value.OrderBy(x => x.Key).Select(x => new UsurperRemake.Data.SpellOverride

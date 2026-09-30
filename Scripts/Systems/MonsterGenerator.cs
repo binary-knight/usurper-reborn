@@ -229,7 +229,8 @@ public static class MonsterGenerator
     /// - Level 50 player (Str 100, Weap 100) deals ~400 damage -> Monster HP ~1200-2000
     /// - Level 100 player (Str 200, Weap 200) deals ~800 damage -> Monster HP ~2500-4000
     /// </summary>
-    private static MonsterStats CalculateMonsterStats(int level, float powerMultiplier, bool isBoss, bool isMiniBoss = false, double approachScale = 1.0)
+    private static MonsterStats CalculateMonsterStats(int level, float powerMultiplier, bool isBoss, bool isMiniBoss = false, double approachScale = 1.0,
+        float? sysopHpMultiplier = null, DifficultyMode? difficulty = null)
     {
         // v0.56.1 — separate HP/damage/defense multipliers so we can buff HP aggressively
         // without turning bosses into one-shot machines.
@@ -299,11 +300,13 @@ public static class MonsterGenerator
             weaponPower = (long)(weaponPower * approachScale);
         }
 
-        // Apply server-wide SysOp HP multiplier
-        hp = (long)(hp * GameConfig.MonsterHPMultiplier);
+        // Apply server-wide SysOp HP multiplier (the wiki export passes the default explicitly)
+        hp = (long)(hp * (sysopHpMultiplier ?? GameConfig.MonsterHPMultiplier));
 
         // Apply difficulty-based HP multiplier
-        hp = DifficultySystem.ApplyMonsterHPMultiplier(hp);
+        hp = difficulty.HasValue
+            ? (long)(hp * DifficultySystem.GetMonsterHPMultiplier(difficulty.Value))
+            : DifficultySystem.ApplyMonsterHPMultiplier(hp);
 
         // Early-floor reduction (v0.49.3 floor-1 step -> v0.65.3 graduated ramp). Telemetry showed
         // permadeaths clustering at character level 1-3: clearing floor 1 then hitting a full-strength
@@ -330,6 +333,15 @@ public static class MonsterGenerator
             WeaponPower = Math.Max(1, weaponPower),
             ArmorPower = Math.Max(0, armorPower)
         };
+    }
+
+    /// <summary>Normal, non-boss monster stats from the combat generator for a wiki level sample, at the
+    /// default server HP multiplier and Normal difficulty whatever the current settings are.</summary>
+    internal static (long HP, long Strength, long Defence, long Punch, long WeaponPower, long ArmorPower)
+        GetWikiStats(int level, float powerMultiplier)
+    {
+        var stats = CalculateMonsterStats(level, powerMultiplier, false, sysopHpMultiplier: 1.0f, difficulty: DifficultyMode.Normal);
+        return (stats.HP, stats.Strength, stats.Defence, stats.Punch, stats.WeaponPower, stats.ArmorPower);
     }
 
     /// <summary>

@@ -91,6 +91,14 @@ namespace UsurperConsole
             // Initialize localization system (loads language JSON files)
             UsurperRemake.Systems.Loc.Initialize();
 
+            // Export built-in wiki facts before GameDataLoader can apply local mods.
+            var wikiExit = UsurperRemake.Systems.WikiDataExporter.RunCommandLine(args, Console.Out, Console.Error);
+            if (wikiExit.HasValue)
+            {
+                Environment.ExitCode = wikiExit.Value;
+                return;
+            }
+
             // Initialize moddable game data loader (loads GameData/ JSON overrides if present)
             UsurperRemake.Systems.GameDataLoader.Initialize();
 
@@ -934,4 +942,4 @@ namespace UsurperConsole
             }
         }
     }
-} 
+}

@@ -197,6 +197,13 @@ namespace UsurperRemake.Systems
             return key;
         }
 
+        /// <summary>Whether a key is present in this language, without English fallback.</summary>
+        public static bool HasIn(string lang, string key)
+        {
+            if (!_loaded) Initialize();
+            return _languages.TryGetValue(lang, out var entries) && entries.ContainsKey(key);
+        }
+
         /// <summary>Get a localized format string in an explicit language and apply arguments.</summary>
         public static string GetIn(string lang, string key, params object[] args)
         {
