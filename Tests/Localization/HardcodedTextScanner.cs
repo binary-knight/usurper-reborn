@@ -322,6 +322,9 @@ public static class HardcodedTextScanner
         return spec.Positions.Contains(index);
     }
 
+    /// <summary>True when the call is one of the output sinks above (used by DataTextScanner for throws).</summary>
+    public static bool IsOutputCall(InvocationExpressionSyntax inv) => ClassifyInvocation(inv) != null;
+
     private static (string Sink, SinkSpec Spec)? ClassifyInvocation(InvocationExpressionSyntax inv)
     {
         string? name;

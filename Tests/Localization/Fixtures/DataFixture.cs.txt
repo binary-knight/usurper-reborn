@@ -1,0 +1,56 @@
+// Fixture for DataTextScannerTests. Not compiled. Line numbers are asserted by the test,
+// so add new cases at the end. The test lists this file's slots in its own sources text.
+using System;
+
+public static class FixtureTables
+{
+    public static readonly string[] Taunts = { "You call that a swing?", "My grandmother hits harder.", "grove_shrine" };
+    public static readonly string[] MaleNames = { "Aldric", "Borin", "Cedric" };
+    public static readonly string[] Unlisted = { "Nobody reads this table." };
+
+    public static List<Line> Lines() => new()
+    {
+        new() { Id = "ag_m1", Text = "There you are, {player_name}.", Category = "greeting" },
+        new() { Id = "ag_m2", Text = $"Back again? {count} times now.", Category = "greeting" },
+    };
+
+    public static readonly Dictionary<string, string> Replies = new()
+    {
+        ["hello"] = "Well met, traveller.",
+        ["bye"] = "SAFE_TRAVELS",
+    };
+
+    public static readonly (string Name, string Desc)[] Abilities = { ("Shield Wall", "Raise your shield against the blow."), ("Cleave", "Strike every foe.") };
+
+    public static readonly DiscDef Keyed = new() { Name = "Weeping Reliquary", Desc = "The box weeps." };
+}
+
+public class FixtureShown
+{
+    private TerminalEmulator terminal;
+
+    public void Run(Character player)
+    {
+        ElectronBridge.EmitNarration("The mist rolls in.", style: "mystery");
+        ElectronBridge.Emit("combat_menu", new { title = "Choose your move", key = "attack", prompt = Loc.Get("combat.menu") });
+        ElectronBridge.EmitSound("sfx.door_open");
+        var items = new List<ElectronBridge.MenuItemData> { new ElectronBridge.MenuItemData { Key = "A", Label = "Attack the foe", Icon = "sword" } };
+        try
+        {
+            if (player == null) throw new InvalidOperationException("The gate will not open for you.");
+        }
+        catch (Exception ex)
+        {
+            terminal.WriteLine(Loc.Get("ui.error", ex.Message));
+        }
+        try
+        {
+            throw new InvalidOperationException("Internal state broken");
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("FIX", ex.Message);
+        }
+        throw new ArgumentException("Unknown boss type");
+    }
+}
