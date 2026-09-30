@@ -61,6 +61,34 @@ for (const [question, expected] of guides121)
     assert.ok(top(question, 3).includes(expected), top(question, 5).join(" "));
   });
 
+// 1.2.2: bug reporting questions must retrieve the reporting guide in the top 3.
+const bugReports = [
+  "I found a bug, where do I report it?",
+  "how do I report a bug",
+  "bug report",
+  "where do I submit an issue",
+];
+for (const question of bugReports)
+  test(`bug guide: "${question}" finds ${W}getting-started/reporting-bugs/ in the top 3`, () => {
+    assert.ok(
+      top(question, 3).includes(`${W}getting-started/reporting-bugs/`),
+      top(question, 5).join(" "),
+    );
+  });
+
+// 1.2.2: dungeon feature and event questions must retrieve the new guides in the top 3.
+const dungeonGuides = [
+  ["is there a wiki page on the various random events and features found in the dungeon?", `${W}world/dungeon-features/`],
+  ["dungeon random events", `${W}world/dungeon-features/`],
+  ["what are dungeon shrines", `${W}world/dungeon-features/`],
+  ["traps in the dungeon", `${W}world/dungeon-features/`],
+  ["rare encounters", `${W}world/rare-encounters/`],
+];
+for (const [question, expected] of dungeonGuides)
+  test(`dungeon guide: "${question}" finds ${expected} in the top 3`, () => {
+    assert.ok(top(question, 3).includes(expected), top(question, 5).join(" "));
+  });
+
 // Sentences written inside :::spoiler blocks of the 1.2.1 guides, as plain text.
 function spoilerSentences(file) {
   const md = fs.readFileSync(
@@ -87,6 +115,21 @@ test("text inside the 1.2.1 guides' spoiler blocks never reaches the search inde
       checked++;
     }
   assert.ok(checked >= 10, `${checked} spoiler sentences checked`);
+});
+
+test("text inside the dungeon guides' spoiler blocks never reaches the search index", () => {
+  const indexed = pages
+    .map((p) => [p.title, ...(p.headings || []), p.text].join(" ").replace(/\s+/g, " "))
+    .join("\n");
+  const features = pages.find((p) => p.path === `${W}world/dungeon-features/`);
+  assert.match(features.text, /Search for Traps is free/, "public feature text is indexed");
+  let checked = 0;
+  for (const file of ["world/dungeon-features.md", "world/rare-encounters.md"])
+    for (const sentence of spoilerSentences(file)) {
+      assert.ok(!indexed.includes(sentence), `${file}: ${sentence}`);
+      checked++;
+    }
+  assert.ok(checked >= 40, `${checked} spoiler sentences checked`);
 });
 
 test("the index marks hand-written guides and only those", () => {
@@ -151,6 +194,13 @@ test("title and headings weigh more than body text", () => {
   assert.equal(favor[0].path, `${W}gods/favor/`);
   const shops = search(pages, "auctions", 5);
   assert.equal(shops[0].path, `${W}items/shops/`);
+});
+
+test("a query phrase found as adjacent words outranks pages with the words apart", () => {
+  // Only the monsters page has "Monster families"; the dungeon guides mention monsters
+  // and the dungeon separately, and the home page has "family" in its title.
+  assert.equal(top("What monster families are in the dungeon?", 1)[0], `${W}monsters/`);
+  assert.equal(top("monster families", 1)[0], `${W}monsters/`);
 });
 
 test("plurals and -ing forms match their base word", () => {

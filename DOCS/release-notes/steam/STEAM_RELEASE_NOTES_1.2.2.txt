@@ -1,0 +1,12 @@
+[h1]Usurper Reborn 1.2.2[/h1]
+
+[list]
+[*]Combat is translated: the combat screens, class ability names and descriptions included, now show in your language. In group combat, each member reads the lines in their own language.
+[*]Item comparison screens (backpack, loot, Magic Shop, companion equip), status effects and poison are translated too.
+[*]Temple gold offerings no longer need a good deed left, and offerings no longer give a good or dark deed back. Alignment, faction standing and Favor from offerings are unchanged.
+[*]A few English wording changes: item bonuses show as HP+n and MR+n, and the comparison screen says Max HP and MR.
+[*]New wiki guides for reporting bugs, dungeon features and rare encounters. Wiki search finds the page that matches your phrase first, and Discord Suggest accepts "suggestion:" as well as "suggest:".
+[*]Still in English or in the group leader's language: the follower's full combat screen and round-status line, ability names in the wiki, and some Electron client combat messages.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.2.md

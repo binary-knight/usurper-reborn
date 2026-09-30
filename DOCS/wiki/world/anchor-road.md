@@ -1,7 +1,7 @@
 ---
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
 ---
 Anchor Road is the town's challenge ground. From Main Street open the Castle Grounds district with C, then press C for Challenges. It appears once the full town menu unlocks.

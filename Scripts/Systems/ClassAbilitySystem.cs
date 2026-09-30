@@ -40,6 +40,11 @@ public static class ClassAbilitySystem
         public int Duration { get; set; } // Combat rounds
         public string SpecialEffect { get; set; } = "";
         public bool CanTargetAlly { get; set; } // Heal abilities that can target teammates
+
+        // v1.2.2: Name and Description stay the English identifiers (combat log, exports, tests).
+        // What the player sees comes from ability.<id>.name / .desc when that key exists.
+        public string DisplayName => Id.Length > 0 && Loc.Has($"ability.{Id}.name") ? Loc.Get($"ability.{Id}.name") : Name;
+        public string DisplayDescription => Id.Length > 0 && Loc.Has($"ability.{Id}.desc") ? Loc.Get($"ability.{Id}.desc") : Description;
     }
 
     public enum AbilityType
@@ -1558,7 +1563,7 @@ public static class ClassAbilitySystem
         {
             Id = "grand_remedy",
             Name = "Grand Remedy",
-            Description = "The ultimate curative — fully restores the party and cures all ailments.",
+            Description = "The ultimate curative: fully restores the party and cures all ailments.",
             LevelRequired = 80,
             StaminaCost = 65,
             Cooldown = 6,
@@ -2630,6 +2635,10 @@ public static class ClassAbilitySystem
         return null;
     }
 
+    /// <summary>v1.2.2: an ability's cost tag, "(12 MP)" or "(15 ST)", in the player's language.</summary>
+    internal static string CostTag(ClassAbility ability) =>
+        ability.ManaCost > 0 ? Loc.Get("ability.cost_mp", ability.ManaCost) : Loc.Get("ability.cost_st", GetEffectiveStaminaCost(ability));
+
     /// <summary>
     /// Use an ability and return the result
     /// </summary>
@@ -2642,7 +2651,7 @@ public static class ClassAbilitySystem
         if (ability == null)
         {
             result.Success = false;
-            result.Message = "Unknown ability!";
+            result.Message = Loc.Get("combat.unknown_ability");
             return result;
         }
 
@@ -2834,7 +2843,7 @@ public static class ClassAbilitySystem
         }
 
         // Generate message
-        result.Message = $"{user.Name2} uses {ability.Name}!";
+        result.Message = Loc.Get("combat.monster_uses_ability", user.Name2, ability.DisplayName);
 
         return result;
     }
@@ -2892,7 +2901,7 @@ public static class ClassAbilitySystem
                         terminal.SetColor("cyan");
                         terminal.Write($"{(spell?.DisplayName ?? slotId),-24}");
                         terminal.SetColor("darkgray");
-                        terminal.Write($"  (spell)");
+                        terminal.Write($"  {Loc.Get("ability.tag_spell")}");
                         terminal.WriteLine("");
                     }
                     else
@@ -2903,12 +2912,12 @@ public static class ClassAbilitySystem
                             terminal.SetColor("bright_yellow");
                             terminal.Write($"  [{i + 1}] ");
                             terminal.SetColor("yellow");
-                            string costDisplay = ability.ManaCost > 0 ? $"({ability.ManaCost} MP)" : $"({GetEffectiveStaminaCost(ability)} ST)";
-                            terminal.Write($"{ability.Name,-24} {costDisplay}");
-                            if (!string.IsNullOrEmpty(ability.Description))
+                            string costDisplay = CostTag(ability);
+                            terminal.Write($"{ability.DisplayName,-24} {costDisplay}");
+                            if (!string.IsNullOrEmpty(ability.DisplayDescription))
                             {
                                 terminal.SetColor("gray");
-                                terminal.Write($"  {ability.Description}");
+                                terminal.Write($"  {ability.DisplayDescription}");
                             }
                             terminal.WriteLine("");
                         }
@@ -2924,7 +2933,7 @@ public static class ClassAbilitySystem
                 else
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"  [{i + 1}] --- empty ---");
+                    terminal.WriteLine($"  [{i + 1}] --- {Loc.Get("ui.empty").ToLower()} ---");
                 }
             }
 
@@ -2947,11 +2956,11 @@ public static class ClassAbilitySystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.Write($"{unequipped[i].Name,-24} ({GetEffectiveStaminaCost(unequipped[i])} ST) Lv{unequipped[i].LevelRequired}");
-                    if (!string.IsNullOrEmpty(unequipped[i].Description))
+                    terminal.Write($"{unequipped[i].DisplayName,-24} {Loc.Get("ability.cost_st", GetEffectiveStaminaCost(unequipped[i]))} {Loc.Get("ability.level_tag", unequipped[i].LevelRequired)}");
+                    if (!string.IsNullOrEmpty(unequipped[i].DisplayDescription))
                     {
                         terminal.SetColor("gray");
-                        terminal.Write($"  {unequipped[i].Description}");
+                        terminal.Write($"  {unequipped[i].DisplayDescription}");
                     }
                     terminal.WriteLine("");
                 }
@@ -2967,10 +2976,10 @@ public static class ClassAbilitySystem
                 foreach (var ability in locked)
                 {
                     terminal.SetColor("darkgray");
-                    string lCostDisplay = ability.ManaCost > 0 ? $"({ability.ManaCost} MP)" : $"({GetEffectiveStaminaCost(ability)} ST)";
-                    terminal.Write($"      {ability.Name,-24} {lCostDisplay} {Loc.Get("ability.requires_lv", ability.LevelRequired)}");
-                    if (!string.IsNullOrEmpty(ability.Description))
-                        terminal.Write($"  {ability.Description}");
+                    string lCostDisplay = CostTag(ability);
+                    terminal.Write($"      {ability.DisplayName,-24} {lCostDisplay} {Loc.Get("ability.requires_lv", ability.LevelRequired)}");
+                    if (!string.IsNullOrEmpty(ability.DisplayDescription))
+                        terminal.Write($"  {ability.DisplayDescription}");
                     terminal.WriteLine("");
                 }
             }
@@ -3022,7 +3031,7 @@ public static class ClassAbilitySystem
                     {
                         var clearedAbility = GetAbility(clearedId);
                         player.Quickbar[clearSlot - 1] = null;
-                        terminal.WriteLine(Loc.Get("ability.removed_from_slot", clearedAbility?.Name ?? clearedId, clearSlot), "cyan");
+                        terminal.WriteLine(Loc.Get("ability.removed_from_slot", clearedAbility?.DisplayName ?? clearedId, clearSlot), "cyan");
                         await SaveSystem.Instance.AutoSave(player);
                         await Pacing.Wait(800);
                     }
@@ -3044,7 +3053,7 @@ public static class ClassAbilitySystem
                 if (currentInSlot != null)
                 {
                     var currentAbility = GetAbility(currentInSlot);
-                    terminal.WriteLine(Loc.Get("ability.slot_has_pick", slotNum, currentAbility?.Name ?? currentInSlot), "cyan");
+                    terminal.WriteLine(Loc.Get("ability.slot_has_pick", slotNum, currentAbility?.DisplayName ?? currentInSlot), "cyan");
                 }
                 else
                 {
@@ -3061,8 +3070,8 @@ public static class ClassAbilitySystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    string uCostDisplay = unequipped[i].ManaCost > 0 ? $"({unequipped[i].ManaCost} MP)" : $"({GetEffectiveStaminaCost(unequipped[i])} ST)";
-                    terminal.WriteLine($"{unequipped[i].Name,-24} {uCostDisplay}");
+                    string uCostDisplay = CostTag(unequipped[i]);
+                    terminal.WriteLine($"{unequipped[i].DisplayName,-24} {uCostDisplay}");
                 }
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
@@ -3090,7 +3099,7 @@ public static class ClassAbilitySystem
                     }
 
                     player.Quickbar[slotNum - 1] = chosen.Id;
-                    terminal.WriteLine(Loc.Get("ability.equipped_to_slot", chosen.Name, slotNum), "bright_green");
+                    terminal.WriteLine(Loc.Get("ability.equipped_to_slot", chosen.DisplayName, slotNum), "bright_green");
                     await SaveSystem.Instance.AutoSave(player);
                     await Pacing.Wait(800);
                 }

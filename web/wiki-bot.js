@@ -2,6 +2,8 @@
 const fs = require("node:fs");
 const path = require("node:path");
 const { search, excerpt } = require("./wiki-search");
+// Suggest prefix: "suggest:" or "suggestion:", any case, optional space before the colon.
+const SUGGEST_PREFIX = /^suggest(?:ion)?\s*:/i;
 
 function sanitize(text) {
   return String(text)
@@ -454,7 +456,7 @@ function createWikiBot({
       userTimes.set(message.author.id, time);
       globalRequests++;
       const raw = (message.content || "").replace(mention, "").trim();
-      if (/^suggest\s*:/i.test(raw)) {
+      if (SUGGEST_PREFIX.test(raw)) {
         if (!roleId || !suggestionsReady) {
           await send(
             "Wiki suggestions are not enabled. Ask the owner about the review queue.",
@@ -467,7 +469,7 @@ function createWikiBot({
           );
           return true;
         }
-        const proposal = raw.replace(/^suggest\s*:/i, "").trim();
+        const proposal = raw.replace(SUGGEST_PREFIX, "").trim();
         if (!proposal || proposal.length > 800) {
           await send(
             "Describe the proposed wiki correction in 1 to 800 characters.",
@@ -483,7 +485,7 @@ function createWikiBot({
       }
       if (!raw || raw.length > 300) {
         await send(
-          "Mention me with a wiki question up to 300 characters, or use `suggest: ...` if you have the trusted role.",
+          "Mention me with a wiki question up to 300 characters, or use `suggest: ...` or `suggestion: ...` if you have the trusted role.",
         );
         return true;
       }

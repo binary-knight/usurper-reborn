@@ -1,7 +1,7 @@
 ---
 title: Relationships and Love Street
 path: /wiki/en/world/relationships/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/LoveStreetLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs
 ---
 Love Street contains dating, gifts, gossip and adult-themed services. Relationships are part of the persistent world rather than a guaranteed reward for repeatedly choosing one dialogue option.

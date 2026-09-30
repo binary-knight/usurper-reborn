@@ -730,10 +730,12 @@ namespace UsurperRemake.Systems
         private void DisplayStatsSummary()
         {
             terminal.SetColor("yellow");
+            // v1.2.2: the key carries its own frame and the labels below their own colon; the code
+            // added a second of each ("═══ ═══ EQUIPMENT BONUSES ═══ ═══", "Stats: : ").
             if (!GameConfig.ScreenReaderMode)
-                terminal.WriteLine($"═══ {Loc.Get("inventory.equipment_bonuses")} ═══");
-            else
                 terminal.WriteLine(Loc.Get("inventory.equipment_bonuses"));
+            else
+                terminal.WriteLine(Loc.Get("inventory.equipment_bonuses").Trim('═', '=', ' '));
 
             // Calculate total bonuses from equipment
             int totalWeapPow = 0, totalArmPow = 0;
@@ -776,26 +778,26 @@ namespace UsurperRemake.Systems
                 totalInt != 0 || totalWis != 0 || totalCha != 0)
             {
                 terminal.SetColor("white");
-                terminal.Write($"{Loc.Get("inventory.stats")}: ");
-                if (totalStr != 0) { terminal.SetColor("green"); terminal.Write($"Str {totalStr:+#;-#;0}  "); }
-                if (totalDex != 0) { terminal.SetColor("green"); terminal.Write($"Dex {totalDex:+#;-#;0}  "); }
-                if (totalAgi != 0) { terminal.SetColor("green"); terminal.Write($"Agi {totalAgi:+#;-#;0}  "); }
-                if (totalCon != 0) { terminal.SetColor("green"); terminal.Write($"Con {totalCon:+#;-#;0}  "); }
-                if (totalInt != 0) { terminal.SetColor("cyan"); terminal.Write($"Int {totalInt:+#;-#;0}  "); }
-                if (totalWis != 0) { terminal.SetColor("cyan"); terminal.Write($"Wis {totalWis:+#;-#;0}  "); }
-                if (totalCha != 0) { terminal.SetColor("cyan"); terminal.Write($"Cha {totalCha:+#;-#;0}  "); }
+                terminal.Write(Loc.Get("inventory.stats"));
+                if (totalStr != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_str")} {totalStr:+#;-#;0}  "); }
+                if (totalDex != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_dex")} {totalDex:+#;-#;0}  "); }
+                if (totalAgi != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_agi")} {totalAgi:+#;-#;0}  "); }
+                if (totalCon != 0) { terminal.SetColor("green"); terminal.Write($"{Loc.Get("ui.stat_con")} {totalCon:+#;-#;0}  "); }
+                if (totalInt != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_int")} {totalInt:+#;-#;0}  "); }
+                if (totalWis != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_wis")} {totalWis:+#;-#;0}  "); }
+                if (totalCha != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_cha")} {totalCha:+#;-#;0}  "); }
                 terminal.WriteLine("");
             }
 
             if (totalMaxHP != 0 || totalMaxMana != 0 || totalMR != 0 || totalDef != 0 || totalSta != 0)
             {
                 terminal.SetColor("white");
-                terminal.Write($"{Loc.Get("inventory.other")}: ");
-                if (totalMaxHP != 0) { terminal.SetColor("red"); terminal.Write($"MaxHP {totalMaxHP:+#;-#;0}  "); }
-                if (totalMaxMana != 0) { terminal.SetColor("blue"); terminal.Write($"MaxMP {totalMaxMana:+#;-#;0}  "); }
-                if (totalMR != 0) { terminal.SetColor("magenta"); terminal.Write($"MagicRes {totalMR:+#;-#;0}  "); }
-                if (totalDef != 0) { terminal.SetColor("cyan"); terminal.Write($"Def {totalDef:+#;-#;0}  "); }
-                if (totalSta != 0) { terminal.SetColor("yellow"); terminal.Write($"Sta {totalSta:+#;-#;0}  "); }
+                terminal.Write(Loc.Get("inventory.other"));
+                if (totalMaxHP != 0) { terminal.SetColor("red"); terminal.Write($"{Loc.Get("ui.max_hp")} {totalMaxHP:+#;-#;0}  "); }
+                if (totalMaxMana != 0) { terminal.SetColor("blue"); terminal.Write($"{Loc.Get("ui.max_mana")} {totalMaxMana:+#;-#;0}  "); }
+                if (totalMR != 0) { terminal.SetColor("magenta"); terminal.Write($"{Loc.Get("ui.stat_mr")} {totalMR:+#;-#;0}  "); }
+                if (totalDef != 0) { terminal.SetColor("cyan"); terminal.Write($"{Loc.Get("ui.stat_def")} {totalDef:+#;-#;0}  "); }
+                if (totalSta != 0) { terminal.SetColor("yellow"); terminal.Write($"{Loc.Get("ui.stat_sta")} {totalSta:+#;-#;0}  "); }
                 terminal.WriteLine("");
             }
 
@@ -1167,7 +1169,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("white");
                 terminal.WriteLine($"  {Loc.Get("inventory.comparison")} ({slotDisplayName}):");
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  {Loc.Get("inventory.currently_equipped")}: {currentEquip.Name}");
+                terminal.WriteLine($"  {Loc.Get("inventory.currently_equipped")}{currentEquip.Name}");
 
                 // Compare primary stat
                 if (item.Type == ObjType.Weapon)
@@ -1176,10 +1178,10 @@ namespace UsurperRemake.Systems
                     int newPower = equipment.WeaponPower;
                     int diff = newPower - currentPower;
                     terminal.SetColor("white");
-                    terminal.Write($"  Attack: {currentPower} -> {newPower} ");
-                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine($"(+{diff} UPGRADE)"); }
-                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine($"({diff} downgrade)"); }
-                    else { terminal.SetColor("yellow"); terminal.WriteLine("(same)"); }
+                    terminal.Write(Loc.Get("combat.compare_attack", currentPower, newPower));
+                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine(Loc.Get("combat.upgrade", diff)); }
+                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine(Loc.Get("combat.downgrade", diff)); }
+                    else { terminal.SetColor("yellow"); terminal.WriteLine(Loc.Get("combat.same")); }
                 }
                 else if (item.Type == ObjType.Fingers || item.Type == ObjType.Neck ||
                          (item.Type == ObjType.Magic && ((int)item.MagicType == 5 || (int)item.MagicType == 10)))
@@ -1194,10 +1196,10 @@ namespace UsurperRemake.Systems
                         equipment.IntelligenceBonus + equipment.CharismaBonus;
                     int diff = newStatTotal - currentStatTotal;
                     terminal.SetColor("white");
-                    terminal.Write($"  Stat Total: {currentStatTotal} -> {newStatTotal} ");
-                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine($"(+{diff} UPGRADE)"); }
-                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine($"({diff} downgrade)"); }
-                    else { terminal.SetColor("yellow"); terminal.WriteLine("(same)"); }
+                    terminal.Write(Loc.Get("combat.compare_stat_total", currentStatTotal, newStatTotal));
+                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine(Loc.Get("combat.upgrade", diff)); }
+                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine(Loc.Get("combat.downgrade", diff)); }
+                    else { terminal.SetColor("yellow"); terminal.WriteLine(Loc.Get("combat.same")); }
                 }
                 else
                 {
@@ -1205,35 +1207,35 @@ namespace UsurperRemake.Systems
                     int newAC = equipment.ArmorClass;
                     int diff = newAC - currentAC;
                     terminal.SetColor("white");
-                    terminal.Write($"  Armor: {currentAC} -> {newAC} ");
-                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine($"(+{diff} UPGRADE)"); }
-                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine($"({diff} downgrade)"); }
-                    else { terminal.SetColor("yellow"); terminal.WriteLine("(same)"); }
+                    terminal.Write(Loc.Get("combat.compare_armor", currentAC, newAC));
+                    if (diff > 0) { terminal.SetColor("bright_green"); terminal.WriteLine(Loc.Get("combat.upgrade", diff)); }
+                    else if (diff < 0) { terminal.SetColor("red"); terminal.WriteLine(Loc.Get("combat.downgrade", diff)); }
+                    else { terminal.SetColor("yellow"); terminal.WriteLine(Loc.Get("combat.same")); }
                 }
 
                 // Compare bonus stats
                 var currentBonuses = new List<string>();
                 var newBonuses = new List<string>();
-                if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"Str {currentEquip.StrengthBonus:+#;-#;0}");
-                if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"Dex {currentEquip.DexterityBonus:+#;-#;0}");
-                if (currentEquip.AgilityBonus != 0) currentBonuses.Add($"Agi {currentEquip.AgilityBonus:+#;-#;0}");
-                if (currentEquip.ConstitutionBonus != 0) currentBonuses.Add($"Con {currentEquip.ConstitutionBonus:+#;-#;0}");
-                if (currentEquip.IntelligenceBonus != 0) currentBonuses.Add($"Int {currentEquip.IntelligenceBonus:+#;-#;0}");
-                if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"Wis {currentEquip.WisdomBonus:+#;-#;0}");
-                if (currentEquip.CharismaBonus != 0) currentBonuses.Add($"Cha {currentEquip.CharismaBonus:+#;-#;0}");
-                if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"HP {currentEquip.MaxHPBonus:+#;-#;0}");
-                if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"Mana {currentEquip.MaxManaBonus:+#;-#;0}");
-                if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"Def {currentEquip.DefenceBonus:+#;-#;0}");
-                if (equipment.StrengthBonus != 0) newBonuses.Add($"Str {equipment.StrengthBonus:+#;-#;0}");
-                if (equipment.DexterityBonus != 0) newBonuses.Add($"Dex {equipment.DexterityBonus:+#;-#;0}");
-                if (equipment.AgilityBonus != 0) newBonuses.Add($"Agi {equipment.AgilityBonus:+#;-#;0}");
-                if (equipment.ConstitutionBonus != 0) newBonuses.Add($"Con {equipment.ConstitutionBonus:+#;-#;0}");
-                if (equipment.IntelligenceBonus != 0) newBonuses.Add($"Int {equipment.IntelligenceBonus:+#;-#;0}");
-                if (equipment.WisdomBonus != 0) newBonuses.Add($"Wis {equipment.WisdomBonus:+#;-#;0}");
-                if (equipment.CharismaBonus != 0) newBonuses.Add($"Cha {equipment.CharismaBonus:+#;-#;0}");
-                if (equipment.MaxHPBonus != 0) newBonuses.Add($"HP {equipment.MaxHPBonus:+#;-#;0}");
-                if (equipment.MaxManaBonus != 0) newBonuses.Add($"Mana {equipment.MaxManaBonus:+#;-#;0}");
-                if (equipment.DefenceBonus != 0) newBonuses.Add($"Def {equipment.DefenceBonus:+#;-#;0}");
+                if (currentEquip.StrengthBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_str")} {currentEquip.StrengthBonus:+#;-#;0}");
+                if (currentEquip.DexterityBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_dex")} {currentEquip.DexterityBonus:+#;-#;0}");
+                if (currentEquip.AgilityBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_agi")} {currentEquip.AgilityBonus:+#;-#;0}");
+                if (currentEquip.ConstitutionBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_con")} {currentEquip.ConstitutionBonus:+#;-#;0}");
+                if (currentEquip.IntelligenceBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_int")} {currentEquip.IntelligenceBonus:+#;-#;0}");
+                if (currentEquip.WisdomBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_wis")} {currentEquip.WisdomBonus:+#;-#;0}");
+                if (currentEquip.CharismaBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_cha")} {currentEquip.CharismaBonus:+#;-#;0}");
+                if (currentEquip.MaxHPBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_hp")} {currentEquip.MaxHPBonus:+#;-#;0}");
+                if (currentEquip.MaxManaBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_mana")} {currentEquip.MaxManaBonus:+#;-#;0}");
+                if (currentEquip.DefenceBonus != 0) currentBonuses.Add($"{Loc.Get("ui.stat_def")} {currentEquip.DefenceBonus:+#;-#;0}");
+                if (equipment.StrengthBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_str")} {equipment.StrengthBonus:+#;-#;0}");
+                if (equipment.DexterityBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_dex")} {equipment.DexterityBonus:+#;-#;0}");
+                if (equipment.AgilityBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_agi")} {equipment.AgilityBonus:+#;-#;0}");
+                if (equipment.ConstitutionBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_con")} {equipment.ConstitutionBonus:+#;-#;0}");
+                if (equipment.IntelligenceBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_int")} {equipment.IntelligenceBonus:+#;-#;0}");
+                if (equipment.WisdomBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_wis")} {equipment.WisdomBonus:+#;-#;0}");
+                if (equipment.CharismaBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_cha")} {equipment.CharismaBonus:+#;-#;0}");
+                if (equipment.MaxHPBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_hp")} {equipment.MaxHPBonus:+#;-#;0}");
+                if (equipment.MaxManaBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_mana")} {equipment.MaxManaBonus:+#;-#;0}");
+                if (equipment.DefenceBonus != 0) newBonuses.Add($"{Loc.Get("ui.stat_def")} {equipment.DefenceBonus:+#;-#;0}");
 
                 // v0.62.1 stat-order consistency: sort alphabetically so the inventory
                 // equip-compare prompt uses the same predictable order as combat-loot
@@ -1245,11 +1247,11 @@ namespace UsurperRemake.Systems
                 {
                     terminal.SetColor("gray");
                     terminal.WriteLine(currentBonuses.Count > 0
-                        ? $"  Current bonuses: {string.Join(", ", currentBonuses)}"
-                        : "  Current bonuses: (none)");
+                        ? $"  {Loc.Get("combat.current_bonuses", string.Join(", ", currentBonuses))}"
+                        : $"  {Loc.Get("combat.current_bonuses_none")}");
                     terminal.WriteLine(newBonuses.Count > 0
-                        ? $"  New bonuses: {string.Join(", ", newBonuses)}"
-                        : "  New bonuses: (none)");
+                        ? $"  {Loc.Get("combat.new_bonuses", string.Join(", ", newBonuses))}"
+                        : $"  {Loc.Get("combat.new_bonuses_none")}");
                 }
 
                 if (!GameConfig.ScreenReaderMode)
@@ -1558,14 +1560,14 @@ namespace UsurperRemake.Systems
 
             terminal.SetColor("bright_yellow");
             if (!GameConfig.ScreenReaderMode)
-                terminal.WriteLine($"═══ {slotName.ToUpper()} SLOT ═══");
+                terminal.WriteLine($"═══ {Loc.Get("inventory.slot_screen_header", slotName.ToUpper())} ═══");
             else
-                terminal.WriteLine($"{slotName.ToUpper()} SLOT");
+                terminal.WriteLine(Loc.Get("inventory.slot_screen_header", slotName.ToUpper()));
             terminal.WriteLine("");
 
             // Show current item
             terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("inventory.currently_equipped")}: ");
+            terminal.Write(Loc.Get("inventory.currently_equipped"));
             if (currentItem != null)
             {
                 terminal.SetColor(GetRarityColor(currentItem.Rarity));
@@ -1602,7 +1604,7 @@ namespace UsurperRemake.Systems
         private void DisplayItemDetails(Equipment item)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine($"  Type: {item.Slot}  |  Rarity: {item.Rarity}");
+            terminal.WriteLine($"  {Loc.Get("inventory.item_type_rarity", GetSlotDisplayName(item.Slot), GetRarityName(item.Rarity))}");
 
             var stats = new List<string>();
 
@@ -1665,6 +1667,17 @@ namespace UsurperRemake.Systems
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("inventory.value")}: {item.Value:N0} {Loc.Get("ui.gold_word")}");
         }
+
+        /// <summary>v1.2.2: the localized tier name of a rarity, for the slot screen.</summary>
+        internal static string GetRarityName(EquipmentRarity rarity) => rarity switch
+        {
+            EquipmentRarity.Uncommon => Loc.Get("inventory.rarity_uncommon"),
+            EquipmentRarity.Rare => Loc.Get("inventory.rarity_rare"),
+            EquipmentRarity.Epic => Loc.Get("inventory.rarity_epic"),
+            EquipmentRarity.Legendary => Loc.Get("inventory.rarity_legendary"),
+            EquipmentRarity.Artifact => Loc.Get("inventory.rarity_artifact"),
+            _ => Loc.Get("inventory.rarity_common"),
+        };
 
         private string GetSlotDisplayName(EquipmentSlot slot)
         {

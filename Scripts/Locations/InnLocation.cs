@@ -3351,7 +3351,7 @@ public class InnLocation : BaseLocation
         if (companionAbilities.Count > 0)
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"  Abilities ({companionAbilities.Count}): {string.Join(", ", companionAbilities.Select(a => a.Name))}");
+            terminal.WriteLine($"  Abilities ({companionAbilities.Count}): {string.Join(", ", companionAbilities.Select(a => a.DisplayName))}");
         }
         else
         {
@@ -3856,7 +3856,7 @@ public class InnLocation : BaseLocation
         while (true)
         {
             terminal.ClearScreen();
-            WriteBoxHeader($"EQUIPMENT: {target.DisplayName.ToUpper()}", "bright_cyan");
+            WriteBoxHeader(Loc.Get("team.equip_header_label", target.DisplayName.ToUpper()), "bright_cyan");
             terminal.WriteLine("");
 
             // Show target's stats
@@ -4060,7 +4060,7 @@ public class InnLocation : BaseLocation
         {
 
             terminal.ClearScreen();
-            WriteSectionHeader($"EQUIP ITEM TO {target.DisplayName.ToUpper()}", "bright_cyan");
+            WriteSectionHeader(Loc.Get("home.equip_to_header", target.DisplayName.ToUpper()), "bright_cyan");
             terminal.WriteLine("");
 
             // Step 1: Pick a slot
@@ -4074,7 +4074,7 @@ public class InnLocation : BaseLocation
             {
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine("  No items available for this slot.");
+                terminal.WriteLine($"  {Loc.Get("home.no_items_slot")}");
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -4083,7 +4083,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine("");
             var currentItem = target.GetEquipment(selectedSlot.Value);
             terminal.SetColor("white");
-            terminal.Write($"  Current: ");
+            terminal.Write($"  {Loc.Get("home.equip_current")} ");
             if (currentItem != null)
             {
                 if (!currentItem.IsIdentified)
@@ -4205,7 +4205,7 @@ public class InnLocation : BaseLocation
     private async Task CompanionUnequipItemFromCharacter(Character target)
     {
         terminal.ClearScreen();
-        WriteSectionHeader($"UNEQUIP FROM {target.DisplayName.ToUpper()}", "bright_cyan");
+        WriteSectionHeader(Loc.Get("team.unequip_header", target.DisplayName.ToUpper()), "bright_cyan");
         terminal.WriteLine("");
 
         // Get all equipped slots
@@ -4223,7 +4223,7 @@ public class InnLocation : BaseLocation
         if (equippedSlots.Count == 0)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"{target.DisplayName} has no equipment to unequip.");
+            terminal.WriteLine(Loc.Get("team.no_equipment_unequip", target.DisplayName));
             await Pacing.Wait(2000);
             return;
         }
@@ -4468,21 +4468,22 @@ public class InnLocation : BaseLocation
                     terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
                     terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
                     terminal.SetColor(isDisabled ? "gray" : "white");
-                    terminal.Write($"{ability.Name,-24}");
+                    terminal.Write($"{ability.DisplayName,-24}");
                     terminal.SetColor("darkgray");
                     terminal.Write($" {ClassAbilitySystem.GetEffectiveStaminaCost(ability),2} ST  Lv{ability.LevelRequired,-3}  ");
                     terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                    if (IsScreenReader || ability.Description.Length <= 35)
+                    string abilityDesc = ability.DisplayDescription;
+                    if (IsScreenReader || abilityDesc.Length <= 35)
                     {
-                        terminal.WriteLine(ability.Description);
+                        terminal.WriteLine(abilityDesc);
                     }
                     else
                     {
-                        int breakAt = ability.Description.LastIndexOf(' ', 35);
+                        int breakAt = abilityDesc.LastIndexOf(' ', 35);
                         if (breakAt <= 10) breakAt = 35;
-                        terminal.WriteLine(ability.Description[..breakAt]);
+                        terminal.WriteLine(abilityDesc[..breakAt]);
                         terminal.SetColor("dark_gray");
-                        terminal.WriteLine($"        {ability.Description[breakAt..].TrimStart()}");
+                        terminal.WriteLine($"        {abilityDesc[breakAt..].TrimStart()}");
                     }
                 }
             }
@@ -4565,13 +4566,13 @@ public class InnLocation : BaseLocation
                     {
                         companion.DisabledAbilities.Remove(ability.Id);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  Enabled: {ability.Name}");
+                        terminal.WriteLine($"  Enabled: {ability.DisplayName}");
                     }
                     else
                     {
                         companion.DisabledAbilities.Add(ability.Id);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  Disabled: {ability.Name}");
+                        terminal.WriteLine($"  Disabled: {ability.DisplayName}");
                     }
                 }
                 else

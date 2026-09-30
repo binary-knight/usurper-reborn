@@ -1,7 +1,7 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs
 ---
 ## Before choosing an action

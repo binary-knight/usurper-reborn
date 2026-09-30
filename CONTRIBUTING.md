@@ -92,6 +92,22 @@ The game has months/years of player saves on public BBSes and the online server.
 - If you don't speak a language, English-to-machine-translation with a note in the PR (`"[MT, needs review]"`) is acceptable for non-English files, as long as the English version is correct.
 - Don't translate localization keys themselves, only values.
 
+### Hardcoded text ratchet
+
+`Tests/Localization/HardcodedTextRatchetTests.cs` counts player-visible English written directly in `Scripts/` (terminal output, UIHelper boxes and menus, news, mail and broadcasts) per file and compares it with `Tests/Localization/hardcoded-baseline.json`. A file may not gain hardcoded text, and when you move strings to `Loc.Get` the baseline must come down with them. After localizing, update it with:
+
+```
+Tests/Localization/loc-scan.sh --write-baseline
+```
+
+The same script without the flag prints the full inventory and a per system rollup. Admin and SysOp only files are listed with a reason in `Tests/Localization/hardcoded-exclusions.txt`.
+
+A second ratchet, `Tests/Localization/DataTextRatchetTests.cs`, counts player-visible English outside output calls, per file and category, against `Tests/Localization/hardcoded-data-baseline.json`: `data` (data tables listed in `Tests/Localization/hardcoded-data-sources.txt`, such as dialogue lines, achievement text and item names), `electron` (text sent to the Electron client) and `throw` (exception messages a catch prints to the player). Tables that already resolve a Loc key (`keyed`) and proper noun name lists (`names`) are listed there but not counted. If you add a table of player text, prefer Loc keys; if it must hold English, add its slot to the sources file. After localizing, update the baseline with:
+
+```
+Tests/Localization/loc-scan.sh --write-data-baseline
+```
+
 ## Review Timing
 
 I review PRs when I have time. It might be the same day, it might be three weeks. If your PR has been open a month with no response, a gentle ping on the PR thread is fair; a ping after a week is not.

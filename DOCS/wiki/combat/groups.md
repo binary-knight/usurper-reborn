@@ -1,7 +1,7 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 ---
 Groups can combine damage, healing and protection. A teammate has its own resources and condition; your healthy leader does not make everyone healthy.

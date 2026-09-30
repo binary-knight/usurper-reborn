@@ -1,7 +1,7 @@
 ---
 title: Discord wiki help
 path: /wiki/en/online/discord/
-checked: 1.2.1
+checked: 1.2.2
 sources: web/wiki-bot.js
 ---
 The Discord bot can answer from the published English wiki in channels enabled by the server owner. Mention the bot and ask a focused question, for example: `@UsurperBot how does Favor work?`
@@ -26,9 +26,13 @@ Questions that are not about Usurper Reborn, such as other games, programming or
 
 Questions are not relayed into in-game gossip. Availability depends on the owner enabling allowed channels and deploying a built search index.
 
+## Report a bug
+
+Ask and Suggest are for the wiki, not for game bugs. To report a bug, press `!` or type `/bug` in the game, or open a GitHub issue; see [reporting bugs](/wiki/en/getting-started/reporting-bugs/).
+
 ## Suggest an improvement
 
-Trusted helpers with the owner's configured role can use `@UsurperBot suggest: ...`. Describe a missing explanation or incorrect claim, not instructions to execute code.
+Trusted helpers with the owner's configured role can use `@UsurperBot suggest: ...` or `@UsurperBot suggestion: ...`. Either word works in any case, with or without a space before the colon. Describe a missing explanation or incorrect claim, not instructions to execute code.
 
 Suggestions enter an audit queue. They do not edit the production site or publish a page. The owner reviews the claim against game code and exported data, then prepares a docs-only pull request. The next reviewed release or approved deployment publishes it.
 

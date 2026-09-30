@@ -1,7 +1,7 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs
 ---
 Your Home is a private base with rest, storage, upgrades and family life. From Main Street open the Home and Hearth district with H, then press H for Home. It appears after your first few levels.

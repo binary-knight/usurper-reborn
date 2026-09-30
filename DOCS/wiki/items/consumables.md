@@ -1,7 +1,7 @@
 ---
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs
 ---
 Consumables solve particular problems. Healing supplies restore HP, mana supplies restore casting resources, and Willow Draught restores Mental in the dungeon. One does not substitute for the others.

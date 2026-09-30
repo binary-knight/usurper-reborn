@@ -217,6 +217,32 @@ public class GroupSystem
     }
 
     /// <summary>
+    /// v1.2.2: BroadcastToGroupSessions rendered per recipient. Each builder receives the recipient's
+    /// language code, so the actor and the observers read their line in their own language.
+    /// </summary>
+    public void BroadcastToGroupSessionsLocalized(DungeonGroup group, string actorUsername,
+        Func<string, string> actorMessage, Func<string, string> observerMessage, bool inDungeonOnly = false)
+    {
+        List<string> members;
+        lock (group.MemberUsernames)
+        {
+            members = new List<string>(group.MemberUsernames);
+        }
+
+        foreach (var member in members)
+        {
+            var session = MudServer.Instance?.ActiveSessions
+                .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
+            if (session == null) continue;
+            if (inDungeonOnly && !IsInDungeonGroupSession(member, group, session)) continue;
+
+            string lang = session.Context?.Language ?? "en";
+            session.EnqueueMessage(member.Equals(actorUsername, StringComparison.OrdinalIgnoreCase)
+                ? actorMessage(lang) : observerMessage(lang));
+        }
+    }
+
+    /// <summary>
     /// Broadcast the same message to all group members.
     /// Sanitizes decorative Unicode for screen reader recipients.
     /// Pass inDungeonOnly=true for combat / loot / dungeon events so members who
@@ -243,6 +269,36 @@ public class GroupSystem
             if (session == null) continue;
             if (inDungeonOnly && !IsInDungeonGroupSession(member, group, session)) continue;
 
+            var msg = session.ScreenReaderMode ? SanitizeBroadcastForSR(message) : message;
+            session.EnqueueMessage(msg);
+        }
+    }
+
+    /// <summary>
+    /// v1.2.2: BroadcastToAllGroupSessions rendered per recipient. `buildMessage` receives the
+    /// recipient's language code and returns the message (built with Loc.GetIn(lang, ...)), so each
+    /// group member reads it in their own language. Same filters and screen reader handling.
+    /// </summary>
+    public void BroadcastToAllGroupSessionsLocalized(DungeonGroup group, Func<string, string> buildMessage,
+        string? excludeUsername = null, bool inDungeonOnly = false)
+    {
+        List<string> members;
+        lock (group.MemberUsernames)
+        {
+            members = new List<string>(group.MemberUsernames);
+        }
+
+        foreach (var member in members)
+        {
+            if (excludeUsername != null && member.Equals(excludeUsername, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            var session = MudServer.Instance?.ActiveSessions
+                .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
+            if (session == null) continue;
+            if (inDungeonOnly && !IsInDungeonGroupSession(member, group, session)) continue;
+
+            string message = buildMessage(session.Context?.Language ?? "en");
             var msg = session.ScreenReaderMode ? SanitizeBroadcastForSR(message) : message;
             session.EnqueueMessage(msg);
         }

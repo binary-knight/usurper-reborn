@@ -1,7 +1,7 @@
 ---
 title: Characters
 path: /wiki/en/characters/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Core/GameConfig.cs
 ---
 Character building has several layers: race creation bonuses, starting class values, level growth, training, specialization, equipment and temporary effects. A table from one layer is not a prediction of your final sheet.

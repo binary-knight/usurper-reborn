@@ -1,7 +1,7 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs
 ---
 The Inn and Home provide different rest and social actions. Recovering HP, recovering Mental and starting a new day are distinct effects.
