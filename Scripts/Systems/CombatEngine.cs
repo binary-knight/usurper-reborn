@@ -713,15 +713,6 @@ public partial class CombatEngine
         attacker.DivineFavorTriggeredThisCombat = false;
         // v1.1.1: per-combat buffs are consumed at the end of the duel (EndPvPCombat)
 
-        // Iron Rations food buff: temporarily increase max HP by 15%
-        long ironRationsHPBonus = 0;
-        if (attacker.FoodBuffCombats > 0 && attacker.FoodBuffType == 3)
-        {
-            ironRationsHPBonus = (long)(attacker.MaxHP * attacker.FoodBuffValue);
-            attacker.MaxHP += ironRationsHPBonus;
-            attacker.HP += ironRationsHPBonus;
-        }
-
         // Ensure abilities are learned based on current level (fixes abilities not showing in quickbar)
         if (!ClassAbilitySystem.IsSpellcaster(attacker.Class))
         {
@@ -753,6 +744,10 @@ public partial class CombatEngine
         // so a thrown disconnect mid-duel cannot leave either side with stale combat state.
         try
         {
+
+        // Iron Rations food buff: max HP up by its share for this duel (1.2.1: kept by RecalculateStats
+        // while the fight is open; the finally closes it on every exit)
+        attacker.BeginIronRationsFight();
 
         // PvP combat introduction
         await ShowPvPIntroduction(attacker, defender, result);
@@ -903,11 +898,7 @@ public partial class CombatEngine
         }
 
         // Reverse Iron Rations temporary MaxHP boost after PvP combat
-        if (ironRationsHPBonus > 0)
-        {
-            attacker.MaxHP -= ironRationsHPBonus;
-            if (attacker.HP > attacker.MaxHP) attacker.HP = attacker.MaxHP;
-        }
+        attacker.EndIronRationsFight();
 
         // Advance game time based on combat duration (single-player only)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode && result.CurrentRound > 0)
@@ -919,6 +910,7 @@ public partial class CombatEngine
         }
         finally
         {
+            attacker.EndIronRationsFight();   // 1.2.1: no-op unless an exception skipped the normal close
             EndPvPCombat(attacker, defender);
         }
         return result;
@@ -1102,15 +1094,6 @@ public partial class CombatEngine
         // Decrement poison coating and well-rested (per combat, not per round)
         // v1.1.1: per-combat buffs are consumed at the end of the fight (ConsumeCombatBuffs)
 
-        // Iron Rations food buff: temporarily increase max HP by 15%
-        long mmIronRationsHPBonus = 0;
-        if (player.FoodBuffCombats > 0 && player.FoodBuffType == 3)
-        {
-            mmIronRationsHPBonus = (long)(player.MaxHP * player.FoodBuffValue);
-            player.MaxHP += mmIronRationsHPBonus;
-            player.HP += mmIronRationsHPBonus;
-        }
-
         // Ensure abilities are learned based on current level (fixes abilities not showing)
         if (!ClassAbilitySystem.IsSpellcaster(player.Class))
         {
@@ -1133,6 +1116,10 @@ public partial class CombatEngine
         // The body is deliberately not re-indented to keep the diff reviewable.
         try
         {
+
+        // Iron Rations food buff: max HP up by its share for this fight (1.2.1: kept by RecalculateStats
+        // while the fight is open; the finally closes it on every exit)
+        player.BeginIronRationsFight();
 
         // Log all monster stats at combat start for diagnosis
         foreach (var m in monsters)
@@ -2229,11 +2216,7 @@ public partial class CombatEngine
         }
 
         // Reverse Iron Rations temporary MaxHP boost after multi-monster combat
-        if (mmIronRationsHPBonus > 0)
-        {
-            player.MaxHP -= mmIronRationsHPBonus;
-            if (player.HP > player.MaxHP) player.HP = player.MaxHP;
-        }
+        player.EndIronRationsFight();
 
         // Clean up temporary combat buffs (matches single-monster/PvP cleanup)
         player.IsRaging = false;
@@ -2378,6 +2361,7 @@ public partial class CombatEngine
         {
             ConsumeCombatBuffs(player);
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
+            player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
         }
 
         return result;

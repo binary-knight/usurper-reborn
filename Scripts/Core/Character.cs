@@ -800,6 +800,49 @@ public class Character
     public float FoodBuffValue { get; set; }    // Buff multiplier (e.g. 0.10 = 10%)
     public bool HasActiveFoodBuff => FoodBuffType > 0 && FoodBuffCombats > 0;
 
+    // 1.2.1: Iron Rations raises MaxHP only while a fight is running. The combat engine opens and
+    // closes the fight (BeginIronRationsFight, EndIronRationsFight); RecalculateStats adds the bonus
+    // while the fight is open, so a recalc in the middle of a fight keeps it. Fields, never saved.
+    private bool _ironRationsFightOpen;
+    private long _ironRationsApplied;
+    /// <summary>1.2.1: true between BeginIronRationsFight and EndIronRationsFight. Not saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IronRationsFightOpen => _ironRationsFightOpen;
+
+    /// <summary>1.2.1: the Iron Rations max HP bonus for the given max HP, or 0 when the food buff is not an active Iron Rations.</summary>
+    private long IronRationsBonusFor(long maxHP)
+        => FoodBuffType == 3 && FoodBuffCombats > 0 ? (long)(maxHP * FoodBuffValue) : 0;
+
+    /// <summary>
+    /// 1.2.1: a fight starts. With an active Iron Rations buff, MaxHP and HP rise by the bonus
+    /// (a share of the current MaxHP, as before). Other stats are left alone.
+    /// </summary>
+    public void BeginIronRationsFight()
+    {
+        if (_ironRationsFightOpen) EndIronRationsFight();
+        _ironRationsFightOpen = true;
+        long bonus = IronRationsBonusFor(MaxHP);
+        _ironRationsApplied = bonus;
+        if (bonus <= 0) return;
+        MaxHP += bonus;
+        HP += bonus;
+    }
+
+    /// <summary>
+    /// 1.2.1: a fight ends. Removes exactly the bonus the last grant or recalc put into MaxHP and
+    /// clamps HP to the new MaxHP. Safe to call more than once and when no fight is open.
+    /// </summary>
+    public void EndIronRationsFight()
+    {
+        if (!_ironRationsFightOpen) return;
+        _ironRationsFightOpen = false;
+        long bonus = _ironRationsApplied;
+        _ironRationsApplied = 0;
+        if (bonus <= 0) return;
+        MaxHP = Math.Max(1, MaxHP - bonus);
+        if (HP > MaxHP) HP = MaxHP;
+    }
+
     // Dark Alley Overhaul (v0.41.0)
     public int GroggoShadowBlessingDex { get; set; } = 0;      // Active Groggo DEX buff (removed on rest)
     // 1.2.0: temporary stat buffs (Inn ale, the evil alignment event, the settlement lockpick and smoke
@@ -1805,6 +1848,11 @@ public class Character
         // (RoundStartHP > MaxHP/2 is always true), so combat can never be won or lost.
         MaxHP = Math.Max(1, MaxHP);
         if (MaxMana < 0) MaxMana = 0;
+
+        // 1.2.1: Iron Rations, last so it is a share of the finished MaxHP (the same size the fight
+        // start grants), and only while a fight is open
+        _ironRationsApplied = _ironRationsFightOpen ? IronRationsBonusFor(MaxHP) : 0;
+        MaxHP += _ironRationsApplied;
 
         // Restore saved HP/Mana and clamp to final MaxHP/MaxMana
         // (the per-item ApplyToCharacter clamps were premature since MaxHP wasn't complete)
