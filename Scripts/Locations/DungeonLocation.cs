@@ -412,18 +412,7 @@ public class DungeonLocation : BaseLocation
         }
 
         // Show NG+ world modifiers on dungeon entry (v0.52.0)
-        int ngCycle = StoryProgressionSystem.Instance?.CurrentCycle ?? 1;
-        if (ngCycle >= 2)
-        {
-            term.SetColor("bright_magenta");
-            term.WriteLine("");
-            term.WriteLine("  Active NG+ Modifiers:");
-            if (ngCycle >= 2) term.WriteLine("    Empowered Monsters (+20% stats, +50% gold)");
-            if (ngCycle >= 3) term.WriteLine("    Ancient Magic (+30% stats)");
-            if (ngCycle >= 4) term.WriteLine("    The Convergence (+50% stats, +100% gold)");
-            term.SetColor("white");
-            term.WriteLine("");
-        }
+        ShowNgPlusModifiers(term, StoryProgressionSystem.Instance?.CurrentCycle ?? 1);
 
         // Mark NPC teammates as engaged so the world sim won't kill them
         foreach (var mate in teammates)
@@ -673,6 +662,36 @@ public class DungeonLocation : BaseLocation
         return true;
     }
 
+    /// <summary>Shows the NG+ world modifiers on dungeon entry (v0.52.0); nothing before cycle 2.</summary>
+    private static void ShowNgPlusModifiers(TerminalEmulator term, int ngCycle)
+    {
+        if (ngCycle < 2) return;
+        term.SetColor("bright_magenta");
+        term.WriteLine("");
+        term.WriteLine($"  {Loc.Get("dungeon.ngplus_active")}");
+        term.WriteLine($"    {Loc.Get("dungeon.ngplus_empowered_line")}");
+        if (ngCycle >= 3) term.WriteLine($"    {Loc.Get("dungeon.ngplus_ancient_line")}");
+        if (ngCycle >= 4) term.WriteLine($"    {Loc.Get("dungeon.ngplus_convergence_line")}");
+        term.SetColor("white");
+        term.WriteLine("");
+    }
+
+    /// <summary>The Floor 5 Guardian's defeat lines and the gold it drops.</summary>
+    private static void ShowGuardianVictory(TerminalEmulator term, long bonusGold)
+    {
+        term.WriteLine("");
+        term.SetColor("bright_green");
+        term.WriteLine($"  {Loc.Get("dungeon.guardian_falls")}");
+        term.WriteLine("");
+        term.SetColor("cyan");
+        term.WriteLine($"  {Loc.Get("dungeon.guardian_proven_worthy")}");
+        term.WriteLine($"  {Loc.Get("dungeon.guardian_deeper_await")}");
+        term.WriteLine("");
+        term.SetColor("bright_yellow");
+        term.WriteLine($"  {Loc.Get("dungeon.guardian_drops_gold", $"{bonusGold:N0}")}");
+        term.WriteLine("");
+    }
+
     /// <summary>
     /// Floor 5 Dungeon Guardian — a one-time mini-boss encounter for new players.
     /// Gives an early boss-fight milestone before the deeper dungeon challenges.
@@ -697,10 +716,10 @@ public class DungeonLocation : BaseLocation
 
         // Generate the guardian as a regular monster scaled for floor 5 (not mini-boss — too hard for support classes)
         var guardian = MonsterGenerator.GenerateMonster(5, isBoss: false, isMiniBoss: false);
-        guardian.Name = "Dungeon Guardian";
+        guardian.Name = Loc.Get("dungeon.guardian_name");
         guardian.MonsterColor = "bright_red";
         guardian.CanSpeak = true;
-        guardian.Phrase = "You are not yet worthy!";
+        guardian.Phrase = Loc.Get("dungeon.guardian_phrase");
 
         // Run full combat using the same pattern as room combat
         var combatEngine = new CombatEngine(terminal);
@@ -712,22 +731,11 @@ public class DungeonLocation : BaseLocation
             // Mark as defeated so the guardian won't appear again
             player.HintsShown.Add("floor5_guardian_defeated");
 
-            term.WriteLine("");
-            term.SetColor("bright_green");
-            term.WriteLine("  The Dungeon Guardian falls!");
-            term.WriteLine("");
-            term.SetColor("cyan");
-            term.WriteLine("  \"You have proven worthy, adventurer.\"");
-            term.WriteLine("  \"The deeper floors await...\"");
-            term.WriteLine("");
-
             // Bonus gold reward
             long bonusGold = 1000;
             player.Gold += bonusGold;
             player.Statistics.RecordGoldChange(player.Gold);
-            term.SetColor("bright_yellow");
-            term.WriteLine($"  The Guardian drops a pouch of {bonusGold:N0} gold!");
-            term.WriteLine("");
+            ShowGuardianVictory(term, bonusGold);
 
             await term.PressAnyKey();
 
@@ -1732,7 +1740,7 @@ public class DungeonLocation : BaseLocation
                 term.WriteLine(Loc.Get("dungeon.allies_too_expensive"));
                 foreach (var (npc, fee) in unaffordableTeammates)
                 {
-                    term.WriteLine($"  {npc.Name}: {fee:N0} gold", "darkgray");
+                    term.WriteLine($"  {Loc.Get("dungeon.ally_fee_line", npc.Name, $"{fee:N0}")}", "darkgray");
                 }
                 term.WriteLine("");
             }
@@ -2040,8 +2048,8 @@ public class DungeonLocation : BaseLocation
                     var godDisplayName = player.Name2 ?? player.Name1;
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
                         _resolvingAtTemple
-                            ? $"{godDisplayName} has slain the Old God {result.God} in the Deep Temple!"
-                            : $"{godDisplayName} has slain the Old God {result.God} on floor {currentDungeonLevel}!", "combat");
+                            ? Loc.Get("dungeon.news_old_god_slain_temple", godDisplayName, result.God)
+                            : Loc.Get("dungeon.news_old_god_slain_floor", godDisplayName, result.God, currentDungeonLevel), "combat");
                 }
                 break;
 
@@ -2061,7 +2069,7 @@ public class DungeonLocation : BaseLocation
                 {
                     var saviorName = player.Name2 ?? player.Name1;
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                        $"{saviorName} has saved the Old God {result.God} from corruption!", "quest");
+                        Loc.Get("dungeon.news_old_god_saved", saviorName, result.God), "quest");
                 }
                 break;
 
@@ -2088,7 +2096,7 @@ public class DungeonLocation : BaseLocation
                 {
                     var sparerName = player.Name2 ?? player.Name1;
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                        $"{sparerName} has shown mercy to the Old God {result.God} and received a sacred relic!", "quest");
+                        Loc.Get("dungeon.news_old_god_spared", sparerName, result.God), "quest");
                 }
                 break;
 
@@ -2331,31 +2339,31 @@ public class DungeonLocation : BaseLocation
                     lines.Add(("", "white")); // blank line
                     if (outcome == BossOutcome.Saved)
                     {
-                        lines.Add(("Mira sinks to her knees, sobbing.", "white"));
-                        lines.Add(("\"She remembered. At the end, she remembered who she was.\"", "bright_cyan"));
-                        lines.Add(("\"Thank you. For letting me see that.\"", "bright_cyan"));
-                        lines.Add(("Mira presses her hands together — the first real prayer she has made in years.", "white"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_saved_1"), "white"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_saved_2"), "bright_cyan"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_saved_3"), "bright_cyan"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_saved_4"), "white"));
                     }
                     else if (outcome == BossOutcome.Defeated)
                     {
                         if (approach == "aggressive")
                         {
-                            lines.Add(("Mira stares at the place where Veloura fell. Her face is stone.", "white"));
-                            lines.Add(("\"She was already dead. The corruption killed her long before we did.\"", "bright_cyan"));
-                            lines.Add(("She says it like she's trying to convince herself.", "gray"));
+                            lines.Add((Loc.Get("dungeon.react_veloura_mira_aggressive_1"), "white"));
+                            lines.Add((Loc.Get("dungeon.react_veloura_mira_aggressive_2"), "bright_cyan"));
+                            lines.Add((Loc.Get("dungeon.react_veloura_mira_aggressive_3"), "gray"));
                         }
                         else
                         {
-                            lines.Add(("Mira kneels where Veloura fell and touches the ground.", "white"));
-                            lines.Add(("\"Rest now. No more corruption. No more pain.\"", "bright_cyan"));
-                            lines.Add(("\"I forgive you. For all of it.\"", "bright_cyan"));
+                            lines.Add((Loc.Get("dungeon.react_veloura_mira_mercy_1"), "white"));
+                            lines.Add((Loc.Get("dungeon.react_veloura_mira_mercy_2"), "bright_cyan"));
+                            lines.Add((Loc.Get("dungeon.react_veloura_mira_mercy_3"), "bright_cyan"));
                         }
                     }
                     else if (outcome == BossOutcome.Allied)
                     {
-                        lines.Add(("Mira's eyes are wide. \"An alliance? With her?\"", "bright_cyan"));
-                        lines.Add(("\"I... I don't know what to feel. The goddess I abandoned just became our ally.\"", "bright_cyan"));
-                        lines.Add(("\"Maybe faith isn't about certainty. Maybe it never was.\"", "bright_cyan"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_allied_1"), "bright_cyan"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_allied_2"), "bright_cyan"));
+                        lines.Add((Loc.Get("dungeon.react_veloura_mira_allied_3"), "bright_cyan"));
                     }
                 }
                 break;
@@ -2729,9 +2737,9 @@ public class DungeonLocation : BaseLocation
             if (targetRoom == null)
                 status = "";
             else if (targetRoom.IsCleared)
-                status = GameConfig.ScreenReaderMode && IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id) ? "(all clear)" : "(clr)";
+                status = GameConfig.ScreenReaderMode && IsDirectionFullyCleared(exit.Value.TargetRoomId, room.Id) ? Loc.Get("dungeon.exit_all_clear") : Loc.Get("dungeon.exit_cleared");
             else if (targetRoom.IsExplored)
-                status = "(exp)";
+                status = Loc.Get("dungeon.exit_explored");
             else
                 status = "(?)";
             terminal.SetColor("darkgray");
@@ -3923,7 +3931,7 @@ public class DungeonLocation : BaseLocation
                 StoryProgressionSystem.Instance.HasStoryFlag("aurelion_save_quest") &&
                 !ArtifactSystem.Instance.HasArtifact(ArtifactType.SunforgedBlade))
             {
-                hint = "You sense something blazing with ancient light nearby...";
+                hint = Loc.Get("dungeon.hint_sunforged_blade");
                 color = "bright_yellow";
             }
         }
@@ -4201,7 +4209,7 @@ public class DungeonLocation : BaseLocation
             var activeQuests = QuestSystem.GetActiveQuestsForPlayer(questPlayerName);
             if (activeQuests != null && activeQuests.Count > 0)
             {
-                WriteSectionHeader("Active Quests", "bright_cyan");
+                WriteSectionHeader(Loc.Get("quest_hall.active"), "bright_cyan");
                 foreach (var quest in activeQuests.Take(5))
                 {
                     terminal.SetColor("bright_yellow");
@@ -4213,7 +4221,7 @@ public class DungeonLocation : BaseLocation
                         int done = quest.Objectives.Count(o => o.IsComplete);
                         int total = quest.Objectives.Count;
                         terminal.SetColor(done == total ? "green" : "white");
-                        terminal.WriteLine($"  [{done}/{total} objectives]");
+                        terminal.WriteLine($"  {Loc.Get("dungeon.quest_objectives_count", done, total)}");
                         foreach (var obj in quest.Objectives)
                         {
                             string check = obj.IsComplete ? "X" : " ";
@@ -5349,7 +5357,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("dungeon.trap_triggered"));
-        BroadcastDungeonEvent("\u001b[1;31m  *** TRAP! ***\u001b[0m");
+        BroadcastDungeonEvent(lang => $"\u001b[1;31m  *** {Loc.GetIn(lang, "dungeon.bc_trap")} ***\u001b[0m");
         await Pacing.Wait(500);
 
         // Check for evasion based on agility. v1.0.2: the odds are reported on
@@ -5361,7 +5369,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.trap_evade_reflexes"));
             terminal.WriteLine(Loc.Get("dungeon.trap_evade_agility", player.Agility, evadeChance));
-            BroadcastDungeonEvent($"\u001b[32m  {player!.Name2}'s quick reflexes avoid the trap!\u001b[0m");
+            BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_trap_evaded", player!.Name2)}\u001b[0m");
             await Pacing.Wait(1500);
             return;
         }
@@ -5379,7 +5387,7 @@ public class DungeonLocation : BaseLocation
                 player.HP = Math.Max(1, player.HP - pitDmg);
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.trap_pit", pitDmg));
-                BroadcastDungeonEvent($"\u001b[31m  The floor gives way! {player!.Name2} falls into a pit for {pitDmg} damage!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_trap_pit", player!.Name2, pitDmg)}\u001b[0m");
                 break;
 
             case 1:
@@ -5399,7 +5407,7 @@ public class DungeonLocation : BaseLocation
                     player.PoisonTurns = Math.Max(player.PoisonTurns, 5 + currentDungeonLevel / 5);
                 }
                 terminal.WriteLine(Loc.Get("dungeon.trap_darts", dartDmg));
-                BroadcastDungeonEvent($"\u001b[31m  Poison darts! {player!.Name2} takes {dartDmg} damage and is poisoned!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_trap_darts", player!.Name2, dartDmg)}\u001b[0m");
                 break;
 
             case 2:
@@ -5408,7 +5416,7 @@ public class DungeonLocation : BaseLocation
                 player.HP = Math.Max(1, player.HP - fireDmg);
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.trap_fire", fireDmg));
-                BroadcastDungeonEvent($"\u001b[31m  A gout of flame! {player!.Name2} takes {fireDmg} fire damage!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_trap_fire", player!.Name2, fireDmg)}\u001b[0m");
                 break;
 
             case 3:
@@ -5422,7 +5430,7 @@ public class DungeonLocation : BaseLocation
                 player.Gold -= goldLost;
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("dungeon.trap_acid", goldLost));
-                BroadcastDungeonEvent($"\u001b[33m  Acid sprays the party! {player!.Name2} loses {goldLost} gold!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_trap_acid", player!.Name2, goldLost)}\u001b[0m");
                 break;
 
             case 4:
@@ -5432,7 +5440,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine(Loc.Get("dungeon.trap_curse_resist", player.Wisdom));
-                    BroadcastDungeonEvent($"\u001b[36m  A dark curse washes over {player!.Name2}, but their wisdom shields them!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[36m  {Loc.GetIn(lang, "dungeon.bc_trap_curse_resisted", player!.Name2)}\u001b[0m");
                 }
                 else
                 {
@@ -5447,7 +5455,7 @@ public class DungeonLocation : BaseLocation
                     expLost = Math.Max(10, expLost);
                     player.Experience = Math.Max(0, player.Experience - expLost);
                     terminal.WriteLine(Loc.Get("dungeon.trap_curse_drain", expLost));
-                    BroadcastDungeonEvent($"\u001b[35m  A dark curse washes over the room! {player!.Name2} loses {expLost} experience!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[35m  {Loc.GetIn(lang, "dungeon.bc_trap_curse_drain", player!.Name2, expLost)}\u001b[0m");
                 }
                 break;
 
@@ -5457,7 +5465,7 @@ public class DungeonLocation : BaseLocation
                 long bonusGold = currentDungeonLevel * 20;
                 player.Gold += bonusGold;
                 terminal.WriteLine(Loc.Get("dungeon.trap_salvage", bonusGold));
-                BroadcastDungeonEvent($"\u001b[32m  The trap mechanism is broken! {player!.Name2} salvages {bonusGold} gold.\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_trap_salvage", player!.Name2, bonusGold)}\u001b[0m");
                 break;
         }
 
@@ -5694,9 +5702,10 @@ public class DungeonLocation : BaseLocation
         {
             var monsterSummary = string.Join(", ", monsters.GroupBy(m => m.Name)
                 .Select(g => g.Count() > 1 ? $"{g.Count()} {GetPluralName(g.Key)}" : g.Key));
-            BroadcastDungeonEvent(room.IsBossRoom
-                ? $"\u001b[1;31m  *** BOSS ENCOUNTER: {monsterSummary} ***\u001b[0m"
-                : $"\u001b[1;33m  Combat! The group faces {monsterSummary}!\u001b[0m");
+            bool bossRoom = room.IsBossRoom;
+            BroadcastDungeonEvent(lang => bossRoom
+                ? $"\u001b[1;31m  *** {Loc.GetIn(lang, "dungeon.bc_boss_encounter", monsterSummary)} ***\u001b[0m"
+                : $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.bc_combat", monsterSummary)}\u001b[0m");
         }
 
         await Pacing.Wait(1500);
@@ -5769,7 +5778,7 @@ public class DungeonLocation : BaseLocation
                 if (teammates.Count > 0)
                 {
                     terminal.WriteLine(Loc.Get("dungeon.boss_bonus_share", bossGold, bossExp, bossGoldShare, bossXPShare));
-                    BroadcastDungeonEvent($"\u001b[1;33m  *** BOSS DEFEATED! ***\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[1;33m  *** {Loc.GetIn(lang, "combat.boss_defeated")} ***\u001b[0m");
                 }
                 else
                 {
@@ -6061,7 +6070,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.treasure_party_finds", goldFound, expFound));
             terminal.WriteLine(Loc.Get("dungeon.treasure_your_share", actualGold, actualXP));
-            BroadcastDungeonEvent($"\u001b[93m  The party found treasure!\u001b[0m");
+            BroadcastDungeonEvent(lang => $"\u001b[93m  {Loc.GetIn(lang, "dungeon.bc_party_treasure")}\u001b[0m");
         }
         else
         {
@@ -6439,14 +6448,15 @@ public class DungeonLocation : BaseLocation
                     }
 
                     // Notify grouped player of their share (gold, XP, or both)
+                    var session = GroupSystem.GetSession(t.GroupPlayerUsername ?? "");
+                    string shareLang = session?.Context?.Language ?? "en";
                     var parts = new System.Collections.Generic.List<string>();
-                    if (goldPerMember > 0) parts.Add($"+{goldPerMember:N0} gold");
-                    if (xpShare > 0) parts.Add($"+{xpShare:N0} XP");
+                    if (goldPerMember > 0) parts.Add(Loc.GetIn(shareLang, "feature.reward_gold_plus", $"{goldPerMember:N0}"));
+                    if (xpShare > 0) parts.Add(Loc.GetIn(shareLang, "feature.plus_xp", $"{xpShare:N0}"));
                     if (parts.Count > 0)
                     {
-                        var session = GroupSystem.GetSession(t.GroupPlayerUsername ?? "");
                         session?.EnqueueMessage(
-                            $"\u001b[1;32m  ═══ {feature.Name} (Your Share) ═══\u001b[0m\n" +
+                            $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", feature.Name)} ═══\u001b[0m\n" +
                             $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
                     }
                 }
@@ -6498,19 +6508,20 @@ public class DungeonLocation : BaseLocation
     // Rate-limit dungeon respawn broadcasts to one per 30 minutes
     private static DateTime _lastDungeonRespawnBroadcast = DateTime.MinValue;
     private static readonly object _respawnBroadcastLock = new();
+    // 1.2.3: Loc keys, looked up when the message is sent (a static array would freeze one language).
     private static readonly string[] DungeonRespawnMessages = {
-        "The dungeon trembles as dark magic pulls new horrors from the void...",
-        "A cold wind howls through the dungeon depths. Something stirs below.",
-        "The Old Gods' power seeps through ancient stone — the dungeon renews itself.",
-        "Torches flicker and shadows shift. The dungeon has drawn new creatures to its halls.",
-        "The earth groans as the dungeon's hunger calls forth fresh terrors from the deep.",
-        "Whispers echo through forgotten corridors. The dead do not rest for long down here.",
-        "A pulse of ancient energy ripples through the dungeon. New dangers await the bold.",
-        "The dungeon breathes. Creatures crawl from cracks in reality, filling empty halls.",
-        "Bones rattle and dust swirls — the dungeon's eternal cycle begins anew.",
-        "The stones remember. The dungeon rebuilds its armies from shadow and spite.",
-        "Something ancient and hungry has restocked the dungeon's larder with fresh nightmares.",
-        "The seal-wards flare briefly. The dungeon's curse replenishes what adventurers have slain.",
+        "dungeon.respawn_news_1",
+        "dungeon.respawn_news_2",
+        "dungeon.respawn_news_3",
+        "dungeon.respawn_news_4",
+        "dungeon.respawn_news_5",
+        "dungeon.respawn_news_6",
+        "dungeon.respawn_news_7",
+        "dungeon.respawn_news_8",
+        "dungeon.respawn_news_9",
+        "dungeon.respawn_news_10",
+        "dungeon.respawn_news_11",
+        "dungeon.respawn_news_12",
     };
 
     /// <summary>
@@ -6524,7 +6535,7 @@ public class DungeonLocation : BaseLocation
                 return;
             _lastDungeonRespawnBroadcast = DateTime.Now;
         }
-        var msg = DungeonRespawnMessages[Random.Shared.Next(DungeonRespawnMessages.Length)];
+        var msg = Loc.Get(DungeonRespawnMessages[Random.Shared.Next(DungeonRespawnMessages.Length)]);
         try { NewsSystem.Instance?.Newsy(msg); } catch (Exception ex) { DebugLogger.Instance.LogError("DUNGEON", $"[BroadcastDungeonRespawn] Failed to broadcast respawn message: {ex.Message}"); }
     }
 
@@ -7009,7 +7020,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.WriteLine(Loc.Get("dungeon.bonus_xp_share", $"{xpBonus:N0}", $"{clearXP:N0}"), "bright_cyan");
             terminal.WriteLine(Loc.Get("dungeon.bonus_gold_share", $"{goldBonus:N0}", $"{clearGold:N0}"), "bright_yellow");
-            BroadcastDungeonEvent($"\u001b[1;33m  ═══ FLOOR CLEARED ═══\u001b[0m");
+            BroadcastDungeonEvent(lang => $"\u001b[1;33m  ═══ {Loc.GetIn(lang, "dungeon.section_floor_cleared")} ═══\u001b[0m");
         }
         else
         {
@@ -7163,7 +7174,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("dungeon.arrive_at_level", currentDungeonLevel));
         terminal.WriteLine(Loc.Get("dungeon.theme_display", currentFloor.Theme));
-        BroadcastDungeonEvent($"\u001b[34m  The group descends to Floor {currentDungeonLevel} ({currentFloor.Theme}).\u001b[0m");
+        BroadcastDungeonEvent(lang => $"\u001b[34m  {Loc.GetIn(lang, "dungeon.bc_descends", currentDungeonLevel, currentFloor.Theme)}\u001b[0m");
 
         // Keep group state in sync
         var descGroup = GroupSystem.Instance?.GetGroupFor(SessionContext.Current?.Username ?? "");
@@ -7416,7 +7427,7 @@ public class DungeonLocation : BaseLocation
             // Find which Old God floor is blocking
             var blockingFloor = OldGodFloors.OrderBy(f => f).FirstOrDefault(f => f >= currentDungeonLevel && f <= requestedTarget);
             var blockingGod = blockingFloor > 0 ? GetOldGodForFloor(blockingFloor) : null;
-            var godName = blockingGod != null ? blockingGod.Value.ToString() : "an Old God";
+            var godName = blockingGod != null ? blockingGod.Value.ToString() : Loc.Get("dungeon.an_old_god");
 
             terminal.WriteLine("", "red");
             terminal.WriteLine(Loc.Get("dungeon.presence_blocks"), "bright_red");
@@ -7562,7 +7573,7 @@ public class DungeonLocation : BaseLocation
                 // Dragon" stays as-is via the helper's silent-h/yu-sound exception list;
                 // "An Archfiend" comes out correctly.
                 string bossNameWithArticle = GameConfig.Language == "en"
-                    ? $"{GameConfig.GetIndefiniteArticle(monster.Name)} powerful [{monster.MonsterColor}]{monster.Name}[/]"
+                    ? $"{GameConfig.GetIndefiniteArticle(monster.Name)} {Loc.Get("dungeon.boss_powerful")} [{monster.MonsterColor}]{monster.Name}[/]"
                     : $"[{monster.MonsterColor}]{monster.Name}[/]";
                 terminal.WriteLine(GameConfig.ScreenReaderMode
                     ? Loc.Get("dungeon.boss_blocks_path_sr", bossNameWithArticle)
@@ -7699,13 +7710,13 @@ public class DungeonLocation : BaseLocation
         {
             difficulty = Loc.Get("dungeon.difficulty_easy");
             diffColor = "bright_green";
-            xpHint = $"~{estXP} XP";
+            xpHint = Loc.Get("dungeon.xp_hint_plain", estXP);
         }
         else if (powerRatio > 1.0f && hpRatio < 1.5f)
         {
             difficulty = Loc.Get("dungeon.difficulty_fair");
             diffColor = "green";
-            xpHint = $"~{estXP} XP";
+            xpHint = Loc.Get("dungeon.xp_hint_plain", estXP);
         }
         else if (powerRatio > 0.7f && hpRatio < 2.5f)
         {
@@ -7931,30 +7942,30 @@ public class DungeonLocation : BaseLocation
         {
             journalEntries = new[]
             {
-                "\"Day 12: The creatures here grow stronger. I've heard whispers of something ancient below...\"",
-                "\"I've discovered that certain monsters fear fire. Must remember this.\"",
-                "\"The merchants in town warned me about these depths. They were right to be afraid.\"",
-                "\"If anyone finds this: Defend often. Healing is precious. Don't fight tired.\""
+                Loc.Get("dungeon.journal_shallow_1"),
+                Loc.Get("dungeon.journal_shallow_2"),
+                Loc.Get("dungeon.journal_shallow_3"),
+                Loc.Get("dungeon.journal_shallow_4")
             };
         }
         else if (currentDungeonLevel < 60)
         {
             journalEntries = new[]
             {
-                "\"The Old Gods stir in the depths. I've felt their presence... watching.\"",
-                "\"Power Attacks work well against the armored beasts here.\"",
-                "\"Found a seal fragment. The temple above spoke of seven such seals...\"",
-                "\"The dungeon seems to respond to those who show both mercy and might.\""
+                Loc.Get("dungeon.journal_middle_1"),
+                Loc.Get("dungeon.journal_middle_2"),
+                Loc.Get("dungeon.journal_middle_3"),
+                Loc.Get("dungeon.journal_middle_4")
             };
         }
         else
         {
             journalEntries = new[]
             {
-                "\"I've seen Manwe's throne. None should sit upon it lightly.\"",
-                "\"The artifacts hidden here... they're keys to something greater.\"",
-                "\"To any who read this: The true ending requires more than strength.\"",
-                "\"I almost reached the bottom. Almost. Beware the god of the deep.\""
+                Loc.Get("dungeon.journal_deep_1"),
+                Loc.Get("dungeon.journal_deep_2"),
+                Loc.Get("dungeon.journal_deep_3"),
+                Loc.Get("dungeon.journal_deep_4")
             };
         }
 
@@ -8081,29 +8092,29 @@ public class DungeonLocation : BaseLocation
         {
             whispers = new[]
             {
-                "\"Rest... you need rest...\"",
-                "\"The Inn above offers safety...\"",
-                "\"Death awaits the weary...\""
+                Loc.Get("dungeon.whisper_weary_1"),
+                Loc.Get("dungeon.whisper_weary_2"),
+                Loc.Get("dungeon.whisper_weary_3")
             };
         }
         else if (currentDungeonLevel >= 80)
         {
             whispers = new[]
             {
-                "\"Manwe watches from his throne...\"",
-                "\"The seven seals... break them all...\"",
-                "\"Will you usurp... or save...?\""
+                Loc.Get("dungeon.whisper_deep_1"),
+                Loc.Get("dungeon.whisper_deep_2"),
+                Loc.Get("dungeon.whisper_deep_3")
             };
         }
         else
         {
             whispers = new[]
             {
-                "\"Deeper... the truth lies deeper...\"",
-                "\"The Old Gods remember...\"",
-                "\"Not all treasures are gold...\"",
-                "\"Your companions may hold secrets...\"",
-                "\"Power attacks break armor... precision finds weakness...\""
+                Loc.Get("dungeon.whisper_1"),
+                Loc.Get("dungeon.whisper_2"),
+                Loc.Get("dungeon.whisper_3"),
+                Loc.Get("dungeon.whisper_4"),
+                Loc.Get("dungeon.whisper_5")
             };
         }
 
@@ -8318,7 +8329,7 @@ public class DungeonLocation : BaseLocation
             var duelistMonster = Monster.CreateMonster(
                 duelistLevel, duelist.Name,
                 (long)(currentPlayer.MaxHP * strengthMod), (long)(currentPlayer.Strength * strengthMod), 0,
-                duelist.GetBattleCry(), false, false, duelist.Weapon, "Duelist's Garb",
+                duelist.GetBattleCry(), false, false, ShownDuelistWeapon(duelist.Weapon), "Duelist's Garb",
                 false, false, (long)(currentPlayer.Dexterity * strengthMod), (long)(currentPlayer.Wisdom * 0.8), 0
             );
             duelistMonster.Level = duelistLevel;
@@ -8446,7 +8457,7 @@ public class DungeonLocation : BaseLocation
             var angryDuelist = Monster.CreateMonster(
                 rageLevel, duelist.Name + " (Enraged)",
                 (long)(currentPlayer.MaxHP * 1.3), (long)(currentPlayer.Strength * 1.3), 0,
-                "DIE!", false, false, duelist.Weapon, "Duelist's Garb",
+                "DIE!", false, false, ShownDuelistWeapon(duelist.Weapon), "Duelist's Garb",
                 false, false, currentPlayer.Dexterity, currentPlayer.Wisdom, 0
             );
             angryDuelist.Level = rageLevel;
@@ -8539,14 +8550,14 @@ public class DungeonLocation : BaseLocation
         // Create a new recurring duelist for this player
         var duelistTemplates = new[]
         {
-            ("Sir Varen the Unyielding", "Longsword of Honor"),
-            ("Lady Seraphina Dawnblade", "Rapier of the Sun"),
-            ("Grimjaw the Ironclad", "War Axe"),
-            ("The Masked Challenger", "Shadow Blade"),
-            ("Kira Shadowstep", "Twin Daggers"),
-            ("Marcus Steelwind", "Greatsword"),
-            ("Yuki the Swift", "Katana"),
-            ("Bartholomew the Bold", "Mace of Valor")
+            ("Sir Varen the Unyielding", "dungeon.duelist_weapon_longsword"),
+            ("Lady Seraphina Dawnblade", "dungeon.duelist_weapon_rapier"),
+            ("Grimjaw the Ironclad", "dungeon.duelist_weapon_war_axe"),
+            ("The Masked Challenger", "dungeon.duelist_weapon_shadow_blade"),
+            ("Kira Shadowstep", "dungeon.duelist_weapon_twin_daggers"),
+            ("Marcus Steelwind", "dungeon.duelist_weapon_greatsword"),
+            ("Yuki the Swift", "dungeon.duelist_weapon_katana"),
+            ("Bartholomew the Bold", "dungeon.duelist_weapon_mace")
         };
 
         var template = duelistTemplates[dungeonRandom.Next(duelistTemplates.Length)];
@@ -8567,6 +8578,13 @@ public class DungeonLocation : BaseLocation
         _playerDuelists[playerId] = newDuelist;
         return newDuelist;
     }
+
+    /// <summary>
+    /// 1.2.3: a duelist's weapon is saved as a Loc key and shown in the player's language.
+    /// Saves from before 1.2.3 hold the English name, which is shown as it is.
+    /// </summary>
+    internal static string ShownDuelistWeapon(string weapon) =>
+        !string.IsNullOrEmpty(weapon) && Loc.Has(weapon) ? Loc.Get(weapon) : weapon;
 
     private void SaveDuelistProgress(Character player, RecurringDuelist duelist)
     {
@@ -8666,7 +8684,7 @@ public class DungeonLocation : BaseLocation
                 {
                     terminal.WriteLine(Loc.Get("dungeon.chest_party_finds", goldFound, expGained));
                     terminal.WriteLine(Loc.Get("dungeon.chest_your_share", $"{chestGold:N0}", $"{chestXP:N0}"));
-                    BroadcastDungeonEvent($"\u001b[93m  The party opens a treasure chest!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[93m  {Loc.GetIn(lang, "dungeon.bc_chest_opened")}\u001b[0m");
                 }
                 else
                 {
@@ -8692,7 +8710,7 @@ public class DungeonLocation : BaseLocation
                 // Trap!
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("dungeon.chest_trap"));
-                BroadcastDungeonEvent("\u001b[91m  The chest was trapped!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[91m  {Loc.GetIn(lang, "dungeon.bc_chest_trapped")}\u001b[0m");
 
                 // Check for evasion based on agility
                 if (TryEvadeTrap(currentPlayer))
@@ -8741,7 +8759,7 @@ public class DungeonLocation : BaseLocation
                 // Mimic! (triggers combat)
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("dungeon.chest_mimic"));
-                BroadcastDungeonEvent("\u001b[91m  The chest was a MIMIC!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[91m  {Loc.GetIn(lang, "dungeon.bc_chest_mimic")}\u001b[0m");
                 await Pacing.Wait(1500);
 
                 // Use MonsterGenerator stats so mimics scale like other mini-bosses
@@ -9139,39 +9157,39 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.shrine_divine_light"), "bright_yellow");
                     currentPlayer.HP = currentPlayer.MaxHP;
                     terminal.WriteLine(Loc.Get("dungeon.shrine_fully_healed"), "green");
-                    BroadcastDungeonEvent($"\u001b[32m  {currentPlayer.Name2} prays at a shrine and is fully healed!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_shrine_healed", currentPlayer.Name2)}\u001b[0m");
                     break;
                 case 1:
                     var strBonus = dungeonRandom.Next(5) + 1;
                     currentPlayer.GrantPermanentStat(StatKind.Strength, strBonus); // 1.2.0: lasting, written to Base
                     terminal.WriteLine(Loc.Get("dungeon.shrine_stronger", strBonus), "green");
-                    BroadcastDungeonEvent($"\u001b[32m  {currentPlayer.Name2} prays at a shrine and gains +{strBonus} Strength!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_shrine_strength", currentPlayer.Name2, strBonus)}\u001b[0m");
                     break;
                 case 2:
                     var expBonus = 50 + currentDungeonLevel * 15;
                     currentPlayer.Experience += expBonus;
                     terminal.WriteLine(Loc.Get("dungeon.shrine_wisdom", expBonus), "yellow");
                     ShareEventRewardsWithGroup(currentPlayer, 0, expBonus, "Mysterious Shrine");
-                    BroadcastDungeonEvent($"\u001b[33m  {currentPlayer.Name2} prays at a shrine and gains +{expBonus} EXP!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_shrine_exp", currentPlayer.Name2, expBonus)}\u001b[0m");
                     break;
                 case 3:
                     terminal.WriteLine(Loc.Get("dungeon.shrine_silent"), "gray");
                     terminal.WriteLine(Loc.Get("dungeon.shrine_nothing"), "gray");
-                    BroadcastDungeonEvent($"\u001b[90m  {currentPlayer.Name2} prays at a shrine... nothing happens.\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[90m  {Loc.GetIn(lang, "dungeon.bc_shrine_nothing", currentPlayer.Name2)}\u001b[0m");
                     break;
                 case 4:
                     var hpLoss = currentPlayer.HP / 4;
                     currentPlayer.HP = Math.Max(1, currentPlayer.HP - hpLoss);
                     terminal.WriteLine(Loc.Get("dungeon.shrine_drains"), "red");
                     terminal.WriteLine(Loc.Get("dungeon.shrine_lose_hp", hpLoss), "red");
-                    BroadcastDungeonEvent($"\u001b[31m  {currentPlayer.Name2} prays at a shrine and loses {hpLoss} HP!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_shrine_hp", currentPlayer.Name2, hpLoss)}\u001b[0m");
                     break;
                 case 5:
                     var goldLoss = currentPlayer.Gold / 5;
                     currentPlayer.Gold -= goldLoss;
                     terminal.WriteLine(Loc.Get("dungeon.shrine_gold_dissolves"), "red");
                     terminal.WriteLine(Loc.Get("dungeon.shrine_lose_gold", goldLoss), "red");
-                    BroadcastDungeonEvent($"\u001b[31m  {currentPlayer.Name2} prays at a shrine and loses {goldLoss} gold!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_shrine_gold", currentPlayer.Name2, goldLoss)}\u001b[0m");
                     break;
             }
         }
@@ -9326,7 +9344,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("quest.lyris_shrine.warning"));
 
                     // Generate news
-                    NewsSystem.Instance.Newsy(false, $"{player.Name2} found {lyris.Name} at a forgotten shrine in the dungeon.");
+                    NewsSystem.Instance.Newsy(false, Loc.Get("dungeon.news_lyris_found", player.Name2, lyris.Name));
                 }
                 break;
 
@@ -18152,6 +18170,20 @@ public class DungeonLocation : BaseLocation
         if (group == null || !group.IsLeader(ctx.Username)) return;
         // inDungeonOnly: members who left to town shouldn't see dungeon events.
         GroupSystem.Instance!.BroadcastToAllGroupSessions(group, message,
+            excludeUsername: ctx.Username, inDungeonOnly: true);
+    }
+
+    /// <summary>
+    /// 1.2.3: BroadcastDungeonEvent rendered per follower. `buildMessage` receives each
+    /// follower's language code, so every group member reads the event in their own language.
+    /// </summary>
+    private void BroadcastDungeonEvent(Func<string, string> buildMessage)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null || !group.IsLeader(ctx.Username)) return;
+        GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(group, buildMessage,
             excludeUsername: ctx.Username, inDungeonOnly: true);
     }
 

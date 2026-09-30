@@ -136,39 +136,27 @@ keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#1|dark_alley.deed_{
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#2|dark_alley.deed_{id}_desc
 table|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#17|deed news text, Newsy
 names|Scripts/Locations/DungeonLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/DungeonLocation.cs|call:Add#0/tuple#0|companion reaction lines
 table|Scripts/Locations/DungeonLocation.cs|call:Add#0/tuple#1|merchant item names
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#2/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#3/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#4/tuple#1|event choice label
 names|Scripts/Locations/DungeonLocation.cs|decl:duelistTemplates/tuple#0|duelist names
-table|Scripts/Locations/DungeonLocation.cs|decl:duelistTemplates/tuple#1|duelist weapon names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#0|NPC names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#1|NPC names with titles
 nouns|Scripts/Locations/DungeonLocation.cs|decl:slotNames/tuple#1|equipment slot names
 names|Scripts/Locations/DungeonLocation.cs|=currentPlayer.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player!.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-nouns|Scripts/Locations/DungeonLocation.cs|decl:bossNameWithArticle|boss name in dungeon.boss_blocks_path
-table|Scripts/Locations/DungeonLocation.cs|decl:DungeonRespawnMessages|news, Newsy
-nouns|Scripts/Locations/DungeonLocation.cs|decl:godName|name in dungeon.must_defeat_god_floor
 table|Scripts/Locations/DungeonLocation.cs|decl:legend|map legend
 nouns|Scripts/Locations/DungeonLocation.cs|decl:name|monster name
 nouns|Scripts/Locations/DungeonLocation.cs|decl:names|undead monster names
 table|Scripts/Locations/DungeonLocation.cs|decl:stats|merchant item description
 table|Scripts/Locations/DungeonLocation.cs|decl:status|party status suffix
 table|Scripts/Locations/DungeonLocation.cs|dictpair#1|boss name pool, monster names
-nouns|Scripts/Locations/DungeonLocation.cs|=guardian.Name|monster name in combat
-table|Scripts/Locations/DungeonLocation.cs|=guardian.Phrase|monster speech
-table|Scripts/Locations/DungeonLocation.cs|=hint|floor hint
 table|Scripts/Locations/DungeonLocation.cs|init.Description|merchant item description
 names|Scripts/Locations/DungeonLocation.cs|init.Name|unique NPC name
-table|Scripts/Locations/DungeonLocation.cs|=journalEntries|journal lines
 table|Scripts/Locations/DungeonLocation.cs|=memberTypes|monster names
 nouns|Scripts/Locations/DungeonLocation.cs|=name|monster name
-table|Scripts/Locations/DungeonLocation.cs|=status|exit status
-table|Scripts/Locations/DungeonLocation.cs|=whispers|whisper lines
-table|Scripts/Locations/DungeonLocation.cs|=xpHint|xp hint line
 names|Scripts/Locations/HealerLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 table|Scripts/Locations/HealerLocation.cs|call:Add#0/tuple#0|slot label in shop.cursed_item_healer
 names|Scripts/Locations/HealerLocation.cs|decl:HealerName|shop name
