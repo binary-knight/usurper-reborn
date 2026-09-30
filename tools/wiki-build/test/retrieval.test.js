@@ -48,6 +48,47 @@ const good = [
   ["What is the Healer for?", `${W}world/healer/`],
 ];
 
+// 1.2.1 guides: each question must retrieve its guide in the top 3.
+const guides121 = [
+  ["How do I become king?", `${W}world/castle/`],
+  ["How do I choose a god?", `${W}gods/`],
+  ["What equipment slots are there?", `${W}items/equipment-slots/`],
+  ["How does NG+ work?", `${W}characters/new-game-plus/`],
+  ["Where is the Arena?", `${W}online/arena/`],
+];
+for (const [question, expected] of guides121)
+  test(`1.2.1 guide: "${question}" finds ${expected} in the top 3`, () => {
+    assert.ok(top(question, 3).includes(expected), top(question, 5).join(" "));
+  });
+
+// Sentences written inside :::spoiler blocks of the 1.2.1 guides, as plain text.
+function spoilerSentences(file) {
+  const md = fs.readFileSync(
+    path.resolve(__dirname, "../../../DOCS/wiki", file),
+    "utf8",
+  );
+  const bodies = [...md.matchAll(/^:::spoiler [^\n]+\n([\s\S]*?)^:::\s*$/gm)];
+  assert.ok(bodies.length > 0, `${file} has spoiler blocks`);
+  return bodies
+    .flatMap((m) => m[1].replace(/\[([^\]]*)\]\([^)]*\)/g, "$1").split(/(?<=[.!?])\s+/))
+    .map((t) => t.replace(/\s+/g, " ").trim())
+    .filter((t) => t.length >= 20);
+}
+test("text inside the 1.2.1 guides' spoiler blocks never reaches the search index", () => {
+  const indexed = pages
+    .map((p) => [p.title, ...(p.headings || []), p.text].join(" ").replace(/\s+/g, " "))
+    .join("\n");
+  const story = pages.find((p) => p.path === `${W}world/story/`);
+  assert.match(story.text, /wakes with no memory/, "public story text is indexed");
+  let checked = 0;
+  for (const file of ["world/story.md", "characters/new-game-plus.md"])
+    for (const sentence of spoilerSentences(file)) {
+      assert.ok(!indexed.includes(sentence), `${file}: ${sentence}`);
+      checked++;
+    }
+  assert.ok(checked >= 10, `${checked} spoiler sentences checked`);
+});
+
 test("the index marks hand-written guides and only those", () => {
   const guides = pages.filter((p) => p.guide);
   assert.ok(guides.some((p) => p.path === `${W}gods/favor/`));

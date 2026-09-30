@@ -10,7 +10,7 @@ Favor is your relationship with the god you worship. It is saved, changes throug
 
 ## Devotion
 
-Daily Temple prayer gives {{balance:GodFavorPrayerGain}} Favor. Gold offerings to your god give a Favor point per (your level x {{balance:GodFavorGoldPerLevel}}) gold, with a daily Favor cap of {{balance:GodFavorGoldDailyCap}}. Item offerings give up the item and have a separate daily cap of {{balance:GodFavorItemDailyCap}}. Cursed and unique items are refused.
+First choose a god at the Temple; the [gods and faith](/wiki/en/gods/#choose-a-god-at-the-temple) page gives the steps. Daily Temple prayer gives {{balance:GodFavorPrayerGain}} Favor. Gold offerings to your god give a Favor point per (your level x {{balance:GodFavorGoldPerLevel}}) gold, with a daily Favor cap of {{balance:GodFavorGoldDailyCap}}. Item offerings give up the item and have a separate daily cap of {{balance:GodFavorItemDailyCap}}. Cursed and unique items are refused.
 
 Qualifying deeds share a daily cap of {{balance:GodFavorDeedDailyCap}}. Taboos lose Favor rather than consuming that gain allowance. Check your god's page before assuming that the same action pleases every domain. Neglect can also reduce Favor.
 
@@ -31,6 +31,6 @@ See [daily Miracles](/wiki/en/gods/miracles/) for the domain-specific effects.
 
 ## Switching gods
 
-Leaving a god discards your accumulated Favor. A voluntary departure can bring wrath or player-god lightning depending on the god and lost Favor. The Temple asks before switching. Do not change gods expecting both relationships to remain. The steps to choose or switch a god are on the [gods and faith](/wiki/en/gods/#choose-a-god-at-the-temple) page.
+Leaving a god discards your accumulated Favor. A voluntary departure can bring wrath or player-god lightning depending on the god and lost Favor. The Temple asks before switching. Do not change gods expecting both relationships to remain.
 
 See [Temple rooms](/wiki/en/world/temple/) and [player-gods](/wiki/en/gods/player-gods/).
