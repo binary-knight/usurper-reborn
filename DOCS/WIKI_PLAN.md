@@ -62,8 +62,8 @@ The new exporter must use built-in definitions even if a local `GameData/`
 directory exists; otherwise a developer's mods can silently change the public
 wiki. It reads no saves or online database. Export errors fail with a nonzero
 exit code. Every dataset includes stable keys, display names, source version,
-and an explicit schema version. `meta.json` records the game version and commit
-used for the build.
+and an explicit schema version. `meta.json` records the game version and, when
+available, the commit used for the build.
 
 Run Phase 1 locally with:
 
@@ -74,7 +74,11 @@ dotnet run --project usurper-reloaded.csproj -c Release -- --export-wiki wiki-da
 The exporter writes the 11 datasets in
 the table below plus `meta.json`. Each dataset has `schemaVersion`,
 `gameVersion`, and `data` at the top level. `meta.json` also records the commit
-when `GITHUB_SHA` is available and the UTC export time. Item and monster names without a verified
+(`GITHUB_SHA` in CI, otherwise `git rev-parse HEAD`, or null when neither is
+available) and the UTC export time. Values are the shipped defaults: the export
+ignores the current difficulty, the server monster HP multiplier and any loaded
+spell or ability overrides. Running `--export-wiki` without a directory prints
+a usage line and exits with code 2. Item and monster names without a verified
 localization key are English only. Monster tier stat samples are normal,
 non-boss values at the tier's minimum and maximum levels from the game's
 generator; server modifiers and NG+ can change live encounters.

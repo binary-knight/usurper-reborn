@@ -92,14 +92,10 @@ namespace UsurperConsole
             UsurperRemake.Systems.Loc.Initialize();
 
             // Export built-in wiki facts before GameDataLoader can apply local mods.
-            var wikiFlag = Array.IndexOf(args, "--export-wiki");
-            if (wikiFlag >= 0)
+            var wikiExit = UsurperRemake.Systems.WikiDataExporter.RunCommandLine(args, Console.Out, Console.Error);
+            if (wikiExit.HasValue)
             {
-                if (wikiFlag + 1 >= args.Length || args[wikiFlag + 1].StartsWith("--"))
-                    throw new ArgumentException("--export-wiki requires an output directory");
-                var outputDir = System.IO.Path.GetFullPath(args[wikiFlag + 1]);
-                UsurperRemake.Systems.WikiDataExporter.Export(outputDir);
-                Console.WriteLine($"Wiki data exported to: {outputDir}");
+                Environment.ExitCode = wikiExit.Value;
                 return;
             }
 
