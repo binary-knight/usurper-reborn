@@ -181,7 +181,9 @@ test("LLM Ask is off without a database for its limits", async () => {
   const f = fixture({ db: null });
   await f.ask("<@123> how does Favor work?");
   assert.equal(f.sdk.calls.length, 0);
+  assert.equal(f.sdk.clients.length, 0);
   assert.match(f.sent[0].content, /^Wiki excerpts/);
+  assert.match(f.logs.join("\n"), /LLM path off: no database for usage limits/);
 });
 
 test("LLM request carries the model, low effort, 400 tokens, no tools and wrapped data", async () => {
