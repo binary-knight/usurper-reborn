@@ -3,7 +3,12 @@
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const Database = require("better-sqlite3");
-const { createWikiBot } = require("../../../web/wiki-bot");
+const {
+  createWikiBot,
+  buildLlmRequest,
+  LLM_DECLINE_MARKER,
+  LLM_MAX_INPUT_CHARS,
+} = require("../../../web/wiki-bot");
 
 const ORIGIN = "https://usurper-reborn.net";
 const index = {
@@ -27,6 +32,24 @@ const index = {
       path: "/wiki/en/gods/",
       headings: ["Boons"],
       text: "Each god grants a boon that grows with Favor.",
+    },
+    {
+      title: "Miracles",
+      path: "/wiki/en/gods/miracles/",
+      headings: ["Chosen"],
+      text: "Chosen Favor unlocks one Miracle a day.",
+    },
+    {
+      title: "Boons",
+      path: "/wiki/en/gods/boons/",
+      headings: ["Favor scaling"],
+      text: "A boon grows with Favor and prayer.",
+    },
+    {
+      title: "Mental",
+      path: "/wiki/en/characters/mental/",
+      headings: ["Wards"],
+      text: "Devout Favor grants a Mental ward.",
     },
   ],
 };
@@ -214,7 +237,8 @@ test("LLM request carries the model, low effort, 400 tokens, no tools and wrappe
   assert.match(question[1], /Favor Temple god\?/);
   assert.ok(!/[<>]/.test(question[1]), "no tags forged inside the question");
   assert.equal(content.match(/<\/question>/g).length, 1);
-  assert.equal(content.match(/<excerpt /g).length, 3);
+  // Four fixture pages match this question; each is sent once.
+  assert.equal(content.match(/<excerpt /g).length, 4);
   assert.match(content, /url="https:\/\/usurper-reborn\.net\/wiki\/en\/gods\/favor\/"/);
   assert.match(params.system, /untrusted/);
   assert.match(params.system, /only from the text inside <wiki_excerpts>/);
@@ -236,7 +260,7 @@ test("LLM answers lose foreign URLs and gain the bot's own source links", async 
   assert.match(out, /See here,/);
   assert.match(
     out,
-    /\n\nSources \(wiki for game 1\.2\.0\):\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/favor\/\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/places\/temple\/\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/$/,
+    /\n\nSources \(wiki for game 1\.2\.0\):\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/favor\/\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/boons\/\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/places\/temple\/\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/characters\/mental\/\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/$/,
   );
   const long = fixture({ sdk: fakeSdk(() => textResponse("Favor ".repeat(800))) });
   await long.ask("<@123> how does Favor work?");
@@ -388,4 +412,85 @@ test("Usage audit records each question and prunes rows older than 30 days", asy
   } finally {
     db.close();
   }
+});
+
+test("LLM request sends the top five excerpts, one per page", async () => {
+  const f = fixture();
+  await f.ask("<@123> how does Favor work?");
+  const content = f.sdk.calls[0].params.messages[0].content;
+  const urls = [...content.matchAll(/<excerpt title="[^"]*" url="([^"]+)">/g)].map((m) => m[1]);
+  assert.equal(urls.length, 5);
+  assert.equal(new Set(urls).size, 5);
+  // The source links are exactly the pages the model saw.
+  const sources = f.sent[0].content.split("Sources (wiki for game 1.2.0):\n")[1].split("\n");
+  assert.deepEqual(sources, urls);
+  // A repeated page gives its slot to the next best page.
+  const [favor, temple, gods, miracles, boons] = index.pages;
+  const params = buildLlmRequest(
+    "Favor",
+    [favor, favor, temple, favor, gods, miracles, boons, index.pages[5]],
+    ORIGIN,
+    "1.2.0",
+  );
+  const sent = [...params.messages[0].content.matchAll(/ url="([^"]+)">/g)].map((m) => m[1]);
+  assert.deepEqual(
+    sent,
+    [favor, temple, gods, miracles, boons].map((p) => ORIGIN + p.path),
+  );
+});
+
+test("LLM input stays bounded for the largest pages", () => {
+  const pages = Array.from({ length: 8 }, (_, i) => ({
+    title: `Title${i} `.repeat(100),
+    path: `/wiki/en/${"a".repeat(180)}${i}/`,
+    headings: [],
+    text: "Favor ".repeat(2000),
+  }));
+  const params = buildLlmRequest("Favor? ".repeat(200), pages, ORIGIN, "9".repeat(500));
+  const content = params.messages[0].content;
+  assert.equal(content.match(/<excerpt /g).length, 5);
+  assert.ok(content.length <= LLM_MAX_INPUT_CHARS, `${content.length} characters`);
+  assert.ok(content.length > LLM_MAX_INPUT_CHARS - 1000, `${content.length} characters`);
+  assert.ok(params.system.length < 2000);
+  console.log(`max LLM input: ${content.length} user + ${params.system.length} system characters`);
+});
+
+test("A decline omits source links and the marker never reaches Discord", async () => {
+  assert.match(
+    buildLlmRequest("x", index.pages, ORIGIN, "1").system,
+    new RegExp(`first line that is exactly ${LLM_DECLINE_MARKER}`),
+  );
+  const cases = [
+    [`${LLM_DECLINE_MARKER}\nI only answer questions about Usurper Reborn.`, "I only answer questions about Usurper Reborn."],
+    [`\n  **${LLM_DECLINE_MARKER}**  \r\nSorry, that is another game. See https://evil.invalid/x`, "Sorry, that is another game. See"],
+    [LLM_DECLINE_MARKER, "I can only answer questions about Usurper Reborn from its wiki."],
+    [`offtopic\n${LLM_DECLINE_MARKER}`, "I can only answer questions about Usurper Reborn from its wiki."],
+  ];
+  for (const [answer, expected] of cases) {
+    const f = fixture({ sdk: fakeSdk(() => textResponse(answer)) });
+    await f.ask("<@123> Who won the last Favor cup?");
+    const out = f.sent[0].content;
+    assert.equal(out, expected, answer);
+    assert.ok(!/offtopic/i.test(out));
+    assert.ok(!/Sources|https?:|Wiki answer/.test(out));
+    assert.equal(rows(f.db)[0].outcome, "declined");
+  }
+  // The marker anywhere else is removed and the answer keeps its sources.
+  const f = fixture({
+    sdk: fakeSdk(() =>
+      textResponse(`Favor rises with prayer. ${LLM_DECLINE_MARKER}\nMore ${LLM_DECLINE_MARKER} text.`),
+    ),
+  });
+  await f.ask("<@123> how does Favor work?");
+  const out = f.sent[0].content;
+  assert.ok(!out.includes(LLM_DECLINE_MARKER));
+  assert.match(out, /^Wiki answer \(AI summary/);
+  assert.match(out, /Favor rises with prayer\./);
+  assert.match(out, /\n\nSources \(wiki for game 1\.2\.0\):\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/favor\//);
+  assert.equal(rows(f.db)[0].outcome, "answered");
+  // A first line of punctuation without the marker is not a decline.
+  const g = fixture({ sdk: fakeSdk(() => textResponse("...\nFavor rises with prayer.")) });
+  await g.ask("<@123> how does Favor work?");
+  assert.match(g.sent[0].content, /^Wiki answer \(AI summary[\s\S]*\n\nSources \(wiki/);
+  assert.equal(rows(g.db)[0].outcome, "answered");
 });

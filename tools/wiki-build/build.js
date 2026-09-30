@@ -766,6 +766,8 @@ function build(options = {}) {
       ...publicHtml(p.body).matchAll(/<h[23][^>]*>([\s\S]*?)<\/h[23]>/g),
     ].map((m) => redact(textOf(m[1]))),
     text: redact(textOf(p.body)),
+    // Hand-written guides from DOCS/wiki rank above generated entity pages.
+    ...(p.sourceFile ? { guide: true } : {}),
   }));
   const strings = JSON.parse(
     fs.readFileSync(path.join(root, "web/lang/en.json"), "utf8"),
