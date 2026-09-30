@@ -213,12 +213,8 @@ names|Scripts/Systems/BetrayalSystem.cs|init.NPCName|NPC names
 table|Scripts/Systems/CharacterCreationSystem.cs|dictpair#1|class abbreviations in the race list
 table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|starter weapon description
 table|Scripts/Systems/CharacterCreationSystem.cs|switcharm/tuple#0|starter weapon names
-table|Scripts/Systems/ClassAbilitySystem.cs|decl:costDisplay|ability cost label
-table|Scripts/Systems/ClassAbilitySystem.cs|decl:lCostDisplay|ability cost label
-table|Scripts/Systems/ClassAbilitySystem.cs|decl:uCostDisplay|ability cost label
 table|Scripts/Systems/ClassAbilitySystem.cs|init.Description|class ability descriptions
 nouns|Scripts/Systems/ClassAbilitySystem.cs|init.Name|class ability names
-table|Scripts/Systems/ClassAbilitySystem.cs|=result.Message|ability result message, CombatEngine
 table|Scripts/Systems/DialogueSystem.cs|init.Text|dialogue tree node text
 names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names
 table|Scripts/Systems/FactionSystem.cs|return/tuple#1|faction join refusal
@@ -249,8 +245,6 @@ nouns|Scripts/Systems/NPCItemGenerator.cs|init.Name|fallback item names
 table|Scripts/Systems/OceanPhilosophySystem.cs|init.[k]=|ambient wisdom, MagicShopLocation
 table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#0|wave fragment title printed raw, DungeonLocation
 table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#1|wave fragment text printed raw, DungeonLocation
-nouns|Scripts/Systems/OldGodBossSystem.cs|=ctx.AoEAbilityName|boss ability name in combat
-nouns|Scripts/Systems/OldGodBossSystem.cs|=ctx.ChannelAbilityName|boss ability name in combat
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#0|prison activity name
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#1|prison activity description
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#2|prison activity effect

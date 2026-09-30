@@ -863,13 +863,13 @@ namespace UsurperRemake.Systems
             terminal.SetColor(hpColor);
             if (GameConfig.ScreenReaderMode)
             {
-                terminal.WriteLine($"  HP: {boss.CurrentHP:N0} / {boss.MaxHP:N0} ({hpPercent:F1}%)");
+                terminal.WriteLine($"  {Loc.Get("world_boss.hp_line", $"{boss.CurrentHP:N0}", $"{boss.MaxHP:N0}", $"{hpPercent:F1}")}");
             }
             else
             {
                 int barFilled = Math.Clamp((int)(hpPercent / 5), 0, 20);
                 string hpBar = new string('█', barFilled) + new string('░', 20 - barFilled);
-                terminal.WriteLine($"  HP: [{hpBar}] {boss.CurrentHP:N0} / {boss.MaxHP:N0} ({hpPercent:F1}%)");
+                terminal.WriteLine($"  {Loc.Get("world_boss.hp_bar_line", hpBar, $"{boss.CurrentHP:N0}", $"{boss.MaxHP:N0}", $"{hpPercent:F1}")}");
             }
 
             // Time remaining
@@ -913,7 +913,7 @@ namespace UsurperRemake.Systems
                 string youTag = isPlayer ? $" ({Loc.Get("world_boss.you_tag")})" : "";
 
                 terminal.SetColor(color);
-                terminal.WriteLine($"  {i + 1,2}. {entry.ShownName,-18} {entry.DamageDealt,10:N0} dmg  {pct,5:F1}%{marker}{youTag}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.leaderboard_row", i + 1, entry.ShownName, $"{entry.DamageDealt:N0}", $"{pct:F1}")}{marker}{youTag}");
             }
             terminal.WriteLine("");
         }
@@ -1683,7 +1683,7 @@ namespace UsurperRemake.Systems
                 if (SpellSystem.CanCastSpell(player, spell.Level))
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  [{castableSpells.Count + 1}] {spell.DisplayName} (Mana: {spell.ManaCost})");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.spell_option", castableSpells.Count + 1, spell.DisplayName, spell.ManaCost)}");
                     castableSpells.Add(spell);
                 }
             }

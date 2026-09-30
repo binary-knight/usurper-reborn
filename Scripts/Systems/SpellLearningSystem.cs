@@ -62,7 +62,7 @@ public static class SpellLearningSystem
                         terminal.SetColor("yellow");
                         terminal.Write($"{spell.DisplayName,-22}");
                         terminal.SetColor("cyan");
-                        terminal.Write($" ({manaCost} MP) ");
+                        terminal.Write($" {Loc.Get("ability.cost_mp", manaCost)} ");
                         terminal.SetColor("gray");
                         terminal.WriteLine(spell.DisplayDescription);
                     }
@@ -82,7 +82,7 @@ public static class SpellLearningSystem
                     terminal.SetColor("yellow");
                     terminal.Write($"{(ability?.Name ?? slotId),-22}");
                     terminal.SetColor("darkgray");
-                    terminal.Write($"  (ability)");
+                    terminal.Write($"  {Loc.Get("spell_learning.tag_ability")}");
                     terminal.WriteLine("");
                 }
             }
@@ -115,7 +115,7 @@ public static class SpellLearningSystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.Write($"{knownUnequipped[i].DisplayName,-22} ({manaCost} MP) ");
+                    terminal.Write($"{knownUnequipped[i].DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} ");
                     terminal.SetColor("gray");
                     terminal.WriteLine(knownUnequipped[i].DisplayDescription);
                 }
@@ -137,7 +137,7 @@ public static class SpellLearningSystem
                     terminal.SetColor("darkgray");
                     terminal.Write($"  [{learnKey,-3}] ");
                     terminal.SetColor("white");
-                    terminal.Write($"{spell.DisplayName,-22} ({manaCost} MP) ");
+                    terminal.Write($"{spell.DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} ");
                     terminal.SetColor("gray");
                     terminal.WriteLine(spell.DisplayDescription);
                 }
@@ -325,7 +325,7 @@ public static class SpellLearningSystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"{knownUnequipped[i].DisplayName,-22} ({manaCost} MP) {knownUnequipped[i].SpellType}");
+                    terminal.WriteLine($"{knownUnequipped[i].DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} {SpellTypeLabel(knownUnequipped[i].SpellType)}");
                 }
                 terminal.SetColor("darkgray");
                 terminal.Write("  [");
@@ -366,6 +366,13 @@ public static class SpellLearningSystem
     /// <summary>
     /// Check if a spell is known by the player
     /// </summary>
+    /// <summary>v1.2.2: a spell's type (Attack, Heal, Buff, ...) in the player's language; an unknown type is shown as is.</summary>
+    internal static string SpellTypeLabel(string spellType)
+    {
+        string key = "spell_learning.type." + (spellType ?? "").ToLowerInvariant();
+        return Loc.Has(key) ? Loc.Get(key) : spellType ?? "";
+    }
+
     private static bool IsSpellKnown(Character player, int spellLevel)
     {
         int idx = spellLevel - 1;

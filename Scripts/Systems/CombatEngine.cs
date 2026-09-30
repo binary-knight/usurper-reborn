@@ -30296,7 +30296,7 @@ public partial class CombatEngine
         boss.ChannelingAbilityName = ctx.ChannelAbilityName;
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_ability", boss.Name, ctx.ChannelAbilityName)}");
+        terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_ability", boss.Name, BossAbilityLabel(ctx.ChannelAbilityName))}");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("combat.channel_interrupt_warning")}");
         terminal.WriteLine($"  {Loc.Get("combat.channel_interrupt_hint")}");
@@ -30317,7 +30317,7 @@ public partial class CombatEngine
             int damage = BossContext?.ChannelDamage ?? (int)(boss.Strength * 3);
 
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, boss.ChannelingAbilityName)} ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, BossAbilityLabel(boss.ChannelingAbilityName))} ***");
 
             // Hit player
             if (player.IsAlive)
@@ -30347,7 +30347,7 @@ public partial class CombatEngine
         else
         {
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_continues", boss.Name, boss.ChannelingAbilityName, boss.ChannelingRoundsLeft)}");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_continues", boss.Name, BossAbilityLabel(boss.ChannelingAbilityName), boss.ChannelingRoundsLeft)}");
         }
     }
 
@@ -30374,7 +30374,7 @@ public partial class CombatEngine
             boss.IsChanneling = false;
             boss.ChannelingRoundsLeft = 0;
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  *** {Loc.Get("combat.boss_channel_interrupted", interrupter.DisplayName, boss.Name, boss.ChannelingAbilityName)} ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_channel_interrupted", interrupter.DisplayName, boss.Name, BossAbilityLabel(boss.ChannelingAbilityName))} ***");
             return true;
         }
         return false;
@@ -30384,12 +30384,19 @@ public partial class CombatEngine
     /// Boss AoE attack that hits the entire party. A taunting tank absorbs damage for others.
     /// Without a tank, everyone takes full damage — forcing tank requirement.
     /// </summary>
+    /// <summary>
+    /// v1.2.2: a boss ability name held as a Loc key (the Old God AoE and channel names) in the reader's
+    /// language, resolved as it is written so a group capture re-renders it; any other name is shown as is.
+    /// </summary>
+    internal static string BossAbilityLabel(string nameOrKey) =>
+        !string.IsNullOrEmpty(nameOrKey) && Loc.Has(nameOrKey) ? Loc.Get(nameOrKey) : nameOrKey;
+
     private async Task ProcessBossAoE(Monster boss, Character player, CombatResult result)
     {
         if (BossContext == null) return;
 
         int baseDamage = BossContext.AoEDamage > 0 ? BossContext.AoEDamage : (int)(boss.Strength * 2);
-        string abilityName = !string.IsNullOrEmpty(BossContext.AoEAbilityName) ? BossContext.AoEAbilityName : Loc.Get("combat.boss_aoe_default");
+        string abilityName = !string.IsNullOrEmpty(BossContext.AoEAbilityName) ? BossAbilityLabel(BossContext.AoEAbilityName) : Loc.Get("combat.boss_aoe_default");
 
         terminal.SetColor("bright_red");
         terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, abilityName)} ***");
@@ -32377,11 +32384,11 @@ public class BossCombatContext
     public double DialogueDamageFactor { get; set; } = 1.0;
     public int DoomRounds { get; set; } = 3;              // Rounds before Doom kills
     public int ChannelFrequency { get; set; } = 0;        // Every N rounds boss channels (0 = never)
-    public string ChannelAbilityName { get; set; } = "";  // Name of channeled ability
+    public string ChannelAbilityName { get; set; } = "";  // Loc key (or name) of channeled ability
     public int ChannelDamage { get; set; } = 0;           // Damage if channel completes
     public int AoEFrequency { get; set; } = 0;            // Every N rounds boss does party-wide AoE (0 = never)
     public int AoEDamage { get; set; } = 0;               // Base AoE damage
-    public string AoEAbilityName { get; set; } = "";      // Name of AoE ability
+    public string AoEAbilityName { get; set; } = "";      // Loc key (or name) of AoE ability
     public double TankAbsorptionRate { get; set; } = 0.6; // % of AoE damage absorbed by taunting tank
     public double DivineArmorReduction { get; set; } = 0;  // % damage reduction from divine armor (set by OldGodBossSystem)
 

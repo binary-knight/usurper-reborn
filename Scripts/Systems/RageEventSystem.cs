@@ -110,71 +110,71 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("dark_red");
                 terminal.WriteLine("");
                 terminal.WriteLine("");
-                terminal.WriteLine("  The world holds its breath.");
+                terminal.WriteLine($"  {Loc.Get("rage.world_holds_breath")}");
                 await Pacing.Wait(2500);
                 terminal.WriteLine("");
-                terminal.WriteLine("  A presence forms in the void.");
+                terminal.WriteLine($"  {Loc.Get("rage.presence_forms")}");
                 await Pacing.Wait(1500);
-                terminal.WriteLine("  Vast.");
+                terminal.WriteLine($"  {Loc.Get("rage.vast")}");
                 await Pacing.Wait(800);
-                terminal.WriteLine("  Ancient.");
+                terminal.WriteLine($"  {Loc.Get("rage.ancient")}");
                 await Pacing.Wait(800);
-                terminal.WriteLine("  Furious.");
+                terminal.WriteLine($"  {Loc.Get("rage.furious")}");
                 await Pacing.Wait(2000);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("  The god RAGE strides into Usurper's realm,");
-                terminal.WriteLine("  his eyes burning with the heat of a thousand reborn worlds.");
-                terminal.WriteLine("  He has been silent for centuries, watching.");
+                terminal.WriteLine($"  {Loc.Get("rage.strides_in")}");
+                terminal.WriteLine($"  {Loc.Get("rage.eyes_burning")}");
+                terminal.WriteLine($"  {Loc.Get("rage.silent_centuries")}");
                 await Pacing.Wait(2500);
                 terminal.WriteLine("");
-                terminal.WriteLine("  Tonight, the watching ends.");
+                terminal.WriteLine($"  {Loc.Get("rage.watching_ends")}");
                 await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  He looks upon you, {player?.Name2 ?? player?.Name1 ?? "mortal"}.");
-                terminal.WriteLine("  He sees every choice. Every grudge. Every shortcut.");
-                terminal.WriteLine("  Every cheese. Every petty victory and every act of cowardice.");
+                terminal.WriteLine($"  {Loc.Get("rage.looks_upon_you", player?.Name2 ?? player?.Name1 ?? Loc.Get("rage.mortal"))}");
+                terminal.WriteLine($"  {Loc.Get("rage.sees_every_choice")}");
+                terminal.WriteLine($"  {Loc.Get("rage.every_cheese")}");
                 await Pacing.Wait(3000);
                 terminal.WriteLine("");
                 terminal.SetColor("dark_red");
-                terminal.WriteLine("  He is not impressed.");
+                terminal.WriteLine($"  {Loc.Get("rage.not_impressed")}");
                 await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("  \"Mortal,\" Rage rumbles, and the sky cracks open.");
-                terminal.WriteLine("  \"You have lived as you saw fit.\"");
+                terminal.WriteLine($"  {Loc.Get("rage.mortal_rumbles")}");
+                terminal.WriteLine($"  {Loc.Get("rage.lived_as_you_saw_fit")}");
                 await Pacing.Wait(2000);
-                terminal.WriteLine("  \"Now you will die as I see fit.\"");
+                terminal.WriteLine($"  {Loc.Get("rage.die_as_i_see_fit")}");
                 await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("white");
-                terminal.WriteLine("  You raise your sword.");
+                terminal.WriteLine($"  {Loc.Get("rage.raise_sword")}");
                 await Pacing.Wait(1500);
                 terminal.SetColor("dark_red");
-                terminal.WriteLine("  He laughs.");
-                terminal.WriteLine("  The laugh sounds like the end of an age.");
+                terminal.WriteLine($"  {Loc.Get("rage.he_laughs")}");
+                terminal.WriteLine($"  {Loc.Get("rage.laugh_end_of_age")}");
                 await Pacing.Wait(2500);
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
-                terminal.WriteLine("  A blow falls.");
+                terminal.WriteLine($"  {Loc.Get("rage.blow_falls")}");
                 await Pacing.Wait(1200);
-                terminal.WriteLine("  Just one.");
+                terminal.WriteLine($"  {Loc.Get("rage.just_one")}");
                 await Pacing.Wait(2000);
 
                 terminal.WriteLine("");
                 terminal.SetColor("dark_gray");
-                terminal.WriteLine("  You are unmade.");
+                terminal.WriteLine($"  {Loc.Get("rage.unmade")}");
                 await Pacing.Wait(3000);
 
                 terminal.WriteLine("");
-                terminal.WriteLine("  When the sun rises on the new world,");
-                terminal.WriteLine("  no one will remember your name.");
+                terminal.WriteLine($"  {Loc.Get("rage.sun_rises")}");
+                terminal.WriteLine($"  {Loc.Get("rage.no_one_remembers")}");
                 await Pacing.Wait(3500);
             }
             catch (Exception ex)
@@ -208,9 +208,9 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  Your record has been erased from the world.");
-                terminal.WriteLine("  Your name will not answer the door again.");
-                terminal.WriteLine("  Disconnecting.");
+                terminal.WriteLine($"  {Loc.Get("rage.record_erased")}");
+                terminal.WriteLine($"  {Loc.Get("rage.name_will_not_answer")}");
+                terminal.WriteLine($"  {Loc.Get("rage.disconnecting")}");
                 terminal.WriteLine("");
                 await Pacing.Wait(2500);
             }

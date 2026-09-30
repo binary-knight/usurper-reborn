@@ -2630,6 +2630,10 @@ public static class ClassAbilitySystem
         return null;
     }
 
+    /// <summary>v1.2.2: an ability's cost tag, "(12 MP)" or "(15 ST)", in the player's language.</summary>
+    internal static string CostTag(ClassAbility ability) =>
+        ability.ManaCost > 0 ? Loc.Get("ability.cost_mp", ability.ManaCost) : Loc.Get("ability.cost_st", GetEffectiveStaminaCost(ability));
+
     /// <summary>
     /// Use an ability and return the result
     /// </summary>
@@ -2642,7 +2646,7 @@ public static class ClassAbilitySystem
         if (ability == null)
         {
             result.Success = false;
-            result.Message = "Unknown ability!";
+            result.Message = Loc.Get("combat.unknown_ability");
             return result;
         }
 
@@ -2834,7 +2838,7 @@ public static class ClassAbilitySystem
         }
 
         // Generate message
-        result.Message = $"{user.Name2} uses {ability.Name}!";
+        result.Message = Loc.Get("combat.monster_uses_ability", user.Name2, ability.Name);
 
         return result;
     }
@@ -2892,7 +2896,7 @@ public static class ClassAbilitySystem
                         terminal.SetColor("cyan");
                         terminal.Write($"{(spell?.DisplayName ?? slotId),-24}");
                         terminal.SetColor("darkgray");
-                        terminal.Write($"  (spell)");
+                        terminal.Write($"  {Loc.Get("ability.tag_spell")}");
                         terminal.WriteLine("");
                     }
                     else
@@ -2903,7 +2907,7 @@ public static class ClassAbilitySystem
                             terminal.SetColor("bright_yellow");
                             terminal.Write($"  [{i + 1}] ");
                             terminal.SetColor("yellow");
-                            string costDisplay = ability.ManaCost > 0 ? $"({ability.ManaCost} MP)" : $"({GetEffectiveStaminaCost(ability)} ST)";
+                            string costDisplay = CostTag(ability);
                             terminal.Write($"{ability.Name,-24} {costDisplay}");
                             if (!string.IsNullOrEmpty(ability.Description))
                             {
@@ -2924,7 +2928,7 @@ public static class ClassAbilitySystem
                 else
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"  [{i + 1}] --- empty ---");
+                    terminal.WriteLine($"  [{i + 1}] --- {Loc.Get("ui.empty").ToLower()} ---");
                 }
             }
 
@@ -2947,7 +2951,7 @@ public static class ClassAbilitySystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.Write($"{unequipped[i].Name,-24} ({GetEffectiveStaminaCost(unequipped[i])} ST) Lv{unequipped[i].LevelRequired}");
+                    terminal.Write($"{unequipped[i].Name,-24} {Loc.Get("ability.cost_st", GetEffectiveStaminaCost(unequipped[i]))} {Loc.Get("ability.level_tag", unequipped[i].LevelRequired)}");
                     if (!string.IsNullOrEmpty(unequipped[i].Description))
                     {
                         terminal.SetColor("gray");
@@ -2967,7 +2971,7 @@ public static class ClassAbilitySystem
                 foreach (var ability in locked)
                 {
                     terminal.SetColor("darkgray");
-                    string lCostDisplay = ability.ManaCost > 0 ? $"({ability.ManaCost} MP)" : $"({GetEffectiveStaminaCost(ability)} ST)";
+                    string lCostDisplay = CostTag(ability);
                     terminal.Write($"      {ability.Name,-24} {lCostDisplay} {Loc.Get("ability.requires_lv", ability.LevelRequired)}");
                     if (!string.IsNullOrEmpty(ability.Description))
                         terminal.Write($"  {ability.Description}");
@@ -3061,7 +3065,7 @@ public static class ClassAbilitySystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    string uCostDisplay = unequipped[i].ManaCost > 0 ? $"({unequipped[i].ManaCost} MP)" : $"({GetEffectiveStaminaCost(unequipped[i])} ST)";
+                    string uCostDisplay = CostTag(unequipped[i]);
                     terminal.WriteLine($"{unequipped[i].Name,-24} {uCostDisplay}");
                 }
                 terminal.SetColor("darkgray");
