@@ -1,0 +1,60 @@
+// Fixture for HardcodedTextScannerTests. Not compiled. Line numbers are asserted by the test,
+// so add new cases at the end.
+using System;
+
+public class FixtureLocation : BaseLocation
+{
+    private TerminalEmulator terminal;
+    private TerminalEmulator followerTerm;
+
+    public async Task Run(Character player, int hp, bool ok)
+    {
+        terminal.WriteLine("You enter the fixture room.");
+        terminal.WriteLine($"Your HP: {hp}/{player.MaxHP}", "bright_green");
+        terminal.WriteLine("Gold: " + player.Gold + " pieces");
+        terminal.WriteLine(
+            ok
+                ? "It worked."
+                : "It failed.",
+            "white");
+        terminal.Write(@"Verbatim words here");
+        followerTerm.WriteLine($"{(ok ? "Victory" : "")}");
+        terminal.WriteLine(Loc.Get("combat.fixture_line", player.Name));
+        terminal.WriteLine(Loc.Get("combat.fixture_line"), "dark_green");
+        terminal.WriteLine("dark_green");
+        terminal.WriteLine("═══════════ -- 12 / 34 ═══════════");
+        terminal.WriteLine($"{player.Name}: {hp}");
+        terminal.WriteLine("\x1b[1;31m[bright_red][/]\x1b[0m");
+        terminal.WriteLine("[A]");
+        terminal.WriteLine("combat.menu.attack");
+        DebugLogger.Instance.LogInfo("COMBAT", "Debug words are not player text");
+        Console.Error.WriteLine("Console error words");
+        Console.WriteLine("Console words");
+        GD.Print("Godot words");
+        someStream.WriteLine("Stream words");
+        var s = "Local words not seen";
+        terminal.WriteLine(s);
+        UIHelper.DrawBoxLine(terminal, "Boxed words", "bright_blue", "white");
+        UIHelper.DrawMenuOption(terminal, "A", "Attack the foe", "bright_yellow");
+        NewsSystem.Instance?.Newsy(true, "Fixture headline for the town");
+        GroupSystem.Instance?.NotifyGroup(group, "The group hears words");
+        WriteMenuRow("1", "bright_yellow", " Rings", "E", "bright_yellow", "nchant Equipment");
+        await terminal.GetInput("Choose wisely: ");
+        terminal.WriteLine(string.Format("Formatted {0} words", hp));
+        terminal.WriteLine("  Name".PadRight(20) + Loc.Get("ui.value"));
+        terminal.WriteLine("[AUTO]");
+        terminal.WriteLine("{0} {1}");
+    }
+
+    public (bool, string) TryThing(bool ok)
+    {
+        if (!ok) return (false, "You cannot do that.");
+        return (true, "");
+    }
+}
+
+public class OnlineAdminConsole
+{
+    private TerminalEmulator terminal;
+    public void Show() => terminal.WriteLine("Admin only words");
+}
