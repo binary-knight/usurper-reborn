@@ -1,7 +1,7 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs
 ---
 Every dungeon floor is a set of connected rooms. A room can hold monsters, treasure, a random event, a trap, features you can examine and stairs deeper. This page covers what you can meet in a room and how to deal with it. For supplies, Mental and outposts see [dungeon travel](/wiki/en/world/dungeon/); for the rarest events see [rare encounters](/wiki/en/world/rare-encounters/).
