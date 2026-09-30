@@ -1,7 +1,7 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
 ---
 Treat your first trip as reconnaissance, not a race to the deepest floor.

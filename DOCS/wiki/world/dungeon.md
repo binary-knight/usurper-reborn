@@ -1,7 +1,7 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs
 ---
 Dungeon rooms can contain monsters, treasure, features and routes deeper. Progress is not only a damage check: supplies and Mental matter across the entire trip.

@@ -1,7 +1,7 @@
 ---
 title: Rare dungeon encounters
 path: /wiki/en/world/rare-encounters/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Systems/RareEncounters.cs, Scripts/Locations/DungeonLocation.cs
 ---
 Rare encounters are unusual random events that can interrupt a dungeon trip. They are separate from ordinary [room features and events](/wiki/en/world/dungeon-features/): they can happen when you enter the dungeon and when you step into a room for the first time, on any floor. Most offer a choice, and most choices carry a risk as well as a reward. Leaving is usually an option.
