@@ -1,7 +1,7 @@
 ---
 title: Favor, prayer and sacrifice
 path: /wiki/en/gods/favor/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Systems/FaithSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDeedSystem.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 ---
 Favor is your relationship with the god you worship. It is saved, changes through devotion and taboos, and updates your boon when you cross a tier.
@@ -10,7 +10,7 @@ Favor is your relationship with the god you worship. It is saved, changes throug
 
 ## Devotion
 
-Daily Temple prayer gives {{balance:GodFavorPrayerGain}} Favor. Gold offerings to your god give a Favor point per (your level x {{balance:GodFavorGoldPerLevel}}) gold, with a daily Favor cap of {{balance:GodFavorGoldDailyCap}}. Item offerings give up the item and have a separate daily cap of {{balance:GodFavorItemDailyCap}}. Cursed and unique items are refused.
+First choose a god at the Temple; the [gods and faith](/wiki/en/gods/#choose-a-god-at-the-temple) page gives the steps. Daily Temple prayer gives {{balance:GodFavorPrayerGain}} Favor. Gold offerings to your god give a Favor point per (your level x {{balance:GodFavorGoldPerLevel}}) gold, with a daily Favor cap of {{balance:GodFavorGoldDailyCap}}. Item offerings give up the item and have a separate daily cap of {{balance:GodFavorItemDailyCap}}. Cursed and unique items are refused.
 
 Qualifying deeds share a daily cap of {{balance:GodFavorDeedDailyCap}}. Taboos lose Favor rather than consuming that gain allowance. Check your god's page before assuming that the same action pleases every domain. Neglect can also reduce Favor.
 

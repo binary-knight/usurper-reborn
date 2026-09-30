@@ -16,6 +16,8 @@ Marriage uses its own ceremony and conditions. Time with a spouse or lover at Ho
 
 Amara recognizes marriage as a deed; Discordia treats it as a taboo. Your god choice can therefore affect how you experience the same social milestone.
 
+For the Home menu, marriage paths and children, see [Home and family](/wiki/en/world/home/).
+
 ## Check the actual effect
 
 Social consumables and paid services are not permanent class changes. Read their described effects and costs, and inspect Status afterward. This wiki does not expose private player relationships or live NPC pairing lists.

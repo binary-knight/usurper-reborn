@@ -11,5 +11,6 @@ Character building has several layers: race creation bonuses, starting class val
 - [Specializations](/wiki/en/characters/specializations/)
 - [Abilities](/wiki/en/characters/abilities/) and [spells](/wiki/en/characters/spells/)
 - [Mental](/wiki/en/characters/mental/) and [afflictions](/wiki/en/characters/afflictions/)
+- [New Game Plus and prestige classes](/wiki/en/characters/new-game-plus/)
 
 Your [god](/wiki/en/gods/) adds a boon and, with sufficient Favor, a Mental ward. Check equipment requirements before buying around a build.
