@@ -1375,8 +1375,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.ambush_sensed"));
                 terminal.WriteLine("");
                 result.CombatLog.Add("Ambush detected! No monsters got a free attack.");
-                BroadcastGroupCombatEvent(result,
-                    "\u001b[1;32m  *** The party sensed the ambush — no free strikes! ***\u001b[0m");
+                BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;32m", "combat.group_ambush_sensed"));
             }
             else if (ambushCount < totalMonsters)
             {
@@ -1385,8 +1384,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.partial_ambush", ambushCount, totalMonsters));
                 terminal.WriteLine("");
                 result.CombatLog.Add($"Partial ambush! {ambushCount}/{totalMonsters} monsters attack first.");
-                BroadcastGroupCombatEvent(result,
-                    $"\u001b[1;33m  *** PARTIAL AMBUSH! {ambushCount} of {totalMonsters} monsters strike first! ***\u001b[0m");
+                BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;33m", "combat.group_ambush_partial", ambushCount, totalMonsters));
             }
             else
             {
@@ -1395,8 +1393,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.full_ambush"));
                 terminal.WriteLine("");
                 result.CombatLog.Add("Ambush! All monsters attack first!");
-                BroadcastGroupCombatEvent(result,
-                    "\u001b[1;31m  *** AMBUSH! Monsters strike before the party can react! ***\u001b[0m");
+                BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;31m", "combat.group_ambush_full"));
             }
 
             // v0.61.2 Last-Stand cap also covers the ambush phase. Capture
@@ -1529,8 +1526,7 @@ public partial class CombatEngine
                             if (hasGroupEarly)
                             {
                                 int hpPctBoss = (int)(bossMonster.HP * 100 / Math.Max(1, bossMonster.MaxHP));
-                                BroadcastGroupCombatEvent(result,
-                                    $"\u001b[1;35m  *** {bossMonster.Name} enters Phase {phase}! ({hpPctBoss}% HP) ***\u001b[0m");
+                                BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;35m", "combat.group_boss_phase", bossMonster.Name, phase, hpPctBoss));
                             }
 
                             // Maelketh spawns minions on phase 2
@@ -1728,7 +1724,7 @@ public partial class CombatEngine
             if (player.IsAlive && monsters.Any(m => m.IsAlive))
             {
                 // Announce leader's turn to group followers
-                BroadcastGroupCombatEvent(result, $"\u001b[1;36m  ── {player.DisplayName}'s turn ──\u001b[0m");
+                BroadcastGroupLocalized(result, lang => $"\u001b[1;36m  ── {Loc.GetIn(lang, "combat.group_leader_turn", player.DisplayName)} ──\u001b[0m");
 
                 CombatAction playerAction;
 
@@ -1896,8 +1892,7 @@ public partial class CombatEngine
                         if (TickPowerSurgeOncePerRound(monster))
                             terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
                         if (hasGroup)
-                            BroadcastGroupCombatEvent(result,
-                                $"\u001b[36m  {monster.Name} hesitates, confused by internal contradictions!\u001b[0m");
+                            BroadcastGroupLocalized(result, lang => GroupLine(lang, "\u001b[36m", "combat.boss_confused", monster.Name));
                         await Pacing.Wait(GetCombatDelay(500));
                         continue;
                     }
@@ -1964,16 +1959,14 @@ public partial class CombatEngine
             {
                 if (!anyGroupedAlive())
                 {
-                    BroadcastGroupCombatEvent(result,
-                        $"\u001b[1;31m  {player.DisplayName} has been slain!\u001b[0m");
+                    BroadcastGroupDeathLine(result, "combat.group_slain", player.DisplayName);
                     break;
                 }
                 // Leader died but grouped players carry on — announce once (via flag)
                 if (!leaderDeathAnnounced)
                 {
                     leaderDeathAnnounced = true;
-                    BroadcastGroupCombatEvent(result,
-                        $"\u001b[1;31m  {player.DisplayName} has fallen! The party fights on!\u001b[0m");
+                    BroadcastGroupDeathLine(result, "combat.group_fallen", player.DisplayName);
                 }
             }
 
@@ -2048,8 +2041,7 @@ public partial class CombatEngine
             }
 
             // Broadcast flee to group followers
-            BroadcastGroupCombatEvent(result,
-                $"\u001b[1;33m  ══ RETREAT ══\u001b[0m\n\u001b[33m  The party retreats from combat!\u001b[0m");
+            BroadcastGroupLocalized(result, GroupRetreatLine);
 
             // Show NPC teammate reactions to fleeing
             if (result.Teammates != null && result.Teammates.Count > 0)
@@ -2111,8 +2103,7 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {Loc.Get("combat.party_fallen", player.DisplayName)}");
                     terminal.WriteLine("");
                 }
-                BroadcastGroupCombatEvent(result,
-                    $"\u001b[1;33m  {player.DisplayName} fell in battle, but the party prevails!\u001b[0m");
+                BroadcastGroupLocalized(result, lang => GroupLine(lang, "\u001b[1;33m", "combat.group_fell_prevails", player.DisplayName));
                 await HandlePlayerDeath(result);
                 CheckGroupLeaderDeath(result);
                 // v1.1.1: Last Stand / Death's Door can rescue the player to 1 HP and rewrite the
@@ -2722,11 +2713,11 @@ public partial class CombatEngine
         terminal.SetColor("bright_yellow");
         terminal.Write(" [A]");
         terminal.SetColor("green");
-        terminal.Write("ttack ");
+        terminal.Write(HotkeyLabel('A', "combat.bbs_attack") + " ");
         terminal.SetColor("bright_yellow");
         terminal.Write("[D]");
         terminal.SetColor("cyan");
-        terminal.Write("efend ");
+        terminal.Write(HotkeyLabel('D', "combat.bbs_defend") + " ");
 
         // Potions (healing and/or mana)
         if (player.Healing > 0 || player.ManaPotions > 0)
@@ -2759,7 +2750,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("[R]");
             terminal.SetColor("white");
-            terminal.Write("etreat ");
+            terminal.Write(HotkeyLabel('R', "combat.bbs_retreat") + " ");
         }
         else if (isPvP)
         {
@@ -2776,11 +2767,11 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write(" [P]");
             terminal.SetColor("darkgray");
-            terminal.Write("ower ");
+            terminal.Write(HotkeyLabel('P', "combat.bbs_power") + " ");
             terminal.SetColor("bright_yellow");
             terminal.Write("[E]");
             terminal.SetColor("darkgray");
-            terminal.Write("xact ");
+            terminal.Write(HotkeyLabel('E', "combat.bbs_exact") + " ");
         }
         terminal.SetColor("bright_yellow");
         terminal.Write("[I]");
@@ -2789,7 +2780,7 @@ public partial class CombatEngine
         terminal.SetColor("bright_yellow");
         terminal.Write("[T]");
         terminal.SetColor("darkgray");
-        terminal.Write("aunt ");
+        terminal.Write(HotkeyLabel('T', "combat.bbs_taunt") + " ");
 
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
@@ -2797,7 +2788,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("[B]");
             terminal.SetColor("dark_green");
-            terminal.Write($"Poison({player.PoisonVials}) ");
+            terminal.Write(Loc.Get("combat.bbs_poison", player.PoisonVials) + " ");
         }
 
         // Herb Pouch
@@ -2806,24 +2797,24 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("[J]");
             terminal.SetColor("bright_green");
-            terminal.Write($"Herbs({player.TotalHerbCount}) ");
+            terminal.Write(Loc.Get("combat.bbs_herbs", player.TotalHerbCount) + " ");
         }
 
         string speedLabel = player.CombatSpeed switch
         {
-            CombatSpeed.Instant => "Inst",
-            CombatSpeed.Fast => "Fast",
-            _ => "Nrml"
+            CombatSpeed.Instant => Loc.Get("combat.bbs_speed_instant"),
+            CombatSpeed.Fast => Loc.Get("combat.bbs_speed_fast"),
+            _ => Loc.Get("combat.bbs_speed_normal")
         };
         terminal.SetColor("bright_yellow");
-        terminal.Write("[AUTO] ");
-        terminal.Write($"[SPD]");
+        terminal.Write(Loc.Get("combat.bbs_auto_key") + " ");
+        terminal.Write(Loc.Get("combat.bbs_speed_key"));
         terminal.SetColor("darkgray");
         terminal.Write($"{speedLabel} ");
         terminal.SetColor("bright_yellow");
         terminal.Write("[S]");
         terminal.SetColor("darkgray");
-        terminal.Write("tats");
+        terminal.Write(HotkeyLabel('S', "combat.bbs_stats"));
         terminal.WriteLine("");
     }
 
@@ -2837,11 +2828,11 @@ public partial class CombatEngine
         terminal.SetColor("bright_yellow");
         terminal.Write(" [A]");
         terminal.SetColor("green");
-        terminal.Write("ttack ");
+        terminal.Write(HotkeyLabel('A', "combat.bbs_attack") + " ");
         terminal.SetColor("bright_yellow");
         terminal.Write("[D]");
         terminal.SetColor("cyan");
-        terminal.Write("efend ");
+        terminal.Write(HotkeyLabel('D', "combat.bbs_defend") + " ");
 
         // Potions (healing and/or mana)
         if (player.Healing > 0 || player.ManaPotions > 0)
@@ -2861,7 +2852,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("[H]");
             terminal.SetColor("green");
-            terminal.Write("ealAlly ");
+            terminal.Write(HotkeyLabel('H', "combat.bbs_heal_ally") + " ");
         }
 
         // Quickbar skills summary
@@ -2873,14 +2864,14 @@ public partial class CombatEngine
                 terminal.SetColor("bright_yellow");
                 terminal.Write("[1-9]");
                 terminal.SetColor("yellow");
-                terminal.Write($"Skills({available.Count}) ");
+                terminal.Write($"{Loc.Get("combat.bar_skills")}({available.Count}) ");
             }
         }
 
         terminal.SetColor("bright_yellow");
         terminal.Write("[R]");
         terminal.SetColor("white");
-        terminal.Write("etreat");
+        terminal.Write(HotkeyLabel('R', "combat.bbs_retreat"));
         terminal.WriteLine("");
 
         // Row 2: Tactical actions + utility
@@ -2888,15 +2879,15 @@ public partial class CombatEngine
         terminal.SetColor("bright_yellow");
         terminal.Write("[P]");
         terminal.SetColor("darkgray");
-        terminal.Write("ower ");
+        terminal.Write(HotkeyLabel('P', "combat.bbs_power") + " ");
         terminal.SetColor("bright_yellow");
         terminal.Write("[E]");
         terminal.SetColor("darkgray");
-        terminal.Write("xact ");
+        terminal.Write(HotkeyLabel('E', "combat.bbs_exact") + " ");
         terminal.SetColor("bright_yellow");
         terminal.Write("[T]");
         terminal.SetColor("darkgray");
-        terminal.Write("aunt ");
+        terminal.Write(HotkeyLabel('T', "combat.bbs_taunt") + " ");
         terminal.SetColor("bright_yellow");
         terminal.Write("[W]");
         terminal.SetColor("darkgray");
@@ -2912,7 +2903,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("[B]");
             terminal.SetColor("dark_green");
-            terminal.Write($"Poison({player.PoisonVials}) ");
+            terminal.Write(Loc.Get("combat.bbs_poison", player.PoisonVials) + " ");
         }
 
         // Herb Pouch
@@ -2921,20 +2912,20 @@ public partial class CombatEngine
             terminal.SetColor("bright_yellow");
             terminal.Write("[J]");
             terminal.SetColor("bright_green");
-            terminal.Write($"Herbs({player.TotalHerbCount}) ");
+            terminal.Write(Loc.Get("combat.bbs_herbs", player.TotalHerbCount) + " ");
         }
 
         if (!isFollower)
         {
             terminal.SetColor("bright_yellow");
-            terminal.Write("[AUTO] ");
+            terminal.Write(Loc.Get("combat.bbs_auto_key") + " ");
             string speedLabel = player.CombatSpeed switch
             {
-                CombatSpeed.Instant => "Inst",
-                CombatSpeed.Fast => "Fast",
-                _ => "Nrml"
+                CombatSpeed.Instant => Loc.Get("combat.bbs_speed_instant"),
+                CombatSpeed.Fast => Loc.Get("combat.bbs_speed_fast"),
+                _ => Loc.Get("combat.bbs_speed_normal")
             };
-            terminal.Write("[SPD]");
+            terminal.Write(Loc.Get("combat.bbs_speed_key"));
             terminal.SetColor("darkgray");
             terminal.Write($"{speedLabel}");
         }
@@ -2975,7 +2966,7 @@ public partial class CombatEngine
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // HP Status line
-        string hpStatus = $"Your HP: {player.HP}/{player.MaxHP}";
+        string hpStatus = Loc.Get("combat.pvp_your_hp", player.HP, player.MaxHP);
         if (monster != null)
         {
             hpStatus += $"  │  {monster.Name}: {monster.HP}";
@@ -3007,7 +2998,7 @@ public partial class CombatEngine
             terminal.SetColor("yellow");
             string statusStr = string.Join(", ", list);
             if (statusStr.Length > 35) statusStr = statusStr.Substring(0, 32) + "...";
-            terminal.Write($"Status: {statusStr,-29}");
+            terminal.Write($"{Loc.Get("combat.status_prefix") + statusStr,-37}");
             terminal.SetColor("green");
             terminal.WriteLine(" ║");
         }
@@ -3231,7 +3222,7 @@ public partial class CombatEngine
         };
         terminal.Write("║ ");
         terminal.SetColor("bright_yellow");
-        terminal.Write("[SPD]  ");
+        terminal.Write(Loc.Get("combat.bbs_speed_key") + "  ");
         terminal.SetColor("darkgray");
         string spdDesc = Loc.Get("combat.speed_label", speedLabel);
         terminal.Write($"{spdDesc,-31}");
@@ -3488,7 +3479,7 @@ public partial class CombatEngine
         {
             terminal.Write("║ ");
             terminal.SetColor("bright_yellow");
-            terminal.Write("[AUTO] ");
+            terminal.Write(Loc.Get("combat.bbs_auto_key") + " ");
             terminal.SetColor("cyan");
             terminal.Write($"{Loc.Get("combat.auto_short"),-31}");
             terminal.SetColor("green");
@@ -3503,7 +3494,7 @@ public partial class CombatEngine
             };
             terminal.Write("║ ");
             terminal.SetColor("bright_yellow");
-            terminal.Write("[SPD]  ");
+            terminal.Write(Loc.Get("combat.bbs_speed_key") + "  ");
             terminal.SetColor("darkgray");
             string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
             terminal.Write($"{spdDesc2,-31}");
@@ -4588,7 +4579,7 @@ public partial class CombatEngine
                 return;
             }
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.poison_already_coated", $"{PoisonData.GetName(player.ActivePoisonType)} ({player.PoisonCoatingCombats} combats remaining)"));
+            terminal.WriteLine(Loc.Get("combat.poison_already_coated", Loc.Get("combat.poison_coating_remaining", PoisonData.GetName(player.ActivePoisonType), player.PoisonCoatingCombats)));
             terminal.Write(Loc.Get("combat.replace_yn"));
             if (!await terminal.AskYesNoAsync(""))
             {
@@ -4623,7 +4614,7 @@ public partial class CombatEngine
             terminal.SetColor(PoisonData.GetColor(poison));
             terminal.Write(PoisonData.GetName(poison));
             terminal.SetColor("gray");
-            terminal.WriteLine($" - {PoisonData.GetDescription(poison)} ({PoisonData.GetCoatingCombats(poison)} combats)");
+            terminal.WriteLine(" - " + Loc.Get("combat.poison_option_combats", PoisonData.GetDescription(poison), PoisonData.GetCoatingCombats(poison)));
         }
 
         terminal.WriteLine("");
@@ -4651,7 +4642,7 @@ public partial class CombatEngine
         terminal.SetColor(PoisonData.GetColor(selectedPoison));
         terminal.WriteLine(Loc.Get("combat.poison_coat", PoisonData.GetName(selectedPoison)));
         terminal.SetColor("dark_green");
-        terminal.WriteLine($"{Loc.Get("combat.poison_glistens")} ({player.PoisonCoatingCombats} combats)");
+        terminal.WriteLine(Loc.Get("combat.poison_glistens_combats", player.PoisonCoatingCombats));
 
         result.CombatLog.Add($"Player coats blade with {PoisonData.GetName(selectedPoison)} ({player.PoisonCoatingCombats} combats)");
         await Pacing.Wait(GetCombatDelay(1500));
@@ -5442,7 +5433,7 @@ public partial class CombatEngine
         if (monsterRoll.Success && StatEffectsSystem.RollDodge(player, random))
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.you_dodge", monster.Name) + $" ({StatEffectsSystem.GetDodgeChance(player.Agility)}% dodge)");
+            terminal.WriteLine(Loc.Get("combat.you_dodge_chance", monster.Name, StatEffectsSystem.GetDodgeChance(player.Agility)));
             result.CombatLog.Add($"Player dodges {monster.Name}'s attack");
             await Pacing.Wait(GetCombatDelay(800));
             return;
@@ -7614,7 +7605,7 @@ public partial class CombatEngine
             {
                 var bossKillerName = result.Player.Name2 ?? result.Player.Name1;
                 _ = OnlineStateManager.Instance!.AddNews(
-                    $"{bossKillerName} defeated the boss {result.Monster.Name}!", "combat");
+                    Loc.Get("combat.news_boss_defeated", bossKillerName, result.Monster.Name), "combat");
             }
         }
 
@@ -9268,7 +9259,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_red");
             terminal.WriteLine(isPlayer
                 ? Loc.Get("combat.enchant_fire", fireDamage)
-                : $"Flames erupt from {name}'s weapon! {fireDamage} fire damage! (Phoenix Fire)");
+                : Loc.Get("combat.enchant_fire_tm", name, fireDamage));
             result.TotalDamageDealt += fireDamage;
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
@@ -9309,13 +9300,13 @@ public partial class CombatEngine
             {
                 terminal.WriteLine(isPlayer
                     ? Loc.Get("combat.enchant_lightning_stun", lightningDamage, target.Name)
-                    : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} is stunned! (Thunderstrike)");
+                    : Loc.Get("combat.enchant_lightning_stun_tm", name, lightningDamage, target.Name));
             }
             else
             {
                 terminal.WriteLine(isPlayer
                     ? Loc.Get("combat.enchant_lightning_resist", lightningDamage, target.Name)
-                    : $"Lightning arcs from {name}'s strike! {lightningDamage} shock damage! {target.Name} resists the stun! (Thunderstrike)");
+                    : Loc.Get("combat.enchant_lightning_resist_tm", name, lightningDamage, target.Name));
             }
             result.TotalDamageDealt += lightningDamage;
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
@@ -32092,6 +32083,45 @@ public partial class CombatEngine
     /// </summary>
     internal static string GroupDeathLine(string lang, string key, string name)
         => $"\u001b[1;31m  {Loc.GetIn(lang, key, name)}\u001b[0m";
+
+    /// <summary>
+    /// v1.2.2: a group combat line in the recipient's language: the ANSI colour, a two space indent, the
+    /// localized text, then the reset.
+    /// </summary>
+    internal static string GroupLine(string lang, string ansi, string key, params object[] args)
+        => $"{ansi}  {Loc.GetIn(lang, key, args)}\u001b[0m";
+
+    /// <summary>v1.2.2: GroupLine with the text between *** marks, for the ambush and boss phase lines.</summary>
+    internal static string GroupStarLine(string lang, string ansi, string key, params object[] args)
+        => $"{ansi}  *** {Loc.GetIn(lang, key, args)} ***\u001b[0m";
+
+    /// <summary>v1.2.2: the retreat banner and line sent to the group, in the recipient's language.</summary>
+    internal static string GroupRetreatLine(string lang)
+        => $"\u001b[1;33m  ══ {Loc.GetIn(lang, "combat.group_retreat_banner")} ══\u001b[0m\n\u001b[33m  {Loc.GetIn(lang, "combat.group_retreat")}\u001b[0m";
+
+    /// <summary>
+    /// v1.2.2: the label after a [X] hotkey in the compact menus. When the localized word starts with the
+    /// hotkey letter, that letter is dropped so it reads "[A]ttack"; otherwise the whole word follows ("[A]Támadás").
+    /// </summary>
+    internal static string HotkeyLabel(char hotkey, string key)
+    {
+        string label = Loc.Get(key);
+        return label.Length > 1 && label[0] == hotkey ? label.Substring(1) : label;
+    }
+
+    /// <summary>
+    /// v1.2.2: BroadcastGroupCombatEvent with each group member reading the message in their own language.
+    /// `build` gets the recipient's language code.
+    /// </summary>
+    private void BroadcastGroupLocalized(CombatResult result, Func<string, string> build)
+    {
+        var ctx = SessionContext.Current;
+        if (ctx == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
+        if (group == null) return;
+        GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(group, build,
+            excludeUsername: ctx.Username, inDungeonOnly: true);
+    }
 
     /// <summary>
     /// v1.2.2: BroadcastGroupCombatEvent for a death line, each group member reading it in their own language.
