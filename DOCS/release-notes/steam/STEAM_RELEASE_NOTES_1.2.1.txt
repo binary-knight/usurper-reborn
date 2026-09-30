@@ -1,0 +1,13 @@
+[h1]Usurper Reborn 1.2.1[/h1]
+
+[list]
+[*]The player wiki is open at /wiki/ on the game website: guides written for players, reference pages generated from the game's own data, and search on every page. Spoilers stay behind disclosures you choose to open.
+[*]New guides for the castle and royalty, the Arena, New Game Plus, the story and the Old Gods, equipment slots, home and family, and Anchor Road.
+[*]On Discord, mention the bot with a question and it answers from the wiki (Ask). When the server enables it, Ask answers in plain language through the Claude API, using only the wiki. Trusted helpers can send corrections with Suggest.
+[*]NPC stat gains from training, Temple blessings and prison activities now last.
+[*]Street fight rage makes only the NPC you fight stronger, for that fight; the town NPC keeps its own stats.
+[*]Admin console edits and wizard /set on an offline player keep their stat changes.
+[*]Iron Rations keeps its max HP bonus through a stat recalculation in the middle of a fight.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.1.md
