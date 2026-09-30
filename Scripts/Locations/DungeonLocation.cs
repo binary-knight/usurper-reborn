@@ -16544,7 +16544,7 @@ public class DungeonLocation : BaseLocation
             var sealFinderName = player.Name2 ?? player.Name1;
             var sealCount = StoryProgressionSystem.Instance.CollectedSeals.Count;
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                $"{sealFinderName} has discovered an ancient Seal! ({sealCount}/7 collected)", "quest");
+                Loc.Get("dungeon.news_seal_found", sealFinderName, sealCount), "quest");
         }
 
         // Mark this seal floor as cleared so player can progress to deeper floors
@@ -18020,7 +18020,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine($"(Combat penalties: {damageModifier}% damage, {defenseModifier}% defense)");
+        terminal.WriteLine(Loc.Get("dungeon.divine_combat_penalties", damageModifier, defenseModifier));
         terminal.WriteLine("");
         await Pacing.Wait(2000);
 
@@ -18153,7 +18153,8 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine(Loc.Get("dungeon.divine_remember_agony", player.Name2));
+        // 1.2.3: wrapped, so a 30-character name keeps the line within 79 columns.
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.divine_remember_agony", player.Name2));
         await Pacing.Wait(1500);
 
         terminal.SetColor("red");
@@ -18189,8 +18190,61 @@ public class DungeonLocation : BaseLocation
         if (ctx == null) return;
         var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
         if (group == null || !group.IsLeader(ctx.Username)) return;
-        GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(group, buildMessage,
+        GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(group, FollowerMessage(buildMessage),
             excludeUsername: ctx.Username, inDungeonOnly: true);
+    }
+
+    /// <summary>1.2.3: a follower's broadcast, built in their language and wrapped to 79 columns.</summary>
+    internal static Func<string, string> FollowerMessage(Func<string, string> buildMessage) =>
+        lang => WrapBroadcast(buildMessage(lang));
+
+    private static readonly System.Text.RegularExpressions.Regex BroadcastLead =
+        new System.Text.RegularExpressions.Regex("^((?:\u001b\\[[0-9;?]*[A-Za-z])*)( *)");
+    private static readonly System.Text.RegularExpressions.Regex BroadcastEscape =
+        new System.Text.RegularExpressions.Regex("\u001b\\[[0-9;?]*[A-Za-z]");
+
+    /// <summary>The color escape still active at the end of `text`, or "" after a reset.</summary>
+    private static string ActiveEscape(string text, string current)
+    {
+        var all = BroadcastEscape.Matches(text);
+        if (all.Count == 0) return current;
+        string last = all[all.Count - 1].Value;
+        return last == "\u001b[0m" ? "" : last;
+    }
+
+    /// <summary>
+    /// 1.2.3: wraps a group broadcast to 79 visible columns per row. A row that fits is left as it is.
+    /// A longer row is word-wrapped: every continuation row repeats the color active at the break and
+    /// the row's leading indent, and ends with a reset. ANSI escapes are not counted.
+    /// </summary>
+    internal static string WrapBroadcast(string message)
+    {
+        if (string.IsNullOrEmpty(message)) return message;
+        const string reset = "\u001b[0m";
+        int width = UsurperRemake.UI.UIHelper.WrapWidth;
+        var sb = new System.Text.StringBuilder();
+        var rows = message.Split('\n');
+        for (int r = 0; r < rows.Length; r++)
+        {
+            if (r > 0) sb.Append('\n');
+            string row = rows[r];
+            if (UsurperRemake.UI.UIHelper.VisibleLength(row) <= width) { sb.Append(row); continue; }
+            var lead = BroadcastLead.Match(row);
+            string colors = lead.Groups[1].Value, indent = lead.Groups[2].Value;
+            string body = row.Substring(lead.Length);
+            bool endsWithReset = body.EndsWith(reset);
+            if (endsWithReset) body = body.Substring(0, body.Length - reset.Length);
+            var parts = UsurperRemake.UI.UIHelper.WordWrap(body, width - indent.Length);
+            string active = ActiveEscape(colors, "");
+            for (int i = 0; i < parts.Count; i++)
+            {
+                if (i > 0) sb.Append('\n');
+                sb.Append(i == 0 ? colors : active).Append(indent).Append(parts[i]);
+                if (endsWithReset || i < parts.Count - 1) sb.Append(reset);
+                active = ActiveEscape(parts[i], active);
+            }
+        }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -18233,15 +18287,16 @@ public class DungeonLocation : BaseLocation
                 mate.Experience += xpShare;
             }
 
-            // Notify grouped player of their share
+            // Notify grouped player of their share, in their language
+            var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+            string shareLang = session?.Context?.Language ?? "en";
             var parts = new System.Collections.Generic.List<string>();
-            if (goldPerMember > 0) parts.Add($"+{goldPerMember:N0} gold");
-            if (xpShare > 0) parts.Add($"+{xpShare:N0} XP");
+            if (goldPerMember > 0) parts.Add(Loc.GetIn(shareLang, "feature.reward_gold_plus", $"{goldPerMember:N0}"));
+            if (xpShare > 0) parts.Add(Loc.GetIn(shareLang, "feature.plus_xp", $"{xpShare:N0}"));
             if (parts.Count > 0)
             {
-                var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
                 session?.EnqueueMessage(
-                    $"\u001b[1;32m  ═══ {source} (Your Share) ═══\u001b[0m\n" +
+                    $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", source)} ═══\u001b[0m\n" +
                     $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
             }
         }
@@ -18250,7 +18305,7 @@ public class DungeonLocation : BaseLocation
         if (goldAmount > 0)
         {
             terminal.SetColor("gray");
-            terminal.WriteLine($"(Gold split {totalMembers} ways: {goldPerMember} each)");
+            terminal.WriteLine(Loc.Get("dungeon.gold_split", totalMembers, goldPerMember));
         }
     }
 
@@ -18266,8 +18321,8 @@ public class DungeonLocation : BaseLocation
         var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
         if (group == null || !group.IsLeader(ctx.Username)) return;
 
-        // Build the shared room portion (same for all followers)
-        string roomAnsi = BuildRoomAnsi(room, ctx.Username);
+        // Build the shared room portion once per follower language
+        var roomAnsiByLang = new Dictionary<string, string>();
 
         // Snapshot teammates for thread safety
         List<Character> teamSnap;
@@ -18278,6 +18333,9 @@ public class DungeonLocation : BaseLocation
             if (mate == null || !mate.IsGroupedPlayer) continue;
             // Show the leader's CHARACTER name in the follower footer, not the raw
             // account username (privacy: account names are not meant to be public).
+            string lang = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "")?.Context?.Language ?? "en";
+            if (!roomAnsiByLang.TryGetValue(lang, out var roomAnsi))
+                roomAnsiByLang[lang] = roomAnsi = BuildRoomAnsi(room, ctx.Username, lang);
             PushRoomToSingleFollower(mate, roomAnsi, currentPlayer?.DisplayName ?? ctx.Username);
         }
     }
@@ -18311,7 +18369,7 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Build the ANSI room description string shared by all followers.
     /// </summary>
-    private string BuildRoomAnsi(DungeonRoom room, string leaderName)
+    private string BuildRoomAnsi(DungeonRoom room, string leaderName, string lang)
     {
         var sb = new System.Text.StringBuilder();
         string tc = GetAnsiThemeColor(currentFloor.Theme);
@@ -18324,9 +18382,9 @@ public class DungeonLocation : BaseLocation
         // Floor/theme/danger/status line
         string stars = new string('*', room.DangerRating) + new string('.', 3 - room.DangerRating);
         string dc = room.DangerRating >= 3 ? "\u001b[91m" : room.DangerRating >= 2 ? "\u001b[93m" : "\u001b[92m";
-        string status = room.IsBossRoom ? " \u001b[91m[BOSS]\u001b[0m"
-            : room.IsCleared ? " \u001b[92m[CLEARED]\u001b[0m"
-            : room.HasMonsters ? " \u001b[91m[DANGER]\u001b[0m" : "";
+        string status = room.IsBossRoom ? $"\u001b[91m{Loc.GetIn(lang, "dungeon.tag_boss")}\u001b[0m"
+            : room.IsCleared ? $" \u001b[92m{Loc.GetIn(lang, "dungeon.tag_cleared")}\u001b[0m"
+            : room.HasMonsters ? $" \u001b[91m{Loc.GetIn(lang, "dungeon.tag_danger")}\u001b[0m" : "";
         sb.AppendLine($"\u001b[90m  Floor {currentDungeonLevel} | {tc}{currentFloor.Theme}\u001b[90m | {dc}{stars}\u001b[0m{status}");
         sb.AppendLine();
 
@@ -18427,9 +18485,10 @@ public class DungeonLocation : BaseLocation
                 if (session != null)
                 {
                     string penalty = groupXPMult < 1.0f ? $" ({(int)(groupXPMult * 100)}%)" : "";
+                    string shareLang = session.Context?.Language ?? "en";
                     session.EnqueueMessage(
-                        $"\u001b[1;32m  ═══ {source} (Your Share) ═══\u001b[0m\n" +
-                        $"\u001b[33m  Gold: +{goldPerMember:N0}  XP: +{memberXP:N0}{penalty}\u001b[0m");
+                        $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", source)} ═══\u001b[0m\n" +
+                        $"\u001b[33m  {Loc.GetIn(shareLang, "dungeon.share_gold_xp", $"{goldPerMember:N0}", $"{memberXP:N0}", penalty)}\u001b[0m");
                 }
             }
             else if (!teammate.IsCompanion && !teammate.IsEcho)
@@ -18493,9 +18552,10 @@ public class DungeonLocation : BaseLocation
         group.CurrentFloor = currentDungeonLevel;
 
         // Notify group followers that leader has entered the dungeon
-        GroupSystem.Instance!.NotifyGroup(group,
-            $"\u001b[1;33m  * Your group leader {currentPlayer?.DisplayName ?? ctx.Username} has entered the dungeon (Floor {currentDungeonLevel})!\u001b[0m" +
-            $"\n\u001b[1;33m  * Go to the Dungeons to join them!\u001b[0m",
+        string enteringLeader = currentPlayer?.DisplayName ?? ctx.Username;
+        GroupSystem.Instance!.NotifyGroup(group, FollowerMessage(lang =>
+            $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.grp_leader_entered", enteringLeader, currentDungeonLevel)}\u001b[0m" +
+            $"\n\u001b[1;33m  {Loc.GetIn(lang, "dungeon.grp_go_join")}\u001b[0m"),
             excludeUsername: ctx.Username);
 
         // Show leader how many slots are available for NPCs
@@ -18518,7 +18578,7 @@ public class DungeonLocation : BaseLocation
             {
                 term.SetColor("yellow");
                 foreach (var r in removed)
-                    term.WriteLine($"  {r.Name2} stays behind to make room for group members.");
+                    term.WriteLine($"  {Loc.Get("dungeon.grp_stays_behind", r.Name2)}");
             }
         }
     }
@@ -18541,7 +18601,7 @@ public class DungeonLocation : BaseLocation
         if (leaderSession?.Context?.LocationManager == null)
         {
             term.SetColor("red");
-            term.WriteLine("  Could not connect to your group leader's dungeon session.");
+            term.WriteLine($"  {Loc.Get("dungeon.grp_no_connect")}");
             await term.PressAnyKey();
             return;
         }
@@ -18550,7 +18610,7 @@ public class DungeonLocation : BaseLocation
         if (leaderDungeon == null)
         {
             term.SetColor("red");
-            term.WriteLine("  Your group leader is not in the dungeon.");
+            term.WriteLine($"  {Loc.Get("dungeon.grp_leader_not_in")}");
             await term.PressAnyKey();
             return;
         }
@@ -18564,7 +18624,7 @@ public class DungeonLocation : BaseLocation
         if (partyFull)
         {
             term.SetColor("yellow");
-            term.WriteLine("  Your group leader's party is full (4 allies maximum).");
+            term.WriteLine($"  {Loc.Get("dungeon.grp_party_full")}");
             await term.PressAnyKey();
             return;
         }
@@ -18595,17 +18655,17 @@ public class DungeonLocation : BaseLocation
         ctx.OnlineState?.UpdateLocation($"Dungeon (Group: {leaderName})");
 
         // Notify leader and group
-        leaderSession.EnqueueMessage(
-            $"\u001b[1;32m  * {myName} has joined your dungeon group!\u001b[0m");
-        GroupSystem.Instance?.NotifyGroup(group,
-            $"\u001b[1;32m  * {myName} has entered the dungeon with the group.\u001b[0m",
+        leaderSession.EnqueueMessage(FollowerMessage(lang =>
+            $"\u001b[1;32m  {Loc.GetIn(lang, "dungeon.grp_joined_your", myName)}\u001b[0m")(leaderSession.Context?.Language ?? "en"));
+        GroupSystem.Instance?.NotifyGroup(group, FollowerMessage(lang =>
+            $"\u001b[1;32m  {Loc.GetIn(lang, "dungeon.grp_entered_with", myName)}\u001b[0m"),
             excludeUsername: ctx.Username);
 
         // Show the current room the leader is in (so follower immediately feels "in" the dungeon)
         var leaderRoom = leaderDungeon.currentFloor?.GetCurrentRoom();
         if (leaderRoom != null)
         {
-            string roomAnsi = leaderDungeon.BuildRoomAnsi(leaderRoom, group.LeaderUsername);
+            string roomAnsi = leaderDungeon.BuildRoomAnsi(leaderRoom, group.LeaderUsername, GameConfig.Language);
             PushRoomToSingleFollower(player, roomAnsi, leaderName);
         }
         else
@@ -18613,7 +18673,7 @@ public class DungeonLocation : BaseLocation
             // Fallback if room not available
             term.ClearScreen();
             term.SetColor("gray");
-            term.WriteLine($"  You join {leaderName}'s group in the dungeon...");
+            term.WriteLine($"  {Loc.Get("dungeon.grp_you_join", leaderName)}");
             term.WriteLine("");
         }
 
@@ -18744,7 +18804,7 @@ public class DungeonLocation : BaseLocation
                 if (trimmed.Length > 0)
                 {
                     term.SetColor("gray");
-                    term.WriteLine($"  Unknown command '{trimmed}'. Use */P/%/Q or /help");
+                    term.WriteLine($"  {Loc.Get("dungeon.follower_unknown_cmd", trimmed)}");
                 }
             }
         }
@@ -18762,7 +18822,7 @@ public class DungeonLocation : BaseLocation
         var room = leaderDungeon.currentFloor?.GetCurrentRoom();
         if (room != null)
         {
-            string roomAnsi = leaderDungeon.BuildRoomAnsi(room, group.LeaderUsername);
+            string roomAnsi = leaderDungeon.BuildRoomAnsi(room, group.LeaderUsername, GameConfig.Language);
             PushRoomToSingleFollower(follower, roomAnsi, leaderDungeon.currentPlayer?.DisplayName ?? group.LeaderUsername);
         }
     }
@@ -18829,33 +18889,33 @@ public class DungeonLocation : BaseLocation
             case "help":
             case "commands":
                 if (GameConfig.ScreenReaderMode)
-                    term.WriteLine("FOLLOWER COMMANDS", "bright_cyan");
+                    term.WriteLine(Loc.Get("dungeon.follower_help_title"), "bright_cyan");
                 else
-                    term.WriteLine("═══ FOLLOWER COMMANDS ═══", "bright_cyan");
+                    term.WriteLine($"═══ {Loc.Get("dungeon.follower_help_title")} ═══", "bright_cyan");
                 term.SetColor("white");
-                term.WriteLine("  Between combats:");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_help_between")}");
                 term.SetColor("yellow");
                 term.Write("    I");
                 term.SetColor("gray");
-                term.WriteLine("  - Inventory (equip/unequip)");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_inventory")}");
                 term.SetColor("yellow");
                 term.Write("    P");
                 term.SetColor("gray");
-                term.WriteLine("  - Use potion (HP or Mana)");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_potion_any")}");
                 term.SetColor("yellow");
                 term.Write("    =");
                 term.SetColor("gray");
-                term.WriteLine("  - Character status");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_status")}");
                 term.SetColor("yellow");
                 term.Write("    Q");
                 term.SetColor("gray");
-                term.WriteLine("  - Leave dungeon");
+                term.WriteLine($"  - {Loc.Get("dungeon.leave_dungeon")}");
                 term.SetColor("white");
-                term.WriteLine("  In combat:");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_help_in_combat")}");
                 term.SetColor("yellow");
                 term.Write("    A");
                 term.SetColor("gray");
-                term.WriteLine("  - Attack (A2=target #2)");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_attack")}");
                 term.SetColor("yellow");
                 term.Write("    C");
                 term.SetColor("gray");
@@ -18863,11 +18923,11 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("yellow");
                 term.Write("    D");
                 term.SetColor("gray");
-                term.WriteLine("  - Defend");
+                term.WriteLine($"  - {Loc.Get("combat.defend")}");
                 term.SetColor("yellow");
                 term.Write("    I");
                 term.SetColor("gray");
-                term.WriteLine("  - Use potion");
+                term.WriteLine($"  - {Loc.Get("dungeon.follower_help_potion")}");
                 term.SetColor("yellow");
                 term.Write("    H");
                 term.SetColor("gray");
@@ -18875,11 +18935,11 @@ public class DungeonLocation : BaseLocation
                 term.SetColor("yellow");
                 term.Write("    R");
                 term.SetColor("gray");
-                term.WriteLine("  - Retreat");
+                term.WriteLine($"  - {Loc.Get("combat.bbs_retreat")}");
                 term.SetColor("yellow");
                 term.Write("    1-9");
                 term.SetColor("gray");
-                term.WriteLine(" - Quickbar (spells/abilities)");
+                term.WriteLine($" - {Loc.Get("dungeon.follower_help_quickbar")}");
                 term.SetColor("darkgray");
                 term.WriteLine($"  {Loc.Get("dungeon.follower_help_heal_targets")}");
                 term.SetColor("white");
@@ -18944,12 +19004,12 @@ public class DungeonLocation : BaseLocation
                 if (activeQuests == null || activeQuests.Count == 0)
                 {
                     term.SetColor("gray");
-                    term.WriteLine("  No active quests.");
+                    term.WriteLine($"  {Loc.Get("dungeon.follower_no_quests")}");
                 }
                 else
                 {
                     term.SetColor("bright_cyan");
-                    term.WriteLine($"  Active Quests ({activeQuests.Count}):");
+                    term.WriteLine($"  {Loc.Get("quest_hall.active")} ({activeQuests.Count}):");
                     foreach (var quest in activeQuests.Take(5))
                     {
                         term.SetColor("yellow");
@@ -18960,7 +19020,7 @@ public class DungeonLocation : BaseLocation
                     if (activeQuests.Count > 5)
                     {
                         term.SetColor("gray");
-                        term.WriteLine($"    ... and {activeQuests.Count - 5} more");
+                        term.WriteLine($"  {Loc.Get("shop.filter_more", activeQuests.Count - 5)}");
                     }
                 }
                 return true;
@@ -18979,29 +19039,29 @@ public class DungeonLocation : BaseLocation
         {
             term.ClearScreen();
             if (GameConfig.ScreenReaderMode)
-                term.WriteLine("INVENTORY", "bright_cyan");
+                term.WriteLine(Loc.Get("inventory.title"), "bright_cyan");
             else
-                term.WriteLine("═══ INVENTORY ═══", "bright_cyan");
+                term.WriteLine($"═══ {Loc.Get("inventory.title")} ═══", "bright_cyan");
             term.WriteLine("");
 
             // Equipped items
             term.SetColor("white");
-            term.WriteLine("  Equipped:");
+            term.WriteLine($"  {Loc.Get("magic_shop.equipped_label")}");
             var slotNames = new (EquipmentSlot slot, string name)[]
             {
-                (EquipmentSlot.MainHand, "Weapon"),
-                (EquipmentSlot.OffHand, "Off-Hand"),
-                (EquipmentSlot.Head, "Head"),
-                (EquipmentSlot.Body, "Body"),
-                (EquipmentSlot.Arms, "Arms"),
-                (EquipmentSlot.Hands, "Hands"),
-                (EquipmentSlot.Legs, "Legs"),
-                (EquipmentSlot.Feet, "Feet"),
-                (EquipmentSlot.Cloak, "Cloak"),
-                (EquipmentSlot.Waist, "Waist"),
-                (EquipmentSlot.Neck, "Neck"),
-                (EquipmentSlot.LFinger, "L.Ring"),
-                (EquipmentSlot.RFinger, "R.Ring"),
+                (EquipmentSlot.MainHand, Loc.Get("inn.equip_slot_weapon")),
+                (EquipmentSlot.OffHand, Loc.Get("inn.equip_slot_off_hand")),
+                (EquipmentSlot.Head, Loc.Get("ui.head")),
+                (EquipmentSlot.Body, Loc.Get("ui.body")),
+                (EquipmentSlot.Arms, Loc.Get("ui.arms")),
+                (EquipmentSlot.Hands, Loc.Get("ui.hands")),
+                (EquipmentSlot.Legs, Loc.Get("ui.legs")),
+                (EquipmentSlot.Feet, Loc.Get("ui.feet")),
+                (EquipmentSlot.Cloak, Loc.Get("ui.cloak")),
+                (EquipmentSlot.Waist, Loc.Get("ui.waist")),
+                (EquipmentSlot.Neck, Loc.Get("ui.neck")),
+                (EquipmentSlot.LFinger, Loc.Get("dungeon.slot_l_ring")),
+                (EquipmentSlot.RFinger, Loc.Get("dungeon.slot_r_ring")),
             };
 
             var equippedList = new List<(EquipmentSlot slot, string name, Equipment equip)>();
@@ -19018,14 +19078,16 @@ public class DungeonLocation : BaseLocation
             if (equippedList.Count == 0)
             {
                 term.SetColor("gray");
-                term.WriteLine("    (nothing equipped)");
+                term.WriteLine($"    {Loc.Get("dungeon.follower_nothing_equipped")}");
             }
             else
             {
+                // Ten columns as before, wider where a slot name in this language is longer.
+                int slotWidth = Math.Max(10, slotNames.Max(s => s.name.Length) + 1);
                 foreach (var (slot, name, equip) in equippedList)
                 {
                     term.SetColor("gray");
-                    term.Write($"    {name,-10}");
+                    term.Write($"    {name.PadRight(slotWidth)}");
                     term.SetColor("yellow");
                     term.WriteLine($"{equip.Name}");
                 }
@@ -19034,11 +19096,11 @@ public class DungeonLocation : BaseLocation
             // Backpack
             term.WriteLine("");
             term.SetColor("white");
-            term.WriteLine("  Backpack:");
+            term.WriteLine($"  {Loc.Get("dungeon.follower_backpack")}");
             if (player.Inventory.Count == 0)
             {
                 term.SetColor("gray");
-                term.WriteLine("    (empty)");
+                term.WriteLine($"  {Loc.Get("inventory.backpack_empty")}");
             }
             else
             {
@@ -19053,7 +19115,7 @@ public class DungeonLocation : BaseLocation
 
             term.WriteLine("");
             term.SetColor("yellow");
-            term.WriteLine($"  Gold: {player.Gold:N0}    HP Potions: {player.Healing}  MP Potions: {player.ManaPotions}");
+            term.WriteLine($"  {Loc.Get("dungeon.follower_inv_totals", $"{player.Gold:N0}", player.Healing, player.ManaPotions)}");
 
             // Show equip/unequip options
             bool hasBackpackItems = player.Inventory.Count > 0;
@@ -19113,13 +19175,13 @@ public class DungeonLocation : BaseLocation
                     else
                     {
                         term.SetColor("red");
-                        term.WriteLine($"  Cannot equip: {equipMsg}");
+                        term.WriteLine($"  {Loc.Get("inventory.cannot_equip", equipMsg)}");
                     }
                 }
                 else
                 {
                     term.SetColor("red");
-                    term.WriteLine($"  {item.Name} cannot be equipped.");
+                    term.WriteLine($"  {Loc.Get("dungeon.follower_cannot_be_equipped", item.Name)}");
                 }
                 await Pacing.Wait(1500);
                 continue;
@@ -19129,7 +19191,7 @@ public class DungeonLocation : BaseLocation
             if (trimChoice.Equals("U", StringComparison.OrdinalIgnoreCase) && hasEquippedItems)
             {
                 term.SetColor("white");
-                term.WriteLine("  Choose slot to unequip:");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_choose_unequip")}");
                 for (int i = 0; i < equippedList.Count; i++)
                 {
                     term.SetColor("gray");
@@ -19140,7 +19202,7 @@ public class DungeonLocation : BaseLocation
                     term.WriteLine(equippedList[i].equip.Name);
                 }
                 term.SetColor("gray");
-                term.Write("  Unequip #: ");
+                term.Write($"  {Loc.Get("dungeon.follower_unequip_prompt")}");
                 var unequipChoice = await term.GetInput("");
                 if (int.TryParse(unequipChoice.Trim(), out int slotNum) &&
                     slotNum >= 1 && slotNum <= equippedList.Count)
@@ -19154,12 +19216,12 @@ public class DungeonLocation : BaseLocation
                         player.RecalculateStats();
 
                         term.SetColor("bright_yellow");
-                        term.WriteLine($"  Unequipped {unequipped.Name} to backpack.");
+                        term.WriteLine($"  {Loc.Get("dungeon.follower_unequipped", unequipped.Name)}");
                     }
                     else
                     {
                         term.SetColor("red");
-                        term.WriteLine("  Cannot unequip (item may be cursed).");
+                        term.WriteLine($"  {Loc.Get("dungeon.follower_cannot_unequip")}");
                     }
                     await Pacing.Wait(1000);
                 }
@@ -19183,12 +19245,12 @@ public class DungeonLocation : BaseLocation
             if (player.Healing <= 0 && player.ManaPotions <= 0)
             {
                 term.SetColor("red");
-                term.WriteLine("  You have no potions.");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_no_potions")}");
             }
             else
             {
                 term.SetColor("green");
-                term.WriteLine("  HP and Mana are already full.");
+                term.WriteLine($"  {Loc.Get("dungeon.follower_hp_mana_full")}");
             }
             await Pacing.Wait(1500);
             return;
@@ -19198,9 +19260,9 @@ public class DungeonLocation : BaseLocation
         if (hasHealPots && hasManaPots)
         {
             term.SetColor("white");
-            term.WriteLine($"  [H] Healing potion ({player.Healing} left)  [M] Mana potion ({player.ManaPotions} left)");
+            term.WriteLine($"  {Loc.Get("dungeon.follower_potion_choice", player.Healing, player.ManaPotions)}");
             term.SetColor("gray");
-            term.Write("  Choose: ");
+            term.Write($"  {Loc.Get("dungeon.choose")}");
             var choice = await term.GetInput("");
             useMana = choice.Trim().Equals("M", StringComparison.OrdinalIgnoreCase);
         }
@@ -19218,9 +19280,9 @@ public class DungeonLocation : BaseLocation
             player.ManaPotions--;
 
             term.SetColor("bright_blue");
-            term.WriteLine($"  You drink a mana potion and recover {actualMana:N0} MP!");
+            term.WriteLine($"  {Loc.Get("combat.drink_mana_potion", $"{actualMana:N0}")}");
             term.SetColor("cyan");
-            term.WriteLine($"  Mana: {player.Mana}/{player.MaxMana}    Mana Potions: {player.ManaPotions}");
+            term.WriteLine($"  {Loc.Get("dungeon.follower_mana_line", player.Mana, player.MaxMana, player.ManaPotions)}");
         }
         else
         {
@@ -19341,9 +19403,11 @@ public class DungeonLocation : BaseLocation
         mySession.GroupLeaderSession = null;
 
         // Notify leader (follower left the dungeon, not necessarily the group)
-        leaderSession.EnqueueMessage(player.PendingGroupDeath != null
-            ? $"\u001b[1;31m  {Loc.Get("group.follower_left_dead", player.DisplayName)}\u001b[0m"
-            : $"\u001b[1;33m  * {player.DisplayName} has left the dungeon.\u001b[0m");
+        // 1.2.3: in the leader's language (this runs in the follower's session).
+        string leaderLang = leaderSession.Context?.Language ?? "en";
+        leaderSession.EnqueueMessage(WrapBroadcast(player.PendingGroupDeath != null
+            ? $"\u001b[1;31m  {Loc.GetIn(leaderLang, "group.follower_left_dead", player.DisplayName)}\u001b[0m"
+            : $"\u001b[1;33m  {Loc.GetIn(leaderLang, "dungeon.grp_member_left", player.DisplayName)}\u001b[0m"));
     }
 
     /// <summary>
@@ -19379,13 +19443,13 @@ public class DungeonLocation : BaseLocation
                 {
                     followerSession.IsGroupFollower = false; // breaks the while loop
                     followerSession.EnqueueMessage(
-                        "\u001b[1;33m  * The leader has left the dungeon. Returning to town...\u001b[0m");
+                        $"\u001b[1;33m  {Loc.GetIn(followerSession.Context?.Language ?? "en", "dungeon.grp_leader_left")}\u001b[0m");
                 }
             }
 
             // Notify group (including non-dungeon members)
-            GroupSystem.Instance?.NotifyGroup(group,
-                $"\u001b[1;33m  * {player.DisplayName} has left the dungeon. The dungeon run is over.\u001b[0m",
+            GroupSystem.Instance?.NotifyGroup(group, FollowerMessage(lang =>
+                $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.grp_run_over", player.DisplayName)}\u001b[0m"),
                 excludeUsername: ctx.Username);
         }
     }

@@ -451,4 +451,379 @@ public class DungeonLocB123Tests
         L("en", "dungeon.camp_header").Should().Be("Safe Haven Camp");
         Hu("dungeon.camp_header").Should().NotBe("Safe Haven Camp");
     }
+
+    // ---------- 10. the Seal news line ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void SealNews_IsInLanguage_AndFits(string lang)
+    {
+        string line = L(lang, "dungeon.news_seal_found", LongName, 7);
+        Capture($"dungeon-b-seal-news-{lang}.txt", line);
+        line.Length.Should().BeLessOrEqualTo(MaxWidth, line);
+        if (lang == "hu") line.Should().NotContain("has discovered");
+        Src().Should().Contain("Loc.Get(\"dungeon.news_seal_found\", sealFinderName, sealCount)").And.NotContain("has discovered an ancient Seal");
+    }
+
+    // ---------- 11. the divine punishment's combat penalties ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task DivinePenalties_RenderInLanguage_AndFit(string lang)
+    {
+        string text = "";
+        for (int seed = 0; seed < 50 && !text.Contains(L(lang, "dungeon.divine_combat_penalties", -30, -30)); seed++)
+        {
+            text = await InLanguage(lang, async () =>
+            {
+                var (term, output) = Term("\n\n\n\n");
+                var hero = Hero();
+                hero.DivineWrathPending = true;
+                hero.DivineWrathLevel = 3;
+                var d = Dungeon(term, hero, 100);
+                typeof(DungeonLocation).GetField("dungeonRandom", F)!.SetValue(d, new Random(seed));
+                await (Task)typeof(DungeonLocation).GetMethod("CheckDivinePunishment", F)!.Invoke(d, new object[] { hero })!;
+                return Shown(term, output);
+            });
+        }
+        Capture($"dungeon-b-divine-penalties-{lang}.txt", text);
+        text.Should().Contain(L(lang, "dungeon.divine_combat_penalties", -30, -30));
+        if (lang == "hu") text.Should().NotContain("Combat penalties");
+        EveryRowFits(text, "divine punishment");
+    }
+
+    // ---------- 12. the reward share notices ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void RewardShares_AreInTheMatesLanguage_AndFit(string lang)
+    {
+        string source = "Lost Explorer Rescue";
+        string text = string.Join("\n",
+            $"  ═══ {L(lang, "dungeon.feature_your_share", source)} ═══",
+            $"  {L(lang, "feature.reward_gold_plus", $"{Big:N0}")}  {L(lang, "feature.plus_xp", $"{Big:N0}")}",
+            $"  {L(lang, "dungeon.share_gold_xp", $"{Big:N0}", $"{Big:N0}", " (50%)")}",
+            L(lang, "dungeon.gold_split", 5, Big));
+        Capture($"dungeon-b-shares-{lang}.txt", text);
+        EveryRowFits(text, "reward share");
+        if (lang == "hu") text.Should().NotContain("Your Share").And.NotContain("Gold split").And.NotContain("Gold:");
+        if (lang == "en") L("en", "dungeon.share_gold_xp", "1", "2", " (50%)").Should().Be("Gold: +1  XP: +2 (50%)");
+
+        string src = Src();
+        src.Should().NotContain("(Your Share)").And.NotContain("Gold split").And.NotContain("  Gold: +{goldPerMember");
+        src.Should().Contain("string shareLang = session?.Context?.Language ?? \"en\";")
+            .And.Contain("string shareLang = session.Context?.Language ?? \"en\";");
+    }
+
+    // ---------- 13. the follower room view status tags ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void FollowerRoomView_TagsInTheFollowersLanguage_AndFit(string lang)
+    {
+        var boss = new DungeonRoom { Id = "b1", Name = new string('B', 52), Description = "A throne room.", DangerRating = 3, IsBossRoom = true, HasMonsters = true, IsExplored = true };
+        var cleared = new DungeonRoom { Id = "c1", Name = "Crypt", Description = "A crypt.", DangerRating = 3, IsExplored = true, IsCleared = true };
+        var danger = new DungeonRoom { Id = "d1", Name = "Pit", Description = "A pit.", DangerRating = 3, IsExplored = true, HasMonsters = true };
+        var floor = new DungeonFloor { Level = 100, Theme = DungeonTheme.AbyssalVoid, CurrentRoomId = "b1" };
+        floor.Rooms.AddRange(new[] { boss, cleared, danger });
+        var (term, _) = Term();
+        var d = Dungeon(term, Hero(), 100, floor);
+        var build = typeof(DungeonLocation).GetMethod("BuildRoomAnsi", F)!;
+        var views = new[] { boss, cleared, danger }.Select(r => Strip((string)build.Invoke(d, new object[] { r, "leader", lang })!)).ToList();
+        string text = string.Join("\n", views);
+        Capture($"dungeon-b-follower-room-{lang}.txt", text);
+        views[0].Should().Contain(L(lang, "dungeon.tag_boss"));
+        views[1].Should().Contain(" " + L(lang, "dungeon.tag_cleared"));
+        views[2].Should().Contain(" " + L(lang, "dungeon.tag_danger"));
+        if (lang == "en") views[0].Should().Contain("*** [BOSS]", "the English row is unchanged");
+        if (lang == "hu") text.Should().NotContain("[BOSS]").And.NotContain("[CLEARED]").And.NotContain("[DANGER]");
+        EveryRowFits(text, "follower room view");
+        Src().Should().Contain("roomAnsiByLang[lang] = roomAnsi = BuildRoomAnsi(room, ctx.Username, lang);");
+    }
+
+    // ---------- 14. the group notices, built per member and wrapped ----------
+
+    private static readonly (string key, object[] args, string color)[] Notices =
+    {
+        ("dungeon.grp_leader_entered", new object[] { LongName, 100 }, "\u001b[1;33m"),
+        ("dungeon.grp_go_join", Array.Empty<object>(), "\u001b[1;33m"),
+        ("dungeon.grp_joined_your", new object[] { LongName }, "\u001b[1;32m"),
+        ("dungeon.grp_entered_with", new object[] { LongName }, "\u001b[1;32m"),
+        ("dungeon.grp_member_left", new object[] { LongName }, "\u001b[1;33m"),
+        ("dungeon.grp_leader_left", Array.Empty<object>(), "\u001b[1;33m"),
+        ("dungeon.grp_run_over", new object[] { LongName }, "\u001b[1;33m"),
+        ("group.follower_left_dead", new object[] { LongName }, "\u001b[1;31m"),
+    };
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void GroupNotices_RenderInLanguage_AndFitWhenWrapped(string lang)
+    {
+        var sb = new StringBuilder();
+        foreach (var (key, args, color) in Notices)
+            sb.AppendLine(Strip(DungeonLocation.FollowerMessage(l => $"{color}  {L(l, key, args)}\u001b[0m")(lang)));
+        string text = sb.ToString();
+        Capture($"dungeon-b-group-notices-{lang}.txt", text);
+        EveryRowFits(text, "group notice");
+        if (lang == "hu") text.Should().NotContain("has left the dungeon").And.NotContain("Your group leader");
+
+        string src = Src();
+        foreach (var key in new[] { "dungeon.grp_leader_entered", "dungeon.grp_go_join", "dungeon.grp_entered_with", "dungeon.grp_run_over" })
+            src.Should().Contain($"Loc.GetIn(lang, \"{key}\"", key);
+        src.Should().Contain("Loc.GetIn(leaderLang, \"dungeon.grp_member_left\"").And.Contain("Loc.GetIn(leaderLang, \"group.follower_left_dead\"");
+        src.Should().Contain("(leaderSession.Context?.Language ?? \"en\")");
+        src.Should().Contain("Loc.GetIn(followerSession.Context?.Language ?? \"en\", \"dungeon.grp_leader_left\")");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void FollowerTerminalLines_AreInLanguage_AndFit(string lang)
+    {
+        var lines = new[]
+        {
+            "  " + L(lang, "dungeon.grp_stays_behind", "Seraphina Lightbringer"),
+            "  " + L(lang, "dungeon.grp_no_connect"),
+            "  " + L(lang, "dungeon.grp_leader_not_in"),
+            "  " + L(lang, "dungeon.grp_party_full"),
+            "  " + L(lang, "dungeon.grp_you_join", LongName),
+            "  " + L(lang, "dungeon.follower_unknown_cmd", "abcdefghijklmnop"),
+        };
+        string text = string.Join("\n", lines);
+        Capture($"dungeon-b-follower-lines-{lang}.txt", text);
+        EveryRowFits(text, "follower lines");
+        if (lang == "hu") text.Should().NotContain("group leader").And.NotContain("Unknown command");
+    }
+
+    // ---------- 15. the follower help, quests, inventory and potions ----------
+
+    private static Character Follower()
+    {
+        var p = new Character { Name1 = LongName, Name2 = LongName, Class = CharacterClass.Magician, Level = 100, HP = 10, MaxHP = Big,
+            Mana = 10, MaxMana = Big, Gold = 999_999_999, AI = CharacterAI.Human };
+        p.Healing = 20; p.ManaPotions = 20;
+        return p;
+    }
+
+    private static async Task<string> FollowerCommand(string lang, string command, Character player)
+    {
+        return await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term();
+            var leader = Dungeon(Term().term, Hero(), 100);
+            var m = typeof(DungeonLocation).GetMethod("ProcessFollowerSlashCommand", FS)!;
+            bool handled = await (Task<bool>)m.Invoke(null, new object[] { command, player, term, leader })!;
+            handled.Should().BeTrue(command);
+            return Shown(term, output);
+        });
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task FollowerHelp_RendersInLanguage_AndFits(string lang)
+    {
+        string text = await FollowerCommand(lang, "/help", Follower());
+        Capture($"dungeon-b-follower-help-{lang}.txt", text);
+        text.Should().Contain($"═══ {L(lang, "dungeon.follower_help_title")} ═══");
+        foreach (var key in new[] { "dungeon.follower_help_inventory", "dungeon.follower_help_potion_any", "dungeon.follower_help_status",
+                     "dungeon.leave_dungeon", "dungeon.follower_help_attack", "combat.defend", "dungeon.follower_help_potion", "combat.bbs_retreat" })
+            text.Should().Contain("  - " + L(lang, key), key);
+        text.Should().Contain(" - " + L(lang, "dungeon.follower_help_quickbar"));
+        text.Should().Contain("  " + L(lang, "dungeon.follower_help_between")).And.Contain("  " + L(lang, "dungeon.follower_help_in_combat"));
+        text.Should().Contain("    /party  /stats  /health  /gold  /quests", "slash command names are what the player types");
+        if (lang == "hu") text.Should().NotContain("FOLLOWER COMMANDS").And.NotContain("Between combats").And.NotContain("Retreat");
+        EveryRowFits(text, "follower help");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task FollowerQuests_RenderInLanguage_AndFit(string lang)
+    {
+        string text = await FollowerCommand(lang, "/quests", Follower());
+        Capture($"dungeon-b-follower-quests-{lang}.txt", text);
+        text.Should().Contain("  " + L(lang, "dungeon.follower_no_quests"));
+        string more = $"  {L(lang, "quest_hall.active")} ({Big}):\n  {L(lang, "shop.filter_more", Big)}";
+        EveryRowFits(text + "\n" + more, "follower quests");
+        if (lang == "hu") text.Should().NotContain("No active quests");
+        L("en", "shop.filter_more", 3).Should().Be("  ... and 3 more");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task FollowerInventory_RendersInLanguage_AndFits(string lang)
+    {
+        // Every slot holds the equipment with the longest name; the backpack holds it too.
+        var longest = EquipmentDatabase.GetAll().OrderByDescending(e => e.Name.Length).First();
+        var player = Follower();
+        foreach (var slot in new[] { EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Arms,
+                     EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Cloak, EquipmentSlot.Waist, EquipmentSlot.Neck,
+                     EquipmentSlot.LFinger, EquipmentSlot.RFinger })
+            player.EquippedItems[slot] = longest.Id;
+        player.Inventory.Add(new Item { Name = longest.Name });
+        string text = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term("U\n\n\n");
+            await (Task)typeof(DungeonLocation).GetMethod("ShowFollowerInventory", FS)!.Invoke(null, new object[] { player, term })!;
+            return Shown(term, output);
+        });
+        Capture($"dungeon-b-follower-inventory-{lang}.txt", text);
+        text.Should().Contain($"═══ {L(lang, "inventory.title")} ═══");
+        text.Should().Contain("  " + L(lang, "magic_shop.equipped_label")).And.Contain("  " + L(lang, "dungeon.follower_backpack"));
+        foreach (var key in new[] { "inn.equip_slot_weapon", "inn.equip_slot_off_hand", "ui.waist", "dungeon.slot_l_ring", "dungeon.slot_r_ring" })
+            text.Should().Contain("    " + L(lang, key), key);
+        text.Should().Contain("  " + L(lang, "dungeon.follower_inv_totals", "999,999,999", 20, 20));
+        text.Should().Contain("  " + L(lang, "dungeon.follower_choose_unequip")).And.Contain("  " + L(lang, "dungeon.follower_unequip_prompt"));
+        // The slot column: at least ten wide, and wider where this language's longest slot name needs it.
+        var slotNames = new[] { "inn.equip_slot_weapon", "inn.equip_slot_off_hand", "ui.head", "ui.body", "ui.arms", "ui.hands", "ui.legs",
+            "ui.feet", "ui.cloak", "ui.waist", "ui.neck", "dungeon.slot_l_ring", "dungeon.slot_r_ring" }.Select(k => L(lang, k)).ToList();
+        int width = Math.Max(10, slotNames.Max(n => n.Length) + 1);
+        text.Should().Contain("    " + L(lang, "inn.equip_slot_weapon").PadRight(width) + longest.Name);
+        if (lang == "en") text.Should().Contain("    Weapon    " + longest.Name, "the English column is ten wide as before");
+        if (lang == "hu") text.Should().NotContain("Equipped:").And.NotContain("Backpack:").And.NotContain("L.Ring").And.NotContain("HP Potions");
+        EveryRowFits(text, "follower inventory");
+
+        var other = new[]
+        {
+            "    " + L(lang, "dungeon.follower_nothing_equipped"),
+            "  " + L(lang, "inventory.backpack_empty"),
+            "  " + L(lang, "inventory.cannot_equip", "You need level 100 to use this."),
+            "  " + L(lang, "dungeon.follower_cannot_be_equipped", longest.Name),
+            "  " + L(lang, "dungeon.follower_unequipped", longest.Name),
+            "  " + L(lang, "dungeon.follower_cannot_unequip"),
+        };
+        EveryRowFits(string.Join("\n", other), "follower inventory messages");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task FollowerPotions_RenderInLanguage_AndFit(string lang)
+    {
+        var m = typeof(DungeonLocation).GetMethod("UseFollowerPotion", FS)!;
+        string both = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term("M\n");
+            await (Task)m.Invoke(null, new object[] { Follower(), term })!;
+            return Shown(term, output);
+        });
+        string none = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term();
+            var p = Follower(); p.Healing = 0; p.ManaPotions = 0;
+            await (Task)m.Invoke(null, new object[] { p, term })!;
+            return Shown(term, output);
+        });
+        string full = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term();
+            var p = Follower(); p.HP = p.MaxHP; p.Mana = p.MaxMana;
+            await (Task)m.Invoke(null, new object[] { p, term })!;
+            return Shown(term, output);
+        });
+        string text = both + "\n" + none + "\n" + full;
+        Capture($"dungeon-b-follower-potions-{lang}.txt", text);
+        text.Should().Contain("  " + L(lang, "dungeon.follower_potion_choice", 20, 20));
+        text.Should().Contain("  " + L(lang, "dungeon.choose"));
+        text.Should().MatchRegex(Regex.Escape("  " + L(lang, "combat.drink_mana_potion", "X")).Replace("X", "[0-9,]+"));
+        text.Should().MatchRegex(Regex.Escape("  " + L(lang, "dungeon.follower_mana_line", "X", Big, 19)).Replace("X", "[0-9]+"), "the mana line");
+        text.Should().Contain("  " + L(lang, "dungeon.follower_no_potions")).And.Contain("  " + L(lang, "dungeon.follower_hp_mana_full"));
+        if (lang == "hu") text.Should().NotContain("Healing potion").And.NotContain("You have no potions").And.NotContain("Mana Potions:");
+        EveryRowFits(text + "\n  " + L(lang, "dungeon.follower_mana_line", Big, Big, Big), "follower potions");
+    }
+
+    // ---------- 16. every dungeon broadcast wraps to 79 columns in every language ----------
+
+    private static readonly Dictionary<string, object[]> BroadcastArgs = new()
+    {
+        ["dungeon.bc_trap"] = Array.Empty<object>(),
+        ["dungeon.bc_trap_evaded"] = new object[] { LongName },
+        ["dungeon.bc_trap_pit"] = new object[] { LongName, Big },
+        ["dungeon.bc_trap_darts"] = new object[] { LongName, Big },
+        ["dungeon.bc_trap_fire"] = new object[] { LongName, Big },
+        ["dungeon.bc_trap_acid"] = new object[] { LongName, Big },
+        ["dungeon.bc_trap_curse_resisted"] = new object[] { LongName },
+        ["dungeon.bc_trap_curse_drain"] = new object[] { LongName, Big },
+        ["dungeon.bc_trap_salvage"] = new object[] { LongName, Big },
+        ["dungeon.bc_boss_encounter"] = new object[] { "3 Skeletons, Bone Lord" },
+        ["dungeon.bc_combat"] = new object[] { "3 Skeletons, 2 Goblins" },
+        ["dungeon.bc_party_treasure"] = Array.Empty<object>(),
+        ["dungeon.bc_descends"] = new object[] { 100, DungeonTheme.AncientRuins },
+        ["dungeon.bc_chest_opened"] = Array.Empty<object>(),
+        ["dungeon.bc_chest_trapped"] = Array.Empty<object>(),
+        ["dungeon.bc_chest_mimic"] = Array.Empty<object>(),
+        ["dungeon.bc_shrine_healed"] = new object[] { LongName },
+        ["dungeon.bc_shrine_strength"] = new object[] { LongName, Big },
+        ["dungeon.bc_shrine_exp"] = new object[] { LongName, Big },
+        ["dungeon.bc_shrine_nothing"] = new object[] { LongName },
+        ["dungeon.bc_shrine_hp"] = new object[] { LongName, Big },
+        ["dungeon.bc_shrine_gold"] = new object[] { LongName, Big },
+        ["dungeon.bc_pixie_blessing"] = new object[] { LongName },
+        ["dungeon.bc_pixie_cursed"] = new object[] { LongName },
+        ["dungeon.bc_map_revealed"] = new object[] { LongName },
+        ["dungeon.bc_explorer_robbed"] = new object[] { LongName, Big },
+        ["dungeon.bc_explorer_rescued"] = new object[] { LongName, Big },
+        ["dungeon.bc_settlement_arrive"] = new object[] { "The Bonewright's Forge" },
+        ["dungeon.bc_settlement_healed"] = new object[] { LongName, "The Bonewright's Forge" },
+        ["dungeon.bc_settlement_lore"] = new object[] { "Durgan Bonewright" },
+        ["dungeon.bc_safe_haven_rest"] = Array.Empty<object>(),
+        ["dungeon.bc_vision_floor"] = Array.Empty<object>(),
+        ["dungeon.bc_time_warp"] = new object[] { LongName, Big },
+        ["dungeon.bc_gold_rain"] = new object[] { LongName, Big },
+    };
+
+    public static IEnumerable<object[]> Languages() => new[] { "en", "es", "fr", "hu", "it" }.Select(l => new object[] { l });
+
+    [Theory]
+    [MemberData(nameof(Languages))]
+    public void EveryDungeonBroadcast_WrapsTo79_AndKeepsItsText(string lang)
+    {
+        LongName.Length.Should().Be(GameConfig.MaxNameLength, "the check uses the longest player name");
+        var enJson = System.Text.Json.JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Localization", "en.json")));
+        var bcKeys = enJson.RootElement.EnumerateObject().Select(p => p.Name).Where(k => k.StartsWith("dungeon.bc_")).ToList();
+        bcKeys.Should().HaveCountGreaterOrEqualTo(34);
+        bcKeys.Should().BeSubsetOf(BroadcastArgs.Keys, "every dungeon broadcast key has worst case arguments here");
+
+        var sb = new StringBuilder();
+        int wrapped = 0;
+        foreach (var key in bcKeys)
+        {
+            string raw = $"\u001b[33m  {L(lang, key, BroadcastArgs[key])}\u001b[0m";
+            string sent = DungeonLocation.FollowerMessage(l => $"\u001b[33m  {L(l, key, BroadcastArgs[key])}\u001b[0m")(lang);
+            var rows = sent.Split('\n');
+            if (rows.Length > 1) wrapped++;
+            foreach (var row in rows)
+            {
+                row.Should().StartWith("\u001b[33m  ", $"{key} keeps its color and indent on every row");
+                Strip(row).Length.Should().BeLessOrEqualTo(MaxWidth, $"{key} in {lang}: \"{Strip(row)}\"");
+                sb.AppendLine(Strip(row));
+            }
+            string.Join(" ", rows.Select(r => Strip(r).Substring(2))).Should().Be(Strip(raw).Substring(2), $"{key} keeps its text");
+        }
+        Capture($"dungeon-b-broadcasts-wrapped-{lang}.txt", sb.ToString());
+        if (lang == "en") wrapped.Should().BeGreaterThan(0, "at the longest name some English broadcasts need a second row");
+    }
+
+    [Fact]
+    public void BroadcastOverload_SendsTheWrappedMessage()
+    {
+        Src().Should().Contain("BroadcastToAllGroupSessionsLocalized(group, FollowerMessage(buildMessage),");
+        // A row that fits is sent as it is, double spaces and all.
+        string fits = "\u001b[32m  +5 HP  +3 MP\u001b[0m";
+        DungeonLocation.WrapBroadcast(fits).Should().Be(fits);
+        // A long row wraps; the color active at the break carries to the next row.
+        string mixed = "\u001b[33m  " + string.Join(" ", Enumerable.Repeat("gold", 12)) + " \u001b[36m" + string.Join(" ", Enumerable.Repeat("cyan", 12)) + "\u001b[0m";
+        var rows = DungeonLocation.WrapBroadcast(mixed).Split('\n');
+        rows.Should().HaveCount(2);
+        rows[1].Should().StartWith("\u001b[36m  cyan");
+        rows[0].Should().EndWith("\u001b[0m");
+    }
 }
