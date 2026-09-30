@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -146,9 +147,9 @@ public class CombatLocA122Tests
     {
         string text = await WithLanguage("hu", RenderBbsMenus);
         Capture("combat-a-bbs-menu-hu.txt", text);
-        text.Should().Contain("[A]Támadás").And.Contain("[D]Védekezés").And.Contain("[R]Menekülés")
-            .And.Contain("[P]Erő").And.Contain("[E]Pontos").And.Contain("[T]Gúnyolódás").And.Contain("[S]Adatok")
-            .And.Contain("[H]Társgyógyítás").And.Contain("Méreg(2)").And.Contain("Képességek(1)").And.Contain("[SPD]Norm");
+        text.Should().Contain("[A]Támadás").And.Contain("[D]Védés").And.Contain("[R]Menekülés")
+            .And.Contain("[P]Erő").And.Contain("[E]Pontos").And.Contain("[T]Gúny").And.Contain("[S]Adatok")
+            .And.Contain("[H]Gyógyít").And.Contain("Méreg(2)").And.Contain("Képess.(1)").And.Contain("[SPD]Norm");
         foreach (var english in new[] { "ttack", "efend", "etreat", "ower ", "xact", "aunt", "tats", "ealAlly", "Poison(", "Skills(", "Nrml" })
             text.Should().NotContain(english);
     }
@@ -158,8 +159,8 @@ public class CombatLocA122Tests
     {
         string text = await WithLanguage("es", RenderBbsMenus);
         Capture("combat-a-bbs-menu-es.txt", text);
-        text.Should().Contain("[A]tacar").And.Contain("[D]efender").And.Contain("[R]etirarse").And.Contain("[P]otente")
-            .And.Contain("[E]xacto").And.Contain("[T]Provocar").And.Contain("[S]Estado").And.Contain("Veneno(2)");
+        text.Should().Contain("[A]tacar").And.Contain("[D]efensa").And.Contain("[R]etirada").And.Contain("[P]oder")
+            .And.Contain("[E]xacto").And.Contain("[T]Burla").And.Contain("[S]Estado").And.Contain("Veneno(2)");
         foreach (var english in new[] { "[A]ttack", "[D]efend ", "[R]etreat", "[P]ower", "[E]xact ", "[T]aunt", "[S]tats", "Poison(", "Nrml" })
             text.Should().NotContain(english);
     }
@@ -171,6 +172,64 @@ public class CombatLocA122Tests
         text.Should().Contain(" [A]ttack [D]efend ").And.Contain("[R]etreat ").And.Contain("[P]ower [E]xact ")
             .And.Contain("[T]aunt ").And.Contain("[B]Poison(2) ").And.Contain("[AUTO] [SPD]Nrml [S]tats")
             .And.Contain("[H]ealAlly ").And.Contain("[1-9]Skills(1) ");
+    }
+
+    // ---------- 2b. the compact menus fit an 80 column terminal in every language ----------
+
+    public static IEnumerable<object[]> AllLanguages() => new[] { "en", "es", "fr", "hu", "it" }.Select(l => new object[] { l });
+
+    /// <summary>Renders both compact menus; `worst` turns on every optional item with two digit counts.</summary>
+    private static (string single, string dungeon) RenderBbsMenusSeparately(bool worst)
+    {
+        var hero = Hero();
+        hero.PoisonVials = worst ? 12 : 2;
+        if (worst) { hero.ManaPotions = 14; hero.Healing = 13; hero.HerbHealing = 11; }
+        var monster = new Monster { Name = "Kobold", Level = 3, HP = 10, MaxHP = 10, IsActive = true };
+        var (e1, t1, o1) = Engine();
+        typeof(CombatEngine).GetMethod("ShowCombatMenuBBS", F)!.Invoke(e1, new object?[] { hero, monster, null, false });
+        var (e2, t2, o2) = Engine();
+        if (worst) e2.BossContext = new BossCombatContext { CanSave = true };
+        var classInfo = new List<(string key, string name, bool available)>();
+        for (int i = 0; i < (worst ? 9 : 1); i++) classInfo.Add(($"{i + 1}", "Slash", true));
+        typeof(CombatEngine).GetMethod("ShowDungeonCombatMenuBBS", F)!
+            .Invoke(e2, new object?[] { hero, true, true, classInfo, false, GodDomain.None });
+        return (Shown(t1, o1), Shown(t2, o2));
+    }
+
+    private static string[] Rows(string text) => text.Replace("\r", "").TrimEnd('\n').Split('\n');
+
+    [Theory]
+    [MemberData(nameof(AllLanguages))]
+    public async Task BbsMenus_StayWithin80Columns(string lang)
+    {
+        foreach (bool worst in new[] { false, true })
+        {
+            var (single, dungeon) = await WithLanguage(lang, () => RenderBbsMenusSeparately(worst));
+            Capture($"combat-a-bbs-width-{lang}-{(worst ? "worst" : "typical")}.txt", single + dungeon);
+            foreach (var row in Rows(single).Concat(Rows(dungeon)))
+                row.Length.Should().BeLessOrEqualTo(80, $"{lang} row \"{row}\"");
+            if (!worst)
+            {
+                // the usual menu keeps its two rows; wrapping is only for the rare full house
+                Rows(single).Length.Should().Be(2, $"{lang} single monster menu:\n{single}");
+                Rows(dungeon).Length.Should().Be(2, $"{lang} dungeon menu:\n{dungeon}");
+            }
+        }
+    }
+
+    [Fact]
+    public void BbsMenuRow_WrapsBeforeAnItemThatWouldPassColumn80()
+    {
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new MemoryStream(), output);
+        var row = new CombatEngine.BbsMenuRow(term);
+        row.Item(" [A]", "white", new string('x', 70), "white");
+        row.Item("[B]", "white", "yyyyyyyy", "white");
+        row.End();
+        var rows = Rows(Shown(term, output));
+        rows.Should().HaveCount(2);
+        rows[0].Length.Should().Be(74);
+        rows[1].Should().Be(" [B]yyyyyyyy");
     }
 
     // ---------- 3. the standard menu's status and speed rows ----------
@@ -198,6 +257,31 @@ public class CombatLocA122Tests
         // the status row keeps its width
         foreach (var line in text.Split('\n'))
             if (line.Contains(prefix)) line.TrimEnd('\r').Length.Should().Be(41);
+    }
+
+    [Theory]
+    [InlineData("hu")]
+    [InlineData("es")]
+    public async Task MenuStatusNames_AreLocalized(string lang)
+    {
+        var (standard, reader) = await WithLanguage(lang, () =>
+        {
+            var hero = Hero();
+            hero.ApplyStatus(StatusEffect.Blessed, 3);
+            hero.IsRaging = true;
+            var monster = new Monster { Name = "Kobold", Level = 3, HP = 10, MaxHP = 10, IsActive = true };
+            var (e1, t1, o1) = Engine();
+            typeof(CombatEngine).GetMethod("ShowCombatMenuStandard", F)!.Invoke(e1, new object?[] { hero, monster, null, false });
+            var (e2, t2, o2) = Engine();
+            typeof(CombatEngine).GetMethod("ShowCombatMenuScreenReader", F)!.Invoke(e2, new object?[] { hero, monster, null, false });
+            return (Shown(t1, o1), Shown(t2, o2));
+        });
+        Capture($"combat-a-status-names-{lang}.txt", standard + reader);
+        string blessed = Loc.GetIn(lang, "status.blessed");
+        standard.Should().Contain(blessed + "(3)").And.Contain(Loc.GetIn(lang, "status.raging"));
+        reader.Should().Contain(Loc.GetIn(lang, "combat.status_turns", blessed, 3)).And.Contain(Loc.GetIn(lang, "status.raging"));
+        foreach (var text in new[] { standard, reader })
+            text.Should().NotContain("Blessed").And.NotContain("Raging").And.NotContain(" turns");
     }
 
     // ---------- 4. the poison coating menu ----------
@@ -345,6 +429,50 @@ public class CombatLocA122Tests
         string text = await WithLanguage("en", () => RenderLootWinnerInventoryFull(winnerLang));
         text.Should().Contain(Loc.GetIn(winnerLang, "combat.loot_won_roll", "Kobold")).And.Contain(Loc.GetIn(winnerLang, "combat.loot_take_option"));
         text.Should().NotContain("You won the roll");
+    }
+
+    [Fact]
+    public void EquipMessageForAnotherPlayer_IsBuiltInTheirLanguage()
+    {
+        Equipment Sword() => new() { Name = "Test Sword", Slot = EquipmentSlot.MainHand, WeaponPower = 5, MinLevel = 1 };
+        Character Fresh() => new() { Name1 = "winner", Name2 = "Winner", Class = CharacterClass.Warrior, Level = 10, HP = 100, MaxHP = 100 };
+        var prev = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = "hu";
+            var s1 = Sword(); EquipmentDatabase.RegisterDynamic(s1);
+            Fresh().EquipItem(s1, out string huMessage);
+            GameConfig.Language = "en";
+            var s2 = Sword(); EquipmentDatabase.RegisterDynamic(s2);
+            Fresh().EquipItem(s2, out string enMessage);
+            var s3 = Sword(); EquipmentDatabase.RegisterDynamic(s3);
+            CombatEngine.EquipIn("hu", Fresh(), s3, out string viaEquipIn).Should().BeTrue();
+            viaEquipIn.Should().Be(huMessage);
+            huMessage.Should().NotBe(enMessage, "the equip message is translated");
+            GameConfig.Language.Should().Be("en", "the session language is put back");
+            CombatEngine.InLanguage("it", () => Loc.Get("combat.actor_you")).Should().Be("Tu");
+            GameConfig.Language.Should().Be("en");
+        }
+        finally { GameConfig.Language = prev; }
+    }
+
+    [Fact]
+    public void AbilityActorAndEquipCalls_UseTheLocalizedForms()
+    {
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        src.Should().NotContain("isPlayer ? \"You\" : player.DisplayName");
+        src.Should().Contain("string actorName = isPlayer ? Loc.Get(\"combat.actor_you\") : player.DisplayName;");
+        foreach (var call in new[] { "EquipIn(followerLang, player, equipResult, out string equipMsg)",
+                     "EquipIn(winnerLang, winner, equipment, out string equipMsg)", "EquipIn(otherLang, otherPlayer, equipResult, out string equipMsg)",
+                     "InLanguage(followerLang, () => GetLootEquipEligibility(player, lootItem))",
+                     "InLanguage(otherLang, () => GetLootEquipEligibility(otherPlayer, lootItem))" })
+            src.Should().Contain(call);
+        // part A's range: the loot functions, before the ability effects
+        string partA = src.Substring(0, src.IndexOf("private async Task ApplyAbilityEffectsMultiMonster(", StringComparison.Ordinal));
+        foreach (Match m in Regex.Matches(partA, "followerTerm\\.Write(Line)?\\([^\\n]*"))
+            m.Value.Should().NotContain("Loc.Get(");
+        foreach (var lang in new[] { "hu", "fr" })
+            Loc.GetIn(lang, "combat.actor_you").Should().NotBe("You");
     }
 
     // ---------- 8. the combat status panels ----------
