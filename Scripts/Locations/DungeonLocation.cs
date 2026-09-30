@@ -10044,7 +10044,7 @@ public class DungeonLocation : BaseLocation
                 items.Add(new MerchantRareItem
                 {
                     Name = item.Name,
-                    Description = $"Atk +{item.Attack}" + FormatItemBonuses(item),
+                    Description = Loc.Get("dungeon.merchant_stat_atk", item.Attack) + FormatItemBonuses(item),
                     Price = merchantPrice,
                     Type = "weapon",
                     LootItem = item
@@ -10065,7 +10065,7 @@ public class DungeonLocation : BaseLocation
                 items.Add(new MerchantRareItem
                 {
                     Name = item.Name,
-                    Description = $"AC +{item.Armor}" + FormatItemBonuses(item),
+                    Description = Loc.Get("dungeon.merchant_stat_ac", item.Armor) + FormatItemBonuses(item),
                     Price = merchantPrice,
                     Type = "armor",
                     LootItem = item
@@ -10087,8 +10087,8 @@ public class DungeonLocation : BaseLocation
                 item.IsIdentified = true; // Merchant items are always identified
                 long merchantPrice = Math.Max(500, (long)(item.Value * 1.5));
                 string stats = item.Type == ObjType.Weapon
-                    ? $"Atk +{item.Attack}" + FormatItemBonuses(item)
-                    : $"AC +{item.Armor}" + FormatItemBonuses(item);
+                    ? Loc.Get("dungeon.merchant_stat_atk", item.Attack) + FormatItemBonuses(item)
+                    : Loc.Get("dungeon.merchant_stat_ac", item.Armor) + FormatItemBonuses(item);
                 items.Add(new MerchantRareItem
                 {
                     Name = item.Name,
@@ -10229,7 +10229,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             WriteThickDivider(39);
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  ACQUIRED: {item.Name.ToUpper()}");
+            terminal.WriteLine($"  {Loc.Get("dungeon.merchant_acquired", item.Name.ToUpper())}");
             WriteThickDivider(39);
             terminal.SetColor("green");
             terminal.WriteLine($"{item.Description}");
@@ -10712,7 +10712,8 @@ public class DungeonLocation : BaseLocation
                 if (isSpouse)
                 {
                     terminal.SetColor("bright_magenta");
-                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} ({Loc.Get("dungeon.spouse")}) - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.WriteLine($"  [{i + 1}] <3 {npc.DisplayName} ({Loc.Get("dungeon.spouse")}) - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName}");
+                    terminal.Write($"      {Loc.Get("dungeon.hp_label")}: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
@@ -10720,14 +10721,16 @@ public class DungeonLocation : BaseLocation
                 else if (isLover)
                 {
                     terminal.SetColor("magenta");
-                    terminal.Write($"  [{i + 1}] <3 {npc.DisplayName} ({Loc.Get("dungeon.lover")}) - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.WriteLine($"  [{i + 1}] <3 {npc.DisplayName} ({Loc.Get("dungeon.lover")}) - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName}");
+                    terminal.Write($"      {Loc.Get("dungeon.hp_label")}: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
                 }
                 else
                 {
-                    terminal.Write($"  [{i + 1}] {npc.DisplayName} - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName} - HP: {npc.HP}/{npc.MaxHP}");
+                    terminal.WriteLine($"  [{i + 1}] {npc.DisplayName} - {Loc.Get("dungeon.level_label")} {npc.Level} {npc.ClassName}");
+                    terminal.Write($"      {Loc.Get("dungeon.hp_label")}: {npc.HP}/{npc.MaxHP}");
                     if (fee > 0) { terminal.SetColor("yellow"); terminal.Write(feeStr); }
                     terminal.WriteLine("");
                     terminal.SetColor("green");
@@ -11267,7 +11270,8 @@ public class DungeonLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write($"  [{n,2}] ");
         terminal.SetColor(off ? "darkgray" : "bright_green");
-        terminal.Write(off ? "[OFF] " : "[ON]  ");
+        string on = Loc.Get("dungeon.skill_on"), offTag = Loc.Get("dungeon.skill_off");
+        terminal.Write((off ? offTag : on).PadRight(Math.Max(6, Math.Max(on.Length, offTag.Length) + 1)));
         terminal.SetColor(off ? "gray" : "white");
         terminal.Write($"{name,-22}");
         terminal.SetColor("darkgray");
@@ -11310,20 +11314,20 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("dungeon.equipment_label")}:");
             terminal.SetColor("white");
 
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.MainHand, "Main Hand");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.OffHand, "Off Hand");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Head, "Head");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Body, "Body");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Arms, "Arms");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Hands, "Hands");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Legs, "Legs");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Feet, "Feet");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Waist, "Belt");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Face, "Face");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Cloak, "Cloak");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Neck, "Neck");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.LFinger, "Left Ring");
-            DisplayEquipmentSlotWithStats(target, EquipmentSlot.RFinger, "Right Ring");
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.MainHand);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.OffHand);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Head);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Body);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Arms);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Hands);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Legs);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Feet);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Waist);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Face);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Cloak);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.Neck);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.LFinger);
+            DisplayEquipmentSlotWithStats(target, EquipmentSlot.RFinger);
             terminal.WriteLine("");
 
             // Options
@@ -12136,13 +12140,22 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor(hpColor);
                     terminal.Write($"  {member.DisplayName,-18} ");
                     DrawBar(member.HP, member.MaxHP, 15, hpColor, "darkgray");
-                    string status = hpPercent >= 100 ? " (Full)" : "";
-                    terminal.Write($" {member.HP}/{member.MaxHP}{status}");
+                    string status = hpPercent >= 100 ? Loc.Get("combat.full_status") : "";
+                    string hpText = $" {member.HP}/{member.MaxHP}{status}";
+                    terminal.Write(hpText);
                     // Show mana for casters
                     if (member.MaxMana > 0)
                     {
                         terminal.SetColor("bright_cyan");
-                        terminal.Write($"  {Loc.Get("dungeon.mp_label")}:{member.Mana}/{member.MaxMana}");
+                        string mpText = $"  {Loc.Get("dungeon.mp_label")}:{member.Mana}/{member.MaxMana}";
+                        // 1.2.3: a long name with six-digit HP and mana puts the mana on its own row, within 79 columns.
+                        int used = 2 + Math.Max(18, member.DisplayName.Length) + 1 + (GameConfig.ScreenReaderMode ? 0 : 17) + hpText.Length;
+                        if (used + mpText.Length > UsurperRemake.UI.UIHelper.WrapWidth)
+                        {
+                            terminal.WriteLine("");
+                            mpText = "    " + mpText.TrimStart();
+                        }
+                        terminal.Write(mpText);
                     }
                     terminal.WriteLine("");
                 }
@@ -13125,7 +13138,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine("*glug glug glug*");
+        terminal.WriteLine(Loc.Get("dungeon.potion_glug"));
         terminal.WriteLine(Loc.Get("dungeon.drink_potion_recover", actualHeal));
         terminal.Write($"{Loc.Get("combat.bar_hp")}: ");
         DrawBar(player.HP, player.MaxHP, 25, "red", "darkgray");
@@ -13186,7 +13199,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine("*glug glug glug* *glug glug*");
+        terminal.WriteLine(Loc.Get("dungeon.potions_glug"));
         terminal.WriteLine(Loc.Get("dungeon.drink_potions_recover", actualPotionsUsed, actualHeal));
         terminal.Write($"{Loc.Get("combat.bar_hp")}: ");
         DrawBar(player.HP, player.MaxHP, 25, "red", "darkgray");
@@ -13463,7 +13476,7 @@ public class DungeonLocation : BaseLocation
         int explored = currentFloor.Rooms.Count(r => r.IsExplored);
         int cleared = currentFloor.Rooms.Count(r => r.IsCleared);
         int total = currentFloor.Rooms.Count;
-        terminal.WriteLine($" DUNGEON MAP ── Level {currentDungeonLevel} ({currentFloor.Theme})  [{explored}/{total} explored, {cleared}/{total} cleared]");
+        terminal.WriteLine($" {Loc.Get("dungeon.map_header", currentDungeonLevel, GetThemeShortName(currentFloor.Theme), explored, total, cleared)}");
         terminal.SetColor("darkgray");
         terminal.WriteLine(new string('─', 78));
 
@@ -13471,19 +13484,9 @@ public class DungeonLocation : BaseLocation
         // Each room: 1 char symbol, connections: ─ (horizontal), │ (vertical)
         // Layout: 4 chars per room column (room + padding), 2 rows per room row (room + vertical connector)
         int legendRow = 0;
-        string[] legend = {
-            "",
-            "  Legend:",
-            "",
-            "  \u001b[93m@\u001b[0m You",      // placeholder, rendered manually
-            "  \u001b[92m#\u001b[0m Cleared",
-            "  \u001b[91m█\u001b[0m Monsters",
-            "  \u001b[94m>\u001b[0m Stairs",
-            "  \u001b[91mB\u001b[0m Boss",
-            "  \u001b[96m·\u001b[0m Safe",
-            "  \u001b[90m?\u001b[0m Unknown",
-            "",
-        };
+        // 1.2.3: the legend rows (a blank row, the title, a blank row, seven symbols, a blank row)
+        // are drawn by RenderLegendEntry in the player's language; this is only their count.
+        const int legendRows = 11;
 
         for (int y = minY; y <= maxY; y++)
         {
@@ -13526,7 +13529,7 @@ public class DungeonLocation : BaseLocation
             }
 
             // Right-side legend
-            if (legendRow < legend.Length)
+            if (legendRow < legendRows)
                 RenderLegendEntry(legendRow, 50);
             legendRow++;
             terminal.WriteLine("");
@@ -13562,7 +13565,7 @@ public class DungeonLocation : BaseLocation
                     }
                 }
 
-                if (legendRow < legend.Length)
+                if (legendRow < legendRows)
                     RenderLegendEntry(legendRow, 50);
                 legendRow++;
                 terminal.WriteLine("");
@@ -13570,7 +13573,7 @@ public class DungeonLocation : BaseLocation
         }
 
         // Print remaining legend entries if map was small
-        while (legendRow < legend.Length)
+        while (legendRow < legendRows)
         {
             terminal.Write(new string(' ', 50));
             RenderLegendEntry(legendRow, 0);
@@ -14105,7 +14108,7 @@ public class DungeonLocation : BaseLocation
         {
             case 1:
                 terminal.SetColor("white");
-                terminal.Write("  Legend:");
+                terminal.Write($"  {Loc.Get("dungeon.map_legend_title")}");
                 break;
             case 3:
                 terminal.SetColor("bright_yellow");
@@ -14397,7 +14400,7 @@ public class DungeonLocation : BaseLocation
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("dungeon.pixie_vanish"));
                         ShareEventRewardsWithGroup(player, pixieGold, 0, "Pixie Gift");
-                        BroadcastDungeonEvent($"\u001b[35m  {player.Name2} catches a pixie and receives a magical blessing!\u001b[0m");
+                        BroadcastDungeonEvent(lang => $"\u001b[35m  {Loc.GetIn(lang, "dungeon.bc_pixie_blessing", player.Name2)}\u001b[0m");
                     }
                     else
                     {
@@ -14437,7 +14440,7 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("magenta");
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("dungeon.pixie_cackles"));
-                        BroadcastDungeonEvent($"\u001b[31m  {player.Name2} angers a pixie and is cursed!\u001b[0m");
+                        BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_pixie_cursed", player.Name2)}\u001b[0m");
                     }
                 }
                 else
@@ -14474,7 +14477,7 @@ public class DungeonLocation : BaseLocation
                         await TryDiscoverSeal(player, mapRoom);
                     }
                 }
-                BroadcastDungeonEvent($"\u001b[32m  {player.Name2} receives a map from a wounded adventurer — dungeon layout revealed!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_map_revealed", player.Name2)}\u001b[0m");
                 break;
 
             case 2: // Rival adventurer
@@ -14570,7 +14573,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.rob_explorer_gold", reward), "red");
                     terminal.WriteLine(Loc.Get("dungeon.darkness_increases"), "dark_magenta");
                     ShareEventRewardsWithGroup(player, reward, 0, "Robbed Explorer");
-                    BroadcastDungeonEvent($"\u001b[31m  {player.Name2} robs a lost explorer for {reward} gold!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_explorer_robbed", player.Name2, reward)}\u001b[0m");
                 }
                 else if (explorerChoice.ToUpper() != "L")
                 {
@@ -14583,7 +14586,7 @@ public class DungeonLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("dungeon.explorer_reward", reward), "yellow");
                     terminal.WriteLine(Loc.Get("dungeon.chivalry_increases"), "white");
                     ShareEventRewardsWithGroup(player, reward, 0, "Lost Explorer Rescue");
-                    BroadcastDungeonEvent($"\u001b[33m  {player.Name2} rescues a lost explorer and receives {reward} gold!\u001b[0m");
+                    BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_explorer_rescued", player.Name2, reward)}\u001b[0m");
                 }
                 else
                 {
@@ -15055,7 +15058,7 @@ public class DungeonLocation : BaseLocation
         if (firstVisit) player.VisitedSettlements.Add(settlement.Id);
 
         // Broadcast to group
-        BroadcastDungeonEvent($"\u001b[33m  The party arrives at {settlement.Name}.\u001b[0m");
+        BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_settlement_arrive", settlement.Name)}\u001b[0m");
 
         bool stayInSettlement = true;
         while (stayInSettlement)
@@ -15218,10 +15221,10 @@ public class DungeonLocation : BaseLocation
         if (hpHealed > 0) terminal.WriteLine(Loc.Get("dungeon.settlement_hp_restored", hpHealed));
         if (manaHealed > 0) terminal.WriteLine(Loc.Get("dungeon.settlement_mana_restored", manaHealed));
         terminal.SetColor("gray");
-        terminal.WriteLine($"(-{cost} gold)");
+        terminal.WriteLine(Loc.Get("church.blood_gold_cost", cost));
 
         // Broadcast to group
-        BroadcastDungeonEvent($"\u001b[32m  {player.Name} was healed at {settlement.Name}.\u001b[0m");
+        BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_settlement_healed", player.Name, settlement.Name)}\u001b[0m");
 
         await Pacing.Wait(2000);
     }
@@ -15233,7 +15236,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.ClearScreen();
             terminal.SetColor(settlement.ThemeColor);
-            terminal.WriteLine($"{settlement.NPCName}'s Wares");
+            terminal.WriteLine(Loc.Get("dungeon.settlement_wares", settlement.NPCName));
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("gray");
@@ -15257,10 +15260,10 @@ public class DungeonLocation : BaseLocation
             if (IsScreenReader)
                 WriteSRMenuOption("0", Loc.Get("ui.done_shopping"));
             else
-                terminal.WriteLine("[0] Done shopping");
+                terminal.WriteLine($"[0] {Loc.Get("ui.done_shopping")}");
             terminal.WriteLine("");
 
-            var choice = await terminal.GetInput("Buy: ");
+            var choice = await terminal.GetInput(Loc.Get("dungeon.settlement_buy_prompt"));
 
             if (choice == "0" || choice.ToUpper() == "R" || choice.ToUpper() == "Q")
             {
@@ -15283,7 +15286,7 @@ public class DungeonLocation : BaseLocation
                     terminal.SetColor("green");
                     terminal.WriteLine(Loc.Get("dungeon.settlement_purchased", item.name));
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"(-{item.cost} gold)");
+                    terminal.WriteLine(Loc.Get("church.blood_gold_cost", item.cost));
                     await Pacing.Wait(1500);
                 }
             }
@@ -15300,31 +15303,31 @@ public class DungeonLocation : BaseLocation
             switch (itemName)
             {
                 case "Healing Potion":
-                    items.Add(("heal_potion", "Healing Potion", 25 * priceScale));
+                    items.Add(("heal_potion", Loc.Get("street_encounter.merchant.item.healing_potion"), 25 * priceScale));
                     break;
                 case "Mana Potion":
-                    items.Add(("mana_potion", "Mana Potion", 30 * priceScale));
+                    items.Add(("mana_potion", Loc.Get("world_boss.mana_potion"), 30 * priceScale));
                     break;
                 case "Antidote":
-                    items.Add(("antidote", "Antidote", 20 * priceScale));
+                    items.Add(("antidote", Loc.Get("street_encounter.merchant.item.antidote"), 20 * priceScale));
                     break;
                 case "Healing Herb":
-                    items.Add(("healing_herb", "Healing Herb", 40 * priceScale));
+                    items.Add(("healing_herb", Loc.Get("herb.healing_herb.name"), 40 * priceScale));
                     break;
                 case "Starbloom Essence":
-                    items.Add(("starbloom", "Starbloom Essence", 80 * priceScale));
+                    items.Add(("starbloom", Loc.Get("herb.starbloom_essence.name"), 80 * priceScale));
                     break;
                 case "Firebloom Petal":
-                    items.Add(("firebloom", "Firebloom Petal", 60 * priceScale));
+                    items.Add(("firebloom", Loc.Get("herb.firebloom_petal.name"), 60 * priceScale));
                     break;
                 case "Torch":
-                    items.Add(("torch", "Enchanted Torch", 15 * priceScale));
+                    items.Add(("torch", Loc.Get("dungeon.settlement_item_torch"), 15 * priceScale));
                     break;
                 case "Lockpick":
-                    items.Add(("lockpick", "Lockpick Set", 50 * priceScale));
+                    items.Add(("lockpick", Loc.Get("dungeon.settlement_item_lockpick"), 50 * priceScale));
                     break;
                 case "Smoke Bomb":
-                    items.Add(("smoke_bomb", "Smoke Bomb (flee aid)", 35 * priceScale));
+                    items.Add(("smoke_bomb", Loc.Get("dungeon.settlement_item_smoke_bomb"), 35 * priceScale));
                     break;
             }
         }
@@ -15421,7 +15424,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.lore_fragment_discovered"));
 
         // Broadcast to group
-        BroadcastDungeonEvent($"\u001b[36m  {settlement.NPCName} shares knowledge of the depths.\u001b[0m");
+        BroadcastDungeonEvent(lang => $"\u001b[36m  {Loc.GetIn(lang, "dungeon.bc_settlement_lore", settlement.NPCName)}\u001b[0m");
 
         await terminal.PressAnyKey();
     }
@@ -15512,11 +15515,12 @@ public class DungeonLocation : BaseLocation
                     if (mate.IsGroupedPlayer)
                     {
                         var session = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "");
+                        string campLang = session?.Context?.Language ?? "en";
                         session?.EnqueueMessage(
-                            $"\u001b[32m  ═══ Safe Haven Camp ═══\u001b[0m\n" +
-                            $"\u001b[32m  +{mateHeal} HP" +
-                            (mateMana > 0 ? $"  +{mateMana} MP" : "") +
-                            (mateSta > 0 ? $"  +{mateSta} STA" : "") + "\u001b[0m");
+                            $"\u001b[32m  ═══ {Loc.GetIn(campLang, "dungeon.camp_header")} ═══\u001b[0m\n" +
+                            $"\u001b[32m  +{mateHeal} {Loc.GetIn(campLang, "dungeon.hp_label")}" +
+                            (mateMana > 0 ? $"  +{mateMana} {Loc.GetIn(campLang, "dungeon.mp_label")}" : "") +
+                            (mateSta > 0 ? $"  +{mateSta} {Loc.GetIn(campLang, "stats.sta")}" : "") + "\u001b[0m");
                     }
                 }
 
@@ -15524,7 +15528,7 @@ public class DungeonLocation : BaseLocation
                 if (anyTeammateHealed)
                     terminal.WriteLine(Loc.Get("dungeon.sanctuary_party_recovers"), "green");
             }
-            BroadcastDungeonEvent($"\u001b[32m  The party rests in a safe haven and recovers their strength.\u001b[0m");
+            BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_safe_haven_rest")}\u001b[0m");
 
             // Trigger dream sequences through the Amnesia System
             // Dreams reveal the player's forgotten past as a fragment of Manwe
@@ -15708,7 +15712,7 @@ public class DungeonLocation : BaseLocation
                         await TryDiscoverSeal(player, visionRoom);
                     }
                 }
-                BroadcastDungeonEvent($"\u001b[36m  A vision reveals the entire floor layout!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[36m  {Loc.GetIn(lang, "dungeon.bc_vision_floor")}\u001b[0m");
                 break;
 
             case 1: // Time warp
@@ -15721,7 +15725,7 @@ public class DungeonLocation : BaseLocation
                 player.Experience += timeWarpXp;
                 terminal.WriteLine(Loc.Get("dungeon.mystery_xp_plus", timeWarpXp));
                 ShareEventRewardsWithGroup(player, 0, timeWarpXp, "Time Warp");
-                BroadcastDungeonEvent($"\u001b[32m  Reality warps! {player.Name2} gains +{timeWarpXp} XP!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_time_warp", player.Name2, timeWarpXp)}\u001b[0m");
                 break;
 
             case 2: // Ghostly message
@@ -15752,7 +15756,7 @@ public class DungeonLocation : BaseLocation
                 player.Gold += goldRain;
                 terminal.WriteLine(Loc.Get("dungeon.gather_gold", goldRain));
                 ShareEventRewardsWithGroup(player, goldRain, 0, "Treasure Rain");
-                BroadcastDungeonEvent($"\u001b[33m  Gold coins rain from the ceiling! {player.Name2} gathers {goldRain} gold!\u001b[0m");
+                BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_gold_rain", player.Name2, goldRain)}\u001b[0m");
                 break;
         }
 

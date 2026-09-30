@@ -10681,7 +10681,7 @@ public abstract class BaseLocation
     /// <summary>
     /// Display an equipment slot with its current item and stat summary (shared by equip screens).
     /// </summary>
-    protected void DisplayEquipmentSlotWithStats(Character target, EquipmentSlot slot, string label)
+    protected void DisplayEquipmentSlotWithStats(Character target, EquipmentSlot slot, string label = "")
     {
         var item = target.GetEquipment(slot);
         terminal.SetColor("gray");
