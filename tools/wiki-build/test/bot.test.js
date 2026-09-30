@@ -181,6 +181,47 @@ test("Suggestion limits persist across bot restart and global cap is enforced", 
     db.close();
   }
 });
+test("Suggest also accepts the suggestion: prefix, and only that word", async () => {
+  const db = new Database(":memory:");
+  const count = () =>
+    db.prepare("SELECT COUNT(*) AS n FROM wiki_suggestions").get().n;
+  try {
+    const f = fixture({ db });
+    await f.bot.handle(
+      f.message("<@123> Suggestion : add bug reporting steps", { id: "10" }),
+      "123",
+    );
+    assert.match(f.sent[0].content, /suggestion #1 was recorded/);
+    assert.equal(db.prepare("SELECT text FROM wiki_suggestions").get().text, "add bug reporting steps");
+    for (const [n, text] of [
+      ["11", "<@123> suggestions: add bug reporting steps"],
+      ["12", "<@123> suggestionx add bug reporting steps"],
+    ]) {
+      f.advance();
+      await f.bot.handle(f.message(text, { id: n }), "123");
+      assert.doesNotMatch(f.sent.at(-1).content, /suggestion #|trusted helper role/);
+    }
+    assert.equal(f.sent.length, 3);
+    assert.equal(count(), 1);
+    const refusals = [];
+    for (const [n, text] of [
+      ["13", "<@123> suggest: correction"],
+      ["14", "<@123> suggestion: correction"],
+    ]) {
+      f.advance();
+      await f.bot.handle(
+        f.message(text, { id: n, member: { roles: { cache: new Set() } } }),
+        "123",
+      );
+      refusals.push(f.sent.at(-1).content);
+    }
+    assert.match(refusals[0], /trusted helper role/);
+    assert.equal(refusals[1], refusals[0]);
+    assert.equal(count(), 1);
+  } finally {
+    db.close();
+  }
+});
 test("Missing index, disabled suggestions and failures never relay", async () => {
   const f = fixture({ index: undefined, indexFile: "/no-such-index" });
   assert.equal(await f.bot.handle(f.message(), "123"), true);

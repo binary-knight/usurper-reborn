@@ -8,6 +8,7 @@ Main Street is the hub. Location keys depend on the current district and menu pr
 
 - [Town directory](/wiki/en/world/town/)
 - [Dungeon and settlements](/wiki/en/world/dungeon/)
+- [Dungeon features and random events](/wiki/en/world/dungeon-features/) and [rare encounters](/wiki/en/world/rare-encounters/)
 - [Wilderness](/wiki/en/world/wilderness/)
 - [Temple rooms](/wiki/en/world/temple/)
 - [Home and the Inn](/wiki/en/world/rest/)

@@ -6,6 +6,8 @@ sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementDat
 ---
 Dungeon rooms can contain monsters, treasure, features and routes deeper. Progress is not only a damage check: supplies and Mental matter across the entire trip.
 
+What you can meet in a room, from chests, traps and shrines to puzzles and strangers, is on [dungeon features and random events](/wiki/en/world/dungeon-features/). The rarest events have their own page, [rare encounters](/wiki/en/world/rare-encounters/).
+
 ## Rest and exploration
 
 New rooms add depth strain, while already explored rooms do not charge that room strain again. Completed monster fights add their own strain. Camp in a cleared room where the option is available. Camp and Safe Haven rest share a floor allowance.
