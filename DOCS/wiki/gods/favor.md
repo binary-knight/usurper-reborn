@@ -1,7 +1,7 @@
 ---
 title: Favor, prayer and sacrifice
 path: /wiki/en/gods/favor/
-checked: 1.2.0
+checked: 1.2.1
 sources: Scripts/Systems/FaithSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDeedSystem.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 ---
 Favor is your relationship with the god you worship. It is saved, changes through devotion and taboos, and updates your boon when you cross a tier.
@@ -31,6 +31,6 @@ See [daily Miracles](/wiki/en/gods/miracles/) for the domain-specific effects.
 
 ## Switching gods
 
-Leaving a god discards your accumulated Favor. A voluntary departure can bring wrath or player-god lightning depending on the god and lost Favor. The Temple asks before switching. Do not change gods expecting both relationships to remain.
+Leaving a god discards your accumulated Favor. A voluntary departure can bring wrath or player-god lightning depending on the god and lost Favor. The Temple asks before switching. Do not change gods expecting both relationships to remain. The steps to choose or switch a god are on the [gods and faith](/wiki/en/gods/#choose-a-god-at-the-temple) page.
 
 See [Temple rooms](/wiki/en/world/temple/) and [player-gods](/wiki/en/gods/player-gods/).
