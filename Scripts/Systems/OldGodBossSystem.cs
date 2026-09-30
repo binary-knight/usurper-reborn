@@ -182,7 +182,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             await Pacing.Wait(1000);
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"{godName} appears before you again.");
+            terminal.WriteLine(Loc.Get("old_god.appears_again", godName));
             await Pacing.Wait(1500);
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
@@ -587,8 +587,8 @@ namespace UsurperRemake.Systems
             if (CompanionSystem.Instance?.IsCompanionActive(CompanionId.Mira) == true)
             {
                 activeCombatModifiers.BossDamageMultiplier *= 0.90; // Veloura hesitates
-                terminal.WriteLine("  Veloura's gaze falls on Mira. Something flickers in the corruption.", "bright_magenta");
-                terminal.WriteLine("  She hesitates.", "bright_magenta");
+                terminal.WriteLine($"  {Loc.Get("old_god.veloura_sees_mira")}", "bright_magenta");
+                terminal.WriteLine($"  {Loc.Get("old_god.veloura_hesitates")}", "bright_magenta");
             }
         }
 
@@ -1182,7 +1182,7 @@ namespace UsurperRemake.Systems
 
             // Saved gods give their artifact as a gift (instead of looting from their corpse)
             terminal.WriteLine("");
-            terminal.WriteLine($"  {boss.Name} entrusts you with a sacred relic...", "bright_magenta");
+            terminal.WriteLine($"  {Loc.Get("old_god.entrusts_relic", boss.Name)}", "bright_magenta");
             await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
 
             // Award thematic crafting materials (same as defeat)
@@ -1332,9 +1332,9 @@ namespace UsurperRemake.Systems
                     DebugLogger.Instance.LogError("BETRAYAL", $"HandleNocturaBetrayal crashed: {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
                     terminal.WriteLine("");
                     terminal.SetColor("dark_magenta");
-                    terminal.WriteLine("  As you reach for Noctura, the world fractures around you...");
-                    terminal.WriteLine("  Her form dissolves into shadow, slipping through your fingers.");
-                    terminal.WriteLine("  She has escaped — for now.");
+                    terminal.WriteLine($"  {Loc.Get("old_god.noctura_escape_fracture")}");
+                    terminal.WriteLine($"  {Loc.Get("old_god.noctura_escape_dissolves")}");
+                    terminal.WriteLine($"  {Loc.Get("old_god.noctura_escape_for_now")}");
                     terminal.WriteLine("");
                     await terminal.PressAnyKey();
                     betrayalResult = false; // treat as escape
@@ -1400,9 +1400,9 @@ namespace UsurperRemake.Systems
             {
                 player.HP += healAmount;
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine($"\n  Shadow energy courses through you, restoring {healAmount} HP...");
+                terminal.WriteLine($"\n  {Loc.Get("old_god.noctura_shadow_heal", healAmount)}");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  NOCTURA: \"I want you at your best. It's no fun otherwise.\"");
+                terminal.WriteLine($"  {Loc.Get("old_god.noctura_fair_fight")}");
                 await Pacing.Wait(2000);
             }
 
@@ -1413,7 +1413,7 @@ namespace UsurperRemake.Systems
 
             // Run combat
             terminal.Clear();
-            UIHelper.WriteBoxHeader(terminal, "NOCTURA, THE SHADOW ASCENDANT", "dark_magenta", 63);
+            UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.noctura_betrayal_title"), "dark_magenta", 63);
             terminal.WriteLine("");
 
             var combatEngine = new CombatEngine(terminal);
@@ -1444,7 +1444,7 @@ namespace UsurperRemake.Systems
                 // Show defeat dialogue
                 terminal.Clear();
                 terminal.WriteLine("");
-                UIHelper.WriteBoxHeader(terminal, "THE SHADOW FALLS", "bright_magenta", 63);
+                UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.noctura_shadow_falls_title"), "bright_magenta", 63);
                 terminal.WriteLine("");
 
                 foreach (var line in betrayalData.LocDefeat())
@@ -1464,9 +1464,9 @@ namespace UsurperRemake.Systems
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine($"  Experience gained: {xpReward:N0}");
+                terminal.WriteLine($"  {Loc.Get("old_god.noctura_xp_gained", $"{xpReward:N0}")}");
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  Gold found: {goldReward:N0}");
+                terminal.WriteLine($"  {Loc.Get("old_god.noctura_gold_found", $"{goldReward:N0}")}");
 
                 await terminal.PressAnyKey();
                 return true;
@@ -1572,16 +1572,16 @@ namespace UsurperRemake.Systems
                     ctx.EnrageRound = 35;
                     ctx.AoEFrequency = 4;
                     ctx.AoEDamage = 300;
-                    ctx.AoEAbilityName = "Heartbreak Shatter";
+                    ctx.AoEAbilityName = "old_god.ability.heartbreak_shatter";
                     break;
 
                 case OldGodType.Thorgrim: // Floor 55 — Introduces channeling (needs interrupter)
                     ctx.EnrageRound = 35;
                     ctx.AoEFrequency = 4;
                     ctx.AoEDamage = 500;
-                    ctx.AoEAbilityName = "Gavel of Judgment";
+                    ctx.AoEAbilityName = "old_god.ability.gavel_of_judgment";
                     ctx.ChannelFrequency = 5;
-                    ctx.ChannelAbilityName = "Final Verdict";
+                    ctx.ChannelAbilityName = "old_god.ability.final_verdict";
                     ctx.ChannelDamage = 1200;
                     break;
 
@@ -1589,9 +1589,9 @@ namespace UsurperRemake.Systems
                     ctx.EnrageRound = 30;
                     ctx.AoEFrequency = 3;
                     ctx.AoEDamage = 700;
-                    ctx.AoEAbilityName = "Shadow Tempest";
+                    ctx.AoEAbilityName = "old_god.ability.shadow_tempest";
                     ctx.ChannelFrequency = 4;
-                    ctx.ChannelAbilityName = "Manifest Oblivion";
+                    ctx.ChannelAbilityName = "old_god.ability.manifest_oblivion";
                     ctx.ChannelDamage = 1800;
                     ctx.CorruptionDamagePerStack = 35;
                     ctx.HasPhysicalImmunityPhase = true; // Phase 2: physical immunity
@@ -1601,9 +1601,9 @@ namespace UsurperRemake.Systems
                     ctx.EnrageRound = 28;
                     ctx.AoEFrequency = 3;
                     ctx.AoEDamage = 900;
-                    ctx.AoEAbilityName = "Solar Cataclysm";
+                    ctx.AoEAbilityName = "old_god.ability.solar_cataclysm";
                     ctx.ChannelFrequency = 4;
-                    ctx.ChannelAbilityName = "Purifying Annihilation";
+                    ctx.ChannelAbilityName = "old_god.ability.purifying_annihilation";
                     ctx.ChannelDamage = 2500;
                     ctx.CorruptionDamagePerStack = 45;
                     ctx.DoomRounds = 3;
@@ -1614,9 +1614,9 @@ namespace UsurperRemake.Systems
                     ctx.EnrageRound = 25;
                     ctx.AoEFrequency = 3;
                     ctx.AoEDamage = 1200;
-                    ctx.AoEAbilityName = "World Breaker";
+                    ctx.AoEAbilityName = "old_god.ability.world_breaker";
                     ctx.ChannelFrequency = 4;
-                    ctx.ChannelAbilityName = "Tectonic Annihilation";
+                    ctx.ChannelAbilityName = "old_god.ability.tectonic_annihilation";
                     ctx.ChannelDamage = 3000;
                     ctx.CorruptionDamagePerStack = 55;
                     ctx.DoomRounds = 3;
@@ -1627,9 +1627,9 @@ namespace UsurperRemake.Systems
                     ctx.EnrageRound = 25;
                     ctx.AoEFrequency = 2;
                     ctx.AoEDamage = 1500;
-                    ctx.AoEAbilityName = "Creation's End";
+                    ctx.AoEAbilityName = "old_god.ability.creations_end";
                     ctx.ChannelFrequency = 3;
-                    ctx.ChannelAbilityName = "Unmake Reality";
+                    ctx.ChannelAbilityName = "old_god.ability.unmake_reality";
                     ctx.ChannelDamage = 4000;
                     ctx.CorruptionDamagePerStack = 70;
                     ctx.DoomRounds = 2; // Only 2 rounds! Must dispel fast

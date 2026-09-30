@@ -836,7 +836,6 @@
       "12aec32c28",
       "13cad7baf5",
       "1690eea665",
-      "274f072d0a",
       "388c4d1f1a",
       "388f260797",
       "42e6462680",
@@ -847,15 +846,15 @@
       "6fd7e59c12",
       "6fff057cff",
       "7736fcf764",
-      "852b657899",
+      "7f8e8387a1",
       "885b4f7525",
-      "937aa7faaf",
       "990f7e9932",
       "a2a1bcc0c1",
       "a2a1bcc0c1",
       "aa3796f5c4",
       "ab3bfaa8b9",
       "b94ae4af42",
+      "cd2393d352",
       "cd9a6a2024",
       "d117928713",
       "d5943097c3",
@@ -868,7 +867,8 @@
       "ec5213b274",
       "f9d8a6d6ca",
       "f9d8a6d6ca",
-      "fadf637985"
+      "fadf637985",
+      "fd20fba9f1"
     ]
   },
   "Scripts/Locations/LevelMasterLocation.cs": {
@@ -1447,14 +1447,6 @@
       "eb7881435d"
     ]
   },
-  "Scripts/Systems/ClassAbilitySystem.cs": {
-    "count": 3,
-    "sites": [
-      "00c55f5634",
-      "2edcf9f9f0",
-      "f0e2b31540"
-    ]
-  },
   "Scripts/Systems/CompanionSystem.cs": {
     "count": 25,
     "sites": [
@@ -1674,24 +1666,6 @@
       "f84d1d3256"
     ]
   },
-  "Scripts/Systems/OldGodBossSystem.cs": {
-    "count": 13,
-    "sites": [
-      "2ee6e33e0c",
-      "35a8e6ac25",
-      "6e873f8060",
-      "82f3e8f60b",
-      "994c1d718e",
-      "a57f8fb7af",
-      "ad55134eeb",
-      "debf590f8e",
-      "eadcb941fb",
-      "f6390dc21c",
-      "fa6033d95c",
-      "fdc2f04dde",
-      "fe42d6b0d7"
-    ]
-  },
   "Scripts/Systems/OnlineChatSystem.cs": {
     "count": 19,
     "sites": [
@@ -1744,39 +1718,6 @@
       "b456882830"
     ]
   },
-  "Scripts/Systems/RageEventSystem.cs": {
-    "count": 28,
-    "sites": [
-      "070161ef4a",
-      "0822bde269",
-      "0be40e4d07",
-      "18b7f5a3c0",
-      "2a3fc7f785",
-      "2b14c31051",
-      "34f16baa08",
-      "372dc228bc",
-      "47e42852be",
-      "51247bbd51",
-      "558f445573",
-      "59a123fc72",
-      "659c77aba5",
-      "6a1b1f5f41",
-      "7c5f4bbdc0",
-      "88c57a3650",
-      "92bcd96072",
-      "a2d2659e36",
-      "a7d6305c10",
-      "cbf3b448e5",
-      "d077f20db7",
-      "d47381963d",
-      "d4c2e82154",
-      "d70cf562a8",
-      "f522392c95",
-      "faa8a843e1",
-      "fbf3af1871",
-      "fd6f182e5f"
-    ]
-  },
   "Scripts/Systems/RareEncounters.cs": {
     "count": 4,
     "sites": [
@@ -1819,16 +1760,6 @@
       "e837d4b00d",
       "e95bb0ee8a",
       "f0e5e50a0c"
-    ]
-  },
-  "Scripts/Systems/SpellLearningSystem.cs": {
-    "count": 5,
-    "sites": [
-      "2579de496b",
-      "4d5fae9cab",
-      "9343ccf874",
-      "9c0d6128f0",
-      "a620a1b05e"
     ]
   },
   "Scripts/Systems/SqlSaveBackend.cs": {
@@ -2083,15 +2014,6 @@
       "b586de08da",
       "bd6366cf02",
       "cb8cbe26a5"
-    ]
-  },
-  "Scripts/Systems/WorldBossSystem.cs": {
-    "count": 4,
-    "sites": [
-      "1dca7f44f9",
-      "3f95aa0641",
-      "9387d02bf4",
-      "c0cdff1b6d"
     ]
   },
   "Scripts/Systems/WorldEventSystem.cs": {
