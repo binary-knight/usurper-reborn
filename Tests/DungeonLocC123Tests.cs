@@ -374,11 +374,6 @@ public class DungeonLocC123Tests
         });
         Capture($"dungeon-c-settlement-{settlement.Id}-{lang}.txt", text);
         string key = $"dungeon.settlement.{settlement.Id}";
-        // GetChoice draws the shared status line (BaseLocation.ShowStatusLine) and the Quick Commands bar
-        // under every location's menu. Both are BaseLocation's, not this screen's, and already run past 79
-        // (en Quick Commands 98; hu status line 85 with six-digit HP), so the width check leaves those two rows out.
-        string statusRow = L(lang, "status.hp") + ": ", quickRow = L(lang, "ui.quick_commands") + ":";
-        string screen = string.Join("\n", Rows(text).Where(r => !r.StartsWith(statusRow) && !r.StartsWith(quickRow)));
         text.Should().Contain($"{settlement.NPCName} ({L(lang, key + ".npc_title")})");
         ShowsWrapped(text, L(lang, key + ".description"), "", "description");
         ShowsWrapped(text, L(lang, key + ".greeting_first"), "", "first greeting");
@@ -386,7 +381,7 @@ public class DungeonLocC123Tests
         if (lang == "hu")
             text.Should().NotContain(settlement.NPCTitle).And.NotContain(settlement.Description.Split('\n')[0])
                 .And.NotContain(settlement.ReturnGreeting.Split('\n')[0]);
-        EveryRowFits(screen, $"{settlement.Id} settlement");
+        EveryRowFits(text, $"{settlement.Id} settlement");
     }
 
     [Theory]
