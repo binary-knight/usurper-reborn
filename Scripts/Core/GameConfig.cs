@@ -359,11 +359,16 @@ public static partial class GameConfig
     {
         get
         {
+            // v1.2.4: a Loc.RenderLanguage scope (a group follower's turn) renders in that language
+            var overrideLang = UsurperRemake.Systems.Loc.RenderLanguageOverride;
+            if (overrideLang != null) return overrideLang;
             var ctx = UsurperRemake.Server.SessionContext.Current;
             return ctx != null ? ctx.Language : _languageGlobal;
         }
         set
         {
+            // v1.2.4: inside a render scope the setting belongs to the session, not to the reader; leave it
+            if (UsurperRemake.Systems.Loc.RenderLanguageOverride != null) return;
             var ctx = UsurperRemake.Server.SessionContext.Current;
             if (ctx != null)
                 ctx.Language = value;

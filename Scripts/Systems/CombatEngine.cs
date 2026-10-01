@@ -546,7 +546,8 @@ public partial class CombatEngine
         if (own != null)
         {
             own.SetColor("magenta");
-            own.WriteLine(Loc.Get(MentalSystem.PickFearLine(random)));
+            // v1.2.4: in the language of the player whose screen it is
+            own.WriteLine(Loc.GetIn(ReferenceEquals(own, terminal) ? GameConfig.Language : LanguageOf(c), MentalSystem.PickFearLine(random)));
         }
         if (!ReferenceEquals(own, terminal) && terminal != null)
         {
@@ -1299,36 +1300,9 @@ public partial class CombatEngine
         DebugLogger.Instance.LogCombatStart(player.Name, player.Level, monsterNames, floorEstimate);
 
         // Broadcast combat introduction to group followers
+        // v1.2.4: built for each member in their own language
         if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
-        {
-            var introSb = new System.Text.StringBuilder();
-            introSb.AppendLine("\u001b[1;31m  ═══ COMBAT ═══\u001b[0m");
-            if (monsters.Count == 1)
-            {
-                var m = monsters[0];
-                if (!string.IsNullOrEmpty(m.Phrase))
-                {
-                    if (m.CanSpeak)
-                        introSb.AppendLine($"\u001b[33m  {m.TheNameOrName} says: \"{m.Phrase}\"\u001b[0m");
-                    else
-                        introSb.AppendLine($"\u001b[33m  {m.TheNameOrName} {m.Phrase}\u001b[0m");
-                }
-                introSb.AppendLine($"\u001b[37m  Facing: {m.GetDisplayInfo()}\u001b[0m");
-            }
-            else
-            {
-                foreach (var m in monsters)
-                    introSb.AppendLine($"\u001b[37m  - {m.Name} (Lv{m.Level}, {m.HP} HP)\u001b[0m");
-            }
-            var teammateList = result.Teammates.Where(t => t.IsAlive).ToList();
-            if (teammateList.Count > 0)
-            {
-                introSb.AppendLine($"\u001b[37m  Fighting alongside you:\u001b[0m");
-                foreach (var tm in teammateList)
-                    introSb.AppendLine($"\u001b[37m    - {tm.DisplayName} (Lv{tm.Level})\u001b[0m");
-            }
-            BroadcastGroupCombatEvent(result, introSb.ToString());
-        }
+            BroadcastGroupLocalized(result, lang => GroupCombatIntro(lang, monsters, result.Teammates));
 
         // Ambush: determine how many monsters catch the leader off guard via opposed roll.
         // Monster stealth vs leader awareness (AGI + DEX + level scaling).
@@ -1407,16 +1381,18 @@ public partial class CombatEngine
                 if (!player.IsAlive) break;
 
                 _lastMonsterTargetedGroupPlayer = false;
-                if (hasGroupAmbush) terminal.StartCapture();
+                // v1.2.4: the Loc calls are recorded, so each member reads the capture in their own language
+                LocRecording? ambushRecording = null;
+                if (hasGroupAmbush) { terminal.StartCapture(); ambushRecording = Loc.BeginRecording(); }
 
-                await ProcessMonsterAction(ambushMonster, player, result);
+                try { await ProcessMonsterAction(ambushMonster, player, result); }
+                finally { if (ambushRecording != null) Loc.EndRecording(ambushRecording); }
 
                 if (hasGroupAmbush)
                 {
                     string? ambushOutput = terminal.StopCapture();
                     if (!_lastMonsterTargetedGroupPlayer && !string.IsNullOrWhiteSpace(ambushOutput))
-                        BroadcastGroupCombatEvent(result,
-                            ConvertToThirdPerson(ambushOutput, player.DisplayName));
+                        BroadcastGroupLocalized(result, lang => CapturedInLanguage(ambushRecording, ambushOutput, lang, player.DisplayName));
                 }
             }
 
@@ -1472,39 +1448,14 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {Loc.Get("combat.boss_unleashed", rampedBoss.Name)}");
                     terminal.WriteLine("");
                     if (hasGroupEarly)
-                        BroadcastGroupCombatEvent(result,
-                            $"\u001b[1;31m  {Loc.Get("combat.boss_unleashed", rampedBoss.Name)}\u001b[0m");
+                        BroadcastGroupLocalized(result, lang => GroupLineWrapped(lang, "\u001b[1;31m", "combat.boss_unleashed", rampedBoss.Name));
                 }
             }
 
             // Broadcast round number and compact combat status to all followers
+            // v1.2.4: built for each member in their own language
             if (hasGroupEarly)
-            {
-                var statusSb = new System.Text.StringBuilder();
-                statusSb.AppendLine($"\u001b[90m  ── Round {roundNumber} ──\u001b[0m");
-                // Monster status line
-                var aliveMonsters = monsters.Where(m => m.IsAlive).ToList();
-                foreach (var m in aliveMonsters)
-                {
-                    int hpPct = (int)(m.HP * 100 / Math.Max(1, m.MaxHP));
-                    string hpColor = hpPct > 50 ? "\u001b[32m" : hpPct > 25 ? "\u001b[33m" : "\u001b[31m";
-                    statusSb.AppendLine($"\u001b[37m  {m.Name}: {hpColor}{hpPct}%\u001b[0m");
-                }
-                // Party status line
-                statusSb.Append($"\u001b[36m  Party: ");
-                var partyMembers = new List<string>();
-                int ldrPct = (int)(player.HP * 100 / Math.Max(1, player.MaxHP));
-                string ldrColor = ldrPct > 50 ? "\u001b[32m" : ldrPct > 25 ? "\u001b[33m" : "\u001b[31m";
-                partyMembers.Add($"{ldrColor}{player.DisplayName} {player.HP}/{player.MaxHP}\u001b[0m");
-                foreach (var tm in result.Teammates.Where(t => t.IsAlive))
-                {
-                    int tmPct = (int)(tm.HP * 100 / Math.Max(1, tm.MaxHP));
-                    string tmColor = tmPct > 50 ? "\u001b[32m" : tmPct > 25 ? "\u001b[33m" : "\u001b[31m";
-                    partyMembers.Add($"{tmColor}{tm.DisplayName} {tm.HP}/{tm.MaxHP}\u001b[0m");
-                }
-                statusSb.AppendLine(string.Join("\u001b[90m | \u001b[0m", partyMembers));
-                BroadcastGroupCombatEvent(result, statusSb.ToString());
-            }
+                BroadcastRoundStatus(result, roundNumber, monsters, player);
 
             // Boss phase transition check
             if (BossContext != null)
@@ -1797,9 +1748,12 @@ public partial class CombatEngine
                 }
 
                 // Capture output during leader's action for broadcasting to followers
-                if (hasGroup) terminal.StartCapture();
+                // v1.2.4: with the Loc calls recorded, so each member reads it in their own language
+                LocRecording? leaderRecording = null;
+                if (hasGroup) { terminal.StartCapture(); leaderRecording = Loc.BeginRecording(); }
 
-                await ProcessPlayerActionMultiMonster(playerAction, player, monsters, result);
+                try { await ProcessPlayerActionMultiMonster(playerAction, player, monsters, result); }
+                finally { if (leaderRecording != null) Loc.EndRecording(leaderRecording); }
 
                 // Broadcast captured combat output to group followers
                 // Convert "You attack" → "Rage attacks" for third-person perspective
@@ -1807,7 +1761,7 @@ public partial class CombatEngine
                 {
                     string? leaderOutput = terminal.StopCapture();
                     if (!string.IsNullOrWhiteSpace(leaderOutput))
-                        BroadcastGroupCombatEvent(result, ConvertToThirdPerson(leaderOutput, player.DisplayName));
+                        BroadcastGroupLocalized(result, lang => CapturedInLanguage(leaderRecording, leaderOutput, lang, player.DisplayName));
                 }
             }
 
@@ -1838,13 +1792,16 @@ public partial class CombatEngine
                     else
                     {
                         // NPC teammate — capture output for group broadcast
-                        if (hasGroup) terminal.StartCapture();
-                        await ProcessTeammateActionMultiMonster(teammate, monsters, result);
+                        // v1.2.4: recorded, so each member reads it in their own language
+                        LocRecording? npcRecording = null;
+                        if (hasGroup) { terminal.StartCapture(); npcRecording = Loc.BeginRecording(); }
+                        try { await ProcessTeammateActionMultiMonster(teammate, monsters, result); }
+                        finally { if (npcRecording != null) Loc.EndRecording(npcRecording); }
                         if (hasGroup)
                         {
                             string? npcOutput = terminal.StopCapture();
                             if (!string.IsNullOrWhiteSpace(npcOutput))
-                                BroadcastGroupCombatEvent(result, npcOutput);
+                                BroadcastGroupLocalized(result, lang => CapturedInLanguage(npcRecording, npcOutput, lang, player.DisplayName));
                         }
                     }
                 }
@@ -1932,7 +1889,9 @@ public partial class CombatEngine
                     // Capture per-attack so we can skip broadcast when monster targets a grouped player
                     // (MonsterAttacksCompanion already sends direct messages to grouped players)
                     _lastMonsterTargetedGroupPlayer = false;
-                    if (hasGroup) terminal.StartCapture();
+                    // v1.2.4: recorded, so each member reads the capture in their own language
+                    LocRecording? monsterRecording = null;
+                    if (hasGroup) { terminal.StartCapture(); monsterRecording = Loc.BeginRecording(); }
 
                     terminal.WriteLine("");
                     terminal.SetColor("red");
@@ -1941,7 +1900,8 @@ public partial class CombatEngine
                     // ProcessMonsterAction now, after the skip-returns and target
                     // selection, so neither announces an action the monster does not take.
 
-                    await ProcessMonsterAction(monster, player, result, monsters);
+                    try { await ProcessMonsterAction(monster, player, result, monsters); }
+                    finally { if (monsterRecording != null) Loc.EndRecording(monsterRecording); }
 
                     // Broadcast this attack to followers — but skip if monster targeted a grouped
                     // player, because MonsterAttacksCompanion already sent them direct messages.
@@ -1949,8 +1909,7 @@ public partial class CombatEngine
                     {
                         string? monsterOutput = terminal.StopCapture();
                         if (!_lastMonsterTargetedGroupPlayer && !string.IsNullOrWhiteSpace(monsterOutput))
-                            BroadcastGroupCombatEvent(result,
-                                ConvertToThirdPerson(monsterOutput, player.DisplayName));
+                            BroadcastGroupLocalized(result, lang => CapturedInLanguage(monsterRecording, monsterOutput, lang, player.DisplayName));
                     }
 
                     await Pacing.Wait(GetCombatDelay(800));
@@ -4424,7 +4383,11 @@ public partial class CombatEngine
 
             case GodDomain.Nature:
             {
-                var beast = MiracleSystem.SummonBeast(actor);
+                // v1.2.4: the beast joins the shared fight and can reach the news, so its name stays in the
+                // session's language even when a follower's turn is drawn in theirs
+                Character? beast;
+                using (Loc.SessionLanguage())
+                    beast = MiracleSystem.SummonBeast(actor);
                 if (beast == null) break;
                 result.Teammates ??= new List<Character>();
                 result.Teammates.Add(beast);   // this fight's list (currentTeammates); it never joins the dungeon party
@@ -21008,8 +20971,8 @@ public partial class CombatEngine
             // Broadcast NPC/companion death to all group followers
             if (!companion.IsGroupedPlayer)
             {
-                BroadcastGroupCombatEvent(result,
-                    $"\u001b[1;31m  ═══ {Loc.Get("combat.npc_fallen_battle_banner", companion.DisplayName)} ═══\u001b[0m");
+                BroadcastGroupLocalized(result, lang =>
+                    $"\u001b[1;31m  ═══ {Loc.GetIn(lang, "combat.npc_fallen_battle_banner", companion.DisplayName)} ═══\u001b[0m");
             }
 
             if (companion.IsEcho)
@@ -21408,15 +21371,8 @@ public partial class CombatEngine
         // Broadcast victory to group followers with details
         if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
         {
-            var vicSb = new System.Text.StringBuilder();
-            vicSb.AppendLine("\u001b[1;32m  ═══════════════════════════\u001b[0m");
-            vicSb.AppendLine($"\u001b[1;32m      {victoryMessage}\u001b[0m");
-            vicSb.AppendLine("\u001b[1;32m  ═══════════════════════════\u001b[0m");
-            if (result.DefeatedMonsters.Count == 1)
-                vicSb.AppendLine($"\u001b[37m  Defeated: {result.DefeatedMonsters[0].Name}\u001b[0m");
-            else
-                vicSb.AppendLine($"\u001b[37m  Defeated {result.DefeatedMonsters.Count} enemies\u001b[0m");
-            BroadcastGroupCombatEvent(result, vicSb.ToString());
+            // v1.2.4: built for each member in their own language
+            BroadcastGroupLocalized(result, lang => GroupVictoryText(lang, result.DefeatedMonsters));
         }
 
         // Calculate total rewards from all defeated monsters
@@ -21831,8 +21787,12 @@ public partial class CombatEngine
                     if (teammate.RemoteTerminal != null)
                         terminal = teammate.RemoteTerminal;
                     currentPlayer = teammate;
-                    AutoHealWithPotions(teammate);
-                    AutoRestoreManaWithPotions(teammate);
+                    // v1.2.4: drawn on the follower's terminal, in the follower's language
+                    using (Loc.RenderLanguage(teammate.RemoteTerminal != null ? LanguageOf(teammate) : null))
+                    {
+                        AutoHealWithPotions(teammate);
+                        AutoRestoreManaWithPotions(teammate);
+                    }
                 }
                 finally
                 {
@@ -22491,7 +22451,7 @@ public partial class CombatEngine
         if (MentalSystem.IsCollapseDeath(floor))
         {
             follower.HP = 0;
-            if (own != null) { own.SetColor("bright_red"); own.WriteLine(Loc.Get("mental.collapse_death")); }
+            if (own != null) { own.SetColor("bright_red"); own.WriteLine(Loc.GetIn(LanguageOf(follower), "mental.collapse_death")); }
             // the collapse is the Mental cost itself, so no death loss; Broken and 20 for after the death
             MentalSystem.ApplyCollapseDeathAftermath(follower);
             UsurperRemake.Server.GroupFollowerDeath.Mark(follower, Loc.Get("mental.collapse_killer"));
@@ -22502,8 +22462,9 @@ public partial class CombatEngine
             if (own != null)
             {
                 own.SetColor("bright_magenta");
-                own.WriteLine(Loc.Get("mental.collapse_rescue"));
-                if (fee > 0) own.WriteLine(Loc.Get("mental.collapse_fee", fee.ToString("N0")));
+                string ownLang = LanguageOf(follower);   // v1.2.4: the follower's own screen
+                own.WriteLine(Loc.GetIn(ownLang, "mental.collapse_rescue"));
+                if (fee > 0) own.WriteLine(Loc.GetIn(ownLang, "mental.collapse_fee", fee.ToString("N0")));
             }
             follower.PendingMentalRescue = true;
             follower.IsAwaitingCombatInput = false;
@@ -22589,7 +22550,7 @@ public partial class CombatEngine
         terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires")}");
         terminal.WriteLine("");
         if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
-            BroadcastGroupCombatEvent(result, $"\u001b[1;35m  {Loc.Get("miracle.mortis_fires_other", player.DisplayName)}\u001b[0m");
+            BroadcastGroupLocalized(result, lang => GroupLineWrapped(lang, "\u001b[1;35m", "miracle.mortis_fires_other", player.DisplayName));
         await Pacing.Wait(GetCombatDelay(1500));
         result.Outcome = result.Monsters != null && !result.Monsters.Any(m => m.IsAlive)
             ? CombatOutcome.Victory : CombatOutcome.PlayerEscaped;
@@ -22608,7 +22569,7 @@ public partial class CombatEngine
         if (follower == null || !follower.IsGroupedPlayer || leader == null) return false;
         if (leader.IsArrestCombat || leader.IsExhibitionCombat || result!.Opponent != null) return false;
         if (!MiracleSystem.TryCheatDeath(follower)) return false;
-        follower.RemoteTerminal?.WriteLine($"  {Loc.Get("miracle.mortis_fires")}", "bright_magenta");
+        follower.RemoteTerminal?.WriteLine($"  {Loc.GetIn(LanguageOf(follower), "miracle.mortis_fires")}", "bright_magenta");
         terminal.WriteLine($"  {Loc.Get("miracle.mortis_fires_other", follower.DisplayName)}", "bright_magenta");
         return true;
     }
@@ -22644,8 +22605,8 @@ public partial class CombatEngine
             // rest of the party sees what happened.
             if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
             {
-                BroadcastGroupCombatEvent(result,
-                    $"{(wasDeathsDoor ? "\u001b[1;31m" : "\u001b[1;33m")}  {Loc.Get(wasDeathsDoor ? "combat.deaths_door_broadcast" : "combat.last_stand_broadcast", result.Player.DisplayName)}\u001b[0m");
+                BroadcastGroupLocalized(result, lang => GroupLineWrapped(lang, wasDeathsDoor ? "\u001b[1;31m" : "\u001b[1;33m",
+                    wasDeathsDoor ? "combat.deaths_door_broadcast" : "combat.last_stand_broadcast", result.Player.DisplayName));
             }
 
             // The caller set Outcome=PlayerDied before invoking HandlePlayerDeath
@@ -30960,23 +30921,24 @@ public partial class CombatEngine
 
         string lang = self != null ? LanguageOf(self) : GameConfig.Language;   // v1.2.2: the follower's terminal
         term.SetColor("gray");
-        term.Write($"  {Loc.GetIn(lang, "combat.party_label")} ");
+        string label = $"  {Loc.GetIn(lang, "combat.party_label")} ";
+        term.Write(label);
+        int col = label.Length;   // v1.2.4: the row wraps before 79 columns
         for (int i = 0; i < members.Count; i++)
         {
             var m = members[i];
-            if (i > 0) { term.SetColor("gray"); term.Write(" | "); }
             string tag = m == self ? Loc.GetIn(lang, "combat.party_you") : (m == leader ? $"{m.DisplayName} {Loc.GetIn(lang, "party.tag_leader")}" : m.DisplayName);
-            if (!m.IsAlive || m.HP <= 0)
+            bool down = !m.IsAlive || m.HP <= 0;
+            int pct = m.MaxHP > 0 ? (int)(100.0 * m.HP / m.MaxHP) : 0;
+            string entry = down ? Loc.GetIn(lang, "combat.party_down", tag) : $"{tag} {m.HP}/{m.MaxHP} ({pct}%)";
+            if (i > 0)
             {
-                term.SetColor("darkgray");
-                term.Write(Loc.GetIn(lang, "combat.party_down", tag));
+                if (col + 3 + entry.Length > 79) { term.WriteLine(""); term.Write("    "); col = 4; }
+                else { term.SetColor("gray"); term.Write(" | "); col += 3; }
             }
-            else
-            {
-                int pct = m.MaxHP > 0 ? (int)(100.0 * m.HP / m.MaxHP) : 0;
-                term.SetColor(pct >= 60 ? "bright_green" : pct >= 30 ? "yellow" : "red");
-                term.Write($"{tag} {m.HP}/{m.MaxHP} ({pct}%)");
-            }
+            term.SetColor(down ? "darkgray" : pct >= 60 ? "bright_green" : pct >= 30 ? "yellow" : "red");
+            term.Write(entry);
+            col += entry.Length;
         }
         term.WriteLine("");
     }
@@ -31045,6 +31007,9 @@ public partial class CombatEngine
         // Swap terminal to follower's BEFORE display so full combat UI renders on their screen
         var savedTerminal = terminal;
         var savedPlayer = currentPlayer;
+        // v1.2.4: everything drawn during the follower's turn is in the follower's language; the leader's
+        // session language is not written, and the scope ends with the method (after the finally below)
+        using var followerLanguage = Loc.RenderLanguage(remoteLang);
         try
         {
             terminal = remoteTerminal;
@@ -31187,8 +31152,7 @@ public partial class CombatEngine
                         teammate.CombatInputChannel = null;
                     }
                     teammate.IsAwaitingCombatInput = false;
-                    BroadcastGroupedPlayerAction(
-                        $"\u001b[35m  {Loc.Get("miracle.vanish_other", teammate.DisplayName)}\u001b[0m", teammate);
+                    BroadcastGroupedPlayerLocalized(lang => GroupLineWrapped(lang, "\u001b[35m", "miracle.vanish_other", teammate.DisplayName), teammate);
                 }
                 return;
             }
@@ -31213,30 +31177,31 @@ public partial class CombatEngine
                     }
                     teammate.IsAwaitingCombatInput = false;
                     // Broadcast to group
-                    BroadcastGroupedPlayerAction(
-                        $"\u001b[33m  {teammate.DisplayName} retreats from combat!\u001b[0m", teammate);
+                    BroadcastGroupedPlayerLocalized(lang => GroupLineWrapped(lang, "\u001b[33m", "combat.group_member_retreats", teammate.DisplayName), teammate);
                 }
                 else
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine($"  {Loc.Get("combat.retreat_failed")}");
-                    BroadcastGroupedPlayerAction(
-                        $"\u001b[31m  {teammate.DisplayName} tries to retreat but fails!\u001b[0m", teammate);
+                    BroadcastGroupedPlayerLocalized(lang => GroupLineWrapped(lang, "\u001b[31m", "combat.group_member_retreat_fails", teammate.DisplayName), teammate);
                 }
                 return; // Don't fall through to ProcessPlayerActionMultiMonster
             }
 
             // Execute the action with output capture — terminal is already swapped
+            // v1.2.4: recorded in the follower's language, re-rendered for each other member
             terminal.StartCapture();
-            await ProcessPlayerActionMultiMonster(action, teammate, monsters, result);
+            var actionRecording = Loc.BeginRecording();
+            try { await ProcessPlayerActionMultiMonster(action, teammate, monsters, result); }
+            finally { Loc.EndRecording(actionRecording); }
             string? capturedOutput = terminal.StopCapture();
 
             // Broadcast the captured combat output to leader and other followers
             // Convert "You attack" → "Ted attacks" for third-person perspective
             if (!string.IsNullOrWhiteSpace(capturedOutput))
             {
-                BroadcastGroupedPlayerAction(
-                    ConvertToThirdPerson(capturedOutput, teammate.DisplayName), teammate);
+                BroadcastGroupedPlayerLocalized(
+                    lang => CapturedInLanguage(actionRecording, capturedOutput, lang, teammate.DisplayName), teammate);
             }
         }
         finally
@@ -31633,14 +31598,16 @@ public partial class CombatEngine
     /// that was rendered on the actor's terminal (with "You" references — reads naturally
     /// since the turn header already identifies whose turn it was).
     /// </summary>
-    private void BroadcastGroupedPlayerAction(string capturedOutput, Character teammate)
+    private void BroadcastGroupedPlayerLocalized(Func<string, string> build, Character teammate)
     {
+        // v1.2.4: each other member reads it in their own language
+        if (GroupBroadcastSink != null) { GroupBroadcastSink(teammate.GroupPlayerUsername, build); return; }
         var group = UsurperRemake.Server.GroupSystem.Instance?.GetGroupFor(
             teammate.GroupPlayerUsername ?? "");
         if (group == null) return;
 
-        UsurperRemake.Server.GroupSystem.Instance!.BroadcastToAllGroupSessions(
-            group, capturedOutput, excludeUsername: teammate.GroupPlayerUsername, inDungeonOnly: true);
+        UsurperRemake.Server.GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(
+            group, build, excludeUsername: teammate.GroupPlayerUsername, inDungeonOnly: true);
     }
 
     /// <summary>
@@ -31996,14 +31963,9 @@ public partial class CombatEngine
     /// <summary>v1.2.2: runs a synchronous builder with the session language set to `lang`, for text shown to another player.</summary>
     internal static T InLanguage<T>(string lang, Func<T> build)
     {
-        var prev = GameConfig.Language;
-        if (prev == lang) return build();
-        try
-        {
-            GameConfig.Language = lang;
+        // v1.2.4: a render scope, so the session's own language is never written
+        using (Loc.RenderLanguage(lang))
             return build();
-        }
-        finally { GameConfig.Language = prev; }
     }
 
     /// <summary>
@@ -32050,7 +32012,45 @@ public partial class CombatEngine
     /// English "You ..." forms).
     /// </summary>
     internal static string CapturedInLanguage(LocRecording? recording, string captured, string lang, string name)
-        => ConvertToThirdPerson(recording?.Render(captured, lang) ?? captured, name);
+    {
+        // v1.2.4: English and unrecorded captures read as before: English, "You attack" made "Name attacks"
+        string english = ConvertToThirdPerson(recording?.Render(captured, "en") ?? captured, name);
+        if (recording == null) return ConvertToThirdPerson(captured, name);
+        if (lang == "en") return english;
+
+        // Another language: a line with a third person key reads in the reader's language; any other line
+        // that is second person in English ("you", "your") falls back to the English third person line,
+        // so a reader never sees "you" meaning another player.
+        string local = recording.Render(captured, lang, (key, args) => ThirdPersonLine(lang, key, name, args));
+        string englishThird = recording.Render(captured, "en", (key, args) => ThirdPersonLine("en", key, name, args));
+        var localRows = local.Split('\n');
+        var englishRows = englishThird.Split('\n');
+        var fallbackRows = english.Split('\n');
+        if (localRows.Length != englishRows.Length || englishRows.Length != fallbackRows.Length) return english;
+        for (int i = 0; i < localRows.Length; i++)
+            if (SecondPersonInEnglish.IsMatch(UIHelper.StripAnsi(englishRows[i]))) localRows[i] = fallbackRows[i];
+        return string.Join("\n", localRows);
+    }
+
+    /// <summary>v1.2.4: the captured lines with a third person form for other readers: key to its "{0} ..." key.</summary>
+    internal static readonly Dictionary<string, string> ThirdPersonKeys = new()
+    {
+        ["combat.defend_stance"] = "combat.defend_stance_third",
+        ["combat.you_attack_target"] = "combat.you_attack_target_third",
+        ["combat.you_miss"] = "combat.you_miss_third",
+    };
+
+    private static string? ThirdPersonLine(string lang, string key, string name, object[] args)
+    {
+        if (!ThirdPersonKeys.TryGetValue(key, out var third)) return null;
+        var withName = new object[args.Length + 1];
+        withName[0] = name;
+        Array.Copy(args, 0, withName, 1, args.Length);
+        return Loc.GetIn(lang, third, withName);
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex SecondPersonInEnglish =
+        new(@"\b(you|your|yours|yourself)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     /// <summary>v1.2.2: the group loot notice for another member, in their language.</summary>
     internal static string GroupLootMessage(string lang, string recipientName, LocalizedLines lines)
@@ -32120,6 +32120,10 @@ public partial class CombatEngine
     internal static string GroupLine(string lang, string ansi, string key, params object[] args)
         => $"{ansi}  {Loc.GetIn(lang, key, args)}\u001b[0m";
 
+    /// <summary>v1.2.4: GroupLine word wrapped so no row is wider than 79 columns (long names).</summary>
+    internal static string GroupLineWrapped(string lang, string ansi, string key, params object[] args)
+        => string.Join("\n", UIHelper.WordWrap(Loc.GetIn(lang, key, args), 77).Select(row => $"{ansi}  {row}\u001b[0m"));
+
     /// <summary>v1.2.2: GroupLine with the text between *** marks, for the ambush and boss phase lines.</summary>
     internal static string GroupStarLine(string lang, string ansi, string key, params object[] args)
         => $"{ansi}  *** {Loc.GetIn(lang, key, args)} ***\u001b[0m";
@@ -32143,6 +32147,101 @@ public partial class CombatEngine
     /// session's language; anyone else is on the session running the fight. A static so tests can
     /// stand in for the live session lookup.
     /// </summary>
+    /// <summary>
+    /// v1.2.4: when set (tests), the localized group broadcasts call it with the excluded username and
+    /// the per-language builder instead of sending to live sessions.
+    /// </summary>
+    internal static Action<string?, Func<string, string>>? GroupBroadcastSink;
+
+    /// <summary>v1.2.4: the fight's opening lines for another group member, in the reader's language.</summary>
+    internal static string GroupCombatIntro(string lang, List<Monster> monsters, IEnumerable<Character>? teammates)
+        => InLanguage(lang, () =>
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"\u001b[1;31m  ═══ {Loc.Get("combat.header")} ═══\u001b[0m");
+            if (monsters.Count == 1)
+            {
+                var m = monsters[0];
+                if (!string.IsNullOrEmpty(m.Phrase))
+                {
+                    if (m.CanSpeak)
+                        sb.AppendLine($"\u001b[33m  {Loc.Get("combat.monster_says", m.TheNameOrName, m.Phrase)}\u001b[0m");
+                    else
+                        sb.AppendLine($"\u001b[33m  {m.TheNameOrName} {m.Phrase}\u001b[0m");
+                }
+                sb.AppendLine($"\u001b[37m  {Loc.Get("combat.facing", m.GetDisplayInfo())}\u001b[0m");
+            }
+            else
+            {
+                foreach (var m in monsters)
+                    sb.AppendLine($"\u001b[37m  - {m.Name} (Lv{m.Level}, {m.HP} HP)\u001b[0m");
+            }
+            var alive = teammates?.Where(t => t.IsAlive).ToList() ?? new List<Character>();
+            if (alive.Count > 0)
+            {
+                sb.AppendLine($"\u001b[37m  {Loc.Get("combat.fighting_alongside")}\u001b[0m");
+                foreach (var tm in alive)
+                    sb.AppendLine($"\u001b[37m    - {tm.DisplayName} (Lv{tm.Level})\u001b[0m");
+            }
+            return sb.ToString();
+        });
+
+    /// <summary>
+    /// v1.2.4: the round number and compact monster and party status for another group member, in the
+    /// reader's language. The party row wraps so no row is wider than 79 columns.
+    /// </summary>
+    internal static string RoundStatusText(string lang, int round, IEnumerable<Monster> monsters, Character leader, IEnumerable<Character>? teammates)
+    {
+        static string HpColor(long hp, long max)
+        {
+            int pct = (int)(hp * 100 / Math.Max(1, max));
+            return pct > 50 ? "\u001b[32m" : pct > 25 ? "\u001b[33m" : "\u001b[31m";
+        }
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"\u001b[90m  ── {Loc.GetIn(lang, "combat.round_label", round)} ──\u001b[0m");
+        foreach (var m in monsters.Where(m => m.IsAlive))
+        {
+            int hpPct = (int)(m.HP * 100 / Math.Max(1, m.MaxHP));
+            sb.AppendLine($"\u001b[37m  {m.Name}: {HpColor(m.HP, m.MaxHP)}{hpPct}%\u001b[0m");
+        }
+        var members = new List<Character> { leader };
+        if (teammates != null) members.AddRange(teammates.Where(t => t.IsAlive));
+        string label = Loc.GetIn(lang, "combat.party_label");
+        sb.Append($"\u001b[36m  {label} ");
+        int col = 2 + label.Length + 1;
+        for (int i = 0; i < members.Count; i++)
+        {
+            var c = members[i];
+            string entry = $"{c.DisplayName} {c.HP}/{c.MaxHP}";
+            if (i > 0)
+            {
+                if (col + 3 + entry.Length > 79) { sb.AppendLine(); sb.Append("    "); col = 4; }
+                else { sb.Append("\u001b[90m | \u001b[0m"); col += 3; }
+            }
+            sb.Append($"{HpColor(c.HP, c.MaxHP)}{entry}\u001b[0m");
+            col += entry.Length;
+        }
+        sb.AppendLine();
+        return sb.ToString();
+    }
+
+    /// <summary>v1.2.4: the round status to the other group members, each in their own language.</summary>
+    private void BroadcastRoundStatus(CombatResult result, int roundNumber, List<Monster> monsters, Character player)
+        => BroadcastGroupLocalized(result, lang => RoundStatusText(lang, roundNumber, monsters, player, result.Teammates));
+
+    /// <summary>v1.2.4: the victory banner and what was defeated, for another group member in their language.</summary>
+    internal static string GroupVictoryText(string lang, List<Monster> defeated)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine("\u001b[1;32m  ═══════════════════════════\u001b[0m");
+        sb.AppendLine($"\u001b[1;32m      {InLanguage(lang, () => CombatMessages.GetVictoryMessage(defeated.Count))}\u001b[0m");
+        sb.AppendLine("\u001b[1;32m  ═══════════════════════════\u001b[0m");
+        sb.AppendLine(defeated.Count == 1
+            ? $"\u001b[37m  {Loc.GetIn(lang, "combat.group_defeated_one", defeated[0].Name)}\u001b[0m"
+            : $"\u001b[37m  {Loc.GetIn(lang, "combat.defeated_count", defeated.Count)}\u001b[0m");
+        return sb.ToString();
+    }
+
     internal static Func<Character, string> LanguageOf = c =>
     {
         var session = string.IsNullOrEmpty(c.GroupPlayerUsername) ? null : GroupSystem.GetSession(c.GroupPlayerUsername);
@@ -32166,6 +32265,7 @@ public partial class CombatEngine
     /// </summary>
     private void BroadcastGroupLocalized(CombatResult result, Func<string, string> build)
     {
+        if (GroupBroadcastSink != null) { GroupBroadcastSink(SessionContext.Current?.Username, build); return; }
         var ctx = SessionContext.Current;
         if (ctx == null) return;
         var group = GroupSystem.Instance?.GetGroupFor(ctx.Username);
