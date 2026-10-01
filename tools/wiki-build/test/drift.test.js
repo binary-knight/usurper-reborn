@@ -161,3 +161,160 @@ test("drift: warn mode exits 0 and fail mode exits non-zero with stale guides", 
   });
   assert.match(annotated.stdout, /^::warning file=DOCS\/wiki\/world\/changed\.md,line=1::/m);
 });
+
+// History rule fixtures: each test gets its own repo so tags do not leak.
+const { previousTag } = require("../drift.js");
+const fixtures = [];
+after(() => {
+  for (const dir of fixtures) fs.rmSync(dir, { recursive: true, force: true });
+});
+function historyRepo() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-history-"));
+  fixtures.push(dir);
+  const g = (...args) => {
+    const r = spawnSync("git", ["-c", "commit.gpgsign=false", ...args], {
+      cwd: dir,
+      env,
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, r.stderr);
+    return r.stdout;
+  };
+  const put = (file, text) => {
+    fs.mkdirSync(path.dirname(path.join(dir, file)), { recursive: true });
+    fs.writeFileSync(path.join(dir, file), text);
+  };
+  const page = (name, sources, history = []) =>
+    put(
+      `DOCS/wiki/world/${name}.md`,
+      `---\ntitle: ${name}\npath: /wiki/en/world/${name}/\nchecked: 1.1.0\nsources: ${sources.join(", ")}\n${history.map((h) => `history: ${h}\n`).join("")}---\nText.\n`,
+    );
+  g("init", "-q", "-b", "main");
+  put("Scripts/Locations/ShopLocation.cs", "old\n");
+  put("Scripts/Locations/InnLocation.cs", "same\n");
+  g("add", "-A");
+  g("commit", "-q", "-m", "release");
+  g("tag", "v1.0.0");
+  put("Scripts/Locations/ShopLocation.cs", "new\n");
+  put("Scripts/Systems/Added.cs", "added\n");
+  page("inn", ["Scripts/Locations/InnLocation.cs"]);
+  put("tools/wiki-build/coverage-allowlist.txt", "ShopLocation.cs  covered by the shop guide when a test adds it\n");
+  g("add", "-A");
+  g("commit", "-q", "-m", "work");
+  const commit = () => {
+    g("add", "-A");
+    g("commit", "-q", "-m", "guides");
+  };
+  const run = (version) => check({ root: dir, version });
+  const cli = (version, mode = "fail") =>
+    spawnSync(
+      process.execPath,
+      [path.resolve(__dirname, "../drift.js"), "--mode", mode, "--root", dir, "--version", version],
+      { env, encoding: "utf8" },
+    );
+  return { dir, g, put, page, commit, run, cli };
+}
+
+test("history: an untagged version with a changed-source guide missing a line fails and names the guide and file", () => {
+  const h = historyRepo();
+  h.page("shop", ["Scripts/Locations/ShopLocation.cs"]);
+  h.page("added", ["Scripts/Systems/Added.cs"]);
+  h.commit();
+  const r = h.run("1.1.0");
+  assert.equal(r.history.active, true);
+  assert.equal(r.history.previous, "v1.0.0");
+  assert.deepEqual(r.history.missing, [
+    {
+      guide: "DOCS/wiki/world/added.md",
+      changes: [{ file: "Scripts/Systems/Added.cs", change: "added" }],
+    },
+    {
+      guide: "DOCS/wiki/world/shop.md",
+      changes: [{ file: "Scripts/Locations/ShopLocation.cs", change: "changed" }],
+    },
+  ]);
+  const out = h.cli("1.1.0");
+  assert.equal(out.status, 1, out.stdout + out.stderr);
+  assert.match(out.stdout, /Guides missing a history line for 1\.1\.0: 2/);
+  assert.match(out.stdout, /DOCS\/wiki\/world\/shop\.md\n {4}changed Scripts\/Locations\/ShopLocation\.cs/);
+  assert.equal(h.cli("1.1.0", "warn").status, 0);
+});
+
+test("history: a sentence or a none marker for the version passes", () => {
+  const h = historyRepo();
+  h.page("shop", ["Scripts/Locations/ShopLocation.cs"], ["1.1.0 | The shop sells more."]);
+  h.page("added", ["Scripts/Systems/Added.cs"], ["1.1.0 | none"]);
+  h.commit();
+  const r = h.run("1.1.0");
+  assert.equal(r.history.active, true);
+  assert.deepEqual(r.history.missing, []);
+  const out = h.cli("1.1.0");
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.match(out.stdout, /History rule: active, comparing sources with v1\.0\.0/);
+});
+
+test("history: a line for another version does not satisfy the rule", () => {
+  const h = historyRepo();
+  h.page("shop", ["Scripts/Locations/ShopLocation.cs"], ["1.0.0 | Older note."]);
+  h.commit();
+  assert.deepEqual(
+    h.run("1.1.0").history.missing.map((m) => m.guide),
+    ["DOCS/wiki/world/shop.md"],
+  );
+});
+
+test("history: a guide whose sources are unchanged needs no line", () => {
+  const h = historyRepo();
+  const r = h.run("1.1.0");
+  assert.equal(r.history.active, true);
+  assert.deepEqual(r.history.missing, []);
+  assert.equal(h.cli("1.1.0").status, 0);
+});
+
+test("history: the rule is inactive once the version is tagged", () => {
+  const h = historyRepo();
+  h.page("shop", ["Scripts/Locations/ShopLocation.cs"]);
+  h.commit();
+  h.g("tag", "v1.1.0");
+  const r = h.run("1.1.0");
+  assert.equal(r.history.active, false);
+  assert.deepEqual(r.history.missing, []);
+  const out = h.cli("1.1.0");
+  assert.equal(out.status, 0, out.stdout + out.stderr);
+  assert.match(out.stdout, /History rule: inactive, v1\.1\.0 is already tagged/);
+});
+
+test("history: the rule is inactive with no release tag below the version", () => {
+  const h = historyRepo();
+  h.page("shop", ["Scripts/Locations/ShopLocation.cs"]);
+  h.commit();
+  const r = h.run("0.9.0");
+  assert.equal(r.history.active, false);
+  assert.deepEqual(r.history.missing, []);
+});
+
+test("history: the previous release is the highest lower tag by number, not by date", () => {
+  const h = historyRepo();
+  const dated = (date, ...args) => {
+    const r = spawnSync("git", ["-c", "commit.gpgsign=false", "-c", "tag.gpgsign=false", ...args], {
+      cwd: h.dir,
+      env: { ...env, GIT_COMMITTER_DATE: date, GIT_AUTHOR_DATE: date },
+      encoding: "utf8",
+    });
+    assert.equal(r.status, 0, r.stderr);
+  };
+  h.put("a.txt", "a\n");
+  h.g("add", "-A");
+  dated("2026-01-01T00:00:00Z", "commit", "-q", "-m", "a");
+  dated("2026-01-01T00:00:00Z", "tag", "-a", "v1.2.2", "-m", "1.2.2");
+  h.put("b.txt", "b\n");
+  h.g("add", "-A");
+  dated("2026-02-01T00:00:00Z", "commit", "-q", "-m", "b");
+  dated("2026-02-01T00:00:00Z", "tag", "-a", "v1.2.1", "-m", "1.2.1");
+  for (const t of ["v1.2.10", "v1.10.0", "v1.2.2-rc1", "wiki-1.2.9", "v1.2"]) h.g("tag", t);
+  assert.equal(previousTag(h.dir, "1.2.3"), "v1.2.2");
+  assert.equal(previousTag(h.dir, "1.2.11"), "v1.2.10");
+  assert.equal(previousTag(h.dir, "1.2.2"), "v1.2.1");
+  assert.equal(previousTag(h.dir, "1.0.0"), null);
+  assert.equal(h.run("1.2.3").history.previous, "v1.2.2");
+});

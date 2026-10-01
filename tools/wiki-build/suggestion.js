@@ -21,6 +21,15 @@ function validateSuggestion(input, root) {
     throw Error(
       "Provide a complete Markdown page with frontmatter, up to 100000 characters",
     );
+  // A reviewed draft keeps every history line the page already has.
+  const historyLines = (markdown) => {
+    const m = markdown.match(/^---\n([\s\S]*?)\n---\n/);
+    return m ? m[1].split("\n").filter((l) => l.startsWith("history: ")) : [];
+  };
+  const kept = new Set(historyLines(input.markdown));
+  for (const line of historyLines(fs.readFileSync(file, "utf8")))
+    if (!kept.has(line))
+      throw Error(`The draft must keep the page's history line: ${line}`);
   if (!input.suggestion || input.suggestion.length > 800)
     throw Error("Provide the recorded suggestion, up to 800 characters");
   if (!input.evidence || input.evidence.length > 4000)

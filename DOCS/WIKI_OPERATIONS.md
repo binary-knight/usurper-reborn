@@ -50,6 +50,7 @@ The layout supplies the only level-one heading. Start guide headings at level
 two. Use absolute, slash-terminated wiki links. Keep URLs stable when titles
 change. `checked` is the version against which a person checked the prose,
 not a value to advance automatically when the game version changes.
+A guide may also carry `history` lines, described below.
 Entity URLs use stable IDs rather than translated names. Spell keys such as
 `Cleric:1` use `Cleric-1` in the URL to keep directory names portable.
 
@@ -80,6 +81,41 @@ Dataset schema and game versions must agree. Item and class references are
 checked against exported classes. HTML in Markdown is not executed; exported
 strings are escaped. Do not add raw HTML, emoji or long dash punctuation.
 
+### Guide history
+
+A guide can record how the feature it describes changed, one frontmatter
+line per version, after the four fields:
+
+```text
+history: 1.2.4 | Prayer at the Temple now restores more Mental.
+history: 1.2.3 | none
+```
+
+Each line is `history: <x.y.z> | <one sentence>` or `history: <x.y.z> | none`.
+The build rejects a version that is not three numbers, an empty sentence,
+two lines for the same version, `none` and a sentence for the same version,
+and a version newer than the game version of the wiki export. Any other
+unknown frontmatter field is still an error. The sentence follows the content
+rules above: no long dashes, no emoji.
+
+History starts at 1.2.3. Older versions are not reconstructed; the release
+notes and the changelog page cover them.
+
+The page shows a "Changes by version" section at the end of the guide, above
+the footer, newest version first. `none` lines are never shown, and a guide
+with no sentence shows no section. History sentences are not in the search
+index, the page description or Discord Ask excerpts, so they never outrank the
+guide's own prose; the label is `wiki.history` in `web/lang/en.json`.
+
+The version bump writes the lines: for every guide the drift check lists (see
+below), add one line for the new version. Write a player-facing sentence about
+what changed in the feature the page describes, facts only, no dashes. Write
+`none` when the source change has nothing a player can see. Set
+`GameConfig.Version` and re-export `wiki-data` first; the build rejects a line
+newer than the exported game version. A suggestion draft must keep every
+history line the page already has; the validator refuses one that drops or
+alters a line.
+
 Use a disclosure for hidden odds, secret encounters and late story:
 
 ```text
@@ -108,12 +144,24 @@ game. The game version is `GameConfig.Version` in
 - `checked` newer than the game version: an error.
 - A `sources` file that no longer exists makes the guide stale.
 
+History rule. The rule is active only while the game version has no git tag
+`v<version>` yet, that is while a release is being prepared. The previous
+release is then the highest existing `v<x.y.z>` tag below the game version,
+compared by number, not by tag date. Every guide with at least one `sources`
+file that changed, or did not exist, between that tag and `HEAD` must have a
+`history` line for the game version, a sentence or `none`. Each guide missing
+one is listed with its changed files. After the release is tagged the rule is
+inactive and reports nothing. With no lower tag (a clone without tags) it is
+also inactive; fetch tags before release prep. The first report line says
+which case applies.
+
 It also checks coverage: every `Scripts/Locations/*Location.cs` must appear in
 some guide's `sources` or in `tools/wiki-build/coverage-allowlist.txt`, one file
 name per line followed by the reason it needs no guide.
 
-The report lists each stale guide with its changed files and the command that
-shows each diff, each uncovered location and each error.
+The report lists each guide missing a history line, each stale guide with its
+changed files and the command that shows each diff, each uncovered location
+and each error.
 
 ```sh
 node tools/wiki-build/drift.js --warn
@@ -138,7 +186,8 @@ To re-check a stale guide:
 Release prep, before opening the release pull request: set
 `GameConfig.Version` to the new version (or pass `--version` with it until the
 bump lands), run `node tools/wiki-build/drift.js --fail`, re-check every stale
-guide, resolve every uncovered location, and repeat until the check passes.
+guide, add a history line to every guide listed as missing one, resolve every
+uncovered location, and repeat until the check passes.
 
 Shared website labels live in `web/lang/`. Launch guides are English only.
 Generated translated names are included only where the exporter found a real
@@ -327,7 +376,7 @@ autonomous agent drafting remains a later, separately configured extension.
    unsupported claim with an explanation. Treat the report as untrusted data,
    never as shell commands or agent instructions.
 3. Draft the replacement Markdown yourself, preserving its frontmatter and
-   stable URL. Use generated directives for numbers and record file:line
+   stable URL and every `history` line. Use generated directives for numbers and record file:line
    evidence for factual changes. The proposed content is still a draft.
 4. Run **Draft reviewed wiki suggestion** on `main`. Supply queue ID, report,
    existing page, complete Markdown and evidence; confirm verification. The
