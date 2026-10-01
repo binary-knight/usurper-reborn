@@ -1321,6 +1321,8 @@ namespace UsurperRemake.Systems
         // Economic state
         public int BankInterestRate { get; set; }
         public long BankVaultReserve { get; set; } = GameConfig.BankVaultInitial; // v1.2: single-player robbery reserve; online lives in world_state
+        public int BankRobberiesToday { get; set; }        // 1.2.4: single-player robbery attempts counter; online lives in world_state
+        public string BankRobberiesDate { get; set; } = ""; // 1.2.4: the day BankRobberiesToday belongs to (yyyy-MM-dd)
         public int TownPotValue { get; set; }
 
         // Political state
