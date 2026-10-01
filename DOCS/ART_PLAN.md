@@ -15,8 +15,9 @@ out of scope; this is the text game on every transport it has.
   combat start, game over, new hero, skull), plus `Assets/ASCII/TitleScreen.txt`.
   They are hand-typed block glyphs with inline `[color]` markup, shown at about
   ten call sites through `DisplayArt` and `DisplayArtAnimated`.
-- Sizes today: 7 to 18 rows; widths 26 to 81 columns. `LevelUp` is 81 wide,
-  which already wraps on an 80-column terminal. Most pieces are lettering
+- Sizes today: 7 to 18 rows; widths 26 to 79 columns. `LevelUp` was 81 wide
+  and `DungeonEntrance` 80 until 1.2.4 trimmed them to 79 and 78
+  (`Tests/ArtWidth124Tests.cs` holds every row to 79). Most pieces are lettering
   ("YOU DIED", "LEVEL UP", the title) drawn in blocks, which cannot be
   localized and reads as text, not art.
 - The emulator draws sixteen foreground colors only. There is no background
