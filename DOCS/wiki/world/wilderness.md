@@ -1,7 +1,7 @@
 ---
 title: Wilderness exploration
 path: /wiki/en/world/wilderness/
-checked: 1.2.1
+checked: 1.2.2
 sources: Scripts/Data/WildernessData.cs, Scripts/Locations/WildernessLocation.cs
 ---
 The wilderness offers regions, travel encounters and discoveries outside the dungeon. Region access and discoveries can depend on level and prior exploration.

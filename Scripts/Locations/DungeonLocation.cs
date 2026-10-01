@@ -3603,7 +3603,7 @@ public class DungeonLocation : BaseLocation
         };
     }
 
-    private static string GetThemeShortName(DungeonTheme theme)
+    internal static string GetThemeShortName(DungeonTheme theme)
     {
         return theme switch
         {

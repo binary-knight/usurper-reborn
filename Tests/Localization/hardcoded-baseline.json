@@ -1023,22 +1023,6 @@
       "fb63c06e1d"
     ]
   },
-  "Scripts/Locations/SettlementLocation.cs": {
-    "count": 11,
-    "sites": [
-      "010e1f5eb9",
-      "06dedf6d16",
-      "11530fe919",
-      "3581c17fd7",
-      "3e7b216182",
-      "679b3db52f",
-      "902e9104f5",
-      "d1062576c0",
-      "da29739a03",
-      "ddf66b89c8",
-      "ee0cc14411"
-    ]
-  },
   "Scripts/Locations/TempleLocation.cs": {
     "count": 14,
     "sites": [
@@ -1064,15 +1048,6 @@
       "406ce99063",
       "4fc6793006",
       "8f08aa828c"
-    ]
-  },
-  "Scripts/Locations/WildernessLocation.cs": {
-    "count": 4,
-    "sites": [
-      "46d024c772",
-      "a734c65542",
-      "bdf8d976c3",
-      "f0ab063289"
     ]
   },
   "Scripts/Server/GroupSystem.cs": {
@@ -1562,12 +1537,6 @@
       "4f3ab4c0e8"
     ]
   },
-  "Scripts/Systems/PuzzleSystem.cs": {
-    "count": 1,
-    "sites": [
-      "9f45b24d01"
-    ]
-  },
   "Scripts/Systems/QuestSystem.cs": {
     "count": 5,
     "sites": [
@@ -1576,15 +1545,6 @@
       "379417a0a3",
       "5877781d5a",
       "b456882830"
-    ]
-  },
-  "Scripts/Systems/RareEncounters.cs": {
-    "count": 4,
-    "sites": [
-      "33d79768c1",
-      "b6d62b5d96",
-      "b6d62b5d96",
-      "b6d62b5d96"
     ]
   },
   "Scripts/Systems/RelationshipSystem.cs": {
@@ -1600,13 +1560,6 @@
     "count": 1,
     "sites": [
       "c9e689fa68"
-    ]
-  },
-  "Scripts/Systems/SettlementSystem.cs": {
-    "count": 2,
-    "sites": [
-      "5079bcceab",
-      "c7aca278cc"
     ]
   },
   "Scripts/Systems/SocialInfluenceSystem.cs": {

@@ -4873,22 +4873,6 @@
       ]
     }
   },
-  "Scripts/Systems/PuzzleSystem.cs": {
-    "data": {
-      "count": 9,
-      "sites": [
-        "0f1c179298",
-        "1d80a7bb5c",
-        "430cd5459c",
-        "4470ee262a",
-        "4e117532ef",
-        "5a51f7074c",
-        "a57ea7fa3f",
-        "b8ae39c93d",
-        "f0c1fd8933"
-      ]
-    }
-  },
   "Scripts/Systems/QuestSystem.cs": {
     "data": {
       "count": 43,
@@ -4936,14 +4920,6 @@
         "f0af292fc1",
         "fcb629d9e3",
         "fffd0b1f56"
-      ]
-    }
-  },
-  "Scripts/Systems/RareEncounters.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "f22ab787bb"
       ]
     }
   },

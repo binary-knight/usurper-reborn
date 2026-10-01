@@ -230,8 +230,6 @@ table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#1|wave fragm
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#0|prison activity name
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#1|prison activity description
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#2|prison activity effect
-table|Scripts/Systems/PuzzleSystem.cs|init.Hints|puzzle hints, DungeonLocation
-table|Scripts/Systems/PuzzleSystem.cs|init.Title|puzzle titles
 table|Scripts/Systems/QuestSystem.cs|call:CreateStarterQuest#7/tuple#0|starter quest monster names
 nouns|Scripts/Systems/QuestSystem.cs|decl:bossName|boss label fallback in quest.objective.defeat_boss
 table|Scripts/Systems/QuestSystem.cs|decl:highLevel|quest target monster names
@@ -243,7 +241,6 @@ table|Scripts/Systems/QuestSystem.cs|init.TargetId|quest target in the descripti
 nouns|Scripts/Systems/QuestSystem.cs|=targetName|quest target in castle.quest_target
 keyed|Scripts/Systems/QuestSystem.cs|init.Comment|merc.contract.{id}.comment
 keyed|Scripts/Systems/QuestSystem.cs|init.Title|merc.contract.{id}.title
-nouns|Scripts/Systems/RareEncounters.cs|=champion.Name|monster name in combat
 names|Scripts/Systems/RareEncounters.cs|decl:godNames|god names
 table|Scripts/Systems/SaveFileRepair.cs|=result.ErrorMessage|repair error, GameEngine
 keyed|Scripts/Systems/SettlementSystem.cs|init.Description|settlement.pbuilding.{id}.desc

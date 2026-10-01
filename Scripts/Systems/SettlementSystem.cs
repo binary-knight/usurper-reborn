@@ -275,7 +275,7 @@ namespace UsurperRemake.Systems
                 if (!State.Founded && State.IsEstablished)
                 {
                     State.Founded = true;
-                    NewsSystem.Instance?.Newsy(true, "A settlement has been founded beyond the city gates!");
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("dungeon.settlement_founded_news"));
                 }
 
                 // Announce new settler (not every one, just sometimes)
@@ -618,15 +618,15 @@ namespace UsurperRemake.Systems
             var template = ProposalCatalog.FirstOrDefault(t => t.Id == State.ActiveProposedBuildingId);
             string buildingName = template?.Name ?? State.ActiveProposedBuildingId;
 
-            string tierName = buildingState.Tier switch
+            string newsKey = buildingState.Tier switch
             {
-                BuildingTier.Foundation => "foundation has been laid",
-                BuildingTier.Built => "has been completed",
-                BuildingTier.Upgraded => "has been upgraded",
-                _ => "has been built"
+                BuildingTier.Foundation => "settlement.news_foundation",
+                BuildingTier.Built => "settlement.news_built",
+                BuildingTier.Upgraded => "settlement.news_upgraded",
+                _ => "settlement.news_default"
             };
 
-            NewsSystem.Instance?.Newsy(true, $"The settlement's {buildingName} {tierName}!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get(newsKey, template?.LocName ?? buildingName));
             DebugLogger.Instance?.LogDebug("SETTLEMENT", $"{buildingName} advanced to {buildingState.Tier}");
 
             // Clear active proposed building — next tick will pick a new one
