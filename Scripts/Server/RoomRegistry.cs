@@ -33,6 +33,20 @@ public class RoomRegistry
     }
 
     /// <summary>
+    /// A location each player has to themselves. 1.2.4: every player's home is the one
+    /// GameLocation.Home, so without this everyone at home shared one room. No room line
+    /// and no "Also here" crosses a private location.
+    /// </summary>
+    public static bool IsPrivateLocation(GameLocation location) => location == GameLocation.Home;
+
+    /// <summary>
+    /// "Also here" is shown at a location: not a private one, and not the Dungeons, where each
+    /// player explores their own floors (room lines there still reach the room, as before).
+    /// </summary>
+    public static bool ShowsCoPresence(GameLocation location) =>
+        location != GameLocation.Dungeons && !IsPrivateLocation(location);
+
+    /// <summary>
     /// Called when a player enters a location. Broadcasts arrival to others in the room.
     /// </summary>
     public void PlayerEntered(GameLocation location, PlayerSession session)
@@ -111,7 +125,7 @@ public class RoomRegistry
     /// </summary>
     public IReadOnlyList<string> GetPlayerNamesAt(GameLocation location, string? excludeUsername = null)
     {
-        if (!_rooms.TryGetValue(location, out var room))
+        if (IsPrivateLocation(location) || !_rooms.TryGetValue(location, out var room))
             return Array.Empty<string>();
 
         var excludeKey = excludeUsername?.ToLowerInvariant();
@@ -140,7 +154,7 @@ public class RoomRegistry
     /// </summary>
     public void BroadcastToRoom(GameLocation location, string message, string? excludeUsername = null)
     {
-        if (!_rooms.TryGetValue(location, out var room))
+        if (IsPrivateLocation(location) || !_rooms.TryGetValue(location, out var room))
             return;
 
         var excludeKey = excludeUsername?.ToLowerInvariant();
@@ -161,7 +175,7 @@ public class RoomRegistry
     /// </summary>
     public void BroadcastToRoomLocalized(GameLocation location, Func<string, string> buildMessage, string? excludeUsername = null)
     {
-        if (!_rooms.TryGetValue(location, out var room))
+        if (IsPrivateLocation(location) || !_rooms.TryGetValue(location, out var room))
             return;
 
         var excludeKey = excludeUsername?.ToLowerInvariant();
