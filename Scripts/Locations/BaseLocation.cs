@@ -881,6 +881,17 @@ public abstract class BaseLocation
                     terminal.WriteLine(string.Join(", ", _coPresenceCache.Select(p => p.DisplayName)));
                     terminal.WriteLine("");
                 }
+
+                // v1.2.4: chat that arrived since the last /history or hint was wiped by the redraw.
+                if (UsurperRemake.Server.SessionContext.IsActive)
+                {
+                    var hint = UsurperRemake.Server.MudChatSystem.TakeRedrawHint(UsurperRemake.Server.SessionContext.Current!.Username);
+                    if (hint != null)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {hint}");
+                    }
+                }
             }
 
             // Always drain pending messages — in streaming mode these must flow every
@@ -3269,6 +3280,7 @@ public abstract class BaseLocation
             WriteOnlineCmd("/emote <action>", Loc.Get("base.help_emote"));
             WriteOnlineCmd("/who", Loc.Get("base.help_who"));
             WriteOnlineCmd("/gossip <msg>", Loc.Get("base.help_gossip"));
+            WriteOnlineCmd(Loc.Get("base.help_history_cmd"), Loc.Get("base.help_history"));
             WriteOnlineCmd("/guild", Loc.Get("base.help_guild"));
             WriteOnlineCmd("/gcreate <name>", Loc.Get("base.help_gcreate"));
             WriteOnlineCmd("/ginvite <player>", Loc.Get("base.help_ginvite"));
@@ -3351,6 +3363,7 @@ public abstract class BaseLocation
             terminal.WriteLine($"/emote <action> {Loc.Get("base.help_emote")}");
             terminal.WriteLine($"/who {Loc.Get("base.help_who")}");
             terminal.WriteLine($"/gossip <msg> {Loc.Get("base.help_gossip")}");
+            terminal.WriteLine($"{Loc.Get("base.help_history_cmd")} {Loc.Get("base.help_history")}");
             terminal.WriteLine($"/guild - {Loc.Get("base.help_guild")}");
             terminal.WriteLine($"/gcreate <name> - {Loc.Get("base.help_gcreate")}");
             terminal.WriteLine($"/ginvite <player> - {Loc.Get("base.help_ginvite")}");

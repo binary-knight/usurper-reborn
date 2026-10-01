@@ -152,7 +152,7 @@ public class RoomRegistry
     /// <summary>
     /// Broadcast a message to all players at a specific location.
     /// </summary>
-    public void BroadcastToRoom(GameLocation location, string message, string? excludeUsername = null)
+    public void BroadcastToRoom(GameLocation location, string message, string? excludeUsername = null, string? historyChannel = null)
     {
         if (IsPrivateLocation(location) || !_rooms.TryGetValue(location, out var room))
             return;
@@ -164,6 +164,9 @@ public class RoomRegistry
                 continue;
 
             kvp.Value.EnqueueMessage(message);
+            // v1.2.4: chat lines go to the recipient's /history as delivered.
+            if (historyChannel != null)
+                MudChatSystem.RecordDelivered(kvp.Value, historyChannel, message);
         }
     }
 
@@ -192,11 +195,11 @@ public class RoomRegistry
     /// <summary>
     /// Broadcast a message to ALL connected players regardless of location.
     /// </summary>
-    public void BroadcastGlobal(string message, string? excludeUsername = null, string? channelKey = null)
+    public void BroadcastGlobal(string message, string? excludeUsername = null, string? channelKey = null, string? historyChannel = null)
     {
         var server = MudServer.Instance;
         if (server != null)
-            server.BroadcastToAll(message, excludeUsername, channelKey);
+            server.BroadcastToAll(message, excludeUsername, channelKey, historyChannel);
     }
 
     /// <summary>
