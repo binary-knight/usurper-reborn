@@ -4056,7 +4056,7 @@ public abstract class BaseLocation
         if (currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.RivalName))
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("base.rival_label")}: {currentPlayer.RivalName} ({Loc.Get("base.lv_label")} {currentPlayer.RivalLevel})");
+            terminal.WriteLine($"  {Loc.Get("base.rival_label")}: {currentPlayer.RivalName} ({Loc.Get("base.lv_label").Trim()} {currentPlayer.RivalLevel})"); // v1.2.3: the key carries a leading space for the BBS row
         }
         if (currentPlayer != null && currentPlayer.WeeklyRank > 0)
         {

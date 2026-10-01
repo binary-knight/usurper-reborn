@@ -417,6 +417,24 @@ public class ChromeWidth123Tests
             }
     }
 
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public void RivalLine_LevelLabel_HasNoStraySpaceOrDoubleColon(string lang)
+    {
+        string plain = InLanguage(lang, () =>
+        {
+            var hero = Hero(true, worst: false);
+            hero.RivalName = "Rivalis"; hero.RivalLevel = 12;
+            var (l, output) = At(new CrowdedInn(), hero);
+            var task = (System.Threading.Tasks.Task)typeof(BaseLocation).GetMethod("ShowHealthStatus", F)!.Invoke(l, null)!;
+            System.Threading.Tasks.Task.WhenAny(task, System.Threading.Tasks.Task.Delay(5000)).GetAwaiter().GetResult();
+            return Strip(Raw(l, output));
+        });
+        Capture($"chrome-rival-{lang}.txt", plain);
+        string row = Rows(plain).Single(r => r.Contains("Rivalis"));
+        row.Should().Contain($"({L(lang, "base.lv_label").Trim()} 12)").And.NotContain("( ").And.NotContain("::");
+    }
+
     [Fact]
     public void NoLooseWidthBound_InTheChromeHelpers()
     {
