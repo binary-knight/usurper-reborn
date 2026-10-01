@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.2.2 "Devotion"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.2.3 "Devotion"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -292,6 +292,7 @@ The game ships small patches frequently. Each version has a dedicated release no
 - **v1.1.1:** a bug pass. Five review agents each took a domain of the codebase and about seventy findings were verified and fixed: NPCs losing their innate power on load, the world simulator editing the wrong player's relationships, a restored character unable to save, one player's autosave starving everyone else's, the Black Market re-rolling on relog, a closed connection spinning the server, bank and gambling exploits, buffs consumed a fight early, and raw placeholders in the text. See `DOCS/release-notes/RELEASE_NOTES_1.1.1.md`.
 - **v1.1.2:** seven of the eight open design items, each designed twice (Codex and Claude), reconciled against the code, and reviewed before implementation: grouped followers get their own cooldowns and a real death; haggling finally has a way in and its attempts persist; the bank vault is one persisted reserve per world, atomic online; relationships cool with neglect measured in days you were present; NPCs left to die while you held a heal remember it; ability and spell numbers are moddable from `GameData/`; the two intimacy lines that really dropped a name are fixed. Docker stack refreshed and verified. See `DOCS/release-notes/RELEASE_NOTES_1.1.2.md`.
 - **v1.1.3:** party survivability. Wounded allies shield up, brace (half damage on ordinary hits, specials, and life drain), and drink their own potion first; NPC allies who die in your party roll the 2 percent team permadeath rate they were always meant to; three stances per ally (Aggressive, Balanced, Cautious) set from the dungeon party menu or the Inn and saved with the character; monsters no longer prefer a wounded target and an ally's brace no longer pulls hits unless it is Aggressive; a shared potion belt (off by default, two loans per fight, never the player's last three), give-a-number, and the one-personal-potion rule; a fight summary per ally, a warning before a voluntary fight with an ally below 30 percent, and a floor guard that offers Cautious to an ally eleven levels behind. Planned by a council of Codex, a Claude design agent, and the supervisor session in `DOCS/PARTY_SURVIVABILITY_PLAN.md`; the downed state is the next release.
+- **v1.2.3:** The dungeon is translated: room views, settlements, wilderness, rare encounters, puzzles, merchants, the map, party and follower screens, secret bosses and group broadcasts show in the player's language, and group broadcasts wrap at 79 columns. The Quick Commands bar and the status line wrap to a second row when they would pass 79 columns, and the invalid-choice hint reads correctly. Magic Shop basic rings and necklaces show their armor and give a small stat, and sell all sells only the accessories it lists. Wiki guides can show what changed in their feature by version. See `DOCS/release-notes/RELEASE_NOTES_1.2.3.md`.
 - **v1.2.2:** The whole combat system is translated, class ability names and descriptions included, and in group combat each member reads the lines in their own language. Item comparison screens, status effects and poison are translated too. Temple gold offerings no longer need a good deed left, and offerings no longer give deeds back. The wiki adds guides for reporting bugs, dungeon features and rare encounters, and search ranks matching phrases first. See `DOCS/release-notes/RELEASE_NOTES_1.2.2.md`.
 - **v1.2.1:** The player wiki opens at `/wiki/` with guides, generated references and search, and the Discord bot answers questions from it (Ask) and takes suggestions from trusted helpers (Suggest). Ask can answer in plain language through the Claude API when the server enables it. NPC stat gains from training, blessings and prison now last, street fight rage raises only the fight's opponent, admin stat edits are kept, and the Iron Rations max HP bonus survives a mid-fight recalculation. See `DOCS/release-notes/RELEASE_NOTES_1.2.1.md`.
 - **v1.2.0 "Devotion":** Mental Health is real: dungeon depth, loss and drugs wear the mind down, and rest, friends, prayer, learning and the Healer restore it; a collapse sends you to the Healer, or below floor 25 is a death. The Sage is rebuilt as the party's mind, with crowd control and party wards. The gods matter: Favor with four tiers, a boon and a Mental ward for each god, deeds and taboos, daily Miracles, a cost to switching, the god of the week and townsfolk faith, with the Temple's gods and player-gods on one list. The Temple is rebuilt as rooms and Aurelion waits in the Deep Temple. Permanent stat rewards now last. Yes/no questions ask again on a stray key, and single-player menus take Enter. See `DOCS/release-notes/RELEASE_NOTES_1.2.0.md`.
@@ -358,18 +359,18 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.2.2)
+## Known Issues (v1.2.3)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
 - Steam features only work when the game is launched through the Steam client.
 - The Electron graphical client is optional and still incomplete; the terminal client is the supported way to play.
 - The Electron client has no party menu: ally stances and the shared potion belt are set from the terminal client.
-- Not all text is translated yet. World news feed entries are stored pre-rendered in English, and some screens and data tables, mostly in older systems, still show English; combat is fully translated as of 1.2.2. The remaining text is tracked and translated system by system, and a test keeps the untranslated count from growing.
+- Not all text is translated yet. World news feed entries are stored pre-rendered in English, and some screens and data tables, mostly in older systems, still show English; combat is fully translated as of 1.2.2, and most of the dungeon, its settlements, wilderness and rare encounters as of 1.2.3; the dungeon text still in English is listed in the 1.2.3 release notes. The remaining text is tracked and translated system by system, and a test keeps the untranslated count from growing.
 - Auto-updater for Linux x64 BBS deployments doesn't currently apply the update (under investigation).
 
 **Report bugs:** Press `!` in-game, or [Discord](https://discord.gg/EZhwgDT6Ta), or [GitHub Issues](https://github.com/binary-knight/usurper-reborn/issues).
 
 ---
 
-**Status:** v1.2.2 "Devotion". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.2.3 "Devotion". The world is running. [Watch it live.](https://usurper-reborn.net)

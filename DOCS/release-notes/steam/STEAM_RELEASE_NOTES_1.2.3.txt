@@ -1,0 +1,12 @@
+[h1]Usurper Reborn 1.2.3[/h1]
+
+[list]
+[*]The dungeon is translated: room views, settlements, the wilderness, rare encounters, puzzles, merchants, the map, party and follower screens, secret bosses and group broadcasts now show in your language.
+[*]Screens fit 79 columns: group dungeon broadcasts, the Quick Commands bar and the status line wrap to a second row instead of running off the screen. In English the Quick Commands bar takes two rows outside Main Street.
+[*]Magic Shop: basic rings and necklaces show their armor and give a small stat (Dexterity on rings, Wisdom on necklaces). Sell all sells only the accessories it lists and leaves cursed and unidentified ones in your backpack.
+[*]Fixes: the dungeon status row, the BBS status line, the rival line and the invalid-choice hint no longer show doubled colons, spaces or brackets.
+[*]Wiki guides can now show what changed in their feature, version by version.
+[*]Still in English: wilderness monster names, tamed beast names, some dungeon gear names and reward labels, and parts of the follower room view.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.3.md
