@@ -226,6 +226,8 @@ public class ChromeWidth123Tests
     {
         string plain = Strip(Chrome(lang, "inn", false, worst: true));
         var rows = StatusRows(plain, lang);
+        rows.Count.Should().BeGreaterThan(1, "the worst-case status line wraps");
+        EveryRowFits(string.Join("\n", rows), $"{lang} status line");
         foreach (var row in rows.Skip(1))
         {
             row.Should().StartWith("  ").And.NotStartWith("   ", "continuation rows are indented 2");
