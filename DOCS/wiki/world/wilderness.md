@@ -1,8 +1,9 @@
 ---
 title: Wilderness exploration
 path: /wiki/en/world/wilderness/
-checked: 1.2.1
+checked: 1.2.3
 sources: Scripts/Data/WildernessData.cs, Scripts/Locations/WildernessLocation.cs
+history: 1.2.3 | Wilderness scouting, beast species, the shrine list and discovery news are translated into all five languages.
 ---
 The wilderness offers regions, travel encounters and discoveries outside the dungeon. Region access and discoveries can depend on level and prior exploration.
 

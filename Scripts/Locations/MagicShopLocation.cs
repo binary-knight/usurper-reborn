@@ -2899,19 +2899,16 @@ public partial class MagicShopLocation : BaseLocation
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (await terminal.AskYesNoAsync(""))
             {
-                // Remove all sold items from inventory (reverse to preserve indices)
+                // v1.2.3: sell only the listed rows. This loop used to take every accessory,
+                // including the cursed and unidentified ones the list skips, and pay more than it quoted.
                 int soldCount = 0;
-                for (int i = player.Inventory.Count - 1; i >= 0; i--)
+                for (int i = 0; i < sellableSource.Count; i++)
                 {
-                    var invItem = player.Inventory[i];
-                    if (invItem.Type == ObjType.Magic || invItem.Type == ObjType.Fingers || invItem.Type == ObjType.Neck)
-                    {
-                        long sellPrice = (long)(Math.Max(1, invItem.Value / 2) * fenceModifier);
-                        player.Gold += sellPrice;
-                        player.Statistics?.RecordSale(sellPrice);
-                        player.Inventory.RemoveAt(i);
-                        soldCount++;
-                    }
+                    if (!player.Inventory.Remove(sellableSource[i])) continue;
+                    long sellPrice = sellable[i].sellPrice;
+                    player.Gold += sellPrice;
+                    player.Statistics?.RecordSale(sellPrice);
+                    soldCount++;
                 }
                 terminal.SetColor("bright_green");
                 terminal.WriteLine($"  {Loc.Get("shop.sold_accessories", soldCount, $"{totalGold:N0}")}");
@@ -2946,9 +2943,12 @@ public partial class MagicShopLocation : BaseLocation
     /// <summary>
     /// Get compact bonus description for accessory display (max 3 bonuses to fit in column)
     /// </summary>
-    private static string GetAccessoryBonusDescription(Equipment item)
+    internal static string GetAccessoryBonusDescription(Equipment item)
     {
         var bonuses = new List<string>();
+        // v1.2.3: shop rings and necklaces from the basic material templates carry only armor,
+        // so the row was blank. Armor goes first so the 4 bonus cap never drops it.
+        if (item.ArmorClass != 0) bonuses.Add($"{Loc.Get("ui.stat_ac")}+{item.ArmorClass}");
         if (item.StrengthBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_str")}{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
         if (item.DexterityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")}{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
         if (item.AgilityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_agi")}{(item.AgilityBonus > 0 ? "+" : "")}{item.AgilityBonus}");
@@ -2970,9 +2970,10 @@ public partial class MagicShopLocation : BaseLocation
     /// <summary>
     /// Get detailed stats for purchase confirmation display (all bonuses shown)
     /// </summary>
-    private static string GetAccessoryDetailedStats(Equipment item)
+    internal static string GetAccessoryDetailedStats(Equipment item)
     {
         var bonuses = new List<string>();
+        if (item.ArmorClass != 0) bonuses.Add($"{Loc.Get("ui.stat_ac")}+{item.ArmorClass}");
         if (item.StrengthBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_str")}{(item.StrengthBonus > 0 ? "+" : "")}{item.StrengthBonus}");
         if (item.DexterityBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_dex")}{(item.DexterityBonus > 0 ? "+" : "")}{item.DexterityBonus}");
         if (item.ConstitutionBonus != 0) bonuses.Add($"{Loc.Get("ui.stat_con")}{(item.ConstitutionBonus > 0 ? "+" : "")}{item.ConstitutionBonus}");
@@ -2996,9 +2997,9 @@ public partial class MagicShopLocation : BaseLocation
     /// <summary>
     /// Calculate a simple score for accessory comparison (upgrade/downgrade indicator)
     /// </summary>
-    private static int GetAccessoryScore(Equipment item)
+    internal static int GetAccessoryScore(Equipment item)
     {
-        return item.StrengthBonus * 3 + item.DexterityBonus * 3 + item.ConstitutionBonus * 3
+        return item.ArmorClass + item.StrengthBonus * 3 + item.DexterityBonus * 3 + item.ConstitutionBonus * 3
              + item.IntelligenceBonus * 3 + item.WisdomBonus * 3 + item.DefenceBonus * 3
              + item.AgilityBonus * 3 + item.CharismaBonus * 3 + item.StaminaBonus * 3
              + item.MaxHPBonus / 5 + item.MaxManaBonus / 5

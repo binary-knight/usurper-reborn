@@ -281,13 +281,13 @@ public class WildernessLocation : BaseLocation
         // Encounter flavor.
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.Species));
+        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.LocSpecies()));
         terminal.SetColor("white");
-        foreach (var line in beast.LocEncounterFlavor().Split('\n'))
-            terminal.WriteLine($"  {line}");
+        // v1.2.3: one wrapped paragraph; the source breaks lines for a wider screen.
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, beast.LocEncounterFlavor().Replace('\n', ' '), "  ");
         terminal.WriteLine("");
         terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  {beast.LocPassiveDescription()}");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, beast.LocPassiveDescription(), "  ");
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -835,7 +835,7 @@ public class WildernessLocation : BaseLocation
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("wilderness.discovery_revisit_hint"));
 
-        NewsSystem.Instance?.Newsy($"☆ {currentPlayer.Name} discovered {discovery.Name} in the {region.Name}!");
+        NewsSystem.Instance?.Newsy(Loc.Get("dungeon.wild_discovery_news", currentPlayer.Name, WildernessData.GetDiscoveryName(discovery), WildernessData.GetRegionName(region)));
 
         await Pacing.Wait(3000);
     }
@@ -853,7 +853,7 @@ public class WildernessLocation : BaseLocation
         terminal.WriteLine(Loc.Get("wilderness.pilgrimage_header"));
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("wilderness.pilgrimage_intro"));
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("wilderness.pilgrimage_intro"));
         terminal.WriteLine("");
 
         if (currentPlayer.HasActiveShrineAttunement)
@@ -880,7 +880,7 @@ public class WildernessLocation : BaseLocation
             terminal.SetColor(isActive ? "bright_green" : "white");
             terminal.Write($"{s.LocName(),-38}");
             terminal.SetColor("dark_gray");
-            terminal.WriteLine($"  favor: {favor}");
+            terminal.WriteLine(Loc.Get("dungeon.wild_shrine_favor", favor));
             terminal.SetColor("cyan");
             terminal.WriteLine($"        {s.LocPassiveSummary()}");
         }
@@ -902,7 +902,7 @@ public class WildernessLocation : BaseLocation
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+        terminal.WriteLine(IsScreenReader ? Loc.Get("settlement.cancel_sr") : Loc.Get("settlement.cancel"));
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("wilderness.pilgrimage_select"));

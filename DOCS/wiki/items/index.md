@@ -1,8 +1,9 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.2.1
+checked: 1.2.3
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs
+history: 1.2.3 | Shop rings and necklaces that had only armor now also give a small stat: Dexterity on rings and Wisdom on necklaces, +1, or +2 from level 30.
 ---
 This catalog lists fixed built-in equipment templates. Shops can generate stock that is not in this list, and server mods can replace definitions. A catalog entry does not promise a drop source or current stock.
 

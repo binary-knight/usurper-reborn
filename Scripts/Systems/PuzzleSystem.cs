@@ -175,7 +175,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.SymbolAlignment,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "Symbol Alignment",
+                Title = Loc.Get("dungeon.puzzle_title_symbol"),
                 Description = Loc.Get("puzzle.symbol.desc", panelCount),
                 Solution = solution,
                 CurrentState = Enumerable.Repeat(symbols[0], panelCount).ToList(),
@@ -201,7 +201,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.PressurePlates,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "Pressure Plates",
+                Title = Loc.Get("dungeon.puzzle_title_pressure"),
                 Description = Loc.Get("puzzle.pressure.desc", plateCount),
                 Solution = solution.Select(i => (i + 1).ToString()).ToList(), // Convert to 1-indexed
                 CurrentState = new List<string>(),
@@ -265,7 +265,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.NumberGrid,
                 Difficulty = difficulty,
                 Theme = DungeonTheme.AncientRuins,
-                Title = "The Number Grid",
+                Title = Loc.Get("dungeon.puzzle_title_number"),
                 Description = Loc.Get("puzzle.number.desc", target),
                 Solution = new List<string> { target.ToString() },
                 CurrentState = new List<string>(),
@@ -274,7 +274,7 @@ namespace UsurperRemake.Systems
                 TargetNumber = target,
                 MaxAttempts = 3 + difficulty,
                 AttemptsRemaining = 3 + difficulty,
-                Hints = new List<string> { $"The answer is {target}. Not all numbers are needed." },
+                Hints = new List<string> { Loc.Get("dungeon.puzzle_number_hint", target) },
                 FailureDamagePercent = 10,
                 SuccessXP = 45 * difficulty,
                 CustomData = new Dictionary<string, object> { ["target"] = target }
@@ -297,7 +297,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.MemoryMatch,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "Memory of the Ancients",
+                Title = Loc.Get("dungeon.puzzle_title_memory"),
                 Description = Loc.Get("puzzle.memory.desc"),
                 Solution = solution,
                 CurrentState = new List<string>(),
@@ -331,7 +331,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.LightDarkness,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "Dance of Light and Shadow",
+                Title = Loc.Get("dungeon.puzzle_title_light"),
                 Description = Loc.Get("puzzle.light.desc", torchCount),
                 Solution = solution,
                 CurrentState = Enumerable.Repeat("unlit", torchCount).ToList(),
@@ -382,7 +382,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.ItemCombination,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "The Alchemist's Lock",
+                Title = Loc.Get("dungeon.puzzle_title_alchemy"),
                 Description = Loc.Get("puzzle.alchemy.desc"),
                 Solution = new List<string> { item1, item2 },
                 CurrentState = new List<string>(),
@@ -425,7 +425,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.EnvironmentChange,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "Elemental Challenge",
+                Title = Loc.Get("dungeon.puzzle_title_elemental"),
                 Description = description,
                 Solution = solution,
                 CurrentState = new List<string>(),
@@ -456,7 +456,7 @@ namespace UsurperRemake.Systems
                 Type = PuzzleType.ReflectionPuzzle,
                 Difficulty = difficulty,
                 Theme = theme,
-                Title = "Hall of Mirrors",
+                Title = Loc.Get("dungeon.puzzle_title_mirror"),
                 Description = Loc.Get("puzzle.mirror.desc", mirrorCount),
                 Solution = solution,
                 CurrentState = Enumerable.Repeat("0", mirrorCount).ToList(),
@@ -577,7 +577,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("puzzle.difficulty_label", diffText), "cyan");
             }
             terminal.WriteLine("");
-            terminal.WriteLine(puzzle.Description, "white");
+            foreach (var line in UIHelper.WordWrap(puzzle.Description))
+                terminal.WriteLine(line, "white");
             terminal.WriteLine("");
         }
 
@@ -866,10 +867,11 @@ namespace UsurperRemake.Systems
                 puzzle.HintsUsed++;
                 terminal.WriteLine("");
                 if (!GameConfig.ScreenReaderMode)
-                    terminal.WriteLine("═══ HINT ═══", "bright_yellow");
+                    terminal.WriteLine(Loc.Get("dungeon.puzzle_hint_banner"), "bright_yellow");
                 else
                     terminal.WriteLine(Loc.Get("puzzle.hint_header"), "bright_yellow");
-                terminal.WriteLine(hint, "yellow");
+                foreach (var line in UIHelper.WordWrap(hint))
+                    terminal.WriteLine(line, "yellow");
                 if (!GameConfig.ScreenReaderMode)
                     terminal.WriteLine("═════════════", "bright_yellow");
                 terminal.WriteLine("");

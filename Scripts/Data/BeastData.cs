@@ -58,6 +58,8 @@ public static class BeastData
         public string LocEncounterFlavor() => LocOr($"beast.{Id}.encounter", EncounterFlavor);
         public string LocTameSuccessFlavor() => LocOr($"beast.{Id}.tame", TameSuccessFlavor);
         public string LocPassiveDescription() => LocOr($"beast.{Id}.passive", PassiveDescription);
+        // v1.2.3: Species is shown only. Name stays English: it is saved as Pet.Name and matched by name.
+        public string LocSpecies() => LocOr($"dungeon.beast.{Id}.species", Species);
     }
 
     public static readonly BeastDefinition[] Beasts = new[]

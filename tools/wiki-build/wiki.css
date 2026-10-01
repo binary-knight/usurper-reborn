@@ -142,6 +142,19 @@ footer {
 footer a {
   overflow-wrap: anywhere;
 }
+.history dl {
+  max-width: 78ch;
+  margin: 0;
+}
+.history dt {
+  color: var(--gold);
+  font-weight: 600;
+  margin-top: 0.8rem;
+}
+.history dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
 .table-wrap {
   max-width: 100%;
   overflow-x: auto;

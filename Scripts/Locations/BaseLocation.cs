@@ -2322,50 +2322,45 @@ public abstract class BaseLocation
         }
         else
         {
+            // v1.2.3: each " | Label: value" is a segment; the line wraps between segments at UIHelper.WrapWidth,
+            // continuation rows indented 2 without the leading " | ". A line that fits is drawn as before.
+            var segments = new List<List<ChromeRun>>();
+
             // HP with urgency coloring
-            terminal.SetColor("gray");
-            terminal.Write($"{Loc.Get("status.hp")}: ");
             float hpPercent = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
             string hpColor = hpPercent > 0.5f ? "bright_green" : hpPercent > 0.25f ? "yellow" : "bright_red";
-            terminal.SetColor(hpColor);
-            terminal.Write($"{currentPlayer.HP}");
-            terminal.SetColor("gray");
-            terminal.Write("/");
-            terminal.SetColor(hpColor);
-            terminal.Write($"{currentPlayer.MaxHP}");
+            segments.Add(new List<ChromeRun>
+            {
+                new("gray", $"{Loc.Get("status.hp")}: "), new(hpColor, $"{currentPlayer.HP}"),
+                new("gray", "/"), new(hpColor, $"{currentPlayer.MaxHP}"),
+            });
 
-            terminal.SetColor("gray");
-            terminal.Write($" | {Loc.Get("status.gold_label")}: ");
-            terminal.SetColor("yellow");
-            terminal.Write($"{currentPlayer.Gold:N0}");
+            segments.Add(new List<ChromeRun>
+            {
+                new("gray", $" | {Loc.Get("status.gold_label")}: "), new("yellow", $"{currentPlayer.Gold:N0}"),
+            });
 
             if (currentPlayer.IsManaClass)
             {
-                terminal.SetColor("gray");
-                terminal.Write($" | {Loc.Get("status.mp")}: ");
-                terminal.SetColor("blue");
-                terminal.Write($"{currentPlayer.Mana}");
-                terminal.SetColor("gray");
-                terminal.Write("/");
-                terminal.SetColor("blue");
-                terminal.Write($"{currentPlayer.MaxMana}");
+                segments.Add(new List<ChromeRun>
+                {
+                    new("gray", $" | {Loc.Get("status.mp")}: "), new("blue", $"{currentPlayer.Mana}"),
+                    new("gray", "/"), new("blue", $"{currentPlayer.MaxMana}"),
+                });
             }
             else
             {
-                terminal.SetColor("gray");
-                terminal.Write($" | {Loc.Get("status.sta")}: ");
-                terminal.SetColor("yellow");
-                terminal.Write($"{currentPlayer.CurrentCombatStamina}");
-                terminal.SetColor("gray");
-                terminal.Write("/");
-                terminal.SetColor("yellow");
-                terminal.Write($"{currentPlayer.MaxCombatStamina}");
+                segments.Add(new List<ChromeRun>
+                {
+                    new("gray", $" | {Loc.Get("status.sta")}: "), new("yellow", $"{currentPlayer.CurrentCombatStamina}"),
+                    new("gray", "/"), new("yellow", $"{currentPlayer.MaxCombatStamina}"),
+                });
             }
 
-            terminal.SetColor("gray");
-            terminal.Write($" | {Loc.Get("ui.level")} ");
-            terminal.SetColor("cyan");
-            terminal.Write($"{currentPlayer.Level}");
+            segments.Add(new List<ChromeRun>
+            {
+                new("gray", $" | {Loc.Get("ui.level")} "), new("cyan", $"{currentPlayer.Level}"),
+            });
 
             // v0.65.6: remaining lives, visible at all times in online permadeath
             // mode. Color escalates as the counter drops -- informed risk feels
@@ -2378,15 +2373,15 @@ public abstract class BaseLocation
             {
                 int livesLeft = Math.Max(0, currentPlayer.Resurrections);
                 int livesMax = Math.Max(1, currentPlayer.MaxResurrections);
-                terminal.SetColor("gray");
-                terminal.Write($" | {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: ");
-                terminal.SetColor(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green");
-                terminal.Write($"{livesLeft}");
-                terminal.SetColor("gray");
-                terminal.Write($"/{livesMax}");
+                segments.Add(new List<ChromeRun>
+                {
+                    new("gray", $" | {Loc.Get(permadeathLives ? "status.lives" : "status.revives")}: "),
+                    new(livesLeft == 0 ? "bright_red" : livesLeft == 1 ? "yellow" : "bright_green", $"{livesLeft}"),
+                    new("gray", $"/{livesMax}"),
+                });
             }
 
-            // XP progress to next level
+            // XP progress to next level; it is drawn after the segment before it and never starts a row
             if (currentPlayer.Level < GameConfig.MaxLevel)
             {
                 long currentXP = currentPlayer.Experience;
@@ -2397,13 +2392,13 @@ public abstract class BaseLocation
                 int xpPercent = xpNeeded > 0 ? (int)((xpIntoLevel * 100) / xpNeeded) : 0;
                 xpPercent = Math.Clamp(xpPercent, 0, 100);
 
-                terminal.SetColor("gray");
-                terminal.Write(" (");
-                terminal.SetColor(xpPercent >= 90 ? "bright_green" : "white");
-                terminal.Write($"{xpPercent}%");
-                terminal.SetColor("gray");
-                terminal.Write(")");
+                segments[^1].AddRange(new ChromeRun[]
+                {
+                    new("gray", " ("), new(xpPercent >= 90 ? "bright_green" : "white", $"{xpPercent}%"), new("gray", ")"),
+                });
             }
+
+            WriteChromeSegments(segments, 0, 2, " | ");
 
             terminal.WriteLine("");
             terminal.WriteLine("");
@@ -2439,94 +2434,104 @@ public abstract class BaseLocation
         terminal.Write("─────────────────────────────────────────────────────────────────────────────");
         terminal.WriteLine("");
 
+        // v1.2.3: each [key]Label is a segment; the bar wraps between segments at UIHelper.WrapWidth, continuation
+        // rows indented to the width of the label so the keys line up under the first one. A bar that fits is drawn as before.
+        string prefix = $"{Loc.Get("ui.quick_commands")}: ";
         terminal.SetColor("gray");
-        terminal.Write($"{Loc.Get("ui.quick_commands")}: ");
+        terminal.Write(prefix);
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("%");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.qc_status_suffix") + "  ");
-
-        if (LocationId != GameLocation.MainStreet)
+        var segments = new List<List<ChromeRun>>();
+        static List<ChromeRun> Key(string key, string label) => new()
         {
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.qc_return_suffix") + "  ");
-        }
+            new("darkgray", "["), new("bright_yellow", key), new("darkgray", "]"), new("white", label),
+        };
 
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("*");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.qc_inventory") + "  ");
-
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("?");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.qc_help") + "  ");
+        segments.Add(Key("%", Loc.Get("base.qc_status_suffix") + "  "));
+        if (LocationId != GameLocation.MainStreet)
+            segments.Add(Key("R", Loc.Get("base.qc_return_suffix") + "  "));
+        segments.Add(Key("*", Loc.Get("base.qc_inventory") + "  "));
+        segments.Add(Key("?", Loc.Get("base.qc_help") + "  "));
 
         // Show Talk option if NPCs are present
         var npcsHere = GetLiveNPCsAtLocation();
         if (npcsHere.Count > 0)
+            segments.Add(Key("0", $" {Loc.Get("base.qc_talk")} ({npcsHere.Count})  "));
+
+        // Preferences, slash commands hint, bug report hint
+        segments.Add(Key("~", Loc.Get("base.qc_prefs") + "  "));
+        segments.Add(Key("/", Loc.Get("base.qc_cmds") + "  "));
+        segments.Add(Key("!", Loc.Get("base.qc_bug")));
+
+        int indent = UIHelper.VisibleLength(prefix);
+        WriteChromeSegments(segments, indent, indent);
+
+        terminal.WriteLine("");
+        terminal.WriteLine("");
+    }
+
+    /// <summary>v1.2.3: one piece of a chrome row: the color it is drawn in (null keeps the current one) and its text.</summary>
+    protected readonly record struct ChromeRun(string? Color, string Text);
+
+    /// <summary>
+    /// v1.2.3: writes chrome segments (each a list of colored runs) from startColumn, starting a new row indented
+    /// by indent before a segment that would pass UIHelper.WrapWidth. A segment never breaks inside and a row's
+    /// first segment is always placed. When nothing wraps, every run is written exactly as given. A row that ends
+    /// at a break drops its trailing spaces, and a segment that starts a continuation row drops its leading lead.
+    /// With endLine the last run is written with WriteLine, ending the row.
+    /// </summary>
+    protected void WriteChromeSegments(List<List<ChromeRun>> segments, int startColumn, int indent, string lead = "", bool endLine = false)
+    {
+        string Text(List<ChromeRun> seg, bool dropLead)
         {
-            terminal.SetColor("darkgray");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("0");
-            terminal.SetColor("darkgray");
-            terminal.Write("]");
-            terminal.SetColor("white");
-            terminal.Write($" {Loc.Get("base.qc_talk")} ({npcsHere.Count})  ");
+            string text = string.Concat(seg.Select(r => r.Text));
+            return dropLead && lead.Length > 0 && text.StartsWith(lead) ? text.Substring(lead.Length) : text;
         }
 
-        // Show Preferences option
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("~");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.qc_prefs") + "  ");
+        // Pass 1: where the rows break.
+        var breaks = new bool[segments.Count];
+        int col = startColumn;
+        for (int i = 0; i < segments.Count; i++)
+        {
+            int need = UIHelper.VisibleLength(Text(segments[i], false).TrimEnd());
+            if (i > 0 && col + need > UIHelper.WrapWidth)
+            {
+                breaks[i] = true;
+                col = indent + UIHelper.VisibleLength(Text(segments[i], true));
+            }
+            else
+                col += UIHelper.VisibleLength(Text(segments[i], false));
+        }
 
-        // Show slash commands hint
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("/");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.qc_cmds") + "  ");
-
-        // Show bug report hint
-        terminal.SetColor("darkgray");
-        terminal.Write("[");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("!");
-        terminal.SetColor("darkgray");
-        terminal.Write("]");
-        terminal.SetColor("white");
-        terminal.Write(Loc.Get("base.qc_bug"));
-
-        terminal.WriteLine("");
-        terminal.WriteLine("");
+        // Pass 2: draw the runs.
+        for (int i = 0; i < segments.Count; i++)
+        {
+            var runs = new List<ChromeRun>(segments[i]);
+            if (breaks[i])
+            {
+                terminal.WriteLine("");
+                terminal.Write(new string(' ', indent));
+                if (lead.Length > 0 && runs.Count > 0 && runs[0].Text.StartsWith(lead))
+                    runs[0] = runs[0] with { Text = runs[0].Text.Substring(lead.Length) };
+            }
+            if (i + 1 < segments.Count && breaks[i + 1])
+            {
+                for (int r = runs.Count - 1; r >= 0; r--)
+                {
+                    string trimmed = runs[r].Text.TrimEnd();
+                    runs[r] = runs[r] with { Text = trimmed };
+                    if (trimmed.Length > 0) break;
+                }
+            }
+            for (int r = 0; r < runs.Count; r++)
+            {
+                var run = runs[r];
+                bool last = endLine && i == segments.Count - 1 && r == runs.Count - 1;
+                if (!last && run.Text.Length == 0 && (breaks[i] || (i + 1 < segments.Count && breaks[i + 1]))) continue;
+                if (run.Color != null) terminal.SetColor(run.Color);
+                if (last) terminal.WriteLine(run.Text);
+                else terminal.Write(run.Text);
+            }
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════════
@@ -2583,33 +2588,21 @@ public abstract class BaseLocation
     /// </summary>
     protected void ShowBBSStatusLine()
     {
-        terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("status.hp")}:");
+        // v1.2.3: wraps between its parts at UIHelper.WrapWidth (only very large values need it), continuing
+        // indented 1 like the row. base.lv_label carries its own space and colon.
         float hpPct = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
-        terminal.SetColor(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red");
-        terminal.Write($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
-        terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("status.gold_label")}:");
-        terminal.SetColor("yellow");
-        terminal.Write($"{currentPlayer.Gold:N0}");
+        var segments = new List<List<ChromeRun>>
+        {
+            new() { new("gray", $" {Loc.Get("status.hp")}:"),
+                    new(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red", $"{currentPlayer.HP}/{currentPlayer.MaxHP}") },
+            new() { new("gray", $" {Loc.Get("status.gold_label")}:"), new("yellow", $"{currentPlayer.Gold:N0}") },
+        };
         if (currentPlayer.IsManaClass)
-        {
-            terminal.SetColor("gray");
-            terminal.Write($" {Loc.Get("status.mp")}:");
-            terminal.SetColor("blue");
-            terminal.Write($"{currentPlayer.Mana}/{currentPlayer.MaxMana}");
-        }
+            segments.Add(new() { new("gray", $" {Loc.Get("status.mp")}:"), new("blue", $"{currentPlayer.Mana}/{currentPlayer.MaxMana}") });
         else
-        {
-            terminal.SetColor("gray");
-            terminal.Write($" {Loc.Get("status.sta")}:");
-            terminal.SetColor("yellow");
-            terminal.Write($"{currentPlayer.CurrentCombatStamina}/{currentPlayer.MaxCombatStamina}");
-        }
-        terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("base.lv_label")}:");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Level}");
+            segments.Add(new() { new("gray", $" {Loc.Get("status.sta")}:"),
+                                 new("yellow", $"{currentPlayer.CurrentCombatStamina}/{currentPlayer.MaxCombatStamina}") });
+        var level = new List<ChromeRun> { new("gray", Loc.Get("base.lv_label")), new("cyan", $"{currentPlayer.Level}") };
         if (currentPlayer.Level < GameConfig.MaxLevel)
         {
             long curXP = currentPlayer.Experience;
@@ -2618,9 +2611,10 @@ public abstract class BaseLocation
             long xpInto = curXP - prevXP;
             long xpNeed = nextXP - prevXP;
             int pct = xpNeed > 0 ? (int)((xpInto * 100) / xpNeed) : 0;
-            terminal.SetColor("gray");
-            terminal.Write($"({Math.Clamp(pct, 0, 100)}%)");
+            level.Add(new("gray", $"({Math.Clamp(pct, 0, 100)}%)"));
         }
+        segments.Add(level);
+        WriteChromeSegments(segments, 0, 1, " ");
         terminal.WriteLine("");
     }
 
@@ -4062,7 +4056,7 @@ public abstract class BaseLocation
         if (currentPlayer != null && !string.IsNullOrEmpty(currentPlayer.RivalName))
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("base.rival_label")}: {currentPlayer.RivalName} ({Loc.Get("base.lv_label")} {currentPlayer.RivalLevel})");
+            terminal.WriteLine($"  {Loc.Get("base.rival_label")}: {currentPlayer.RivalName} ({Loc.Get("base.lv_label").Trim()} {currentPlayer.RivalLevel})"); // v1.2.3: the key carries a leading space for the BBS row
         }
         if (currentPlayer != null && currentPlayer.WeeklyRank > 0)
         {
@@ -4184,35 +4178,17 @@ public abstract class BaseLocation
             default:
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("base.invalid_choice", choice));
-                terminal.SetColor("gray");
-                terminal.Write($"{Loc.Get("base.try_hint")}: [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("%");
-                terminal.SetColor("gray");
-                terminal.Write("]");
-                terminal.Write(Loc.Get("base.qc_status_suffix"));
-                terminal.Write(", [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("*");
-                terminal.SetColor("gray");
-                terminal.Write("] ");
-                terminal.Write(Loc.Get("base.qc_inventory"));
-
-                if (LocationId != GameLocation.MainStreet)
+                // v1.2.3: one sentence, "Try: [%] Status, [*] Inventory, [R] Return, or [?] for help", wrapping between
+                // its parts at UIHelper.WrapWidth; a continuation row starts without the ", ".
+                var hint = new List<List<ChromeRun>>
                 {
-                    terminal.Write(", [");
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("R");
-                    terminal.SetColor("gray");
-                    terminal.Write("]");
-                    terminal.Write(Loc.Get("base.qc_return_suffix"));
-                }
-
-                terminal.Write($", {Loc.Get("base.or")} [");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("?");
-                terminal.SetColor("gray");
-                terminal.WriteLine($"] {Loc.Get("base.for_help")}");
+                    new() { new("gray", $"{Loc.Get("base.try_hint")} ["), new("bright_yellow", "%"), new("gray", $"] {Loc.Get("base.qc_status_suffix").Trim()}") },
+                    new() { new(null, ", ["), new("bright_yellow", "*"), new("gray", $"] {Loc.Get("base.qc_inventory").Trim()}") },
+                };
+                if (LocationId != GameLocation.MainStreet)
+                    hint.Add(new() { new(null, ", ["), new("bright_yellow", "R"), new("gray", $"] {Loc.Get("base.qc_return_suffix").Trim()}") });
+                hint.Add(new() { new(null, $", {Loc.Get("base.or")} ["), new("bright_yellow", "?"), new("gray", $"] {Loc.Get("base.for_help")}") });
+                WriteChromeSegments(hint, 0, 2, ", ", endLine: true);
                 await Pacing.Wait(2000);
                 break;
         }
@@ -10681,7 +10657,7 @@ public abstract class BaseLocation
     /// <summary>
     /// Display an equipment slot with its current item and stat summary (shared by equip screens).
     /// </summary>
-    protected void DisplayEquipmentSlotWithStats(Character target, EquipmentSlot slot, string label)
+    protected void DisplayEquipmentSlotWithStats(Character target, EquipmentSlot slot, string label = "")
     {
         var item = target.GetEquipment(slot);
         terminal.SetColor("gray");

@@ -1,10 +1,11 @@
 "use strict";
 // Wiki drift check: flags guides whose source files changed since the release
-// named in their `checked:` field, and game locations no guide covers.
+// named in their `checked:` field, game locations no guide covers and, while a
+// release is being prepared, guides whose sources changed with no history line.
 const fs = require("node:fs");
 const path = require("node:path");
 const { spawnSync } = require("node:child_process");
-const { readPages } = require("./build.js");
+const { readPages, compareVersions } = require("./build.js");
 
 const buildRoot = path.resolve(__dirname, "../..");
 
@@ -17,18 +18,6 @@ function gameVersion(root) {
   return m[1];
 }
 
-function compareVersions(a, b) {
-  const pa = String(a).split(".").map(Number);
-  const pb = String(b).split(".").map(Number);
-  if ([...pa, ...pb].some((n) => !Number.isInteger(n)))
-    throw Error(`Not a version: ${a} or ${b}`);
-  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
-    const d = (pa[i] || 0) - (pb[i] || 0);
-    if (d) return Math.sign(d);
-  }
-  return 0;
-}
-
 function git(root, args) {
   return spawnSync("git", args, { cwd: root, encoding: "utf8" });
 }
@@ -36,6 +25,19 @@ function git(root, args) {
 function tagExists(root, tag) {
   return git(root, ["rev-parse", "-q", "--verify", `refs/tags/${tag}`])
     .status === 0;
+}
+
+// The previous release: the highest v<x.y.z> tag below the version, by number.
+function previousTag(root, version) {
+  const r = git(root, ["tag", "--list", "v*"]);
+  if (r.status !== 0) throw Error(`git tag failed: ${r.stderr.trim()}`);
+  const lower = r.stdout
+    .split("\n")
+    .map((t) => t.trim())
+    .filter((t) => /^v\d+\.\d+\.\d+$/.test(t))
+    .filter((t) => compareVersions(t.slice(1), version) < 0)
+    .sort((a, b) => compareVersions(a.slice(1), b.slice(1)));
+  return lower.length ? lower[lower.length - 1] : null;
 }
 
 // Returns "changed", "added" (absent at the tag) or null (unchanged).
@@ -77,7 +79,7 @@ function check(options = {}) {
   const version = options.version || gameVersion(root);
   const stale = [];
   const errors = [];
-  const guides = readPages(contentDir).map((p) => ({
+  const guides = readPages(contentDir, { gameVersion: version }).map((p) => ({
     ...p,
     file: path
       .relative(root, path.resolve(buildRoot, p.sourceFile))
@@ -113,6 +115,26 @@ function check(options = {}) {
     }
     if (changes.length) stale.push({ guide: g.file, checked: g.checked, changes });
   }
+  // History rule: active only while the game version has no tag yet.
+  const history = { active: false, previous: null, missing: [] };
+  if (tagExists(root, `v${version}`)) history.reason = "tagged";
+  else {
+    history.previous = previousTag(root, version);
+    if (!history.previous) history.reason = "no earlier tag";
+    else {
+      history.active = true;
+      for (const g of guides) {
+        if (g.history.some((h) => h.version === version)) continue;
+        const changes = [];
+        for (const s of g.sourceList) {
+          if (!fs.existsSync(path.join(root, s))) continue;
+          const change = sourceChange(root, history.previous, s);
+          if (change) changes.push({ file: s, change });
+        }
+        if (changes.length) history.missing.push({ guide: g.file, changes });
+      }
+    }
+  }
   const allow = readAllowlist(allowlistPath);
   const covered = new Set(
     guides.flatMap((g) => g.sourceList.map((s) => path.posix.basename(s))),
@@ -130,7 +152,7 @@ function check(options = {}) {
       guide: path.relative(root, allowlistPath).split(path.sep).join("/"),
       message: `allowlist entry ${f} names a file that does not exist in ${path.relative(root, locationsDir)}`,
     });
-  return { version, stale, errors, uncovered };
+  return { version, stale, errors, uncovered, history };
 }
 
 function report(result, mode, locationsRel = "Scripts/Locations") {
@@ -139,6 +161,25 @@ function report(result, mode, locationsRel = "Scripts/Locations") {
     `Wiki drift check for game version ${result.version} (${mode} mode)`,
   ];
   const annotations = [];
+  const h = result.history || { active: false, missing: [] };
+  lines.push(
+    h.active
+      ? `History rule: active, comparing sources with ${h.previous}`
+      : h.reason === "tagged"
+        ? `History rule: inactive, v${result.version} is already tagged`
+        : `History rule: inactive, no release tag older than ${result.version}`,
+  );
+  if (h.missing.length) {
+    lines.push("", `Guides missing a history line for ${result.version}: ${h.missing.length}`);
+    for (const m of h.missing) {
+      lines.push(`  ${m.guide}`);
+      for (const c of m.changes)
+        lines.push(`    ${c.change} ${c.file}  see: git diff ${h.previous} HEAD -- ${c.file}`);
+      annotations.push(
+        `::${level} file=${m.guide},line=1::Wiki guide has no history line for ${result.version}: ${m.changes.map((c) => `${c.file} ${c.change}`).join("; ")} since ${h.previous}. Add "history: ${result.version} | <one sentence>" or "history: ${result.version} | none".`,
+      );
+    }
+  }
   if (result.stale.length) {
     lines.push("", `Stale guides: ${result.stale.length}`);
     for (const s of result.stale) {
@@ -176,7 +217,10 @@ function report(result, mode, locationsRel = "Scripts/Locations") {
     }
   }
   const clean =
-    !result.stale.length && !result.uncovered.length && !result.errors.length;
+    !result.stale.length &&
+    !result.uncovered.length &&
+    !result.errors.length &&
+    !h.missing.length;
   if (clean) lines.push("", "All guides are current and every location is covered.");
   return { text: lines.join("\n"), annotations, clean };
 }
@@ -211,4 +255,11 @@ if (require.main === module) {
     process.exitCode = 2;
   }
 }
-module.exports = { check, report, main, compareVersions, gameVersion };
+module.exports = {
+  check,
+  report,
+  main,
+  compareVersions,
+  gameVersion,
+  previousTag,
+};

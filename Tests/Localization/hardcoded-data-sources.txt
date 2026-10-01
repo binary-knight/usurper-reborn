@@ -46,8 +46,8 @@ table|Scripts/AI/EnhancedNPCBehaviors.cs|init.Message|affair result, VisualNovel
 table|Scripts/AI/EnhancedNPCBehaviors.cs|init.Reason|divorce refusal reason, VisualNovelDialogueSystem
 
 # --- Scripts/Data -------------------------------------------------------------------------------
-nouns|Scripts/Data/BeastData.cs|init.Name|beast names printed raw, WildernessLocation
-table|Scripts/Data/BeastData.cs|init.Species|beast species printed raw, WildernessLocation
+nouns|Scripts/Data/BeastData.cs|init.Name|kept English: saved as Pet.Name (WildernessLocation TryBeastEncounter), matched by name in CombatEngine and DungeonLocation
+keyed|Scripts/Data/BeastData.cs|init.Species|dungeon.beast.{id}.species
 keyed|Scripts/Data/BeastData.cs|init.EncounterFlavor|beast.{id}.encounter
 keyed|Scripts/Data/BeastData.cs|init.PassiveDescription|beast.{id}.passive
 keyed|Scripts/Data/BeastData.cs|init.TameSuccessFlavor|beast.{id}.tame
@@ -60,11 +60,11 @@ keyed|Scripts/Data/DruidShrineData.cs|init.FlavorDescription|shrine.{id}.flavor
 keyed|Scripts/Data/DruidShrineData.cs|init.GodPatron|shrine.{id}.god
 keyed|Scripts/Data/DruidShrineData.cs|init.Name|shrine.{id}.name
 keyed|Scripts/Data/DruidShrineData.cs|init.PassiveSummary|shrine.{id}.passive
-table|Scripts/Data/DungeonSettlementData.cs|init.Description|settlement description, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.FirstGreeting|settlement NPC greeting, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.LoreFragments|settlement lore, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.NPCTitle|settlement NPC title, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.ReturnGreeting|settlement NPC greeting, DungeonLocation
+keyed|Scripts/Data/DungeonSettlementData.cs|init.Description|dungeon.settlement.{id}.description
+keyed|Scripts/Data/DungeonSettlementData.cs|init.FirstGreeting|dungeon.settlement.{id}.greeting_first
+keyed|Scripts/Data/DungeonSettlementData.cs|init.LoreFragments|dungeon.settlement.{id}.lore.{i}
+keyed|Scripts/Data/DungeonSettlementData.cs|init.NPCTitle|dungeon.settlement.{id}.npc_title
+keyed|Scripts/Data/DungeonSettlementData.cs|init.ReturnGreeting|dungeon.settlement.{id}.greeting_return
 names|Scripts/Data/DungeonSettlementData.cs|init.Name|settlement place names
 names|Scripts/Data/DungeonSettlementData.cs|init.NPCName|settlement NPC names
 table|Scripts/Data/FounderStatueData.cs|decl:ART_AMARANTH|statue art with words, FounderStatueSystem
@@ -136,39 +136,21 @@ keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#1|dark_alley.deed_{
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#2|dark_alley.deed_{id}_desc
 table|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#17|deed news text, Newsy
 names|Scripts/Locations/DungeonLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/DungeonLocation.cs|call:Add#0/tuple#0|companion reaction lines
-table|Scripts/Locations/DungeonLocation.cs|call:Add#0/tuple#1|merchant item names
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#2/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#3/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#4/tuple#1|event choice label
 names|Scripts/Locations/DungeonLocation.cs|decl:duelistTemplates/tuple#0|duelist names
-table|Scripts/Locations/DungeonLocation.cs|decl:duelistTemplates/tuple#1|duelist weapon names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#0|NPC names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#1|NPC names with titles
-nouns|Scripts/Locations/DungeonLocation.cs|decl:slotNames/tuple#1|equipment slot names
 names|Scripts/Locations/DungeonLocation.cs|=currentPlayer.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player!.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-nouns|Scripts/Locations/DungeonLocation.cs|decl:bossNameWithArticle|boss name in dungeon.boss_blocks_path
-table|Scripts/Locations/DungeonLocation.cs|decl:DungeonRespawnMessages|news, Newsy
-nouns|Scripts/Locations/DungeonLocation.cs|decl:godName|name in dungeon.must_defeat_god_floor
-table|Scripts/Locations/DungeonLocation.cs|decl:legend|map legend
 nouns|Scripts/Locations/DungeonLocation.cs|decl:name|monster name
 nouns|Scripts/Locations/DungeonLocation.cs|decl:names|undead monster names
-table|Scripts/Locations/DungeonLocation.cs|decl:stats|merchant item description
-table|Scripts/Locations/DungeonLocation.cs|decl:status|party status suffix
 table|Scripts/Locations/DungeonLocation.cs|dictpair#1|boss name pool, monster names
-nouns|Scripts/Locations/DungeonLocation.cs|=guardian.Name|monster name in combat
-table|Scripts/Locations/DungeonLocation.cs|=guardian.Phrase|monster speech
-table|Scripts/Locations/DungeonLocation.cs|=hint|floor hint
-table|Scripts/Locations/DungeonLocation.cs|init.Description|merchant item description
 names|Scripts/Locations/DungeonLocation.cs|init.Name|unique NPC name
-table|Scripts/Locations/DungeonLocation.cs|=journalEntries|journal lines
 table|Scripts/Locations/DungeonLocation.cs|=memberTypes|monster names
 nouns|Scripts/Locations/DungeonLocation.cs|=name|monster name
-table|Scripts/Locations/DungeonLocation.cs|=status|exit status
-table|Scripts/Locations/DungeonLocation.cs|=whispers|whisper lines
-table|Scripts/Locations/DungeonLocation.cs|=xpHint|xp hint line
 names|Scripts/Locations/HealerLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 table|Scripts/Locations/HealerLocation.cs|call:Add#0/tuple#0|slot label in shop.cursed_item_healer
 names|Scripts/Locations/HealerLocation.cs|decl:HealerName|shop name
@@ -223,7 +205,6 @@ nouns|Scripts/Systems/FactionSystem.cs|init.Name|faction names printed raw, InnL
 table|Scripts/Systems/FactionSystem.cs|init.Ranks|faction rank titles
 keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
 names|Scripts/Systems/FeatureInteractionSystem.cs|init.RevealsOldGod|Old God names
-table|Scripts/Systems/FeatureInteractionSystem.cs|switcharm/tuple#1|stat names in a Loc template
 table|Scripts/Systems/FileSaveBackend.cs|init.SaveType|save type in the save list
 table|Scripts/Systems/FileSaveBackend.cs|return/tuple#1|load error shown by GameEngine
 table|Scripts/Systems/GuildSystem.cs|=errorMessage|guild error, MudChatSystem
@@ -248,8 +229,6 @@ table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#1|wave fragm
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#0|prison activity name
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#1|prison activity description
 table|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#2|prison activity effect
-table|Scripts/Systems/PuzzleSystem.cs|init.Hints|puzzle hints, DungeonLocation
-table|Scripts/Systems/PuzzleSystem.cs|init.Title|puzzle titles
 table|Scripts/Systems/QuestSystem.cs|call:CreateStarterQuest#7/tuple#0|starter quest monster names
 nouns|Scripts/Systems/QuestSystem.cs|decl:bossName|boss label fallback in quest.objective.defeat_boss
 table|Scripts/Systems/QuestSystem.cs|decl:highLevel|quest target monster names
@@ -261,7 +240,6 @@ table|Scripts/Systems/QuestSystem.cs|init.TargetId|quest target in the descripti
 nouns|Scripts/Systems/QuestSystem.cs|=targetName|quest target in castle.quest_target
 keyed|Scripts/Systems/QuestSystem.cs|init.Comment|merc.contract.{id}.comment
 keyed|Scripts/Systems/QuestSystem.cs|init.Title|merc.contract.{id}.title
-nouns|Scripts/Systems/RareEncounters.cs|=champion.Name|monster name in combat
 names|Scripts/Systems/RareEncounters.cs|decl:godNames|god names
 table|Scripts/Systems/SaveFileRepair.cs|=result.ErrorMessage|repair error, GameEngine
 keyed|Scripts/Systems/SettlementSystem.cs|init.Description|settlement.pbuilding.{id}.desc
@@ -333,7 +311,7 @@ keyed|Scripts/Data/GauntletChampionData.cs|init.EntranceAnnouncement|gauntlet.ch
 keyed|Scripts/Data/GauntletChampionData.cs|init.FlavorDescription|gauntlet.champ.{id}.drop_flavor
 keyed|Scripts/Data/GauntletChampionData.cs|init.LoreLine|gauntlet.champ.{id}.lore
 names|Scripts/Data/GauntletChampionData.cs|init.GodPatron|god names
-nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|champion drop item names printed raw
+nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|kept English: becomes the saved Equipment.Name (AnchorRoadLocation, SanctumLocation); item names have no display-time translation
 names|Scripts/Data/GauntletChampionData.cs|init.Name|champion names
 names|Scripts/Data/GauntletChampionData.cs|init.Title|champion titles
 keyed|Scripts/Data/HonorTournamentData.cs|init.CrowdReaction|tournament.champ.{id}.crowd
@@ -352,7 +330,7 @@ keyed|Scripts/Data/WildernessData.cs|init.Description|wilderness.region and disc
 keyed|Scripts/Data/WildernessData.cs|init.Direction|wilderness.direction.{key}
 keyed|Scripts/Data/WildernessData.cs|init.Name|wilderness.region and discovery name keys
 keyed|Scripts/Data/WildernessData.cs|init.RuinsEncounters|wilderness.ruins.{id}.{i}
-nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|wilderness monster names printed raw
+nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|kept English: monster.Name and TierName for quest kills, GetMonsterProfile lookup, CombatEngine undead name checks
 names|Scripts/Locations/AnchorRoadLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|decl:BankerName|NPC name

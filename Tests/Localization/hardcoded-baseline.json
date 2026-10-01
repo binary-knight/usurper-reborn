@@ -671,150 +671,10 @@
     ]
   },
   "Scripts/Locations/DungeonLocation.cs": {
-    "count": 142,
+    "count": 2,
     "sites": [
-      "0279841061",
-      "0367d115c5",
-      "04a3867de7",
-      "06d7cd0f5f",
-      "06eb33d643",
-      "0ff4030eec",
-      "1023108706",
-      "11121942bc",
-      "1621fd60de",
-      "16980260a3",
-      "16c16d1d60",
-      "1855071379",
-      "189b6ca1c5",
-      "1ae9a8da5c",
-      "1e964abcba",
-      "1eba711fe1",
-      "222d83acea",
-      "22b7660411",
-      "23db2684e3",
-      "256bdd151e",
-      "25c445ed8c",
-      "26d6aca636",
-      "294022b5dd",
       "2ada8c9b77",
-      "2cf4fcfa15",
-      "2d8a0d6ec0",
-      "3233781b02",
-      "32b3eff950",
-      "33365b30e0",
-      "34de45299e",
-      "3635679d75",
-      "375a45d7f3",
-      "3d15e7f24c",
-      "3d88731c65",
-      "3d9c1a803e",
-      "3f11913e05",
-      "423d8256e3",
-      "42d4decfe0",
-      "42da89a999",
-      "4341ed3acf",
-      "43c2ae86d9",
-      "4553bdd4c0",
-      "45b085b3dc",
-      "4a3963e25f",
-      "4b997bf874",
-      "4dadad73ba",
-      "4df9f39df7",
-      "545b34040e",
-      "54a6476be0",
-      "55086a72e4",
-      "55129c27b6",
-      "588474afbf",
-      "5d7981d1cb",
-      "5e6e8c80b1",
-      "5ff7363563",
-      "69534bdd56",
-      "6988631863",
-      "6bbf0c7b29",
-      "6c2bf20404",
-      "6d61958622",
-      "6efefbd5c7",
-      "71728685db",
-      "7a3b1f0031",
-      "7c5577cfa0",
-      "7d7fc088d0",
-      "7e6fbe5b65",
-      "7f75d05733",
-      "801d255b5c",
-      "82de502384",
-      "84309faa0a",
-      "85df62e12f",
-      "8736a66376",
-      "890be6017e",
-      "8967bf05f0",
-      "8b92ada517",
-      "8bbdc3d5aa",
-      "8bcc93c9ae",
-      "8c41506cad",
-      "9116df5dfc",
-      "95a4197341",
-      "963c950e5e",
-      "9dc03de8a9",
-      "9e0b7d2448",
-      "9fb169cd4f",
-      "a2a1bcc0c1",
-      "a5a04f23c3",
-      "a64279e32b",
-      "a708f97ff1",
-      "ab98fc993f",
-      "af87b3a768",
-      "b1bc2080b9",
-      "b2feb2382d",
-      "b376f41c0b",
-      "b4a629c4e7",
-      "b78365e66a",
-      "bac3ec482c",
-      "bc800af54d",
-      "bd5884f8da",
-      "bdd2654d9a",
-      "bf516bbdb1",
-      "c0fad7d393",
-      "c14f004763",
-      "c2d952ce1e",
-      "c67e6c3de3",
-      "c7dde48a76",
-      "c9e995f0a0",
-      "ce89019246",
-      "d0170199bd",
-      "d11a965510",
-      "d2d6349495",
-      "d38e19edf8",
-      "d5eba2e567",
-      "d801e6edfc",
-      "d98936e5ba",
-      "d9cf61fe0d",
-      "daf61be7de",
-      "dca6aff65b",
-      "e061dd0f6b",
-      "e449da92ee",
-      "e4704b5fab",
-      "e49e3ad05c",
-      "e5696a92aa",
-      "e650332b36",
-      "e6c33dfeb8",
-      "e6c33dfeb8",
-      "e8f4b9fdaa",
-      "e9116ffd99",
-      "eb046ddd24",
-      "ed3515d7bf",
-      "ef39c49516",
-      "f07ffc8e68",
-      "f099c3ab7f",
-      "f09cab5247",
-      "f0b244fe3d",
-      "f276d45d1f",
-      "f47b1540c8",
-      "f6ffea4526",
-      "f818d035c4",
-      "f9d8a6d6ca",
-      "fb2e1b20ce",
-      "fb68efbf83",
-      "fead53e320"
+      "6bbf0c7b29"
     ]
   },
   "Scripts/Locations/HomeLocation.cs": {
@@ -1163,22 +1023,6 @@
       "fb63c06e1d"
     ]
   },
-  "Scripts/Locations/SettlementLocation.cs": {
-    "count": 11,
-    "sites": [
-      "010e1f5eb9",
-      "06dedf6d16",
-      "11530fe919",
-      "3581c17fd7",
-      "3e7b216182",
-      "679b3db52f",
-      "902e9104f5",
-      "d1062576c0",
-      "da29739a03",
-      "ddf66b89c8",
-      "ee0cc14411"
-    ]
-  },
   "Scripts/Locations/TempleLocation.cs": {
     "count": 14,
     "sites": [
@@ -1204,15 +1048,6 @@
       "406ce99063",
       "4fc6793006",
       "8f08aa828c"
-    ]
-  },
-  "Scripts/Locations/WildernessLocation.cs": {
-    "count": 4,
-    "sites": [
-      "46d024c772",
-      "a734c65542",
-      "bdf8d976c3",
-      "f0ab063289"
     ]
   },
   "Scripts/Server/GroupSystem.cs": {
@@ -1702,12 +1537,6 @@
       "4f3ab4c0e8"
     ]
   },
-  "Scripts/Systems/PuzzleSystem.cs": {
-    "count": 1,
-    "sites": [
-      "9f45b24d01"
-    ]
-  },
   "Scripts/Systems/QuestSystem.cs": {
     "count": 5,
     "sites": [
@@ -1716,15 +1545,6 @@
       "379417a0a3",
       "5877781d5a",
       "b456882830"
-    ]
-  },
-  "Scripts/Systems/RareEncounters.cs": {
-    "count": 4,
-    "sites": [
-      "33d79768c1",
-      "b6d62b5d96",
-      "b6d62b5d96",
-      "b6d62b5d96"
     ]
   },
   "Scripts/Systems/RelationshipSystem.cs": {
@@ -1740,13 +1560,6 @@
     "count": 1,
     "sites": [
       "c9e689fa68"
-    ]
-  },
-  "Scripts/Systems/SettlementSystem.cs": {
-    "count": 2,
-    "sites": [
-      "5079bcceab",
-      "c7aca278cc"
     ]
   },
   "Scripts/Systems/SocialInfluenceSystem.cs": {

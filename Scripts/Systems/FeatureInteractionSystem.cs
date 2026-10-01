@@ -686,7 +686,8 @@ public class FeatureInteractionSystem
         TerminalEmulator terminal, FeatureOutcome outcome)
     {
         // Determine which stat to test based on feature type
-        var (stat, statName, statValue) = GetRelevantStat(feature, player);
+        var (stat, statValue) = GetRelevantStat(feature, player);
+        string statName = StatLabel(stat);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("feature.interact_with", feature.Interaction.ToString().ToLower(), feature.Name));
@@ -718,31 +719,40 @@ public class FeatureInteractionSystem
 
         if (success)
         {
-            await HandleSkillSuccess(feature, player, level, terminal, outcome, statName);
+            await HandleSkillSuccess(feature, player, level, terminal, outcome, stat);
         }
         else
         {
-            await HandleSkillFailure(feature, player, level, terminal, outcome, statName);
+            await HandleSkillFailure(feature, player, level, terminal, outcome, stat);
         }
 
         outcome.Success = success;
         await terminal.PressAnyKey();
     }
 
-    private (string stat, string name, int value) GetRelevantStat(RoomFeature feature, Character player)
+    // v1.2.3: the stat code is the identifier the reward switch reads; the label is shown only.
+    private (string stat, int value) GetRelevantStat(RoomFeature feature, Character player)
     {
         return feature.Interaction switch
         {
-            FeatureInteraction.Open => ("STR", "Strength", (int)player.Strength),
-            FeatureInteraction.Search => ("INT", "Intelligence", (int)player.Intelligence),
-            FeatureInteraction.Read => ("INT", "Intelligence", (int)player.Intelligence),
-            FeatureInteraction.Take => ("DEX", "Dexterity", (int)player.Dexterity),
-            FeatureInteraction.Break => ("STR", "Strength", (int)player.Strength),
-            FeatureInteraction.Use => ("WIS", "Wisdom", (int)player.Wisdom),
-            FeatureInteraction.Enter => ("DEX", "Dexterity", (int)player.Dexterity),
-            _ => ("WIS", "Wisdom", (int)player.Wisdom)
+            FeatureInteraction.Open => ("STR", (int)player.Strength),
+            FeatureInteraction.Search => ("INT", (int)player.Intelligence),
+            FeatureInteraction.Read => ("INT", (int)player.Intelligence),
+            FeatureInteraction.Take => ("DEX", (int)player.Dexterity),
+            FeatureInteraction.Break => ("STR", (int)player.Strength),
+            FeatureInteraction.Use => ("WIS", (int)player.Wisdom),
+            FeatureInteraction.Enter => ("DEX", (int)player.Dexterity),
+            _ => ("WIS", (int)player.Wisdom)
         };
     }
+
+    private static string StatLabel(string stat) => stat switch
+    {
+        "STR" => Loc.Get("ui.stat_strength"),
+        "INT" => Loc.Get("ui.stat_intelligence"),
+        "DEX" => Loc.Get("ui.stat_dexterity"),
+        _ => Loc.Get("ui.stat_wisdom")
+    };
 
     private async Task HandleSkillSuccess(RoomFeature feature, Character player, int level,
         TerminalEmulator terminal, FeatureOutcome outcome, string stat)
@@ -761,14 +771,14 @@ public class FeatureInteractionSystem
             int boost = 2 + (level / 20);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("feature.hidden_knowledge"));
-            terminal.WriteLine(Loc.Get("feature.stat_boost", boost, stat));
+            terminal.WriteLine(Loc.Get("feature.stat_boost", boost, StatLabel(stat)));
 
-            // Apply temporary stat boost based on stat name
+            // Apply temporary stat boost based on the stat code
             switch (stat)
             {
-                case "Strength": player.TempAttackBonus += boost; break;
-                case "Dexterity": player.TempDefenseBonus += boost; break;
-                case "Intelligence": player.Mana = Math.Min(player.MaxMana, player.Mana + boost * 5); break;
+                case "STR": player.TempAttackBonus += boost; break;
+                case "DEX": player.TempDefenseBonus += boost; break;
+                case "INT": player.Mana = Math.Min(player.MaxMana, player.Mana + boost * 5); break;
             }
         }
         else if (rewardType < 60)

@@ -416,24 +416,67 @@ function renderers(data) {
   }
   return { directive, god, monster, boss };
 }
-function readPages(dir) {
+function compareVersions(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  if ([...pa, ...pb].some((n) => !Number.isInteger(n)))
+    throw Error(`Not a version: ${a} or ${b}`);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] || 0) - (pb[i] || 0);
+    if (d) return Math.sign(d);
+  }
+  return 0;
+}
+// One `history:` line per version: "<x.y.z> | <one sentence>" or "<x.y.z> | none".
+function parseHistory(lines, file, gameVersion) {
+  const history = [];
+  const seen = new Map();
+  for (const raw of lines) {
+    const m = raw.match(/^(\S+)\s*\|\s*(.*)$/);
+    if (!m) throw Error(`Invalid history line in ${file}: expected "<x.y.z> | <sentence>" or "<x.y.z> | none": ${raw}`);
+    const [, version, text] = m;
+    const sentence = text.trim();
+    if (!/^\d+\.\d+\.\d+$/.test(version))
+      throw Error(`Invalid history version in ${file}: ${version} is not x.y.z`);
+    if (!sentence)
+      throw Error(`Empty history sentence in ${file} for ${version}`);
+    const none = sentence === "none";
+    if (seen.has(version))
+      throw Error(
+        seen.get(version) !== none
+          ? `History for ${version} in ${file} has both none and a sentence`
+          : `Two history lines for ${version} in ${file}`,
+      );
+    seen.set(version, none);
+    if (gameVersion && compareVersions(version, gameVersion) > 0)
+      throw Error(`History version ${version} in ${file} is newer than the game version ${gameVersion}`);
+    history.push({ version, sentence: none ? null : sentence });
+  }
+  return history;
+}
+function readPages(dir, options = {}) {
   const result = [];
   for (const entry of fs
     .readdirSync(dir, { withFileTypes: true })
     .sort((a, b) => a.name.localeCompare(b.name))) {
     const file = path.join(dir, entry.name);
-    if (entry.isDirectory()) result.push(...readPages(file));
+    if (entry.isDirectory()) result.push(...readPages(file, options));
     else if (entry.name.endsWith(".md")) {
       const source = fs.readFileSync(file, "utf8");
       const match = source.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
       if (!match) throw Error(`Missing frontmatter: ${file}`);
-      const fields = Object.fromEntries(
-        match[1].split("\n").map((line) => {
-          const m = line.match(/^(title|path|checked|sources): (.+)$/);
-          if (!m) throw Error(`Unknown frontmatter: ${line}`);
-          return [m[1], m[2]];
-        }),
-      );
+      const fields = {};
+      const historyLines = [];
+      for (const line of match[1].split("\n")) {
+        const h = line.match(/^history: (.*)$/);
+        if (h) {
+          historyLines.push(h[1]);
+          continue;
+        }
+        const m = line.match(/^(title|path|checked|sources): (.+)$/);
+        if (!m) throw Error(`Unknown frontmatter: ${line}`);
+        fields[m[1]] = m[2];
+      }
       if (
         !fields.title ||
         !fields.checked ||
@@ -443,6 +486,7 @@ function readPages(dir) {
         throw Error(`Invalid page metadata: ${file}`);
       result.push({
         ...fields,
+        history: parseHistory(historyLines, file, options.gameVersion),
         markdown: match[2],
         sourceFile: path.relative(root, file).split(path.sep).join("/"),
       });
@@ -450,6 +494,11 @@ function readPages(dir) {
   }
   return result;
 }
+// Shown history entries, newest version first; `none` markers are never shown.
+const shownHistory = (history = []) =>
+  history
+    .filter((h) => h.sentence)
+    .sort((a, b) => compareVersions(b.version, a.version));
 function build(options = {}) {
   const dataDir = options.dataDir || path.join(root, "wiki-data");
   const contentDir = options.contentDir || path.join(root, "DOCS/wiki");
@@ -478,7 +527,7 @@ function build(options = {}) {
     tokens[idx].attrSet("id", slug(tokens[idx + 1].content));
     return self.renderToken(tokens, idx, _opts);
   };
-  const pages = readPages(contentDir);
+  const pages = readPages(contentDir, { gameVersion: meta.gameVersion });
   for (const page of pages) {
     const disclosureLines = page.markdown
       .split("\n")
@@ -496,7 +545,9 @@ function build(options = {}) {
     if (inside) throw Error(`Unclosed spoiler: ${page.path}`);
     if (
       /[\u2013\u2014]|\p{Extended_Pictographic}/u.test(
-        page.markdown + page.title,
+        page.markdown +
+          page.title +
+          page.history.map((h) => h.sentence || "").join(" "),
       )
     )
       throw Error(`Forbidden punctuation or emoji: ${page.path}`);
@@ -788,7 +839,11 @@ function build(options = {}) {
           `<a href="https://github.com/binary-knight/usurper-reborn/blob/${encodeURIComponent(sourceRef)}/${s}">${escape(s)}</a>`,
       )
       .join(", ");
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(p.title)} | Usurper Reborn Wiki</title><meta name="description" content="${escape(preview.slice(0, 180))}"><link rel="stylesheet" href="/wiki/wiki.css"><script defer src="/wiki/wiki-labels.js"></script><script defer src="/wiki/wiki-search.js"></script><script defer src="/wiki/wiki.js"></script></head><body><a class="skip" href="#main">${t("skip")}</a><header><a class="logo" href="/">USURPER REBORN</a><nav aria-label="Site"><a href="/wiki/en/">${t("home")}</a><a href="/#connect">${t("play")}</a><button id="theme" type="button" aria-pressed="false">${t("theme")}</button></nav></header><div class="layout"><aside><form role="search" id="search-form"><label for="search">${t("search")}</label><input type="search" id="search" placeholder="${t("searchPlaceholder")}" maxlength="200" autocomplete="off"><button type="submit">${t("find")}</button></form><p id="search-status" role="status"></p><div id="search-results"></div><nav aria-label="Wiki sections" class="sections">${nav}</nav></aside><main id="main" tabindex="-1"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/wiki/en/">${t("home")}</a>${group ? ` / <a href="/wiki/en/${group[0]}/">${escape(group[1])}</a>` : ""}</nav><h1>${escape(p.title)}</h1><p class="version">${t("version")} ${escape(meta.gameVersion)}. ${t("checked")} ${escape(p.checked)}.</p>${p.body}<footer><p>${t("fixedRules")}</p><p>${t("sources")}: ${sourceLinks}</p><p>${t("languageNote")}</p></footer></main></div></body></html>`;
+    const entries = shownHistory(p.history);
+    const history = entries.length
+      ? `<section class="history" aria-labelledby="changes-by-version"><h2 id="changes-by-version">${t("history")}</h2><dl>${entries.map((h) => `<dt>${escape(h.version)}</dt><dd>${escape(h.sentence)}</dd>`).join("")}</dl></section>`
+      : "";
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(p.title)} | Usurper Reborn Wiki</title><meta name="description" content="${escape(preview.slice(0, 180))}"><link rel="stylesheet" href="/wiki/wiki.css"><script defer src="/wiki/wiki-labels.js"></script><script defer src="/wiki/wiki-search.js"></script><script defer src="/wiki/wiki.js"></script></head><body><a class="skip" href="#main">${t("skip")}</a><header><a class="logo" href="/">USURPER REBORN</a><nav aria-label="Site"><a href="/wiki/en/">${t("home")}</a><a href="/#connect">${t("play")}</a><button id="theme" type="button" aria-pressed="false">${t("theme")}</button></nav></header><div class="layout"><aside><form role="search" id="search-form"><label for="search">${t("search")}</label><input type="search" id="search" placeholder="${t("searchPlaceholder")}" maxlength="200" autocomplete="off"><button type="submit">${t("find")}</button></form><p id="search-status" role="status"></p><div id="search-results"></div><nav aria-label="Wiki sections" class="sections">${nav}</nav></aside><main id="main" tabindex="-1"><nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/wiki/en/">${t("home")}</a>${group ? ` / <a href="/wiki/en/${group[0]}/">${escape(group[1])}</a>` : ""}</nav><h1>${escape(p.title)}</h1><p class="version">${t("version")} ${escape(meta.gameVersion)}. ${t("checked")} ${escape(p.checked)}.</p>${p.body}${history}<footer><p>${t("fixedRules")}</p><p>${t("sources")}: ${sourceLinks}</p><p>${t("languageNote")}</p></footer></main></div></body></html>`;
   }
   // Remove only obsolete generated page files listed by our previous manifest.
   // No recursive output cleanup and no removal of hand-written assets.
@@ -881,4 +936,13 @@ if (require.main === module) {
     process.exitCode = 1;
   }
 }
-module.exports = { build, loadData, readPages, renderers, textOf };
+module.exports = {
+  build,
+  loadData,
+  readPages,
+  renderers,
+  textOf,
+  compareVersions,
+  parseHistory,
+  shownHistory,
+};
