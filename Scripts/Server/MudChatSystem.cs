@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -98,6 +99,11 @@ public static class MudChatSystem
             case "who":
             case "w":
                 return HandleWho(username, terminal);
+
+            // v1.2.4: read recent chat. Not in ChatCommands: a silenced player can still read.
+            case "history":
+            case "hist":
+                return await HandleHistory(username, args, terminal);
 
             case "title":
                 return HandleTitle(username, args, terminal);
@@ -327,13 +333,15 @@ public static class MudChatSystem
         // Show to sender
         terminal.SetColor("bright_white");
         terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_say", message)}");
+        RecordOwn(username, "say", UsurperRemake.Systems.Loc.Get("chat.you_say", message));
 
         // Broadcast to others in the room
         var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance.BroadcastToRoom(
             location.Value,
             $"\u001b[1;37m  {displayName} says: {message}\u001b[0m",
-            excludeUsername: username);
+            excludeUsername: username,
+            historyChannel: "say");
 
         return true;
     }
@@ -349,13 +357,15 @@ public static class MudChatSystem
         // Show to sender
         terminal.SetColor("bright_yellow");
         terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_shout", message)}");
+        RecordOwn(username, "shout", UsurperRemake.Systems.Loc.Get("chat.you_shout", message));
 
         // Broadcast to ALL connected players
         var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance!.BroadcastGlobal(
             $"\u001b[1;33m  {displayName} shouts: {message}\u001b[0m",
             excludeUsername: username,
-            channelKey: "shout");
+            channelKey: "shout",
+            historyChannel: "shout");
 
         // v0.57.21: GMCP fan-out
         FanoutChannelText("shout", displayName, message, excludeUsername: username);
@@ -399,9 +409,11 @@ public static class MudChatSystem
             }
 
             targetSession.EnqueueMessage($"\u001b[35m  {displayName} tells you: {message}\u001b[0m");
+            RecordDelivered(targetSession, "tell", $"{displayName} tells you: {message}");
             var targetDisplayName = GetSessionDisplayName(targetSession, targetName);
             terminal.SetColor("magenta");
             terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_tell", targetDisplayName, message)}");
+            RecordOwn(username, "tell", UsurperRemake.Systems.Loc.Get("chat.you_tell", targetDisplayName, message));
 
             // v0.57.21: GMCP single-target tell to the recipient. Channel "tell"
             // matches Achaea convention so off-the-shelf Mudlet scripts pick it up.
@@ -489,12 +501,14 @@ public static class MudChatSystem
         var displayName = GetChatDisplayName(username);
         terminal.SetColor("bright_cyan");
         terminal.WriteLine($"  * {displayName} {action}");
+        RecordOwn(username, "emote", $"* {displayName} {action}");
 
         // Broadcast to others in the room
         RoomRegistry.Instance.BroadcastToRoom(
             location.Value,
             $"\u001b[1;36m  * {displayName} {action}\u001b[0m",
-            excludeUsername: username);
+            excludeUsername: username,
+            historyChannel: "emote");
 
         return true;
     }
@@ -510,13 +524,15 @@ public static class MudChatSystem
         // Show to sender
         terminal.SetColor("bright_green");
         terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.gossip_you", message)}");
+        RecordOwn(username, "gossip", UsurperRemake.Systems.Loc.Get("chat.gossip_you", message));
 
         // Broadcast to ALL connected players (global out-of-character channel)
         var displayName = GetChatDisplayName(username);
         RoomRegistry.Instance!.BroadcastGlobal(
             $"\u001b[92m  [Gossip] {displayName}: {message}\u001b[0m",
             excludeUsername: username,
-            channelKey: "gossip");
+            channelKey: "gossip",
+            historyChannel: "gossip");
 
         // v0.57.21: GMCP Comm.Channel.Text fan-out for MUD-client chat capture panes.
         FanoutChannelText("gossip", displayName, message, excludeUsername: username);
@@ -526,6 +542,158 @@ public static class MudChatSystem
         UsurperRemake.Systems.DiscordBridge.QueueOutbound(displayName, message);
 
         return true;
+    }
+
+    // ---- v1.2.4: chat history (/history) ----
+
+    /// <summary>The channel a /history filter names (tell, gossip, say, shout, emote, guild, or an
+    /// alias a player may type), or null.</summary>
+    private static string? HistoryChannelFor(string arg) => arg.ToLowerInvariant() switch
+    {
+        "tell" or "t" or "tells" => "tell",
+        "gossip" or "gos" => "gossip",
+        "say" or "s" => "say",
+        "shout" => "shout",
+        "emote" or "me" => "emote",
+        "guild" or "gc" => "guild",
+        _ => null,
+    };
+
+    private const int HistoryPageRows = 20;
+
+    private static bool HasMuted(PlayerSession? session, string channel) =>
+        session?.Context?.Engine?.CurrentPlayer?.MutedChannels?.Contains(channel) == true;
+
+    /// <summary>A chat line was delivered to <paramref name="recipient"/>: keep it in their history,
+    /// unless they muted the channel.</summary>
+    internal static void RecordDelivered(PlayerSession recipient, string channel, string renderedLine)
+    {
+        if (recipient == null || HasMuted(recipient, channel)) return;
+        string text = UsurperRemake.UI.UIHelper.StripAnsi(renderedLine).Trim();
+        ChatHistoryStore.Instance.RecordChatLine(recipient.Username, channel, text, incoming: true);
+    }
+
+    /// <summary>The sender's own line, as their screen showed it.</summary>
+    private static void RecordOwn(string username, string channel, string shownLine)
+    {
+        PlayerSession? own = null;
+        MudServer.Instance?.ActiveSessions.TryGetValue(username.ToLowerInvariant(), out own);
+        if (HasMuted(own, channel)) return;
+        ChatHistoryStore.Instance.RecordChatLine(username, channel, shownLine.Trim(), incoming: false);
+    }
+
+    private static string HistoryColor(string channel) => channel switch
+    {
+        "tell" => "magenta",
+        "gossip" => "bright_green",
+        "guild" => "bright_green",
+        "shout" => "bright_yellow",
+        "emote" => "bright_cyan",
+        _ => "bright_white",
+    };
+
+    /// <summary>
+    /// The rows /history prints for <paramref name="entries"/>, oldest first. Each message starts
+    /// with its time (UTC) and wraps at UIHelper.WrapWidth, a word too long for a line broken
+    /// inside it. Screen reader: one plain line per message.
+    /// </summary>
+    internal static List<(string Color, string Text)> RenderHistoryRows(IReadOnlyList<ChatHistoryEntry> entries, bool screenReader)
+    {
+        var rows = new List<(string, string)>();
+        foreach (var e in entries)
+        {
+            string time = e.TimeUtc.ToString("HH:mm", System.Globalization.CultureInfo.InvariantCulture);
+            if (screenReader)
+            {
+                rows.Add(("white", $"{time} {e.Text}"));
+                continue;
+            }
+            string prefix = $"  [{time}] ";
+            int width = UsurperRemake.UI.UIHelper.WrapWidth - prefix.Length;
+            var words = new List<string>();
+            foreach (var w in e.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                for (int i = 0; i < w.Length; i += width)
+                    words.Add(w.Substring(i, Math.Min(width, w.Length - i)));
+            }
+            var lines = UsurperRemake.UI.UIHelper.WordWrap(string.Join(' ', words), width);
+            string color = HistoryColor(e.Channel);
+            for (int i = 0; i < lines.Count; i++)
+                rows.Add((color, (i == 0 ? prefix : new string(' ', prefix.Length)) + lines[i]));
+        }
+        return rows;
+    }
+
+    /// <summary>The header row for /history, or for one channel.</summary>
+    internal static string HistoryHeader(string? channel) => channel == null
+        ? UsurperRemake.Systems.Loc.Get("chat.history_header")
+        : UsurperRemake.Systems.Loc.Get("chat.history_header_channel", channel);
+
+    private static async Task<bool> HandleHistory(string username, string args, TerminalEmulator terminal)
+    {
+        string? channel = null;
+        if (!string.IsNullOrWhiteSpace(args))
+        {
+            channel = HistoryChannelFor(args.Trim());
+            if (channel == null)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.history_usage")}");
+                return true;
+            }
+        }
+
+        bool sr = GameConfig.ScreenReaderMode;
+        var entries = ChatHistoryStore.Instance.ReadChatHistory(username, channel);
+        ChatHistoryStore.Instance.MarkChatHistoryViewed(username);
+
+        terminal.SetColor("bright_cyan");
+        terminal.WriteLine(sr ? HistoryHeader(channel) : $"  {HistoryHeader(channel)}");
+        if (entries.Count == 0)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(sr ? UsurperRemake.Systems.Loc.Get("chat.history_empty") : $"  {UsurperRemake.Systems.Loc.Get("chat.history_empty")}");
+            return true;
+        }
+
+        var rows = RenderHistoryRows(entries, sr);
+        int totalPages = (rows.Count + HistoryPageRows - 1) / HistoryPageRows;
+        int page = 0;
+        while (true)
+        {
+            int start = page * HistoryPageRows;
+            int count = Math.Min(HistoryPageRows, rows.Count - start);
+            for (int i = start; i < start + count; i++)
+            {
+                terminal.SetColor(rows[i].Color);
+                terminal.WriteLine(rows[i].Text);
+            }
+            if (totalPages <= 1) return true;
+
+            terminal.SetColor("darkgray");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("team.recruit_page_footer", start + 1, start + count, rows.Count, page + 1, totalPages)}");
+            terminal.SetColor("gray");
+            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("base.quest_pager_nav")}");
+            var nav = ((await terminal.GetInput("")) ?? "").Trim().ToUpperInvariant();
+            if (nav == "N" && page < totalPages - 1) page++;
+            else if (nav == "P" && page > 0) page--;
+            else if (nav == "N" || nav == "P") continue;
+            else return true;
+        }
+    }
+
+    /// <summary>
+    /// The one-line hint after a full location redraw: how many chat lines from other players
+    /// were recorded since the last /history or the last hint. Null when there are none. Taking
+    /// it resets the count, so one redraw shows it once.
+    /// </summary>
+    internal static string? TakeRedrawHint(string username)
+    {
+        int n = ChatHistoryStore.Instance.TakeUnseenChatCount(username);
+        if (n <= 0) return null;
+        return n == 1
+            ? UsurperRemake.Systems.Loc.Get("chat.history_hint_one")
+            : UsurperRemake.Systems.Loc.Get("chat.history_hint_many", n);
     }
 
     /// <summary>
@@ -1702,6 +1870,8 @@ public static class MudChatSystem
             {
                 memberSession?.Context?.Terminal?.SetColor("bright_green");
                 memberSession?.Context?.Terminal?.WriteLine($"\r\n  {chatLabel} {displayName}: {args}\r\n");
+                if (memberSession?.Context?.Terminal != null)
+                    RecordDelivered(memberSession, "guild", $"{chatLabel} {displayName}: {args}");
             }
             catch { }
 
@@ -1715,6 +1885,7 @@ public static class MudChatSystem
         }
 
         terminal.WriteLine($"  {Systems.Loc.Get("guild.chat_you", args)}", "bright_green");
+        RecordOwn(username, "guild", Systems.Loc.Get("guild.chat_you", args));
         return true;
     }
 

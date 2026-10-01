@@ -280,6 +280,10 @@ namespace UsurperRemake.UI
         public static int VisibleLength(string text) =>
             string.IsNullOrEmpty(text) ? 0 : AnsiEscape.Replace(text, "").Length;
 
+        /// <summary>v1.2.4: text without its ANSI escape sequences.</summary>
+        public static string StripAnsi(string? text) =>
+            string.IsNullOrEmpty(text) ? "" : AnsiEscape.Replace(text, "");
+
         /// <summary>
         /// v1.1.14: word-wrap text at spaces so no line is wider than width visible columns.
         /// ANSI sequences are kept intact and not counted. Existing newlines start a new line.

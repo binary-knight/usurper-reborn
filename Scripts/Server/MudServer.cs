@@ -79,6 +79,9 @@ public class MudServer
         var usernameKey = username.ToLowerInvariant();
         // v1.2.4: only this connection's own entry; a reconnect may already hold the key.
         RemoveOwnSession(usernameKey, ownSession);
+        // v1.2.4: the chat history's retention window starts once no session holds the key.
+        if (ownSession != null && !ActiveSessions.ContainsKey(usernameKey))
+            ChatHistoryStore.Instance.ChatSessionEnded(usernameKey);
         // v0.60.0 bot-detection Tier 1: drop the player's input-timing ring
         // buffer so reconnects start fresh (otherwise a fast player who
         // reconnects inherits a stale fast-streak count).
@@ -109,13 +112,18 @@ public class MudServer
     /// holds the key, kick it, wait for its cleanup, and retry once.</summary>
     internal async Task<bool> RegisterSessionAsync(string key, PlayerSession session)
     {
-        if (ActiveSessions.TryAdd(key, session)) return true;
-        if (ActiveSessions.TryGetValue(key, out var staleSession) && !ReferenceEquals(staleSession, session))
+        if (!ActiveSessions.TryAdd(key, session))
         {
-            await KickStaleSessionAsync(key, staleSession, "race condition");
-            await WaitForStaleCleanupAsync(staleSession);
+            if (ActiveSessions.TryGetValue(key, out var staleSession) && !ReferenceEquals(staleSession, session))
+            {
+                await KickStaleSessionAsync(key, staleSession, "race condition");
+                await WaitForStaleCleanupAsync(staleSession);
+            }
+            if (!ActiveSessions.TryAdd(key, session)) return false;
         }
-        return ActiveSessions.TryAdd(key, session);
+        // v1.2.4: a reconnect within the retention window keeps the chat history.
+        ChatHistoryStore.Instance.ChatSessionStarted(key);
+        return true;
     }
 
     // v0.65.0 (1.0-prep SR): per-IP failed-login throttle. The per-CONNECTION
@@ -1547,7 +1555,7 @@ public class MudServer
     /// the channel in their MutedChannels set, they don't receive this broadcast.
     /// channelKey = null means "always deliver" (system messages, server events).
     /// </summary>
-    public void BroadcastToAll(string message, string? excludeUsername = null, string? channelKey = null)
+    public void BroadcastToAll(string message, string? excludeUsername = null, string? channelKey = null, string? historyChannel = null)
     {
         foreach (var kvp in ActiveSessions)
         {
@@ -1575,6 +1583,9 @@ public class MudServer
             }
 
             kvp.Value.EnqueueMessage(message);
+            // v1.2.4: chat lines go to the recipient's /history as delivered.
+            if (historyChannel != null)
+                MudChatSystem.RecordDelivered(kvp.Value, historyChannel, message);
         }
     }
 
