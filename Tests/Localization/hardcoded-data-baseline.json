@@ -297,22 +297,14 @@
   },
   "Scripts/Data/BeastData.cs": {
     "data": {
-      "count": 16,
+      "count": 8,
       "sites": [
         "22f28ab237",
-        "2b42212208",
-        "35debb734a",
         "3c735cb74e",
         "4426a560ed",
         "4889daeb15",
-        "5cefb9fcbc",
-        "7f4d885415",
-        "a1e72a3fe7",
         "a620d6719e",
-        "c30b14aa4b",
-        "c48864a4a2",
         "d7efb1b0f6",
-        "e2adad2b4b",
         "f5063bc02a",
         "ff46cdcd9e"
       ]
@@ -926,45 +918,6 @@
         "f65ba4c36b",
         "fd03befec2",
         "ffa62599ca"
-      ]
-    }
-  },
-  "Scripts/Data/DungeonSettlementData.cs": {
-    "data": {
-      "count": 32,
-      "sites": [
-        "0c59b19b54",
-        "2e6034fffa",
-        "304e88c7be",
-        "32c9dbb6d7",
-        "341bb208d3",
-        "4de92f69e1",
-        "513e332dc6",
-        "5d71aa7195",
-        "6d6103ecbf",
-        "702ae6ce7c",
-        "7141101cb5",
-        "727ccd2e34",
-        "78d6965444",
-        "7f99ddcc7b",
-        "a1c18abe07",
-        "a497d73016",
-        "b7b1888894",
-        "b88d3f437f",
-        "bbf659393c",
-        "c0dcc6f02b",
-        "c72e98b1fa",
-        "cbbcb3c2a4",
-        "ccf584bf17",
-        "d289de2f69",
-        "d81dc70dc2",
-        "e0c3f6d8b9",
-        "e16ff9d693",
-        "f06bc942ad",
-        "f1eaf99ab6",
-        "f36b2e8177",
-        "f62c68b21f",
-        "fa68d26f54"
       ]
     }
   },
@@ -4056,21 +4009,6 @@
       ]
     }
   },
-  "Scripts/Systems/FeatureInteractionSystem.cs": {
-    "data": {
-      "count": 8,
-      "sites": [
-        "10b0db177c",
-        "10b0db177c",
-        "752a13ac1a",
-        "752a13ac1a",
-        "8a46e6b95e",
-        "8a46e6b95e",
-        "e3870f2378",
-        "e3870f2378"
-      ]
-    }
-  },
   "Scripts/Systems/FileSaveBackend.cs": {
     "data": {
       "count": 17,
@@ -4873,22 +4811,6 @@
       ]
     }
   },
-  "Scripts/Systems/PuzzleSystem.cs": {
-    "data": {
-      "count": 9,
-      "sites": [
-        "0f1c179298",
-        "1d80a7bb5c",
-        "430cd5459c",
-        "4470ee262a",
-        "4e117532ef",
-        "5a51f7074c",
-        "a57ea7fa3f",
-        "b8ae39c93d",
-        "f0c1fd8933"
-      ]
-    }
-  },
   "Scripts/Systems/QuestSystem.cs": {
     "data": {
       "count": 43,
@@ -4936,14 +4858,6 @@
         "f0af292fc1",
         "fcb629d9e3",
         "fffd0b1f56"
-      ]
-    }
-  },
-  "Scripts/Systems/RareEncounters.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "f22ab787bb"
       ]
     }
   },

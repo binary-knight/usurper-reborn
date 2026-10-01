@@ -498,7 +498,7 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("gray");
                     terminal.WriteLine(Loc.Get("encounter.minstrel.listen_leave"));
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  (+{listenXP} XP)");
+                    terminal.WriteLine(Loc.Get("dungeon.encounter_xp_gain", listenXP));
                     break;
             }
 
@@ -1963,7 +1963,7 @@ namespace UsurperRemake.Systems
                 if (monsters.Count > 0)
                 {
                     var champion = monsters[0];
-                    champion.Name = $"Arena {champion.Name}";
+                    champion.Name = Loc.Get("dungeon.arena_champion_name", champion.Name);
                     champion.IsMiniBoss = true;
                     // Mini-boss bonuses applied by Monster class
 
@@ -2345,7 +2345,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.tomb.open_mummy"));
                     int damage = (int)(player.MaxHP / 3);
                     player.HP -= damage;
-                    terminal.WriteLine($"-{damage} HP!");
+                    terminal.WriteLine(Loc.Get("feature.minus_hp", damage));
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("encounter.tomb.open_mummy_treasure"));
                     player.Gold += level * 1500;  // Increased from 500 for economic balance
@@ -2507,7 +2507,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.child.check_trap_2"));
                     int damage = (int)(player.MaxHP / 5);
                     player.HP -= damage;
-                    terminal.WriteLine($"-{damage} HP!");
+                    terminal.WriteLine(Loc.Get("feature.minus_hp", damage));
                 }
                 else
                 {
@@ -2678,7 +2678,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine(Loc.Get("encounter.hoard.trap_thieves"));
                     int damage = (int)(player.MaxHP / 4);
                     player.HP -= damage;
-                    terminal.WriteLine($"-{damage} HP!");
+                    terminal.WriteLine(Loc.Get("feature.minus_hp", damage));
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("encounter.hoard.trap_grab"));
                     player.Gold += level * 900;  // Increased from 300 for economic balance

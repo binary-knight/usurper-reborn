@@ -1268,7 +1268,7 @@ public class DungeonLocation : BaseLocation
 
         teammates.Add(wrapper);
         term.SetColor("bright_yellow");
-        term.WriteLine(Loc.Get("dungeon.pet_joins_party", pet.Name, def.Species));
+        term.WriteLine(Loc.Get("dungeon.pet_joins_party", pet.Name, def.LocSpecies()));
     }
 
     /// <summary>
@@ -3603,7 +3603,7 @@ public class DungeonLocation : BaseLocation
         };
     }
 
-    private static string GetThemeShortName(DungeonTheme theme)
+    internal static string GetThemeShortName(DungeonTheme theme)
     {
         return theme switch
         {
@@ -15079,7 +15079,7 @@ public class DungeonLocation : BaseLocation
 
             // Description
             terminal.SetColor("white");
-            foreach (var line in settlement.Description.Split('\n'))
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(settlement.LocDescription()))
                 terminal.WriteLine(line);
             terminal.WriteLine("");
 
@@ -15087,10 +15087,10 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.Write($"{settlement.NPCName}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" ({settlement.NPCTitle})");
+            terminal.WriteLine($" ({settlement.LocNPCTitle()})");
             terminal.SetColor("white");
-            string greeting = firstVisit ? settlement.FirstGreeting : settlement.ReturnGreeting;
-            foreach (var line in greeting.Split('\n'))
+            string greeting = firstVisit ? settlement.LocFirstGreeting() : settlement.LocReturnGreeting();
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(greeting))
                 terminal.WriteLine(line);
             firstVisit = false; // Only show first greeting once per visit
             terminal.WriteLine("");
@@ -15387,7 +15387,7 @@ public class DungeonLocation : BaseLocation
             if (!player.SettlementLoreRead.Contains(key))
             {
                 unreadKey = key;
-                unreadText = settlement.LoreFragments[i];
+                unreadText = settlement.LocLore(i);
                 break;
             }
         }
@@ -15416,7 +15416,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        foreach (var line in unreadText.Split('\n'))
+        foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(unreadText))
             terminal.WriteLine(line);
 
         terminal.WriteLine("");

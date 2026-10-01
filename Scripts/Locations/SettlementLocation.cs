@@ -604,16 +604,16 @@ public class SettlementLocation : BaseLocation
         if (currentPlayer.SettlementWorkshopUsedToday)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine("  The smiths have already sharpened your weapon today. Return tomorrow.");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.workshop_used_today"), "  ");
             await terminal.PressAnyKey();
             return;
         }
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine("  The settlement smiths heat your blade in the forge and hone it to a razor edge.");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.workshop_hone"), "  ");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  Your weapon has been sharpened! +20% damage for 10 combats.");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.workshop_sharpened"), "  ");
 
         currentPlayer.WorkshopBuffCombats = 10;
         currentPlayer.SettlementWorkshopUsedToday = true;
@@ -625,7 +625,7 @@ public class SettlementLocation : BaseLocation
     {
         terminal.SetColor("cyan");
         terminal.WriteLine("");
-        string input = await terminal.GetInput("Which dungeon floor to reveal? (1-100): ");
+        string input = await terminal.GetInput(Loc.Get("dungeon.scout_floor_prompt"));
         if (!int.TryParse(input, out int floor) || floor < 1 || floor > 100)
         {
             terminal.WriteLine(Loc.Get("ui.cancelled"), "gray");
@@ -637,7 +637,7 @@ public class SettlementLocation : BaseLocation
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine("");
-        terminal.WriteLine($"  ╔══ WATCHTOWER SCOUT REPORT: Floor {floor} ══╗");
+        terminal.WriteLine(Loc.Get("dungeon.scout_report_header", floor));
         terminal.SetColor("white");
 
         // Special floor warnings
@@ -646,18 +646,18 @@ public class SettlementLocation : BaseLocation
         if (oldGodFloors.Contains(floor))
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  ⚠ WARNING: An Old God dwells on this floor. Do not enter unprepared.");
+            terminal.WriteLine(Loc.Get("dungeon.scout_old_god_warning"));
             terminal.SetColor("white");
         }
         else if (sealFloors.Contains(floor))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  ★ SEAL FLOOR: An ancient seal awaits collection.");
+            terminal.WriteLine(Loc.Get("dungeon.scout_seal_floor"));
             terminal.SetColor("white");
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine($"  Theme: {dungeonFloor.Theme}  |  Danger: {dungeonFloor.DangerLevel}/10  |  Rooms: {dungeonFloor.Rooms.Count}");
+        terminal.WriteLine(Loc.Get("dungeon.scout_floor_summary", DungeonLocation.GetThemeShortName(dungeonFloor.Theme), dungeonFloor.DangerLevel, dungeonFloor.Rooms.Count));
         terminal.WriteLine("");
 
         // Room-by-room breakdown
@@ -667,26 +667,26 @@ public class SettlementLocation : BaseLocation
             roomNum++;
             string roomIcon = room.Type switch
             {
-                RoomType.BossAntechamber => "[BOSS]",
-                RoomType.SecretVault     => "[SECRET]",
-                RoomType.Shrine          => "[SHRINE]",
-                RoomType.MeditationChamber => "[MEDITATE]",
-                RoomType.LoreLibrary     => "[LORE]",
-                RoomType.ArenaRoom       => "[ARENA]",
-                RoomType.MerchantDen     => "[MERCHANT]",
-                RoomType.Settlement      => "[OUTPOST]",
+                RoomType.BossAntechamber => Loc.Get("dungeon.scout_icon_boss"),
+                RoomType.SecretVault     => Loc.Get("dungeon.scout_icon_secret"),
+                RoomType.Shrine          => Loc.Get("dungeon.scout_icon_shrine"),
+                RoomType.MeditationChamber => Loc.Get("dungeon.scout_icon_meditate"),
+                RoomType.LoreLibrary     => Loc.Get("dungeon.scout_icon_lore"),
+                RoomType.ArenaRoom       => Loc.Get("dungeon.scout_icon_arena"),
+                RoomType.MerchantDen     => Loc.Get("dungeon.scout_icon_merchant"),
+                RoomType.Settlement      => Loc.Get("dungeon.scout_icon_outpost"),
                 _                        => ""
             };
 
             // Build tags
             var tags = new System.Text.StringBuilder();
-            if (room.HasMonsters)   tags.Append(" Monsters");
-            if (room.HasTrap)       tags.Append(" Trap");
-            if (room.HasTreasure)   tags.Append(" Treasure");
-            if (room.HasEvent)      tags.Append(" Event");
-            if (room.IsBossRoom)    tags.Append(" [BOSS ROOM]");
-            if (room.IsSecretRoom)  tags.Append(" [SECRET]");
-            if (room.HasStairsDown) tags.Append(" ↓Stairs");
+            if (room.HasMonsters)   tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_monsters"));
+            if (room.HasTrap)       tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_trap"));
+            if (room.HasTreasure)   tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_treasure"));
+            if (room.HasEvent)      tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_event"));
+            if (room.IsBossRoom)    tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_boss_room"));
+            if (room.IsSecretRoom)  tags.Append(' ').Append(Loc.Get("dungeon.scout_icon_secret"));
+            if (room.HasStairsDown) tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_stairs"));
 
             string tagStr = tags.Length > 0 ? " —" + tags : "";
 
@@ -705,7 +705,11 @@ public class SettlementLocation : BaseLocation
                 terminal.SetColor("white");
 
             string label = roomIcon.Length > 0 ? $" {roomIcon}" : "";
-            terminal.WriteLine($"  {roomNum,2}. {room.Name}{label}{tagStr}");
+            // v1.2.3: a long room name with many tags wraps; continuation rows indent under the name.
+            string prefix = $"  {roomNum,2}. ";
+            var rowLines = UsurperRemake.UI.UIHelper.WordWrap($"{room.Name}{label}{tagStr}", UsurperRemake.UI.UIHelper.WrapWidth - prefix.Length);
+            for (int li = 0; li < rowLines.Count; li++)
+                terminal.WriteLine((li == 0 ? prefix : new string(' ', prefix.Length)) + rowLines[li]);
 
             // Sample monster if present (Monsters list is empty at gen-time; generate a sample)
             if (room.HasMonsters)
@@ -714,21 +718,21 @@ public class SettlementLocation : BaseLocation
                 if (room.Monsters.Count > 0)
                 {
                     var m = room.Monsters[0];
-                    string plural = room.Monsters.Count > 1 ? $" (+{room.Monsters.Count - 1} more)" : "";
-                    terminal.WriteLine($"      → {m.Name} (Lv {m.Level}){plural}");
+                    string plural = room.Monsters.Count > 1 ? Loc.Get("settlement.settlers_more", room.Monsters.Count - 1) : "";
+                    terminal.WriteLine(Loc.Get("dungeon.scout_monster", m.Name, m.Level, plural));
                 }
                 else
                 {
                     var sample = MonsterGenerator.GenerateMonster(floor);
                     if (sample != null)
-                        terminal.WriteLine($"      → {sample.Name} (Lv {sample.Level})");
+                        terminal.WriteLine(Loc.Get("dungeon.scout_monster", sample.Name, sample.Level, ""));
                 }
             }
         }
 
         terminal.SetColor("gray");
         terminal.WriteLine("");
-        terminal.WriteLine("  (Scout report reflects floor layout at time of observation)");
+        terminal.WriteLine(Loc.Get("dungeon.scout_report_footer"));
 
         await terminal.PressAnyKey();
     }
