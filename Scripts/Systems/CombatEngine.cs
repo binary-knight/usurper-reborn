@@ -1801,7 +1801,7 @@ public partial class CombatEngine
                         {
                             string? npcOutput = terminal.StopCapture();
                             if (!string.IsNullOrWhiteSpace(npcOutput))
-                                BroadcastGroupLocalized(result, lang => npcRecording!.Render(npcOutput, lang));
+                                BroadcastGroupLocalized(result, lang => CapturedInLanguage(npcRecording, npcOutput, lang, player.DisplayName));
                         }
                     }
                 }
@@ -32012,7 +32012,45 @@ public partial class CombatEngine
     /// English "You ..." forms).
     /// </summary>
     internal static string CapturedInLanguage(LocRecording? recording, string captured, string lang, string name)
-        => ConvertToThirdPerson(recording?.Render(captured, lang) ?? captured, name);
+    {
+        // v1.2.4: English and unrecorded captures read as before: English, "You attack" made "Name attacks"
+        string english = ConvertToThirdPerson(recording?.Render(captured, "en") ?? captured, name);
+        if (recording == null) return ConvertToThirdPerson(captured, name);
+        if (lang == "en") return english;
+
+        // Another language: a line with a third person key reads in the reader's language; any other line
+        // that is second person in English ("you", "your") falls back to the English third person line,
+        // so a reader never sees "you" meaning another player.
+        string local = recording.Render(captured, lang, (key, args) => ThirdPersonLine(lang, key, name, args));
+        string englishThird = recording.Render(captured, "en", (key, args) => ThirdPersonLine("en", key, name, args));
+        var localRows = local.Split('\n');
+        var englishRows = englishThird.Split('\n');
+        var fallbackRows = english.Split('\n');
+        if (localRows.Length != englishRows.Length || englishRows.Length != fallbackRows.Length) return english;
+        for (int i = 0; i < localRows.Length; i++)
+            if (SecondPersonInEnglish.IsMatch(UIHelper.StripAnsi(englishRows[i]))) localRows[i] = fallbackRows[i];
+        return string.Join("\n", localRows);
+    }
+
+    /// <summary>v1.2.4: the captured lines with a third person form for other readers: key to its "{0} ..." key.</summary>
+    internal static readonly Dictionary<string, string> ThirdPersonKeys = new()
+    {
+        ["combat.defend_stance"] = "combat.defend_stance_third",
+        ["combat.you_attack_target"] = "combat.you_attack_target_third",
+        ["combat.you_miss"] = "combat.you_miss_third",
+    };
+
+    private static string? ThirdPersonLine(string lang, string key, string name, object[] args)
+    {
+        if (!ThirdPersonKeys.TryGetValue(key, out var third)) return null;
+        var withName = new object[args.Length + 1];
+        withName[0] = name;
+        Array.Copy(args, 0, withName, 1, args.Length);
+        return Loc.GetIn(lang, third, withName);
+    }
+
+    private static readonly System.Text.RegularExpressions.Regex SecondPersonInEnglish =
+        new(@"\b(you|your|yours|yourself)\b", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
     /// <summary>v1.2.2: the group loot notice for another member, in their language.</summary>
     internal static string GroupLootMessage(string lang, string recipientName, LocalizedLines lines)

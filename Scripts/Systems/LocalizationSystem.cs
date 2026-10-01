@@ -429,9 +429,15 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>`captured` with each recorded text replaced by its rendering in `lang`.</summary>
-        public string Render(string captured, string lang)
+        public string Render(string captured, string lang) => Render(captured, lang, null);
+
+        /// <summary>
+        /// v1.2.4: Render where `substitute` (key, translated args) can give a recorded call's replacement
+        /// text, for example a third person form; null keeps the key's own rendering in `lang`.
+        /// </summary>
+        public string Render(string captured, string lang, Func<string, object[], string?>? substitute)
         {
-            if (string.IsNullOrEmpty(captured) || lang == Language) return captured;
+            if (string.IsNullOrEmpty(captured) || (lang == Language && substitute == null)) return captured;
             List<(string text, string key, object[] args)> calls;
             lock (_lock) calls = new List<(string, string, object[])>(_calls);
 
@@ -442,7 +448,8 @@ namespace UsurperRemake.Systems
                 var translatedArgs = new object[args.Length];
                 for (int i = 0; i < args.Length; i++)
                     translatedArgs[i] = args[i] is string s && map.TryGetValue(s, out var t) ? t : args[i];
-                string rendered = args.Length == 0 ? Loc.GetIn(lang, key) : Loc.GetIn(lang, key, translatedArgs);
+                string rendered = substitute?.Invoke(key, translatedArgs)
+                    ?? (args.Length == 0 ? Loc.GetIn(lang, key) : Loc.GetIn(lang, key, translatedArgs));
                 if (rendered != text) map[text] = rendered;
             }
             if (map.Count == 0) return captured;

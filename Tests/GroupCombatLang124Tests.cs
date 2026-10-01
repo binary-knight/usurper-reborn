@@ -269,18 +269,92 @@ public class GroupCombatLang124Tests
                 AllRowsFit(Strip(build(lineLang)), $"broadcast in {lineLang}");
     }
 
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("it")]
+    public async Task FollowerTurn_TheActionMenuBoxIsAligned(string lang)
+    {
+        var turn = await FollowerTurn(lang);
+        var rows = Rows(turn.Follower).ToList();
+        int top = rows.FindIndex(r => r.StartsWith("╔") && r.EndsWith("╗") && rows.IndexOf(r) + 1 < rows.Count
+            && rows[rows.IndexOf(r) + 1].Contains(Loc.GetIn(lang, "combat.choose_action").Trim()));
+        top.Should().BeGreaterThanOrEqualTo(0, "the action menu box is drawn");
+        int bottom = rows.FindIndex(top, r => r.StartsWith("╚"));
+        bottom.Should().BeGreaterThan(top);
+        var box = rows.GetRange(top, bottom - top + 1);
+        box.Should().Contain(r => r.Contains(Loc.GetIn(lang, "combat.aid_ally_none_short")), "the no-means aid row is in the box");
+        foreach (var row in box)
+        {
+            row.Length.Should().Be(rows[top].Length, $"every row's right border is in the same column: \"{row}\"");
+            "║╗╣╝".Should().Contain(row[^1].ToString(), $"the row ends in the border: \"{row}\"");
+        }
+        rows[top].Length.Should().BeLessThanOrEqualTo(79);
+    }
+
     [Fact]
     public async Task FollowerTurn_TheCapturedActionReachesEachOtherMemberInTheirLanguage()
     {
         var turn = await FollowerTurn("hu");
         var action = turn.Broadcasts.Where(b => b.exclude == "gcl124f1")
-            .Select(b => b.build).Where(b => Strip(b("hu")).Contains(Loc.GetIn("hu", "combat.defend_stance"))).ToList();
+            .Select(b => b.build).Where(b => Strip(b("en")).Contains("defensive stance")).ToList();
         action.Should().HaveCount(1, "the follower's action is sent once, built per reader");
+        Strip(action[0]("hu")).Should().Contain(Loc.GetIn("hu", "combat.defend_stance_third", LongName), "a Hungarian reader other than the actor reads the third person")
+            .And.NotContain(Loc.GetIn("hu", "combat.defend_stance"));
         Capture("group-lang-action.txt", action[0]("hu") + "\n----\n" + action[0]("en") + "\n----\n" + action[0]("fr"));
         Strip(action[0]("en")).Should().Contain($"{LongName} takes a defensive stance!", "the leader reads English, in the third person");
-        Strip(action[0]("fr")).Should().Contain(Loc.GetIn("fr", "combat.defend_stance"), "the other follower reads French");
+        Strip(action[0]("fr")).Should().Contain(Loc.GetIn("fr", "combat.defend_stance_third", LongName), "the other follower reads French, in the third person");
+        Strip(action[0]("fr")).Should().NotContain(Loc.GetIn("fr", "combat.defend_stance")).And.NotContain("Vous");
         Strip(action[0]("fr")).Should().NotContain(Loc.GetIn("hu", "combat.defend_stance"));
         Loc.GetIn("fr", "combat.defend_stance").Should().NotBe(Loc.GetIn("en", "combat.defend_stance"));
+    }
+
+    /// <summary>The leader's captured action, recorded in English as the combat loop records it.</summary>
+    private static (LocRecording rec, string captured) LeaderAction()
+    {
+        var prev = GameConfig.Language;
+        GameConfig.Language = "en";
+        var term = new TerminalEmulator(new MemoryStream(), new MemoryStream());
+        term.StartCapture();
+        var rec = Loc.BeginRecording();
+        try
+        {
+            term.WriteLine(Loc.Get("combat.you_attack_target", "Ogre"), "white");                    // has a third person key
+            term.WriteLine(Loc.Get("combat.miss", "Ogre"), "white");                                  // no person
+            term.WriteLine(Loc.Get("combat.power_attack_action"), "white");                          // second person, no third person key
+        }
+        finally { Loc.EndRecording(rec); GameConfig.Language = prev; }
+        return (rec, term.StopCapture()!);
+    }
+
+    [Theory]
+    [InlineData("fr", "Vous")]
+    [InlineData("hu", "Megtámadod")]
+    [InlineData("hu", "készülsz")]
+    public void LeadersCapturedAction_NeverReachesAnotherReaderInTheSecondPerson(string lang, string youMarker)
+    {
+        var (rec, captured) = LeaderAction();
+        (Loc.GetIn(lang, "combat.you_attack_target", "Ogre") + Loc.GetIn(lang, "combat.power_attack_action"))
+            .Should().Contain(youMarker, "the marker is the reader language's own second person form");
+        string shown = Strip(CombatEngine.CapturedInLanguage(rec, captured, lang, "Rage"));
+        Capture($"group-lang-leader-action-{lang}.txt", shown);
+        shown.Should().NotContain(youMarker);
+        shown.Should().NotContain(Loc.GetIn(lang, "combat.you_attack_target", "Ogre")).And.NotContain(Loc.GetIn(lang, "combat.power_attack_action"));
+        shown.Should().Contain(Loc.GetIn(lang, "combat.you_attack_target_third", "Rage", "Ogre"), "a line with a third person key is in the reader's language");
+        shown.Should().Contain(Loc.GetIn(lang, "combat.miss", "Ogre"), "a line with no person is in the reader's language");
+        shown.Should().Contain("Rage unleashes a powerful strike!", "a second person line with no third person key falls back to English in the third person");
+    }
+
+    [Fact]
+    public void LeadersCapturedAction_ForAnEnglishReaderIsUnchanged()
+    {
+        var (rec, captured) = LeaderAction();
+        string shown = CombatEngine.CapturedInLanguage(rec, captured, "en", "Rage");
+        shown.Should().Be(captured.Replace("You attack", "Rage attacks").Replace("You unleash", "Rage unleashes"),
+            "English reads as it did before: the English line put in the third person");
+        Strip(shown).Should().Contain("Rage attacks Ogre!").And.Contain("Rage unleashes a powerful strike!").And.Contain("The Ogre misses!");
     }
 
     // ---------- 3. the round status ----------
@@ -376,7 +450,7 @@ public class GroupCombatLang124Tests
                  {
                      "BroadcastGroupLocalized(result, lang => CapturedInLanguage(ambushRecording, ambushOutput, lang, player.DisplayName));",
                      "BroadcastGroupLocalized(result, lang => CapturedInLanguage(leaderRecording, leaderOutput, lang, player.DisplayName));",
-                     "BroadcastGroupLocalized(result, lang => npcRecording!.Render(npcOutput, lang));",
+                     "BroadcastGroupLocalized(result, lang => CapturedInLanguage(npcRecording, npcOutput, lang, player.DisplayName));",
                      "BroadcastGroupLocalized(result, lang => CapturedInLanguage(monsterRecording, monsterOutput, lang, player.DisplayName));",
                      "BroadcastGroupLocalized(result, lang => GroupCombatIntro(lang, monsters, result.Teammates));",
                      "BroadcastGroupLocalized(result, lang => GroupVictoryText(lang, result.DefeatedMonsters));",
