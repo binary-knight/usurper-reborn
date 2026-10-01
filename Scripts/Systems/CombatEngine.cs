@@ -31996,14 +31996,9 @@ public partial class CombatEngine
     /// <summary>v1.2.2: runs a synchronous builder with the session language set to `lang`, for text shown to another player.</summary>
     internal static T InLanguage<T>(string lang, Func<T> build)
     {
-        var prev = GameConfig.Language;
-        if (prev == lang) return build();
-        try
-        {
-            GameConfig.Language = lang;
+        // v1.2.4: a render scope, so the session's own language is never written
+        using (Loc.RenderLanguage(lang))
             return build();
-        }
-        finally { GameConfig.Language = prev; }
     }
 
     /// <summary>
