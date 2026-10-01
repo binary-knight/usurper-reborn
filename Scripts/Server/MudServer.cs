@@ -55,6 +55,69 @@ public class MudServer
     /// <summary>All currently active player sessions, keyed by lowercase username.</summary>
     public ConcurrentDictionary<string, PlayerSession> ActiveSessions { get; } = new();
 
+    /// <summary>v1.2.4: how long a reconnect waits for the kicked session's cleanup (emergency save,
+    /// sleeper registration) before the new session is registered. Replaces the fixed 500 ms.</summary>
+    internal static readonly TimeSpan DefaultStaleCleanupTimeout = TimeSpan.FromSeconds(15);
+
+    /// <summary>Test override for DefaultStaleCleanupTimeout (null uses the default).</summary>
+    internal TimeSpan? StaleCleanupTimeoutOverride;
+
+    private TimeSpan StaleCleanupTimeout => StaleCleanupTimeoutOverride ?? DefaultStaleCleanupTimeout;
+
+    /// <summary>v1.2.4: remove the entry for <paramref name="key"/> only while it still holds
+    /// <paramref name="session"/>. A by-key removal from an old connection deleted the entry of the
+    /// session that had replaced it on a reconnect.</summary>
+    internal bool RemoveOwnSession(string key, PlayerSession? session)
+    {
+        if (session == null) return false;
+        return ActiveSessions.TryRemove(new KeyValuePair<string, PlayerSession>(key, session));
+    }
+
+    /// <summary>v1.2.4: the connection handler's final cleanup for <paramref name="username"/>.</summary>
+    internal void EndConnection(string username, PlayerSession? ownSession)
+    {
+        var usernameKey = username.ToLowerInvariant();
+        // v1.2.4: only this connection's own entry; a reconnect may already hold the key.
+        RemoveOwnSession(usernameKey, ownSession);
+        // v0.60.0 bot-detection Tier 1: drop the player's input-timing ring
+        // buffer so reconnects start fresh (otherwise a fast player who
+        // reconnects inherits a stale fast-streak count).
+        BotDetectionSystem.ClearSession(usernameKey);
+        Console.Error.WriteLine($"[MUD] Session ended for '{username}'. Active sessions: {ActiveSessions.Count}");
+    }
+
+    /// <summary>v1.2.4: kick a stale session on a reconnect. Disconnects it and removes its own
+    /// entry; the caller waits for its cleanup with WaitForStaleCleanupAsync before registering
+    /// the new session.</summary>
+    internal async Task KickStaleSessionAsync(string key, PlayerSession stale, string why)
+    {
+        Console.Error.WriteLine($"[MUD] Kicking stale session for '{key}' ({why})");
+        await stale.DisconnectAsync("Disconnected: logged in from another session");
+        RemoveOwnSession(key, stale);
+    }
+
+    /// <summary>v1.2.4: wait (bounded) for a kicked session's cleanup to finish, so its emergency
+    /// save lands before the new session loads the character.</summary>
+    internal async Task WaitForStaleCleanupAsync(PlayerSession? stale)
+    {
+        if (stale == null) return;
+        if (!await stale.WaitForCleanupAsync(StaleCleanupTimeout))
+            Console.Error.WriteLine($"[MUD] Stale session cleanup for '{stale.Username}' still running after {StaleCleanupTimeout.TotalSeconds:0}s; continuing");
+    }
+
+    /// <summary>v1.2.4: register a new session under <paramref name="key"/>. If another session
+    /// holds the key, kick it, wait for its cleanup, and retry once.</summary>
+    internal async Task<bool> RegisterSessionAsync(string key, PlayerSession session)
+    {
+        if (ActiveSessions.TryAdd(key, session)) return true;
+        if (ActiveSessions.TryGetValue(key, out var staleSession) && !ReferenceEquals(staleSession, session))
+        {
+            await KickStaleSessionAsync(key, staleSession, "race condition");
+            await WaitForStaleCleanupAsync(staleSession);
+        }
+        return ActiveSessions.TryAdd(key, session);
+    }
+
     // v0.65.0 (1.0-prep SR): per-IP failed-login throttle. The per-CONNECTION
     // 5-attempt cap reset on every reconnect, so password guessing ran at
     // TCP-reconnect speed. This tracks failures per effectiveIp (X-IP honored,
@@ -383,6 +446,8 @@ public class MudServer
     {
         string? username = null;
         string? clientVersion = null; // from the optional AUTH 5th field (v0.65.13)
+        PlayerSession? ownSession = null;     // v1.2.4: this connection's session once registered
+        PlayerSession? kickedSession = null;  // v1.2.4: the stale session a reconnect kicked
         try
         {
             client.NoDelay = true;
@@ -723,15 +788,17 @@ public class MudServer
                 // Kick existing session if duplicate (reconnect takes priority)
                 if (ActiveSessions.TryGetValue(usernameKey, out var existingSession))
                 {
-                    Console.Error.WriteLine($"[MUD] Kicking stale session for '{username}' (reconnect)");
-                    await existingSession.DisconnectAsync("Disconnected: logged in from another session");
-                    ActiveSessions.TryRemove(usernameKey, out _);
-                    await Task.Delay(500); // Brief delay for cleanup
+                    await KickStaleSessionAsync(usernameKey, existingSession, "reconnect");
+                    kickedSession = existingSession;
                 }
 
-                // Send OK to signal auth success
+                // Send OK to signal auth success. v1.2.4: sent before waiting for the kicked
+                // session's cleanup; clients give up on the OK after 5 seconds.
                 await WriteLineAsync(stream, "OK");
             }
+
+            // v1.2.4: let the kicked session's emergency save finish before this one loads.
+            await WaitForStaleCleanupAsync(kickedSession);
 
             // Create and start the player session
             var sessionUsernameKey = username.ToLowerInvariant();
@@ -755,22 +822,13 @@ public class MudServer
                 session.ClientVersion = clientVersion;
 
                 // If TryAdd fails (race condition), kick stale session and retry
-                if (!ActiveSessions.TryAdd(sessionUsernameKey, session))
+                if (!await RegisterSessionAsync(sessionUsernameKey, session))
                 {
-                    if (ActiveSessions.TryGetValue(sessionUsernameKey, out var staleSession))
-                    {
-                        Console.Error.WriteLine($"[MUD] Kicking stale session for '{username}' (race condition)");
-                        await staleSession.DisconnectAsync("Disconnected: logged in from another session");
-                        ActiveSessions.TryRemove(sessionUsernameKey, out _);
-                        await Task.Delay(500);
-                    }
-                    if (!ActiveSessions.TryAdd(sessionUsernameKey, session))
-                    {
-                        await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Could not start session. Try again.\u001b[0m\r\n", isCp437);
-                        client.Close();
-                        return;
-                    }
+                    await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Could not start session. Try again.\u001b[0m\r\n", isCp437);
+                    client.Close();
+                    return;
                 }
+                ownSession = session;
 
                 Console.Error.WriteLine($"[MUD] Session started for '{username}' ({connectionType}). Active sessions: {ActiveSessions.Count}");
                 await session.RunAsync();
@@ -788,15 +846,7 @@ public class MudServer
         {
             // Clean up session
             if (username != null)
-            {
-                var usernameKey = username.ToLowerInvariant();
-                ActiveSessions.TryRemove(usernameKey, out _);
-                // v0.60.0 bot-detection Tier 1: drop the player's input-timing ring
-                // buffer so reconnects start fresh (otherwise a fast player who
-                // reconnects inherits a stale fast-streak count).
-                BotDetectionSystem.ClearSession(usernameKey);
-                Console.Error.WriteLine($"[MUD] Session ended for '{username}'. Active sessions: {ActiveSessions.Count}");
-            }
+                EndConnection(username, ownSession);
 
             try { client.Close(); } catch { }
         }
@@ -1046,10 +1096,8 @@ public class MudServer
             var interactiveKey = username!.ToLowerInvariant();
             if (ActiveSessions.TryGetValue(interactiveKey, out var existingInteractive))
             {
-                Console.Error.WriteLine($"[MUD] Kicking stale session for '{username}' (reconnect)");
-                await existingInteractive.DisconnectAsync("Disconnected: logged in from another session");
-                ActiveSessions.TryRemove(interactiveKey, out _);
-                await Task.Delay(500);
+                await KickStaleSessionAsync(interactiveKey, existingInteractive, "reconnect");
+                await WaitForStaleCleanupAsync(existingInteractive);
                 if (isPlainText)
                     await WriteAnsiAsync(stream, $"{L("auth.prev_session")}\r\n", isCp437);
                 else
