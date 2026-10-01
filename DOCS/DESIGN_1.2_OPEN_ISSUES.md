@@ -206,8 +206,10 @@ withdraw to floor, robbery math and cap, refill and cap, a retried atomic update
 that lands once, single-player round trip.
 
 **Slice.** Persist, atomic update, cap, refill. Deferred: SysOp reset command,
-persisting the per-process robbery attempt counter, a "recent heist" world
-event.
+a "recent heist" world event. 1.2.4 persisted the robbery attempt counter:
+`WorldStateData.BankRobberiesToday` and `BankRobberiesDate` (single-player) and
+a `bank_robberies` world-state key (online), one count for the world, reset at
+the day change (`Tests/BankRobberyCounter124Tests.cs`).
 
 ---
 

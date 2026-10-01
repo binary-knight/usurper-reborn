@@ -1545,10 +1545,21 @@ public class StreetEncounterSystem
     }
 
     /// <summary>
+    /// The fight Monster's hit points for this NPC: its MaxHP (or HP when MaxHP is 0), times a rage
+    /// multiplier. 1.2.4: a murder grudge's rage HP lives here, not on the town NPC.
+    /// </summary>
+    internal static long FightHitPoints(NPC npc, double rageHpMult = 1.0)
+    {
+        long baseHp = npc.MaxHP > 0 ? npc.MaxHP : Math.Max(1, npc.HP);
+        return (int)(baseHp * rageHpMult);
+    }
+
+    /// <summary>
     /// Fight an NPC using the combat engine
     /// </summary>
     private async Task FightNPC(Character player, NPC npc, EncounterResult result, TerminalEmulator terminal,
-        bool isBrawl = false, bool isHonorDuel = false, long rageStrengthFlat = 0, double rageStrengthMult = 1.0)
+        bool isBrawl = false, bool isHonorDuel = false, long rageStrengthFlat = 0, double rageStrengthMult = 1.0,
+        double rageHpMult = 1.0)
     {
         // 1.2.1: a rage buff raises the Monster's strength (and its punch, which is half of it) for
         // this fight only. It used to be written onto the world NPC and never undone.
@@ -1561,7 +1572,7 @@ public class StreetEncounterSystem
         var monster = Monster.CreateMonster(
             nr: npc.Level,
             name: npc.Name,
-            hps: (int)(npc.MaxHP > 0 ? npc.MaxHP : Math.Max(1, npc.HP)),
+            hps: FightHitPoints(npc, rageHpMult),
             strength: (int)fightStrength,
             defence: (int)npc.Defence,
             phrase: GetHostilePhrase(npc),
@@ -2504,7 +2515,9 @@ public class StreetEncounterSystem
             // === MURDER REVENGE — Rage buff, no bribe/apologize ===
             // Apply rage buff (1.2.1: the Strength part goes onto the fight's Monster, see FightNPC)
             double murderRage = 1.0f + GameConfig.MurderGrudgeRageBonusSTR;
-            grudgeNpc.HP = (long)Math.Min(grudgeNpc.MaxHP * (1.0f + GameConfig.MurderGrudgeRageBonusHP), grudgeNpc.MaxHP * 1.5f);
+            // 1.2.4: the HP part goes onto the fight's Monster too; the town NPC's HP is left alone
+            double murderRageHp = Math.Min(1.0f + GameConfig.MurderGrudgeRageBonusHP, 1.5);
+            long rageFightHp = FightHitPoints(grudgeNpc, murderRageHp);
 
             UIHelper.DrawBoxTop(terminal, Loc.Get("street_encounter.grudge.murder_revenge_title"), "dark_red");
             UIHelper.DrawBoxEmpty(terminal, "dark_red");
@@ -2513,7 +2526,7 @@ public class StreetEncounterSystem
             UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.murder_quote_1"), "dark_red", "bright_red");
             UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.murder_quote_2"), "dark_red", "bright_red");
             UIHelper.DrawBoxEmpty(terminal, "dark_red");
-            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.enraged_stats", grudgeNpc.Level, GameConfig.GetLocalizedClassName(grudgeNpc.Class), grudgeNpc.HP, grudgeNpc.MaxHP), "dark_red", "bright_yellow");
+            UIHelper.DrawBoxLine(terminal, Loc.Get("street_encounter.grudge.enraged_stats", grudgeNpc.Level, GameConfig.GetLocalizedClassName(grudgeNpc.Class), rageFightHp, rageFightHp), "dark_red", "bright_yellow");
             UIHelper.DrawBoxEmpty(terminal, "dark_red");
             UIHelper.DrawBoxSeparator(terminal, "dark_red");
             UIHelper.DrawMenuOption(terminal, "F", Loc.Get("street_encounter.grudge.opt_fight"), "dark_red", "bright_yellow", "white");
@@ -2536,14 +2549,14 @@ public class StreetEncounterSystem
                 {
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("street_encounter.grudge.cuts_off_escape", grudgeNpc.Name2));
-                    await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage);
+                    await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage, rageHpMult: murderRageHp);
                     fought = true;
                 }
             }
             else
             {
                 // Fight (default for any input)
-                await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage);
+                await FightNPC(player, grudgeNpc, result, terminal, rageStrengthMult: murderRage, rageHpMult: murderRageHp);
                 fought = true;
             }
 

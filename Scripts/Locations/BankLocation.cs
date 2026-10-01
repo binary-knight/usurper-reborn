@@ -20,8 +20,6 @@ public class BankLocation : BaseLocation
     // Bank safe information (shared across all instances). v1.2: the reserve itself lives in
     // BankVaultSystem (persisted per world; atomic online); only the nuisance counters stay here.
     private static List<string> _activeGuardNames = new();
-    private static int _robberyAttemptsToday = 0;
-    private static DateTime _lastResetDate = DateTime.MinValue;
 
     // Interest rates
     private const float DailyInterestRate = 0.001f; // 0.1% daily interest
@@ -64,13 +62,6 @@ public class BankLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
-        // Reset daily robbery counter if new day
-        if (_lastResetDate.Date != DateTime.Now.Date)
-        {
-            _robberyAttemptsToday = 0;
-            _lastResetDate = DateTime.Now;
-        }
-
         // v0.57.12: refresh guard wage from current level so level-ups between daily ticks are visible
         // immediately on the bank's display (otherwise the player sees the stale hire-time wage until
         // the next daily payout).
@@ -1343,7 +1334,7 @@ public class BankLocation : BaseLocation
         UsurperRemake.Systems.AlignmentSystem.Instance.ModifyAlignment(currentPlayer, 0, 100, "bank robbery");
         currentPlayer.BankRobberyAttempts--;
         currentPlayer.WantedLvl += 5;
-        _robberyAttemptsToday++;
+        await BankVaultSystem.RecordRobberyAttempt(); // 1.2.4: one persisted counter for the world, reset at the day change
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("bank.rob_draw_weapon"));
@@ -1532,7 +1523,7 @@ public class BankLocation : BaseLocation
         if (BankVaultSystem.Current > 1000000) guards += 3;
 
         // More guards after recent robbery attempts
-        guards += _robberyAttemptsToday * 2;
+        guards += BankVaultSystem.RobberiesToday * 2;
 
         return Math.Min(guards, 12); // Cap at 12
     }

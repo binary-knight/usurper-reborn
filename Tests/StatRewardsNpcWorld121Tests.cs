@@ -290,6 +290,41 @@ public class StatRewardsNpcWorld121Tests : IDisposable
     }
 
     [Fact]
+    public async Task AMurderGrudgeRageHp_GoesOnTheFight_NotTheTownNpc()
+    {
+        var player = Player("P5GrudgeHpHero");
+        var npc = Npc("P5GrudgeHpNpc");
+        npc.Memory!.RecordEvent(new MemoryEvent { Type = MemoryType.Murdered, InvolvedCharacter = player.Name2, Description = "murdered", Timestamp = DateTime.Now });
+        long maxHp = npc.MaxHP;
+        long rageHp = (long)(maxHp * Math.Min(1.0f + GameConfig.MurderGrudgeRageBonusHP, 1.5));
+        rageHp.Should().BeGreaterThan(maxHp, "the fixture's rage is a real raise");
+
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new ScriptedStream("F\n" + string.Concat(Enumerable.Repeat("R\n", 12)) + string.Concat(Enumerable.Repeat("\n", 40))), output);
+        var street = Street(new HighRandom());
+        await Run(street, "ExecuteGrudgeConfrontation", npc, player, term, new EncounterResult());
+
+        npc.HP.Should().BeLessThanOrEqualTo(npc.MaxHP, "the town NPC's HP is never raised above its MaxHP");
+        npc.MaxHP.Should().Be(maxHp);
+        street.LastFightMonster.Should().NotBeNull("the grudge fight took place");
+        street.LastFightMonster!.MaxHP.Should().Be(rageHp, "the fight's opponent carries the rage HP");
+
+        string shown = System.Text.RegularExpressions.Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\x1b\\[[0-9;]*[A-Za-z]", "");
+        string expected = Loc.Get("street_encounter.grudge.enraged_stats", npc.Level, GameConfig.GetLocalizedClassName(npc.Class), street.LastFightMonster.MaxHP, street.LastFightMonster.MaxHP);
+        shown.Should().Contain(expected, "the enraged box shows the fight's HP");
+    }
+
+    [Fact]
+    public async Task AFightWithoutRage_KeepsTheNpcMaxHp()
+    {
+        var npc = Npc("P5NoRageHp");
+        StreetEncounterSystem.FightHitPoints(npc).Should().Be(npc.MaxHP);
+        npc.MaxHP = 0; npc.HP = 7;
+        StreetEncounterSystem.FightHitPoints(npc).Should().Be(7, "a zero MaxHP falls back to HP, as before");
+        await Task.CompletedTask;
+    }
+
+    [Fact]
     public async Task ARefusedGrudgeApology_BoostsTheMonster_NotTheWorldNpc()
     {
         var player = Player("P5ApologyHero");

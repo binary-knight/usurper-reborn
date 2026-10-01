@@ -34,18 +34,18 @@ namespace UsurperRemake.UI
         public static readonly string[] DungeonEntrance = new[]
         {
             "[/]",
-            "[bright_yellow]▓▓[/]                                                                            [bright_yellow]▓▓",
-            "[yellow]██[/]                                                                            [yellow]██",
-            "[yellow]██[/]                  [darkgray]╔══════════════════════════════════════╗[/]                  [yellow]██",
-            "[yellow]██[/]                  [darkgray]║[/]                                      [darkgray]║[/]                  [yellow]██",
-            "[yellow]██══════════════════[darkgray]║[/]        [bright_red]T H E   D U N G E O N S[/]       [darkgray]║[yellow]══════════════════██",
-            "[yellow]██[/]                  [darkgray]║[/]                                      [darkgray]║[/]                  [yellow]██",
-            "[yellow]██[/]                  [darkgray]║[/]  [red]Abandon all hope ye who enter here[/]  [darkgray]║[/]                  [yellow]██",
-            "[yellow]██[/]                  [darkgray]║[/]                                      [darkgray]║[/]                  [yellow]██",
-            "[yellow]██[/]                  [darkgray]╚══════════════════════════════════════╝[/]                  [yellow]██",
-            "[yellow]██[/]                                                                            [yellow]██",
-            "[yellow]██[/]                                                                            [yellow]██",
-            "[darkgray]░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
+            "[bright_yellow]▓▓[/]                                                                          [bright_yellow]▓▓",
+            "[yellow]██[/]                                                                          [yellow]██",
+            "[yellow]██[/]                 [darkgray]╔══════════════════════════════════════╗[/]                 [yellow]██",
+            "[yellow]██[/]                 [darkgray]║[/]                                      [darkgray]║[/]                 [yellow]██",
+            "[yellow]██═════════════════[darkgray]║[/]        [bright_red]T H E   D U N G E O N S[/]       [darkgray]║[yellow]═════════════════██",
+            "[yellow]██[/]                 [darkgray]║[/]                                      [darkgray]║[/]                 [yellow]██",
+            "[yellow]██[/]                 [darkgray]║[/]  [red]Abandon all hope ye who enter here[/]  [darkgray]║[/]                 [yellow]██",
+            "[yellow]██[/]                 [darkgray]║[/]                                      [darkgray]║[/]                 [yellow]██",
+            "[yellow]██[/]                 [darkgray]╚══════════════════════════════════════╝[/]                 [yellow]██",
+            "[yellow]██[/]                                                                          [yellow]██",
+            "[yellow]██[/]                                                                          [yellow]██",
+            "[darkgray]░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░",
             "[/]"
         };
 
@@ -96,17 +96,17 @@ namespace UsurperRemake.UI
         public static readonly string[] LevelUp = new[]
         {
             "[bright_cyan]",
-            "        ╔════════════════════════════════════════╗",
-            "        ║  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ║",
-            "        ║  ░[bright_yellow]  ██╗     ███████╗██╗   ██╗███████╗██╗     ██╗   ██╗██████╗ ██╗  [bright_cyan]░  ║",
-            "        ║  ░[bright_yellow]  ██║     ██╔════╝██║   ██║██╔════╝██║     ██║   ██║██╔══██╗██║  [bright_cyan]░  ║",
-            "        ║  ░[bright_yellow]  ██║     █████╗  ██║   ██║█████╗  ██║     ██║   ██║██████╔╝██║  [bright_cyan]░  ║",
-            "        ║  ░[bright_yellow]  ██║     ██╔══╝  ╚██╗ ██╔╝██╔══╝  ██║     ██║   ██║██╔═══╝ ╚═╝  [bright_cyan]░  ║",
-            "        ║  ░[bright_yellow]  ███████╗███████╗ ╚████╔╝ ███████╗███████╗╚██████╔╝██║     ██╗  [bright_cyan]░  ║",
-            "        ║  ░[bright_yellow]  ╚══════╝╚══════╝  ╚═══╝  ╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝  [bright_cyan]░  ║",
-            "        ║  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ║",
-            "        ╚════════════════════════════════════════╝",
-            "[white]               Your power grows stronger![/]"
+            "      ╔════════════════════════════════════════╗",
+            "      ║  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ║",
+            "      ║  ░[bright_yellow]  ██╗     ███████╗██╗   ██╗███████╗██╗     ██╗   ██╗██████╗ ██╗  [bright_cyan]░  ║",
+            "      ║  ░[bright_yellow]  ██║     ██╔════╝██║   ██║██╔════╝██║     ██║   ██║██╔══██╗██║  [bright_cyan]░  ║",
+            "      ║  ░[bright_yellow]  ██║     █████╗  ██║   ██║█████╗  ██║     ██║   ██║██████╔╝██║  [bright_cyan]░  ║",
+            "      ║  ░[bright_yellow]  ██║     ██╔══╝  ╚██╗ ██╔╝██╔══╝  ██║     ██║   ██║██╔═══╝ ╚═╝  [bright_cyan]░  ║",
+            "      ║  ░[bright_yellow]  ███████╗███████╗ ╚████╔╝ ███████╗███████╗╚██████╔╝██║     ██╗  [bright_cyan]░  ║",
+            "      ║  ░[bright_yellow]  ╚══════╝╚══════╝  ╚═══╝  ╚══════╝╚══════╝ ╚═════╝ ╚═╝     ╚═╝  [bright_cyan]░  ║",
+            "      ║  ░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  ║",
+            "      ╚════════════════════════════════════════╝",
+            "[white]             Your power grows stronger![/]"
         };
 
         /// <summary>

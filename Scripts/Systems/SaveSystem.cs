@@ -1565,7 +1565,11 @@ namespace UsurperRemake.Systems
                 // copy would be stale, so write the initial value there and never read it back.
                 BankVaultReserve = UsurperRemake.BBS.DoorMode.IsOnlineMode
                     ? GameConfig.BankVaultInitial
-                    : UsurperRemake.Systems.BankVaultSystem.Current
+                    : UsurperRemake.Systems.BankVaultSystem.Current,
+
+                // 1.2.4: the robbery attempts counter, same rule as the reserve
+                BankRobberiesToday = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0 : UsurperRemake.Systems.BankVaultSystem.RobberyCount,
+                BankRobberiesDate = UsurperRemake.BBS.DoorMode.IsOnlineMode ? "" : UsurperRemake.Systems.BankVaultSystem.RobberyDate
             };
         }
         
