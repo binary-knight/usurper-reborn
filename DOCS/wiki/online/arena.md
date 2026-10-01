@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+history: 1.2.3 | none
 ---
 The Arena is the online game's player-versus-player ground. It exists only in online play.
 

@@ -1,8 +1,9 @@
 ---
 title: Balance rules
 path: /wiki/en/reference/balance/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/GameDataLoader.cs
+history: 1.2.3 | none
 ---
 Moddable defaults are exported from the release's balance model. A server can override them, and a single constant is not the full formula for every combat path.
 

@@ -1,8 +1,9 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
+history: 1.2.3 | none
 ---
 Your character wears equipment in named slots. Open your inventory from a location menu with `*` or the `/inventory` command to see every slot and change what is in it.
 

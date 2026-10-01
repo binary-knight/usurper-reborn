@@ -1,8 +1,9 @@
 ---
 title: New Game Plus (NG+) and cycles
 path: /wiki/en/characters/new-game-plus/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MetaProgressionSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.2.3 | none
 ---
 New Game Plus, shown in the game as the Eternal Cycle, starts a new life after you finish the main story. Each finished life adds one to your cycle count.
 

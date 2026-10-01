@@ -1,8 +1,9 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.2.3 | The Magic Shop shows armor on rings and necklaces and counts it toward the upgrade marker, and sell all sells only the accessories it lists.
 ---
 Weapon and armor shops inspect and sell different equipment. A shop's generated stock is not identical to the fixed [equipment catalog](/wiki/en/items/).
 
