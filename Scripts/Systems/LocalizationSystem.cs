@@ -204,6 +204,9 @@ namespace UsurperRemake.Systems
         /// <summary>v1.2.4: ends the innermost recording; one begun around it records again.</summary>
         public static void EndRecording() => _recording.Value = _recording.Value?.Previous;
 
+        /// <summary>v1.2.4: ends `rec` and any recording begun inside it and left open.</summary>
+        public static void EndRecording(LocRecording rec) => _recording.Value = rec.Previous;
+
         private static readonly System.Threading.AsyncLocal<string?> _renderLanguage = new();
 
         /// <summary>v1.2.4: the language of an open RenderLanguage scope, or null.</summary>
