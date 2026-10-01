@@ -210,3 +210,119 @@ test("search is deterministic and returns no answer for an unknown question", ()
     "/wiki/en/characters/specializations/",
   );
 });
+test("history lines: valid forms parse and each invalid form fails with a clear message", () => {
+  const { parseHistory, readPages } = require("../build");
+  assert.deepEqual(parseHistory(["1.2.3 | Shops sell more.", "1.2.2 | none"], "f.md", "1.2.3"), [
+    { version: "1.2.3", sentence: "Shops sell more." },
+    { version: "1.2.2", sentence: null },
+  ]);
+  assert.deepEqual(parseHistory([], "f.md", "1.2.3"), []);
+  const cases = [
+    ["history: 1.2 | Short version.\n", /1\.2 is not x\.y\.z/],
+    ["history: v1.2.0 | Prefixed version.\n", /v1\.2\.0 is not x\.y\.z/],
+    ["history: 1.2.0 |\n", /Empty history sentence in .* for 1\.2\.0/],
+    ["history: 1.2.0 |   \n", /Empty history sentence/],
+    ["history: 1.2.0 Missing bar.\n", /Invalid history line/],
+    ["history: 1.2.0 | One.\nhistory: 1.2.0 | Two.\n", /Two history lines for 1\.2\.0/],
+    ["history: 1.2.0 | none\nhistory: 1.2.0 | none\n", /Two history lines for 1\.2\.0/],
+    ["history: 1.2.0 | none\nhistory: 1.2.0 | A sentence.\n", /both none and a sentence/],
+    ["history: 1.2.0 | A sentence.\nhistory: 1.2.0 | none\n", /both none and a sentence/],
+    ["history: 99.0.0 | Too new.\n", /99\.0\.0 .* newer than the game version/],
+    ["history: 1.2.0 | Long \u2014 dash.\n", /Forbidden punctuation/],
+    ["histories: 1.2.0 | Typo field.\n", /Unknown frontmatter/],
+  ];
+  for (const [extra, message] of cases)
+    assert.throws(invalidPage("Text", extra), message, extra);
+  // Without a game version (drift passes its own) the newer check is skipped.
+  const dir = fs.mkdtempSync(path.join(temp, "history-read-"));
+  fs.writeFileSync(
+    path.join(dir, "a.md"),
+    "---\ntitle: A\npath: /wiki/en/\nchecked: 1.2.0\nsources: README.md\nhistory: 99.0.0 | Later.\n---\nText\n",
+  );
+  assert.equal(readPages(dir)[0].history[0].version, "99.0.0");
+  assert.throws(() => readPages(dir, { gameVersion: "1.2.2" }), /newer than the game version 1\.2\.2/);
+});
+function historySite() {
+  const content = fs.mkdtempSync(path.join(temp, "history-content-"));
+  fs.cpSync(path.resolve(__dirname, "../../../DOCS/wiki"), content, { recursive: true });
+  const favor = path.join(content, "gods/favor.md");
+  const version = loadData(dataDir).meta.gameVersion;
+  fs.writeFileSync(
+    favor,
+    fs
+      .readFileSync(favor, "utf8")
+      .replace(
+        /^(sources: .*)$/m,
+        `$1\nhistory: 1.1.9 | Oldest qxoldword note.\nhistory: ${version} | Newest qxhistoryword note with <b>tags</b> & "quotes".\nhistory: 1.1.10 | Middle note.\nhistory: 1.2.1 | none`,
+      ),
+  );
+  const out = path.join(temp, "history-site");
+  const built = build({ dataDir, contentDir: content, outDir: out });
+  const html = (p) => fs.readFileSync(path.join(out, p.slice("/wiki/".length), "index.html"), "utf8");
+  return { built, out, html, version };
+}
+test("history section: newest first, escaped, none hidden, labelled, only where entries exist", () => {
+  const { html, version } = historySite();
+  const page = html("/wiki/en/gods/favor/");
+  const section = page.match(/<section class="history"[\s\S]*?<\/section>/);
+  assert.ok(section, "section rendered");
+  assert.match(section[0], /<h2 id="changes-by-version">Changes by version<\/h2>/);
+  assert.deepEqual(
+    [...section[0].matchAll(/<dt>([^<]+)<\/dt>/g)].map((m) => m[1]),
+    [version, "1.1.10", "1.1.9"],
+  );
+  assert.ok(section[0].includes("&lt;b&gt;tags&lt;/b&gt; &amp; &quot;quotes&quot;"));
+  assert.ok(!section[0].includes("<b>"));
+  assert.ok(!section[0].includes("1.2.1"), "none marker is not shown");
+  assert.ok(!/>none</.test(section[0]));
+  // Inside main, after the body and before the footer.
+  assert.ok(page.indexOf("</section><footer>") > page.indexOf('id="main"'));
+  for (const p of ["/wiki/en/gods/boons/", "/wiki/en/items/1000/", "/wiki/en/"])
+    assert.ok(!html(p).includes('class="history"'), p);
+});
+test("history section: a guide with only none markers shows no section", () => {
+  const content = fs.mkdtempSync(path.join(temp, "history-none-"));
+  fs.cpSync(path.resolve(__dirname, "../../../DOCS/wiki"), content, { recursive: true });
+  const favor = path.join(content, "gods/favor.md");
+  fs.writeFileSync(
+    favor,
+    fs.readFileSync(favor, "utf8").replace(/^(sources: .*)$/m, "$1\nhistory: 1.2.0 | none\nhistory: 1.2.1 | none"),
+  );
+  const out = path.join(temp, "history-none-site");
+  build({ dataDir, contentDir: content, outDir: out });
+  const page = fs.readFileSync(path.join(out, "en/gods/favor/index.html"), "utf8");
+  assert.ok(!page.includes('class="history"'));
+  assert.ok(!page.includes("Changes by version"));
+});
+test("history entries stay out of search, page descriptions and Ask replies", async () => {
+  const { built, out, html } = historySite();
+  const entry = built.search.find((p) => p.path === "/wiki/en/gods/favor/");
+  assert.ok(!entry.text.includes("qxhistoryword") && !entry.text.includes("qxoldword"));
+  assert.ok(!entry.headings.includes("Changes by version"));
+  assert.ok(!fs.readFileSync(path.join(out, "search-index.json"), "utf8").includes("qxhistoryword"));
+  assert.deepEqual(search(built.search, "qxhistoryword"), []);
+  assert.equal(search(built.search, "how does Favor work?")[0].path, "/wiki/en/gods/favor/");
+  const meta = html("/wiki/en/gods/favor/").match(/<meta name="description" content="([^"]*)"/)[1];
+  assert.ok(!meta.includes("qxhistoryword"));
+  const { createWikiBot, loadIndex } = require("../../../web/wiki-bot");
+  const sent = [];
+  const bot = createWikiBot({
+    channels: ["allowed"],
+    index: loadIndex(path.join(out, "search-index.json")),
+    logger: { error() {} },
+  });
+  const ask = (content) => ({
+    id: String(sent.length + 1),
+    guildId: "guild",
+    channelId: "allowed",
+    content,
+    author: { id: "user" + sent.length, bot: false },
+    member: { roles: { cache: new Set() } },
+    channel: { send: async (payload) => sent.push(payload) },
+  });
+  assert.equal(await bot.handle(ask("<@123> how does Favor work?"), "123"), true);
+  assert.match(sent[0].content, /wiki\/en\/gods\/favor\//);
+  assert.ok(!sent[0].content.includes("qxhistoryword"));
+  assert.equal(await bot.handle(ask("<@123> qxhistoryword"), "123"), true);
+  assert.ok(!/wiki\/en\/gods\/favor\//.test(sent[1].content));
+});

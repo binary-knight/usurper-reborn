@@ -11,6 +11,7 @@
   "wiki.checked": "Prose checked against",
   "wiki.fixedRules": "Built-in release rules. Server mods, difficulty, NG+ and the changing online world can alter live results.",
   "wiki.sources": "Sources",
+  "wiki.history": "Changes by version",
   "wiki.languageNote": "English guides at launch. Translated entity labels are shown only where the game has a verified translation.",
   "wiki.searching": "Searching...",
   "wiki.results": "{count} results",

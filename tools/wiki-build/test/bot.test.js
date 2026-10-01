@@ -307,3 +307,38 @@ test("Off-server drafts are confined to existing prose with valid evidence", () 
   );
   assert.throws(() => assertDocsOnly([]));
 });
+test("Off-server drafts keep the page's history lines", () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "wiki-suggest-history-"));
+  try {
+    const page =
+      "---\ntitle: Favor\npath: /wiki/en/gods/favor/\nchecked: 1.2.2\nsources: Scripts/Core/GameConfig.cs\nhistory: 1.2.2 | Prayer restores more Mental.\nhistory: 1.2.1 | none\n---\nOld prose.\n";
+    fs.mkdirSync(path.join(root, "DOCS/wiki/gods"), { recursive: true });
+    fs.mkdirSync(path.join(root, "Scripts/Core"), { recursive: true });
+    fs.writeFileSync(path.join(root, "DOCS/wiki/gods/favor.md"), page);
+    fs.writeFileSync(path.join(root, "Scripts/Core/GameConfig.cs"), "x\n");
+    const input = {
+      id: "7",
+      page: "gods/favor.md",
+      markdown: page.replace("Old prose.", "New prose."),
+      suggestion: "Prose fix",
+      evidence: "Scripts/Core/GameConfig.cs:1",
+    };
+    assert.ok(validateSuggestion(input, root).markdown.includes("history: 1.2.1 | none"));
+    assert.ok(
+      validateSuggestion(
+        { ...input, markdown: input.markdown.replace("history: 1.2.1", "history: 1.2.3 | Added.\nhistory: 1.2.1") },
+        root,
+      ),
+    );
+    assert.throws(
+      () => validateSuggestion({ ...input, markdown: input.markdown.replace("history: 1.2.1 | none\n", "") }, root),
+      /must keep the page's history line: history: 1\.2\.1 \| none/,
+    );
+    assert.throws(
+      () => validateSuggestion({ ...input, markdown: input.markdown.replace("more Mental", "less Mental") }, root),
+      /must keep the page's history line: history: 1\.2\.2/,
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});
