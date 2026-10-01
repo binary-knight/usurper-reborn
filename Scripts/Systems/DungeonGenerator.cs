@@ -786,7 +786,7 @@ namespace UsurperRemake.Systems
             foreach (var room in floor.Rooms.Where(r => r.Type == RoomType.Settlement))
             {
                 room.Name = settlement.Name;
-                room.Description = settlement.Description;
+                room.Description = settlement.LocDescription();
                 room.HasMonsters = false;
                 room.HasTrap = false;
                 room.HasTreasure = false;

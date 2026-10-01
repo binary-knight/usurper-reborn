@@ -46,8 +46,8 @@ table|Scripts/AI/EnhancedNPCBehaviors.cs|init.Message|affair result, VisualNovel
 table|Scripts/AI/EnhancedNPCBehaviors.cs|init.Reason|divorce refusal reason, VisualNovelDialogueSystem
 
 # --- Scripts/Data -------------------------------------------------------------------------------
-nouns|Scripts/Data/BeastData.cs|init.Name|beast names printed raw, WildernessLocation
-table|Scripts/Data/BeastData.cs|init.Species|beast species printed raw, WildernessLocation
+nouns|Scripts/Data/BeastData.cs|init.Name|kept English: saved as Pet.Name (WildernessLocation TryBeastEncounter), matched by name in CombatEngine and DungeonLocation
+keyed|Scripts/Data/BeastData.cs|init.Species|dungeon.beast.{id}.species
 keyed|Scripts/Data/BeastData.cs|init.EncounterFlavor|beast.{id}.encounter
 keyed|Scripts/Data/BeastData.cs|init.PassiveDescription|beast.{id}.passive
 keyed|Scripts/Data/BeastData.cs|init.TameSuccessFlavor|beast.{id}.tame
@@ -60,11 +60,11 @@ keyed|Scripts/Data/DruidShrineData.cs|init.FlavorDescription|shrine.{id}.flavor
 keyed|Scripts/Data/DruidShrineData.cs|init.GodPatron|shrine.{id}.god
 keyed|Scripts/Data/DruidShrineData.cs|init.Name|shrine.{id}.name
 keyed|Scripts/Data/DruidShrineData.cs|init.PassiveSummary|shrine.{id}.passive
-table|Scripts/Data/DungeonSettlementData.cs|init.Description|settlement description, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.FirstGreeting|settlement NPC greeting, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.LoreFragments|settlement lore, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.NPCTitle|settlement NPC title, DungeonLocation
-table|Scripts/Data/DungeonSettlementData.cs|init.ReturnGreeting|settlement NPC greeting, DungeonLocation
+keyed|Scripts/Data/DungeonSettlementData.cs|init.Description|dungeon.settlement.{id}.description
+keyed|Scripts/Data/DungeonSettlementData.cs|init.FirstGreeting|dungeon.settlement.{id}.greeting_first
+keyed|Scripts/Data/DungeonSettlementData.cs|init.LoreFragments|dungeon.settlement.{id}.lore.{i}
+keyed|Scripts/Data/DungeonSettlementData.cs|init.NPCTitle|dungeon.settlement.{id}.npc_title
+keyed|Scripts/Data/DungeonSettlementData.cs|init.ReturnGreeting|dungeon.settlement.{id}.greeting_return
 names|Scripts/Data/DungeonSettlementData.cs|init.Name|settlement place names
 names|Scripts/Data/DungeonSettlementData.cs|init.NPCName|settlement NPC names
 table|Scripts/Data/FounderStatueData.cs|decl:ART_AMARANTH|statue art with words, FounderStatueSystem
@@ -205,7 +205,6 @@ nouns|Scripts/Systems/FactionSystem.cs|init.Name|faction names printed raw, InnL
 table|Scripts/Systems/FactionSystem.cs|init.Ranks|faction rank titles
 keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
 names|Scripts/Systems/FeatureInteractionSystem.cs|init.RevealsOldGod|Old God names
-table|Scripts/Systems/FeatureInteractionSystem.cs|switcharm/tuple#1|stat names in a Loc template
 table|Scripts/Systems/FileSaveBackend.cs|init.SaveType|save type in the save list
 table|Scripts/Systems/FileSaveBackend.cs|return/tuple#1|load error shown by GameEngine
 table|Scripts/Systems/GuildSystem.cs|=errorMessage|guild error, MudChatSystem
@@ -312,7 +311,7 @@ keyed|Scripts/Data/GauntletChampionData.cs|init.EntranceAnnouncement|gauntlet.ch
 keyed|Scripts/Data/GauntletChampionData.cs|init.FlavorDescription|gauntlet.champ.{id}.drop_flavor
 keyed|Scripts/Data/GauntletChampionData.cs|init.LoreLine|gauntlet.champ.{id}.lore
 names|Scripts/Data/GauntletChampionData.cs|init.GodPatron|god names
-nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|champion drop item names printed raw
+nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|kept English: becomes the saved Equipment.Name (AnchorRoadLocation, SanctumLocation); item names have no display-time translation
 names|Scripts/Data/GauntletChampionData.cs|init.Name|champion names
 names|Scripts/Data/GauntletChampionData.cs|init.Title|champion titles
 keyed|Scripts/Data/HonorTournamentData.cs|init.CrowdReaction|tournament.champ.{id}.crowd
@@ -331,7 +330,7 @@ keyed|Scripts/Data/WildernessData.cs|init.Description|wilderness.region and disc
 keyed|Scripts/Data/WildernessData.cs|init.Direction|wilderness.direction.{key}
 keyed|Scripts/Data/WildernessData.cs|init.Name|wilderness.region and discovery name keys
 keyed|Scripts/Data/WildernessData.cs|init.RuinsEncounters|wilderness.ruins.{id}.{i}
-nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|wilderness monster names printed raw
+nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|kept English: monster.Name and TierName for quest kills, GetMonsterProfile lookup, CombatEngine undead name checks
 names|Scripts/Locations/AnchorRoadLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|decl:BankerName|NPC name

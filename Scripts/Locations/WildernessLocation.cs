@@ -281,13 +281,13 @@ public class WildernessLocation : BaseLocation
         // Encounter flavor.
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.Species));
+        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.LocSpecies()));
         terminal.SetColor("white");
-        foreach (var line in beast.LocEncounterFlavor().Split('\n'))
-            terminal.WriteLine($"  {line}");
+        // v1.2.3: one wrapped paragraph; the source breaks lines for a wider screen.
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, beast.LocEncounterFlavor().Replace('\n', ' '), "  ");
         terminal.WriteLine("");
         terminal.SetColor("dark_gray");
-        terminal.WriteLine($"  {beast.LocPassiveDescription()}");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, beast.LocPassiveDescription(), "  ");
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");

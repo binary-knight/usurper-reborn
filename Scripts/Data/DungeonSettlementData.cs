@@ -143,4 +143,18 @@ public class DungeonSettlement
 
     public string[] TradeItems { get; set; } = System.Array.Empty<string>();
     public string[] LoreFragments { get; set; } = System.Array.Empty<string>();
+
+    // v1.2.3: localized accessors. The English fields above are the source and fallback; these
+    // resolve dungeon.settlement.{id}.* keys so the text renders in the session language.
+    private string LocOr(string field, string fallback)
+    {
+        string key = $"dungeon.settlement.{Id}.{field}";
+        var v = UsurperRemake.Systems.Loc.Get(key);
+        return v == key ? fallback : v;
+    }
+    public string LocNPCTitle() => LocOr("npc_title", NPCTitle);
+    public string LocDescription() => LocOr("description", Description);
+    public string LocFirstGreeting() => LocOr("greeting_first", FirstGreeting);
+    public string LocReturnGreeting() => LocOr("greeting_return", ReturnGreeting);
+    public string LocLore(int index) => LocOr($"lore.{index}", LoreFragments[index]);
 }

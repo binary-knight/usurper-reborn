@@ -102,7 +102,7 @@ public class DungeonLocC123Tests
     private static Character Hero(int level = 100) => new()
     {
         Name1 = "tester", Name2 = LongName, Class = CharacterClass.Warrior, Level = level, HP = Big, MaxHP = Big,
-        AI = CharacterAI.Human, Mental = 100, Gold = 1_000_000_000,
+        AI = CharacterAI.Human, Mental = 100, Gold = Big,
     };
 
     private static T At<T>(T location, TerminalEmulator term, Character hero) where T : BaseLocation
@@ -344,5 +344,221 @@ public class DungeonLocC123Tests
         foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
             foreach (var key in new[] { "symbol", "pressure", "number", "memory", "light", "alchemy", "elemental", "mirror" })
                 L(lang, $"dungeon.puzzle_title_{key}").Length.Should().BeLessOrEqualTo(62, $"{lang} {key}");
+    }
+
+    // ---------- 7. the dungeon settlements: screen and every lore fragment ----------
+
+    private static DungeonLocation Dungeon(TerminalEmulator term, Character hero, int level)
+    {
+        var d = At(new DungeonLocation(), term, hero);
+        typeof(DungeonLocation).GetField("currentDungeonLevel", F)!.SetValue(d, level);
+        return d;
+    }
+
+    public static IEnumerable<object[]> SettlementCases() =>
+        DungeonSettlementData.Settlements.Keys.SelectMany(floor => new[] { new object[] { "en", floor }, new object[] { "hu", floor } });
+
+    [Theory]
+    [MemberData(nameof(SettlementCases))]
+    public async Task SettlementScreen_FirstAndReturnGreeting_RenderInLanguage_AndFit(string lang, int floor)
+    {
+        var settlement = DungeonSettlementData.GetSettlement(floor)!;
+        string text = await InLanguage(lang, async () =>
+        {
+            // An unknown key redraws the screen with the return greeting, then R leaves.
+            var (term, output) = Term("Z\nR\n");
+            var hero = Hero();
+            var d = Dungeon(term, hero, floor);
+            await Run(d, "SettlementEncounter", new object?[] { null });
+            return Shown(term, output);
+        });
+        Capture($"dungeon-c-settlement-{settlement.Id}-{lang}.txt", text);
+        string key = $"dungeon.settlement.{settlement.Id}";
+        // GetChoice draws the shared status line (BaseLocation.ShowStatusLine) and the Quick Commands bar
+        // under every location's menu. Both are BaseLocation's, not this screen's, and already run past 79
+        // (en Quick Commands 98; hu status line 85 with six-digit HP), so the width check leaves those two rows out.
+        string statusRow = L(lang, "status.hp") + ": ", quickRow = L(lang, "ui.quick_commands") + ":";
+        string screen = string.Join("\n", Rows(text).Where(r => !r.StartsWith(statusRow) && !r.StartsWith(quickRow)));
+        text.Should().Contain($"{settlement.NPCName} ({L(lang, key + ".npc_title")})");
+        ShowsWrapped(text, L(lang, key + ".description"), "", "description");
+        ShowsWrapped(text, L(lang, key + ".greeting_first"), "", "first greeting");
+        ShowsWrapped(text, L(lang, key + ".greeting_return"), "", "return greeting");
+        if (lang == "hu")
+            text.Should().NotContain(settlement.NPCTitle).And.NotContain(settlement.Description.Split('\n')[0])
+                .And.NotContain(settlement.ReturnGreeting.Split('\n')[0]);
+        EveryRowFits(screen, $"{settlement.Id} settlement");
+    }
+
+    [Theory]
+    [MemberData(nameof(SettlementCases))]
+    public async Task SettlementLore_EveryFragment_RendersInLanguage_AndFits(string lang, int floor)
+    {
+        var settlement = DungeonSettlementData.GetSettlement(floor)!;
+        var hero = Hero();
+        string text = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term(string.Concat(Enumerable.Repeat("\n", settlement.LoreFragments.Length + 1)));
+            var d = Dungeon(term, hero, floor);
+            for (int i = 0; i < settlement.LoreFragments.Length; i++)
+                await Run(d, "SettlementLore", hero, settlement);
+            return Shown(term, output);
+        });
+        Capture($"dungeon-c-settlement-lore-{settlement.Id}-{lang}.txt", text);
+        for (int i = 0; i < settlement.LoreFragments.Length; i++)
+        {
+            hero.SettlementLoreRead.Should().Contain($"{settlement.Id}_{i}", "lore read is saved by id and index, not text");
+            ShowsWrapped(text, L(lang, $"dungeon.settlement.{settlement.Id}.lore.{i}"), "", $"lore {i}");
+            if (lang == "hu") text.Should().NotContain(settlement.LoreFragments[i].Split('\n')[0]);
+        }
+        EveryRowFits(text, $"{settlement.Id} lore");
+    }
+
+    [Fact]
+    public void SettlementEnglish_KeysMatchTheSource_ExceptDashes()
+    {
+        // The English keys are the data's text; the only change is an em-dash written as "--".
+        foreach (var s in DungeonSettlementData.Settlements.Values)
+        {
+            string Dash(string t) => t.Replace(" — ", " -- ").Replace(" —\n", " --\n");
+            string key = $"dungeon.settlement.{s.Id}";
+            L("en", key + ".npc_title").Should().Be(s.NPCTitle);
+            L("en", key + ".description").Should().Be(Dash(s.Description));
+            L("en", key + ".greeting_first").Should().Be(Dash(s.FirstGreeting));
+            L("en", key + ".greeting_return").Should().Be(Dash(s.ReturnGreeting));
+            for (int i = 0; i < s.LoreFragments.Length; i++) L("en", $"{key}.lore.{i}").Should().Be(Dash(s.LoreFragments[i]));
+        }
+    }
+
+    [Fact]
+    public void SettlementRoom_DescriptionIsKeyed_AtGeneration()
+    {
+        string hu = InLanguage("hu", () => Task.FromResult(DungeonGenerator.GenerateFloor(10).Rooms
+            .First(r => r.Type == RoomType.Settlement).Description)).Result;
+        hu.Should().Be(L("hu", "dungeon.settlement.bonewright_forge.description"));
+    }
+
+    // ---------- 8. beasts: the species label ----------
+
+    public static IEnumerable<object[]> BeastCases() =>
+        BeastData.Beasts.SelectMany(b => new[] { new object[] { "en", b.Id }, new object[] { "hu", b.Id } });
+
+    [Theory]
+    [MemberData(nameof(BeastCases))]
+    public async Task BeastEncounter_SpeciesRendersInLanguage_NameStaysEnglish_AndFits(string lang, string id)
+    {
+        var beast = BeastData.GetById(id)!;
+        var hero = Hero();
+        // Own every other beast so the region's pick is this one.
+        foreach (var other in BeastData.Beasts.Where(b => b.Id != id && b.RegionDirectionKey == beast.RegionDirectionKey))
+            hero.PetRoster.Add(new Pet { Id = other.Id, Name = other.Name });
+        var region = WildernessData.Regions.First(r => r.DirectionKey == beast.RegionDirectionKey);
+        string text = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term("W\n\n");
+            var w = At(new WildernessLocation(), term, hero);
+            await Run(w, "TryBeastEncounter", region);
+            return Shown(term, output);
+        });
+        Capture($"dungeon-c-beast-{id}-{lang}.txt", text);
+        text.Should().Contain(L(lang, "wilderness.beast_encounter_header", beast.Name, L(lang, $"dungeon.beast.{id}.species")));
+        L("en", $"dungeon.beast.{id}.species").Should().Be(beast.Species);
+        ShowsWrapped(text, L(lang, $"beast.{id}.encounter").Replace('\n', ' '), "  ", "encounter flavor");
+        ShowsWrapped(text, L(lang, $"beast.{id}.passive"), "  ", "passive summary");
+        if (lang == "hu") text.Should().NotContain($"({beast.Species})");
+        EveryRowFits(text, $"{id} encounter");
+    }
+
+    [Theory]
+    [MemberData(nameof(BeastCases))]
+    public void PetJoinsParty_SpeciesRendersInLanguage_AndFits(string lang, string id)
+    {
+        var beast = BeastData.GetById(id)!;
+        if (beast.Role != BeastData.BeastRole.Combat) return;
+        string text = InLanguage(lang, () =>
+        {
+            var (term, output) = Term();
+            var hero = Hero();
+            hero.PetRoster.Add(new Pet { Id = id, Name = beast.Name });
+            hero.ActivePetId = id;
+            var d = Dungeon(term, hero, 100);
+            typeof(DungeonLocation).GetMethod("AddActivePetToParty", F)!.Invoke(d, new object[] { hero, term });
+            return Task.FromResult(Shown(term, output));
+        }).Result;
+        Capture($"dungeon-c-pet-joins-{id}-{lang}.txt", text);
+        text.Should().Contain(L(lang, "dungeon.pet_joins_party", beast.Name, L(lang, $"dungeon.beast.{id}.species")));
+        EveryRowFits(text, $"{id} joins the party");
+    }
+
+    // ---------- 9. room feature stat checks ----------
+
+    private static async Task<(string text, Character hero)> StatChallenge(string lang, FeatureInteraction interaction)
+    {
+        var system = (FeatureInteractionSystem)Activator.CreateInstance(typeof(FeatureInteractionSystem), true)!;
+        typeof(FeatureInteractionSystem).GetField("random", F)!.SetValue(system, new LowRandom());
+        var hero = Hero();
+        hero.Strength = hero.Intelligence = hero.Dexterity = hero.Wisdom = 1000;
+        hero.Mana = 0; hero.MaxMana = Big;
+        string text = await InLanguage(lang, async () =>
+        {
+            var (term, output) = Term("\n\n");
+            var feature = new RoomFeature("Ancient Chest", "x", interaction);
+            await (Task)typeof(FeatureInteractionSystem).GetMethod("HandleSkillChallenge", F)!
+                .Invoke(system, new object[] { feature, hero, 100, term, new FeatureOutcome() })!;
+            return Shown(term, output);
+        });
+        return (text, hero);
+    }
+
+    [Theory]
+    [InlineData("en", FeatureInteraction.Open, "ui.stat_strength")]
+    [InlineData("hu", FeatureInteraction.Open, "ui.stat_strength")]
+    [InlineData("en", FeatureInteraction.Search, "ui.stat_intelligence")]
+    [InlineData("hu", FeatureInteraction.Search, "ui.stat_intelligence")]
+    [InlineData("en", FeatureInteraction.Take, "ui.stat_dexterity")]
+    [InlineData("hu", FeatureInteraction.Take, "ui.stat_dexterity")]
+    [InlineData("en", FeatureInteraction.Use, "ui.stat_wisdom")]
+    [InlineData("hu", FeatureInteraction.Use, "ui.stat_wisdom")]
+    public async Task FeatureStatCheck_LabelRendersInLanguage_AndFits(string lang, FeatureInteraction interaction, string statKey)
+    {
+        var (text, _) = await StatChallenge(lang, interaction);
+        Capture($"dungeon-c-feature-{interaction}-{lang}.txt", text);
+        string stat = L(lang, statKey);
+        int difficulty = 8 + 100 / 4;
+        text.Should().Contain(L(lang, "feature.stat_check", stat, difficulty));
+        text.Should().Contain(L(lang, "feature.roll_result", 1, 40, stat, 41));
+        text.Should().Contain(L(lang, "feature.stat_boost", 2 + 100 / 20, stat));
+        if (lang == "hu") text.Should().NotContain("Strength").And.NotContain("Intelligence").And.NotContain("Dexterity").And.NotContain("Wisdom");
+        EveryRowFits(text, $"{interaction} stat check");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task FeatureStatBoost_StillAppliesByStatCode_InEveryLanguage(string lang)
+    {
+        int boost = 2 + 100 / 20;
+        (await StatChallenge(lang, FeatureInteraction.Open)).hero.TempAttackBonus.Should().Be(boost, "Strength raises attack");
+        (await StatChallenge(lang, FeatureInteraction.Take)).hero.TempDefenseBonus.Should().Be(boost, "Dexterity raises defence");
+        (await StatChallenge(lang, FeatureInteraction.Search)).hero.Mana.Should().Be(boost * 5, "Intelligence restores mana");
+        var wis = (await StatChallenge(lang, FeatureInteraction.Use)).hero;
+        (wis.TempAttackBonus + wis.TempDefenseBonus + wis.Mana).Should().Be(0, "Wisdom has no boost, as before");
+    }
+
+    // ---------- 10. names kept English on purpose ----------
+
+    [Fact]
+    public void KeptEnglish_WildernessMonsterNames_BeastNames_ChampionItems_StayListed()
+    {
+        string sources = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Tests", "Localization", "hardcoded-data-sources.txt"));
+        sources.Should().Contain("nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|")
+            .And.Contain("nouns|Scripts/Data/BeastData.cs|init.Name|")
+            .And.Contain("nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|")
+            .And.Contain("keyed|Scripts/Data/BeastData.cs|init.Species|dungeon.beast.{id}.species");
+        // The wilderness fight looks its monster up by the English name.
+        foreach (var region in WildernessData.Regions)
+            foreach (var name in region.MonsterNames)
+                WildernessData.MonsterProfiles.Should().ContainKey(name, "the fight finds its profile by the English name");
+        Src("Locations", "WildernessLocation.cs").Should().Contain("monster.Name = monsterName;")
+            .And.Contain("monster.TierName = monsterName;").And.Contain("WildernessData.GetMonsterProfile(monsterName)");
     }
 }
