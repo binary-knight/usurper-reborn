@@ -419,7 +419,7 @@ public class DungeonLocC123Tests
         // The English keys are the data's text; the only change is an em-dash written as "--".
         foreach (var s in DungeonSettlementData.Settlements.Values)
         {
-            string Dash(string t) => t.Replace(" — ", " -- ").Replace(" —\n", " --\n");
+            string Dash(string t) => t.Replace(" \u2014 ", " -- ").Replace(" \u2014\n", " --\n");
             string key = $"dungeon.settlement.{s.Id}";
             L("en", key + ".npc_title").Should().Be(s.NPCTitle);
             L("en", key + ".description").Should().Be(Dash(s.Description));
