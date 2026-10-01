@@ -31,6 +31,9 @@ namespace UsurperRemake.Systems
         private readonly IOnlineSaveBackend backend;
         private string username;
 
+        /// <summary>The key this session is registered under in online_players (the alt key after SwitchIdentity).</summary>
+        public string OnlineKey => username;
+
         private readonly JsonSerializerOptions jsonOptions;
 
         private System.Threading.Timer? heartbeatTimer;

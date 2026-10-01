@@ -61,6 +61,25 @@ public abstract class BaseLocation
     private List<UsurperRemake.Systems.OnlinePlayerInfo> _coPresenceCache = new();
     private DateTime _coPresenceCacheTime = DateTime.MinValue;
 
+    /// <summary>
+    /// The online players shown in the cached "Also here" line: those whose presence row names
+    /// this location, leaving out the viewer by online key. 1.2.4: it compared the shown name
+    /// with Name2, which missed a viewer whose shown name carries a family name. The keys are the
+    /// session's online_players key (the alt key after an alt switch) and the account username.
+    /// Nothing is shown at a location without co-presence (the Dungeons, Home).
+    /// </summary>
+    internal static List<UsurperRemake.Systems.OnlinePlayerInfo> CoPresenceOthers(
+        IEnumerable<UsurperRemake.Systems.OnlinePlayerInfo> online, GameLocation locationId, string locationName,
+        params string?[] viewerKeys)
+    {
+        if (!UsurperRemake.Server.RoomRegistry.ShowsCoPresence(locationId))
+            return new List<UsurperRemake.Systems.OnlinePlayerInfo>();
+        return online
+            .Where(p => p.Location == locationName
+                && !viewerKeys.Any(k => !string.IsNullOrEmpty(k) && string.Equals(p.Username, k, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+
     // v0.57.21: GMCP last-emitted vitals for delta detection. Per-instance because
     // each location has its own loop; resets implicitly on location change.
     /// <summary>
@@ -194,10 +213,10 @@ public abstract class BaseLocation
             throw new LocationExitException(GameLocation.MainStreet);
         }
 
-        // MUD mode: show other players at this location. Skipped in the Dungeons: each
-        // player explores their own floors/instance, so "Also here" there is misleading.
+        // MUD mode: show other players at this location. Skipped in the Dungeons (each player
+        // explores their own floors) and at private locations such as Home.
         if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null
-            && LocationId != GameLocation.Dungeons)
+            && UsurperRemake.Server.RoomRegistry.ShowsCoPresence(LocationId))
         {
             var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, UsurperRemake.Server.SessionContext.Current?.Username);
             if (otherPlayers.Count > 0)
@@ -822,17 +841,16 @@ public abstract class BaseLocation
             _skipNextRedraw = false;
 
             // Refresh co-presence player cache every 15s (MUD mode only).
-            // Skipped in the Dungeons: each player explores their own floors/instance,
-            // so co-presence there is misleading.
+            // Skipped in the Dungeons and at private locations (see CoPresenceOthers).
             if (UsurperRemake.BBS.DoorMode.IsMudServerMode &&
                 UsurperRemake.Systems.OnlineStateManager.IsActive &&
-                LocationId != GameLocation.Dungeons &&
+                UsurperRemake.Server.RoomRegistry.ShowsCoPresence(LocationId) &&
                 (DateTime.Now - _coPresenceCacheTime).TotalSeconds >= 15)
             {
-                var allPlayers = await UsurperRemake.Systems.OnlineStateManager.Instance!.GetOnlinePlayers();
-                _coPresenceCache = allPlayers
-                    .Where(p => p.Location == Name && p.DisplayName != (currentPlayer?.Name2 ?? ""))
-                    .ToList();
+                var osm = UsurperRemake.Systems.OnlineStateManager.Instance!;
+                var allPlayers = await osm.GetOnlinePlayers();
+                _coPresenceCache = CoPresenceOthers(allPlayers, LocationId, Name,
+                    osm.OnlineKey, UsurperRemake.Server.SessionContext.Current?.Username);
                 _coPresenceCacheTime = DateTime.Now;
             }
 
@@ -853,9 +871,9 @@ public abstract class BaseLocation
                 ShowImmersionText();
 
                 // Co-presence: show other online players at this location (MUD mode only).
-                // Skipped in the Dungeons (instanced per player).
+                // Skipped in the Dungeons and at private locations.
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode && _coPresenceCache.Count > 0
-                    && LocationId != GameLocation.Dungeons)
+                    && UsurperRemake.Server.RoomRegistry.ShowsCoPresence(LocationId))
                 {
                     terminal.SetColor("cyan");
                     terminal.Write(Loc.Get("base.also_here") + ": ");
