@@ -2588,33 +2588,21 @@ public abstract class BaseLocation
     /// </summary>
     protected void ShowBBSStatusLine()
     {
-        terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("status.hp")}:");
+        // v1.2.3: wraps between its parts at UIHelper.WrapWidth (only very large values need it), continuing
+        // indented 1 like the row. base.lv_label carries its own space and colon.
         float hpPct = currentPlayer.MaxHP > 0 ? (float)currentPlayer.HP / currentPlayer.MaxHP : 0;
-        terminal.SetColor(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red");
-        terminal.Write($"{currentPlayer.HP}/{currentPlayer.MaxHP}");
-        terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("status.gold_label")}:");
-        terminal.SetColor("yellow");
-        terminal.Write($"{currentPlayer.Gold:N0}");
+        var segments = new List<List<ChromeRun>>
+        {
+            new() { new("gray", $" {Loc.Get("status.hp")}:"),
+                    new(hpPct > 0.5f ? "bright_green" : hpPct > 0.25f ? "yellow" : "bright_red", $"{currentPlayer.HP}/{currentPlayer.MaxHP}") },
+            new() { new("gray", $" {Loc.Get("status.gold_label")}:"), new("yellow", $"{currentPlayer.Gold:N0}") },
+        };
         if (currentPlayer.IsManaClass)
-        {
-            terminal.SetColor("gray");
-            terminal.Write($" {Loc.Get("status.mp")}:");
-            terminal.SetColor("blue");
-            terminal.Write($"{currentPlayer.Mana}/{currentPlayer.MaxMana}");
-        }
+            segments.Add(new() { new("gray", $" {Loc.Get("status.mp")}:"), new("blue", $"{currentPlayer.Mana}/{currentPlayer.MaxMana}") });
         else
-        {
-            terminal.SetColor("gray");
-            terminal.Write($" {Loc.Get("status.sta")}:");
-            terminal.SetColor("yellow");
-            terminal.Write($"{currentPlayer.CurrentCombatStamina}/{currentPlayer.MaxCombatStamina}");
-        }
-        terminal.SetColor("gray");
-        terminal.Write($" {Loc.Get("base.lv_label")}:");
-        terminal.SetColor("cyan");
-        terminal.Write($"{currentPlayer.Level}");
+            segments.Add(new() { new("gray", $" {Loc.Get("status.sta")}:"),
+                                 new("yellow", $"{currentPlayer.CurrentCombatStamina}/{currentPlayer.MaxCombatStamina}") });
+        var level = new List<ChromeRun> { new("gray", Loc.Get("base.lv_label")), new("cyan", $"{currentPlayer.Level}") };
         if (currentPlayer.Level < GameConfig.MaxLevel)
         {
             long curXP = currentPlayer.Experience;
@@ -2623,9 +2611,10 @@ public abstract class BaseLocation
             long xpInto = curXP - prevXP;
             long xpNeed = nextXP - prevXP;
             int pct = xpNeed > 0 ? (int)((xpInto * 100) / xpNeed) : 0;
-            terminal.SetColor("gray");
-            terminal.Write($"({Math.Clamp(pct, 0, 100)}%)");
+            level.Add(new("gray", $"({Math.Clamp(pct, 0, 100)}%)"));
         }
+        segments.Add(level);
+        WriteChromeSegments(segments, 0, 1, " ");
         terminal.WriteLine("");
     }
 
@@ -4189,15 +4178,15 @@ public abstract class BaseLocation
             default:
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("base.invalid_choice", choice));
-                // v1.2.3: wraps between its parts at UIHelper.WrapWidth like the Quick Commands bar; a null color keeps
-                // the color already set, as the hint always drew it.
+                // v1.2.3: one sentence, "Try: [%] Status, [*] Inventory, [R] Return, or [?] for help", wrapping between
+                // its parts at UIHelper.WrapWidth; a continuation row starts without the ", ".
                 var hint = new List<List<ChromeRun>>
                 {
-                    new() { new("gray", $"{Loc.Get("base.try_hint")}: ["), new("bright_yellow", "%"), new("gray", "]"), new(null, Loc.Get("base.qc_status_suffix")) },
-                    new() { new(null, ", ["), new("bright_yellow", "*"), new("gray", "] "), new(null, Loc.Get("base.qc_inventory")) },
+                    new() { new("gray", $"{Loc.Get("base.try_hint")} ["), new("bright_yellow", "%"), new("gray", $"] {Loc.Get("base.qc_status_suffix").Trim()}") },
+                    new() { new(null, ", ["), new("bright_yellow", "*"), new("gray", $"] {Loc.Get("base.qc_inventory").Trim()}") },
                 };
                 if (LocationId != GameLocation.MainStreet)
-                    hint.Add(new() { new(null, ", ["), new("bright_yellow", "R"), new("gray", "]"), new(null, Loc.Get("base.qc_return_suffix")) });
+                    hint.Add(new() { new(null, ", ["), new("bright_yellow", "R"), new("gray", $"] {Loc.Get("base.qc_return_suffix").Trim()}") });
                 hint.Add(new() { new(null, $", {Loc.Get("base.or")} ["), new("bright_yellow", "?"), new("gray", $"] {Loc.Get("base.for_help")}") });
                 WriteChromeSegments(hint, 0, 2, ", ", endLine: true);
                 await Pacing.Wait(2000);

@@ -330,64 +330,91 @@ public class ChromeWidth123Tests
         return Raw(l, output);
     });
 
-    /// <summary>The hint as BaseLocation drew it before v1.2.3, call for call.</summary>
-    private static string HintBefore(string lang, bool street) => InLanguage(lang, () =>
+    /// <summary>The hint rows joined back with the ", " a continuation row starts without.</summary>
+    private static string HintSentence(string plain)
     {
-        var output = new MemoryStream();
-        var terminal = new TerminalEmulator(new MemoryStream(), output);
-        terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("base.invalid_choice", "QQQ"));
-        terminal.SetColor("gray");
-        terminal.Write($"{Loc.Get("base.try_hint")}: [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("%");
-        terminal.SetColor("gray");
-        terminal.Write("]");
-        terminal.Write(Loc.Get("base.qc_status_suffix"));
-        terminal.Write(", [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("*");
-        terminal.SetColor("gray");
-        terminal.Write("] ");
-        terminal.Write(Loc.Get("base.qc_inventory"));
-        if (!street)
-        {
-            terminal.Write(", [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("gray");
-            terminal.Write("]");
-            terminal.Write(Loc.Get("base.qc_return_suffix"));
-        }
-        terminal.Write($", {Loc.Get("base.or")} [");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("?");
-        terminal.SetColor("gray");
-        terminal.WriteLine($"] {Loc.Get("base.for_help")}");
-        terminal.StreamWriterInternal?.Flush();
-        return Encoding.UTF8.GetString(output.ToArray()).Replace("\r", "");
-    });
+        var rows = Rows(plain).Where(r => r.Length > 0).Skip(1).ToList();
+        return rows[0] + string.Concat(rows.Skip(1).Select(r => ", " + r.Trim()));
+    }
+
+    [Fact]
+    public void InvalidChoiceHint_English_IsOneCleanSentence()
+    {
+        HintSentence(Strip(Hint("en", false))).Should().Be("Try: [%] Status, [*] Inventory, [R] Return, or [?] for help");
+        HintSentence(Strip(Hint("en", true))).Should().Be("Try: [%] Status, [*] Inventory, or [?] for help");
+    }
 
     [Theory]
     [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
-    public void InvalidChoiceHint_Fits_AndIsUnchangedWhereItFit(string lang)
+    public void InvalidChoiceHint_Fits_AndReadsAsOneSentence(string lang)
     {
         foreach (bool street in new[] { false, true })
         {
-            string raw = Hint(lang, street), before = HintBefore(lang, street);
-            string plain = Strip(raw);
+            string plain = Strip(Hint(lang, street));
             Capture($"chrome-hint-{(street ? "street" : "inn")}-{lang}.txt", plain);
             EveryRowFits(plain, $"{lang} invalid-choice hint");
             plain.Contains("[R]").Should().Be(!street, "Main Street leaves out [R]");
-            bool fitBefore = Rows(Strip(before)).All(r => r.Length <= MaxWidth);
-            if (fitBefore) raw.Should().Be(before, $"{lang}: a hint that fits is drawn as before, byte for byte");
-            else
-            {
-                Rows(plain).Count.Should().BeGreaterThan(Rows(Strip(before)).Count, $"{lang}: the hint wraps");
-                foreach (var row in Rows(plain).Skip(2).Where(r => r.Length > 0))
-                    row.Should().StartWith("  ").And.NotStartWith("  , [", "a continuation row drops the leading separator");
-            }
+            foreach (var row in Rows(plain).Where(r => r.Length > 0).Skip(2))
+                row.Should().StartWith("  ").And.NotStartWith("   ").And.NotStartWith("  ,", "a continuation row starts without the separator");
+            string ret = street ? "" : $", [R] {L(lang, "base.qc_return_suffix").Trim()}";
+            HintSentence(plain).Should().Be(
+                $"{L(lang, "base.try_hint")} [%] {L(lang, "base.qc_status_suffix").Trim()}, [*] {L(lang, "base.qc_inventory").Trim()}{ret}, {L(lang, "base.or")} [?] {L(lang, "base.for_help")}");
+            Regex.IsMatch(plain, @", ,|\[ ?\[|\[:|  ,| ,").Should().BeFalse($"{lang}: no doubled bracket or separator: {plain}");
+            L(lang, "base.for_help").Length.Should().BeLessThan(20, $"{lang}: for_help is a fragment");
         }
+    }
+
+    // ---------- the BBS compact status line (ShowBBSStatusLine) ----------
+
+    private static string BbsStatus(string lang, bool mana, bool worst) => InLanguage(lang, () =>
+    {
+        var (l, output) = At(new CrowdedInn(), Hero(mana, worst));
+        typeof(BaseLocation).GetMethod("ShowBBSStatusLine", F)!.Invoke(l, null);
+        return Raw(l, output);
+    });
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public void BbsStatusLine_WorstCase_FitsAndWraps(string lang)
+    {
+        foreach (bool mana in new[] { true, false })
+        {
+            string plain = Strip(BbsStatus(lang, mana, worst: true));
+            Capture($"chrome-bbs-{(mana ? "mana" : "stamina")}-worst-{lang}.txt", plain);
+            var rows = Rows(plain).Where(r => r.Length > 0).ToList();
+            EveryRowFits(plain, $"{lang} BBS status line");
+            foreach (var row in rows.Skip(1))
+                row.Should().StartWith(" ").And.NotStartWith("  ", "a continuation row is indented 1 like the row");
+            string joined = string.Join("", rows);
+            joined.Should().Contain(GoldCap.ToString("N0")).And.Contain($"{L(lang, "base.lv_label").Trim()}{GameConfig.MaxLevel - 1}(");
+        }
+        Rows(Strip(BbsStatus(lang, false, worst: true))).Count(r => r.Length > 0).Should().Be(2, "six-digit stamina at the gold cap needs a second row");
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public void BbsStatusLine_LevelLabel_IsWrittenAsTheKey(string lang)
+    {
+        string plain = Strip(BbsStatus(lang, true, worst: false));
+        plain.Should().Contain($"{L(lang, "base.lv_label")}5(").And.NotContain("::").And.NotContain(": :");
+        plain.TrimEnd().Should().NotContain("  ", "no doubled space on the row");
+    }
+
+    [Fact]
+    public void BbsStatusLine_ShortCase_IsByteIdentical_ApartFromTheLevelLabel()
+    {
+        var golden = ReadGolden();
+        foreach (var lang in new[] { "en", "hu" })
+            foreach (var mana in new[] { true, false })
+            {
+                string name = $"bbs-{lang}-{(mana ? "mana" : "stamina")}";
+                string raw = BbsStatus(lang, mana, worst: false);
+                Capture($"chrome-short-{name}.txt", Strip(raw));
+                string lv = L(lang, "base.lv_label");
+                // the golden is the code before v1.2.3, which wrote " {lv_label}:"; the key already has its space and colon
+                golden[name].Should().Contain($" {lv}:");
+                raw.Should().Be(golden[name].Replace($" {lv}:", lv), $"{name}: a BBS status line that fits is unchanged but for the label");
+            }
     }
 
     [Fact]
