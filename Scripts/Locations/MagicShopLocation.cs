@@ -209,26 +209,44 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
 
         // Menu rows - Shopping
+        // v1.2.5: whole-word labels in the player's language, the key shown apart: "[S]ell" when the label starts
+        // with its key letter (English), "[S] Eladás" otherwise (BaseLocation.MenuKeyLabel). The keys stay the typed commands.
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_shopping")}");
-        ShowBBSMenuRow(("1", "bright_yellow", $" {Loc.Get("magic_shop.rings")}"), ("2", "bright_yellow", $" {Loc.Get("magic_shop.necklaces")}"), ("S", "bright_yellow", Loc.Get("magic_shop.bbs_sell")), ("I", "bright_yellow", Loc.Get("magic_shop.bbs_identify")));
+        ShowBBSWordRow(("1", Loc.Get("magic_shop.rings")), ("2", Loc.Get("magic_shop.necklaces")), ("S", Loc.Get("shop.sell")), ("I", Loc.Get("magic_shop.bbs_word_identify")));
 
         // Potions & Scrolls
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_potions_scrolls")}");
-        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("magic_shop.bbs_healing_pots")), ("M", "bright_yellow", Loc.Get("magic_shop.bbs_mana_pots")), ("D", "bright_yellow", Loc.Get("magic_shop.bbs_dungeon_reset")));
+        ShowBBSWordRow(("H", Loc.Get("magic_shop.bbs_word_healing_pots")), ("M", Loc.Get("magic_shop.bbs_word_mana_pots")), ("D", Loc.Get("magic_shop.bbs_word_dungeon_reset")));
 
         // Enchanting & Arcane
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_enchanting_arcane")}");
-        ShowBBSMenuRow(("E", "bright_yellow", Loc.Get("magic_shop.bbs_enchant")), ("W", "bright_yellow", Loc.Get("magic_shop.bbs_remove_ench")), ("C", "bright_yellow", Loc.Get("magic_shop.bbs_curse_removal")));
-        ShowBBSMenuRow(("V", "bright_yellow", Loc.Get("magic_shop.bbs_love_spells")), ("K", "bright_yellow", Loc.Get("magic_shop.bbs_dark_arts")), ("Y", "bright_yellow", Loc.Get("magic_shop.bbs_study")), ("G", "bright_yellow", Loc.Get("magic_shop.bbs_scry")));
+        ShowBBSWordRow(("E", Loc.Get("magic_shop.bbs_word_enchant")), ("W", Loc.Get("magic_shop.bbs_remove_ench")), ("C", Loc.Get("magic_shop.menu_curse_removal")));
+        ShowBBSWordRow(("V", Loc.Get("magic_shop.bbs_love_spells")), ("K", Loc.Get("magic_shop.bbs_dark_arts")), ("Y", Loc.Get("magic_shop.bbs_study")), ("G", Loc.Get("magic_shop.bbs_scry")));
 
         // Talk & Return
-        ShowBBSMenuRow(("T", "bright_yellow", Loc.Get("magic_shop.bbs_talk_to", _ownerName)), ("R", "bright_yellow", Loc.Get("shop.return")));
+        ShowBBSWordRow(("T", Loc.Get("magic_shop.talk_to", _ownerName)), ("R", Loc.Get("shop.return")));
 
         // Footer
         ShowBBSFooter();
+    }
+
+    /// <summary>v1.2.5: one compact BBS menu row, each key followed by its whole label (MenuKeyLabel), a space
+    /// between items and none after the last, so a 30-character owner name still fits in 79 columns.</summary>
+    private void ShowBBSWordRow(params (string key, string label)[] items)
+    {
+        terminal.Write(" ");
+        for (int i = 0; i < items.Length; i++)
+        {
+            var (letter, tail) = MenuKeyLabel(items[i].key, items[i].label);
+            terminal.SetColor("darkgray"); terminal.Write(i == 0 ? "[" : " [");
+            terminal.SetColor("bright_yellow"); terminal.Write(letter);
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write(tail);
+        }
+        terminal.WriteLine("");
     }
 
     protected override async Task<bool> ProcessChoice(string choice)
@@ -1226,9 +1244,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             string suffix = enchantChoice switch
             {
-                4 => " (Blessed)",
-                5 => " (Ocean-Touched)",
-                6 => " (Warded)",
+                4 or 5 or 6 => NamedEnchantTag(enchantChoice + 1),   // Blessed, Ocean-Touched, Warded
                 _ => $" +{bonus}"
             };
 
@@ -1648,6 +1664,35 @@ public partial class MagicShopLocation : BaseLocation
 
     /// <summary>v1.2.5: what an enchant of this stat appends to the stored item name, English in every language.</summary>
     internal static string StatSuffix(int bonus, int statChoice) => $" +{bonus} {StatNames[statChoice - 1]}";
+
+    /// <summary>v1.2.5: the English tag a named enchant appends to the item's stored name, by enchant tier
+    /// (both enchant flows write it from here, the legacy one by its own choice + 1), "" for a stat tier.
+    /// RemoveEnchantment strips every tag this returns, so a new tag is stripped as soon as it is written.</summary>
+    internal static string NamedEnchantTag(int tierChoice) => tierChoice switch
+    {
+        5 => " (Blessed)",
+        6 => " (Ocean-Touched)",
+        7 => " (Warded)",
+        8 => " (Predator)",
+        9 => " (Lifedrinker)",
+        13 => " (Phoenix Fire)",
+        14 => " (Frostbite)",
+        _ => "",
+    };
+
+    /// <summary>v1.2.5: every named enchant tag (NamedEnchantTag over every tier).</summary>
+    internal static IEnumerable<string> AllNamedEnchantTags() =>
+        Enumerable.Range(1, EnchantTiers.Length).Select(NamedEnchantTag).Where(t => t.Length > 0);
+
+    /// <summary>v1.2.5: the stored name with every enchant tag taken out: each named tag, each stat suffix
+    /// (" +6 Dex", StatSuffix) and the legacy flow's bare " +N". Used by RemoveEnchantment.</summary>
+    internal static string StripEnchantTags(string name)
+    {
+        foreach (var tag in AllNamedEnchantTags())
+            name = name.Replace(tag, "");
+        // Any three letters, as before and as GearSetFamilyResolver.TrailingEnchant reads it, so an older code still goes.
+        return System.Text.RegularExpressions.Regex.Replace(name, @"\s\+\d+(?:\s\p{L}{3})?(?!\w)", "");
+    }
 
     /// <summary>v1.2.5: a stat's name in the player's language, for the stat menu and the confirm line.</summary>
     internal static string StatLabel(int statChoice) => Loc.Get(StatLabelKeys[statChoice - 1]);
@@ -2280,23 +2325,23 @@ public partial class MagicShopLocation : BaseLocation
                 enchanted.StrengthBonus += 3; enchanted.DexterityBonus += 3;
                 enchanted.DefenceBonus += 3; enchanted.WisdomBonus += 3;
                 enchanted.WeaponPower += 3; enchanted.ArmorClass += 3;
-                suffix = " (Blessed)";
+                suffix = NamedEnchantTag(5);
                 break;
             case 6: // Ocean's Touch
                 enchanted.IntelligenceBonus += 6; enchanted.WisdomBonus += 4;
-                suffix = " (Ocean-Touched)";
+                suffix = NamedEnchantTag(6);
                 break;
             case 7: // Ward
                 enchanted.MagicResistance += 20; enchanted.DefenceBonus += 2;
-                suffix = " (Warded)";
+                suffix = NamedEnchantTag(7);
                 break;
             case 8: // Predator
                 enchanted.CriticalChanceBonus += 5; enchanted.CriticalDamageBonus += 10;
-                suffix = " (Predator)";
+                suffix = NamedEnchantTag(8);
                 break;
             case 9: // Lifedrinker
                 enchanted.LifeSteal += 3;
-                suffix = " (Lifedrinker)";
+                suffix = NamedEnchantTag(9);
                 break;
             case 10: case 11: case 12: // Mythic/Legendary/Godforged stat enchants
                 ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
@@ -2305,12 +2350,12 @@ public partial class MagicShopLocation : BaseLocation
             case 13: // Phoenix Fire
                 enchanted.WeaponPower += 20;
                 enchanted.HasFireEnchant = true;
-                suffix = " (Phoenix Fire)";
+                suffix = NamedEnchantTag(13);
                 break;
             case 14: // Frostbite
                 enchanted.WeaponPower += 20;
                 enchanted.HasFrostEnchant = true;
-                suffix = " (Frostbite)";
+                suffix = NamedEnchantTag(14);
                 break;
             default:
                 suffix = "";
@@ -2487,12 +2532,9 @@ public partial class MagicShopLocation : BaseLocation
         var stripped = rmEquip.Clone();
         stripped.ClearEnchantMarkers();   // v1.1.7: the count and the kinds, so paid removal really frees the item
 
-        // Strip name suffixes
-        string[] suffixes = { " (Blessed)", " (Ocean-Touched)", " (Warded)", " (Predator)", " (Lifedrinker)" };
-        foreach (var sfx in suffixes)
-            stripped.Name = stripped.Name.Replace(sfx, "");
-        // Strip stat suffixes like " +2 Str", " +4 Dex", etc.
-        stripped.Name = System.Text.RegularExpressions.Regex.Replace(stripped.Name, @"\s\+\d+\s\w{3}", "");
+        // Strip every tag an enchant writes (v1.2.5: the list is NamedEnchantTag, so Phoenix Fire and
+        // Frostbite are stripped too, and so is a stale tag left on an item by an older removal)
+        stripped.Name = StripEnchantTags(stripped.Name);
 
         EquipmentDatabase.RegisterDynamic(stripped);
         player.UnequipSlot(rmSlot);
