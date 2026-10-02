@@ -29,13 +29,12 @@ namespace UsurperRemake.Tests
             "engine.story_begins_4",
         };
 
-        // Banned-punctuation debt ceilings (em-dash + en-dash + ellipsis chars,
-        // counted as OCCURRENCES per file) as measured at the v0.65.12 audit.
-        // New keys must use ASCII punctuation ("--", "...", "-"); these counts
-        // may only go DOWN (lower a ceiling after any cleanup pass).
+        // Banned punctuation (em-dash, en-dash, ellipsis characters) is cleaned out
+        // of every value in every language. Use ASCII: "--" for dashes, "-" for
+        // number ranges, "..." for ellipsis. The ceiling is zero.
         private static readonly Dictionary<string, int> PunctCeiling = new()
         {
-            { "en", 223 }, { "es", 290 }, { "fr", 467 }, { "it", 356 }, { "hu", 408 },
+            { "en", 0 }, { "es", 0 }, { "fr", 0 }, { "it", 0 }, { "hu", 0 },
         };
 
         private static string LocDir()
@@ -208,15 +207,19 @@ namespace UsurperRemake.Tests
         }
 
         [Fact]
-        public void BannedPunctuation_DoesNotGrow()
+        public void BannedPunctuation_NoneInAnyValue()
         {
+            char[] banned = { '\u2014', '\u2013', '\u2026' };
             foreach (var (lang, ceiling) in PunctCeiling)
             {
                 var d = Load(lang);
-                int count = d.Values.Sum(v => v.Count(c => c == '—' || c == '–' || c == '…'));
-                Assert.True(count <= ceiling,
-                    $"{lang}.json banned-punctuation count {count} exceeds ceiling {ceiling}. " +
-                    "New keys must use ASCII punctuation: -- for dashes, ... for ellipsis.");
+                var offenders = d.Where(kv => kv.Value.IndexOfAny(banned) >= 0)
+                                 .Select(kv => kv.Key).ToList();
+                int count = d.Values.Sum(v => v.Count(c => Array.IndexOf(banned, c) >= 0));
+                Assert.True(count <= ceiling && offenders.Count == 0,
+                    $"{lang}.json has {count} banned-punctuation characters (ceiling {ceiling}) in: " +
+                    string.Join(", ", offenders.Take(10)) +
+                    ". Use ASCII punctuation: -- for dashes, - for number ranges, ... for ellipsis.");
             }
         }
     }
