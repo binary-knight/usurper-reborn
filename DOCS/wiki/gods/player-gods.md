@@ -24,7 +24,7 @@ When you ascend:
 - The ending counts as completed and your cycle count goes up, as it would for NG+. This keeps prestige classes and cycle bonuses for a later life.
 - You go straight to the Pantheon.
 
-Online, only your main character can ascend; an alt character is refused. Ascending also earns the alt character slot for your account, and that slot stays earned even if you renounce later.
+Online, only your main character can ascend; an alt character is refused. While your main character is immortal, your account can create an alt character.
 
 ## What changes for an immortal
 
@@ -113,8 +113,7 @@ What is lost:
 
 What is kept:
 
-- your cycle count and completed endings, so the new life starts with the cycle bonuses of [New Game Plus](/wiki/en/characters/new-game-plus/);
-- the alt character slot your ascension earned.
+- your cycle count and completed endings, so the new life starts with the cycle bonuses of [New Game Plus](/wiki/en/characters/new-game-plus/).
 
 If you are the monarch when you renounce, you abdicate first; nothing is renounced if the abdication fails. The new life starts on the next cycle with the Old Gods reset, the same way NG+ starts.
 
