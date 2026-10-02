@@ -1,7 +1,7 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs
 ---
 Your Home is a private base with rest, storage, upgrades and family life. From Main Street open the Home and Hearth district with H, then press H for Home. It appears after your first few levels.
@@ -25,7 +25,7 @@ Living Quarters, Bed, Chest, Hearth and Garden each have several levels. A bette
 
 You can marry an NPC you love at the Old Church, which offers ceremonies of different cost, or by proposing in conversation once the NPC is your lover. A ruler can also arrange a royal wedding at the [Castle](/wiki/en/world/castle/). Both of you must be adults and unmarried, not related, in love for some days, and the NPC must accept. Courtship itself is covered in [relationships](/wiki/en/world/relationships/).
 
-A living spouse adds combat experience and can join your dungeon party. The partner menu offers dinner, a walk, a fire and more; these share a cooldown and restore Mental. A spouse you neglect for too long loves you less, and the greeting at your door warns you. Divorce is free from the partner menu at Home, but it hurts your children.
+A living spouse adds combat experience and can join your dungeon party. The partner menu offers dinner, a walk, a fire and more; these share a cooldown and restore Mental. A spouse you neglect for too long loves you less, and the greeting at your door warns you. After 21 of your days without contact, your spouse sends you a letter. It appears on screen, and you can read it again in your online mailbox, or offline with the MAIL command on Main Street. Divorce is free from the partner menu at Home, but it hurts your children.
 
 ## Children
 

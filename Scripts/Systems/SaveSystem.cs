@@ -493,6 +493,7 @@ namespace UsurperRemake.Systems
                 MaxResurrections = player.MaxResurrections,
                 PlaythroughDeaths = player.PlaythroughDeaths,
                 PresentDays = player.PresentDays,
+                PendingSpouseLetters = new List<string>(player.PendingSpouseLetters ?? new List<string>()),
                 BannedFromChurch = player.BannedFromChurch,
                 BlessingsReceived = player.BlessingsReceived,
                 ChurchDonations = player.ChurchDonations,
