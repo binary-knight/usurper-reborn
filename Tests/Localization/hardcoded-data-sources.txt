@@ -361,19 +361,10 @@ table|Scripts/Locations/LevelMasterLocation.cs|=navOptions|crystal navigation op
 names|Scripts/Locations/LevelMasterLocation.cs|new()#0|master names
 table|Scripts/Locations/LevelMasterLocation.cs|new()#1|master description
 names|Scripts/Locations/MagicShopLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/MagicShopLocation.cs|call:Add#0/tuple#0|stat label
-table|Scripts/Locations/MagicShopLocation.cs|decl:DeathSpells/tuple#0|spell names
-table|Scripts/Locations/MagicShopLocation.cs|decl:DeathSpells/tuple#7|spell descriptions
-table|Scripts/Locations/MagicShopLocation.cs|decl:EnchantTiers/tuple#0|enchant tier names
-table|Scripts/Locations/MagicShopLocation.cs|decl:EnchantTiers/tuple#5|enchant tier descriptions
-table|Scripts/Locations/MagicShopLocation.cs|decl:LoveSpells/tuple#0|spell names
-table|Scripts/Locations/MagicShopLocation.cs|decl:LoveSpells/tuple#7|spell descriptions
-nouns|Scripts/Locations/MagicShopLocation.cs|decl:StatNames|stat menu
-table|Scripts/Locations/MagicShopLocation.cs|decl:trait1|scry personality line
-table|Scripts/Locations/MagicShopLocation.cs|decl:trait2|scry personality line
-table|Scripts/Locations/MagicShopLocation.cs|=suffix|enchanted item name suffix
-nouns|Scripts/Locations/MagicShopLocation.cs|=targetEquip.Name|item name prefix
-nouns|Scripts/Locations/MagicShopLocation.cs|=targetItem.Name|item name prefix
+nouns|Scripts/Locations/MagicShopLocation.cs|decl:StatNames|stat code an enchant appends to the stored item name, English in every language (GearSetFamilyResolver)
+table|Scripts/Locations/MagicShopLocation.cs|=suffix|enchanted item name suffix, stored, English in every language (GearSetFamilyResolver)
+nouns|Scripts/Locations/MagicShopLocation.cs|=targetEquip.Name|item name prefix, stored, English in every language (GearSetFamilyResolver)
+nouns|Scripts/Locations/MagicShopLocation.cs|=targetItem.Name|item name prefix, stored, English in every language (GearSetFamilyResolver)
 names|Scripts/Locations/MainStreetLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 nouns|Scripts/Locations/MainStreetLocation.cs|decl:categoryName|achievements box header
 table|Scripts/Locations/MainStreetLocation.cs|decl:onlineTag|character list location column
