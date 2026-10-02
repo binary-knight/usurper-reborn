@@ -1923,16 +1923,6 @@
       ]
     }
   },
-  "Scripts/Locations/BankLocation.cs": {
-    "data": {
-      "count": 3,
-      "sites": [
-        "48e1ad3e66",
-        "4fac5bf74c",
-        "86f8a15a74"
-      ]
-    }
-  },
   "Scripts/Locations/CastleLocation.cs": {
     "data": {
       "count": 49,
@@ -2216,28 +2206,6 @@
       ]
     }
   },
-  "Scripts/Locations/InnLocation.cs": {
-    "data": {
-      "count": 2,
-      "sites": [
-        "8416819282",
-        "b5a5073695"
-      ]
-    },
-    "electron": {
-      "count": 8,
-      "sites": [
-        "7782ec1c2b",
-        "8207711b9b",
-        "88f29a4706",
-        "978205527a",
-        "a584510555",
-        "ca5adef603",
-        "d1a33eb42b",
-        "fe752e4cf1"
-      ]
-    }
-  },
   "Scripts/Locations/LevelMasterLocation.cs": {
     "data": {
       "count": 5,
@@ -2264,91 +2232,6 @@
         "b3ade907e9",
         "bcb27c3a44",
         "db3742bbcf"
-      ]
-    }
-  },
-  "Scripts/Locations/LoveStreetLocation.cs": {
-    "data": {
-      "count": 66,
-      "sites": [
-        "03b4edacdb",
-        "0902a5af91",
-        "0c0a23fa34",
-        "10b68600e7",
-        "22d049df47",
-        "2b40fb22a8",
-        "2d3d7a1e69",
-        "303acbc1cf",
-        "326c62ac2c",
-        "326c62ac2c",
-        "33d6528f94",
-        "34a44f7523",
-        "3bb302f3c1",
-        "3ce0209ce5",
-        "468a61a344",
-        "488a100c16",
-        "4bbf89ce51",
-        "518fcaa8a3",
-        "54eccc1d55",
-        "5954226472",
-        "5a4ed95428",
-        "7040879423",
-        "80bf2a9b96",
-        "842f43fc17",
-        "88f9e11a81",
-        "9322ce5f9e",
-        "9adde62e48",
-        "a0854eea9b",
-        "a16a589e55",
-        "a6a1f3e83c",
-        "a836821c13",
-        "a836821c13",
-        "a836821c13",
-        "a83e1d0962",
-        "a8fa64ca04",
-        "ac71595cc8",
-        "b3421e4428",
-        "b3421e4428",
-        "b3421e4428",
-        "b3421e4428",
-        "b3421e4428",
-        "b3421e4428",
-        "b3421e4428",
-        "b3421e4428",
-        "b54153793c",
-        "b8fb020ce1",
-        "b98f8bbe77",
-        "bd1fd9a4c6",
-        "c9d1eef51e",
-        "ca69f0f893",
-        "cc186cbd7b",
-        "d11ca8ae5a",
-        "d3669b0580",
-        "d73355e551",
-        "d8a59266de",
-        "ddedf09589",
-        "e01fbee008",
-        "e28cb45e05",
-        "e2dbfb00c1",
-        "e733ebbeb0",
-        "e930c36a27",
-        "ea99d53e48",
-        "eecdcc3bec",
-        "f22520dff9",
-        "f31baac599",
-        "f8016da2c0"
-      ]
-    },
-    "electron": {
-      "count": 7,
-      "sites": [
-        "08ff86b3d9",
-        "3476c08db5",
-        "37dbbfa3a2",
-        "47c437373b",
-        "9a433f8ed1",
-        "9b81403b9f",
-        "fd36f45576"
       ]
     }
   },
@@ -4888,73 +4771,9 @@
   },
   "Scripts/Systems/StreetEncounterSystem.cs": {
     "data": {
-      "count": 65,
+      "count": 1,
       "sites": [
-        "0145f013db",
-        "07e3f388e9",
-        "09a34b1022",
-        "1648722594",
-        "1a03c27bac",
-        "1a15353c44",
-        "1b3bded305",
-        "1bcededc38",
-        "214e5eccf2",
-        "2172707c7c",
-        "231ff116e4",
-        "24895338f0",
-        "27ef51b16f",
-        "2ead213843",
-        "39c48d0fd6",
-        "40df1b53f3",
-        "4109537dc6",
-        "46689fbb85",
-        "4955f0ae18",
-        "49cef29ee8",
-        "51c37f2e01",
-        "52fd152bdd",
-        "57e7723a96",
-        "5f5baf68b2",
-        "65f2e6c7e0",
-        "68c01f5da2",
-        "69084cc592",
-        "6c4f1a5f8a",
-        "717a109429",
-        "71be03085e",
-        "79e325f9b0",
-        "7ab69bb4f6",
-        "805881dbd8",
-        "8181d33bd0",
-        "860721bc03",
-        "8630434509",
-        "9135ed00c7",
-        "951c194535",
-        "96a9b3056a",
-        "9b324a830e",
-        "9e34d5b754",
-        "a2a701f73a",
-        "a3100c5c6a",
-        "a46b3379e9",
-        "a4ddc6b220",
-        "a70cb5e1b7",
-        "b02dd5ae5e",
-        "b072566181",
-        "b0b0a5f5fc",
-        "b23c4eda36",
-        "b4b6766395",
-        "b63852b2e8",
-        "d659dcee6a",
-        "d9484a54ec",
-        "d9b615da39",
-        "d9d9f04caf",
-        "da285b3199",
-        "de0c0ef8f3",
-        "e42f22ee86",
-        "e89fabbb4a",
-        "edcee6a0b7",
-        "ef5ada67b9",
-        "f2b4ad62b1",
-        "f7b4e0fa73",
-        "fcd000de41"
+        "79e325f9b0"
       ]
     }
   },

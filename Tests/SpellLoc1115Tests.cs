@@ -106,10 +106,11 @@ public class SpellLoc1115Tests
     public void Skill_editor_lists_spells_by_DisplayName_and_DisplayDescription()
     {
         string src = ReadScript(Path.Combine("Scripts", "Locations", "InnLocation.cs"));
-        src.Should().Contain("{spell.DisplayName,-24}", "the teammate skill editor's spell row must show the localized name");
+        // 1.2.5: the row is drawn by WriteSkillRow (columns from the longest name) and the toggle lines are keys.
+        src.Should().Contain("WriteSkillRow(layout, displayIdx, isDisabled, spell.DisplayName,", "the teammate skill editor's spell row must show the localized name");
         src.Should().Contain("spell.DisplayDescription", "the teammate skill editor's spell row must show the localized description");
-        src.Should().Contain("Enabled: {spell.DisplayName}");
-        src.Should().Contain("Disabled: {spell.DisplayName}");
+        src.Should().Contain("Loc.Get(\"inn.enabled\", spell.DisplayName)");
+        src.Should().Contain("Loc.Get(\"inn.disabled\", spell.DisplayName)");
         // .Name must still be used for the disabled-spell list itself (identifier, not display).
         src.Should().Contain("companion.DisabledSpells.Contains(spell.Name)");
     }

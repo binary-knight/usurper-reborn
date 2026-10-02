@@ -232,17 +232,17 @@ public class BankLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write(Loc.Get("bank.gold_on_hand"));
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"{currentPlayer.Gold:N0} gold");
+        terminal.WriteLine(Loc.Get("anchor_road.gold_amount", $"{currentPlayer.Gold:N0}"));
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("bank.gold_in_bank"));
         terminal.SetColor("yellow");
-        terminal.WriteLine($"{currentPlayer.BankGold:N0} gold");
+        terminal.WriteLine(Loc.Get("anchor_road.gold_amount", $"{currentPlayer.BankGold:N0}"));
 
         terminal.SetColor("white");
         terminal.Write(Loc.Get("bank.total_worth"));
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"{(currentPlayer.Gold + currentPlayer.BankGold):N0} gold");
+        terminal.WriteLine(Loc.Get("anchor_road.gold_amount", $"{(currentPlayer.Gold + currentPlayer.BankGold):N0}"));
 
         if (currentPlayer.BankGuard)
         {
@@ -559,7 +559,7 @@ public class BankLocation : BaseLocation
         // Generate news for large deposits
         if (amount >= 50000)
         {
-            NewsSystem.Instance.Newsy(false, $"{currentPlayer.DisplayName} made a substantial deposit at the Ironvault Bank.");
+            NewsSystem.Instance.Newsy(false, Loc.Get("bank.news_big_deposit", currentPlayer.DisplayName));
         }
 
         await terminal.PressAnyKey();
@@ -825,7 +825,7 @@ public class BankLocation : BaseLocation
         // News for large transfers (use the typed display name; recipient is remote).
         if (net >= 10000)
         {
-            NewsSystem.Instance.Newsy(false, $"{currentPlayer.DisplayName} wired a generous sum to {recipientInput}.");
+            NewsSystem.Instance.Newsy(false, Loc.Get("bank.news_wired", currentPlayer.DisplayName, recipientInput));
         }
 
         await terminal.PressAnyKey();
@@ -994,7 +994,7 @@ public class BankLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("bank.account_holder", currentPlayer.DisplayName));
-        terminal.WriteLine($"Account Status: {(currentPlayer.Loan > 0 ? Loc.Get("bank.account_status_debt") : Loc.Get("bank.account_status_good"))}");
+        terminal.WriteLine(Loc.Get("bank.account_status_line", currentPlayer.Loan > 0 ? Loc.Get("bank.account_status_debt") : Loc.Get("bank.account_status_good")));
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -1115,7 +1115,7 @@ public class BankLocation : BaseLocation
 
             if (await terminal.AskYesNoAsync("> "))
             {
-                NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} has been hired as a guard at the Ironvault Bank!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_hired_guard", currentPlayer.DisplayName));
             }
         }
         else
@@ -1354,7 +1354,7 @@ public class BankLocation : BaseLocation
         long captainHP = (long)(150 * level + Math.Pow(level, 1.3) * 40);
         var captain = new Monster
         {
-            Name = "Captain of the Guard",
+            Name = Loc.Get("bank.guard_captain_name"),
             Level = level + 5, // Loot quality scales with monster level
             HP = captainHP,
             MaxHP = captainHP,
@@ -1373,7 +1373,7 @@ public class BankLocation : BaseLocation
             long guardHP = (long)(100 * level + Math.Pow(level, 1.2) * 25);
             var guard = new Monster
             {
-                Name = "Bank Guard",
+                Name = Loc.Get("bank.guard_name"),
                 Level = level,
                 HP = guardHP,
                 MaxHP = guardHP,
@@ -1395,7 +1395,7 @@ public class BankLocation : BaseLocation
             long dogHP = (long)(60 * level + Math.Pow(level, 1.2) * 15);
             var dog = new Monster
             {
-                Name = "War Hound",
+                Name = Loc.Get("bank.war_hound_name"),
                 Level = level - 5,
                 HP = dogHP,
                 MaxHP = dogHP,
@@ -1461,7 +1461,7 @@ public class BankLocation : BaseLocation
                 long vaultRemaining = Math.Max(0, BankVaultSystem.Current - currentPlayer.BankGold);
                 terminal.WriteLine(Loc.Get("bank.rob_vault_remaining", vaultRemaining.ToString("N0")));
 
-                NewsSystem.Instance.Newsy(true, $"BANK ROBBERY! {currentPlayer.DisplayName} robbed the Ironvault Bank of {stolenGold:N0} gold!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_robbery", currentPlayer.DisplayName, $"{stolenGold:N0}"));
             }
         }
         else if (result.Outcome == CombatOutcome.PlayerDied)
@@ -1490,7 +1490,7 @@ public class BankLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("bank.rob_confiscate_bank", fineFromBank.ToString("N0")));
             }
 
-            NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} attempted to rob the Ironvault Bank but was defeated by guards!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_rob_defeated", currentPlayer.DisplayName));
         }
         else if (result.MentalCollapseNotFought)
         {
@@ -1508,7 +1508,7 @@ public class BankLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("bank.rob_face_seen"));
 
-            NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} attempted to rob the Ironvault Bank but fled!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_rob_fled", currentPlayer.DisplayName));
         }
     }
 
@@ -1595,7 +1595,7 @@ public class BankLocation : BaseLocation
             player.BankGold -= seizure;
             player.Loan -= seizure;
             // GD.Print($"[Bank] Seized {seizure} gold from {player.DisplayName}'s account to cover loan");
-            NewsSystem.Instance.Newsy(false, $"The Ironvault Bank seized {seizure:N0} gold from {player.DisplayName}'s account.");
+            NewsSystem.Instance.Newsy(false, Loc.Get("bank.news_seized", $"{seizure:N0}", player.DisplayName));
         }
 
         // Threshold 2: Loan over 10,000 - Debt collectors visit (deal damage)
@@ -1607,7 +1607,7 @@ public class BankLocation : BaseLocation
             {
                 player.HP -= damage;
                 // GD.Print($"[Bank] Debt collectors dealt {damage} damage to {player.DisplayName}");
-                NewsSystem.Instance.Newsy(true, $"Debt collectors from the Ironvault Bank paid {player.DisplayName} a painful visit.");
+                NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_collectors", player.DisplayName));
             }
 
             // Increase darkness and wanted level
@@ -1626,7 +1626,7 @@ public class BankLocation : BaseLocation
             player.Gold -= confiscate;
             player.Loan -= confiscate;
             // GD.Print($"[Bank] Confiscated {confiscate} gold from {player.DisplayName}'s purse");
-            NewsSystem.Instance.Newsy(true, $"Bank enforcers confiscated {confiscate:N0} gold directly from {player.DisplayName}!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_confiscated", $"{confiscate:N0}", player.DisplayName));
         }
 
         // Threshold 4: Loan over 50,000 - Banned from guard duty, more severe penalties
@@ -1636,7 +1636,7 @@ public class BankLocation : BaseLocation
             {
                 player.BankGuard = false;
                 player.BankWage = 0;
-                NewsSystem.Instance.Newsy(true, $"{player.DisplayName} was fired from bank guard duty for unpaid debts!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("bank.news_fired", player.DisplayName));
             }
 
             // Severe reputation hit
