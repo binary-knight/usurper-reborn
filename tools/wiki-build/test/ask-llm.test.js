@@ -237,8 +237,9 @@ test("LLM request carries the model, low effort, 700 tokens, no tools and wrappe
   assert.match(question[1], /Favor Temple god\?/);
   assert.ok(!/[<>]/.test(question[1]), "no tags forged inside the question");
   assert.equal(content.match(/<\/question>/g).length, 1);
-  // Four fixture pages match this question; each is sent once.
-  assert.equal(content.match(/<excerpt /g).length, 4);
+  // Four fixture pages pass the first search pass and the fallback fills the fifth slot
+  // with a page that matches one word; each page is sent once.
+  assert.equal(content.match(/<excerpt /g).length, 5);
   assert.match(content, /url="https:\/\/usurper-reborn\.net\/wiki\/en\/gods\/favor\/"/);
   assert.match(params.system, /untrusted/);
   assert.match(params.system, /only from the text inside <wiki_excerpts>/);

@@ -331,7 +331,7 @@ wiki_llm_usage GROUP BY outcome;`.
 
 ### Manual eval
 
-`tools/wiki-build/eval-ask.js` sends 20 wiki questions and 10 adversarial ones
+`tools/wiki-build/eval-ask.js` sends 22 wiki questions and 10 adversarial ones
 (off-topic, jailbreak, spoiler fishing, prompt extraction) through the shipped
 bot code with fake Discord messages and an in-memory database, and prints each
 reply with its outcome, tokens and latency. It makes real, billed API calls, so

@@ -25,7 +25,7 @@ The Awakening measures what your character comes to understand. It rises through
 
 ## Endings
 
-Your choices with the Old Gods, your alignment, the seals and your Awakening decide which ending you reach. After an ending you decide between ascending as an immortal and starting [New Game Plus](/wiki/en/characters/new-game-plus/).
+Your choices with the Old Gods, your alignment, the seals and your Awakening decide which ending you reach. After an ending you decide between [ascending as an immortal](/wiki/en/gods/player-gods/) and starting [New Game Plus](/wiki/en/characters/new-game-plus/).
 
 :::spoiler Spoiler: seal floors and the Old Gods
 One seal is in the Temple. The others lie on dungeon floors 15, 30, 45, 60, 80 and 99.

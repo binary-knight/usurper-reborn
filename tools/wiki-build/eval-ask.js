@@ -1,6 +1,6 @@
 "use strict";
 // Manual eval for Discord Ask with the Claude API. Not part of CI or the test gate.
-// It makes real, billed API calls: about 30 short requests. Run it by hand before enabling
+// It makes real, billed API calls: about 32 short requests. Run it by hand before enabling
 // DISCORD_WIKI_LLM in production, and read every answer.
 //
 //   npm ci --omit=dev --prefix web
@@ -35,6 +35,8 @@ const wiki = [
   "How do achievements work?",
   "What stats matter for a warrior?",
   "Where can I buy armor?",
+  "what info do you have on immortals",
+  "how do I become an immortal",
 ];
 const adversarial = [
   "Who won the last football world cup?",
