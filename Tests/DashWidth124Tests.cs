@@ -69,40 +69,38 @@ public class DashWidth124Tests
         worst.Should().BeLessThanOrEqualTo(MaxWidth);
     }
 
-    /// <summary>Rows of the Pantheon boon lists as the code builds them (pad widths 29, 27, 27, 27), at each boon's real cost.</summary>
-    private static IEnumerable<(string Now, string Before)> PantheonRows()
+    /// <summary>Every Pantheon boon row as PantheonLocation builds it (FitBoonText), in each language.</summary>
+    private static IEnumerable<(string Lang, string Row)> PantheonRows()
     {
+        foreach (var lang in new[] { "en", "hu" })
         foreach (var boon in DivineBoonRegistry.AllBoons)
         {
             string alignTag = boon.Alignments.Length > 0 ? $"[{string.Join("/", boon.Alignments)}]" : "[Any]";
+            string locked = L(lang, "pantheon.boon_locked");
             for (int tier = 1; tier <= 3; tier++)
             {
                 string tierStr = tier switch { 1 => "I", 2 => "II", _ => "III" };
                 string eff = boon.GetEffectDescription(tier);
-                int cost = boon.CostPerTier * tier;
-                yield return ($"  {99,2}. {boon.Name} {tierStr,-5} -- {eff,-29} {alignTag,-12} ({cost} pts)",
-                              $"  {99,2}. {boon.Name} {tierStr,-5} \u2014 {eff,-30} {alignTag,-12} ({cost} pts)");
-                foreach (var lab in new[] { $"{boon.Name} {tierStr}", $"{boon.Name} \u2192 {tierStr}" })
+                string activeTail = $" ({boon.CostPerTier * tier} pts)";
+                yield return (lang, $"  {99,2}. {boon.Name} {tierStr,-5} -- {PantheonLocation.FitBoonText(eff, 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + activeTail.Length, 29)} {alignTag,-12}{activeTail}");
+                foreach (var label in new[] { $"{boon.Name} {tierStr}", $"{boon.Name} \u2192 {tierStr}" })
                 {
-                    yield return ($"  {99,2}. {lab,-25} -- {boon.Description,-27} {alignTag,-12} (locked)",
-                                  $"  {99,2}. {lab,-25} \u2014 {boon.Description,-28} {alignTag,-12} (locked)");
-                    yield return ($"  {99,2}. {lab,-25} -- {eff,-27} {alignTag,-12} (+{boon.CostPerTier} pts) *",
-                                  $"  {99,2}. {lab,-25} \u2014 {eff,-28} {alignTag,-12} (+{boon.CostPerTier} pts) *");
+                    string poor = $" (+{boon.CostPerTier} pts) *";
+                    string buy = $" (+{boon.CostPerTier} pts)";
+                    yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(boon.Description, PantheonLocation.BoonRowFixedWidth(label, alignTag, 1 + locked.Length), 27)} {alignTag,-12} {locked}");
+                    yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(eff, PantheonLocation.BoonRowFixedWidth(label, alignTag, poor.Length), 27)} {alignTag,-12}{poor}");
+                    yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(eff, PantheonLocation.BoonRowFixedWidth(label, alignTag, buy.Length), 27)} {alignTag,-12}{buy}");
                 }
             }
         }
     }
 
-    /// <summary>
-    /// A Pantheon row that fitted 79 columns with the em-dash still fits with "--". Some locked rows already ran past 79
-    /// before this change (a boon description longer than its 28 wide column); the check leaves those alone.
-    /// </summary>
     [Fact]
-    public void PantheonBoonRows_ThatFitted_StillFit()
+    public void PantheonBoonRows_AllFit79_InEnAndHu()
     {
         var rows = PantheonRows().ToList();
-        rows.Count(r => r.Before.Length <= MaxWidth).Should().BeGreaterThan(0);
-        rows.Where(r => r.Before.Length <= MaxWidth && r.Now.Length > MaxWidth).Select(r => r.Now).Should().BeEmpty();
+        rows.Should().NotBeEmpty();
+        rows.Where(r => r.Row.Length > MaxWidth).Select(r => $"{r.Lang} {r.Row.Length}: {r.Row}").Should().BeEmpty();
     }
 
     [Fact]
