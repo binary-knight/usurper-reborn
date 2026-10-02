@@ -2782,6 +2782,7 @@ public class CharacterCreationSystem
         character.BankWage = 0;
         character.WeapHag = 3;
         character.ArmHag = 3;
+        character.MagicHag = 3;
         character.RoyTaxPaid = 0;
         character.Wrestlings = 3;
         character.DrinksLeft = 3;
