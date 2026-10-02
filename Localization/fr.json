@@ -21005,6 +21005,7 @@
   "mail.neglect_letter_line1": "Tu me délaisses. Reviens à la maison, je t'en prie ; tu me manques.",
   "mail.neglect_letter_line2": "Cela ne peut plus durer ainsi très longtemps.",
   "mail.neglect_letter_line3": "-- {0}",
+  "mail.neglect_letter_arrives": "Une lettre arrive de la part de {0} :",
   "mail.birthday_choose": "Choisissez votre cadeau d'anniversaire :",
   "mail.birthday_experience": "(E)xpérience",
   "mail.birthday_love": "(L) Amour",

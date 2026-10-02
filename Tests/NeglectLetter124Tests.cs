@@ -1,10 +1,16 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
 using FluentAssertions;
 using UsurperRemake;
 using UsurperRemake.Systems;
+using UsurperRemake.Utils;
 using Xunit;
 
 namespace UsurperReborn.Tests;
@@ -188,5 +194,135 @@ public class NeglectLetter124Tests : IDisposable
         RelationshipSystem.AreMarried(_player, _spouse).Should().BeTrue("the leaving scene is held");
         RomanceTracker.Instance.Spouses.Should().ContainSingle(s => s.NPCId == _spouse.ID);
         RelationshipSystem.GetOrCreateRelationship(_player, _spouse).MarriedDays.Should().Be(1);
+    }
+
+    // ---- delivery: the online store, the on-screen showing, and the pending flag ----
+
+    private static (TerminalEmulator term, MemoryStream output) Terminal(string input = "")
+    {
+        var output = new MemoryStream();
+        return (new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes(input)), output), output);
+    }
+
+    private static string Shown(TerminalEmulator term, MemoryStream output)
+    {
+        term.StreamWriterInternal?.Flush();
+        return Encoding.UTF8.GetString(output.ToArray());
+    }
+
+    private static void Online(SqlSaveBackend db, Action body)
+    {
+        var online = typeof(UsurperRemake.BBS.DoorMode).GetField("_onlineMode", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var inst = typeof(SaveSystem).GetField("instance", BindingFlags.NonPublic | BindingFlags.Static)!;
+        bool wasOnline = (bool)online.GetValue(null)!;
+        var before = inst.GetValue(null);
+        online.SetValue(null, true);
+        SaveSystem.InitializeWithBackend(db);
+        try { body(); }
+        finally { online.SetValue(null, wasOnline); inst.SetValue(null, before); }
+    }
+
+    [Fact]
+    public async Task Online_TheLetterLandsInThePersistentStore_UnreadAndInTheInbox_AndShowsOnScreenOnce()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"usurper-nl-{Guid.NewGuid():N}.db");
+        try
+        {
+            var db = new SqlSaveBackend(path);
+            Marry(_spouse);
+            Online(db, () => { for (int d = 1; d <= 30; d++) Day(d); });
+
+            db.GetUnreadMailCount(_player.DisplayName).Should().Be(1, "one letter, counted unread");
+            var inbox = await db.GetMailInbox(_player.DisplayName);
+            var letter = inbox.Should().ContainSingle().Subject;
+            letter.FromPlayer.Should().Be(_spouse.Name);
+            letter.MessageType.Should().Be("mail", "the type player mail uses");
+            letter.Message.Should().Contain(Loc.Get("mail.neglect_letter_line1")).And.Contain(Loc.Get("mail.neglect_letter_line3", _spouse.Name));
+            MailSystem.MailFor(_player.Name2).Should().BeEmpty("online the letter goes to the saved store, not the in-process mailbox");
+
+            var (term, output) = Terminal("\n\n");
+            (await MailSystem.ShowPendingSpouseLetters(term, _player)).Should().BeTrue();
+            string shown = Shown(term, output);
+            shown.Should().Contain(Loc.Get("mail.neglect_letter_arrives", _spouse.Name)).And.Contain(Loc.Get("mail.neglect_letter_line2"));
+            var (term2, _) = Terminal("\n\n");
+            (await MailSystem.ShowPendingSpouseLetters(term2, _player)).Should().BeFalse("the on-screen letter shows once");
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task SinglePlayer_ShowsTheLetterOnScreen_Once()
+    {
+        Marry(_spouse);
+        for (int d = 1; d <= 21; d++) Day(d);
+        Letters(_spouse.Name).Should().HaveCount(1);
+        var (term, output) = Terminal("\n\n");
+        (await MailSystem.ShowPendingSpouseLetters(term, _player)).Should().BeTrue();
+        string shown = Shown(term, output);
+        shown.Should().Contain(Loc.Get("mail.neglect_letter_arrives", _spouse.Name));
+        foreach (var line in MailSystem.SpouseNeglectLetterLines(_spouse.Name)) shown.Should().Contain(line);
+        for (int d = 22; d <= 30; d++) Day(d);
+        var (term2, _) = Terminal("\n\n");
+        (await MailSystem.ShowPendingSpouseLetters(term2, _player)).Should().BeFalse("the same letter is not shown again");
+    }
+
+    [Fact]
+    public async Task AQuitBeforeTheRedraw_ShowsTheLetterAtTheNextLogin()
+    {
+        Marry(_spouse);
+        for (int d = 1; d <= 21; d++) Day(d);
+        _player.PendingSpouseLetters.Should().ContainSingle().Which.Should().Be(_spouse.Name);
+
+        var ser = typeof(SaveSystem).GetMethod("SerializePlayer", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var data = (PlayerData)ser.Invoke(SaveSystem.Instance, new object[] { _player })!;
+        var json = JsonSerializer.Serialize(data);
+        var restoreM = typeof(GameEngine).GetMethod("RestorePlayerFromSaveData", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        Character restored;
+        try { restored = (Character)restoreM.Invoke(GameEngine.Instance, new object[] { JsonSerializer.Deserialize<PlayerData>(json)! })!; }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+
+        restored.PendingSpouseLetters.Should().ContainSingle().Which.Should().Be(_spouse.Name, "the pending letter is saved");
+        var (term, output) = Terminal("\n\n");
+        (await MailSystem.ShowPendingSpouseLetters(term, restored)).Should().BeTrue();
+        Shown(term, output).Should().Contain(Loc.Get("mail.neglect_letter_arrives", _spouse.Name));
+
+        JsonSerializer.Deserialize<PlayerData>("{}")!.PendingSpouseLetters.Should().BeEmpty("an old save has none waiting");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void OnScreenAndOnlineRows_Fit79_With30CharacterName(string lang)
+    {
+        string name = new string('W', GameConfig.MaxNameLength);
+        using (Loc.RenderLanguage(lang))
+        {
+            var rows = new List<string> { $"  {Loc.Get("mail.neglect_letter_arrives", name)}" };
+            rows.AddRange(MailSystem.SpouseNeglectLetterLines(name).Select(l => $"  {l}"));
+            rows.Add(BaseLocation.MailboxRow("*", 10, name, "2026-10-02", new string('x', 32) + "..."));
+            rows.Add(Loc.Get("base.mail_message_from_box", name.ToUpper()));
+            foreach (var row in rows)
+                row.Length.Should().BeLessThanOrEqualTo(79, $"[{lang}] {row}");
+        }
+    }
+
+    [Fact]
+    public void TheLocationLoop_ShowsPendingLetters_BeforeTheCommandRuns()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "usurper-reloaded.csproj"))) dir = dir.Parent;
+        string loop = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Locations", "BaseLocation.cs"));
+        int loopStart = loop.IndexOf("while (!exitLocation && currentPlayer.IsAlive)");
+        int show = loop.IndexOf("await MailSystem.ShowPendingSpouseLetters(terminal, currentPlayer);");
+        int process = loop.IndexOf("exitLocation = await ProcessChoice(choice);");
+        loopStart.Should().BeGreaterThan(0);
+        show.Should().BeGreaterThan(loopStart).And.BeLessThan(process);
     }
 }

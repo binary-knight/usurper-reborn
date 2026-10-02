@@ -40,29 +40,74 @@ public static partial class MailSystem
         // GD.Print($"[MailSystem] System mail sent to {playerName}: {subject}");
     }
     
+    /// <summary>The three lines of a neglected spouse's letter, in the current language.</summary>
+    public static List<string> SpouseNeglectLetterLines(string spouseName) => new List<string>
+    {
+        Loc.Get("mail.neglect_letter_line1"),
+        Loc.Get("mail.neglect_letter_line2"),
+        Loc.Get("mail.neglect_letter_line3", spouseName)
+    };
+
     /// <summary>
     /// v1.2.4 (design item F): the letter a neglected spouse writes after
-    /// SpouseNeglectLetterDays present days without contact. Sent in the spouse's name through
-    /// this in-process mailbox, which Main Street's MAIL command reads in every mode.
+    /// SpouseNeglectLetterDays present days without contact. Online it goes into the persistent
+    /// messages table as type "mail", addressed to the character's display name (the key the
+    /// online mailbox reads), as rendered text: it is only sent during the player's own daily
+    /// reset, so the session language is the reader's. Offline it goes to this in-process mailbox
+    /// (Main Street's MAIL command). Either way the player is also queued to see it on screen at
+    /// the next location redraw (PendingSpouseLetters, saved), because the offline mailbox is not.
     /// </summary>
-    public static void SendSpouseNeglectLetter(string playerName, string spouseName)
+    public static void SendSpouseNeglectLetter(Character player, string spouseName)
     {
+        var lines = SpouseNeglectLetterLines(spouseName);
+        player.PendingSpouseLetters ??= new List<string>();
+        player.PendingSpouseLetters.Add(spouseName);
+
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance.Backend is SqlSaveBackend backend)
+        {
+            try
+            {
+                backend.SendMessage(spouseName, player.DisplayName, "mail", string.Join(" ", lines)).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("MAIL", $"Neglect letter for {player.DisplayName} failed: {ex.Message}");
+            }
+            return;
+        }
+
         var mail = new MailRecord
         {
-            Receiver = playerName,
+            Receiver = player.Name2,
             Sender = spouseName,
             Subject = Loc.Get("mail.neglect_letter_subject"),
             Date = DateTime.Now,
             ReadFlag = false,
             Special = GameConfig.MailRequestNothing,
-            Lines = new List<string>
-            {
-                Loc.Get("mail.neglect_letter_line1"),
-                Loc.Get("mail.neglect_letter_line2"),
-                Loc.Get("mail.neglect_letter_line3", spouseName)
-            }
+            Lines = lines
         };
         SaveMailRecord(mail);
+    }
+
+    /// <summary>
+    /// v1.2.4: shows each queued spouse letter once, at a clean location boundary, then clears the
+    /// queue. Returns false when nothing was waiting.
+    /// </summary>
+    public static async Task<bool> ShowPendingSpouseLetters(TerminalEmulator term, Character? player)
+    {
+        if (term == null || player?.PendingSpouseLetters == null || player.PendingSpouseLetters.Count == 0) return false;
+        var names = new List<string>(player.PendingSpouseLetters);
+        player.PendingSpouseLetters.Clear();
+        term.WriteLine("");
+        foreach (var name in names)
+        {
+            term.WriteLine($"  {Loc.Get("mail.neglect_letter_arrives", name)}", "bright_magenta");
+            foreach (var line in SpouseNeglectLetterLines(name))
+                term.WriteLine($"  {line}", "white");
+            term.WriteLine("");
+        }
+        await term.PressAnyKey();
+        return true;
     }
 
     /// <summary>Mail addressed to <paramref name="playerName"/>, newest first (tests read the letter back).</summary>

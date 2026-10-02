@@ -5434,6 +5434,7 @@ public partial class GameEngine
             MaxResurrections = playerData.MaxResurrections > 0 ? playerData.MaxResurrections : 3,
             PlaythroughDeaths = playerData.PlaythroughDeaths,
             PresentDays = playerData.PresentDays,
+            PendingSpouseLetters = playerData.PendingSpouseLetters ?? new List<string>(),
             BannedFromChurch = playerData.BannedFromChurch,
             BlessingsReceived = playerData.BlessingsReceived,
             ChurchDonations = playerData.ChurchDonations,

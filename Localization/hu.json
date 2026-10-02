@@ -21319,6 +21319,7 @@
   "mail.neglect_letter_line1": "Elhanyagolva érzem magam. Kérlek, gyere haza, hiányzol.",
   "mail.neglect_letter_line2": "Ez így nem mehet tovább sokáig.",
   "mail.neglect_letter_line3": "-- {0}",
+  "mail.neglect_letter_arrives": "Levél érkezett tőle: {0}",
   "mail.birthday_choose": "Válaszd ki a születésnapi ajándékodat:",
   "mail.birthday_experience": "(T)apasztalat",
   "mail.birthday_love": "(S)zerelem",

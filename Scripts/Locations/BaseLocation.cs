@@ -812,6 +812,9 @@ public abstract class BaseLocation
                 await DailySystemManager.Instance.DisplayDailyResetMessage();
             }
 
+            // v1.2.4: a neglected spouse's letter sent at the daily reset, shown once here
+            await MailSystem.ShowPendingSpouseLetters(terminal, currentPlayer);
+
             // Companion death triggers (once per game day)
             if (currentPlayer != null && CompanionSystem.Instance != null)
             {
@@ -8843,7 +8846,7 @@ public abstract class BaseLocation
                     string msgPreview = msg.Message.Length > 35 ? msg.Message.Substring(0, 32) + "..." : msg.Message;
 
                     terminal.SetColor(msg.IsRead ? "gray" : "white");
-                    terminal.WriteLine($"{unreadMark}{i + 1,-3} {msg.FromPlayer,-16} {dateStr,-12} {msgPreview,-36}");
+                    terminal.WriteLine(MailboxRow(unreadMark, i + 1, msg.FromPlayer, dateStr, msgPreview));
                 }
             }
 
@@ -8915,6 +8918,13 @@ public abstract class BaseLocation
                 await ReadMail(backend, inbox[directRead - 1]);
             }
         }
+    }
+
+    /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.</summary>
+    internal static string MailboxRow(string unreadMark, int number, string from, string date, string preview)
+    {
+        string sender = from.Length > 16 ? from.Substring(0, 16) : from;
+        return $"{unreadMark}{number,-3} {sender,-16} {date,-12} {preview,-36}";
     }
 
     private async Task ReadMail(SqlSaveBackend backend, PlayerMessage msg)

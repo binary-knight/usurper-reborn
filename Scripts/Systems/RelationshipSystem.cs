@@ -1236,7 +1236,7 @@ public partial class RelationshipSystem
                 if (neglect >= GameConfig.SpouseNeglectLetterDays && record.NeglectLetterSentDay <= record.LastPlayerContactDay)
                 {
                     record.NeglectLetterSentDay = player.PresentDays;
-                    MailSystem.SendSpouseNeglectLetter(player.Name2, otherName);
+                    MailSystem.SendSpouseNeglectLetter(player, otherName);
                     changed = true;
                 }
                 // The 28-day leaving scene (design item F: the spouse leaves at the next Home visit,

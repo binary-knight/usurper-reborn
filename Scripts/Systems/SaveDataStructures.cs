@@ -251,6 +251,7 @@ namespace UsurperRemake.Systems
         // v0.60.0 beta: total deaths this playthrough (resets on NG+).
         public int PlaythroughDeaths { get; set; }
         public int PresentDays { get; set; } // v1.2 (design item F)
+        public List<string> PendingSpouseLetters { get; set; } = new(); // v1.2.4 (design item F): neglect letters not yet shown
         public bool BannedFromChurch { get; set; }
         public int BlessingsReceived { get; set; }
         public long ChurchDonations { get; set; }

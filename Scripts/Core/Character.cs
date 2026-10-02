@@ -2328,6 +2328,9 @@ public class Character
     // v1.2 (design item F): days this player experienced a daily reset while logged in. Absence
     // adds nothing, so neglect is measured in time the player could have spent.
     public int PresentDays { get; set; }
+    // v1.2.4 (design item F): spouses whose neglect letter has been sent but not yet shown on
+    // screen; saved, so a quit before the next location redraw shows it at the next login.
+    public List<string> PendingSpouseLetters { get; set; } = new();
 
     // v0.60.0 beta: transient flag set by ApplyMurderConsequences before the
     // Royal Guard arrest-combat. When true, CombatEngine.HandlePlayerDeath
