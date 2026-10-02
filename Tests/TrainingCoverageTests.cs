@@ -268,7 +268,7 @@ public class TrainingCoverageTests
         string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Locations", "DungeonLocation.cs"));
         var calls = Regex.Matches(src, @"AwardDungeonReward\(([^;]*)\);").Select(m => m.Groups[1].Value).Where(a => !a.StartsWith("long ")).ToList();
         calls.Count.Should().BeGreaterThanOrEqualTo(4);
-        calls.Where(a => a.Contains("fromCombat: true")).Should().ContainSingle().Which.Should().Contain("\"Boss Defeated\"");
+        calls.Where(a => a.Contains("fromCombat: true")).Should().ContainSingle().Which.Should().Contain("\"dungeon.reward_src_boss_defeated\"");
     }
 
     // Behaviour.
