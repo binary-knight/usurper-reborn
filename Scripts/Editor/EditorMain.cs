@@ -125,12 +125,16 @@ public static class EditorMain
         }
     }
 
+    /// <summary>v1.2.4: the Export Defaults question, its count taken from the list of files the export writes.</summary>
+    internal static string ExportPrompt =>
+        $"Write all {UsurperRemake.Systems.GameDataLoader.DefaultExports.Count} default JSON files here? Existing files will be OVERWRITTEN";
+
     private static void ExportDefaults()
     {
         EditorIO.Section("Export Defaults");
         var outputDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "GameData");
         EditorIO.Info($"Target directory: {outputDir}");
-        if (!EditorIO.Confirm("Write all 7 default JSON files here? Existing files will be OVERWRITTEN"))
+        if (!EditorIO.Confirm(ExportPrompt))
         {
             EditorIO.Info("Cancelled.");
             return;

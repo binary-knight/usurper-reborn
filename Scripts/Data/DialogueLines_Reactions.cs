@@ -20,7 +20,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "rx_cv_ag2", Text = "*roars* THAT'S what I live for! More! Bring me MORE!", Category = "reaction", PersonalityType = "aggressive", EventType = "combat_victory" });
             lines.Add(new() { Id = "rx_cv_ag3", Text = "*wipes blood from face with a grin* Beautiful. Absolutely beautiful.", Category = "reaction", PersonalityType = "aggressive", EventType = "combat_victory" });
 
-            lines.Add(new() { Id = "rx_cv_no1", Text = "Victory! But let us not celebrate -- there will be harder battles ahead.", Category = "reaction", PersonalityType = "noble", EventType = "combat_victory" });
+            lines.Add(new() { Id = "rx_cv_no1", Text = "Victory! But let us not celebrate; there will be harder battles ahead.", Category = "reaction", PersonalityType = "noble", EventType = "combat_victory" });
             lines.Add(new() { Id = "rx_cv_no2", Text = "Well fought, {player_name}. You carry yourself with honor on the battlefield.", Category = "reaction", PersonalityType = "noble", EventType = "combat_victory" });
             lines.Add(new() { Id = "rx_cv_no3", Text = "The day is ours. Let us press forward with renewed courage.", Category = "reaction", PersonalityType = "noble", EventType = "combat_victory" });
 
@@ -34,7 +34,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "rx_cv_sc2", Text = "Victory through superior tactics and preparation. As expected.", Category = "reaction", PersonalityType = "scholarly", EventType = "combat_victory" });
 
             lines.Add(new() { Id = "rx_cv_cy1", Text = "Great, we won. Now let's collect whatever's useful before something worse shows up.", Category = "reaction", PersonalityType = "cynical", EventType = "combat_victory" });
-            lines.Add(new() { Id = "rx_cv_cy2", Text = "We're alive. Don't get excited -- there'll be plenty more chances to die.", Category = "reaction", PersonalityType = "cynical", EventType = "combat_victory" });
+            lines.Add(new() { Id = "rx_cv_cy2", Text = "We're alive. Don't get excited. There'll be plenty more chances to die.", Category = "reaction", PersonalityType = "cynical", EventType = "combat_victory" });
 
             lines.Add(new() { Id = "rx_cv_ch1", Text = "And THAT, my friends, is how legends are born! You're welcome!", Category = "reaction", PersonalityType = "charming", EventType = "combat_victory" });
             lines.Add(new() { Id = "rx_cv_ch2", Text = "*takes a theatrical bow* I'd like to thank my weapon, my incredible reflexes, and my stunning good looks.", Category = "reaction", PersonalityType = "charming", EventType = "combat_victory" });
@@ -49,7 +49,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "rx_cd_ag1", Text = "NO! Get up! We're not finished yet! GET UP!", Category = "reaction", PersonalityType = "aggressive", EventType = "combat_defeat" });
             lines.Add(new() { Id = "rx_cd_ag2", Text = "*punches the ground* DAMN IT! I'll rip them apart next time!", Category = "reaction", PersonalityType = "aggressive", EventType = "combat_defeat" });
 
-            lines.Add(new() { Id = "rx_cd_no1", Text = "Retreat is not defeat -- it is wisdom. We will return stronger.", Category = "reaction", PersonalityType = "noble", EventType = "combat_defeat" });
+            lines.Add(new() { Id = "rx_cd_no1", Text = "Retreat is not defeat — it is wisdom. We will return stronger.", Category = "reaction", PersonalityType = "noble", EventType = "combat_defeat" });
             lines.Add(new() { Id = "rx_cd_no2", Text = "We must regroup. There is no shame in living to fight another day.", Category = "reaction", PersonalityType = "noble", EventType = "combat_defeat" });
 
             lines.Add(new() { Id = "rx_cd_cu1", Text = "This changes my calculations entirely. We need a different approach.", Category = "reaction", PersonalityType = "cunning", EventType = "combat_defeat" });
