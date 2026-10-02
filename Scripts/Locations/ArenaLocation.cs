@@ -546,7 +546,7 @@ public class ArenaLocation : BaseLocation
             string notifyMsg = attackerWon
                 ? Loc.Get("arena.notify_attack_won", myName, $"{goldStolen:N0}")
                 : Loc.Get("arena.notify_attack_lost", myName, $"{goldStolen:N0}");
-            await backend.SendMessage(myUsername, defenderUsername, "pvp", notifyMsg);
+            await backend.SendMessageToKey(myUsername, defenderUsername, "pvp", notifyMsg);
             UsurperRemake.Server.MudServer.Instance?.SendToPlayer(defenderUsername,
                 $"\u001b[91m  {notifyMsg}\u001b[0m");
         }

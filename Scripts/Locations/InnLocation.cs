@@ -5949,7 +5949,7 @@ public class InnLocation : BaseLocation
             });
             await backend.AppendSleepAttackLog(target.Username, logEntry);
 
-            await backend.SendMessage(currentPlayer.Name2, target.Username, "sleep_attack",
+            await backend.SendMessageToKey(currentPlayer.Name2, target.Username, "sleep_attack",
                 $"{currentPlayer.Name2} broke into your Inn room and murdered you! They stole {stolenGold:N0} gold{(stolenItemName != null ? $" and your {stolenItemName}" : "")}.");
 
             terminal.SetColor("dark_red");

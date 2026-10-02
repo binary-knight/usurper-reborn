@@ -666,7 +666,7 @@ namespace UsurperRemake.Systems
                 foreach (var (username, language) in backend.GetRecentActivePlayers(GameConfig.WorldBossActiveDays))
                 {
                     string lang = string.IsNullOrEmpty(language) ? "en" : language;
-                    await backend.SendMessage("System", username, "world_boss", Loc.GetIn(lang, key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn(lang, "world_boss.spawn_hour_text")));
+                    await backend.SendMessageToKey("System", username, "world_boss", Loc.GetIn(lang, key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn(lang, "world_boss.spawn_hour_text")));
                 }
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("WORLD_BOSS", $"Notice failed: {ex.Message}"); }

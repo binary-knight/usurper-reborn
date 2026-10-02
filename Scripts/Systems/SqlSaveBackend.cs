@@ -1145,7 +1145,8 @@ namespace UsurperRemake.Systems
                     using (var m = connection.CreateCommand())
                     {
                         m.Transaction = tx;
-                        m.CommandText = "SELECT username, COALESCE(language, 'en') FROM players WHERE json_valid(player_data) AND json_extract(player_data, '$.player.team') = @old;";
+                        // v1.2.4: the notice is addressed by display name, the mailbox's owner key
+                        m.CommandText = "SELECT COALESCE(NULLIF(display_name, ''), username), COALESCE(language, 'en') FROM players WHERE json_valid(player_data) AND json_extract(player_data, '$.player.team') = @old;";
                         m.Parameters.AddWithValue("@old", oldName);
                         using var r = m.ExecuteReader();
                         while (r.Read()) members.Add((r.GetString(0), r.GetString(1)));
@@ -3549,7 +3550,18 @@ namespace UsurperRemake.Systems
 
         // --- Messaging ---
 
-        public async Task SendMessage(string from, string to, string messageType, string message)
+        /// <summary>
+        /// Mail to a player by name. v1.2.4: written under the recipient's display name
+        /// (<see cref="MailAddressForName"/>) so the row has one owner; a name no player goes by is kept.
+        /// </summary>
+        public Task SendMessage(string from, string to, string messageType, string message) =>
+            InsertMessage(from, MailAddressForName(to), messageType, message);
+
+        /// <summary>v1.2.4: mail to a player by save key, written under that player's display name.</summary>
+        public Task SendMessageToKey(string from, string key, string messageType, string message) =>
+            InsertMessage(from, MailAddressForKey(key), messageType, message);
+
+        private async Task InsertMessage(string from, string to, string messageType, string message)
         {
             try
             {
@@ -3584,7 +3596,7 @@ namespace UsurperRemake.Systems
                 cmd.CommandText = @"
                     SELECT id, from_player, to_player, message_type, message, created_at
                     FROM messages
-                    WHERE (((LOWER(to_player) = LOWER(@username) OR to_player IN (SELECT display_name FROM players WHERE LOWER(username) = LOWER(@username))) AND is_read = 0)
+                    WHERE ((" + MailToClause + @" AND is_read = 0)
                            OR (to_player = '*' AND id > @afterId AND LOWER(from_player) != LOWER(@username)))
                     ORDER BY created_at ASC;
                 ";
@@ -3620,10 +3632,8 @@ namespace UsurperRemake.Systems
                 using var cmd = connection.CreateCommand();
                 // Must match the same messages as GetUnreadMessages — both username AND display_name,
                 // otherwise messages sent to display_name are fetched but never marked read (infinite loop)
-                cmd.CommandText = @"UPDATE messages SET is_read = 1
-                    WHERE (LOWER(to_player) = LOWER(@username)
-                           OR to_player IN (SELECT display_name FROM players WHERE LOWER(username) = LOWER(@username)))
-                    AND is_read = 0;";
+                // v1.2.4: MailToClause, the same names GetUnreadMessages and the mailbox read
+                cmd.CommandText = "UPDATE messages SET is_read = 1 WHERE " + MailToClause + " AND is_read = 0;";
                 cmd.Parameters.AddWithValue("@username", username);
                 await cmd.ExecuteNonQueryAsync();
             }
@@ -7165,6 +7175,95 @@ namespace UsurperRemake.Systems
         return key == null ? null : await ReadGameData(key);
     }
 
+    /// <summary>
+    /// v1.2.4: the one player a mail row belongs to, as SQL true when the row is the player's whose save
+    /// key is <paramref name="keyExpr"/>. A row addressed to a display name (unique) is that player's;
+    /// else a row addressed to a save key is that account's, unless another player's display name or
+    /// character name is the same string; else (an ambiguous older row) it is nobody's. Every mail
+    /// reader uses this, so no row is read, counted, marked or deleted by two players.
+    /// </summary>
+    internal static string MailOwnedBy(string keyExpr) =>
+        "(LOWER(messages.to_player) IN (SELECT LOWER(o.display_name) FROM players o WHERE LOWER(o.username) = LOWER(" + keyExpr + ") AND o.display_name IS NOT NULL) " +
+        "OR (LOWER(messages.to_player) = LOWER(" + keyExpr + ") " +
+        "AND NOT EXISTS (SELECT 1 FROM players p WHERE LOWER(p.username) != LOWER(" + keyExpr + ") " +
+        "AND (LOWER(p.display_name) = LOWER(messages.to_player) " +
+        "OR LOWER(CASE WHEN json_valid(p.player_data) THEN json_extract(p.player_data, '$.player.name2') END) = LOWER(messages.to_player)))))";
+
+    /// <summary>v1.2.4: <see cref="MailOwnedBy"/> for the @username parameter.</summary>
+    internal static readonly string MailToClause = MailOwnedBy("@username");
+
+    /// <summary>v1.2.4: the save key of the one player a mail recipient string belongs to, by
+    /// <see cref="MailOwnedBy"/>; null when it is nobody's.</summary>
+    public string? ResolveMailOwner(string recipient)
+    {
+        if (string.IsNullOrWhiteSpace(recipient) || recipient == "*") return null;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT k.username FROM players k WHERE EXISTS (SELECT 1 FROM (SELECT @r AS to_player) AS messages WHERE " +
+                MailOwnedBy("k.username") + ") LIMIT 2;";
+            cmd.Parameters.AddWithValue("@r", recipient);
+            using var reader = cmd.ExecuteReader();
+            string? owner = null;
+            while (reader.Read())
+            {
+                if (owner != null) return null;
+                owner = reader.GetString(0);
+            }
+            return owner;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>v1.2.4: the address new mail to a save key is written under: that player's display
+    /// name, or the key itself when the row has none.</summary>
+    public string MailAddressForKey(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key) || key == "*") return key;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = "SELECT display_name FROM players WHERE LOWER(username) = LOWER(@k) AND display_name IS NOT NULL AND display_name != '' LIMIT 1;";
+            cmd.Parameters.AddWithValue("@k", key);
+            return cmd.ExecuteScalar() as string ?? key;
+        }
+        catch { return key; }
+    }
+
+    /// <summary>v1.2.4: the address new mail to a character name is written under: a display name as
+    /// given; else the display name of the one player with that character name; else the display
+    /// name of the save key; else the name unchanged (an NPC or unknown name).</summary>
+    public string MailAddressForName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name == "*") return name;
+        try
+        {
+            using var connection = OpenConnection();
+            string? One(string sql)
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = sql;
+                cmd.Parameters.AddWithValue("@n", name);
+                using var r = cmd.ExecuteReader();
+                string? found = null;
+                while (r.Read())
+                {
+                    if (r.IsDBNull(0)) continue;
+                    if (found != null) return null;
+                    found = r.GetString(0);
+                }
+                return found;
+            }
+            return One("SELECT display_name FROM players WHERE LOWER(display_name) = LOWER(@n) LIMIT 2;")
+                ?? One("SELECT display_name FROM players WHERE json_valid(player_data) AND LOWER(json_extract(player_data, '$.player.name2')) = LOWER(@n) LIMIT 2;")
+                ?? One("SELECT display_name FROM players WHERE LOWER(username) = LOWER(@n) LIMIT 2;")
+                ?? name;
+        }
+        catch { return name; }
+    }
+
     public async Task<List<PlayerMessage>> GetMailInbox(string username, int limit = 20, int offset = 0)
     {
         var messages = new List<PlayerMessage>();
@@ -7175,7 +7274,7 @@ namespace UsurperRemake.Systems
             cmd.CommandText = @"
                 SELECT id, from_player, to_player, message_type, message, is_read, created_at
                 FROM messages
-                WHERE LOWER(to_player) = LOWER(@username)
+                WHERE " + MailToClause + @"
                 AND to_player != '*'
                 ORDER BY created_at DESC
                 LIMIT @limit OFFSET @offset;
@@ -7213,7 +7312,7 @@ namespace UsurperRemake.Systems
             using var cmd = connection.CreateCommand();
             cmd.CommandText = @"
                 SELECT COUNT(*) FROM messages
-                WHERE LOWER(to_player) = LOWER(@username)
+                WHERE " + MailToClause + @"
                 AND to_player != '*' AND is_read = 0;
             ";
             cmd.Parameters.AddWithValue("@username", username);
@@ -7228,7 +7327,7 @@ namespace UsurperRemake.Systems
         {
             using var connection = OpenConnection();
             using var cmd = connection.CreateCommand();
-            cmd.CommandText = "DELETE FROM messages WHERE id = @id AND LOWER(to_player) = LOWER(@username);";
+            cmd.CommandText = "DELETE FROM messages WHERE id = @id AND " + MailToClause + ";";
             cmd.Parameters.AddWithValue("@id", messageId);
             cmd.Parameters.AddWithValue("@username", username);
             await Task.Run(() => cmd.ExecuteNonQuery());

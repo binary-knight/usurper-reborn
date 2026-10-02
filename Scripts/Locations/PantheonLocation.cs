@@ -1744,7 +1744,7 @@ public class PantheonLocation : BaseLocation
         string text = Loc.GetIn(s.Lang, "pantheon.bless_received", godName, (int)Math.Round(s.Outcome.Bonus * 100), s.Outcome.Combats);
         if (s.Outcome.FavorGained > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.gain", godName, s.Outcome.FavorGained, s.Outcome.FavorNow);
-        await backend.SendMessage(godName, target.Username, "divine", text);
+        await backend.SendMessageToKey(godName, target.Username, "divine", text);
         return s.Outcome;
     }
 
@@ -1786,7 +1786,7 @@ public class PantheonLocation : BaseLocation
         string text = Loc.GetIn(s.Lang, "pantheon.chastise_received", godName);
         if (s.Outcome.FavorLost > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.loss", godName, s.Outcome.FavorLost, s.Outcome.FavorNow);
-        await backend.SendMessage(godName, target.Username, "divine", text);
+        await backend.SendMessageToKey(godName, target.Username, "divine", text);
         return s.Outcome;
     }
 
@@ -1814,7 +1814,7 @@ public class PantheonLocation : BaseLocation
         // Offline: atomic DB update + message (in the save's language)
         await backend.ApplyDivineSmite(target.Username, damagePercent);
         string savedLang = (await backend.ReadGameData(target.Username))?.Player?.Language ?? "";
-        await backend.SendMessage(godName, target.Username, "divine",
+        await backend.SendMessageToKey(godName, target.Username, "divine",
             Loc.GetIn(savedLang.Length == 0 ? "en" : savedLang, "pantheon.smite_received_offline", godName));
     }
 
@@ -1843,7 +1843,7 @@ public class PantheonLocation : BaseLocation
 
         // Offline: atomic DB update + message
         await backend.SetPlayerWorshippedGod(target.Username, godName);
-        await backend.SendMessage(godName, target.Username, "divine",
+        await backend.SendMessageToKey(godName, target.Username, "divine",
             $"The god {godName} has claimed you as a believer!");
     }
 

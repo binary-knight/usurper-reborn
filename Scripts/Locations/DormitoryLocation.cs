@@ -757,7 +757,7 @@ public class DormitoryLocation : BaseLocation
             await backend.AppendSleepAttackLog(target.Username, logEntry);
 
             // Send message to victim
-            await backend.SendMessage(currentPlayer.Name2, target.Username, "sleep_attack",
+            await backend.SendMessageToKey(currentPlayer.Name2, target.Username, "sleep_attack",
                 $"{currentPlayer.Name2} murdered you in your sleep! They stole {stolenGold:N0} gold{(stolenItemName != null ? $" and your {stolenItemName}" : "")}.");
 
             terminal.SetColor("dark_red");

@@ -8803,6 +8803,8 @@ public abstract class BaseLocation
         if (backend == null) return;
 
         string username = currentPlayer.DisplayName.ToLower();
+        // v1.2.4: read by the save key; the backend gives each row one owner (SqlSaveBackend.MailOwnedBy)
+        string mailKey = UsurperRemake.BBS.DoorMode.OnlineUsername is { Length: > 0 } key ? key : username;
         int page = 0;
         const int pageSize = 10;
 
@@ -8812,8 +8814,8 @@ public abstract class BaseLocation
             WriteBoxHeader(Loc.Get("base.your_mailbox"), "bright_cyan");
             terminal.WriteLine("");
 
-            int unread = backend.GetUnreadMailCount(username);
-            var inbox = await backend.GetMailInbox(username, pageSize, page * pageSize);
+            int unread = backend.GetUnreadMailCount(mailKey);
+            var inbox = await backend.GetMailInbox(mailKey, pageSize, page * pageSize);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("base.mail_unread", unread));
@@ -8907,7 +8909,7 @@ public abstract class BaseLocation
             {
                 if (delIdx >= 1 && delIdx <= inbox.Count)
                 {
-                    await backend.DeleteMessage(inbox[delIdx - 1].Id, username);
+                    await backend.DeleteMessage(inbox[delIdx - 1].Id, mailKey);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("base.mail_deleted"));
                     await Pacing.Wait(1000);
