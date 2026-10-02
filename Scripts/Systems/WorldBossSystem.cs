@@ -662,12 +662,8 @@ namespace UsurperRemake.Systems
                     await OnlineStateManager.Instance!.AddNews(Loc.Get(key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.Get("world_boss.spawn_hour_text")), "world_boss");
                 DiscordBridge.QueueSystemEvent(Loc.GetIn("en", key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn("en", "world_boss.spawn_hour_text")));
                 MudServer.Instance?.BroadcastLocalized(lang => $"\n  {Loc.GetIn(lang, key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn(lang, "world_boss.spawn_hour_text"))}");
-                // Awaited one by one: hundreds of fire-and-forget inserts would contend with the tick's own writes.
-                foreach (var (username, language) in backend.GetRecentActivePlayers(GameConfig.WorldBossActiveDays))
-                {
-                    string lang = string.IsNullOrEmpty(language) ? "en" : language;
-                    await backend.SendMessageToKey("System", username, "world_boss", Loc.GetIn(lang, key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn(lang, "world_boss.spawn_hour_text")));
-                }
+                // 1.2.5: no mail. The notice went to every recent player each night; news, the broadcast,
+                // Discord and /boss carry it.
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("WORLD_BOSS", $"Notice failed: {ex.Message}"); }
         }

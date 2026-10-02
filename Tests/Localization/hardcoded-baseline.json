@@ -1024,7 +1024,7 @@
     ]
   },
   "Scripts/Locations/TempleLocation.cs": {
-    "count": 14,
+    "count": 13,
     "sites": [
       "1e0719ed70",
       "348b70b135",
@@ -1035,7 +1035,6 @@
       "96d3f71422",
       "a161539af0",
       "ac18a85d09",
-      "c10231aa6f",
       "cd7a495921",
       "d19946f2fe",
       "eb9616a26d",
@@ -1236,13 +1235,11 @@
     ]
   },
   "Scripts/Systems/ChallengeSystem.cs": {
-    "count": 24,
+    "count": 21,
     "sites": [
       "024bf8d6aa",
-      "04aa488d86",
       "05a732abce",
       "1603b0f584",
-      "185e8d470f",
       "2b61e21373",
       "2e6baab384",
       "2fb8978825",
@@ -1255,7 +1252,6 @@
       "8ec6f31707",
       "a15ab51678",
       "aacd23e229",
-      "bcc83c3471",
       "c324ec2551",
       "c4ba0a4840",
       "cb9695bc3b",
@@ -1862,7 +1858,7 @@
     ]
   },
   "Scripts/Systems/WorldSimulator.cs": {
-    "count": 46,
+    "count": 45,
     "sites": [
       "0b1f0b90e5",
       "0cbceb4a64",
@@ -1878,17 +1874,17 @@
       "4578e7a2d1",
       "471a68177e",
       "49e17d1bfc",
-      "4d6dc71cad",
       "4da6d4b5d0",
+      "5196ffd52e",
       "5c6817ac9d",
       "637a811aef",
       "63d4ef8bf1",
-      "70bee031f9",
       "74267f4730",
       "7b79442804",
       "800e92c7c0",
       "84fecd292d",
       "8c8ca978b9",
+      "90bc492d28",
       "90fdd30133",
       "929ff2e01a",
       "932d5cfaf8",
@@ -1898,7 +1894,6 @@
       "b98138a4c8",
       "bb8b68fb1c",
       "cd840b56b3",
-      "cfd142b0d2",
       "d12ddd4aee",
       "d70962820f",
       "d975683efb",

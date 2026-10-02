@@ -1081,6 +1081,10 @@ namespace UsurperRemake.Systems
             EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
             RenameCaseVariantTeams();                    // v1.1.14
 
+            EnsureMailUpkeepTables(connection);                       // 1.2.5
+            PurgeWorldBossMailOnce();                                 // 1.2.5: once per database
+            PruneOldSystemMail(GameConfig.SystemMailKeepDays);        // 1.2.5: also at the world-sim daily reset
+
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
         }
 

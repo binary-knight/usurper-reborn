@@ -8845,7 +8845,7 @@ public abstract class BaseLocation
                     var msg = inbox[i];
                     string unreadMark = msg.IsRead ? " " : "*";
                     string dateStr = GameConfig.FormatShortDate(msg.CreatedAt, currentPlayer.DateFormatPreference);
-                    string msgPreview = msg.Message.Length > 35 ? msg.Message.Substring(0, 32) + "..." : msg.Message;
+                    string msgPreview = MailPreview(msg.Message);
 
                     terminal.SetColor(msg.IsRead ? "gray" : "white");
                     terminal.WriteLine(MailboxRow(unreadMark, i + 1, msg.FromPlayer, dateStr, msgPreview));
@@ -8920,6 +8920,14 @@ public abstract class BaseLocation
                 await ReadMail(backend, inbox[directRead - 1]);
             }
         }
+    }
+
+    /// <summary>The inbox preview of a message: 1.2.5 joins its lines with a space (a mail of several lines
+    /// keeps its row on one line), then clips it to the 35-column field.</summary>
+    internal static string MailPreview(string message)
+    {
+        string flat = string.Join(" ", message.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()));
+        return flat.Length > 35 ? flat.Substring(0, 32) + "..." : flat;
     }
 
     /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.</summary>

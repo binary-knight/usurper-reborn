@@ -2917,8 +2917,9 @@ public partial class TempleLocation : BaseLocation
                     var godInfo = immortals.FirstOrDefault(g => g.DivineName == currentPlayer.WorshippedGod);
                     if (godInfo != null)
                     {
-                        await backend.SendMessageToKey("Temple", godInfo.Username, "divine",
-                            $"{currentPlayer.Name2} sacrificed {amount:N0} gold at your altar! +{power} divine experience.");
+                        string sacrificer = currentPlayer.Name2;
+                        await backend.SendMessageToKeyLocalized("Temple", godInfo.Username, "divine",
+                            lang => Loc.GetIn(lang, "mail.sacrifice", sacrificer, $"{amount:N0}", power));
                     }
                     delivered = true;
                 }

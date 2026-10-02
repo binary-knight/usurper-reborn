@@ -5722,9 +5722,8 @@ public class WorldSimulator
                     NewsSystem.Instance?.Newsy(false,
                         $"{npc.Name} bought {item.Name} from {chosen.Seller} at the Auction House.");
 
-                    // Notify seller
-                    await backend.SendMessage("Auction House", chosen.Seller, "auction",
-                        $"Your {item.Name} sold to {npc.Name} for {chosen.Price:N0} gold!");
+                    // Notify seller: 1.2.5, in the seller's language, one mail per world-sim day
+                    await backend.MailAuctionSale(chosen.Seller, item.Name, npc.Name, chosen.Price);
                 }
                 catch (Exception ex)
                 {

@@ -89,6 +89,12 @@ namespace UsurperRemake.Systems
         Task SendMessage(string from, string to, string messageType, string message);
 
         /// <summary>
+        /// 1.2.5: send a message to a player by name, rendered in that player's account language
+        /// (<paramref name="textIn"/> is given the language code; "en" for a name no player goes by).
+        /// </summary>
+        Task SendMessageLocalized(string from, string to, string messageType, Func<string, string> textIn);
+
+        /// <summary>
         /// Get unread messages for a player (newer than afterMessageId to avoid re-fetching broadcasts).
         /// </summary>
         Task<List<PlayerMessage>> GetUnreadMessages(string username, long afterMessageId = 0);

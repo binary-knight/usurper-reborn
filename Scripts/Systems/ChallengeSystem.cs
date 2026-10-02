@@ -205,13 +205,8 @@ public class ChallengeSystem
 
             NewsSystem.Instance?.Newsy(true, $"THREAT: {npcChallenger.Name} (Level {npcChallenger.Level}) has declared intent to challenge for the throne!");
 
-            // Send direct message to king
-            try
-            {
-                SqlBackend?.SendMessage("System", king.Name, "throne_warning", $"WARNING: {npcChallenger.Name} (Level {npcChallenger.Level}) has declared intent to seize your throne! The challenge will happen soon.").GetAwaiter().GetResult();
-            }
-            catch { /* Message delivery failed, news is enough */ }
-
+            // 1.2.5: no mail to the king for the threat (it came with every challenge); the news carries it,
+            // and the outcome is mailed (ExecuteNPCThroneChallenge)
             return;
         }
 
@@ -791,8 +786,8 @@ public class ChallengeSystem
             // Notify the dethroned player
             try
             {
-                SqlBackend?.SendMessage("System", king.Name, "throne_lost",
-                    $"You have been DETHRONED! {challenger.Name} (Level {challenger.Level}) stormed the castle and defeated your defenses. The throne is no longer yours.")
+                SqlBackend?.SendMessageLocalized("System", king.Name, "throne_lost",
+                    lang => Loc.GetIn(lang, "mail.throne_lost", challenger.Name, challenger.Level))
                     .GetAwaiter().GetResult();
             }
             catch { /* Notification failed */ }
@@ -805,8 +800,8 @@ public class ChallengeSystem
             // Notify the king that their defenses held
             try
             {
-                SqlBackend?.SendMessage("System", king.Name, "throne_defended",
-                    $"Your defenses held! {challenger.Name} (Level {challenger.Level}) challenged for your throne but was defeated and thrown in prison.")
+                SqlBackend?.SendMessageLocalized("System", king.Name, "throne_defended",
+                    lang => Loc.GetIn(lang, "mail.throne_defended", challenger.Name, challenger.Level))
                     .GetAwaiter().GetResult();
             }
             catch { /* Notification failed */ }
