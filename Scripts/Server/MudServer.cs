@@ -2162,7 +2162,7 @@ public class MudServer
                         _sqlBackend.MarkAdminCommandFailed(cmd.Id, "Missing target or message");
                         return;
                     }
-                    await _sqlBackend.SendMessage("Admin", target, "system", message);
+                    await _sqlBackend.SendMessageToKey("Admin", target, "system", message);
                     if (session != null)
                         session.EnqueueMessage($"\u001b[1;33m  [Admin Message] {message}\u001b[0m");
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Message sent to {target}");

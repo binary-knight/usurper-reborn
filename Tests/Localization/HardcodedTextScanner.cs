@@ -96,7 +96,7 @@ public static class HardcodedTextScanner
     // receiver counts.
     //   NewsSystem.Newsy / WriteNews / GenericNews / Write*News  (Scripts/Systems/NewsSystem.cs)
     //   MailSystem.SendSystemMail / CompatLayer.SendMail / LegacyCompat.SendMail
-    //   OnlineStateManager.SendMessage, SqlSaveBackend.SendMessage, Player.SendMessage (last argument)
+    //   OnlineStateManager.SendMessage, SqlSaveBackend.SendMessage / SendMessageToKey, Player.SendMessage (last argument)
     //   GroupSystem.NotifyGroup / BroadcastToGroupSessions / BroadcastToAllGroupSessions
     //   MudServer.BroadcastToAll / SendToPlayer, RoomRegistry.BroadcastToRoom / BroadcastAction / BroadcastGlobal
     //   PlayerSession.EnqueueMessage, OnlineStateManager.AddNews / BroadcastMessage, SqlSaveBackend.AddNews
@@ -119,6 +119,7 @@ public static class HardcodedTextScanner
         new SinkSpec("SendSystemMail", new[] { 1 }, FromPositionOn: true),
         new SinkSpec("SendMail", new[] { 1 }, FromPositionOn: true),
         new SinkSpec("SendMessage", null, LastOnly: true),
+        new SinkSpec("SendMessageToKey", null, LastOnly: true),
         new SinkSpec("NotifyGroup", new[] { 1 }),
         new SinkSpec("BroadcastToGroupSessions", new[] { 2, 3 }),
         new SinkSpec("BroadcastToAllGroupSessions", new[] { 1 }),

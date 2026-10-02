@@ -37,6 +37,22 @@ public class DeleteFollowUpTests : IDisposable
         cmd.ExecuteNonQuery();
     }
 
+    /// <summary>v1.2.4: a mail row exactly as addressed, as older builds stored it (SendMessage now
+    /// writes the recipient's display name).</summary>
+    private Task StoredMail(string from, string to, string type, string message)
+    {
+        using var conn = new SqliteConnection($"Data Source={_path}");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "INSERT INTO messages (from_player, to_player, message_type, message) VALUES (@f, @t, @y, @m);";
+        cmd.Parameters.AddWithValue("@f", from);
+        cmd.Parameters.AddWithValue("@t", to);
+        cmd.Parameters.AddWithValue("@y", type);
+        cmd.Parameters.AddWithValue("@m", message);
+        cmd.ExecuteNonQuery();
+        return Task.CompletedTask;
+    }
+
     private long Count(string sql)
     {
         using var conn = new SqliteConnection($"Data Source={_path}");
@@ -127,11 +143,11 @@ public class DeleteFollowUpTests : IDisposable
     {
         Player("bob_account", "Bob Smith");
         Player("alice", "Alice");
-        await _db.SendMessage("System", "Bob", "mail", "to the display name");
-        await _db.SendMessage("System", "Bob Smith", "mail", "to the married name");
-        await _db.SendMessage("System", "bob_account", "mail", "to the key");
-        await _db.SendMessage("System", "Alice", "mail", "to someone else");
-        await _db.SendMessage("Bob", "Alice", "mail", "sent by Bob, in Alice's inbox");
+        await StoredMail("System", "Bob", "mail", "to the display name");
+        await StoredMail("System", "Bob Smith", "mail", "to the married name");
+        await StoredMail("System", "bob_account", "mail", "to the key");
+        await StoredMail("System", "Alice", "mail", "to someone else");
+        await StoredMail("Bob", "Alice", "mail", "sent by Bob, in Alice's inbox");
 
         int bobs = await _db.CreateAuctionListing("bob", "Sword", "{}", 100);
         int bobsMarried = await _db.CreateAuctionListing("Bob Smith", "Shield", "{}", 100);
@@ -154,7 +170,7 @@ public class DeleteFollowUpTests : IDisposable
     {
         Player("bob", "Robert");                 // another account whose KEY is "bob"
         Player("bob_account", "Bob");
-        await _db.SendMessage("System", "bob", "mail", "for the other account");
+        await StoredMail("System", "bob", "mail", "for the other account");
         _db.PurgePlayerWorldState("bob_account", "Bob");
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'bob';").Should().Be(1);
     }
@@ -165,8 +181,8 @@ public class DeleteFollowUpTests : IDisposable
         // v1.1.12: deleting a married "Bob Smith" erased the mail of another character named "Bob Smith"
         Player("bob_account", "Bob Smith");
         Exec("INSERT INTO players (username, display_name, player_data) VALUES ('bsmith', 'Robert', '{\"player\":{\"name2\":\"Bob Smith\"}}');");
-        await _db.SendMessage("System", "Bob Smith", "mail", "for the other Bob Smith");
-        await _db.SendMessage("System", "Bob", "mail", "for the deleted Bob");
+        await StoredMail("System", "Bob Smith", "mail", "for the other Bob Smith");
+        await StoredMail("System", "Bob", "mail", "for the deleted Bob");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob_account", "Bob"));
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob Smith';").Should().Be(1);
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(0);
@@ -178,9 +194,9 @@ public class DeleteFollowUpTests : IDisposable
         // v1.1.12: account "bob" deleting its character "Alice" erased the mail of another account's character "Bob"
         Player("bob", "Alice");
         Exec("INSERT INTO players (username, display_name, player_data) VALUES ('robin', 'Robin', '{\"player\":{\"name2\":\"Bob\"}}');");
-        await _db.SendMessage("System", "Bob", "mail", "for the other Bob");
-        await _db.SendMessage("System", "Alice", "mail", "for the deleted Alice");
-        await _db.SendMessage("bob", "Robin", "mail", "sent by the deleted key");
+        await StoredMail("System", "Bob", "mail", "for the other Bob");
+        await StoredMail("System", "Alice", "mail", "for the deleted Alice");
+        await StoredMail("bob", "Robin", "mail", "sent by the deleted key");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Bob';").Should().Be(1, "another character's name2 is Bob");
         Count("SELECT COUNT(*) FROM messages WHERE to_player = 'Alice';").Should().Be(0);
@@ -195,8 +211,8 @@ public class DeleteFollowUpTests : IDisposable
         Player("bob", "Alice");
         Player("robin", "Bob");
         Exec("INSERT INTO players (username, display_name, player_data) VALUES ('sam', 'Sam', '{\"player\":{\"name2\":\"Bobby\"}}');");
-        await _db.SendMessage("Bob", "Sam", "team", "from the living Bob");
-        await _db.SendMessage("Bobby", "Robin", "team", "from the living Bobby");
+        await StoredMail("Bob", "Sam", "team", "from the living Bob");
+        await StoredMail("Bobby", "Robin", "team", "from the living Bobby");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
         Count("SELECT COUNT(*) FROM messages WHERE from_player = 'Bob';").Should().Be(1, "another character's display name is Bob");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bobby", "Carol"));
@@ -208,7 +224,7 @@ public class DeleteFollowUpTests : IDisposable
     {
         Player("bob", "Alice");
         Player("robin", "Robin");
-        await _db.SendMessage("bob", "Robin", "mail", "sent by the deleted key");
+        await StoredMail("bob", "Robin", "mail", "sent by the deleted key");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
         Count("SELECT COUNT(*) FROM messages WHERE LOWER(from_player) = 'bob';").Should().Be(0);
     }
@@ -218,7 +234,7 @@ public class DeleteFollowUpTests : IDisposable
     {
         Player("bob", "Alice");
         Player("robin", "Robin");
-        await _db.SendMessage("System", "bob", "mail", "for the deleted key");
+        await StoredMail("System", "bob", "mail", "for the deleted key");
         WithCompleteRoster(() => _db.PurgePlayerWorldState("bob", "Alice"));
         Count("SELECT COUNT(*) FROM messages WHERE LOWER(to_player) = 'bob';").Should().Be(0);
     }

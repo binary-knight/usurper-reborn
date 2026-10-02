@@ -1,7 +1,7 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.2.1
+checked: 1.2.3
 sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs
 ---
 Main Street shows a few places and a list of districts. Press a district's key to open it, then the place's key; R goes back. More places appear as you gain your first levels. The classic single-screen layout can be chosen in Settings (`~`).

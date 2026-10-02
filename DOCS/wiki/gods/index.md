@@ -1,7 +1,7 @@
 ---
 title: Gods and faith
 path: /wiki/en/gods/
-checked: 1.2.2
+checked: 1.2.3
 sources: Scripts/Systems/GodSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/FaithSystem.cs, Scripts/Locations/MainStreetDistricts.cs
 ---
 You worship one god at a time. The Temple's canonical gods and player-gods compete for followers. Your personal Favor controls how much of your god's boon you receive.
