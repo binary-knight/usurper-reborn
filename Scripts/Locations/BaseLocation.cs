@@ -6451,7 +6451,7 @@ public abstract class BaseLocation
                 long guardHP = (long)(100 * level + Math.Pow(level, 1.4) * 25);
                 var guard = new Monster
                 {
-                    Name = Loc.Get("base.royal_guard"),   // v1.2.5: display only; no quest or combat check reads this name
+                    Name = Loc.Get("base.royal_guard"),   // v1.2.5: no quest targets it; CombatEngine's name checks (Boss, King, undead) match no translation (tested)
                     Level = level,
                     HP = guardHP,
                     MaxHP = guardHP,
