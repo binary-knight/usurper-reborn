@@ -161,7 +161,7 @@ public class CulturalMemeSystem
         EnsureLocationStrength(originLocation);
         _locationMemeStrength[originLocation][meme.Id] = meme.GlobalStrength;
 
-        NewsSystem.Instance?.Newsy($"A new idea is stirring in {originLocation}: \"{meme.Name}\" — {meme.Description}");
+        NewsSystem.Instance?.Newsy($"A new idea is stirring in {originLocation}: \"{meme.Name}\" -- {meme.Description}");
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("SOCIAL",
             $"New cultural meme: \"{meme.Name}\" ({meme.Category}) originated at {originLocation} by {originName}");

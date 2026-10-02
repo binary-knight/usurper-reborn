@@ -1242,7 +1242,7 @@ public static class MudChatSystem
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.not_in_group")}");
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("  Usage: /group <player> — invite a player to your group");
+                terminal.WriteLine("  Usage: /group <player> -- invite a player to your group");
                 terminal.WriteLine("  All group members must be on the same team.");
                 return true;
             }
@@ -1493,7 +1493,7 @@ public static class MudChatSystem
         if (!groupSystem.AddMember(group, targetSession.Username))
         {
             leaderSession.EnqueueMessage(
-                $"\u001b[1;33m  * Failed to add {targetName} — group may be full.\u001b[0m");
+                $"\u001b[1;33m  * Failed to add {targetName} -- group may be full.\u001b[0m");
             return;
         }
 

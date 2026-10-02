@@ -2153,7 +2153,7 @@ public class MudServer
                         // The player will die on their next action when HP is checked
                         // We send a force-kill message — the session's game engine will handle death
                     }
-                    _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Slay command sent to {target}" + (session == null ? " (offline — edit HP via player editor)" : ""));
+                    _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Slay command sent to {target}" + (session == null ? " (offline -- edit HP via player editor)" : ""));
                     break;
 
                 case "message":

@@ -500,7 +500,7 @@ public class MarketplaceLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($"    {listing.Item.GetDisplayName()}");
                 terminal.SetColor("gray");
-                terminal.Write(" — ");
+                terminal.Write(" -- ");
                 terminal.SetColor("bright_yellow");
                 terminal.Write($"{listing.Price:N0} {GameConfig.MoneyType}");
                 terminal.SetColor("gray");

@@ -564,7 +564,7 @@ namespace UsurperRemake.Systems
                         {
                             RelationshipSystem.ProcessDivorce(player, npc, out _);
                         }
-                        Divorce(npcId, "Infidelity — jealousy", playerInitiated: false);
+                        Divorce(npcId, "Infidelity -- jealousy", playerInitiated: false);
 
                         // Clear marriage state on player in case ProcessDivorce missed it
                         if (player != null)

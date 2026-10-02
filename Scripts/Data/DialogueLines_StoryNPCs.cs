@@ -59,7 +59,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "morgana_g2", Text = "Ah, the {player_class}. I've been watching your progress with... interest. You have potential, if you can refine it.", Category = "greeting", NpcName = "Lady Morgana", RelationshipTier = GameConfig.RelationRespect });
             lines.Add(new() { Id = "morgana_g3", Text = "You dare approach me after what you've done? Your audacity is almost admirable. Almost.", Category = "greeting", NpcName = "Lady Morgana", RelationshipTier = GameConfig.RelationAnger });
 
-            lines.Add(new() { Id = "morgana_st1", Text = "Power is not taken, it is cultivated. Like a garden — with patience, precision, and the occasional pruning of dead weight.", Category = "smalltalk", NpcName = "Lady Morgana" });
+            lines.Add(new() { Id = "morgana_st1", Text = "Power is not taken, it is cultivated. Like a garden -- with patience, precision, and the occasional pruning of dead weight.", Category = "smalltalk", NpcName = "Lady Morgana" });
             lines.Add(new() { Id = "morgana_st2", Text = "The court politics grow tiresome. Everyone schemes but none have the elegance to do it properly.", Category = "smalltalk", NpcName = "Lady Morgana" });
 
             lines.Add(new() { Id = "morgana_fw1", Text = "You may go. And {player_name}? Do try to be more interesting next time.", Category = "farewell", NpcName = "Lady Morgana" });
@@ -68,8 +68,8 @@ namespace UsurperRemake.Data
             // LYSANDRA THE PURE / LYSANDRA DAWNWHISPER - Devout healer
             // ═══════════════════════════════════════════════════════════════
 
-            lines.Add(new() { Id = "lysandra_g1", Text = "The light shines upon you today, {player_name}. I can see it in your eyes — you carry a great purpose.", Category = "greeting", NpcName = "Lysandra the Pure", RelationshipTier = GameConfig.RelationFriendship });
-            lines.Add(new() { Id = "lysandra_g2", Text = "Welcome, traveler. The temple is open to all who seek healing — of body or spirit.", Category = "greeting", NpcName = "Lysandra the Pure", RelationshipTier = GameConfig.RelationNormal });
+            lines.Add(new() { Id = "lysandra_g1", Text = "The light shines upon you today, {player_name}. I can see it in your eyes -- you carry a great purpose.", Category = "greeting", NpcName = "Lysandra the Pure", RelationshipTier = GameConfig.RelationFriendship });
+            lines.Add(new() { Id = "lysandra_g2", Text = "Welcome, traveler. The temple is open to all who seek healing -- of body or spirit.", Category = "greeting", NpcName = "Lysandra the Pure", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "lysandra_g3", Text = "I sense a shadow upon you, {player_name}. Please... let me help. No one should carry such weight alone.", Category = "greeting", NpcName = "Lysandra the Pure", Context = "low_hp" });
 
             lines.Add(new() { Id = "lysandradw_g1", Text = "*the air shimmers with warmth as she smiles* {player_name}. Dawn breaks anew, and with it, hope.", Category = "greeting", NpcName = "Lysandra Dawnwhisper", RelationshipTier = GameConfig.RelationFriendship });
@@ -89,7 +89,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "mordecai_g3", Text = "Another visitor to disturb my studies. At least you're marginally more tolerable than the last one.", Category = "greeting", NpcName = "Mordecai Voidborne", RelationshipTier = GameConfig.RelationNormal });
 
             lines.Add(new() { Id = "mordecai_st1", Text = "I've been studying the patterns between the Old God floors. There's a mathematical harmony to the destruction. Beautiful, in a terrible way.", Category = "smalltalk", NpcName = "Mordecai Voidborne" });
-            lines.Add(new() { Id = "mordecai_st2", Text = "People fear the dark. They should. But not because of what hides in it — because of what it reveals about ourselves.", Category = "smalltalk", NpcName = "Mordecai Voidborne" });
+            lines.Add(new() { Id = "mordecai_st2", Text = "People fear the dark. They should. But not because of what hides in it -- because of what it reveals about ourselves.", Category = "smalltalk", NpcName = "Mordecai Voidborne" });
             lines.Add(new() { Id = "mordecai_st3", Text = "I read something disturbing last night. Then I read it again because it was also fascinating. That's usually how it goes.", Category = "smalltalk", NpcName = "Mordecai Voidborne" });
 
             lines.Add(new() { Id = "mordecai_fw1", Text = "Go then. The darkness and I have much to discuss. We always do.", Category = "farewell", NpcName = "Mordecai Voidborne" });
@@ -102,7 +102,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "sylvana_g2", Text = "Oh! Hello there! Sorry, I was listening to something... never mind. The birds around here tell the most interesting stories.", Category = "greeting", NpcName = "Sylvana Riverwind", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "sylvana_g3", Text = "{player_name}! *twirls* The river told me you'd come today. I know that sounds strange but the river is rarely wrong.", Category = "greeting", NpcName = "Sylvana Riverwind", RelationshipTier = GameConfig.RelationLove });
 
-            lines.Add(new() { Id = "sylvana_st1", Text = "I tried to grow flowers in the dungeon once. They all died except one — a tiny blue thing that glowed. I left it there. It seemed happy.", Category = "smalltalk", NpcName = "Sylvana Riverwind" });
+            lines.Add(new() { Id = "sylvana_st1", Text = "I tried to grow flowers in the dungeon once. They all died except one -- a tiny blue thing that glowed. I left it there. It seemed happy.", Category = "smalltalk", NpcName = "Sylvana Riverwind" });
             lines.Add(new() { Id = "sylvana_st2", Text = "Why do people build walls? The best view is always from the other side of them.", Category = "smalltalk", NpcName = "Sylvana Riverwind" });
             lines.Add(new() { Id = "sylvana_st3", Text = "I collected seventeen different kinds of moss today. People think that's weird but moss is actually very underappreciated.", Category = "smalltalk", NpcName = "Sylvana Riverwind" });
 
@@ -113,7 +113,7 @@ namespace UsurperRemake.Data
             // ═══════════════════════════════════════════════════════════════
 
             lines.Add(new() { Id = "aldwyn_g1", Text = "{player_name}. Come in, come in. I've been cross-referencing some ancient texts and I believe I've found something quite remarkable.", Category = "greeting", NpcName = "Archpriest Aldwyn", RelationshipTier = GameConfig.RelationFriendship });
-            lines.Add(new() { Id = "aldwyn_g2", Text = "Ah, a visitor. Forgive the mess — the pursuit of knowledge generates rather a lot of parchment.", Category = "greeting", NpcName = "Archpriest Aldwyn", RelationshipTier = GameConfig.RelationNormal });
+            lines.Add(new() { Id = "aldwyn_g2", Text = "Ah, a visitor. Forgive the mess -- the pursuit of knowledge generates rather a lot of parchment.", Category = "greeting", NpcName = "Archpriest Aldwyn", RelationshipTier = GameConfig.RelationNormal });
 
             lines.Add(new() { Id = "aldwyn_st1", Text = "The Old Gods were not always gods, you know. The texts suggest they were once mortal scholars who gazed too deeply into the truth of creation.", Category = "smalltalk", NpcName = "Archpriest Aldwyn" });
             lines.Add(new() { Id = "aldwyn_st2", Text = "I've catalogued three hundred and twelve interpretations of the Ocean Philosophy. At least four of them are probably correct.", Category = "smalltalk", NpcName = "Archpriest Aldwyn" });
@@ -142,7 +142,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "whisper_g2", Text = "*leans against wall, watching* Interesting company you've been keeping, {player_name}. Very interesting.", Category = "greeting", NpcName = "Whisperwind", RelationshipTier = GameConfig.RelationTrust });
             lines.Add(new() { Id = "whisper_g3", Text = "*barely visible in the shadows* ...You shouldn't be able to see me. Hmm. You're more perceptive than most.", Category = "greeting", NpcName = "Whisperwind", RelationshipTier = GameConfig.RelationNormal });
 
-            lines.Add(new() { Id = "whisper_st1", Text = "Secrets are currency, {player_name}. And this town is rich beyond measure — everyone has something to hide.", Category = "smalltalk", NpcName = "Whisperwind" });
+            lines.Add(new() { Id = "whisper_st1", Text = "Secrets are currency, {player_name}. And this town is rich beyond measure -- everyone has something to hide.", Category = "smalltalk", NpcName = "Whisperwind" });
             lines.Add(new() { Id = "whisper_st2", Text = "I heard something on the wind last night. Something about the deep floors. Something that made even me uncomfortable.", Category = "smalltalk", NpcName = "Whisperwind" });
             lines.Add(new() { Id = "whisper_st3", Text = "Three people tried to follow me yesterday. I let the first two think they succeeded. The third... well. Don't ask about the third.", Category = "smalltalk", NpcName = "Whisperwind" });
 
@@ -156,7 +156,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "sera_g2", Text = "*surrounded by maps and notes* Oh! A person! Sorry, I've been down in the dungeon for... what day is it? Never mind, it doesn't matter. Look at THIS!", Category = "greeting", NpcName = "Sera the Seeker", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "sera_g3", Text = "{player_name}! *grabs your arm* Have you been past floor forty recently? I need someone to confirm what I found because if I'm right... if I'm RIGHT...", Category = "greeting", NpcName = "Sera the Seeker", Emotion = "joy" });
 
-            lines.Add(new() { Id = "sera_st1", Text = "The dungeon rearranges itself, you know. Not randomly — there's a PATTERN. I've been tracking it for months. The rooms move when nobody's watching.", Category = "smalltalk", NpcName = "Sera the Seeker" });
+            lines.Add(new() { Id = "sera_st1", Text = "The dungeon rearranges itself, you know. Not randomly -- there's a PATTERN. I've been tracking it for months. The rooms move when nobody's watching.", Category = "smalltalk", NpcName = "Sera the Seeker" });
             lines.Add(new() { Id = "sera_st2", Text = "I found writing on a wall on floor twenty-two. Ancient script. It said... well, it roughly translates to 'turn back.' Very unhelpful. I went deeper, obviously.", Category = "smalltalk", NpcName = "Sera the Seeker" });
             lines.Add(new() { Id = "sera_st3", Text = "Everyone asks me why I'm obsessed with the dungeon. It's not obsession. It's... okay, it might be obsession. But it's PRODUCTIVE obsession.", Category = "smalltalk", NpcName = "Sera the Seeker" });
 
@@ -212,7 +212,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "malachi_st1", Text = "Light and darkness are not opposites. They are the same force, viewed from different angles. Most are too afraid to look from mine.", Category = "smalltalk", NpcName = "Malachi the Dark" });
             lines.Add(new() { Id = "malachi_st2", Text = "The Necromancer, Mord, thinks we are kindred spirits. He is mistaken. I study the darkness. He lets it consume him. A crucial difference.", Category = "smalltalk", NpcName = "Malachi the Dark" });
 
-            lines.Add(new() { Id = "malachi_fw1", Text = "The shadows have more to teach me. As do you, I suspect — in time.", Category = "farewell", NpcName = "Malachi the Dark" });
+            lines.Add(new() { Id = "malachi_fw1", Text = "The shadows have more to teach me. As do you, I suspect -- in time.", Category = "farewell", NpcName = "Malachi the Dark" });
 
             // ═══════════════════════════════════════════════════════════════
             // ELARA MOONWHISPER - Wise mystic sage

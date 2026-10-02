@@ -802,7 +802,7 @@ namespace UsurperRemake.Systems
                             else
                             {
                                 terminal.SetColor("yellow");
-                                terminal.WriteLine("  Level decreased. Stats NOT auto-adjusted — edit manually if needed.");
+                                terminal.WriteLine("  Level decreased. Stats NOT auto-adjusted -- edit manually if needed.");
                             }
                         }
                         modified = true;
@@ -1049,7 +1049,7 @@ namespace UsurperRemake.Systems
                     }
 
                     terminal.SetColor("white");
-                    terminal.Write($"  [{i}] {CompanionNames[i],-10}— ");
+                    terminal.Write($"  [{i}] {CompanionNames[i],-10}-- ");
                     terminal.SetColor(color);
                     terminal.WriteLine(status);
                 }
@@ -1063,7 +1063,7 @@ namespace UsurperRemake.Systems
                     foreach (var g in ss.ActiveGriefs)
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine($"    {g.CompanionName} — Stage {g.CurrentStage}");
+                        terminal.WriteLine($"    {g.CompanionName} -- Stage {g.CurrentStage}");
                     }
                 }
 
@@ -1277,7 +1277,7 @@ namespace UsurperRemake.Systems
                     };
 
                     terminal.SetColor("white");
-                    terminal.Write($"  [{i}] {GodNames[i],-32}— ");
+                    terminal.Write($"  [{i}] {GodNames[i],-32}-- ");
                     terminal.SetColor(color);
                     terminal.WriteLine(statusName);
                 }
@@ -1510,7 +1510,7 @@ namespace UsurperRemake.Systems
             var player = targetSave.Player;
 
             terminal.SetColor("white");
-            terminal.WriteLine($"  Player: {player.Name2} — Level {player.Level} {GetClassName((int)player.Class)}");
+            terminal.WriteLine($"  Player: {player.Name2} -- Level {player.Level} {GetClassName((int)player.Class)}");
             terminal.WriteLine("");
 
             // Get divine name

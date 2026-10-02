@@ -19015,7 +19015,7 @@ public class DungeonLocation : BaseLocation
             case "stats":
             case "status":
                 term.SetColor("bright_cyan");
-                term.WriteLine($"  {player.DisplayName} — {Loc.Get("dungeon.level_label")} {player.Level} {player.Race} {player.ClassName}");
+                term.WriteLine($"  {player.DisplayName} -- {Loc.Get("dungeon.level_label")} {player.Level} {player.Race} {player.ClassName}");
                 term.SetColor("white");
                 term.WriteLine($"  {Loc.Get("dungeon.hp_label")}: {player.HP}/{player.MaxHP}  {Loc.Get("dungeon.mana_label")}: {player.Mana}/{player.MaxMana}  {Loc.Get("dungeon.sta_label")}: {player.CurrentCombatStamina}/{player.Stamina}");
                 term.SetColor("gray");

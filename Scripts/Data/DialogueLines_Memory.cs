@@ -17,7 +17,7 @@ namespace UsurperRemake.Data
             // HELPED memories - NPC remembers player helped them
             // ═══════════════════════════════════════════════════════════════
 
-            lines.Add(new() { Id = "mem_help_ag1", Text = "You helped me out before. Don't think that makes us even — but it does mean I won't punch you first.", Category = "memory", PersonalityType = "aggressive", MemoryType = "helped" });
+            lines.Add(new() { Id = "mem_help_ag1", Text = "You helped me out before. Don't think that makes us even -- but it does mean I won't punch you first.", Category = "memory", PersonalityType = "aggressive", MemoryType = "helped" });
             lines.Add(new() { Id = "mem_help_no1", Text = "I haven't forgotten your kindness, {player_name}. Such deeds speak louder than any words.", Category = "memory", PersonalityType = "noble", MemoryType = "helped" });
             lines.Add(new() { Id = "mem_help_cu1", Text = "You helped me once. I keep careful accounts of such things. Your balance is favorable.", Category = "memory", PersonalityType = "cunning", MemoryType = "helped" });
             lines.Add(new() { Id = "mem_help_pi1", Text = "The kindness you showed me... it was the gods working through you. I'm certain of it.", Category = "memory", PersonalityType = "pious", MemoryType = "helped" });
@@ -35,7 +35,7 @@ namespace UsurperRemake.Data
             // ═══════════════════════════════════════════════════════════════
 
             lines.Add(new() { Id = "mem_atk_ag1", Text = "Last time you came at me with a weapon. Want to try again? I'm ready this time.", Category = "memory", PersonalityType = "aggressive", MemoryType = "attacked" });
-            lines.Add(new() { Id = "mem_atk_no1", Text = "You attacked me. That wound — to my body and my trust — has not fully healed.", Category = "memory", PersonalityType = "noble", MemoryType = "attacked" });
+            lines.Add(new() { Id = "mem_atk_no1", Text = "You attacked me. That wound -- to my body and my trust -- has not fully healed.", Category = "memory", PersonalityType = "noble", MemoryType = "attacked" });
             lines.Add(new() { Id = "mem_atk_cu1", Text = "I remember your little attack. I've been preparing for the possibility of a repeat. You won't find me so easy a target.", Category = "memory", PersonalityType = "cunning", MemoryType = "attacked" });
             lines.Add(new() { Id = "mem_atk_pi1", Text = "You raised your hand against me. I've prayed for the strength to forgive you. I'm... working on it.", Category = "memory", PersonalityType = "pious", MemoryType = "attacked" });
             lines.Add(new() { Id = "mem_atk_cy1", Text = "Oh, you. The one who decided to make things personal. Trust me, I haven't forgotten.", Category = "memory", PersonalityType = "cynical", MemoryType = "attacked" });
@@ -50,7 +50,7 @@ namespace UsurperRemake.Data
 
             lines.Add(new() { Id = "mem_bet_ag1", Text = "You stabbed me in the back. Figuratively. Next time it won't be figurative.", Category = "memory", PersonalityType = "aggressive", MemoryType = "betrayed" });
             lines.Add(new() { Id = "mem_bet_no1", Text = "Your betrayal cut deeper than any blade. I once believed in you. That was my mistake.", Category = "memory", PersonalityType = "noble", MemoryType = "betrayed" });
-            lines.Add(new() { Id = "mem_bet_cu1", Text = "You betrayed me. Impressive, actually — I don't usually get blindsided. Won't happen twice.", Category = "memory", PersonalityType = "cunning", MemoryType = "betrayed" });
+            lines.Add(new() { Id = "mem_bet_cu1", Text = "You betrayed me. Impressive, actually -- I don't usually get blindsided. Won't happen twice.", Category = "memory", PersonalityType = "cunning", MemoryType = "betrayed" });
             lines.Add(new() { Id = "mem_bet_pi1", Text = "You broke my trust. That... that hurt more than anything physical ever could.", Category = "memory", PersonalityType = "pious", MemoryType = "betrayed" });
             lines.Add(new() { Id = "mem_bet_ch1", Text = "You know, betrayal really ruins a good friendship. And we had such potential.", Category = "memory", PersonalityType = "charming", MemoryType = "betrayed" });
 
@@ -64,7 +64,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "mem_sav_ag1", Text = "You saved my life. I HATE owing people, but... yeah. I owe you. Big time.", Category = "memory", PersonalityType = "aggressive", MemoryType = "saved" });
             lines.Add(new() { Id = "mem_sav_no1", Text = "You saved my life. I am honor-bound to repay that debt, and I intend to.", Category = "memory", PersonalityType = "noble", MemoryType = "saved" });
             lines.Add(new() { Id = "mem_sav_pi1", Text = "You saved me. I believe the gods sent you. That day, you were my miracle.", Category = "memory", PersonalityType = "pious", MemoryType = "saved" });
-            lines.Add(new() { Id = "mem_sav_cy1", Text = "You pulled me out of death's grip. Annoying, really — I was just getting comfortable.", Category = "memory", PersonalityType = "cynical", MemoryType = "saved" });
+            lines.Add(new() { Id = "mem_sav_cy1", Text = "You pulled me out of death's grip. Annoying, really -- I was just getting comfortable.", Category = "memory", PersonalityType = "cynical", MemoryType = "saved" });
             lines.Add(new() { Id = "mem_sav_ch1", Text = "You literally saved my life! I've been telling everyone. You're my favorite person. After me, obviously.", Category = "memory", PersonalityType = "charming", MemoryType = "saved" });
             lines.Add(new() { Id = "mem_sav_st1", Text = "*meets your eyes directly* You saved me. That's not something I'll ever forget.", Category = "memory", PersonalityType = "stoic", MemoryType = "saved" });
 

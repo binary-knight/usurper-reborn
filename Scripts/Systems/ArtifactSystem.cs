@@ -73,7 +73,7 @@ namespace UsurperRemake.Systems
                     "",
                     "Veloura found it in the ruins of a forgotten age and",
                     "tried to use it to heal her own fractured heart. But the",
-                    "Loom's power is a double-edged thread — it bound her",
+                    "Loom's power is a double-edged thread -- it bound her",
                     "corruption even deeper, trapping her in an endless loop",
                     "of longing. Only by freeing her could the Loom be claimed."
                 },

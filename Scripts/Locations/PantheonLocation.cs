@@ -16,6 +16,21 @@ using System.Threading.Tasks;
 /// </summary>
 public class PantheonLocation : BaseLocation
 {
+    /// <summary>Columns a Pantheon boon row may use (the 79 column screen).</summary>
+    internal const int BoonRowWidth = 79;
+
+    /// <summary>Fixed part of an available-boon row: "  NN. " + label + " -- " + space + alignment tag + tail.</summary>
+    internal static int BoonRowFixedWidth(string label, string alignTag, int tailLength) =>
+        6 + Math.Max(25, label.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + tailLength;
+
+    /// <summary>Description column for a boon row: at most cap wide, cut with "..." so the whole row stays within 79 columns.</summary>
+    internal static string FitBoonText(string text, int fixedWidth, int cap)
+    {
+        int width = Math.Min(cap, Math.Max(10, BoonRowWidth - fixedWidth));
+        if (text.Length > width) text = text.Substring(0, width - 3) + "...";
+        return text.PadRight(width);
+    }
+
     // Anti-grief: tracks last smite time per "godName>targetName" pair
     private static readonly Dictionary<string, DateTime> _smiteCooldowns = new();
 
@@ -375,7 +390,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_green");
                     terminal.Write($"{boon.Name} {tierStr,-5}");
                     terminal.SetColor("gray");
-                    terminal.Write($" — {boon.GetEffectDescription(tier),-30}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + $" ({cost} pts)".Length, 29)}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12} ({cost} pts)");
                     idx++;
@@ -409,14 +424,15 @@ public class PantheonLocation : BaseLocation
                 if (!alignmentMatch)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"  {optNum,2}. {label,-25} — {boon.Description,-28} {alignTag,-12} {Loc.Get("pantheon.boon_locked")}");
+                    string lockedTail = Loc.Get("pantheon.boon_locked");
+                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {FitBoonText(boon.Description, BoonRowFixedWidth(label, alignTag, 1 + lockedTail.Length), 27)} {alignTag,-12} {lockedTail}");
                 }
                 else if (!canAfford)
                 {
                     terminal.SetColor("darkgray");
                     terminal.Write($"  {optNum,2}. ");
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"{label,-25} — {boon.GetEffectDescription(nextTier),-28} {alignTag,-12} (+{addedCost} pts) *");
+                    terminal.WriteLine($"{label,-25} -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts) *".Length), 27)} {alignTag,-12} (+{addedCost} pts) *");
                 }
                 else
                 {
@@ -425,7 +441,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_cyan");
                     terminal.Write($"{label,-25}");
                     terminal.SetColor("gray");
-                    terminal.Write($" — {boon.GetEffectDescription(nextTier),-28}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts)".Length), 27)}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12} (+{addedCost} pts)");
                     optionMap[optNum] = (boon.Id, nextTier, addedCost);

@@ -20,7 +20,7 @@ namespace UsurperRemake.Data
             // ═══════════════════════════════════════════════════════════════
 
             // Married
-            lines.Add(new() { Id = "ag_m1", Text = "There you are. Was about to go looking for you — and not in a gentle way.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationMarried });
+            lines.Add(new() { Id = "ag_m1", Text = "There you are. Was about to go looking for you -- and not in a gentle way.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationMarried });
             lines.Add(new() { Id = "ag_m2", Text = "*grabs you roughly and pulls you close* Missed you. Don't tell anyone I said that.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationMarried });
             lines.Add(new() { Id = "ag_m3", Text = "Finally. The bed's too cold without you and I'm tired of punching walls about it.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationMarried });
 
@@ -70,9 +70,9 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "ag_e3", Text = "*growls* The only reason you're still standing is because there are witnesses.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationEnemy });
 
             // Hate
-            lines.Add(new() { Id = "ag_h1", Text = "I will end you. Not today — today there are too many eyes. But soon.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationHate });
+            lines.Add(new() { Id = "ag_h1", Text = "I will end you. Not today -- today there are too many eyes. But soon.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationHate });
             lines.Add(new() { Id = "ag_h2", Text = "*stares with pure hatred* Don't. Speak. To. Me.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationHate });
-            lines.Add(new() { Id = "ag_h3", Text = "You're dead to me. Actually, scratch that — you'll just be dead.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationHate });
+            lines.Add(new() { Id = "ag_h3", Text = "You're dead to me. Actually, scratch that -- you'll just be dead.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = GameConfig.RelationHate });
 
             // Aggressive + Emotion overlays
             lines.Add(new() { Id = "ag_ej1", Text = "*slams table with a grin* HA! {player_name}! Just won a fight! Life is GOOD! What do you want?", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = 0, Emotion = "joy" });
@@ -81,7 +81,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "ag_ea2", Text = "*kicks a barrel* Everyone in this town is USELESS. What do YOU want?", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = 0, Emotion = "anger" });
             lines.Add(new() { Id = "ag_es1", Text = "*staring at nothing* ...What? Oh. It's you. *rubs eyes* Forget it. What do you need?", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = 0, Emotion = "sadness" });
             lines.Add(new() { Id = "ag_es2", Text = "Don't look at me like that. I'm not... I'm fine. *voice cracks* I said I'M FINE.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = 0, Emotion = "sadness" });
-            lines.Add(new() { Id = "ag_ef1", Text = "*jumps when you approach* Oh — it's you. Don't sneak up on me like that. Things are... bad right now.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = 0, Emotion = "fear" });
+            lines.Add(new() { Id = "ag_ef1", Text = "*jumps when you approach* Oh -- it's you. Don't sneak up on me like that. Things are... bad right now.", Category = "greeting", PersonalityType = "aggressive", RelationshipTier = 0, Emotion = "fear" });
 
             // ═══════════════════════════════════════════════════════════════
             // NOBLE personality greetings
@@ -157,19 +157,19 @@ namespace UsurperRemake.Data
             // ═══════════════════════════════════════════════════════════════
 
             lines.Add(new() { Id = "cu_m1", Text = "*traces a finger down your cheek* My favorite secret. Come, tell me everything you've learned today.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationMarried });
-            lines.Add(new() { Id = "cu_m2", Text = "Darling. I've arranged something for us tonight. Don't ask questions — just trust me.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationMarried });
+            lines.Add(new() { Id = "cu_m2", Text = "Darling. I've arranged something for us tonight. Don't ask questions -- just trust me.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationMarried });
             lines.Add(new() { Id = "cu_m3", Text = "You're late. I was starting to formulate contingency plans. *smirks* Don't let it happen again.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationMarried });
 
             lines.Add(new() { Id = "cu_l1", Text = "You're the only person whose footsteps I actually want to hear approaching. Take that as the compliment it is.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationLove });
             lines.Add(new() { Id = "cu_l2", Text = "*quiet smile* I keep no secrets from you, {player_name}. That's how you know this is real.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationLove });
             lines.Add(new() { Id = "cu_l3", Text = "I've been watching the door all {time_of_day}. Not that I'd admit that to anyone else.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationLove });
 
-            lines.Add(new() { Id = "cu_p1", Text = "{player_name}. *lowers voice* I have something interesting to share. But not here — too many ears.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationPassion });
+            lines.Add(new() { Id = "cu_p1", Text = "{player_name}. *lowers voice* I have something interesting to share. But not here -- too many ears.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationPassion });
             lines.Add(new() { Id = "cu_p2", Text = "You again. I'm starting to think the universe keeps putting us together for a reason.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationPassion });
 
             lines.Add(new() { Id = "cu_f1", Text = "*appears from nowhere* {player_name}. I was just thinking about a mutual opportunity.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationFriendship });
             lines.Add(new() { Id = "cu_f2", Text = "Ah, a friendly face. Or at least a useful one. Either way, welcome.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationFriendship });
-            lines.Add(new() { Id = "cu_f3", Text = "I noticed you three streets ago. Don't worry — so far, only I did.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationFriendship });
+            lines.Add(new() { Id = "cu_f3", Text = "I noticed you three streets ago. Don't worry -- so far, only I did.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationFriendship });
 
             lines.Add(new() { Id = "cu_t1", Text = "You've proven... reliable. That's the highest compliment I give. Use it wisely.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationTrust });
             lines.Add(new() { Id = "cu_t2", Text = "*nods almost imperceptibly* I heard about what you did. Smart move.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationTrust });
@@ -177,7 +177,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "cu_r1", Text = "{player_name}. You seem... capable. That can be useful to both of us.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationRespect });
             lines.Add(new() { Id = "cu_r2", Text = "*studying you* Interesting. You're not as simple as you look.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationRespect });
 
-            lines.Add(new() { Id = "cu_n1", Text = "*appraising look* Another adventurer. Let me guess — you need something.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationNormal });
+            lines.Add(new() { Id = "cu_n1", Text = "*appraising look* Another adventurer. Let me guess -- you need something.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "cu_n2", Text = "Hmm. You're new to me. That either means you're unimportant or very good at hiding.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "cu_n3", Text = "I know three things about you already and you haven't said a word. Shall I list them?", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationNormal });
 
@@ -188,10 +188,10 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "cu_a2", Text = "You've made a powerful enemy today, and you don't even know the half of it.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationAnger });
 
             lines.Add(new() { Id = "cu_e1", Text = "Ah, {player_name}. Still walking around freely? That's... temporary.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationEnemy });
-            lines.Add(new() { Id = "cu_e2", Text = "*leans against wall* You should know — I've already set three plans in motion against you.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationEnemy });
+            lines.Add(new() { Id = "cu_e2", Text = "*leans against wall* You should know -- I've already set three plans in motion against you.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationEnemy });
 
             lines.Add(new() { Id = "cu_h1", Text = "*dead eyes* Every thread you pull, I'll unravel ten of yours. You chose the wrong enemy.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationHate });
-            lines.Add(new() { Id = "cu_h2", Text = "I don't hate openly — that's for fools. But make no mistake: I will destroy everything you care about.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationHate });
+            lines.Add(new() { Id = "cu_h2", Text = "I don't hate openly -- that's for fools. But make no mistake: I will destroy everything you care about.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = GameConfig.RelationHate });
 
             // Cunning + Emotion overlays
             lines.Add(new() { Id = "cu_ej1", Text = "*rare genuine smile* Things are falling into place, {player_name}. All the pieces, right where I want them.", Category = "greeting", PersonalityType = "cunning", RelationshipTier = 0, Emotion = "joy" });
@@ -224,12 +224,12 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "pi_n3", Text = "Blessings. Is there something troubling you? I have an ear for listening.", Category = "greeting", PersonalityType = "pious", RelationshipTier = GameConfig.RelationNormal });
 
             lines.Add(new() { Id = "pi_s1", Text = "*clasps hands tightly* I wish to believe in your goodness, {player_name}. But your actions test my faith.", Category = "greeting", PersonalityType = "pious", RelationshipTier = GameConfig.RelationSuspicious });
-            lines.Add(new() { Id = "pi_a1", Text = "I pray for you, {player_name}. Not because you deserve it — but because my faith demands it. Even for those who wrong me.", Category = "greeting", PersonalityType = "pious", RelationshipTier = GameConfig.RelationAnger });
+            lines.Add(new() { Id = "pi_a1", Text = "I pray for you, {player_name}. Not because you deserve it -- but because my faith demands it. Even for those who wrong me.", Category = "greeting", PersonalityType = "pious", RelationshipTier = GameConfig.RelationAnger });
             lines.Add(new() { Id = "pi_e1", Text = "*sad but firm* You have strayed so far from the light. I mourn what you could have been.", Category = "greeting", PersonalityType = "pious", RelationshipTier = GameConfig.RelationEnemy });
             lines.Add(new() { Id = "pi_h1", Text = "I have forgiven many things. But what you have done... the gods themselves weep. Leave this place.", Category = "greeting", PersonalityType = "pious", RelationshipTier = GameConfig.RelationHate });
 
             // Pious + Emotion
-            lines.Add(new() { Id = "pi_ej1", Text = "*radiant smile* {player_name}! I just witnessed a miracle — a life saved, a soul redeemed! What a glorious day!", Category = "greeting", PersonalityType = "pious", RelationshipTier = 0, Emotion = "joy" });
+            lines.Add(new() { Id = "pi_ej1", Text = "*radiant smile* {player_name}! I just witnessed a miracle -- a life saved, a soul redeemed! What a glorious day!", Category = "greeting", PersonalityType = "pious", RelationshipTier = 0, Emotion = "joy" });
             lines.Add(new() { Id = "pi_es1", Text = "*eyes glistening* Forgive me... I received word of a tragedy and my heart is heavy. But your presence helps.", Category = "greeting", PersonalityType = "pious", RelationshipTier = 0, Emotion = "sadness" });
 
             // ═══════════════════════════════════════════════════════════════
@@ -238,7 +238,7 @@ namespace UsurperRemake.Data
             // Voice: Intellectual, curious, analytical, occasionally absent-minded
             // ═══════════════════════════════════════════════════════════════
 
-            lines.Add(new() { Id = "sc_m1", Text = "Ah, my dear. I've been reading something fascinating — remind me to tell you later. After I tell you I love you.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationMarried });
+            lines.Add(new() { Id = "sc_m1", Text = "Ah, my dear. I've been reading something fascinating -- remind me to tell you later. After I tell you I love you.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationMarried });
             lines.Add(new() { Id = "sc_m2", Text = "You're the only equation I never want to solve. Let it remain a beautiful mystery.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationMarried });
 
             lines.Add(new() { Id = "sc_l1", Text = "{player_name}. You know, I've catalogued every conversation we've had. They're my favorite collection.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationLove });
@@ -248,10 +248,10 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "sc_f3", Text = "Oh good, it's you. Everyone else just stares blankly when I try to discuss ley line theory.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationFriendship });
 
             lines.Add(new() { Id = "sc_t1", Text = "*looks up from a book* Hmm? Oh, {player_name}. Yes, yes, come in. I was lost in thought.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationTrust });
-            lines.Add(new() { Id = "sc_r1", Text = "Greetings. You have an inquisitive look about you. Ask your questions — I may have answers.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationRespect });
+            lines.Add(new() { Id = "sc_r1", Text = "Greetings. You have an inquisitive look about you. Ask your questions -- I may have answers.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationRespect });
 
             lines.Add(new() { Id = "sc_n1", Text = "*glances up distractedly* Oh. A visitor. I don't usually get visitors. What is it?", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationNormal });
-            lines.Add(new() { Id = "sc_n2", Text = "Hello. Forgive my distraction — I'm in the middle of a rather compelling line of research.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationNormal });
+            lines.Add(new() { Id = "sc_n2", Text = "Hello. Forgive my distraction -- I'm in the middle of a rather compelling line of research.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "sc_n3", Text = "Ah, an adventurer. Fascinating creatures, adventurers. Always in motion, rarely in thought.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationNormal });
 
             lines.Add(new() { Id = "sc_s1", Text = "*narrows eyes over reading glasses* Your recent actions don't add up. I've been running the calculations.", Category = "greeting", PersonalityType = "scholarly", RelationshipTier = GameConfig.RelationSuspicious });
@@ -291,7 +291,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "cy_h1", Text = "*turns away* You're living proof that the world is as rotten as I always said it was.", Category = "greeting", PersonalityType = "cynical", RelationshipTier = GameConfig.RelationHate });
 
             // Cynical + Emotion
-            lines.Add(new() { Id = "cy_ej1", Text = "*suspicious grin* Something good happened to me today. Don't worry — I'm sure it'll go wrong soon.", Category = "greeting", PersonalityType = "cynical", RelationshipTier = 0, Emotion = "joy" });
+            lines.Add(new() { Id = "cy_ej1", Text = "*suspicious grin* Something good happened to me today. Don't worry -- I'm sure it'll go wrong soon.", Category = "greeting", PersonalityType = "cynical", RelationshipTier = 0, Emotion = "joy" });
             lines.Add(new() { Id = "cy_es1", Text = "*staring into a mug* What's the point of any of it, {player_name}? ...Don't answer that. I already know.", Category = "greeting", PersonalityType = "cynical", RelationshipTier = 0, Emotion = "sadness" });
 
             // ═══════════════════════════════════════════════════════════════
@@ -300,7 +300,7 @@ namespace UsurperRemake.Data
             // Voice: Witty, confident, flirtatious, energetic
             // ═══════════════════════════════════════════════════════════════
 
-            lines.Add(new() { Id = "ch_m1", Text = "There's the most beautiful person in this entire realm. And I should know — I've checked.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationMarried });
+            lines.Add(new() { Id = "ch_m1", Text = "There's the most beautiful person in this entire realm. And I should know -- I've checked.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationMarried });
             lines.Add(new() { Id = "ch_m2", Text = "*sweeps you into a dramatic embrace* My love! My muse! My reason for getting out of bed!", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationMarried });
 
             lines.Add(new() { Id = "ch_l1", Text = "{player_name}! My heart does this ridiculous little flip when I see you. I blame you entirely.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationLove });
@@ -315,7 +315,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "ch_t1", Text = "Hey, you! Yeah, you with the face. The good face. Come, join the fun.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationTrust });
             lines.Add(new() { Id = "ch_r1", Text = "*tips hat* Greetings! You look like someone with excellent taste. Am I right?", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationRespect });
 
-            lines.Add(new() { Id = "ch_n1", Text = "Hello, gorgeous! Wait — everyone's gorgeous to me. But you? Extra gorgeous.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationNormal });
+            lines.Add(new() { Id = "ch_n1", Text = "Hello, gorgeous! Wait -- everyone's gorgeous to me. But you? Extra gorgeous.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "ch_n2", Text = "*dazzling smile* New face! I love new faces! They haven't heard any of my stories yet.", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationNormal });
             lines.Add(new() { Id = "ch_n3", Text = "Welcome, welcome! You look like someone who appreciates a good time. Am I wrong?", Category = "greeting", PersonalityType = "charming", RelationshipTier = GameConfig.RelationNormal });
 
@@ -369,12 +369,12 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "ctx_rich2", Text = "*eyes your gold* Business has been good for you, hasn't it, {player_name}?", Category = "greeting", Context = "rich" });
 
             lines.Add(new() { Id = "ctx_poor1", Text = "You look like you could use a meal. Rough times, {player_name}?", Category = "greeting", Context = "poor" });
-            lines.Add(new() { Id = "ctx_poor2", Text = "*glances at your empty pockets* Don't worry — we've all been there. Things get better.", Category = "greeting", Context = "poor" });
+            lines.Add(new() { Id = "ctx_poor2", Text = "*glances at your empty pockets* Don't worry -- we've all been there. Things get better.", Category = "greeting", Context = "poor" });
 
-            lines.Add(new() { Id = "ctx_hlvl1", Text = "I've heard the tales, {player_name}. Your reputation precedes you — and it's a tall one.", Category = "greeting", Context = "high_level" });
+            lines.Add(new() { Id = "ctx_hlvl1", Text = "I've heard the tales, {player_name}. Your reputation precedes you -- and it's a tall one.", Category = "greeting", Context = "high_level" });
             lines.Add(new() { Id = "ctx_hlvl2", Text = "*respectful nod* Not many reach your level of experience and live to tell about it.", Category = "greeting", Context = "high_level" });
 
-            lines.Add(new() { Id = "ctx_llvl1", Text = "New to these parts? I can see it in how you walk — all wide eyes and wonder.", Category = "greeting", Context = "low_level" });
+            lines.Add(new() { Id = "ctx_llvl1", Text = "New to these parts? I can see it in how you walk -- all wide eyes and wonder.", Category = "greeting", Context = "low_level" });
             lines.Add(new() { Id = "ctx_llvl2", Text = "Just starting out, are you? Take some advice: the dungeon doesn't care how brave you think you are.", Category = "greeting", Context = "low_level" });
 
             return lines;

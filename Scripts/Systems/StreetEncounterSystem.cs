@@ -2567,7 +2567,7 @@ public class StreetEncounterSystem
                 grudgeNpc.Memory?.RecordEvent(new MemoryEvent
                 {
                     Type = MemoryType.Defeated,
-                    Description = $"Defeated again by {player.Name2} — murder revenge failed",
+                    Description = $"Defeated again by {player.Name2} -- murder revenge failed",
                     InvolvedCharacter = player.Name2,
                     Importance = 0.6f,
                     EmotionalImpact = -0.5f
@@ -2711,7 +2711,7 @@ public class StreetEncounterSystem
                         grudgeNpc.Memory?.RecordEvent(new MemoryEvent
                         {
                             Type = MemoryType.Defeated,
-                            Description = $"Defeated again by {player.Name2} — grudge settled",
+                            Description = $"Defeated again by {player.Name2} -- grudge settled",
                             InvolvedCharacter = player.Name2,
                             Importance = 0.5f,
                             EmotionalImpact = -0.3f

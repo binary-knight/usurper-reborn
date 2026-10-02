@@ -3457,7 +3457,7 @@ namespace UsurperRemake.Locations
                 false, null, "chivalry_loss"),
 
             new EvilDeedDef("spread_rumors", "Spread Venomous Rumors",
-                "The gossips near the well are always hungry for scandal. A well-placed\nlie about a merchant's debts could ruin someone — and entertain you.",
+                "The gossips near the well are always hungry for scandal. A well-placed\nlie about a merchant's debts could ruin someone -- and entertain you.",
                 DeedTier.Petty, 6, 0, 0, 0, 0, 0, 10, 1, 0, 0.10f, 0, 0,
                 true, "{PLAYER} has been spreading dark whispers through town.", null),
 
@@ -3473,12 +3473,12 @@ namespace UsurperRemake.Locations
 
             // ── Tier 2: Serious Crimes ──
             new EvilDeedDef("desecrate_dead", "Desecrate the Dead",
-                "The cemetery holds more than memories. The recently buried are sometimes\ninterred with jewelry. The gravedigger looks the other way — for a price.",
+                "The cemetery holds more than memories. The recently buried are sometimes\ninterred with jewelry. The gravedigger looks the other way -- for a price.",
                 DeedTier.Serious, 15, 5, 100, 30, 100, 200, 0, 0, 0, 0.15f, 10, 0,
                 false, null, null),
 
             new EvilDeedDef("arson_market", "Arson in the Market",
-                "The timber-framed stalls of the lower market are tinder-dry. One spark\nand the chaos will keep the guards busy for hours — perfect cover.",
+                "The timber-framed stalls of the lower market are tinder-dry. One spark\nand the chaos will keep the guards busy for hours -- perfect cover.",
                 DeedTier.Serious, 20, 5, 100, 0, 0, 0, 25, 5, -5, 0.20f, 15, 0,
                 true, "Fire ravages the lower market! Arson suspected.", null),
 
@@ -3493,7 +3493,7 @@ namespace UsurperRemake.Locations
                 false, null, "noctura"),
 
             new EvilDeedDef("sabotage_wagons", "Sabotage Crown Wagons",
-                "The Crown's supply caravan passes through the narrow streets at dawn.\nA loosened axle pin, a spooked horse — the King's soldiers go hungry\nwhile the rebels feast.",
+                "The Crown's supply caravan passes through the narrow streets at dawn.\nA loosened axle pin, a spooked horse -- the King's soldiers go hungry\nwhile the rebels feast.",
                 DeedTier.Serious, 18, 5, 100, 0, 0, 0, 30, 8, -8, 0.15f, 0, 200,
                 true, "{PLAYER} is wanted for sabotaging Crown supply lines.", "shadows_bonus"),
 
@@ -3519,7 +3519,7 @@ namespace UsurperRemake.Locations
                 false, null, "void"),
 
             new EvilDeedDef("shatter_seal", "Shatter a Seal Fragment",
-                "The Seven Seals aren't just lore. Fragments of their power echo in\nhidden places. In the deepest part of the alley, you find such a\nfragment — a humming shard of ancient law. You could study it...\nor you could break it and drink in the power that spills out.",
+                "The Seven Seals aren't just lore. Fragments of their power echo in\nhidden places. In the deepest part of the alley, you find such a\nfragment -- a humming shard of ancient law. You could study it...\nor you could break it and drink in the power that spills out.",
                 DeedTier.Dark, 60, 15, 400, 0, 0, 0, 200, 0, 0, 0.10f, 25, 0,
                 true, "A tremor of dark energy ripples through the town. An ancient seal has been defiled.", "seal"),
         };

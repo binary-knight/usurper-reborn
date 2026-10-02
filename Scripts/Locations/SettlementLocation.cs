@@ -345,7 +345,7 @@ public class SettlementLocation : BaseLocation
             bool isActive = state.ActiveBuilding == building;
 
             terminal.SetColor(bs.Tier > BuildingTier.None ? "bright_green" : "gray");
-            terminal.WriteLine($"  {name} — {tier}");
+            terminal.WriteLine($"  {name} -- {tier}");
             terminal.SetColor("white");
             terminal.WriteLine($"    {desc}");
 
@@ -688,7 +688,7 @@ public class SettlementLocation : BaseLocation
             if (room.IsSecretRoom)  tags.Append(' ').Append(Loc.Get("dungeon.scout_icon_secret"));
             if (room.HasStairsDown) tags.Append(' ').Append(Loc.Get("dungeon.scout_tag_stairs"));
 
-            string tagStr = tags.Length > 0 ? " —" + tags : "";
+            string tagStr = tags.Length > 0 ? " --" + tags : "";
 
             // Color by danger
             if (room.IsBossRoom)

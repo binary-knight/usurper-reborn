@@ -1620,7 +1620,7 @@ public class CastleLocation : BaseLocation
         await Pacing.Wait(1500);
 
         terminal.SetColor("white");
-        terminal.WriteLine("  A tide of citizens floods the throne room — farmers,");
+        terminal.WriteLine("  A tide of citizens floods the throne room -- farmers,");
         terminal.WriteLine("  merchants, mothers clutching children, old soldiers");
         terminal.WriteLine("  with rusty swords. Their eyes burn with fury.");
         terminal.WriteLine("");
@@ -1708,7 +1708,7 @@ public class CastleLocation : BaseLocation
         await Pacing.Wait(2000);
 
         terminal.SetColor("cyan");
-        terminal.WriteLine("  The judge — an elderly woman whose son you executed —");
+        terminal.WriteLine("  The judge -- an elderly woman whose son you executed --");
         terminal.WriteLine("  reads the charges in a steady voice:");
         terminal.WriteLine("");
         await Pacing.Wait(1500);
@@ -1718,10 +1718,10 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine($"   of {currentPlayer.TotalExecutions} citizens under color of royal authority.\"");
         terminal.WriteLine("");
         terminal.WriteLine("  \"The law of this land is clear: a tyrant who rules");
-        terminal.WriteLine("   through execution forfeits their right to rule —\"");
+        terminal.WriteLine("   through execution forfeits their right to rule --\"");
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
-        terminal.WriteLine("  \"— and perhaps their right to LIVE.\"");
+        terminal.WriteLine("  \"-- and perhaps their right to LIVE.\"");
         terminal.WriteLine("");
         await Pacing.Wait(2500);
 
@@ -1742,7 +1742,7 @@ public class CastleLocation : BaseLocation
 
         terminal.SetColor("white");
         terminal.WriteLine("  The judge reaches into her robe and produces");
-        terminal.WriteLine("  an ancient coin — tarnished, heavy, inscribed");
+        terminal.WriteLine("  an ancient coin -- tarnished, heavy, inscribed");
         terminal.WriteLine("  with symbols older than the kingdom itself.");
         terminal.WriteLine("");
         await Pacing.Wait(2000);
@@ -1751,9 +1751,9 @@ public class CastleLocation : BaseLocation
         terminal.WriteLine("  \"The gods will decide your fate.\"");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine("  \"Heads — the executioner takes your life.\"");
+        terminal.WriteLine("  \"Heads -- the executioner takes your life.\"");
         terminal.SetColor("gray");
-        terminal.WriteLine("  \"Tails — you walk. Stripped of everything, but alive.\"");
+        terminal.WriteLine("  \"Tails -- you walk. Stripped of everything, but alive.\"");
         terminal.WriteLine("");
         await Pacing.Wait(2500);
 
@@ -7081,7 +7081,7 @@ public class CastleLocation : BaseLocation
             terminal.ClearScreen();
             terminal.SetColor("gray");
             terminal.WriteLine("");
-            terminal.WriteLine("  The king draws the ceremonial blade — an ancient sword that has");
+            terminal.WriteLine("  The king draws the ceremonial blade -- an ancient sword that has");
             terminal.WriteLine("  touched the shoulders of every knight in the realm's history.");
             terminal.WriteLine("");
             await Pacing.Wait(2000);

@@ -2505,7 +2505,7 @@ public partial class GameEngine
                 terminal.SetColor("gray");
                 if (save.IsRecovered)
                 {
-                    terminal.Write("(unparsed — will open recovery menu)");
+                    terminal.Write("(unparsed -- will open recovery menu)");
                 }
                 else
                 {
@@ -2563,7 +2563,7 @@ public partial class GameEngine
                     // bloat here.
                     string reason = selectedSave.IsEmergency
                         ? "This is an emergency save (Ctrl+C dump). The regular save for this character was lost or never written."
-                        : "Save file failed to parse during listing — the save is likely bloated or too large. Not enough memory to load it normally. Recovery options below.";
+                        : "Save file failed to parse during listing -- the save is likely bloated or too large. Not enough memory to load it normally. Recovery options below.";
                     await ShowLoadFailureWithRecovery(selectedSave.FileName, reason);
                     return;
                 }
@@ -2630,7 +2630,7 @@ public partial class GameEngine
             var (saveData, loadError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (saveData == null)
             {
-                await ShowLoadFailureWithRecovery(fileName, loadError ?? "Unknown error — save file could not be parsed.");
+                await ShowLoadFailureWithRecovery(fileName, loadError ?? "Unknown error -- save file could not be parsed.");
                 return;
             }
 
@@ -3292,7 +3292,7 @@ public partial class GameEngine
         terminal.WriteLine("  SAVE LOAD FAILED", "bright_red");
         terminal.WriteLine("========================================================================", "red");
         terminal.WriteLine("");
-        terminal.WriteLine("The game could not load your save. Your save file is still on disk —", "yellow");
+        terminal.WriteLine("The game could not load your save. Your save file is still on disk --", "yellow");
         terminal.WriteLine("it was NOT deleted. Details below so you can recover it.", "yellow");
         terminal.WriteLine("");
 
@@ -3670,7 +3670,7 @@ public partial class GameEngine
             var (verifyData, verifyError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (verifyData?.Player != null)
             {
-                terminal.WriteLine("Repair succeeded — loading character now.", "bright_green");
+                terminal.WriteLine("Repair succeeded -- loading character now.", "bright_green");
                 terminal.WriteLine("");
                 await Pacing.Wait(1000);
                 await LoadSaveByFileName(fileName);
