@@ -1,14 +1,15 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.4 | A follower's turn screen, menus, round status, group lines and NPC ally victory lines are shown in each player's own language.
 ---
 Groups can combine damage, healing and protection. A teammate has its own resources and condition; your healthy leader does not make everyone healthy.
 
 ## Support roles
 
-Heals restore HP. Party wards absorb later damage and are not the same as immediately filling health. Sage ward changes in this release make support relevant to party survival; read the spell description before deciding whether a heal or shield is needed.
+Heals restore HP. Party wards absorb later damage and are not the same as immediately filling health. Sage ward changes in 1.2.0 make support relevant to party survival; read the spell description before deciding whether a heal or shield is needed.
 
 ## Mental in a group
 

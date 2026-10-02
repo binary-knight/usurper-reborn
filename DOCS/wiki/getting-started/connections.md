@@ -1,15 +1,16 @@
 ---
 title: Ways to play
 path: /wiki/en/getting-started/connections/
-checked: 1.2.3
+checked: 1.2.4
 sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md
+history: 1.2.4 | A reconnect waits for the old session to finish saving, and you stay on /who, /tell, groups and broadcasts after it.
 history: 1.2.3 | none
 ---
 ## Browser and SSH
 
 The [website's Play section](/#connect) has the browser terminal and connection information. The browser displays the same text game; keep the tab open during a session. Connection addresses belong on the website rather than in this versioned rules reference.
 
-An SSH client is another way to reach a hosted game. Use the server operator's published connection instructions. A dropped connection is not the same as choosing to quit, so reconnect and inspect your character before continuing.
+An SSH client is another way to reach a hosted game. Use the server operator's published connection instructions. A dropped connection is not the same as choosing to quit, so reconnect and inspect your character before continuing. Online, a reconnect waits for your old session to finish saving, usually under a second, before your character loads, and you stay listed as online.
 
 ## Local single-player
 

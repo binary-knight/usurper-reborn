@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Data/WorldBossData.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs
+history: 1.2.4 | In group combat, a secret boss's battle cry is shown in each player's own language.
 ---
 Boss phases can change abilities and danger during the fight. Base definitions below are not a prediction of a live scaled encounter.
 

@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Systems/SpellSystem.cs
+history: 1.2.4 | none
 ---
 Spells are class-specific definitions. Required level, mana cost and effect text below come from the game. The spell's catalog slot is not the same as your character level.
 
