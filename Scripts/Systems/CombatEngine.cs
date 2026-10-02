@@ -21734,22 +21734,7 @@ public partial class CombatEngine
         // Show NPC teammate reactions after combat victory — broadcast to group
         if (result.Teammates != null && result.Teammates.Count > 0)
         {
-            var reactionSb = new System.Text.StringBuilder();
-            foreach (var teammate in result.Teammates)
-            {
-                if (teammate is NPC npc && npc.IsAlive)
-                {
-                    string reaction = npc.GetReaction(result.Player as Player, "combat_victory");
-                    if (!string.IsNullOrEmpty(reaction))
-                    {
-                        terminal.SetColor("cyan");
-                        terminal.WriteLine($"  {npc.Name2}: \"{reaction}\"");
-                        reactionSb.AppendLine($"\u001b[36m  {npc.Name2}: \"{reaction}\"\u001b[0m");
-                    }
-                }
-            }
-            if (reactionSb.Length > 0)
-                BroadcastGroupCombatEvent(result, reactionSb.ToString());
+            ShowVictoryReactions(result);
             terminal.WriteLine("");
         }
 
@@ -32253,6 +32238,42 @@ public partial class CombatEngine
             ? $"\u001b[37m  {Loc.GetIn(lang, "combat.group_defeated_one", defeated[0].Name)}\u001b[0m"
             : $"\u001b[37m  {Loc.GetIn(lang, "combat.defeated_count", defeated.Count)}\u001b[0m");
         return sb.ToString();
+    }
+
+    /// <summary>
+    /// v1.2.4: each living NPC teammate's victory reaction, picked once, shown to the leader and sent to
+    /// the other group members, each reading it in their own language.
+    /// </summary>
+    private void ShowVictoryReactions(CombatResult result)
+    {
+        // the reaction is picked once; each reader's text is written in that reader's language
+        var said = new List<(string name, Func<string> say)>();
+        foreach (var teammate in result.Teammates)
+        {
+            if (teammate is NPC npc && npc.IsAlive)
+            {
+                var say = npc.GetReactionInLanguage(result.Player as Player, "combat_victory");
+                if (!string.IsNullOrEmpty(say())) said.Add((npc.Name2, say));
+            }
+        }
+        if (said.Count == 0) return;
+        terminal.SetColor("cyan");
+        foreach (var (name, say) in said)
+            foreach (var row in NpcReactionRows(GameConfig.Language, name, say()))
+                terminal.WriteLine(row);
+        BroadcastGroupLocalized(result, lang => InLanguage(lang, () =>
+            string.Concat(said.SelectMany(s => NpcReactionRows(lang, s.name, s.say())).Select(row => $"\u001b[36m{row}\u001b[0m\n"))));
+    }
+
+    /// <summary>
+    /// v1.2.4: an NPC's reaction ("Name: \"...\"") in `lang`, as rows of at most 79 columns; a row
+    /// after the first is indented under the speech.
+    /// </summary>
+    internal static List<string> NpcReactionRows(string lang, string name, string reaction)
+    {
+        string said = Loc.GetIn(lang, "combat.npc_reaction", name, reaction).Trim();
+        var rows = UIHelper.WordWrap(said, UIHelper.WrapWidth - 4);
+        return rows.Select((r, i) => (i == 0 ? "  " : "    ") + r).ToList();
     }
 
     internal static Func<Character, string> LanguageOf = c =>

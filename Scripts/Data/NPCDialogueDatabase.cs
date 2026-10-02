@@ -125,6 +125,16 @@ namespace UsurperRemake.Data
         /// </summary>
         public static string? GetBestLine(string category, NPC npc, Player player, string? eventType = null)
         {
+            var chosen = PickLine(category, npc, player, eventType);
+            return chosen == null ? null : SubstitutePlaceholders(chosen.Text, npc, player);
+        }
+
+        /// <summary>
+        /// v1.2.4: GetBestLine's pick, the line itself, so it can be rendered in more than one language.
+        /// Marks the line used. Null when nothing fits.
+        /// </summary>
+        public static DialogueLine? PickLine(string category, NPC npc, Player player, string? eventType = null)
+        {
             Initialize();
             if (_allLines == null || _allLines.Count == 0) return null;
 
@@ -164,9 +174,20 @@ namespace UsurperRemake.Data
 
             // Mark as recently used
             MarkUsed(npcName, chosen.Id);
+            return chosen;
+        }
 
-            // Substitute placeholders
-            return SubstitutePlaceholders(chosen.Text, npc, player);
+        /// <summary>
+        /// v1.2.4: a picked line in the current language. A built-in line with a translation key
+        /// (npc_dialogue.{Id}, {0} for the player's name) uses it; a line whose text a mod changed, or one
+        /// with no key, keeps its own text.
+        /// </summary>
+        public static string RenderLine(DialogueLine line, NPC npc, Player player)
+        {
+            string key = "npc_dialogue." + line.Id;
+            if (UsurperRemake.Systems.Loc.GetIn("en", key) == line.Text.Replace("{player_name}", "{0}"))
+                return UsurperRemake.Systems.Loc.Get(key, player?.Name2 ?? player?.Name1 ?? "stranger");
+            return SubstitutePlaceholders(line.Text, npc, player);
         }
 
         /// <summary>

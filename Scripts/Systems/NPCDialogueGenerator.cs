@@ -553,13 +553,26 @@ public static class NPCDialogueGenerator
     /// Generate a reaction to an event
     /// </summary>
     public static string GenerateReaction(NPC npc, Player player, string eventType)
+        => ReactionInLanguage(npc, player, eventType)();
+
+    /// <summary>
+    /// v1.2.4: the reaction is picked once; the returned function writes it in the current language, so
+    /// each group member can read the same reaction in their own language.
+    /// </summary>
+    public static Func<string> ReactionInLanguage(NPC npc, Player player, string eventType)
     {
-        if (npc?.Personality == null) return "Hm.";
+        if (npc?.Personality == null) return () => "Hm.";
 
         // Try pre-generated dialogue database first
-        var dbLine = NPCDialogueDatabase.GetBestLine("reaction", npc, player, eventType);
-        if (dbLine != null) return dbLine;
+        var line = NPCDialogueDatabase.PickLine("reaction", npc, player, eventType);
+        if (line != null) return () => NPCDialogueDatabase.RenderLine(line, npc, player);
 
+        string fallback = FallbackReaction(npc, player, eventType);
+        return () => fallback;
+    }
+
+    private static string FallbackReaction(NPC npc, Player player, string eventType)
+    {
         return eventType.ToLower() switch
         {
             "combat_victory" => GenerateCombatVictoryReaction(npc.Personality),
