@@ -83,6 +83,7 @@ public partial class RelationshipSystem
         public DateTime LastUpdated { get; set; }       // last update time
         public int CreatedOnGameDay { get; set; }       // in-game day when relationship started (v0.26)
         public int LastPlayerContactDay { get; set; }   // v1.2: player's PresentDays at the last positive contact
+        public int NeglectLetterSentDay { get; set; }   // v1.2.4: PresentDays when the spouse's neglect letter went out; sent this episode while > LastPlayerContactDay
     }
     
     /// <summary>
@@ -1111,6 +1112,7 @@ public partial class RelationshipSystem
                         LastUpdated = relation.LastUpdated,
                         CreatedOnGameDay = relation.CreatedOnGameDay,  // In-game day tracking (v0.26)
                         LastPlayerContactDay = relation.LastPlayerContactDay,
+                        NeglectLetterSentDay = relation.NeglectLetterSentDay,
                         BannedMarry = relation.BannedMarry,
                         MarriedTimes = relation.MarriedTimes,
                         Kids = relation.Kids,
@@ -1155,6 +1157,7 @@ public partial class RelationshipSystem
                 LastUpdated = saved.LastUpdated,
                 CreatedOnGameDay = saved.CreatedOnGameDay,  // Restore in-game day tracking (v0.26)
                 LastPlayerContactDay = saved.LastPlayerContactDay,
+                NeglectLetterSentDay = saved.NeglectLetterSentDay,
                 BannedMarry = saved.BannedMarry,
                 MarriedTimes = saved.MarriedTimes,
                 Kids = saved.Kids,
@@ -1226,6 +1229,20 @@ public partial class RelationshipSystem
                         changed = true;
                     }
                 }
+                // v1.2.4: one letter per neglect episode, at the first present day neglect reaches
+                // SpouseNeglectLetterDays. The stamp is the day it was sent, so a letter counts for
+                // this episode only while it is newer than the last contact; contact starts a new
+                // episode, and an old save (stamp 0) has sent none.
+                if (neglect >= GameConfig.SpouseNeglectLetterDays && record.NeglectLetterSentDay <= record.LastPlayerContactDay)
+                {
+                    record.NeglectLetterSentDay = player.PresentDays;
+                    MailSystem.SendSpouseNeglectLetter(player.Name2, otherName);
+                    changed = true;
+                }
+                // The 28-day leaving scene (design item F: the spouse leaves at the next Home visit,
+                // then ProcessDivorce) is deliberately NOT built. Maintainer decision 2026-10-02: ship
+                // the 21-day letter only and hold the leaving scene until real players reach those
+                // thresholds. It would go here, as a pending flag Home acts on.
             }
             else if (onStep)
             {

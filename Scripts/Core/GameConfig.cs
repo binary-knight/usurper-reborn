@@ -2264,6 +2264,7 @@ public static partial class GameConfig
     public const int NeglectStepDays = 7;
     public const int SpouseNeglectGraceDays = 7;
     public const int SpouseNeglectLovePenalty = 5;
+    public const int SpouseNeglectLetterDays = 21;   // v1.2.4: the spouse writes once per neglect episode
     // v1.2 (design item G): an NPC left to die while the player could have helped
     public const int AbandonPenaltySteps = 2;
     public const int AbandonCompanionLoyaltyPenalty = 15;

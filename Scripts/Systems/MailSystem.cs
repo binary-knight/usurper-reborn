@@ -41,6 +41,37 @@ public static partial class MailSystem
     }
     
     /// <summary>
+    /// v1.2.4 (design item F): the letter a neglected spouse writes after
+    /// SpouseNeglectLetterDays present days without contact. Sent in the spouse's name through
+    /// this in-process mailbox, which Main Street's MAIL command reads in every mode.
+    /// </summary>
+    public static void SendSpouseNeglectLetter(string playerName, string spouseName)
+    {
+        var mail = new MailRecord
+        {
+            Receiver = playerName,
+            Sender = spouseName,
+            Subject = Loc.Get("mail.neglect_letter_subject"),
+            Date = DateTime.Now,
+            ReadFlag = false,
+            Special = GameConfig.MailRequestNothing,
+            Lines = new List<string>
+            {
+                Loc.Get("mail.neglect_letter_line1"),
+                Loc.Get("mail.neglect_letter_line2"),
+                Loc.Get("mail.neglect_letter_line3", spouseName)
+            }
+        };
+        SaveMailRecord(mail);
+    }
+
+    /// <summary>Mail addressed to <paramref name="playerName"/>, newest first (tests read the letter back).</summary>
+    internal static List<MailRecord> MailFor(string playerName) => GetPlayerMail(playerName);
+
+    /// <summary>Empties the in-process mailbox (tests share it across the singleton collection).</summary>
+    internal static void ClearAllMail() => mailDatabase.Clear();
+
+    /// <summary>
     /// Send birthday mail with gift options
     /// Pascal: Birthday mail processing in MAIL.PAS
     /// </summary>
