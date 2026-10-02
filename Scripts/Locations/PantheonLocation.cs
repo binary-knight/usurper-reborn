@@ -1396,11 +1396,10 @@ public class PantheonLocation : BaseLocation
         foreach (var session in MudServer.Instance?.ActiveSessions.Values.ToList() ?? new())
         {
             var player = session?.Context?.Engine?.CurrentPlayer;
-            if (player == null || player.IsImmortal || player.WorshippedGod != divineName) continue;
-            if (GodRegistry.GetWorshippedGod(player)?.Name == divineName)
-                GodSwitchSystem.Switch(player, null, GodChangeBy.Other, otherSession: true);
-            else
-                player.WorshippedGod = "";   // a canon god wins; only the stale player-god entry goes
+            // a canon god wins over a stale player-god entry (the load clears that one), so only a
+            // player who follows this god now is switched
+            if (player == null || player.IsImmortal || GodRegistry.GetWorshippedGod(player)?.Name != divineName) continue;
+            GodSwitchSystem.Switch(player, null, GodChangeBy.Other, otherSession: true);
             string lang = session!.Context?.Language ?? "en";
             session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "pantheon.follower_god_renounced", divineName)}\u001b[0m");
             session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "pantheon.follower_now_godless")}\u001b[0m");
