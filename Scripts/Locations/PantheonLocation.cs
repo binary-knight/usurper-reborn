@@ -390,10 +390,9 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_green");
                     terminal.Write($"{boon.Name} {tierStr,-5}");
                     terminal.SetColor("gray");
-                    string activeTail = $" ({cost} pts)";
-                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + activeTail.Length, 29)}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + $" ({cost} pts)".Length, 29)}");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($" {alignTag,-12}{activeTail}");
+                    terminal.WriteLine($" {alignTag,-12} ({cost} pts)");
                     idx++;
                 }
                 terminal.WriteLine("");
@@ -433,8 +432,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("darkgray");
                     terminal.Write($"  {optNum,2}. ");
                     terminal.SetColor("gray");
-                    string poorTail = $" (+{addedCost} pts) *";
-                    terminal.WriteLine($"{label,-25} -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, poorTail.Length), 27)} {alignTag,-12}{poorTail}");
+                    terminal.WriteLine($"{label,-25} -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts) *".Length), 27)} {alignTag,-12} (+{addedCost} pts) *");
                 }
                 else
                 {
@@ -443,10 +441,9 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_cyan");
                     terminal.Write($"{label,-25}");
                     terminal.SetColor("gray");
-                    string buyTail = $" (+{addedCost} pts)";
-                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, buyTail.Length), 27)}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts)".Length), 27)}");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($" {alignTag,-12}{buyTail}");
+                    terminal.WriteLine($" {alignTag,-12} (+{addedCost} pts)");
                     optionMap[optNum] = (boon.Id, nextTier, addedCost);
                 }
                 optNum++;
