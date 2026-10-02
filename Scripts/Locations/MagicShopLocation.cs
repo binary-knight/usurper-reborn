@@ -1668,16 +1668,19 @@ public partial class MagicShopLocation : BaseLocation
     /// <summary>v1.2.5: the English tag a named enchant appends to the item's stored name, by enchant tier
     /// (both enchant flows write it from here, the legacy one by its own choice + 1), "" for a stat tier.
     /// RemoveEnchantment strips every tag this returns, so a new tag is stripped as soon as it is written.</summary>
-    internal static string NamedEnchantTag(int tierChoice) => tierChoice switch
+    internal static string NamedEnchantTag(int tierChoice) =>
+        NamedEnchantTags.FirstOrDefault(t => t.Tier == tierChoice).Tag ?? "";
+
+    // v1.2.5: the named enchant tags by tier, the one list both enchant flows write from and removal strips.
+    private static readonly (int Tier, string Tag)[] NamedEnchantTags =
     {
-        5 => " (Blessed)",
-        6 => " (Ocean-Touched)",
-        7 => " (Warded)",
-        8 => " (Predator)",
-        9 => " (Lifedrinker)",
-        13 => " (Phoenix Fire)",
-        14 => " (Frostbite)",
-        _ => "",
+        (5, " (Blessed)"),
+        (6, " (Ocean-Touched)"),
+        (7, " (Warded)"),
+        (8, " (Predator)"),
+        (9, " (Lifedrinker)"),
+        (13, " (Phoenix Fire)"),
+        (14, " (Frostbite)"),
     };
 
     /// <summary>v1.2.5: every named enchant tag (NamedEnchantTag over every tier).</summary>
