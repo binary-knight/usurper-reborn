@@ -147,6 +147,7 @@ public class MagicFix125Tests
         foreach (var lang in new[] { "en", "hu" })
         {
             var hero = Wearing("Leather Cap", 0);
+            string before = Form(hero.GetEquipment(EquipmentSlot.Head)!);
             await InLanguage(lang, async () =>
             {
                 var s = stat > 0 ? Open(hero, "1", $"{tier}", $"{stat}", "Y") : Open(hero, "1", $"{tier}", "Y");
@@ -157,22 +158,192 @@ public class MagicFix125Tests
             enchanted.Should().Be("Leather Cap" + tag, $"tier {tier} writes its English tag in {lang}");
             Family(enchanted).Should().Be("Leather Cap", "the resolver reads the enchanted name");
 
+            Form(hero.GetEquipment(EquipmentSlot.Head)!).Should().NotBe(before, $"tier {tier} changes the item");
+            long gold = hero.Gold;
+
             await InLanguage(lang, async () => { await Remove(hero); return 0; });
-            string stripped = hero.GetEquipment(EquipmentSlot.Head)!.Name;
-            stripped.Should().Be("Leather Cap", $"removal strips{tag} in {lang}");
-            Family(stripped).Should().Be("Leather Cap", "the resolver reads the stripped name");
+            var cap = hero.GetEquipment(EquipmentSlot.Head)!;
+            cap.Name.Should().Be("Leather Cap", $"removal strips{tag} in {lang}");
+            Family(cap.Name).Should().Be("Leather Cap", "the resolver reads the stripped name");
+            Form(cap).Should().Be(before, $"removal returns every stat, flag, the value and the name of tier {tier} to base");
+            cap.HasFireEnchant.Should().BeFalse(); cap.HasFrostEnchant.Should().BeFalse();
+            cap.GetEnchantmentCount().Should().Be(0); cap.GetEnchantedKinds().Should().BeEmpty();
+            cap.EnchantBase.Should().BeEmpty("the record goes with the enchants");
+            hero.Gold.Should().BeLessThan(gold, "removal is paid for, never refunded");
         }
     }
+
+    /// <summary>Everything an enchant can change (name, value, stats, fire and frost), plus the fields it never
+    /// touches, as one comparable string.</summary>
+    private static string Form(Equipment e) => System.Text.Json.JsonSerializer.Serialize(e.ToEnchantBaseRecord())
+        + $"|{e.MinLevel}|{e.Rarity}|{e.MaxHPBonus}|{e.MaxManaBonus}|{e.ShieldBonus}|{e.BlockChance}|{e.Slot}";
 
     [Theory]
     [MemberData(nameof(EveryEnchant))]
     public async Task Removal_CleansATagAnItemAlreadyCarries(int tier, int stat, string tag)
     {
         _ = tier; _ = stat;
-        // An item saved with this tag (an older removal left Phoenix Fire and Frostbite behind) and enchanted again.
-        var hero = Wearing("Leather Cap" + tag, 1);
+        // An older removal left this tag on the name and cleared the count. Enchanted again now, the record keeps
+        // the stale name, and removal strips the tag from it too.
+        var hero = Wearing("Leather Cap" + tag, 0);
+        var s = Open(hero, "1", "7", "Y");
+        await Run(s, "EnchantEquipment", hero);
+        hero.GetEquipment(EquipmentSlot.Head)!.Name.Should().Be("Leather Cap" + tag + " (Warded)");
         await Remove(hero);
         hero.GetEquipment(EquipmentSlot.Head)!.Name.Should().Be("Leather Cap", $"removal strips{tag} from a stored name");
+        hero.GetEquipment(EquipmentSlot.Head)!.MagicResistance.Should().Be(0);
+    }
+
+    // ---------- 1b. full undo through the bag, the save, the enchant limit, and items with no record ----------
+
+    private static PlayerData Save(Character hero) =>
+        (PlayerData)typeof(SaveSystem).GetMethod("SerializePlayer", F)!.Invoke(SaveSystem.Instance, new object[] { hero })!;
+
+    private static Character Reload(Character hero)
+    {
+        var data = System.Text.Json.JsonSerializer.Deserialize<PlayerData>(System.Text.Json.JsonSerializer.Serialize(Save(hero)))!;
+        var restore = typeof(GameEngine).GetMethod("RestorePlayerFromSaveData", F)!;
+        try
+        {
+            var back = (Character)restore.Invoke(GameEngine.Instance, new object[] { data })!;
+            back.Gold = hero.Gold;
+            return back;
+        }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+    }
+
+    private static async Task Enchant(Character hero, int tier, int stat = 0)
+    {
+        var s = stat > 0 ? Open(hero, "1", $"{tier}", $"{stat}", "Y") : Open(hero, "1", $"{tier}", "Y");
+        await Run(s, "EnchantEquipment", hero);
+    }
+
+    [Fact]
+    public async Task TheRecord_SurvivesTheBag_AndASaveAndReload()
+    {
+        var hero = Wearing("Leather Cap", 0);
+        string before = Form(hero.GetEquipment(EquipmentSlot.Head)!);
+        await Enchant(hero, 13);
+        await Enchant(hero, 2, 3);
+        var cap = hero.GetEquipment(EquipmentSlot.Head)!;
+        cap.EnchantBase.Should().NotBeEmpty("the first enchant records the base form");
+
+        // through the bag: Equipment to Item, the inventory save form, and back
+        var item = hero.ConvertEquipmentToLegacyItem(cap);
+        var saved = InventoryItemData.FromItem(item);
+        var json = System.Text.Json.JsonSerializer.Deserialize<InventoryItemData>(System.Text.Json.JsonSerializer.Serialize(saved))!;
+        var back = Character.BuildEquipmentFromItem(json.ToItem(), EquipmentSlot.Head, WeaponHandedness.None, WeaponType.None);
+        back.EnchantBase.Should().Be(cap.EnchantBase, "the bag carries the record");
+
+        // through a save and reload
+        var loaded = Reload(hero);
+        var reloaded = loaded.GetEquipment(EquipmentSlot.Head)!;
+        reloaded.EnchantBase.Should().Be(cap.EnchantBase, "DynamicEquipment[].EnchantBase is saved and restored");
+        Form(reloaded).Should().Be(Form(cap));
+        await Remove(loaded);
+        Form(loaded.GetEquipment(EquipmentSlot.Head)!).Should().Be(before);
+    }
+
+    [Fact]
+    public async Task AfterRemoval_TheEnchantLimitStillHolds_AndTheSameKindCanGoOnOnce()
+    {
+        var hero = Wearing("Leather Cap", 0);
+        var cap = hero.GetEquipment(EquipmentSlot.Head)!;
+        await Enchant(hero, 2, 3);
+        var once = hero.GetEquipment(EquipmentSlot.Head)!;
+        // a sixth enchant is refused at the limit
+        for (int i = once.GetEnchantmentCount(); i < GameConfig.MaxEnchantments; i++) once.IncrementEnchantmentCount();
+        string full = Form(once);
+        await Enchant(hero, 5);
+        Form(hero.GetEquipment(EquipmentSlot.Head)!).Should().Be(full, "an item at the limit takes no more");
+
+        await Remove(hero);
+        hero.GetEquipment(EquipmentSlot.Head)!.DexterityBonus.Should().Be(cap.DexterityBonus);
+        await Enchant(hero, 2, 3);
+        var again = hero.GetEquipment(EquipmentSlot.Head)!;
+        again.Name.Should().Be("Leather Cap +4 Dex");
+        again.DexterityBonus.Should().Be(cap.DexterityBonus + 4, "the bonus goes on once over the base");
+        again.GetEnchantmentCount().Should().Be(1);
+        await Enchant(hero, 2, 3);
+        hero.GetEquipment(EquipmentSlot.Head)!.DexterityBonus.Should().Be(cap.DexterityBonus + 4, "the same kind twice is still refused");
+    }
+
+    private static Equipment Template(string name) =>
+        EquipmentDatabase.GetBuiltInTemplates().Single(t => t.Name == name && t.Slot == EquipmentSlot.Head);
+
+    /// <summary>An item enchanted before 1.2.5: the template plus +4 Dex and Frostbite, two markers, no record.</summary>
+    private static Equipment LegacyCap(int extraDex = 0)
+    {
+        var e = Template("Leather Cap").Clone();
+        e.DexterityBonus += 4 + extraDex;
+        MagicShopLocation.ApplyNamedEnchant(e, 14);
+        e.Name = "Leather Cap +4 Dex (Frostbite)";
+        e.Value += 9000;
+        e.IncrementEnchantmentCount(); e.IncrementEnchantmentCount();
+        e.AddEnchantedKind("dex"); e.AddEnchantedKind("frost");
+        return e;
+    }
+
+    [Fact]
+    public async Task ALegacyStackedItem_IsUnchangedByASaveAndReload_AndRemovalLandsOnItsTemplate()
+    {
+        var hero = Hero();
+        hero.EquippedItems[EquipmentSlot.Head] = EquipmentDatabase.RegisterDynamic(LegacyCap());
+        var cap = hero.GetEquipment(EquipmentSlot.Head)!;
+        cap.EnchantBase.Should().BeEmpty("enchanted before 1.2.5, it has no record");
+
+        var loaded = Reload(hero);
+        var reloaded = loaded.GetEquipment(EquipmentSlot.Head)!;
+        Form(reloaded).Should().Be(Form(cap), "a reload leaves the stacked item as it was");
+        reloaded.Description.Should().Be(cap.Description);
+        reloaded.EnchantBase.Should().BeEmpty();
+
+        await Remove(loaded);
+        var stripped = loaded.GetEquipment(EquipmentSlot.Head)!;
+        Form(stripped).Should().Be(Form(Template("Leather Cap")), "removal returns it exactly to its template");
+        stripped.GetEnchantmentCount().Should().Be(0);
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public async Task AnItemWithNoRecordAndNoMatchingTemplate_IsLeftAlone_AndNothingIsCharged(string lang)
+    {
+        foreach (var item in new[] { RolledLegacy(), LegacyCap(extraDex: 1) })
+        {
+            var hero = Hero();
+            int id = EquipmentDatabase.RegisterDynamic(item);
+            hero.EquippedItems[EquipmentSlot.Head] = id;
+            string before = Form(item) + item.Description;
+            long gold = hero.Gold;
+            string shown = await InLanguage(lang, async () =>
+            {
+                var s = Open(hero, "1", "Y");
+                await Run(s, "RemoveEnchantment", hero);
+                return s.Text;
+            });
+            hero.EquippedItems[EquipmentSlot.Head].Should().Be(id, "the item is not replaced");
+            var still = hero.GetEquipment(EquipmentSlot.Head)!;
+            (Form(still) + still.Description).Should().Be(before, "nothing on it changes");
+            hero.Gold.Should().Be(gold, "nothing is charged");
+            shown.Should().Contain(Loc.GetIn(lang, "magic_shop.remove_no_base"));
+            Capture($"magic-fix-no-base-{lang}.txt", shown);
+            foreach (var row in Rows(shown))
+                if (row.Length > 0 && "╔║╚".IndexOf(row[0]) < 0)
+                    row.Length.Should().BeLessOrEqualTo(MaxWidth, $"every {lang} row fits: \"{row}\"");
+        }
+    }
+
+    /// <summary>A rolled loot item (no built-in template of that name) enchanted before 1.2.5.</summary>
+    private static Equipment RolledLegacy()
+    {
+        var e = new Equipment
+        {
+            Name = "Abyssal Studded Leather Cap of Fortitu +4 Dex", Slot = EquipmentSlot.Head, ArmorClass = 41, DexterityBonus = 13,
+            MinLevel = 1, Value = 5000,
+        };
+        e.IncrementEnchantmentCount();
+        e.AddEnchantedKind("dex");
+        return e;
     }
 
     [Fact]

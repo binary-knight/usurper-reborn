@@ -24523,6 +24523,7 @@
   "magic_shop.enchant_result": "{0} mostantól: {1}!",
   "magic_shop.remove_nods": "'{0} komolyan bólint. 'Egy bűvölés eltávolítása kényes munka.'",
   "magic_shop.remove_no_gold": "'Nincs elég aranyad' - mondja a gnóm.",
+  "magic_shop.remove_no_base": "Eredeti alakja nincs feljegyezve, ezért a bűvölés nem oldható le róla.",
   "magic_shop.remove_dissolve": "A bűvölések halványuló fényfoszlányokká oldódnak...",
   "magic_shop.remove_restored": "{0}: a tárgy visszanyerte eredeti formáját.",
   "magic_shop.picker_search": "Keresés: \"{0}\" ({1} találat)",

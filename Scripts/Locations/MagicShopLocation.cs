@@ -2310,6 +2310,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Clone the equipment
         var enchanted = selectedEquip.Clone();
+        enchanted.RecordEnchantBase();   // v1.2.5: before the first enchant, keep the item as it is, for full removal
         enchanted.IncrementEnchantmentCount();
         // Record which kind was applied so future enchant attempts can refuse a
         // duplicate of the same stat / named enchant on this item.
@@ -2324,41 +2325,17 @@ public partial class MagicShopLocation : BaseLocation
                 ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
                 suffix = StatSuffix(selectedTier.bonus, statChoice);
                 break;
-            case 5: // Divine Blessing
-                enchanted.StrengthBonus += 3; enchanted.DexterityBonus += 3;
-                enchanted.DefenceBonus += 3; enchanted.WisdomBonus += 3;
-                enchanted.WeaponPower += 3; enchanted.ArmorClass += 3;
-                suffix = NamedEnchantTag(5);
-                break;
-            case 6: // Ocean's Touch
-                enchanted.IntelligenceBonus += 6; enchanted.WisdomBonus += 4;
-                suffix = NamedEnchantTag(6);
-                break;
-            case 7: // Ward
-                enchanted.MagicResistance += 20; enchanted.DefenceBonus += 2;
-                suffix = NamedEnchantTag(7);
-                break;
-            case 8: // Predator
-                enchanted.CriticalChanceBonus += 5; enchanted.CriticalDamageBonus += 10;
-                suffix = NamedEnchantTag(8);
-                break;
-            case 9: // Lifedrinker
-                enchanted.LifeSteal += 3;
-                suffix = NamedEnchantTag(9);
+            case 5: case 6: case 7: case 8: case 9: // Divine Blessing, Ocean's Touch, Ward, Predator, Lifedrinker
+                ApplyNamedEnchant(enchanted, tierChoice);
+                suffix = NamedEnchantTag(tierChoice);
                 break;
             case 10: case 11: case 12: // Mythic/Legendary/Godforged stat enchants
                 ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
                 suffix = StatSuffix(selectedTier.bonus, statChoice);
                 break;
-            case 13: // Phoenix Fire
-                enchanted.WeaponPower += 20;
-                enchanted.HasFireEnchant = true;
-                suffix = NamedEnchantTag(13);
-                break;
-            case 14: // Frostbite
-                enchanted.WeaponPower += 20;
-                enchanted.HasFrostEnchant = true;
-                suffix = NamedEnchantTag(14);
+            case 13: case 14: // Phoenix Fire, Frostbite
+                ApplyNamedEnchant(enchanted, tierChoice);
+                suffix = NamedEnchantTag(tierChoice);
                 break;
             default:
                 suffix = "";
@@ -2442,7 +2419,98 @@ public partial class MagicShopLocation : BaseLocation
         };
     }
 
-    private void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
+    /// <summary>v1.2.5: what a named enchant tier adds to an item (the enchant applies it; removal of an item
+    /// enchanted before 1.2.5 reads it to check the item against its template).</summary>
+    internal static void ApplyNamedEnchant(Equipment e, int tierChoice)
+    {
+        switch (tierChoice)
+        {
+            case 5: // Divine Blessing
+                e.StrengthBonus += 3; e.DexterityBonus += 3; e.DefenceBonus += 3; e.WisdomBonus += 3;
+                e.WeaponPower += 3; e.ArmorClass += 3;
+                break;
+            case 6: e.IntelligenceBonus += 6; e.WisdomBonus += 4; break;      // Ocean's Touch
+            case 7: e.MagicResistance += 20; e.DefenceBonus += 2; break;      // Ward
+            case 8: e.CriticalChanceBonus += 5; e.CriticalDamageBonus += 10; break;   // Predator
+            case 9: e.LifeSteal += 3; break;                                  // Lifedrinker
+            case 13: e.WeaponPower += 20; e.HasFireEnchant = true; break;     // Phoenix Fire
+            case 14: e.WeaponPower += 20; e.HasFrostEnchant = true; break;    // Frostbite
+        }
+    }
+
+    // v1.2.5: the enchant-touched stats of a record as one vector, to compare an item with its template.
+    private static int[] StatVector(Equipment.EnchantBaseRecord r) => new[]
+    {
+        r.WeaponPower, r.ArmorClass, r.StrengthBonus, r.DexterityBonus, r.ConstitutionBonus, r.IntelligenceBonus,
+        r.WisdomBonus, r.CharismaBonus, r.DefenceBonus, r.StaminaBonus, r.AgilityBonus, r.CriticalChanceBonus,
+        r.CriticalDamageBonus, r.MagicResistance, r.LifeSteal,
+    };
+
+    /// <summary>v1.2.5: the form enchant removal returns an item to. The record taken before its first enchant
+    /// when there is one; for an item enchanted before 1.2.5 (no record), its built-in template, but only when
+    /// the item is exactly that template plus the enchants its kind list names; otherwise null (unknown).</summary>
+    internal static Equipment.EnchantBaseRecord? EnchantBaseOf(Equipment item)
+    {
+        var recorded = item.GetEnchantBase();
+        if (recorded != null) return recorded;
+        var template = VerifiedTemplate(item);
+        return template?.ToEnchantBaseRecord();
+    }
+
+    /// <summary>v1.2.5: the built-in template (same name once the enchant tags are stripped, same slot) that this
+    /// item is plus its recorded enchants and nothing else: every field an enchant never touches equal, the
+    /// named enchants' exact amounts, each stat enchant one stat tier's bonus on its own stat. Failure damage,
+    /// a rolled loot item or a kind list that does not match the enchant count all fail the check.</summary>
+    internal static Equipment? VerifiedTemplate(Equipment item)
+    {
+        var kinds = item.GetEnchantedKinds();
+        if (kinds.Count == 0 || kinds.Count != item.GetEnchantmentCount()) return null;
+        string baseName = StripEnchantTags(item.Name);
+        foreach (var t in EquipmentDatabase.GetBuiltInTemplates())
+            if (t.Slot == item.Slot && t.Name == baseName && IsTemplatePlusKinds(item, t, kinds))
+                return t;
+        return null;
+    }
+
+    private static bool IsTemplatePlusKinds(Equipment item, Equipment t, List<string> kinds)
+    {
+        bool untouchedSame = item.Handedness == t.Handedness && item.WeaponType == t.WeaponType && item.ArmorType == t.ArmorType
+            && item.Rarity == t.Rarity && item.MinLevel == t.MinLevel && item.MaxHPBonus == t.MaxHPBonus && item.MaxManaBonus == t.MaxManaBonus
+            && item.ShieldBonus == t.ShieldBonus && item.BlockChance == t.BlockChance && item.PoisonDamage == t.PoisonDamage
+            && item.ManaSteal == t.ManaSteal && item.ArmorPiercing == t.ArmorPiercing && item.Thorns == t.Thorns
+            && item.HPRegen == t.HPRegen && item.ManaRegen == t.ManaRegen && item.HasLightningEnchant == t.HasLightningEnchant
+            && item.HasPoisonEnchant == t.HasPoisonEnchant && item.HasHolyEnchant == t.HasHolyEnchant
+            && item.HasShadowEnchant == t.HasShadowEnchant && item.HasBossSlayer == t.HasBossSlayer && item.HasTitanResolve == t.HasTitanResolve
+            && item.Value >= t.Value;
+        if (!untouchedSame) return false;
+
+        // The template with every named enchant on the list applied, and each stat enchant's stat noted.
+        var expected = t.Clone();
+        var statTiers = Enumerable.Range(1, EnchantTiers.Length).Where(tier => tier <= 4 || (tier >= 10 && tier <= 12)).ToList();
+        var statBonuses = statTiers.Select(tier => EnchantTiers[tier - 1].bonus).ToHashSet();
+        var statFields = new List<int>();
+        foreach (var kind in kinds)
+        {
+            int named = NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
+            if (named > 0) { ApplyNamedEnchant(expected, named); continue; }
+            int stat = Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
+            if (stat == 0) return false;
+            var unit = new Equipment();
+            ApplyEquipmentStatBonus(unit, stat, 1);
+            statFields.Add(Array.IndexOf(StatVector(unit.ToEnchantBaseRecord()), 1));
+        }
+        if (item.HasFireEnchant != expected.HasFireEnchant || item.HasFrostEnchant != expected.HasFrostEnchant) return false;
+        var have = StatVector(item.ToEnchantBaseRecord());
+        var want = StatVector(expected.ToEnchantBaseRecord());
+        for (int i = 0; i < have.Length; i++)
+        {
+            int extra = have[i] - want[i];
+            if (statFields.Contains(i) ? !statBonuses.Contains(extra) : extra != 0) return false;
+        }
+        return true;
+    }
+
+    private static void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
     {
         switch (statChoice)
         {
@@ -2512,6 +2580,17 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
+        var (rmSlot, rmEquip) = enchantedItems[choice - 1];
+        // v1.2.5: removal returns the item to its base form; when that form is not known, nothing is done
+        // and nothing is charged (clearing the count but keeping the powers would let enchants stack).
+        var baseForm = EnchantBaseOf(rmEquip);
+        if (baseForm == null)
+        {
+            DisplayMessage(Loc.Get("magic_shop.remove_no_base"), "red");
+            await terminal.WaitForKey();
+            return;
+        }
+
         if (player.Gold < removalCost)
         {
             DisplayMessage(Loc.Get("magic_shop.remove_no_gold"), "red");
@@ -2519,7 +2598,6 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        var (rmSlot, rmEquip) = enchantedItems[choice - 1];
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.remove_enchant_confirm", rmEquip.Name)))
         {
@@ -2527,16 +2605,17 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        // Find the base equipment by looking up by original ID pattern
-        // For dynamic equipment, we can't easily get back to the original - so just strip enchantments
         player.Gold -= removalCost;
 
-        // Create a clean clone and reset enchantment tracking
+        // v1.2.5: back to the base form: every stat, the fire and frost flags, the value and the name the
+        // enchants changed. The record goes too, so a later first enchant records afresh.
         var stripped = rmEquip.Clone();
+        stripped.ApplyEnchantBaseRecord(baseForm);
+        stripped.EnchantBase = "";
         stripped.ClearEnchantMarkers();   // v1.1.7: the count and the kinds, so paid removal really frees the item
 
         // Strip every tag an enchant writes (v1.2.5: the list is NamedEnchantTag, so Phoenix Fire and
-        // Frostbite are stripped too, and so is a stale tag left on an item by an older removal)
+        // Frostbite are stripped too, and so is a stale tag on the base name)
         stripped.Name = StripEnchantTags(stripped.Name);
 
         EquipmentDatabase.RegisterDynamic(stripped);

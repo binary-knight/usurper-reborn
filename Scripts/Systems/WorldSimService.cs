@@ -1809,6 +1809,7 @@ namespace UsurperRemake.Systems
                             IsCursed = equipData.IsCursed,
                             Rarity = (EquipmentRarity)equipData.Rarity,
                     Family = equipData.Family ?? "",
+                    EnchantBase = equipData.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                     IsIdentified = equipData.IsIdentified,
                             WeaponType = (WeaponType)equipData.WeaponType,
                             Handedness = (WeaponHandedness)equipData.Handedness,

@@ -24219,6 +24219,7 @@
   "magic_shop.enchant_result": "Il tuo {0} ora è {1}!",
   "magic_shop.remove_nods": "'{0} annuisce gravemente. 'Rimuovere un incantamento è un lavoro delicato.'",
   "magic_shop.remove_no_gold": "'Ti manca l'oro', dice lo gnomo.",
+  "magic_shop.remove_no_base": "Forma originale sconosciuta: i suoi incantesimi non si possono rimuovere.",
   "magic_shop.remove_dissolve": "Gli incantamenti si dissolvono in fili di luce che svanisce...",
   "magic_shop.remove_restored": "Il tuo {0} è tornato alla sua forma base.",
   "magic_shop.picker_search": "Ricerca: \"{0}\" ({1} risultati)",

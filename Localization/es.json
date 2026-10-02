@@ -24230,6 +24230,7 @@
   "magic_shop.enchant_result": "¡Tu {0} ahora es {1}!",
   "magic_shop.remove_nods": "'{0} asiente con gravedad. 'Quitar un encantamiento es un trabajo delicado.'",
   "magic_shop.remove_no_gold": "'Te falta el oro', dice el gnomo.",
+  "magic_shop.remove_no_base": "Sin registro de su forma original, sus encantamientos no se pueden quitar.",
   "magic_shop.remove_dissolve": "Los encantamientos se disuelven en hilos de luz que se apaga...",
   "magic_shop.remove_restored": "Tu {0} ha vuelto a su forma básica.",
   "magic_shop.picker_search": "Búsqueda: \"{0}\" ({1} resultados)",

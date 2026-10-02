@@ -24662,6 +24662,7 @@
   "magic_shop.enchant_result": "Your {0} is now {1}!",
   "magic_shop.remove_nods": "'{0} nods gravely. 'Removing an enchantment is delicate work.'",
   "magic_shop.remove_no_gold": "'You lack the gold,' the gnome says.",
+  "magic_shop.remove_no_base": "Its original form is not on record, so its enchantments cannot be lifted.",
   "magic_shop.remove_dissolve": "The enchantments dissolve into wisps of fading light...",
   "magic_shop.remove_restored": "Your {0} has been restored to its base form.",
   "magic_shop.picker_search": "Search: \"{0}\" ({1} matches)",

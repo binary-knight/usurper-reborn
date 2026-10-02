@@ -24219,6 +24219,7 @@
   "magic_shop.enchant_result": "Votre {0} est maintenant {1} !",
   "magic_shop.remove_nods": "'{0} hoche gravement la tête. 'Retirer un enchantement est un travail délicat.'",
   "magic_shop.remove_no_gold": "'Vous manquez d'or', dit le gnome.",
+  "magic_shop.remove_no_base": "Sa forme d'origine n'est pas connue : ses enchantements ne peuvent être levés.",
   "magic_shop.remove_dissolve": "Les enchantements se dissipent en volutes de lumière évanescente...",
   "magic_shop.remove_restored": "Votre {0} a retrouvé sa forme de base.",
   "magic_shop.picker_search": "Recherche : \"{0}\" ({1} résultats)",
