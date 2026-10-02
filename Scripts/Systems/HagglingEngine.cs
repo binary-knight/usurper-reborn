@@ -13,7 +13,8 @@ public static class HagglingEngine
     public enum ShopType
     {
         Weapon = 'W',
-        Armor = 'A'
+        Armor = 'A',
+        Magic = 'M' // v1.2.4: appended
     }
     
     /// <summary>The outcome of one haggle: the agreed pre-tax price (the original if nothing
@@ -97,6 +98,7 @@ public static class HagglingEngine
         {
             ShopType.Weapon => player.WeapHag > 0,
             ShopType.Armor => player.ArmHag > 0,
+            ShopType.Magic => player.MagicHag > 0,
             _ => false
         };
     }
@@ -113,6 +115,9 @@ public static class HagglingEngine
                 break;
             case ShopType.Armor:
                 player.ArmHag--;
+                break;
+            case ShopType.Magic:
+                player.MagicHag--;
                 break;
         }
     }
@@ -164,6 +169,7 @@ public static class HagglingEngine
                 break;
 
             case ShopType.Armor:
+            case ShopType.Magic: // v1.2.4: the magic shop reuses the armor keeper's lines
                 terminal.WriteLine(Loc.Get("haggle.armor_damn", player.DisplayName));
                 terminal.WriteLine(Loc.Get("haggle.accept_or_leave"));
                 terminal.WriteLine("");
@@ -181,7 +187,8 @@ public static class HagglingEngine
             terminal.WriteLine(Loc.Get("haggle.kicked_out"));
 
             // Create news entry (placeholder for news system)
-            string shopName = shopType == ShopType.Weapon ? "Weaponshop" : "Armor Shop";
+            string shopName = shopType == ShopType.Weapon ? "Weaponshop"
+                : shopType == ShopType.Magic ? Loc.Get("location.magic_shop") : "Armor Shop";
             terminal.WriteLine(Loc.Get("haggle.kicked_news", player.DisplayName, shopName));
             
             await Pacing.Wait(3000);
@@ -211,6 +218,7 @@ public static class HagglingEngine
                 break;
 
             case ShopType.Armor:
+            case ShopType.Magic:
                 terminal.WriteLine(Loc.Get("haggle.armor_fail_1"));
                 terminal.WriteLine(Loc.Get("haggle.armor_fail_2"));
                 break;
@@ -228,6 +236,8 @@ public static class HagglingEngine
         player.ArmHag = 3;   // Reset to 3 attempts per day
         player.WeaponShopBarredUntilDay = 0; // v1.2: a kick-out lasts until the next day
         player.ArmorShopBarredUntilDay = 0;
+        player.MagicHag = 3;
+        player.MagicShopBarredUntilDay = 0;
     }
     
     /// <summary>
@@ -254,6 +264,7 @@ public static class HagglingEngine
         {
             ShopType.Weapon => player.WeapHag,
             ShopType.Armor => player.ArmHag,
+            ShopType.Magic => player.MagicHag,
             _ => 0
         };
     }

@@ -403,6 +403,8 @@ public class MaintenanceSystem
         player.ArmHag = 3;
         player.WeaponShopBarredUntilDay = 0;
         player.ArmorShopBarredUntilDay = 0;
+        player.MagicHag = 3;
+        player.MagicShopBarredUntilDay = 0;
 
         // Reset real-world-date daily tracking (online mode persistence)
         player.SethFightsToday = 0;

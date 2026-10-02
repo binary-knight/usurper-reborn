@@ -1,7 +1,7 @@
 ---
 title: Getting started
 path: /wiki/en/getting-started/
-checked: 1.2.1
+checked: 1.2.3
 sources: Scripts/Locations/CharacterCreationLocation.cs, DOCS/BBS_DOOR_SETUP.md
 ---
 Begin with the [ways to connect](/wiki/en/getting-started/connections/), then create a character and take a short [first expedition](/wiki/en/getting-started/first-hour/). If something goes wrong, see [reporting bugs](/wiki/en/getting-started/reporting-bugs/).

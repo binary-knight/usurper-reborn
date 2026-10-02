@@ -5419,6 +5419,8 @@ public partial class GameEngine
             ArmHag = playerData.ArmHag,
             WeaponShopBarredUntilDay = playerData.WeaponShopBarredUntilDay,
             ArmorShopBarredUntilDay = playerData.ArmorShopBarredUntilDay,
+            MagicHag = playerData.MagicHag,
+            MagicShopBarredUntilDay = playerData.MagicShopBarredUntilDay,
             PendingGroupDeath = playerData.PendingGroupDeath,
             GymSessions = (byte)playerData.GymSessions,
             PickPocketAttempts = playerData.PickPocketAttempts,

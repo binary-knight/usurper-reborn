@@ -2239,13 +2239,16 @@ public class Character
     public long Loan { get; set; }                  // outstanding bank loan
     public byte WeapHag { get; set; } = 3;          // weapon shop haggling attempts left
     public byte ArmHag { get; set; } = 3;           // armor shop haggling attempts left
+    public byte MagicHag { get; set; } = 3;         // v1.2.4: magic shop haggling attempts left
     // v1.2 (design item C): being thrown out for bad haggling used to be "attempts == 0",
     // which barred the shop the moment the third attempt was spent. The bar is its own
     // day-stamped field now; attempts and the bar both persist.
     public int WeaponShopBarredUntilDay { get; set; }
     public int ArmorShopBarredUntilDay { get; set; }
+    public int MagicShopBarredUntilDay { get; set; }
     public bool IsBarredFromWeaponShop(int currentDay) => WeaponShopBarredUntilDay > currentDay;
     public bool IsBarredFromArmorShop(int currentDay) => ArmorShopBarredUntilDay > currentDay;
+    public bool IsBarredFromMagicShop(int currentDay) => MagicShopBarredUntilDay > currentDay;
     public int RecNr { get; set; }                  // file record number
 
     // New for version 0.14+

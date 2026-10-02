@@ -144,6 +144,7 @@ public class CharacterCreationLocation : BaseLocation
         target.Trains = source.Trains;
         target.WeapHag = source.WeapHag;
         target.ArmHag = source.ArmHag;
+        target.MagicHag = source.MagicHag;
         target.Resurrections = source.Resurrections;
         target.PickPocketAttempts = source.PickPocketAttempts;
         target.BankRobberyAttempts = source.BankRobberyAttempts;

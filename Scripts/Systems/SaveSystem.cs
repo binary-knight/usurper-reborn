@@ -478,6 +478,8 @@ namespace UsurperRemake.Systems
                 ArmHag = player.ArmHag,
                 WeaponShopBarredUntilDay = player.WeaponShopBarredUntilDay,
                 ArmorShopBarredUntilDay = player.ArmorShopBarredUntilDay,
+                MagicHag = player.MagicHag,
+                MagicShopBarredUntilDay = player.MagicShopBarredUntilDay,
                 PendingGroupDeath = player.PendingGroupDeath,
                 GymSessions = player.GymSessions,
                 PickPocketAttempts = player.PickPocketAttempts,
