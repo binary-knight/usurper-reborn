@@ -184,6 +184,9 @@ and tests without an attribution footer.
   labels only where source keys are verified, then expand language coverage.
 - **D4, bot model:** Ask uses search, short excerpts, and links without an LLM.
   An agent may later draft Suggest changes for owner review.
+  Superseded in part: Ask has an optional Claude API path, off unless
+  `DISCORD_WIKI_LLM` is `on`, described in `DOCS/WIKI_OPERATIONS.md` under
+  "Ask with the Claude API (optional)". Without that path Ask is as D4 says.
 - **D5, URL:** Host the wiki at `/wiki/` on the existing website.
 
 No production publication is authorized by this design plan.
