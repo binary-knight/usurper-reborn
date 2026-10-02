@@ -49,7 +49,7 @@ namespace UsurperRemake.Data
             lines.Add(new() { Id = "rx_cd_ag1", Text = "NO! Get up! We're not finished yet! GET UP!", Category = "reaction", PersonalityType = "aggressive", EventType = "combat_defeat" });
             lines.Add(new() { Id = "rx_cd_ag2", Text = "*punches the ground* DAMN IT! I'll rip them apart next time!", Category = "reaction", PersonalityType = "aggressive", EventType = "combat_defeat" });
 
-            lines.Add(new() { Id = "rx_cd_no1", Text = "Retreat is not defeat — it is wisdom. We will return stronger.", Category = "reaction", PersonalityType = "noble", EventType = "combat_defeat" });
+            lines.Add(new() { Id = "rx_cd_no1", Text = "Retreat is not defeat -- it is wisdom. We will return stronger.", Category = "reaction", PersonalityType = "noble", EventType = "combat_defeat" });
             lines.Add(new() { Id = "rx_cd_no2", Text = "We must regroup. There is no shame in living to fight another day.", Category = "reaction", PersonalityType = "noble", EventType = "combat_defeat" });
 
             lines.Add(new() { Id = "rx_cd_cu1", Text = "This changes my calculations entirely. We need a different approach.", Category = "reaction", PersonalityType = "cunning", EventType = "combat_defeat" });
