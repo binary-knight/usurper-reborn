@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs
+history: 1.2.4 | none
 history: 1.2.3 | Beast species names are translated into all five languages; beast names stay in English.
 ---
 Story companions and tameable beasts are separate systems. Do not assume that a beast occupies the same role, uses the same recruitment rules or grants the same bonuses as a story companion.

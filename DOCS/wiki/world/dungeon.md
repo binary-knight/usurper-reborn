@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs
+history: 1.2.4 | The follower room view, reward labels, skill toggle names, the descend message's theme, duelist cries and gear are translated into all five languages.
 history: 1.2.3 | Dungeon screens, outpost greetings and lore, the map and group broadcasts are translated into all five languages, and group broadcasts wrap at 79 columns.
 ---
 Dungeon rooms can contain monsters, treasure, features and routes deeper. Progress is not only a damage check: supplies and Mental matter across the entire trip.

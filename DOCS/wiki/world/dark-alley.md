@@ -1,8 +1,9 @@
 ---
 title: The Dark Alley
 path: /wiki/en/world/dark-alley/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs
+history: 1.2.4 | In English, the Shadows standing line in the Dark Alley says "use" instead of "access".
 ---
 The Dark Alley combines underground commerce, risky training, drugs, pickpocketing, gambling, the Pit, loans and Shadows faction services. Open it from Main Street with A once the full town menu unlocks. Access and available services depend on your character and faction standing. Martial law can close the alley, and a stranger may approach you on the way in.
 

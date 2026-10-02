@@ -1,8 +1,9 @@
 ---
 title: Rankings, news and world events
 path: /wiki/en/online/events/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/NewsSystem.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.2.4 | none
 ---
 Use the Notice Board for news and World Events, and the status-oriented menus for records and Fame. These screens describe a live world rather than fixed release data.
 
