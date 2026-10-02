@@ -15,6 +15,12 @@ public class Monster
     public bool GrabWeap { get; set; }                  // can weapon be taken?
     public bool GrabArm { get; set; }                   // can armor be taken?
     public string Phrase { get; set; } = "";            // intro phrase from monster
+    /// <summary>
+    /// v1.2.4: when the phrase is localized text, this builds it again in the current language, so a
+    /// group member reads the fight's opening line in their own language. Not saved.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal Func<string>? PhraseInLanguage;
     public int MagicRes { get; set; }                   // magic resistance
     public long Strength { get; set; }                  // strength
     public int Defence { get; set; }                    // defence
@@ -72,8 +78,10 @@ public class Monster
 
     /// <summary>
     /// Returns name with appropriate article: "The Drake" for generic monsters, "Dahlia Coldstream" for named NPCs
+    /// v1.2.4: a name that already starts with "The" ("The First Wave") gets no second article.
+    /// The article is the same English "The" in every language.
     /// </summary>
-    public string TheNameOrName => IsProperName ? Name : $"The {Name}";
+    public string TheNameOrName => IsProperName || Name.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? Name : $"The {Name}";
 
     // Taunt mechanic — forced targeting
     public string? TauntedBy { get; set; }              // DisplayName of character who taunted this monster

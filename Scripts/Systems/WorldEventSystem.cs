@@ -936,7 +936,7 @@ namespace UsurperRemake.Systems
         {
             ("War", new[] {
                 "Border skirmishes between {REGION1} and {REGION2} have intensified.",
-                "The armies of {REGION1} march south — refugees flood the roads.",
+                "The armies of {REGION1} march south -- refugees flood the roads.",
                 "A ceasefire was declared between {REGION1} and {REGION2}.",
                 "Mercenary companies from {REGION1} are recruiting. The pay is good.",
                 "Raiders from {REGION1} burned a border village near {REGION2}.",
@@ -946,7 +946,7 @@ namespace UsurperRemake.Systems
             ("Trade", new[] {
                 "A merchant caravan from {REGION1} arrived bearing exotic spices and silks.",
                 "Trade routes through {REGION1} have been disrupted by bandits.",
-                "The price of iron has tripled — {REGION1}'s mines have flooded.",
+                "The price of iron has tripled -- {REGION1}'s mines have flooded.",
                 "A rare shipment of enchanted ore from {REGION1} reached port.",
                 "Merchants from {REGION1} speak of a boom in the gem trade.",
                 "A trade embargo between {REGION1} and {REGION2} has collapsed local markets.",
@@ -969,7 +969,7 @@ namespace UsurperRemake.Systems
             }),
             ("Political", new[] {
                 "The High Council of {REGION1} has elected a new Chancellor.",
-                "Civil unrest in {REGION1} — the governor has been deposed.",
+                "Civil unrest in {REGION1} -- the governor has been deposed.",
                 "An alliance between {REGION1} and {REGION2} shakes the balance of power.",
                 "The throne of {REGION1} sits empty. Three claimants vie for the crown.",
                 "A beloved queen of {REGION1} was assassinated. The realm mourns.",

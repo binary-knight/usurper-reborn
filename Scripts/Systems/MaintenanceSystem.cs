@@ -332,7 +332,7 @@ public class MaintenanceSystem
                 // Send mail to player explaining why they left
                 if (OnlineStateManager.Instance != null)
                 {
-                    string mailMessage = $"{npc.DisplayName} has left your team. \"You haven't paid me in {GameConfig.MaxUnpaidWageDays} days. I'm no charity worker — find yourself another sword arm. Maybe when your coffers aren't empty, we can talk again.\"";
+                    string mailMessage = $"{npc.DisplayName} has left your team. \"You haven't paid me in {GameConfig.MaxUnpaidWageDays} days. I'm no charity worker -- find yourself another sword arm. Maybe when your coffers aren't empty, we can talk again.\"";
                     await OnlineStateManager.Instance.SendMessage(player.Name2 ?? "", "team_departure", mailMessage);
                 }
 
@@ -403,6 +403,8 @@ public class MaintenanceSystem
         player.ArmHag = 3;
         player.WeaponShopBarredUntilDay = 0;
         player.ArmorShopBarredUntilDay = 0;
+        player.MagicHag = 3;
+        player.MagicShopBarredUntilDay = 0;
 
         // Reset real-world-date daily tracking (online mode persistence)
         player.SethFightsToday = 0;

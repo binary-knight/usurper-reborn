@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.2.3";
+    public const string Version = "1.2.4";
     public const string VersionName = "Devotion"; // 1.2 line: Mental Health, the Sage and the gods
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -359,11 +359,16 @@ public static partial class GameConfig
     {
         get
         {
+            // v1.2.4: a Loc.RenderLanguage scope (a group follower's turn) renders in that language
+            var overrideLang = UsurperRemake.Systems.Loc.RenderLanguageOverride;
+            if (overrideLang != null) return overrideLang;
             var ctx = UsurperRemake.Server.SessionContext.Current;
             return ctx != null ? ctx.Language : _languageGlobal;
         }
         set
         {
+            // v1.2.4: inside a render scope the setting belongs to the session, not to the reader; leave it
+            if (UsurperRemake.Systems.Loc.RenderLanguageOverride != null) return;
             var ctx = UsurperRemake.Server.SessionContext.Current;
             if (ctx != null)
                 ctx.Language = value;
@@ -1979,7 +1984,7 @@ public static partial class GameConfig
     public static readonly long[] GodExpThresholds = { 0, 5_000, 15_000, 50_000, 90_000, 150_000, 300_000, 600_000, 1_000_000 };
     public static readonly int[] GodDeedsPerDay = { 3, 4, 5, 6, 7, 8, 10, 12, 15 };
     public static readonly string[] GodTitles = { "Lesser Spirit", "Minor Spirit", "Spirit", "Major Spirit", "Minor Deity", "Deity", "Major Deity", "DemiGod", "God" };
-    public const int GodBelieverExpPerLevel = 5;          // Each believer grants level * this per daily reset
+    public const int GodBelieverExpPerLevel = 2;          // Each believer grants level * this per daily reset (1.2.4: the payout's value; the status showed 5)
     public const int GodRecruitPaganExp = 150;            // Exp for converting a pagan
     public const int GodRecruitStealExp = 50;             // Exp for stealing a rival's believer
     public const int GodBlessExp = 10;                    // Exp per blessing bestowed
@@ -2259,6 +2264,7 @@ public static partial class GameConfig
     public const int NeglectStepDays = 7;
     public const int SpouseNeglectGraceDays = 7;
     public const int SpouseNeglectLovePenalty = 5;
+    public const int SpouseNeglectLetterDays = 21;   // v1.2.4: the spouse writes once per neglect episode
     // v1.2 (design item G): an NPC left to die while the player could have helped
     public const int AbandonPenaltySteps = 2;
     public const int AbandonCompanionLoyaltyPenalty = 15;

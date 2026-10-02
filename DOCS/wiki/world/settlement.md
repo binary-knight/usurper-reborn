@@ -1,8 +1,9 @@
 ---
 title: The Outskirts settlement
 path: /wiki/en/world/settlement/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Locations/SettlementLocation.cs, Scripts/Systems/SettlementSystem.cs
+history: 1.2.4 | none
 history: 1.2.3 | The settlement workshop, the watchtower scout report and settlement news are translated into all five languages, and long scout report rows wrap.
 ---
 The Settlement on Castle Grounds leads to the Outskirts, an NPC-built community beyond the city gates. It is not one of the safe outposts found inside the dungeon.

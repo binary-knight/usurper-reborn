@@ -1,8 +1,9 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.2.2
+checked: 1.2.4
 sources: Scripts/Locations/TempleLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.4 | The notice a player-god gets when you sacrifice gold at its altar now reaches its mailbox.
 ---
 The Temple is organized into rooms. Legacy shortcuts can point you to the new location for an action.
 

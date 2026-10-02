@@ -158,6 +158,124 @@ public class PlayerSession : IDisposable
     private readonly bool _gmcpEnabled;
     private readonly string? _forwardedIP;
 
+    // v1.2.4: completes when RunAsync's cleanup (emergency save, sleeper registration) is done,
+    // so a reconnect can wait for it instead of a fixed delay.
+    private readonly TaskCompletionSource _cleanupDone = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>v1.2.4: wait up to <paramref name="timeout"/> for this session's disconnect
+    /// cleanup. Returns false on timeout.</summary>
+    internal async Task<bool> WaitForCleanupAsync(TimeSpan timeout)
+    {
+        var done = _cleanupDone.Task;
+        return await Task.WhenAny(done, Task.Delay(timeout)) == done;
+    }
+
+    /// <summary>v1.2.4: mark this session's disconnect cleanup as finished.</summary>
+    internal void MarkCleanupComplete() => _cleanupDone.TrySetResult();
+
+    /// <summary>v1.2.4: true when ActiveSessions holds a different (newer) session for this
+    /// account, i.e. a reconnect replaced this one.</summary>
+    internal bool IsSuperseded()
+    {
+        var sessions = _server?.ActiveSessions;
+        if (sessions == null) return false;
+        return sessions.TryGetValue(Username.ToLowerInvariant(), out var current)
+            && current != null && !ReferenceEquals(current, this);
+    }
+
+    /// <summary>
+    /// v1.2.4: the disconnect save and the dormitory sleeper registration. Both are skipped when
+    /// a newer session for this account is active: its character is newer than this session's,
+    /// and the player is online, not asleep. <paramref name="emergencySave"/> is null when there
+    /// is nothing to save. v1.2.4: <paramref name="hadCharacter"/> is false when the session never
+    /// loaded or created a character (a hang-up at login or during creation); there is no one to
+    /// put to sleep, so neither runs.
+    /// </summary>
+    internal async Task PersistOnDisconnectAsync(Func<Task>? emergencySave, string dormKey, bool hadCharacter)
+    {
+        if (!hadCharacter)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Dormitory sleeper skipped (no character was loaded)");
+            return;
+        }
+        try
+        {
+            if (emergencySave != null)
+            {
+                if (IsSuperseded())
+                {
+                    Console.Error.WriteLine($"[MUD] [{Username}] Emergency save skipped (a newer session is active)");
+                }
+                else
+                {
+                    Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save (key: {dormKey})...");
+                    await emergencySave();
+                    Console.Error.WriteLine($"[MUD] [{Username}] Emergency save completed");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
+        }
+        // Register as dormitory sleeper if not already sleeping
+        // This catches disconnects, crashes, and players who just close the terminal
+        try
+        {
+            if (IsSuperseded())
+            {
+                Console.Error.WriteLine($"[MUD] [{Username}] Dormitory sleeper skipped (a newer session is active)");
+                return;
+            }
+            var sleepInfo = await _sqlBackend.GetSleepingPlayerInfo(dormKey);
+            if (sleepInfo == null)
+            {
+                // Player wasn't registered as sleeping: force dormitory
+                await _sqlBackend.RegisterSleepingPlayer(dormKey, "dormitory", "[]", 0);
+                Console.Error.WriteLine($"[MUD] [{Username}] Registered as dormitory sleeper (key: {dormKey}, unclean disconnect)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Failed to register dormitory sleep: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// RunAsync's disconnect persistence: build the emergency save for the loaded character (unless
+    /// suppressed) and run PersistOnDisconnectAsync. v1.2.4: a seam so tests drive the
+    /// "never had a character" guard; <paramref name="engine"/> is the session's engine.
+    /// </summary>
+    internal async Task FinishDisconnectPersistAsync(GameEngine? engine)
+    {
+        // Emergency save on disconnect: save to main player key so it persists
+        // Skip if character was deleted (e.g., rebellion execution)
+        Func<Task>? emergencySave = null;
+        bool hadCharacter = false;
+        var currentKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
+        try
+        {
+            var player = engine?.CurrentPlayer;
+            hadCharacter = player != null;
+            bool suppress = SuppressDisconnectSave && (SuppressDisconnectSaveKey == null || SuppressDisconnectSaveKey == currentKey);
+            if (player != null && !suppress)
+            {
+                var saveKey = currentKey;
+                emergencySave = () => SaveSystem.Instance.SaveGame(saveKey, player);
+            }
+            else if (suppress)
+            {
+                Console.Error.WriteLine($"[MUD] [{Username}] Disconnect save suppressed (character deleted)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
+        }
+        // v1.2.4: save and sleeper registration, both skipped if a reconnect replaced us.
+        await PersistOnDisconnectAsync(emergencySave, currentKey, hadCharacter);
+    }
+
     /// <summary>
     /// Run the game loop for this player session. Blocks until the player
     /// disconnects, quits, or the server shuts down.
@@ -298,46 +416,8 @@ public class PlayerSession : IDisposable
         }
         finally
         {
-            // Emergency save on disconnect — save to main player key so it persists
-            // Skip if character was deleted (e.g., rebellion execution)
-            try
-            {
-                var player = ctx.Engine?.CurrentPlayer;
-                var currentKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
-                bool suppress = SuppressDisconnectSave && (SuppressDisconnectSaveKey == null || SuppressDisconnectSaveKey == currentKey);
-                if (player != null && !suppress)
-                {
-                    var saveKey = currentKey;
-                    Console.Error.WriteLine($"[MUD] [{Username}] Performing emergency save (key: {saveKey})...");
-                    await SaveSystem.Instance.SaveGame(saveKey, player);
-                    Console.Error.WriteLine($"[MUD] [{Username}] Emergency save completed");
-                }
-                else if (suppress)
-                {
-                    Console.Error.WriteLine($"[MUD] [{Username}] Disconnect save suppressed (character deleted)");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
-            }
-            // Register as dormitory sleeper if not already sleeping
-            // This catches disconnects, crashes, and players who just close the terminal
-            try
-            {
-                var dormKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
-                var sleepInfo = await _sqlBackend.GetSleepingPlayerInfo(dormKey);
-                if (sleepInfo == null)
-                {
-                    // Player wasn't registered as sleeping — force dormitory
-                    await _sqlBackend.RegisterSleepingPlayer(dormKey, "dormitory", "[]", 0);
-                    Console.Error.WriteLine($"[MUD] [{Username}] Registered as dormitory sleeper (key: {dormKey}, unclean disconnect)");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[MUD] [{Username}] Failed to register dormitory sleep: {ex.Message}");
-            }
+            // v1.2.4: emergency save and sleeper registration (see FinishDisconnectPersistAsync).
+            await FinishDisconnectPersistAsync(ctx.Engine);
 
             // Notify WizNet of logout
             try
@@ -468,6 +548,7 @@ public class PlayerSession : IDisposable
             Context = null;
 
             Console.Error.WriteLine($"[MUD] [{Username}] Session fully cleaned up");
+            MarkCleanupComplete();
         }
     }
 

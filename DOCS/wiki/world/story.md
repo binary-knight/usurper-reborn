@@ -1,8 +1,9 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.2.2
+checked: 1.2.4
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.2.4 | In group combat, an Old God's opening line is shown in each player's own language.
 ---
 The main story runs alongside ordinary adventuring. You can play at your own pace; the story waits for you in the dungeon and the Temple. This page keeps names, locations and outcomes inside spoiler disclosures.
 
@@ -25,7 +26,7 @@ The Awakening measures what your character comes to understand. It rises through
 
 ## Endings
 
-Your choices with the Old Gods, your alignment, the seals and your Awakening decide which ending you reach. After an ending you decide between ascending as an immortal and starting [New Game Plus](/wiki/en/characters/new-game-plus/).
+Your choices with the Old Gods, your alignment, the seals and your Awakening decide which ending you reach. After an ending you decide between [ascending as an immortal](/wiki/en/gods/player-gods/) and starting [New Game Plus](/wiki/en/characters/new-game-plus/).
 
 :::spoiler Spoiler: seal floors and the Old Gods
 One seal is in the Temple. The others lie on dungeon floors 15, 30, 45, 60, 80 and 99.

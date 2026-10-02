@@ -341,8 +341,8 @@ public class WildernessLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                foreach (var line in beast.LocTameSuccessFlavor().Split('\n'))
-                    terminal.WriteLine($"  {line}");
+                foreach (var row in TameFlavorRows(beast.LocTameSuccessFlavor()))
+                    terminal.WriteLine(row);
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine(Loc.Get("wilderness.beast_tame_success", beast.Name, currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize));
@@ -366,6 +366,21 @@ public class WildernessLocation : BaseLocation
     // ═══════════════════════════════════════════════════════════════
     // ENCOUNTER TYPES
     // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// v1.2.4: the tame success flavor as indented rows of at most 79 columns. When every source line
+    /// fits it is shown line for line as before; otherwise it is one paragraph wrapped, as the encounter
+    /// flavor is (the source breaks lines for a wider screen).
+    /// </summary>
+    internal static List<string> TameFlavorRows(string flavor)
+    {
+        const string indent = "  ";
+        var source = flavor.Replace("\r\n", "\n").Split('\n');
+        if (source.All(l => UsurperRemake.UI.UIHelper.VisibleLength(indent + l) <= UsurperRemake.UI.UIHelper.WrapWidth))
+            return source.Select(l => indent + l).ToList();
+        return UsurperRemake.UI.UIHelper.WordWrap(flavor.Replace("\r\n", "\n").Replace('\n', ' '),
+            UsurperRemake.UI.UIHelper.WrapWidth - indent.Length).Select(l => indent + l).ToList();
+    }
 
     private async Task CombatEncounter(WildernessRegion region)
     {

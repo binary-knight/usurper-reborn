@@ -462,7 +462,7 @@ public class WeaponShopLocation : BaseLocation
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"—",3}  ");
+                terminal.Write($"{"--",3}  ");
             }
 
             if (category == WeaponCategory.Shields)

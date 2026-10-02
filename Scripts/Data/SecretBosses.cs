@@ -629,7 +629,8 @@ namespace UsurperRemake.Data
                 Gold = 0,
                 Experience = 0,
                 IsBoss = true,
-                Phrase = $"\"{boss.LocBattleCry()}\""
+                Phrase = $"\"{boss.LocBattleCry()}\"",
+                PhraseInLanguage = () => $"\"{boss.LocBattleCry()}\""
             };
         }
     }

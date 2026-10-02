@@ -22,7 +22,7 @@ public class HomeLocation : BaseLocation
     private List<ModelItem> Chest => PlayerChests[playerKey];
     private string playerKey;
 
-    public HomeLocation() : base(GameLocation.Home, "Your Home", "Your humble abode – a safe haven to rest and prepare for adventures.")
+    public HomeLocation() : base(GameLocation.Home, "Your Home", "Your humble abode -- a safe haven to rest and prepare for adventures.")
     {
     }
 

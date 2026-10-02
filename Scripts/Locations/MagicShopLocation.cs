@@ -65,6 +65,18 @@ public partial class MagicShopLocation : BaseLocation
 
     protected override void DisplayLocation()
     {
+        // v1.2.4 (design item C, magic shop part): thrown out for bad haggling, barred for the day
+        if (currentPlayer != null && currentPlayer.IsBarredFromMagicShop(GameEngine.Instance.SessionCurrentDay))
+        {
+            terminal.ClearScreen();
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("armor_shop.kicked_out_1"));
+            terminal.WriteLine(Loc.Get("armor_shop.kicked_out_2"));
+            terminal.WriteLine(Loc.Get("armor_shop.kicked_out_3"));
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("armor_shop.kicked_out_return"), "yellow");
+            return;
+        }
         if (_currentAccessoryCategory.HasValue)
         {
             ShowAccessoryCategoryItems(_currentAccessoryCategory.Value);
@@ -223,6 +235,13 @@ public partial class MagicShopLocation : BaseLocation
         // Handle global quick commands first
         var (handled, shouldExit) = await TryProcessGlobalCommand(choice);
         if (handled) return shouldExit;
+
+        if (currentPlayer != null && currentPlayer.IsBarredFromMagicShop(GameEngine.Instance.SessionCurrentDay))
+        {
+            _currentAccessoryCategory = null;
+            await NavigateToLocation(GameLocation.MainStreet);
+            return true;
+        }
 
         return await HandleMagicShopChoice(choice.ToUpper(), currentPlayer);
     }
@@ -745,7 +764,7 @@ public partial class MagicShopLocation : BaseLocation
                 var (slot, equip) = cursedPlayerGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage($"  {displayNum}. {equip.Name} (your {slot.GetDisplayName()}) — {listedTotal:N0} gold", "red");
+                DisplayMessage($"  {displayNum}. {equip.Name} (your {slot.GetDisplayName()}) -- {listedTotal:N0} gold", "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -761,7 +780,7 @@ public partial class MagicShopLocation : BaseLocation
                 var (ownerName, slot, equip) = cursedTeamGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage($"  {displayNum}. {equip.Name} ({ownerName}'s {slot.GetDisplayName()}) — {listedTotal:N0} gold", "red");
+                DisplayMessage($"  {displayNum}. {equip.Name} ({ownerName}'s {slot.GetDisplayName()}) -- {listedTotal:N0} gold", "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -878,7 +897,7 @@ public partial class MagicShopLocation : BaseLocation
             // Fix curse description
             if (targetItem.Description != null && targetItem.Description.Count > 1 &&
                 targetItem.Description[1] != null && targetItem.Description[1].Contains("CURSED"))
-                targetItem.Description[1] = "Purified — some power was lost in the cleansing.";
+                targetItem.Description[1] = "Purified -- some power was lost in the cleansing.";
 
             // Fix any negative magic resistance
             if (targetItem.MagicProperties.MagicResistance < 0)
@@ -2514,7 +2533,7 @@ public partial class MagicShopLocation : BaseLocation
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"—",3}  ");
+                terminal.Write($"{"--",3}  ");
             }
 
             // Price
@@ -2660,7 +2679,11 @@ public partial class MagicShopLocation : BaseLocation
         long price = ApplyAllPriceModifiers(item.Value, player);
         var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(price);
 
-        if (player.Gold < totalWithTax)
+        // v1.2.4 (design item C): a player who can afford only a haggled price may still try;
+        // the real check runs after negotiation.
+        bool mayHaggle = HagglingEngine.CanHaggle(player, HagglingEngine.ShopType.Magic);
+        long bestCaseTotal = mayHaggle ? CityControlSystem.CalculateTaxedPrice(price - price / 5).Item3 : totalWithTax;
+        if (player.Gold < bestCaseTotal)
         {
             terminal.SetColor("red");
             terminal.WriteLine($"  {Loc.Get("magic_shop.cant_afford")}");
@@ -2700,8 +2723,49 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
 
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, price);
-        // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.buy_confirm", $"{totalWithTax:N0}")}")) return;
+
+        // v1.2.4 (design item C): [H]aggle over the pre-tax price; tax is recomputed on the agreed amount
+        while (true)
+        {
+            int attemptsLeft = HagglingEngine.GetHagglingAttemptsLeft(player, HagglingEngine.ShopType.Magic);
+            terminal.SetColor("white");
+            terminal.Write("  " + (attemptsLeft > 0
+                ? Loc.Get("shop.buy_prompt_haggle", $"{totalWithTax:N0}", attemptsLeft)
+                : Loc.Get("shop.buy_prompt_no_haggle", $"{totalWithTax:N0}")));
+            var confirm = (await terminal.GetInput("")).Trim().ToUpperInvariant();
+            if (confirm == "H")
+            {
+                var haggle = await HagglingEngine.Haggle(player, HagglingEngine.ShopType.Magic, price, _ownerName, terminal);
+                if (haggle.Kicked)
+                {
+                    player.MagicShopBarredUntilDay = GameEngine.Instance.SessionCurrentDay + 1;
+                    _currentAccessoryCategory = null;
+                    _accessoryPage = 0;
+                    await NavigateToLocation(GameLocation.MainStreet);
+                    return;
+                }
+                if (haggle.Price < price)
+                {
+                    price = haggle.Price;
+                    (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(price);
+                    terminal.WriteLine("  " + Loc.Get("shop.haggle_price_agreed", $"{price:N0}", $"{kingTax + cityTax:N0}"), "bright_green");
+                }
+                continue;
+            }
+            if (!GameConfig.IsAffirmative(confirm)) // v1.1.15: yesno-exempt: three-way haggle menu (H/Y/N), not a plain yes/no
+            {
+                return;
+            }
+            break;
+        }
+
+        if (player.Gold < totalWithTax)
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine($"  {Loc.Get("magic_shop.cant_afford")}");
+            await terminal.WaitForKey();
+            return;
+        }
 
         player.Gold -= totalWithTax;
 

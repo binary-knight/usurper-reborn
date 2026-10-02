@@ -196,12 +196,51 @@ namespace UsurperRemake.Systems
         /// </summary>
         public static LocRecording BeginRecording()
         {
-            var rec = new LocRecording(GameConfig.Language);
+            var rec = new LocRecording(GameConfig.Language) { Previous = _recording.Value };
             _recording.Value = rec;
             return rec;
         }
 
-        public static void EndRecording() => _recording.Value = null;
+        /// <summary>v1.2.4: ends the innermost recording; one begun around it records again.</summary>
+        public static void EndRecording() => _recording.Value = _recording.Value?.Previous;
+
+        /// <summary>v1.2.4: ends `rec` and any recording begun inside it and left open.</summary>
+        public static void EndRecording(LocRecording rec) => _recording.Value = rec.Previous;
+
+        private static readonly System.Threading.AsyncLocal<string?> _renderLanguage = new();
+
+        /// <summary>v1.2.4: the language of an open RenderLanguage scope, or null.</summary>
+        public static string? RenderLanguageOverride => _renderLanguage.Value;
+
+        /// <summary>
+        /// v1.2.4: until the returned scope is disposed, Loc.Get and GameConfig.Language in this flow use
+        /// `lang`, for text drawn on another player's terminal (a group follower's turn runs on the
+        /// leader's session). The session's own Language is not written; GameConfig.Language's setter
+        /// does nothing while a scope is open. Scopes nest; null opens a scope with no override, for
+        /// text that goes into shared state. Enter and dispose it in the same method (a using block).
+        /// </summary>
+        public static IDisposable RenderLanguage(string? lang)
+        {
+            var scope = new RenderScope(_renderLanguage.Value);
+            _renderLanguage.Value = string.IsNullOrEmpty(lang) ? null : lang;
+            return scope;
+        }
+
+        /// <summary>v1.2.4: a scope in the session's own language, for text stored in shared or saved state.</summary>
+        public static IDisposable SessionLanguage() => RenderLanguage(null);
+
+        private sealed class RenderScope : IDisposable
+        {
+            private readonly string? _previous;
+            private bool _disposed;
+            public RenderScope(string? previous) { _previous = previous; }
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _renderLanguage.Value = _previous;
+            }
+        }
 
         /// <summary>
         /// Get a localized string in an explicitly specified language, independent of the current
@@ -374,6 +413,9 @@ namespace UsurperRemake.Systems
 
         public LocRecording(string language) { Language = language; }
 
+        /// <summary>v1.2.4: the recording that was open when this one began; Add records there too.</summary>
+        internal LocRecording? Previous { get; init; }
+
         /// <summary>The language the recorded text was written in.</summary>
         public string Language { get; }
 
@@ -383,12 +425,19 @@ namespace UsurperRemake.Systems
             {
                 if (_calls.Count < MaxCalls) _calls.Add((text, key, args));
             }
+            Previous?.Add(text, key, args);
         }
 
         /// <summary>`captured` with each recorded text replaced by its rendering in `lang`.</summary>
-        public string Render(string captured, string lang)
+        public string Render(string captured, string lang) => Render(captured, lang, null);
+
+        /// <summary>
+        /// v1.2.4: Render where `substitute` (key, translated args) can give a recorded call's replacement
+        /// text, for example a third person form; null keeps the key's own rendering in `lang`.
+        /// </summary>
+        public string Render(string captured, string lang, Func<string, object[], string?>? substitute)
         {
-            if (string.IsNullOrEmpty(captured) || lang == Language) return captured;
+            if (string.IsNullOrEmpty(captured) || (lang == Language && substitute == null)) return captured;
             List<(string text, string key, object[] args)> calls;
             lock (_lock) calls = new List<(string, string, object[])>(_calls);
 
@@ -399,7 +448,8 @@ namespace UsurperRemake.Systems
                 var translatedArgs = new object[args.Length];
                 for (int i = 0; i < args.Length; i++)
                     translatedArgs[i] = args[i] is string s && map.TryGetValue(s, out var t) ? t : args[i];
-                string rendered = args.Length == 0 ? Loc.GetIn(lang, key) : Loc.GetIn(lang, key, translatedArgs);
+                string rendered = substitute?.Invoke(key, translatedArgs)
+                    ?? (args.Length == 0 ? Loc.GetIn(lang, key) : Loc.GetIn(lang, key, translatedArgs));
                 if (rendered != text) map[text] = rendered;
             }
             if (map.Count == 0) return captured;

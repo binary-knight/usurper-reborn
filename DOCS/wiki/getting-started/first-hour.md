@@ -1,8 +1,9 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.2.4 | none
 history: 1.2.3 | Dungeon room views, exits, floor notices and the status row are translated into all five languages, and the status row no longer doubles its colons.
 ---
 Treat your first trip as reconnaissance, not a race to the deepest floor.

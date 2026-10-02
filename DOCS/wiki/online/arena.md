@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.2.3
+checked: 1.2.4
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+history: 1.2.4 | The notice a defender gets after your Arena attack now reaches their mailbox.
 history: 1.2.3 | none
 ---
 The Arena is the online game's player-versus-player ground. It exists only in online play.

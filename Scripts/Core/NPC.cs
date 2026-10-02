@@ -830,6 +830,10 @@ public partial class NPC : Character
     {
         return NPCDialogueGenerator.GenerateReaction(this, player, eventType);
     }
+
+    /// <summary>v1.2.4: a reaction picked once, written in the current language each time it is called.</summary>
+    public Func<string> GetReactionInLanguage(Player player, string eventType)
+        => NPCDialogueGenerator.ReactionInLanguage(this, player, eventType);
     
     /// <summary>
     /// Get special greeting for special NPCs (Pascal behavior)

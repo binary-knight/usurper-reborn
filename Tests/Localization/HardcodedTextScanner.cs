@@ -96,7 +96,7 @@ public static class HardcodedTextScanner
     // receiver counts.
     //   NewsSystem.Newsy / WriteNews / GenericNews / Write*News  (Scripts/Systems/NewsSystem.cs)
     //   MailSystem.SendSystemMail / CompatLayer.SendMail / LegacyCompat.SendMail
-    //   OnlineStateManager.SendMessage, SqlSaveBackend.SendMessage, Player.SendMessage (last argument)
+    //   OnlineStateManager.SendMessage, SqlSaveBackend.SendMessage / SendMessageToKey, Player.SendMessage (last argument)
     //   GroupSystem.NotifyGroup / BroadcastToGroupSessions / BroadcastToAllGroupSessions
     //   MudServer.BroadcastToAll / SendToPlayer, RoomRegistry.BroadcastToRoom / BroadcastAction / BroadcastGlobal
     //   PlayerSession.EnqueueMessage, OnlineStateManager.AddNews / BroadcastMessage, SqlSaveBackend.AddNews
@@ -119,6 +119,7 @@ public static class HardcodedTextScanner
         new SinkSpec("SendSystemMail", new[] { 1 }, FromPositionOn: true),
         new SinkSpec("SendMail", new[] { 1 }, FromPositionOn: true),
         new SinkSpec("SendMessage", null, LastOnly: true),
+        new SinkSpec("SendMessageToKey", null, LastOnly: true),
         new SinkSpec("NotifyGroup", new[] { 1 }),
         new SinkSpec("BroadcastToGroupSessions", new[] { 2, 3 }),
         new SinkSpec("BroadcastToAllGroupSessions", new[] { 1 }),
@@ -259,7 +260,7 @@ public static class HardcodedTextScanner
     // Scan
     // ---------------------------------------------------------------------------------------------
 
-    public static List<Site> ScanRepo(string repoRoot, IReadOnlyList<Exclusion> exclusions)
+    public static List<Site> ScanRepo(string repoRoot, IReadOnlyList<Exclusion> exclusions, bool dashes = false)
     {
         var sites = new List<Site>();
         foreach (var path in Directory.EnumerateFiles(Path.Combine(repoRoot, "Scripts"), "*.cs", SearchOption.AllDirectories)
@@ -267,12 +268,13 @@ public static class HardcodedTextScanner
         {
             string rel = Path.GetRelativePath(repoRoot, path).Replace('\\', '/');
             if (FileExcluded(rel, exclusions)) continue;
-            sites.AddRange(ScanSource(rel, File.ReadAllText(path), exclusions));
+            sites.AddRange(ScanSource(rel, File.ReadAllText(path), exclusions, dashes));
         }
         return sites;
     }
 
-    public static List<Site> ScanSource(string rel, string source, IReadOnlyList<Exclusion> exclusions)
+    /// <summary>With dashes true, a site is any screen string holding U+2014, U+2013 or U+2026 (words not required).</summary>
+    public static List<Site> ScanSource(string rel, string source, IReadOnlyList<Exclusion> exclusions, bool dashes = false)
     {
         var tree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Latest));
         var root = tree.GetRoot();
@@ -283,7 +285,7 @@ public static class HardcodedTextScanner
         {
             if (node is InvocationExpressionSyntax inv)
             {
-                var hit = ClassifyInvocation(inv);
+                var hit = ClassifyInvocation(inv) ?? (dashes ? ClassifyDashOnlySink(inv) : null);
                 if (hit == null) continue;
                 var (sinkName, spec) = hit.Value;
                 if (InExcludedClass(inv, excludedClasses)) continue;
@@ -292,7 +294,7 @@ public static class HardcodedTextScanner
                 {
                     if (!IsTextArgument(spec, i, args.Count, args[i])) continue;
                     foreach (var lit in Collect(args[i].Expression))
-                        AddIfWordy(sites, rel, sinkName, lit);
+                        AddIfWordy(sites, rel, sinkName, lit, dashes);
                 }
             }
             else if (node is ReturnStatementSyntax ret && ret.Expression is TupleExpressionSyntax tuple
@@ -303,7 +305,7 @@ public static class HardcodedTextScanner
                 if (InExcludedClass(ret, excludedClasses)) continue;
                 for (int i = 1; i < tuple.Arguments.Count; i++)
                     foreach (var lit in Collect(tuple.Arguments[i].Expression))
-                        AddIfWordy(sites, rel, "return (bool, string)", lit);
+                        AddIfWordy(sites, rel, "return (bool, string)", lit, dashes);
             }
         }
         return sites;
@@ -364,6 +366,21 @@ public static class HardcodedTextScanner
             return (name, m);
         if (MenuHelperSinks.TryGetValue(name, out var h) && unqualified)
             return ("(helper) " + name, h);
+        return null;
+    }
+
+    private static readonly SinkSpec CombatLogAdd = new("Add", new[] { 0 });
+
+    /// <summary>
+    /// v1.2.4: sinks checked for dashes only. CombatLog.Add (receiver's last identifier "CombatLog") holds
+    /// English shown in the combat test summary; it is not counted as hardcoded text, so the ratchet
+    /// counts are unchanged.
+    /// </summary>
+    private static (string Sink, SinkSpec Spec)? ClassifyDashOnlySink(InvocationExpressionSyntax inv)
+    {
+        if (inv.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.ValueText == "Add"
+            && LastIdentifier(ma.Expression) == "CombatLog")
+            return ("CombatLog.Add", CombatLogAdd);
         return null;
     }
 
@@ -465,7 +482,10 @@ public static class HardcodedTextScanner
         }
     }
 
-    private static void AddIfWordy(List<Site> sites, string rel, string sink, ExpressionSyntax node)
+    /// <summary>Em-dash, en-dash and ellipsis: kept out of on-screen strings (terminals and BBS clients show them as junk).</summary>
+    public static readonly char[] DashChars = { '\u2014', '\u2013', '\u2026' };
+
+    private static void AddIfWordy(List<Site> sites, string rel, string sink, ExpressionSyntax node, bool dashes = false)
     {
         string visible = node switch
         {
@@ -475,7 +495,7 @@ public static class HardcodedTextScanner
                 interp.Contents.OfType<InterpolatedStringTextSyntax>().Select(t => t.TextToken.ValueText)),
             _ => "",
         };
-        if (!IsWordy(visible)) return;
+        if (dashes ? visible.IndexOfAny(DashChars) < 0 : !IsWordy(visible)) return;
         int line = node.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
         string shown = Regex.Replace(node.ToString(), @"\s*\r?\n\s*", " ");
         sites.Add(new Site(rel, line, sink, shown));

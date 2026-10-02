@@ -1,8 +1,9 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs
+history: 1.2.4 | Long news rows wrap at 79 columns, and the notice to a sleeper you attack in the Dormitory reaches their mailbox.
 ---
 Main Street shows a few places and a list of districts. Press a district's key to open it, then the place's key; R goes back. More places appear as you gain your first levels. The classic single-screen layout can be chosen in Settings (`~`).
 

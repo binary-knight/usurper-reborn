@@ -478,6 +478,8 @@ namespace UsurperRemake.Systems
                 ArmHag = player.ArmHag,
                 WeaponShopBarredUntilDay = player.WeaponShopBarredUntilDay,
                 ArmorShopBarredUntilDay = player.ArmorShopBarredUntilDay,
+                MagicHag = player.MagicHag,
+                MagicShopBarredUntilDay = player.MagicShopBarredUntilDay,
                 PendingGroupDeath = player.PendingGroupDeath,
                 GymSessions = player.GymSessions,
                 PickPocketAttempts = player.PickPocketAttempts,
@@ -491,6 +493,7 @@ namespace UsurperRemake.Systems
                 MaxResurrections = player.MaxResurrections,
                 PlaythroughDeaths = player.PlaythroughDeaths,
                 PresentDays = player.PresentDays,
+                PendingSpouseLetters = new List<string>(player.PendingSpouseLetters ?? new List<string>()),
                 BannedFromChurch = player.BannedFromChurch,
                 BlessingsReceived = player.BlessingsReceived,
                 ChurchDonations = player.ChurchDonations,
@@ -1565,7 +1568,11 @@ namespace UsurperRemake.Systems
                 // copy would be stale, so write the initial value there and never read it back.
                 BankVaultReserve = UsurperRemake.BBS.DoorMode.IsOnlineMode
                     ? GameConfig.BankVaultInitial
-                    : UsurperRemake.Systems.BankVaultSystem.Current
+                    : UsurperRemake.Systems.BankVaultSystem.Current,
+
+                // 1.2.4: the robbery attempts counter, same rule as the reserve
+                BankRobberiesToday = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0 : UsurperRemake.Systems.BankVaultSystem.RobberyCount,
+                BankRobberiesDate = UsurperRemake.BBS.DoorMode.IsOnlineMode ? "" : UsurperRemake.Systems.BankVaultSystem.RobberyDate
             };
         }
         

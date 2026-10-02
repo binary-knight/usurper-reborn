@@ -394,7 +394,7 @@ public class ArmorShopLocation : BaseLocation
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"—",3}  ");
+                terminal.Write($"{"--",3}  ");
             }
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");

@@ -206,8 +206,10 @@ withdraw to floor, robbery math and cap, refill and cap, a retried atomic update
 that lands once, single-player round trip.
 
 **Slice.** Persist, atomic update, cap, refill. Deferred: SysOp reset command,
-persisting the per-process robbery attempt counter, a "recent heist" world
-event.
+a "recent heist" world event. 1.2.4 persisted the robbery attempt counter:
+`WorldStateData.BankRobberiesToday` and `BankRobberiesDate` (single-player) and
+a `bank_robberies` world-state key (online), one count for the world, reset at
+the day change (`Tests/BankRobberyCounter124Tests.cs`).
 
 ---
 
@@ -345,6 +347,15 @@ through `TryAtomicUpdate`, read by `WorldSimService` before NPC browsing (Codex'
 point: a single blob plus a compare-and-swap is not an atomic transfer of buyer
 gold, escrowed item, and seller proceeds; per-shop keys and a sale transaction
 in `SqlSaveBackend` are the online path).
+
+**Key note (added at 1.2.4).** The claim that Main Street `[8]` is free dates
+from the numeric layout. Since 1.1.13 the default Main Street uses district
+letters (D, I, E, T, A, M, G, H, C, S, N, O, plus `~`, `?`, Q); numeric keys
+survive only in the optional Classic Main Street layout
+(`Scripts/Locations/MainStreetClassic.cs`, where `8` maps to the Level Master).
+When 1.3 is designed, choose the Player District entry key against the current
+district key map, and decide whether it sits on Main Street or inside a
+district. This design is otherwise unchanged.
 
 **Full version** (later releases): buy filters funded from the till, upgrades
 to 15 and 20 slots, inns at 10,000,000 gold with rooms and rest benefits,

@@ -275,6 +275,13 @@ public class CharacterCreationSystem
             // User chose to abort — not an error
             return null;
         }
+        catch (Exception ex) when (ConnectionClosedException.IsDisconnect(ex))
+        {
+            // v1.2.4: the player hung up mid-creation. Not an error: no [ERR] line, no retry
+            // prompt on a dead connection; the session's IOException handler ends it.
+            DebugLogger.Instance?.LogInfo("CHARCREATE", "Connection closed during character creation");
+            throw;
+        }
         catch (Exception ex)
         {
             terminal.WriteLine($"Error during character creation: {ex.Message}", "red");
@@ -2782,6 +2789,7 @@ public class CharacterCreationSystem
         character.BankWage = 0;
         character.WeapHag = 3;
         character.ArmHag = 3;
+        character.MagicHag = 3;
         character.RoyTaxPaid = 0;
         character.Wrestlings = 3;
         character.DrinksLeft = 3;

@@ -2173,7 +2173,7 @@ namespace UsurperRemake.Systems
                 Speaker = "Aurelion",
                 Text = new[]
                 {
-                    "Light floods the chamber — not warm, but searing.",
+                    "Light floods the chamber -- not warm, but searing.",
                     "A figure of living radiance stands before you,",
                     "his form too bright to look at directly.",
                     "",
@@ -2368,7 +2368,7 @@ namespace UsurperRemake.Systems
                 Text = new[]
                 {
                     "For the first time in millennia, Aurelion's light softens.",
-                    "It becomes warm — the light of a hearth, not a furnace.",
+                    "It becomes warm -- the light of a hearth, not a furnace.",
                     "",
                     "\"You... mean it. I can see it in you.\"",
                     "",
@@ -2429,7 +2429,7 @@ namespace UsurperRemake.Systems
                 {
                     "The walls themselves are alive.",
                     "Stone grinds against stone as a massive form assembles",
-                    "from the bedrock — a mountain given consciousness.",
+                    "from the bedrock -- a mountain given consciousness.",
                     "",
                     "Two eyes of molten amber open in the darkness.",
                     "",
@@ -2523,7 +2523,7 @@ namespace UsurperRemake.Systems
                 Speaker = "Terravok",
                 Text = new[]
                 {
-                    "The amber eyes blink slowly — once, twice.",
+                    "The amber eyes blink slowly -- once, twice.",
                     "The grinding of stone softens to a low hum.",
                     "",
                     "\"...sleep... yes...\"",
@@ -2564,7 +2564,7 @@ namespace UsurperRemake.Systems
                 {
                     "At the heart of everything, silence.",
                     "",
-                    "Then a voice — quiet, tired, impossibly old.",
+                    "Then a voice -- quiet, tired, impossibly old.",
                     "",
                     "\"You made it. I wasn't sure you would.\"",
                     "",
@@ -2575,7 +2575,7 @@ namespace UsurperRemake.Systems
                     "\"Unravel the threads I spent eternity weaving.\"",
                     "",
                     "\"And now here you are. At the end of all things.\"",
-                    "\"So tell me — what do you want?\""
+                    "\"So tell me -- what do you want?\""
                 },
                 TextColor = "bright_yellow",
                 Choices = new List<DialogueChoice>
@@ -2622,7 +2622,7 @@ namespace UsurperRemake.Systems
                     "\"Ten thousand years.\"",
                     "",
                     "\"Show me, then. Show me that creation was worth it.\"",
-                    "\"Show me that my children — broken as they are —\"",
+                    "\"Show me that my children -- broken as they are --\"",
                     "\"made something BEAUTIFUL.\"",
                     "",
                     "The Creator raises his hands, and reality bends."
@@ -2675,7 +2675,7 @@ namespace UsurperRemake.Systems
                     "",
                     "\"You don't want to fight.\"",
                     "",
-                    "He laughs — not cruelly, but like someone hearing",
+                    "He laughs -- not cruelly, but like someone hearing",
                     "a joke told ten thousand years ago.",
                     "",
                     "\"That might be the most dangerous thing\"",
@@ -2713,7 +2713,7 @@ namespace UsurperRemake.Systems
                     "",
                     "\"Take the burden? You would carry... THIS?\"",
                     "",
-                    "He gestures and you see it — everything.",
+                    "He gestures and you see it -- everything.",
                     "Every star, every soul, every moment of joy and suffering.",
                     "The weight of all creation, balanced on a single point.",
                     "",

@@ -260,9 +260,10 @@ public partial class OwnerProcessConflictTests
         var npcs = (await _db.LoadWorldState(OnlineStateManager.KEY_NPCS))!;
         npcs.Should().Contain("\"team\":\"Wolves (3)\"").And.Contain("\"team\":\"Wolves\"");
         _db.GetWorldStateVersion(OnlineStateManager.KEY_NPCS).Should().Be(npcsVersion + 1, "a process holding the older roster reloads it");
-        Scalar1("SELECT COUNT(*) FROM messages WHERE to_player = 'm1' AND message_type = 'team_renamed'").Should().Be("1");
-        Scalar1("SELECT message FROM messages WHERE to_player = 'm1'").Should().Be(Loc.GetIn("es", "team.renamed_case_notice", "wolves", "Wolves", "Wolves (3)"));
-        Scalar1("SELECT COUNT(*) FROM messages WHERE to_player = 'k1'").Should().Be("0", "the older team's members are not told anything");
+        // v1.2.4: the notice is addressed by display name
+        Scalar1("SELECT COUNT(*) FROM messages WHERE to_player = 'Em' AND message_type = 'team_renamed'").Should().Be("1");
+        Scalar1("SELECT message FROM messages WHERE to_player = 'Em'").Should().Be(Loc.GetIn("es", "team.renamed_case_notice", "wolves", "Wolves", "Wolves (3)"));
+        Scalar1("SELECT COUNT(*) FROM messages WHERE to_player IN ('k1', 'Kay')").Should().Be("0", "the older team's members are not told anything");
 
         // a second start finds no pair and changes nothing
         _db.RenameCaseVariantTeams().Should().Be(0);

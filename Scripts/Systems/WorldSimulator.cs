@@ -834,7 +834,7 @@ public class WorldSimulator
                 var username = SqlBackend.ResolvePlayerUsernameForMail(spouseName); // SpouseName is a bare Name2; a family surname widens the display name
                 if (!string.IsNullOrEmpty(username))
                 {
-                    _ = SqlBackend.SendMessage("The Town Crier", username, "death", body);
+                    _ = SqlBackend.SendMessageToKey("The Town Crier", username, "death", body);
                     DebugLogger.Instance.LogInfo("WORLDSIM",
                         $"Spouse-death mail sent to player '{username}' for {npcName}");
                 }
@@ -6315,7 +6315,7 @@ public class WorldSimulator
                 _ => null
             };
             if (emotionWord != null)
-                AddGossip($"A wave of {emotionWord} swept through the {npc.CurrentLocation} — started by {npcName}");
+                AddGossip($"A wave of {emotionWord} swept through the {npc.CurrentLocation} -- started by {npcName}");
         }
     }
 
@@ -7722,7 +7722,7 @@ public class WorldSimulator
                         details = attackLog
                     });
                     SqlBackend.AppendSleepAttackLog(sleeper.Username, logEntry).GetAwaiter().GetResult();
-                    SqlBackend.SendMessage(attackerNPC.Name2, sleeper.Username, "sleep_attack",
+                    SqlBackend.SendMessageToKey(attackerNPC.Name2, sleeper.Username, "sleep_attack",
                         $"{attackerNPC.Name2} murdered you in your sleep! Lost {stolenGold:N0} gold{(stolenItemName != null ? $" and {stolenItemName}" : "")}.").GetAwaiter().GetResult();
 
                     DebugLogger.Instance.LogInfo("SLEEP", $"NPC {attackerNPC.Name2} killed sleeping {sleeper.Username}, stole {stolenGold}g + {stolenItemName ?? "nothing"}");

@@ -391,7 +391,7 @@ public partial class GameEngine
         var playerName = (ctx0 != null && !string.IsNullOrEmpty(ctx0.Username))
             ? ctx0.Username
             : UsurperRemake.BBS.DoorMode.GetPlayerName();
-        UsurperRemake.BBS.DoorMode.Log($"BBS Door mode: Looking for save for '{playerName}'");
+        UsurperRemake.BBS.DoorMode.Log(UsurperRemake.BBS.DoorMode.SaveLookupLogMessage(playerName));
 
         // Show the title screen (once per session)
         if (!_splashScreenShown)
@@ -910,24 +910,34 @@ public partial class GameEngine
         if (PendingNewGamePlus)
         {
             PendingNewGamePlus = false;
-            // Preserve player preferences before deleting old save
-            bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
-            bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
-            var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
-            // Use the active character key (could be main or alt)
-            var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
-            var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
-            foreach (var save in ngpSaves)
-                SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
-            await CreateNewGame(activeKey);
-            // Restore preferences that CreateNewGame defaults from CLI flags
-            if (currentPlayer != null)
-            {
-                currentPlayer.ScreenReaderMode = preserveScreenReader;
-                currentPlayer.Orientation = preserveOrientation;
-                currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
-                GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
-            }
+            await BeginNewLifeAsync(accountName);
+        }
+    }
+
+    /// <summary>
+    /// The NG+ and renounce restart in BBS/online mode: the active character's saves are deleted and
+    /// a new character is created under the same key (CreateNewGame carries the NG+ values and,
+    /// 1.2.4, the earned alt slot); the screen reader, menu keys and orientation preferences are kept.
+    /// </summary>
+    internal async Task BeginNewLifeAsync(string accountName)
+    {
+        // Preserve player preferences before deleting old save
+        bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
+        bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
+        var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
+        // Use the active character key (could be main or alt)
+        var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
+        var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
+        foreach (var save in ngpSaves)
+            SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
+        await CreateNewGame(activeKey);
+        // Restore preferences that CreateNewGame defaults from CLI flags
+        if (currentPlayer != null)
+        {
+            currentPlayer.ScreenReaderMode = preserveScreenReader;
+            currentPlayer.Orientation = preserveOrientation;
+            currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
+            GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
         }
     }
 
@@ -2495,7 +2505,7 @@ public partial class GameEngine
                 terminal.SetColor("gray");
                 if (save.IsRecovered)
                 {
-                    terminal.Write("(unparsed — will open recovery menu)");
+                    terminal.Write("(unparsed -- will open recovery menu)");
                 }
                 else
                 {
@@ -2553,7 +2563,7 @@ public partial class GameEngine
                     // bloat here.
                     string reason = selectedSave.IsEmergency
                         ? "This is an emergency save (Ctrl+C dump). The regular save for this character was lost or never written."
-                        : "Save file failed to parse during listing — the save is likely bloated or too large. Not enough memory to load it normally. Recovery options below.";
+                        : "Save file failed to parse during listing -- the save is likely bloated or too large. Not enough memory to load it normally. Recovery options below.";
                     await ShowLoadFailureWithRecovery(selectedSave.FileName, reason);
                     return;
                 }
@@ -2620,7 +2630,7 @@ public partial class GameEngine
             var (saveData, loadError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (saveData == null)
             {
-                await ShowLoadFailureWithRecovery(fileName, loadError ?? "Unknown error — save file could not be parsed.");
+                await ShowLoadFailureWithRecovery(fileName, loadError ?? "Unknown error -- save file could not be parsed.");
                 return;
             }
 
@@ -3282,7 +3292,7 @@ public partial class GameEngine
         terminal.WriteLine("  SAVE LOAD FAILED", "bright_red");
         terminal.WriteLine("========================================================================", "red");
         terminal.WriteLine("");
-        terminal.WriteLine("The game could not load your save. Your save file is still on disk —", "yellow");
+        terminal.WriteLine("The game could not load your save. Your save file is still on disk --", "yellow");
         terminal.WriteLine("it was NOT deleted. Details below so you can recover it.", "yellow");
         terminal.WriteLine("");
 
@@ -3660,7 +3670,7 @@ public partial class GameEngine
             var (verifyData, verifyError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (verifyData?.Player != null)
             {
-                terminal.WriteLine("Repair succeeded — loading character now.", "bright_green");
+                terminal.WriteLine("Repair succeeded -- loading character now.", "bright_green");
                 terminal.WriteLine("");
                 await Pacing.Wait(1000);
                 await LoadSaveByFileName(fileName);
@@ -4905,6 +4915,9 @@ public partial class GameEngine
         HashSet<string> previousArcNames = (isNgPlus && currentPlayer?.CompletedArcChildNames != null)
             ? new HashSet<string>(currentPlayer.CompletedArcChildNames)
             : new HashSet<string>();
+        // 1.2.4: the alt slot, once earned by ascending, stays with the account through the new
+        // life (renounce and NG+ replace the main's save, which is where the slot is read)
+        bool previousEarnedAltSlot = currentPlayer?.HasEarnedAltSlot == true;
 
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
@@ -5099,6 +5112,8 @@ public partial class GameEngine
                 DebugLogger.Instance.LogWarning("DEATH_CAP", $"Fallen-legacy claim failed: {lex.Message}");
             }
         }
+
+        if (previousEarnedAltSlot) currentPlayer.HasEarnedAltSlot = true;
 
         // Save the new game using the character's actual name (Name1)
         // This is important because playerName may be empty if coming from no-saves path
@@ -5419,6 +5434,8 @@ public partial class GameEngine
             ArmHag = playerData.ArmHag,
             WeaponShopBarredUntilDay = playerData.WeaponShopBarredUntilDay,
             ArmorShopBarredUntilDay = playerData.ArmorShopBarredUntilDay,
+            MagicHag = playerData.MagicHag,
+            MagicShopBarredUntilDay = playerData.MagicShopBarredUntilDay,
             PendingGroupDeath = playerData.PendingGroupDeath,
             GymSessions = (byte)playerData.GymSessions,
             PickPocketAttempts = playerData.PickPocketAttempts,
@@ -5432,6 +5449,7 @@ public partial class GameEngine
             MaxResurrections = playerData.MaxResurrections > 0 ? playerData.MaxResurrections : 3,
             PlaythroughDeaths = playerData.PlaythroughDeaths,
             PresentDays = playerData.PresentDays,
+            PendingSpouseLetters = playerData.PendingSpouseLetters ?? new List<string>(),
             BannedFromChurch = playerData.BannedFromChurch,
             BlessingsReceived = playerData.BlessingsReceived,
             ChurchDonations = playerData.ChurchDonations,
@@ -6547,7 +6565,10 @@ public partial class GameEngine
 
         // v1.2: the bank's robbery reserve (single-player only; online reads world_state)
         if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+        {
             UsurperRemake.Systems.BankVaultSystem.Load(worldState.BankVaultReserve);
+            UsurperRemake.Systems.BankVaultSystem.LoadRobberies(worldState.BankRobberiesToday, worldState.BankRobberiesDate); // 1.2.4
+        }
 
         // Restore active world events from save data
         var currentDay = dailyManager?.CurrentDay ?? 1;
@@ -7542,6 +7563,13 @@ public partial class GameEngine
         {
             terminal.WriteLine(Loc.Get("engine.creation_aborted"), "red");
             return null;
+        }
+        catch (Exception ex) when (ConnectionClosedException.IsDisconnect(ex))
+        {
+            // v1.2.4: a hang-up during creation is a disconnect: no [ERR] CRASH line and no retry
+            // prompt; rethrow so the session's disconnect handling ends it.
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("CREATE", "Connection closed during character creation");
+            throw;
         }
         catch (Exception ex)
         {

@@ -1765,7 +1765,7 @@ public class TeamCornerLocation : BaseLocation
     private static string TruncateName(string name, int max)
     {
         if (string.IsNullOrEmpty(name)) return "";
-        return name.Length <= max ? name : name.Substring(0, max - 1) + "…";
+        return name.Length <= max ? name : name.Substring(0, max - 3) + "...";
     }
 
     private static string GetBandTag(TeamSystem.RecruitmentBand band) => band switch

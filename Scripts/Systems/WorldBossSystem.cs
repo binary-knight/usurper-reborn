@@ -666,7 +666,7 @@ namespace UsurperRemake.Systems
                 foreach (var (username, language) in backend.GetRecentActivePlayers(GameConfig.WorldBossActiveDays))
                 {
                     string lang = string.IsNullOrEmpty(language) ? "en" : language;
-                    await backend.SendMessage("System", username, "world_boss", Loc.GetIn(lang, key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn(lang, "world_boss.spawn_hour_text")));
+                    await backend.SendMessageToKey("System", username, "world_boss", Loc.GetIn(lang, key, bossDef.Name, bossDef.Title, schedule.BossLevel, Loc.GetIn(lang, "world_boss.spawn_hour_text")));
                 }
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("WORLD_BOSS", $"Notice failed: {ex.Message}"); }
@@ -848,7 +848,7 @@ namespace UsurperRemake.Systems
             if (phase > 1)
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", phase, 3)} — {GetPhaseDescription(phase)}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", phase, 3)} -- {GetPhaseDescription(phase)}");
             }
             if (boss.Nights > 1)
             {
@@ -2090,7 +2090,7 @@ namespace UsurperRemake.Systems
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("");
-            terminal.WriteLine($"  *** {Loc.Get("world_boss.phase_label", newPhase, 3)} — {GetPhaseDescription(newPhase)} ***");
+            terminal.WriteLine($"  *** {Loc.Get("world_boss.phase_label", newPhase, 3)} -- {GetPhaseDescription(newPhase)} ***");
             string[]? dialogue = newPhase == 2 ? bossDef.LocPhase2() : bossDef.LocPhase3();
             if (dialogue != null)
             {

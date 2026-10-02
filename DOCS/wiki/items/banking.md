@@ -1,8 +1,9 @@
 ---
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs
+history: 1.2.4 | The Bank's count of robbery attempts for the day is kept across server restarts.
 ---
 Gold on hand and bank gold are separate balances. The Bank offers deposits, withdrawals and transfers alongside other banking activities.
 

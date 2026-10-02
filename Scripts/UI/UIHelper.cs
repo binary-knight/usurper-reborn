@@ -280,11 +280,17 @@ namespace UsurperRemake.UI
         public static int VisibleLength(string text) =>
             string.IsNullOrEmpty(text) ? 0 : AnsiEscape.Replace(text, "").Length;
 
+        /// <summary>v1.2.4: text without its ANSI escape sequences.</summary>
+        public static string StripAnsi(string? text) =>
+            string.IsNullOrEmpty(text) ? "" : AnsiEscape.Replace(text, "");
+
         /// <summary>
         /// v1.1.14: word-wrap text at spaces so no line is wider than width visible columns.
         /// ANSI sequences are kept intact and not counted. Existing newlines start a new line.
         /// A single word wider than width stays whole on its own line. firstLineOffset is the
         /// number of columns already used on the first line.
+        /// v1.2.4: a space before !, ?, : or ; does not break (French "mot !"), so the mark stays
+        /// on the row of the word before it.
         /// </summary>
         public static List<string> WordWrap(string? text, int width = WrapWidth, int firstLineOffset = 0)
         {
@@ -295,7 +301,7 @@ namespace UsurperRemake.UI
                 var sb = new StringBuilder();
                 int used = lines.Count == 0 ? firstLineOffset : 0;
                 int len = 0;
-                foreach (var word in para.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+                foreach (var word in JoinMarksToPreviousWord(para.Split(' ', StringSplitOptions.RemoveEmptyEntries)))
                 {
                     int w = VisibleLength(word);
                     if (len > 0 && used + len + 1 + w > width)
@@ -312,6 +318,33 @@ namespace UsurperRemake.UI
                 lines.Add(sb.ToString());
             }
             return lines;
+        }
+
+        /// <summary>
+        /// v1.2.4: text that follows a prefix (a news time stamp), as the text part of each row. When the
+        /// prefix and text fit width it is the text unchanged; otherwise it is wrapped to the columns
+        /// after the prefix, and the caller writes each later row under the text, indented by the prefix width.
+        /// </summary>
+        public static List<string> WrapAfterPrefix(string prefix, string text, int width = WrapWidth)
+        {
+            int used = VisibleLength(prefix);
+            if (used + VisibleLength(text) <= width) return new List<string> { text };
+            return WordWrap(text, width - used);
+        }
+
+        /// <summary>v1.2.4: a word that starts with !, ?, : or ; is joined to the word before it.</summary>
+        private static List<string> JoinMarksToPreviousWord(string[] words)
+        {
+            var joined = new List<string>(words.Length);
+            foreach (var word in words)
+            {
+                string visible = StripAnsi(word);
+                if (joined.Count > 0 && visible.Length > 0 && "!?:;".IndexOf(visible[0]) >= 0)
+                    joined[joined.Count - 1] += " " + word;
+                else
+                    joined.Add(word);
+            }
+            return joined;
         }
 
         /// <summary>

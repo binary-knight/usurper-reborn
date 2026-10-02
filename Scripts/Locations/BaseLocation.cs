@@ -61,6 +61,25 @@ public abstract class BaseLocation
     private List<UsurperRemake.Systems.OnlinePlayerInfo> _coPresenceCache = new();
     private DateTime _coPresenceCacheTime = DateTime.MinValue;
 
+    /// <summary>
+    /// The online players shown in the cached "Also here" line: those whose presence row names
+    /// this location, leaving out the viewer by online key. 1.2.4: it compared the shown name
+    /// with Name2, which missed a viewer whose shown name carries a family name. The keys are the
+    /// session's online_players key (the alt key after an alt switch) and the account username.
+    /// Nothing is shown at a location without co-presence (the Dungeons, Home).
+    /// </summary>
+    internal static List<UsurperRemake.Systems.OnlinePlayerInfo> CoPresenceOthers(
+        IEnumerable<UsurperRemake.Systems.OnlinePlayerInfo> online, GameLocation locationId, string locationName,
+        params string?[] viewerKeys)
+    {
+        if (!UsurperRemake.Server.RoomRegistry.ShowsCoPresence(locationId))
+            return new List<UsurperRemake.Systems.OnlinePlayerInfo>();
+        return online
+            .Where(p => p.Location == locationName
+                && !viewerKeys.Any(k => !string.IsNullOrEmpty(k) && string.Equals(p.Username, k, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+    }
+
     // v0.57.21: GMCP last-emitted vitals for delta detection. Per-instance because
     // each location has its own loop; resets implicitly on location change.
     /// <summary>
@@ -194,10 +213,10 @@ public abstract class BaseLocation
             throw new LocationExitException(GameLocation.MainStreet);
         }
 
-        // MUD mode: show other players at this location. Skipped in the Dungeons: each
-        // player explores their own floors/instance, so "Also here" there is misleading.
+        // MUD mode: show other players at this location. Skipped in the Dungeons (each player
+        // explores their own floors) and at private locations such as Home.
         if (UsurperRemake.Server.SessionContext.IsActive && UsurperRemake.Server.RoomRegistry.Instance != null
-            && LocationId != GameLocation.Dungeons)
+            && UsurperRemake.Server.RoomRegistry.ShowsCoPresence(LocationId))
         {
             var otherPlayers = UsurperRemake.Server.RoomRegistry.Instance.GetPlayerNamesAt(LocationId, UsurperRemake.Server.SessionContext.Current?.Username);
             if (otherPlayers.Count > 0)
@@ -793,6 +812,9 @@ public abstract class BaseLocation
                 await DailySystemManager.Instance.DisplayDailyResetMessage();
             }
 
+            // v1.2.4: a neglected spouse's letter sent at the daily reset, shown once here
+            await MailSystem.ShowPendingSpouseLetters(terminal, currentPlayer);
+
             // Companion death triggers (once per game day)
             if (currentPlayer != null && CompanionSystem.Instance != null)
             {
@@ -822,17 +844,16 @@ public abstract class BaseLocation
             _skipNextRedraw = false;
 
             // Refresh co-presence player cache every 15s (MUD mode only).
-            // Skipped in the Dungeons: each player explores their own floors/instance,
-            // so co-presence there is misleading.
+            // Skipped in the Dungeons and at private locations (see CoPresenceOthers).
             if (UsurperRemake.BBS.DoorMode.IsMudServerMode &&
                 UsurperRemake.Systems.OnlineStateManager.IsActive &&
-                LocationId != GameLocation.Dungeons &&
+                UsurperRemake.Server.RoomRegistry.ShowsCoPresence(LocationId) &&
                 (DateTime.Now - _coPresenceCacheTime).TotalSeconds >= 15)
             {
-                var allPlayers = await UsurperRemake.Systems.OnlineStateManager.Instance!.GetOnlinePlayers();
-                _coPresenceCache = allPlayers
-                    .Where(p => p.Location == Name && p.DisplayName != (currentPlayer?.Name2 ?? ""))
-                    .ToList();
+                var osm = UsurperRemake.Systems.OnlineStateManager.Instance!;
+                var allPlayers = await osm.GetOnlinePlayers();
+                _coPresenceCache = CoPresenceOthers(allPlayers, LocationId, Name,
+                    osm.OnlineKey, UsurperRemake.Server.SessionContext.Current?.Username);
                 _coPresenceCacheTime = DateTime.Now;
             }
 
@@ -853,15 +874,26 @@ public abstract class BaseLocation
                 ShowImmersionText();
 
                 // Co-presence: show other online players at this location (MUD mode only).
-                // Skipped in the Dungeons (instanced per player).
+                // Skipped in the Dungeons and at private locations.
                 if (UsurperRemake.BBS.DoorMode.IsMudServerMode && _coPresenceCache.Count > 0
-                    && LocationId != GameLocation.Dungeons)
+                    && UsurperRemake.Server.RoomRegistry.ShowsCoPresence(LocationId))
                 {
                     terminal.SetColor("cyan");
                     terminal.Write(Loc.Get("base.also_here") + ": ");
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine(string.Join(", ", _coPresenceCache.Select(p => p.DisplayName)));
                     terminal.WriteLine("");
+                }
+
+                // v1.2.4: chat that arrived since the last /history or hint was wiped by the redraw.
+                if (UsurperRemake.Server.SessionContext.IsActive)
+                {
+                    var hint = UsurperRemake.Server.MudChatSystem.TakeRedrawHint(UsurperRemake.Server.SessionContext.Current!.Username);
+                    if (hint != null)
+                    {
+                        terminal.SetColor("gray");
+                        terminal.WriteLine($"  {hint}");
+                    }
                 }
             }
 
@@ -1592,13 +1624,13 @@ public abstract class BaseLocation
             string locDisplayName = GetLocationName(LocationId);
             terminal.Write(locDisplayName);
             terminal.SetColor("gray");
-            terminal.Write(" — ");
+            terminal.Write(" -- ");
             terminal.SetColor(timeColor);
             terminal.Write(timePeriod);
 
             // Append fatigue tier label when Tired or Exhausted
             var (fatigueLabel, fatigueColor) = currentPlayer.GetFatigueTier();
-            int headerLen = locDisplayName.Length + 3 + timePeriod.Length;
+            int headerLen = locDisplayName.Length + 4 + timePeriod.Length;
             if (!string.IsNullOrEmpty(fatigueLabel) && currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
             {
                 terminal.SetColor("gray");
@@ -3251,6 +3283,7 @@ public abstract class BaseLocation
             WriteOnlineCmd("/emote <action>", Loc.Get("base.help_emote"));
             WriteOnlineCmd("/who", Loc.Get("base.help_who"));
             WriteOnlineCmd("/gossip <msg>", Loc.Get("base.help_gossip"));
+            WriteOnlineCmd(Loc.Get("base.help_history_cmd"), Loc.Get("base.help_history"));
             WriteOnlineCmd("/guild", Loc.Get("base.help_guild"));
             WriteOnlineCmd("/gcreate <name>", Loc.Get("base.help_gcreate"));
             WriteOnlineCmd("/ginvite <player>", Loc.Get("base.help_ginvite"));
@@ -3333,6 +3366,7 @@ public abstract class BaseLocation
             terminal.WriteLine($"/emote <action> {Loc.Get("base.help_emote")}");
             terminal.WriteLine($"/who {Loc.Get("base.help_who")}");
             terminal.WriteLine($"/gossip <msg> {Loc.Get("base.help_gossip")}");
+            terminal.WriteLine($"{Loc.Get("base.help_history_cmd")} {Loc.Get("base.help_history")}");
             terminal.WriteLine($"/guild - {Loc.Get("base.help_guild")}");
             terminal.WriteLine($"/gcreate <name> - {Loc.Get("base.help_gcreate")}");
             terminal.WriteLine($"/ginvite <player> - {Loc.Get("base.help_ginvite")}");
@@ -3633,7 +3667,7 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($" x{count}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  — {matDef.Description}");
+                terminal.WriteLine($"  -- {matDef.Description}");
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"    {Loc.Get("base.mat_found_floors", matDef.FloorMin, matDef.FloorMax)}");
                 terminal.WriteLine("");
@@ -4010,9 +4044,9 @@ public abstract class BaseLocation
             terminal.Write($"({currentPlayer.Fatigue}/100)");
             // Show penalty description
             if (currentPlayer.Fatigue >= GameConfig.FatigueExhaustedThreshold)
-                terminal.WriteLine($" — {Loc.Get("base.fatigue_exhausted_penalty")}");
+                terminal.WriteLine($" -- {Loc.Get("base.fatigue_exhausted_penalty")}");
             else if (currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
-                terminal.WriteLine($" — {Loc.Get("base.fatigue_tired_penalty")}");
+                terminal.WriteLine($" -- {Loc.Get("base.fatigue_tired_penalty")}");
             else
                 terminal.WriteLine("");
         }
@@ -4749,7 +4783,7 @@ public abstract class BaseLocation
                     else
                     {
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  0. ({Loc.Get("ui.none")}) — {Loc.Get("base.remove_title")}");
+                        terminal.WriteLine($"  0. ({Loc.Get("ui.none")}) -- {Loc.Get("base.remove_title")}");
                         for (int ti = 0; ti < availableTitles.Count; ti++)
                         {
                             string marker = availableTitles[ti] == currentPlayer.NobleTitle ? " *" : "";
@@ -6992,19 +7026,19 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("dark_red");
                 terminal.WriteLine($"  - Blood Price (Mass Murderer): -{(int)(GameConfig.MurderWeightTier3CombatPenalty * 100)}% damage, +{(int)(GameConfig.MurderWeightTier3ShopMarkup * 100)}% shop prices, +{(int)(GameConfig.MurderWeightTier3HealPenalty * 100)}% healer costs");
-                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} -- Confess at the Church to reduce.");
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  - Blood Price (Notorious Killer): -{(int)(GameConfig.MurderWeightTier2CombatPenalty * 100)}% damage, +{(int)(GameConfig.MurderWeightTier2ShopMarkup * 100)}% shop prices");
-                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} -- Confess at the Church to reduce.");
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  - Blood Price (Known Killer): +{(int)(GameConfig.MurderWeightShopMarkupPercent * 100)}% shop prices");
-                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} -- Confess at the Church to reduce.");
             }
 
             if (currentPlayer.IsKnighted)
@@ -8076,7 +8110,7 @@ public abstract class BaseLocation
         if (player == null) return;
 
         terminal.WriteLine("");
-        UIHelper.WriteBoxHeader(terminal, $"Equipment — {player.DisplayName}", "bright_yellow", 76);
+        UIHelper.WriteBoxHeader(terminal, $"Equipment -- {player.DisplayName}", "bright_yellow", 76);
         terminal.WriteLine("");
 
         var slots = new (EquipmentSlot slot, string label)[]
@@ -8769,6 +8803,8 @@ public abstract class BaseLocation
         if (backend == null) return;
 
         string username = currentPlayer.DisplayName.ToLower();
+        // v1.2.4: read by the save key; the backend gives each row one owner (SqlSaveBackend.MailOwnedBy)
+        string mailKey = UsurperRemake.BBS.DoorMode.OnlineUsername is { Length: > 0 } key ? key : username;
         int page = 0;
         const int pageSize = 10;
 
@@ -8778,8 +8814,8 @@ public abstract class BaseLocation
             WriteBoxHeader(Loc.Get("base.your_mailbox"), "bright_cyan");
             terminal.WriteLine("");
 
-            int unread = backend.GetUnreadMailCount(username);
-            var inbox = await backend.GetMailInbox(username, pageSize, page * pageSize);
+            int unread = backend.GetUnreadMailCount(mailKey);
+            var inbox = await backend.GetMailInbox(mailKey, pageSize, page * pageSize);
 
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("base.mail_unread", unread));
@@ -8812,7 +8848,7 @@ public abstract class BaseLocation
                     string msgPreview = msg.Message.Length > 35 ? msg.Message.Substring(0, 32) + "..." : msg.Message;
 
                     terminal.SetColor(msg.IsRead ? "gray" : "white");
-                    terminal.WriteLine($"{unreadMark}{i + 1,-3} {msg.FromPlayer,-16} {dateStr,-12} {msgPreview,-36}");
+                    terminal.WriteLine(MailboxRow(unreadMark, i + 1, msg.FromPlayer, dateStr, msgPreview));
                 }
             }
 
@@ -8873,7 +8909,7 @@ public abstract class BaseLocation
             {
                 if (delIdx >= 1 && delIdx <= inbox.Count)
                 {
-                    await backend.DeleteMessage(inbox[delIdx - 1].Id, username);
+                    await backend.DeleteMessage(inbox[delIdx - 1].Id, mailKey);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("base.mail_deleted"));
                     await Pacing.Wait(1000);
@@ -8884,6 +8920,13 @@ public abstract class BaseLocation
                 await ReadMail(backend, inbox[directRead - 1]);
             }
         }
+    }
+
+    /// <summary>One inbox row; v1.2.4 clips the sender to its 16-column field so a long name keeps the row inside 79.</summary>
+    internal static string MailboxRow(string unreadMark, int number, string from, string date, string preview)
+    {
+        string sender = from.Length > 16 ? from.Substring(0, 16) : from;
+        return $"{unreadMark}{number,-3} {sender,-16} {date,-12} {preview,-36}";
     }
 
     private async Task ReadMail(SqlSaveBackend backend, PlayerMessage msg)
@@ -9985,7 +10028,7 @@ public abstract class BaseLocation
     private static string Truncate(string s, int maxLen)
     {
         if (s.Length <= maxLen) return s;
-        return s.Substring(0, maxLen - 1) + "…";
+        return s.Substring(0, maxLen - 3) + "...";
     }
 
     private static string GetItemStatsCompact(Item? item)

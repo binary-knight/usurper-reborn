@@ -16,6 +16,21 @@ using System.Threading.Tasks;
 /// </summary>
 public class PantheonLocation : BaseLocation
 {
+    /// <summary>Columns a Pantheon boon row may use (the 79 column screen).</summary>
+    internal const int BoonRowWidth = 79;
+
+    /// <summary>Fixed part of an available-boon row: "  NN. " + label + " -- " + space + alignment tag + tail.</summary>
+    internal static int BoonRowFixedWidth(string label, string alignTag, int tailLength) =>
+        6 + Math.Max(25, label.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + tailLength;
+
+    /// <summary>Description column for a boon row: at most cap wide, cut with "..." so the whole row stays within 79 columns.</summary>
+    internal static string FitBoonText(string text, int fixedWidth, int cap)
+    {
+        int width = Math.Min(cap, Math.Max(10, BoonRowWidth - fixedWidth));
+        if (text.Length > width) text = text.Substring(0, width - 3) + "...";
+        return text.PadRight(width);
+    }
+
     // Anti-grief: tracks last smite time per "godName>targetName" pair
     private static readonly Dictionary<string, DateTime> _smiteCooldowns = new();
 
@@ -246,7 +261,7 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("pantheon.daily_exp_label"));
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("pantheon.daily_exp_value", believers * currentPlayer.GodLevel * GameConfig.GodBelieverExpPerLevel));
+        terminal.WriteLine(Loc.Get("pantheon.daily_exp_value", DailyBelieverExp(believers, currentPlayer.GodLevel)));
 
         // Show configured boons
         var boonLines = DivineBoonRegistry.GetEffectSummaryLines(currentPlayer.DivineBoonConfig);
@@ -375,7 +390,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_green");
                     terminal.Write($"{boon.Name} {tierStr,-5}");
                     terminal.SetColor("gray");
-                    terminal.Write($" — {boon.GetEffectDescription(tier),-30}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + $" ({cost} pts)".Length, 29)}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12} ({cost} pts)");
                     idx++;
@@ -409,14 +424,15 @@ public class PantheonLocation : BaseLocation
                 if (!alignmentMatch)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"  {optNum,2}. {label,-25} — {boon.Description,-28} {alignTag,-12} {Loc.Get("pantheon.boon_locked")}");
+                    string lockedTail = Loc.Get("pantheon.boon_locked");
+                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {FitBoonText(boon.Description, BoonRowFixedWidth(label, alignTag, 1 + lockedTail.Length), 27)} {alignTag,-12} {lockedTail}");
                 }
                 else if (!canAfford)
                 {
                     terminal.SetColor("darkgray");
                     terminal.Write($"  {optNum,2}. ");
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"{label,-25} — {boon.GetEffectDescription(nextTier),-28} {alignTag,-12} (+{addedCost} pts) *");
+                    terminal.WriteLine($"{label,-25} -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts) *".Length), 27)} {alignTag,-12} (+{addedCost} pts) *");
                 }
                 else
                 {
@@ -425,7 +441,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_cyan");
                     terminal.Write($"{label,-25}");
                     terminal.SetColor("gray");
-                    terminal.Write($" — {boon.GetEffectDescription(nextTier),-28}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts)".Length), 27)}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12} (+{addedCost} pts)");
                     optionMap[optNum] = (boon.Id, nextTier, addedCost);
@@ -1308,14 +1324,8 @@ public class PantheonLocation : BaseLocation
             await Pacing.Wait(1500);
         }
 
-        // Clear all believers
-        var believers = NPCSpawnSystem.Instance?.ActiveNPCs?
-            .Where(n => n.WorshippedGod == currentPlayer.DivineName)
-            .ToList() ?? new();
-        foreach (var npc in believers)
-        {
-            npc.WorshippedGod = "";
-        }
+        // Clear all believers: NPCs, and (1.2.4) player followers in the game and in saved games
+        await ClearFollowersOfAsync(currentPlayer.DivineName);
 
         // News
         NewsSystem.Instance?.Newsy(true,
@@ -1324,7 +1334,9 @@ public class PantheonLocation : BaseLocation
         // Capture alignment before clearing (needed for legacy migration below)
         string godAlignment = currentPlayer.GodAlignment ?? "";
 
-        // Clear immortal state
+        // Clear immortal state. 1.2.4: the alt slot stays earned (also for a god that ascended before
+        // the flag existed); CreateNewGame carries it to the new life.
+        currentPlayer.HasEarnedAltSlot = true;
         currentPlayer.IsImmortal = false;
         currentPlayer.DivineName = "";
         currentPlayer.GodLevel = 0;
@@ -1381,6 +1393,48 @@ public class PantheonLocation : BaseLocation
         return true;
     }
 
+    /// <summary>
+    /// 1.2.4: a renouncing god's followers lose their god. NPC believers are cleared in memory. A
+    /// player in the game in another session is switched to no god as another's act (Favor goes
+    /// with the god, no wrath) and told in their session's language. Every saved mortal character
+    /// still following the god (SqlSaveBackend.ClearPlayerFollowersOf, one transaction) is cleared,
+    /// and those not told in a session get the notice as mail in the save's language, so each
+    /// player is told once. Returns the number of players cleared.
+    /// </summary>
+    internal static async Task<int> ClearFollowersOfAsync(string divineName)
+    {
+        if (string.IsNullOrWhiteSpace(divineName)) return 0;
+
+        foreach (var npc in NPCSpawnSystem.Instance?.ActiveNPCs?.Where(n => n.WorshippedGod == divineName).ToList() ?? new())
+            npc.WorshippedGod = "";
+
+        var told = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in MudServer.Instance?.ActiveSessions.Values.ToList() ?? new())
+        {
+            var player = session?.Context?.Engine?.CurrentPlayer;
+            // a canon god wins over a stale player-god entry (the load clears that one), so only a
+            // player who follows this god now is switched
+            if (player == null || player.IsImmortal || GodRegistry.GetWorshippedGod(player)?.Name != divineName) continue;
+            GodSwitchSystem.Switch(player, null, GodChangeBy.Other, otherSession: true);
+            string lang = session!.Context?.Language ?? "en";
+            session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "pantheon.follower_god_renounced", divineName)}\u001b[0m");
+            session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "pantheon.follower_now_godless")}\u001b[0m");
+            string key = !string.IsNullOrEmpty(session.Context?.CharacterKey) ? session.Context!.CharacterKey : session.Username;
+            if (!string.IsNullOrEmpty(key)) told.Add(key);
+        }
+
+        if (SaveSystem.Instance?.Backend is not SqlSaveBackend backend) return told.Count;
+        var saved = await backend.ClearPlayerFollowersOf(divineName);
+        foreach (var (key, lang) in saved)
+        {
+            if (told.Contains(key)) continue;
+            told.Add(key);
+            await backend.SendMessageToKey(divineName, key, "divine",
+                Loc.GetIn(lang, "pantheon.follower_god_renounced", divineName) + " " + Loc.GetIn(lang, "pantheon.follower_now_godless"));
+        }
+        return told.Count;
+    }
+
     #endregion
 
     #region Helper Methods
@@ -1420,6 +1474,13 @@ public class PantheonLocation : BaseLocation
     }
 
     /// <summary>Count NPCs (and player believers in MUD mode) that worship a given divine name</summary>
+    /// <summary>
+    /// 1.2.4: the divine experience believers grant at each daily reset. The payout
+    /// (DailySystemManager) and the Status screen both read it, so they show the same number.
+    /// </summary>
+    public static long DailyBelieverExp(int believers, int godLevel) =>
+        (long)Math.Max(0, believers) * Math.Max(0, godLevel) * GameConfig.GodBelieverExpPerLevel;
+
     public static int CountBelievers(string divineName)
     {
         if (string.IsNullOrEmpty(divineName)) return 0;
@@ -1744,7 +1805,7 @@ public class PantheonLocation : BaseLocation
         string text = Loc.GetIn(s.Lang, "pantheon.bless_received", godName, (int)Math.Round(s.Outcome.Bonus * 100), s.Outcome.Combats);
         if (s.Outcome.FavorGained > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.gain", godName, s.Outcome.FavorGained, s.Outcome.FavorNow);
-        await backend.SendMessage(godName, target.Username, "divine", text);
+        await backend.SendMessageToKey(godName, target.Username, "divine", text);
         return s.Outcome;
     }
 
@@ -1786,7 +1847,7 @@ public class PantheonLocation : BaseLocation
         string text = Loc.GetIn(s.Lang, "pantheon.chastise_received", godName);
         if (s.Outcome.FavorLost > 0)
             text += " " + Loc.GetIn(s.Lang, "favor.loss", godName, s.Outcome.FavorLost, s.Outcome.FavorNow);
-        await backend.SendMessage(godName, target.Username, "divine", text);
+        await backend.SendMessageToKey(godName, target.Username, "divine", text);
         return s.Outcome;
     }
 
@@ -1814,7 +1875,7 @@ public class PantheonLocation : BaseLocation
         // Offline: atomic DB update + message (in the save's language)
         await backend.ApplyDivineSmite(target.Username, damagePercent);
         string savedLang = (await backend.ReadGameData(target.Username))?.Player?.Language ?? "";
-        await backend.SendMessage(godName, target.Username, "divine",
+        await backend.SendMessageToKey(godName, target.Username, "divine",
             Loc.GetIn(savedLang.Length == 0 ? "en" : savedLang, "pantheon.smite_received_offline", godName));
     }
 
@@ -1843,7 +1904,7 @@ public class PantheonLocation : BaseLocation
 
         // Offline: atomic DB update + message
         await backend.SetPlayerWorshippedGod(target.Username, godName);
-        await backend.SendMessage(godName, target.Username, "divine",
+        await backend.SendMessageToKey(godName, target.Username, "divine",
             $"The god {godName} has claimed you as a believer!");
     }
 

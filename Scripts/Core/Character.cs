@@ -2239,13 +2239,16 @@ public class Character
     public long Loan { get; set; }                  // outstanding bank loan
     public byte WeapHag { get; set; } = 3;          // weapon shop haggling attempts left
     public byte ArmHag { get; set; } = 3;           // armor shop haggling attempts left
+    public byte MagicHag { get; set; } = 3;         // v1.2.4: magic shop haggling attempts left
     // v1.2 (design item C): being thrown out for bad haggling used to be "attempts == 0",
     // which barred the shop the moment the third attempt was spent. The bar is its own
     // day-stamped field now; attempts and the bar both persist.
     public int WeaponShopBarredUntilDay { get; set; }
     public int ArmorShopBarredUntilDay { get; set; }
+    public int MagicShopBarredUntilDay { get; set; }
     public bool IsBarredFromWeaponShop(int currentDay) => WeaponShopBarredUntilDay > currentDay;
     public bool IsBarredFromArmorShop(int currentDay) => ArmorShopBarredUntilDay > currentDay;
+    public bool IsBarredFromMagicShop(int currentDay) => MagicShopBarredUntilDay > currentDay;
     public int RecNr { get; set; }                  // file record number
 
     // New for version 0.14+
@@ -2325,6 +2328,9 @@ public class Character
     // v1.2 (design item F): days this player experienced a daily reset while logged in. Absence
     // adds nothing, so neglect is measured in time the player could have spent.
     public int PresentDays { get; set; }
+    // v1.2.4 (design item F): spouses whose neglect letter has been sent but not yet shown on
+    // screen; saved, so a quit before the next location redraw shows it at the next login.
+    public List<string> PendingSpouseLetters { get; set; } = new();
 
     // v0.60.0 beta: transient flag set by ApplyMurderConsequences before the
     // Royal Guard arrest-combat. When true, CombatEngine.HandlePlayerDeath

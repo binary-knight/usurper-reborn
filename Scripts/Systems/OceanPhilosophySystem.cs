@@ -421,7 +421,7 @@ namespace UsurperRemake.Systems
                 AwakeningMoment.AcceptedDeath => new OceanInsight(
                     "The Still Water",
                     "You looked into the void and did not flinch. " +
-                    "Death is not the opposite of life — it is the shore " +
+                    "Death is not the opposite of life -- it is the shore " +
                     "where every wave finally rests.",
                     4
                 ),
@@ -429,7 +429,7 @@ namespace UsurperRemake.Systems
                     "The Gift of Depth",
                     "They gave everything so you could continue. " +
                     "In their sacrifice, the boundary between self and other " +
-                    "dissolved entirely. Love is not a transaction — it is water " +
+                    "dissolved entirely. Love is not a transaction -- it is water " +
                     "pouring itself into water.",
                     4
                 ),
@@ -442,7 +442,7 @@ namespace UsurperRemake.Systems
                 ),
                 AwakeningMoment.AcceptedGrief => new OceanInsight(
                     "The Tide Returns",
-                    "Grief is not a wound to heal — it is the ocean mourning " +
+                    "Grief is not a wound to heal -- it is the ocean mourning " +
                     "a wave that has returned home. You carried the weight " +
                     "until it became wisdom.",
                     4

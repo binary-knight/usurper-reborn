@@ -1,8 +1,9 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs
+history: 1.2.4 | none
 ---
 Teams support adventuring relationships and group participation. Guilds are a separate online social system. Joining one does not imply that every member is automatically following you in combat.
 
