@@ -10237,7 +10237,9 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("dungeon.merchant_purchase_confirm", item.Name, item.Price));
+        // v1.2.4: a long item name and price wrap at 79 (a row that fits is unchanged)
+        foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(Loc.Get("dungeon.merchant_purchase_confirm", item.Name, item.Price)))
+            terminal.WriteLine(line);
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (await terminal.AskYesNoAsync(""))
         {
