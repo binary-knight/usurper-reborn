@@ -613,6 +613,80 @@ public class TownBase125Tests : IDisposable
         Regex.Matches(src, @"backend\.SendMessage\(").Count.Should().Be(1, "only player-written mail (/mail) is stored as typed");
     }
 
+    // ---------- 7b. the mailbox, trade and bounty screens, rendered ----------
+
+    private static readonly FieldInfo SaveBackend = typeof(SaveSystem).GetField("backend", F)!;
+
+    /// <summary>Renders a BaseLocation screen that reads SaveSystem's backend, with this test's database behind it.</summary>
+    private string Screen(string lang, string method, string input = "Q\n")
+    {
+        var before = SaveBackend.GetValue(SaveSystem.Instance);
+        SaveBackend.SetValue(SaveSystem.Instance, Db);
+        try
+        {
+            return InLanguage(lang, () =>
+            {
+                var (term, output) = Term(input);
+                Call(At(new Plain(), term, Hero()), method);
+                return Shown(term, output);
+            });
+        }
+        finally { SaveBackend.SetValue(SaveSystem.Instance, before); }
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public async Task MailboxScreen_Fits_AndItsHeaderIsInThePlayersLanguage(string lang)
+    {
+        Player(LongName.ToLower(), LongName, lang);
+        await Db.SendMessage(LongName, LongName, "mail", new string('m', 200));
+        string shown = Screen(lang, "ShowMailbox");
+        Capture($"town-base-mailbox-{lang}.txt", shown);
+        EveryRowFits(shown, $"{lang} mailbox");
+        shown.Should().Contain(BaseLocation.Cell(L(lang, "base.from_label"), 16) + " " + BaseLocation.Cell(L(lang, "base.col_date"), 12));
+        if (lang == "hu") shown.Should().NotContain("From").And.NotContain("Message");
+        string bar = Rows(shown).Single(r => r.StartsWith("[R]"));
+        if (lang == "en") bar.Should().Be("[R]ead #  [S]end  [D]elete #  [N]ext Page  [P]rev Page  [Q]uit", "the English bar is unchanged");
+        else bar.Should().Be("[R] Olvasás #  [S] Küldés  [D] Törlés #  [N] Következő  [P] Előző  [Q] Kilépés");
+        foreach (var lang2 in AllLanguages)
+            InLanguage(lang2, () =>
+            {
+                foreach (var k in new[] { "read", "send", "delete", "next", "prev", "quit" })
+                    BaseLocation.MenuKeyLabel("X", L(lang2, "base.mail_bar_" + k)).Tail.Should().NotStartWith("]");
+                return 0;
+            });
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public async Task TradeScreen_Fits_AndItsRowsAreInThePlayersLanguage(string lang)
+    {
+        string me = LongName.ToLower();
+        Player(me, LongName, lang);
+        Player("other_key", "Other", "en");
+        await Db.CreateTradeOffer("other_key", me, "[]", 999_999_999, "");
+        await Db.CreateTradeOffer(me, "other_key", "[]", 0, "");
+        string shown = Screen(lang, "ShowTradeMenu");
+        Capture($"town-base-trade-{lang}.txt", shown);
+        EveryRowFits(shown, $"{lang} trade menu");
+        shown.Should().Contain(L(lang, "base.trade_sent_row", "Other", L(lang, "base.trade_empty_package")));
+        if (lang == "hu") shown.Should().NotContain("(pending)").And.NotContain("(empty)").And.NotContain(" To ");
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public async Task BountyBoard_Fits_AndIsInThePlayersLanguage(string lang)
+    {
+        Player("victim_key", LongName, "en");
+        await Db.PlaceBounty(LongName.ToLower(), LongName.ToLower(), 1_000_000_000);
+        string shown = Screen(lang, "ShowBountyMenu");
+        Capture($"town-base-bounty-{lang}.txt", shown);
+        EveryRowFits(shown, $"{lang} bounty board");
+        shown.Should().Contain(InLanguage(lang, BaseLocation.BountyHeader)).And.Contain(L(lang, "anchor_road.gold_amount", "1,000,000,000"));
+        if (lang == "en") shown.Should().Contain("1,000,000,000 gold ");
+        else shown.Should().NotContain("Posted By").And.NotContain("Target").And.NotContain(" gold");
+    }
+
     // ---------- 8. identifiers kept as their readers expect ----------
 
     [Fact]
@@ -685,6 +759,7 @@ public class TownBase125Tests : IDisposable
         var used = Regex.Matches(source, "Loc\\.Get(?:In)?\\((?:lang, )?\"([a-z0-9_.]+)\"").Select(m => m.Groups[1].Value).Where(k => !k.EndsWith("_"))
             .Concat(new[] { "base.help_arg_msg", "base.help_arg_name", "base.help_arg_action", "base.help_arg_player", "base.help_arg_guild",
                 "base.help_arg_rank", "base.trade_mail_declined_items", "base.trade_mail_declined_gold" })
+            .Concat(new[] { "read", "send", "delete", "next", "prev", "quit" }.Select(id => "base.mail_bar_" + id))
             .Concat(new[] { "weapon", "helm", "armor", "arms", "gloves", "ring", "legs", "boots", "belt", "necklace", "face", "shield",
                 "cloak", "food", "drink", "magic", "potion", "item" }.Select(id => "base.item_type_" + id))
             .Distinct().ToList();

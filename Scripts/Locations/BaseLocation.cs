@@ -8909,32 +8909,21 @@ public abstract class BaseLocation
             }
 
             terminal.WriteLine("");
-            terminal.SetColor("white");
-            terminal.Write("[");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("R");
-            terminal.SetColor("white");
-            terminal.Write($"]{Loc.Get("base.mail_read_label")}  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("S");
-            terminal.SetColor("white");
-            terminal.Write($"]{Loc.Get("base.mail_send_label")}  [");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("D");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.mail_delete_menu"));
-            terminal.SetColor("bright_yellow");
-            terminal.Write("N");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.mail_next_menu"));
-            terminal.SetColor("bright_yellow");
-            terminal.Write("P");
-            terminal.SetColor("white");
-            terminal.Write(Loc.Get("base.mail_prev_menu"));
-            terminal.SetColor("bright_yellow");
-            terminal.Write("Q");
-            terminal.SetColor("white");
-            terminal.WriteLine($"]{Loc.Get("base.mail_quit_label")}");
+            // v1.2.5: whole-word labels; a label that starts with its key letter shows as "[R]ead #" (English
+            // unchanged), any other as "[R] Olvasás #". The key letters stay the typed commands.
+            var bar = new[] { ("R", "base.mail_bar_read"), ("S", "base.mail_bar_send"), ("D", "base.mail_bar_delete"),
+                              ("N", "base.mail_bar_next"), ("P", "base.mail_bar_prev"), ("Q", "base.mail_bar_quit") };
+            for (int b = 0; b < bar.Length; b++)
+            {
+                var (letter, rest) = MenuKeyLabel(bar[b].Item1, Loc.Get(bar[b].Item2));
+                terminal.SetColor("white");
+                terminal.Write(b == 0 ? "[" : "  [");
+                terminal.SetColor("bright_yellow");
+                terminal.Write(letter);
+                terminal.SetColor("white");
+                terminal.Write($"]{rest}");
+            }
+            terminal.WriteLine("");
             terminal.Write("> ");
             terminal.SetColor("white");
             string input = (await terminal.ReadLineAsync()).Trim();
@@ -8985,6 +8974,12 @@ public abstract class BaseLocation
         string flat = string.Join(" ", message.Split('\n', StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()));
         return flat.Length > 35 ? flat.Substring(0, 32) + "..." : flat;
     }
+
+    /// <summary>v1.2.5: a menu key and its label for "[K]rest": a label that starts with the key letter is split
+    /// after that letter ("Read #" gives R and "ead #"); any other keeps the key and gets a space ("Olvasás #"
+    /// gives R and " Olvasás #").</summary>
+    internal static (string Letter, string Tail) MenuKeyLabel(string key, string label) =>
+        label.StartsWith(key, StringComparison.OrdinalIgnoreCase) ? (label.Substring(0, key.Length), label.Substring(key.Length)) : (key, " " + label);
 
     /// <summary>v1.2.5: the inbox column header in the player's language, each label in its row's field.</summary>
     internal static string MailboxHeader() =>
