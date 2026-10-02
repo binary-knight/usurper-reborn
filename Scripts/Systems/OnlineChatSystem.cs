@@ -235,10 +235,7 @@ namespace UsurperRemake.Systems
                         _ => "white"
                     };
 
-                    terminal.SetColor("darkgray");
-                    terminal.Write($"  [{GameConfig.FormatShortDate(entry.CreatedAt, GameConfig.DateFormat)} {entry.CreatedAt:HH:mm}] ");
-                    terminal.SetColor(color);
-                    terminal.WriteLine(entry.Message);
+                    WriteNewsEntry(terminal, $"  [{GameConfig.FormatShortDate(entry.CreatedAt, GameConfig.DateFormat)} {entry.CreatedAt:HH:mm}] ", entry.Message, color);
                 }
             }
 
@@ -249,6 +246,22 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("════════════════════════════════════════════════════════════");
             }
             await terminal.PressAnyKey();
+        }
+
+        /// <summary>
+        /// v1.2.4: one news entry, its date stamp in gray. An entry wider than 79 columns wraps, its
+        /// later rows indented under the text after the stamp.
+        /// </summary>
+        internal static void WriteNewsEntry(TerminalEmulator terminal, string stamp, string message, string color)
+        {
+            var parts = UsurperRemake.UI.UIHelper.WrapAfterPrefix(stamp, message);
+            terminal.SetColor("darkgray");
+            terminal.Write(stamp);
+            terminal.SetColor(color);
+            terminal.WriteLine(parts[0]);
+            string indent = new string(' ', UsurperRemake.UI.UIHelper.VisibleLength(stamp));
+            for (int i = 1; i < parts.Count; i++)
+                terminal.WriteLine(indent + parts[i]);
         }
 
         // =====================================================================
@@ -454,17 +467,22 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Format a location enum string into a readable name.
+        /// v1.2.4: a location that already has a space ("Dungeon (Group: Name)", "SysOp Console",
+        /// "Spectating Name") is shown as it is; a joined one ("MainStreet") gets a space only where a
+        /// capital follows a lowercase letter, never after "(" or another non-letter.
         /// </summary>
-        private string FormatLocation(string location)
+        internal static string FormatLocation(string location)
         {
             if (string.IsNullOrEmpty(location))
                 return "Unknown";
+            if (location.Contains(' '))
+                return location;
 
             // Convert "MainStreet" to "Main Street", "TheInn" to "The Inn", etc.
             var result = new System.Text.StringBuilder();
             for (int i = 0; i < location.Length; i++)
             {
-                if (i > 0 && char.IsUpper(location[i]) && !char.IsUpper(location[i - 1]))
+                if (i > 0 && char.IsUpper(location[i]) && char.IsLower(location[i - 1]))
                     result.Append(' ');
                 result.Append(location[i]);
             }

@@ -141,7 +141,24 @@ public class NewsLocation : BaseLocation
             terminal.SetColor("white");
         }
 
-        terminal.WriteLine($"  {line}");
+        foreach (var row in NewsRows(line))
+            terminal.WriteLine(row);
+    }
+
+    /// <summary>
+    /// v1.2.4: a news item as the rows shown on the board, each at most 79 columns. An item that fits
+    /// is one row, as before; a longer one wraps, its later rows indented under the text after the
+    /// "[HH:mm] " time prefix.
+    /// </summary>
+    internal static List<string> NewsRows(string line)
+    {
+        var stamp = System.Text.RegularExpressions.Regex.Match(line, @"^\[[^\]]{1,8}\] ");
+        string prefix = "  " + (stamp.Success ? stamp.Value : "");
+        var parts = UsurperRemake.UI.UIHelper.WrapAfterPrefix(prefix, line.Substring(prefix.Length - 2));
+        var rows = new List<string> { prefix + parts[0] };
+        for (int i = 1; i < parts.Count; i++)
+            rows.Add(new string(' ', prefix.Length) + parts[i]);
+        return rows;
     }
 
     private async Task DisplayPaginatedNews(List<string> newsLines)
