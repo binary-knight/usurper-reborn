@@ -1492,7 +1492,8 @@ public partial class MagicShopLocation : BaseLocation
         return UIHelper.WordWrap(body, UIHelper.WrapWidth - indent.Length).Select(r => indent + r).ToList();
     }
 
-    /// <summary>v1.2.5: a translated template whose {0}, {1}... are written in their own colours and the rest in
+    /// <summary>v1.2.5: a translated template (fetched with "{0}", "{1}"... as its arguments, so the placeholders
+    /// stay in place) whose {0}, {1}... are written in their own colours and the rest in
     /// baseColor, so a language can put the names in its own order; word-wrapped at 79 columns, later rows under
     /// the text after indent.</summary>
     private void WriteTemplate(string indent, string template, string baseColor, params (string text, string color)[] args)
@@ -2146,7 +2147,7 @@ public partial class MagicShopLocation : BaseLocation
         // Confirm
         string enchantDesc = (tierChoice <= 4 || (tierChoice >= 10 && tierChoice <= 12)) ? $"+{selectedTier.bonus} {StatLabel(statChoice)}" : TierDescription(tierChoice - 1);
         terminal.WriteLine("");
-        WriteTemplate("  ", Loc.Get("magic_shop.enchant_confirm_line"), "yellow",
+        WriteTemplate("  ", Loc.Get("magic_shop.enchant_confirm_line", "{0}", "{1}", "{2}"), "yellow",
             (selectedEquip.Name, selectedEquip.GetRarityColor()), (TierName(tierChoice - 1), "bright_magenta"), (enchantDesc, "yellow"));
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("magic_shop.enchant_cost", $"{enchantCost:N0}")}");
@@ -3606,7 +3607,7 @@ public partial class MagicShopLocation : BaseLocation
         string afterName = GetRelationshipDisplayName(projectedRel);
 
         terminal.WriteLine("");
-        WriteTemplate("  ", Loc.Get("magic_shop.love_cast_confirm"), "white",
+        WriteTemplate("  ", Loc.Get("magic_shop.love_cast_confirm", "{0}", "{1}"), "white",
             (Loc.Get(selected.name), "bright_magenta"), (targetNPC.Name1, "bright_magenta"));
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("magic_shop.relationship_label")} ");
