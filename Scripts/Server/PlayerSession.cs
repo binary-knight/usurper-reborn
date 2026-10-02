@@ -187,10 +187,17 @@ public class PlayerSession : IDisposable
     /// v1.2.4: the disconnect save and the dormitory sleeper registration. Both are skipped when
     /// a newer session for this account is active: its character is newer than this session's,
     /// and the player is online, not asleep. <paramref name="emergencySave"/> is null when there
-    /// is nothing to save.
+    /// is nothing to save. v1.2.4: <paramref name="hadCharacter"/> is false when the session never
+    /// loaded or created a character (a hang-up at login or during creation); there is no one to
+    /// put to sleep, so neither runs.
     /// </summary>
-    internal async Task PersistOnDisconnectAsync(Func<Task>? emergencySave, string dormKey)
+    internal async Task PersistOnDisconnectAsync(Func<Task>? emergencySave, string dormKey, bool hadCharacter)
     {
+        if (!hadCharacter)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Dormitory sleeper skipped (no character was loaded)");
+            return;
+        }
         try
         {
             if (emergencySave != null)
@@ -232,6 +239,41 @@ public class PlayerSession : IDisposable
         {
             Console.Error.WriteLine($"[MUD] [{Username}] Failed to register dormitory sleep: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// RunAsync's disconnect persistence: build the emergency save for the loaded character (unless
+    /// suppressed) and run PersistOnDisconnectAsync. v1.2.4: a seam so tests drive the
+    /// "never had a character" guard; <paramref name="engine"/> is the session's engine.
+    /// </summary>
+    internal async Task FinishDisconnectPersistAsync(GameEngine? engine)
+    {
+        // Emergency save on disconnect: save to main player key so it persists
+        // Skip if character was deleted (e.g., rebellion execution)
+        Func<Task>? emergencySave = null;
+        bool hadCharacter = false;
+        var currentKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
+        try
+        {
+            var player = engine?.CurrentPlayer;
+            hadCharacter = player != null;
+            bool suppress = SuppressDisconnectSave && (SuppressDisconnectSaveKey == null || SuppressDisconnectSaveKey == currentKey);
+            if (player != null && !suppress)
+            {
+                var saveKey = currentKey;
+                emergencySave = () => SaveSystem.Instance.SaveGame(saveKey, player);
+            }
+            else if (suppress)
+            {
+                Console.Error.WriteLine($"[MUD] [{Username}] Disconnect save suppressed (character deleted)");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
+        }
+        // v1.2.4: save and sleeper registration, both skipped if a reconnect replaced us.
+        await PersistOnDisconnectAsync(emergencySave, currentKey, hadCharacter);
     }
 
     /// <summary>
@@ -374,30 +416,8 @@ public class PlayerSession : IDisposable
         }
         finally
         {
-            // Emergency save on disconnect — save to main player key so it persists
-            // Skip if character was deleted (e.g., rebellion execution)
-            Func<Task>? emergencySave = null;
-            var currentKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
-            try
-            {
-                var player = ctx.Engine?.CurrentPlayer;
-                bool suppress = SuppressDisconnectSave && (SuppressDisconnectSaveKey == null || SuppressDisconnectSaveKey == currentKey);
-                if (player != null && !suppress)
-                {
-                    var saveKey = currentKey;
-                    emergencySave = () => SaveSystem.Instance.SaveGame(saveKey, player);
-                }
-                else if (suppress)
-                {
-                    Console.Error.WriteLine($"[MUD] [{Username}] Disconnect save suppressed (character deleted)");
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
-            }
-            // v1.2.4: save and sleeper registration, both skipped if a reconnect replaced us.
-            await PersistOnDisconnectAsync(emergencySave, currentKey);
+            // v1.2.4: emergency save and sleeper registration (see FinishDisconnectPersistAsync).
+            await FinishDisconnectPersistAsync(ctx.Engine);
 
             // Notify WizNet of logout
             try

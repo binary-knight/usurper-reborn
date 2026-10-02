@@ -1766,7 +1766,7 @@ public partial class TerminalEmulator
                 while (true)
                 {
                     int read = await _streamReader.ReadAsync(charBuf, 0, 1);
-                    if (read == 0) throw new IOException("connection closed by peer"); // v1.1.1: see ReadLineInteractiveCore
+                    if (read == 0) throw new ConnectionClosedException(); // v1.1.1: see ReadLineInteractiveCore
 
                     char ch = charBuf[0];
                     if (ch == '\r' || ch == '\n')
@@ -2255,7 +2255,7 @@ public partial class TerminalEmulator
                 // then spun at full CPU until a write finally failed. Surface it the same way
                 // a failed write does so PlayerSession's IOException handler ends the session.
                 UpdateMudIdleTimeout(force: true);
-                throw new IOException("connection closed by peer");
+                throw new ConnectionClosedException();
             }
 
             char c = charBuf[0];
@@ -2822,4 +2822,34 @@ public partial class TerminalEmulator
             pos++;
         }
     }
-} 
+}
+
+/// <summary>
+/// v1.2.4: the peer closed the connection (a 0-byte read on the MUD stream). An IOException so
+/// every existing IOException handler (PlayerSession ends the session) still catches it.
+/// </summary>
+public sealed class ConnectionClosedException : IOException
+{
+    public ConnectionClosedException() : base("connection closed by peer") { }
+
+    /// <summary>
+    /// v1.2.4: true when <paramref name="ex"/> (or an inner exception) means the player's
+    /// connection is gone: the terminal's closed-connection signal, a socket failure under an
+    /// IOException, or an IOException after the door detected the hang-up. Any other exception,
+    /// a bare IOException included, is a real error.
+    /// </summary>
+    public static bool IsDisconnect(Exception? ex)
+    {
+        for (int depth = 0; ex != null && depth < 8; depth++)
+        {
+            if (ex is ConnectionClosedException) return true;
+            if (ex is IOException && (ex.InnerException is System.Net.Sockets.SocketException || DoorMode.IsDisconnected))
+                return true;
+            if (ex is AggregateException agg && agg.InnerExceptions.Count == 1)
+                ex = agg.InnerExceptions[0];
+            else
+                ex = ex.InnerException;
+        }
+        return false;
+    }
+}

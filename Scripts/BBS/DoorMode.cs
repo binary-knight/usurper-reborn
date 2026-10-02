@@ -237,6 +237,18 @@ namespace UsurperRemake.BBS
         /// </summary>
         public static bool IsMudServerMode => _mudServerMode;
 
+        /// <summary>v1.2.4: the mode this process serves the player in, for log lines.</summary>
+        internal static string SessionModeName =>
+            _mudServerMode ? "MUD session"
+            : IsInDoorMode ? "BBS door"
+            : _onlineMode ? "Online session"
+            : "Local";
+
+        /// <summary>v1.2.4: the save-lookup log line, naming the real mode (it said "BBS Door
+        /// mode" for MUD sessions too).</summary>
+        internal static string SaveLookupLogMessage(string playerName) =>
+            $"{SessionModeName}: Looking for save for '{playerName}'";
+
         /// <summary>TCP port for MUD server (default: 4001).</summary>
         public static int MudPort => _mudPort;
 

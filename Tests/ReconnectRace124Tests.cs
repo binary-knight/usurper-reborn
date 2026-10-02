@@ -45,7 +45,7 @@ public class ReconnectRace124Tests : IDisposable
     /// <summary>The old connection's tail: RunAsync's cleanup, then the handler's finally.</summary>
     private static async Task OldConnectionEnds(MudServer server, PlayerSession old, Func<Task>? save)
     {
-        await old.PersistOnDisconnectAsync(save, Key);
+        await old.PersistOnDisconnectAsync(save, Key, hadCharacter: true);
         old.MarkCleanupComplete();
         server.EndConnection(Key, old);
     }
@@ -81,7 +81,7 @@ public class ReconnectRace124Tests : IDisposable
         var newS = NewSession(server);
         server.ActiveSessions[Key] = newS;
 
-        await oldS.PersistOnDisconnectAsync(null, Key);
+        await oldS.PersistOnDisconnectAsync(null, Key, hadCharacter: true);
 
         (await _db.GetSleepingPlayerInfo(Key)).Should().BeNull("the player is online in the newer session");
     }
@@ -94,7 +94,7 @@ public class ReconnectRace124Tests : IDisposable
         server.ActiveSessions[Key] = NewSession(server);
         bool saved = false;
 
-        await oldS.PersistOnDisconnectAsync(() => { saved = true; return Task.CompletedTask; }, Key);
+        await oldS.PersistOnDisconnectAsync(() => { saved = true; return Task.CompletedTask; }, Key, hadCharacter: true);
 
         saved.Should().BeFalse("the newer session holds newer data; the stale save would overwrite it");
     }
