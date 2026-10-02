@@ -497,6 +497,11 @@ namespace UsurperConsole
                 // The terminal adapter will handle all I/O
                 await GameEngine.RunConsoleAsync();
             }
+            catch (Exception ex) when (ConnectionClosedException.IsDisconnect(ex))
+            {
+                // v1.2.4: the caller hung up. End quietly: an info line, no [ERR].
+                DoorMode.Log($"Door session ended: connection lost ({ex.Message})");
+            }
             catch (Exception ex)
             {
                 DoorMode.Log($"Door mode error: {ex.Message}");

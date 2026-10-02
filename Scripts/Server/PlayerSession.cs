@@ -187,10 +187,17 @@ public class PlayerSession : IDisposable
     /// v1.2.4: the disconnect save and the dormitory sleeper registration. Both are skipped when
     /// a newer session for this account is active: its character is newer than this session's,
     /// and the player is online, not asleep. <paramref name="emergencySave"/> is null when there
-    /// is nothing to save.
+    /// is nothing to save. v1.2.4: <paramref name="hadCharacter"/> is false when the session never
+    /// loaded or created a character (a hang-up at login or during creation); there is no one to
+    /// put to sleep, so neither runs.
     /// </summary>
-    internal async Task PersistOnDisconnectAsync(Func<Task>? emergencySave, string dormKey)
+    internal async Task PersistOnDisconnectAsync(Func<Task>? emergencySave, string dormKey, bool hadCharacter)
     {
+        if (!hadCharacter)
+        {
+            Console.Error.WriteLine($"[MUD] [{Username}] Dormitory sleeper skipped (no character was loaded)");
+            return;
+        }
         try
         {
             if (emergencySave != null)
@@ -377,10 +384,12 @@ public class PlayerSession : IDisposable
             // Emergency save on disconnect — save to main player key so it persists
             // Skip if character was deleted (e.g., rebellion execution)
             Func<Task>? emergencySave = null;
+            bool hadCharacter = false;
             var currentKey = (Context?.CharacterKey ?? Username).ToLowerInvariant();
             try
             {
                 var player = ctx.Engine?.CurrentPlayer;
+                hadCharacter = player != null;
                 bool suppress = SuppressDisconnectSave && (SuppressDisconnectSaveKey == null || SuppressDisconnectSaveKey == currentKey);
                 if (player != null && !suppress)
                 {
@@ -397,7 +406,7 @@ public class PlayerSession : IDisposable
                 Console.Error.WriteLine($"[MUD] [{Username}] Emergency save failed: {ex.Message}");
             }
             // v1.2.4: save and sleeper registration, both skipped if a reconnect replaced us.
-            await PersistOnDisconnectAsync(emergencySave, currentKey);
+            await PersistOnDisconnectAsync(emergencySave, currentKey, hadCharacter);
 
             // Notify WizNet of logout
             try

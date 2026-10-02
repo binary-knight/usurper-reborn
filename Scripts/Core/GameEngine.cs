@@ -391,7 +391,7 @@ public partial class GameEngine
         var playerName = (ctx0 != null && !string.IsNullOrEmpty(ctx0.Username))
             ? ctx0.Username
             : UsurperRemake.BBS.DoorMode.GetPlayerName();
-        UsurperRemake.BBS.DoorMode.Log($"BBS Door mode: Looking for save for '{playerName}'");
+        UsurperRemake.BBS.DoorMode.Log(UsurperRemake.BBS.DoorMode.SaveLookupLogMessage(playerName));
 
         // Show the title screen (once per session)
         if (!_splashScreenShown)
@@ -7547,6 +7547,13 @@ public partial class GameEngine
         {
             terminal.WriteLine(Loc.Get("engine.creation_aborted"), "red");
             return null;
+        }
+        catch (Exception ex) when (ConnectionClosedException.IsDisconnect(ex))
+        {
+            // v1.2.4: a hang-up during creation is a disconnect: no [ERR] CRASH line and no retry
+            // prompt; rethrow so the session's disconnect handling ends it.
+            UsurperRemake.Systems.DebugLogger.Instance.LogInfo("CREATE", "Connection closed during character creation");
+            throw;
         }
         catch (Exception ex)
         {
