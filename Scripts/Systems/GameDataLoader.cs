@@ -112,25 +112,35 @@ namespace UsurperRemake.Systems
         {
             Directory.CreateDirectory(outputDir);
 
-            ExportFile(outputDir, "npcs.json", ClassicNPCs.GetBuiltInNPCs());
-            ExportFile(outputDir, "monster_families.json", global::MonsterFamilies.GetBuiltInFamilies());
-            ExportFile(outputDir, "dreams.json", DreamSystem.GetBuiltInDreams());
-            ExportFile(outputDir, "achievements.json", AchievementSystem.GetBuiltInAchievements());
-            ExportFile(outputDir, "dialogue.json", NPCDialogueDatabase.GetAllBuiltInLines());
-            ExportFile(outputDir, "balance.json", new BalanceConfig());
+            foreach (var (fileName, build) in DefaultExports)
+                ExportFile(outputDir, fileName, build());
+
+            DebugLogger.Instance.LogInfo("GAMEDATA", $"Exported {DefaultExports.Count} default data files to: {outputDir}");
+        }
+
+        /// <summary>
+        /// v1.2.4: the files ExportDefaults writes, in order. The editor's prompt counts this list, so the
+        /// number it shows is always the number written.
+        /// </summary>
+        public static readonly IReadOnlyList<(string FileName, Func<object> Build)> DefaultExports = new List<(string, Func<object>)>
+        {
+            ("npcs.json", () => ClassicNPCs.GetBuiltInNPCs()),
+            ("monster_families.json", () => global::MonsterFamilies.GetBuiltInFamilies()),
+            ("dreams.json", () => DreamSystem.GetBuiltInDreams()),
+            ("achievements.json", () => AchievementSystem.GetBuiltInAchievements()),
+            ("dialogue.json", () => NPCDialogueDatabase.GetAllBuiltInLines()),
+            ("balance.json", () => new BalanceConfig()),
 
             // Equipment is additive-only: export a small example rather than all
             // ~700 built-in items. Modders add NEW items at ID 200000+; built-ins
             // stay read-only for save compatibility.
-            ExportFile(outputDir, "equipment.json", GetExampleCustomEquipment());
+            ("equipment.json", () => GetExampleCustomEquipment()),
 
             // v1.2 (design item H2): every built-in ability and spell with its current numbers,
             // as a template: delete what you do not change, edit what you do.
-            ExportFile(outputDir, "abilities.json", ClassAbilitySystem.ExportOverrideTemplate());
-            ExportFile(outputDir, "spells.json", SpellSystem.ExportOverrideTemplate());
-
-            DebugLogger.Instance.LogInfo("GAMEDATA", $"Exported 9 default data files to: {outputDir}");
-        }
+            ("abilities.json", () => ClassAbilitySystem.ExportOverrideTemplate()),
+            ("spells.json", () => SpellSystem.ExportOverrideTemplate()),
+        };
 
         /// <summary>A loaded override file is kept only when its validator finds nothing wrong.</summary>
         private static List<T>? LoadValidated<T>(string fileName, List<T>? loaded, Func<List<T>, List<string>> validate) where T : class
