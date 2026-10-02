@@ -1,7 +1,7 @@
 ---
 title: The online world
 path: /wiki/en/online/
-checked: 1.2.1
+checked: 1.2.3
 sources: DOCS/MULTIPLAYER_ARCHITECTURE.md, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldEventSystem.cs
 ---
 Online play shares a persistent world. NPCs and other players can change the town while you are away. A wiki page describes rules, not a snapshot of today's state.
