@@ -264,7 +264,7 @@ public class MagicFix125Tests
             foreach (var lang in AllLanguages)
             {
                 string v = Loc.GetIn(lang, key);
-                v.Should().NotBeNullOrWhiteSpace().And.NotBe(key).And.NotContain("—").And.NotContain("–");
+                v.Should().NotBeNullOrWhiteSpace().And.NotBe(key).And.NotContain(((char)0x2014).ToString()).And.NotContain(((char)0x2013).ToString());
             }
             Loc.GetIn("hu", key).Should().NotBe(Loc.GetIn("en", key), $"{key} is translated");
         }
