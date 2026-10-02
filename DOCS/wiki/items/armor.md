@@ -1,7 +1,7 @@
 ---
 title: Armor and accessories
 path: /wiki/en/items/armor/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs
 ---
 Armor class, defence bonuses, resistances and block effects are different fields. More expensive equipment can trade one kind of protection for another. Your class's armor rules still apply.
