@@ -350,8 +350,10 @@ jobs:
 
       - name: Resolve WezTerm version
         id: wezterm
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VER=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
+          VER=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/wezterm/wezterm/releases/latest | \
             python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
           [ -z "$VER" ] && { echo "ERROR: Could not resolve WezTerm version"; exit 1; }
           echo "version=$VER" >> "$GITHUB_OUTPUT"
@@ -482,8 +484,10 @@ jobs:
 
       - name: Resolve WezTerm version
         id: wezterm
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          VER=$(curl -sL https://api.github.com/repos/wezterm/wezterm/releases/latest | \
+          VER=$(curl -sL -H "Authorization: Bearer $GH_TOKEN" https://api.github.com/repos/wezterm/wezterm/releases/latest | \
             python3 -c "import json,sys; print(json.load(sys.stdin).get('tag_name',''))")
           [ -z "$VER" ] && { echo "ERROR: Could not resolve WezTerm version"; exit 1; }
           echo "version=$VER" >> "$GITHUB_OUTPUT"
