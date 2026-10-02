@@ -2,7 +2,7 @@
 (function (root) {
   "use strict";
   const stop = new Set(
-    "a about all an and any are as at be can do does explain for get got have help how i in is it many me much my of on or s tell the there to what when where which who why will with work works you your".split(
+    "a about all an and any anything are as at be can do does explain for get got have help how i in info information is it know many me much my of on or please s something tell the there to what when where which who why will with work works you your".split(
       " ",
     ),
   );
@@ -141,7 +141,7 @@
       const [a, b] = [queryWords[i - 1], queryWords[i]];
       if (!stop.has(a) && !stop.has(b) && a !== b) phrases.push([a, b]);
     }
-    return pages
+    const scored = pages
       .map((page) => {
         const p = prepare(page);
         const named = namesTitle(queryWords, p.titleWords);
@@ -181,13 +181,28 @@
             p.titleWords.length >= meaningful ? 1000 : 25 * p.titleWords.length;
         return { ...page, score, matched, titleMatch: fieldMatch };
       })
-      .filter(
-        (p) =>
-          p.matched &&
-          (p.titleMatch || p.matched >= Math.min(2, terms.length)),
+      .filter((p) => p.matched);
+    // First pass: a title or heading match, or at least two query words. A page with every
+    // query word always ranks above one with only some.
+    const full = (p) => (p.matched === terms.length ? 1 : 0);
+    const first = scored
+      .filter((p) => p.titleMatch || p.matched >= Math.min(2, terms.length))
+      .sort(
+        (a, b) =>
+          full(b) - full(a) || b.score - a.score || a.path.localeCompare(b.path),
       )
-      .sort((a, b) => b.score - a.score || a.path.localeCompare(b.path))
       .slice(0, limit);
+    if (first.length >= limit) return first;
+    // Fallback: fill the rest with pages ranked by how many distinct query words they match.
+    // Every full match passed the first pass, so these never outrank one.
+    const taken = new Set(first.map((p) => p.path));
+    const rest = scored
+      .filter((p) => !taken.has(p.path))
+      .sort(
+        (a, b) =>
+          b.matched - a.matched || b.score - a.score || a.path.localeCompare(b.path),
+      );
+    return first.concat(rest.slice(0, limit - first.length));
   }
   // Picks the window of the page text that covers the most distinct query terms.
   function excerpt(page, query, max = 360) {
@@ -234,7 +249,7 @@
       chunk = chunk.slice(0, chunk.lastIndexOf(" ")) + "...";
     return (start ? "..." : "") + chunk;
   }
-  const api = { search, excerpt, words, stem };
+  const api = { search, excerpt, words, stem, queryTerms };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WikiSearch = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

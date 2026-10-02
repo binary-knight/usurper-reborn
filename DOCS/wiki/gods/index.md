@@ -16,7 +16,7 @@ You worship one god at a time. The Temple's canonical gods and player-gods compe
 4. The altars are listed. Type the god's name, or part of it, and confirm with Y when asked whether you are sure. Press Enter at the list to cancel.
 5. The game says you are now a believer. Pray daily with Y in the Nave to build [Favor](/wiki/en/gods/favor/).
 
-The Undercroft (U in the Temple halls) has its own W, which lists only the dark altars. Player-gods appear on the same altar list as the Temple gods.
+The Undercroft (U in the Temple halls) has its own W, which lists only the dark altars. Player-gods appear on the same altar list as the Temple gods. Read [immortals, player-gods and the Pantheon](/wiki/en/gods/player-gods/) for how a player becomes a god and what an immortal does.
 
 ## Switch or leave your god
 

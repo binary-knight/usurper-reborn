@@ -6,7 +6,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const { build } = require("../build");
-const { search, excerpt } = require("../../../web/wiki-search");
+const { search, excerpt, queryTerms } = require("../../../web/wiki-search");
 const dataDir =
   process.env.WIKI_DATA_DIR || path.resolve(__dirname, "../../../wiki-data");
 let temp, pages;
@@ -88,6 +88,66 @@ for (const [question, expected] of dungeonGuides)
   test(`dungeon guide: "${question}" finds ${expected} in the top 3`, () => {
     assert.ok(top(question, 3).includes(expected), top(question, 5).join(" "));
   });
+
+// 1.2.4: questions asked in Discord about immortals must return the immortals guide first.
+const immortals = [
+  "what info do you have on immortals",
+  "how do I become an immortal",
+  "immortals",
+];
+for (const question of immortals)
+  test(`immortals guide: "${question}" returns ${W}gods/player-gods/ first`, () => {
+    assert.equal(top(question, 1)[0], `${W}gods/player-gods/`, top(question, 5).join(" "));
+  });
+
+// 1.2.4: question filler words are stop words, so they change neither the results nor the scores.
+const fillers = ["info", "information", "know", "anything", "something", "please", "tell", "about"];
+for (const word of fillers)
+  test(`filler word "${word}" is ignored by search`, () => {
+    const plain = search(pages, "immortals", 8).map((p) => [p.path, p.score]);
+    const filled = search(pages, `${word} immortals`, 8).map((p) => [p.path, p.score]);
+    assert.deepEqual(filled, plain);
+  });
+
+// Synthetic pages: A has both query words in its body, B and C one each, D neither.
+const synthetic = [
+  { path: "/a/", title: "Page A", headings: [], text: "alpha beta" },
+  { path: "/b/", title: "Page B", headings: [], text: "alpha gamma" },
+  { path: "/c/", title: "Page C", headings: [], text: "beta delta" },
+  { path: "/d/", title: "Page D", headings: [], text: "epsilon" },
+];
+test("the fallback fills the requested count with partial matches, never unrelated pages", () => {
+  assert.deepEqual(search(synthetic, "alpha beta", 8).map((p) => p.path), ["/a/", "/b/", "/c/"]);
+  assert.deepEqual(search(synthetic, "alpha beta", 2).map((p) => p.path), ["/a/", "/b/"]);
+});
+test("the fallback ranks pages by how many distinct query words they match", () => {
+  const pages3 = [
+    { path: "/one/", title: "One", headings: [], text: "alpha alpha alpha alpha" },
+    { path: "/two/", title: "Two", headings: [], text: "alpha beta" },
+    { path: "/all/", title: "All", headings: [], text: "alpha beta gamma" },
+  ];
+  // "/two/" matches two words and passes the first pass; "/one/" matches one and is a fallback.
+  assert.deepEqual(search(pages3, "alpha beta gamma", 8).map((p) => p.path), ["/all/", "/two/", "/one/"]);
+});
+test("a page matching every query word outranks any page matching only some", () => {
+  // A title match on one word scores far above a body match on both, but must rank below it.
+  const titled = [
+    { path: "/title/", title: "Alpha", headings: ["Alpha"], text: "alpha alpha alpha", guide: true },
+    { path: "/full/", title: "Other", headings: [], text: "alpha beta" },
+  ];
+  assert.deepEqual(search(titled, "alpha beta", 8).map((p) => p.path), ["/full/", "/title/"]);
+  // The same order holds on the real index for every question in this file.
+  const questions = [
+    ...misses.map((m) => m[0]), ...good.map((g) => g[0]), ...guides121.map((g) => g[0]),
+    ...bugReports, ...dungeonGuides.map((d) => d[0]), ...immortals,
+  ];
+  for (const question of questions) {
+    const n = queryTerms(question).length;
+    const full = search(pages, question, 20).map((p) => p.matched === n);
+    const firstPartial = full.indexOf(false);
+    assert.ok(firstPartial < 0 || !full.slice(firstPartial).includes(true), question);
+  }
+});
 
 // Sentences written inside :::spoiler blocks of the 1.2.1 guides, as plain text.
 function spoilerSentences(file) {
