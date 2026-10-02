@@ -1933,38 +1933,6 @@
       ]
     }
   },
-  "Scripts/Locations/BaseLocation.cs": {
-    "data": {
-      "count": 19,
-      "sites": [
-        "29ccf95295",
-        "2b503ba6e0",
-        "320e1908c2",
-        "428b3aa1c0",
-        "482a8aca17",
-        "75bb38e990",
-        "85f4e80d89",
-        "8974daa5f7",
-        "a03d651640",
-        "a8f56c1073",
-        "a9a02fbfde",
-        "c30efa261c",
-        "c3318b077f",
-        "c6fd406e51",
-        "c8543204c3",
-        "c8a5102d67",
-        "e4692b4fab",
-        "f16192520c",
-        "fe6e8ec259"
-      ]
-    },
-    "electron": {
-      "count": 1,
-      "sites": [
-        "f4e9009629"
-      ]
-    }
-  },
   "Scripts/Locations/CastleLocation.cs": {
     "data": {
       "count": 49,

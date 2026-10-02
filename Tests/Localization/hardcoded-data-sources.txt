@@ -335,12 +335,6 @@ names|Scripts/Locations/AnchorRoadLocation.cs|BaseConstructorInitializer#1|place
 names|Scripts/Locations/BankLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|decl:BankerName|NPC name
 nouns|Scripts/Locations/BankLocation.cs|init.Name|bank guard monster names
-table|Scripts/Locations/BaseLocation.cs|call:Add#0/tuple#0|auction stat labels
-table|Scripts/Locations/BaseLocation.cs|decl:AuctionDurations/tuple#1|auction duration labels
-nouns|Scripts/Locations/BaseLocation.cs|decl:npcName|fallback NPC name in a Loc template
-table|Scripts/Locations/BaseLocation.cs|decl:returnMsg|mail and online message
-nouns|Scripts/Locations/BaseLocation.cs|init.Name|arrest guard monster name
-table|Scripts/Locations/BaseLocation.cs|SimpleMemberAccessExpression|auction header
 names|Scripts/Locations/BaseLocation.cs|decl:fonts|font names
 table|Scripts/Locations/CastleLocation.cs|=currentPlayer.NobleTitle|noble title prefix in chat
 table|Scripts/Locations/CastleLocation.cs|decl:knightNews|news, Newsy

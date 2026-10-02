@@ -1644,6 +1644,20 @@ public class MudServer
         return false;
     }
 
+    /// <summary>
+    /// v1.2.5: send a message to a specific player by username, rendered in that session's language.
+    /// `buildMessage` receives the language code, as in BroadcastLocalized. False when the player is not online.
+    /// </summary>
+    public bool SendToPlayerLocalized(string username, Func<string, string> buildMessage)
+    {
+        if (ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
+        {
+            session.EnqueueMessage(buildMessage(session.Context?.Language ?? "en"));
+            return true;
+        }
+        return false;
+    }
+
     /// <summary>Get all currently online player usernames.</summary>
     public IReadOnlyList<string> GetOnlinePlayerNames()
     {
