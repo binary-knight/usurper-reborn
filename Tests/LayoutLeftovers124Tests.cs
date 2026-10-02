@@ -282,6 +282,98 @@ public class LayoutLeftovers124Tests
         src.Should().Contain("boss.PhraseInLanguage = () => GetBossPhrase(bossTheme);");
     }
 
+    // ---------- 7. no second article ----------
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void TheNameOrName_AddsNoSecondThe(string lang)
+    {
+        new Monster { Name = "The First Wave" }.TheNameOrName.Should().Be("The First Wave");
+        new Monster { Name = "Ogre" }.TheNameOrName.Should().Be("The Ogre");
+        new Monster { Name = "Theodore" }.TheNameOrName.Should().Be("The Theodore", "only the word The counts");
+        new Monster { Name = "Dahlia", IsProperName = true }.TheNameOrName.Should().Be("Dahlia");
+
+        var secret = SecretBossManager.Instance.CreateBossMonster(SecretBossType.TheFirstWave, 30);
+        secret.CanSpeak = true;
+        string intro = Strip(CombatEngine.GroupCombatIntro(lang, new List<Monster> { secret }, null));
+        intro.Should().NotContain("The The").And.Contain(Loc.GetIn(lang, "combat.monster_says", "The First Wave", "").Split('"')[0]);
+    }
+
+    // ---------- 8. the intro rows fit for the longest boss name and phrase ----------
+
+    private static List<Monster> Bosses(string lang)
+    {
+        var list = new List<Monster>();
+        using (Loc.RenderLanguage(lang))
+        {
+            var sys = new OldGodBossSystem();
+            var create = typeof(OldGodBossSystem).GetMethod("CreateBossMonster", F)!;
+            foreach (var god in OldGodsData.GetAllOldGods().Append(OldGodsData.GetNocturaBetrayal()))
+                list.Add((Monster)create.Invoke(sys, new object[] { god })!);
+            foreach (SecretBossType t in Enum.GetValues(typeof(SecretBossType)))
+            {
+                var m = SecretBossManager.Instance.CreateBossMonster(t, 100);
+                if (m != null) list.Add(m);
+            }
+            var dungeon = new DungeonLocation();
+            var bossName = typeof(DungeonLocation).GetMethod("GetBossName", F)!;
+            var bossPhrase = typeof(DungeonLocation).GetMethod("GetBossPhrase", BindingFlags.Static | BindingFlags.NonPublic)!;
+            foreach (DungeonTheme theme in Enum.GetValues(typeof(DungeonTheme)))
+                list.Add(new Monster { Name = (string)bossName.Invoke(dungeon, new object[] { theme })!, Phrase = (string)bossPhrase.Invoke(null, new object[] { theme })!, IsBoss = true });
+            list.Add(new Monster { Name = Loc.Get("dungeon.guardian_name"), Phrase = Loc.Get("dungeon.guardian_phrase") });
+        }
+        return list;
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void FacingRow_FitsForTheLongestBossName(string lang)
+    {
+        var bosses = Bosses(lang);
+        bosses.Count.Should().BeGreaterThan(10);
+        string longest = bosses.Select(b => b.Name).OrderByDescending(n => n.Length).First();
+        // the widest status: every tag, the most digits
+        var worst = new Monster { Name = longest, Level = 100, HP = 99_999_999, MaxHP = 99_999_999, IsBoss = true, IsUnique = true, Poisoned = true, Disease = true };
+        using (Loc.RenderLanguage(lang))
+        {
+            string single = Loc.Get("combat.facing", worst.GetDisplayInfo());
+            (single.Length + 2).Should().BeGreaterThan(79, "the case being fixed overflows");
+            var leaderRows = CombatEngine.FacingRows(worst, "");
+            var followerRows = CombatEngine.FacingRows(worst, "  ");
+            AllFit(leaderRows, $"leader facing {lang}");
+            AllFit(followerRows, $"follower facing {lang}");
+            string.Join(" ", followerRows.Select(r => r.Trim())).Should().Be(single);
+            var shortFoe = new Monster { Name = "Ogre", Level = 5, HP = 50 };
+            CombatEngine.FacingRows(shortFoe, "").Should().Equal(new[] { Loc.Get("combat.facing", shortFoe.GetDisplayInfo()) }, "a row that fits is unchanged");
+        }
+        string intro = Strip(CombatEngine.GroupCombatIntro(lang, new List<Monster> { worst }, null));
+        AllFit(intro.Replace("\r", "").Split('\n'), $"follower intro {lang}");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void LeaderPhraseRow_FitsForTheLongestPhrase(string lang)
+    {
+        var bosses = Bosses(lang).Where(b => !string.IsNullOrEmpty(b.Phrase)).ToList();
+        using (Loc.RenderLanguage(lang))
+        {
+            var worst = bosses.OrderByDescending(b => MonsterSaysLength(b)).First();
+            worst.CanSpeak = true;
+            int single = Loc.Get("combat.monster_says", worst.TheNameOrName, worst.Phrase).Length;
+            single.Should().BeGreaterThan(79, "the longest phrase overflows one row");
+            AllFit(CombatEngine.MonsterSaysRows(worst, worst.Phrase, ""), $"leader phrase {lang}");
+            AllFit(CombatEngine.MonsterSaysRows(worst, worst.Phrase, "  "), $"follower phrase {lang}");
+        }
+        string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
+        Regex.Matches(src, Regex.Escape("foreach (var row in MonsterSaysRows(monster, monster.Phrase, \"\"))")).Count.Should().Be(2, "both leader intro screens wrap");
+        Regex.Matches(src, Regex.Escape("foreach (var row in FacingRows(monster, \"\"))")).Count.Should().Be(2);
+    }
+
+    private static int MonsterSaysLength(Monster b) => Loc.Get("combat.monster_says", b.TheNameOrName, b.Phrase).Length;
+
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);

@@ -78,8 +78,10 @@ public class Monster
 
     /// <summary>
     /// Returns name with appropriate article: "The Drake" for generic monsters, "Dahlia Coldstream" for named NPCs
+    /// v1.2.4: a name that already starts with "The" ("The First Wave") gets no second article.
+    /// The article is the same English "The" in every language.
     /// </summary>
-    public string TheNameOrName => IsProperName ? Name : $"The {Name}";
+    public string TheNameOrName => IsProperName || Name.StartsWith("The ", StringComparison.OrdinalIgnoreCase) ? Name : $"The {Name}";
 
     // Taunt mechanic — forced targeting
     public string? TauntedBy { get; set; }              // DisplayName of character who taunted this monster

@@ -1154,14 +1154,13 @@ public partial class CombatEngine
             if (!string.IsNullOrEmpty(monster.Phrase))
             {
                 terminal.SetColor("yellow");
-                if (monster.CanSpeak)
-                    terminal.WriteLine(Loc.Get("combat.monster_says", monster.TheNameOrName, monster.Phrase));
-                else
-                    terminal.WriteLine($"{monster.TheNameOrName} {monster.Phrase}");
+                foreach (var row in MonsterSaysRows(monster, monster.Phrase, ""))
+                    terminal.WriteLine(row);
                 terminal.WriteLine("");
             }
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("combat.facing", monster.GetDisplayInfo()));
+            foreach (var row in FacingRows(monster, ""))
+                terminal.WriteLine(row);
 
             // Show monster silhouette for single monster (skip for screen readers, BBS mode, compact mode, and art-disabled)
             if (player is Player pp3 && !pp3.ScreenReaderMode && !DoorMode.IsInDoorMode && !GameConfig.CompactMode && !GameConfig.DisableCharacterMonsterArt)
@@ -2354,15 +2353,14 @@ public partial class CombatEngine
         if (!string.IsNullOrEmpty(monster.Phrase))
         {
             terminal.SetColor("yellow");
-            if (monster.CanSpeak)
-                terminal.WriteLine(Loc.Get("combat.monster_says", monster.TheNameOrName, monster.Phrase));
-            else
-                terminal.WriteLine($"{monster.TheNameOrName} {monster.Phrase}");
+            foreach (var row in MonsterSaysRows(monster, monster.Phrase, ""))
+                terminal.WriteLine(row);
             terminal.WriteLine("");
         }
 
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("combat.facing", monster.GetDisplayInfo()));
+        foreach (var row in FacingRows(monster, ""))
+            terminal.WriteLine(row);
         terminal.WriteLine("");
 
         // Show monster silhouette (skip for screen readers, BBS mode, compact mode, and art-disabled)
@@ -32153,6 +32151,20 @@ public partial class CombatEngine
     /// </summary>
     internal static Action<string?, Func<string, string>>? GroupBroadcastSink;
 
+    /// <summary>
+    /// v1.2.4: the monster's opening line ("X says: ...") in the current language, as rows of at most
+    /// 79 columns each starting with indent. A line that fits is one row, as before.
+    /// </summary>
+    internal static List<string> MonsterSaysRows(Monster m, string phrase, string indent)
+    {
+        string said = m.CanSpeak ? Loc.Get("combat.monster_says", m.TheNameOrName, phrase) : $"{m.TheNameOrName} {phrase}";
+        return UIHelper.WordWrap(said, UIHelper.WrapWidth - indent.Length).Select(r => indent + r).ToList();
+    }
+
+    /// <summary>v1.2.4: the "You are facing" line as rows of at most 79 columns each starting with indent.</summary>
+    internal static List<string> FacingRows(Monster m, string indent)
+        => UIHelper.WordWrap(Loc.Get("combat.facing", m.GetDisplayInfo()), UIHelper.WrapWidth - indent.Length).Select(r => indent + r).ToList();
+
     /// <summary>v1.2.4: the fight's opening lines for another group member, in the reader's language.</summary>
     internal static string GroupCombatIntro(string lang, List<Monster> monsters, IEnumerable<Character>? teammates)
         => InLanguage(lang, () =>
@@ -32166,11 +32178,11 @@ public partial class CombatEngine
                 string phrase = m.PhraseInLanguage?.Invoke() ?? m.Phrase;
                 if (!string.IsNullOrEmpty(phrase))
                 {
-                    string said = m.CanSpeak ? Loc.Get("combat.monster_says", m.TheNameOrName, phrase) : $"{m.TheNameOrName} {phrase}";
-                    foreach (var row in UIHelper.WordWrap(said, 77))
-                        sb.AppendLine($"\u001b[33m  {row}\u001b[0m");
+                    foreach (var row in MonsterSaysRows(m, phrase, "  "))
+                        sb.AppendLine($"\u001b[33m{row}\u001b[0m");
                 }
-                sb.AppendLine($"\u001b[37m  {Loc.Get("combat.facing", m.GetDisplayInfo())}\u001b[0m");
+                foreach (var row in FacingRows(m, "  "))
+                    sb.AppendLine($"\u001b[37m{row}\u001b[0m");
             }
             else
             {
