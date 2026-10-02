@@ -1,0 +1,14 @@
+[h1]Usurper Reborn 1.2.4[/h1]
+
+[list]
+[*]Reconnecting no longer drops you from /who, /tell, group invites and broadcasts, and the old session no longer saves over the new one.
+[*]New: /history (or /hist) shows your last 50 chat lines, with filters such as /history tell. It lives in server memory only and lasts through a reconnect.
+[*]Homes are private: room chat, emotes and notices no longer reach you at home, and "Also here" no longer shows there.
+[*]Group combat speaks your language: a follower's turn screen, menus, round status, group lines and ally victory lines show in each player's own language.
+[*]Magic Shop: haggle over rings and necklaces, 3 tries a day. A spouse left alone for 21 days writes you a letter.
+[*]Fixes: mail counts and system notices for players whose account and character names differ, hanging up during character creation, murder revenge HP, the Bank robbery count after a restart, and immortal ascension and renouncing.
+[*]Dungeon text left in English in 1.2.3 is translated, more screens fit 79 columns, and the wiki has a full guide to immortals.
+[*]Still in English: the "Dungeon (Group: ...)" online location, monster names, some group combat lines about other players, and incoming lines in /history.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.4.md
