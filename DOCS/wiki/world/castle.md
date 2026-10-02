@@ -1,7 +1,7 @@
 ---
 title: Castle, king and throne
 path: /wiki/en/world/castle/
-checked: 1.2.1
+checked: 1.2.3
 sources: Scripts/Locations/CastleLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/King.cs, Scripts/Systems/ChallengeSystem.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/DailySystemManager.cs
 ---
 The Castle is where the realm's ruler holds court. Open the Castle Grounds district from Main Street and press K. It appears in the menu after your first few levels.

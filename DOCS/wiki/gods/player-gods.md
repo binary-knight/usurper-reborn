@@ -21,10 +21,11 @@ When you ascend:
 - Your alignment as a god comes from the ending you reached: Light, Dark or Balance.
 - You choose a domain, one of the ten boon domains of the Temple gods. Press Enter to decide later; the Pantheon asks again on each visit until you choose. A domain is permanent.
 - If you were the monarch, you abdicate the throne. You leave your team and your guild.
+- The account's alt character slot opens, and stays open for good.
 - The ending counts as completed and your cycle count goes up, as it would for NG+. This keeps prestige classes and cycle bonuses for a later life.
 - You go straight to the Pantheon.
 
-Online, only your main character can ascend; an alt character is refused. While your main character is immortal, your account can create an alt character.
+Online, only your main character can ascend. An alt character is refused right after it answers Y, before it chooses a name, so it keeps its throne, team and guild. Once your main character has ascended, your account can create an alt character, also after a renounce.
 
 ## What changes for an immortal
 
@@ -108,12 +109,13 @@ R in the Pantheon gives up godhood for good. You confirm twice: type YES, then t
 What is lost:
 
 - the divine name, rank, experience and deeds;
-- your NPC believers, who are left without a god;
+- your believers, NPCs and players, who are left without a god. A player follower in the game is told at once; one who is not is told by mail;
 - the character itself: its save is replaced by a brand new character, as in NG+.
 
 What is kept:
 
-- your cycle count and completed endings, so the new life starts with the cycle bonuses of [New Game Plus](/wiki/en/characters/new-game-plus/).
+- your cycle count and completed endings, so the new life starts with the cycle bonuses of [New Game Plus](/wiki/en/characters/new-game-plus/);
+- the account's alt character slot.
 
 If you are the monarch when you renounce, you abdicate first; nothing is renounced if the abdication fails. The new life starts on the next cycle with the Old Gods reset, the same way NG+ starts.
 

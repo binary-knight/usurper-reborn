@@ -1296,7 +1296,7 @@ public class DailySystemManager
 
         // Count believers and grant passive exp
         int believers = PantheonLocation.CountBelievers(god.DivineName);
-        long believerExp = (long)believers * god.GodLevel * 2;
+        long believerExp = PantheonLocation.DailyBelieverExp(believers, god.GodLevel);
         if (believerExp > 0)
         {
             god.GodExperience += believerExp;

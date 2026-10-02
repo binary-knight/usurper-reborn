@@ -5219,6 +5219,8 @@
   "pantheon.smite_news": "[DIVINO] {0} ha colpito {1} con il fulmine divino!",
   "pantheon.smite_received": "Il dio {0} ti ha colpito con il fulmine divino! Subisci {1} danni!",
   "pantheon.smite_received_offline": "Il dio {0} ti ha colpito con il fulmine divino mentre eri via!",
+  "pantheon.follower_god_renounced": "{0} ha rinunciato alla divinità.",
+  "pantheon.follower_now_godless": "Non segui più alcun dio.",
   "pantheon.menu_chastise": "Castiga Seguace",
   "pantheon.menu_chastise_desc": "Togli Favore a uno dei tuoi seguaci",
   "pantheon.no_followers_to_chastise": "  Oggi non puoi castigare nessuno dei tuoi seguaci.",

@@ -5219,6 +5219,8 @@
   "pantheon.smite_news": "[DIVINO] ¡{0} golpeó a {1} con un rayo divino!",
   "pantheon.smite_received": "¡El dios {0} te ha golpeado con un rayo divino! ¡Recibes {1} de daño!",
   "pantheon.smite_received_offline": "¡El dios {0} te golpeó con un rayo divino mientras no estabas!",
+  "pantheon.follower_god_renounced": "{0} ha renunciado a la divinidad.",
+  "pantheon.follower_now_godless": "Ya no sigues a ningún dios.",
   "pantheon.menu_chastise": "Castigar Seguidor",
   "pantheon.menu_chastise_desc": "Quita Favor a uno de tus propios seguidores",
   "pantheon.no_followers_to_chastise": "  Hoy no puedes castigar a ninguno de tus seguidores.",

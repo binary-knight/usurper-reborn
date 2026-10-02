@@ -910,24 +910,34 @@ public partial class GameEngine
         if (PendingNewGamePlus)
         {
             PendingNewGamePlus = false;
-            // Preserve player preferences before deleting old save
-            bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
-            bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
-            var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
-            // Use the active character key (could be main or alt)
-            var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
-            var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
-            foreach (var save in ngpSaves)
-                SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
-            await CreateNewGame(activeKey);
-            // Restore preferences that CreateNewGame defaults from CLI flags
-            if (currentPlayer != null)
-            {
-                currentPlayer.ScreenReaderMode = preserveScreenReader;
-                currentPlayer.Orientation = preserveOrientation;
-                currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
-                GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
-            }
+            await BeginNewLifeAsync(accountName);
+        }
+    }
+
+    /// <summary>
+    /// The NG+ and renounce restart in BBS/online mode: the active character's saves are deleted and
+    /// a new character is created under the same key (CreateNewGame carries the NG+ values and,
+    /// 1.2.4, the earned alt slot); the screen reader, menu keys and orientation preferences are kept.
+    /// </summary>
+    internal async Task BeginNewLifeAsync(string accountName)
+    {
+        // Preserve player preferences before deleting old save
+        bool preserveScreenReader = currentPlayer?.ScreenReaderMode ?? GameConfig.ScreenReaderMode;
+        bool preserveMenuKeys = currentPlayer?.MenuKeysNeedEnter ?? GameConfig.MenuKeysNeedEnter; // v1.1.15
+        var preserveOrientation = currentPlayer?.Orientation ?? SexualOrientation.Straight;
+        // Use the active character key (could be main or alt)
+        var activeKey = UsurperRemake.BBS.DoorMode.GetPlayerName()?.ToLowerInvariant() ?? accountName;
+        var ngpSaves = SaveSystem.Instance.GetPlayerSaves(activeKey);
+        foreach (var save in ngpSaves)
+            SaveSystem.Instance.DeleteSave(Path.GetFileNameWithoutExtension(save.FileName));
+        await CreateNewGame(activeKey);
+        // Restore preferences that CreateNewGame defaults from CLI flags
+        if (currentPlayer != null)
+        {
+            currentPlayer.ScreenReaderMode = preserveScreenReader;
+            currentPlayer.Orientation = preserveOrientation;
+            currentPlayer.MenuKeysNeedEnter = preserveMenuKeys; // v1.1.15
+            GameConfig.MenuKeysNeedEnter = preserveMenuKeys;
         }
     }
 
@@ -4905,6 +4915,9 @@ public partial class GameEngine
         HashSet<string> previousArcNames = (isNgPlus && currentPlayer?.CompletedArcChildNames != null)
             ? new HashSet<string>(currentPlayer.CompletedArcChildNames)
             : new HashSet<string>();
+        // 1.2.4: the alt slot, once earned by ascending, stays with the account through the new
+        // life (renounce and NG+ replace the main's save, which is where the slot is read)
+        bool previousEarnedAltSlot = currentPlayer?.HasEarnedAltSlot == true;
 
         UsurperRemake.Systems.RomanceTracker.Instance.Reset();
         UsurperRemake.Systems.CompanionSystem.Instance?.ResetAllCompanions();
@@ -5099,6 +5112,8 @@ public partial class GameEngine
                 DebugLogger.Instance.LogWarning("DEATH_CAP", $"Fallen-legacy claim failed: {lex.Message}");
             }
         }
+
+        if (previousEarnedAltSlot) currentPlayer.HasEarnedAltSlot = true;
 
         // Save the new game using the character's actual name (Name1)
         // This is important because playerName may be empty if coming from no-saves path

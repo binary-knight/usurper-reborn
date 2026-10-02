@@ -246,7 +246,7 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("pantheon.daily_exp_label"));
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("pantheon.daily_exp_value", believers * currentPlayer.GodLevel * GameConfig.GodBelieverExpPerLevel));
+        terminal.WriteLine(Loc.Get("pantheon.daily_exp_value", DailyBelieverExp(believers, currentPlayer.GodLevel)));
 
         // Show configured boons
         var boonLines = DivineBoonRegistry.GetEffectSummaryLines(currentPlayer.DivineBoonConfig);
@@ -1308,14 +1308,8 @@ public class PantheonLocation : BaseLocation
             await Pacing.Wait(1500);
         }
 
-        // Clear all believers
-        var believers = NPCSpawnSystem.Instance?.ActiveNPCs?
-            .Where(n => n.WorshippedGod == currentPlayer.DivineName)
-            .ToList() ?? new();
-        foreach (var npc in believers)
-        {
-            npc.WorshippedGod = "";
-        }
+        // Clear all believers: NPCs, and (1.2.4) player followers in the game and in saved games
+        await ClearFollowersOfAsync(currentPlayer.DivineName);
 
         // News
         NewsSystem.Instance?.Newsy(true,
@@ -1324,7 +1318,9 @@ public class PantheonLocation : BaseLocation
         // Capture alignment before clearing (needed for legacy migration below)
         string godAlignment = currentPlayer.GodAlignment ?? "";
 
-        // Clear immortal state
+        // Clear immortal state. 1.2.4: the alt slot stays earned (also for a god that ascended before
+        // the flag existed); CreateNewGame carries it to the new life.
+        currentPlayer.HasEarnedAltSlot = true;
         currentPlayer.IsImmortal = false;
         currentPlayer.DivineName = "";
         currentPlayer.GodLevel = 0;
@@ -1381,6 +1377,48 @@ public class PantheonLocation : BaseLocation
         return true;
     }
 
+    /// <summary>
+    /// 1.2.4: a renouncing god's followers lose their god. NPC believers are cleared in memory. A
+    /// player in the game in another session is switched to no god as another's act (Favor goes
+    /// with the god, no wrath) and told in their session's language. Every saved mortal character
+    /// still following the god (SqlSaveBackend.ClearPlayerFollowersOf, one transaction) is cleared,
+    /// and those not told in a session get the notice as mail in the save's language, so each
+    /// player is told once. Returns the number of players cleared.
+    /// </summary>
+    internal static async Task<int> ClearFollowersOfAsync(string divineName)
+    {
+        if (string.IsNullOrWhiteSpace(divineName)) return 0;
+
+        foreach (var npc in NPCSpawnSystem.Instance?.ActiveNPCs?.Where(n => n.WorshippedGod == divineName).ToList() ?? new())
+            npc.WorshippedGod = "";
+
+        var told = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var session in MudServer.Instance?.ActiveSessions.Values.ToList() ?? new())
+        {
+            var player = session?.Context?.Engine?.CurrentPlayer;
+            // a canon god wins over a stale player-god entry (the load clears that one), so only a
+            // player who follows this god now is switched
+            if (player == null || player.IsImmortal || GodRegistry.GetWorshippedGod(player)?.Name != divineName) continue;
+            GodSwitchSystem.Switch(player, null, GodChangeBy.Other, otherSession: true);
+            string lang = session!.Context?.Language ?? "en";
+            session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "pantheon.follower_god_renounced", divineName)}\u001b[0m");
+            session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(lang, "pantheon.follower_now_godless")}\u001b[0m");
+            string key = !string.IsNullOrEmpty(session.Context?.CharacterKey) ? session.Context!.CharacterKey : session.Username;
+            if (!string.IsNullOrEmpty(key)) told.Add(key);
+        }
+
+        if (SaveSystem.Instance?.Backend is not SqlSaveBackend backend) return told.Count;
+        var saved = await backend.ClearPlayerFollowersOf(divineName);
+        foreach (var (key, lang) in saved)
+        {
+            if (told.Contains(key)) continue;
+            told.Add(key);
+            await backend.SendMessageToKey(divineName, key, "divine",
+                Loc.GetIn(lang, "pantheon.follower_god_renounced", divineName) + " " + Loc.GetIn(lang, "pantheon.follower_now_godless"));
+        }
+        return told.Count;
+    }
+
     #endregion
 
     #region Helper Methods
@@ -1420,6 +1458,13 @@ public class PantheonLocation : BaseLocation
     }
 
     /// <summary>Count NPCs (and player believers in MUD mode) that worship a given divine name</summary>
+    /// <summary>
+    /// 1.2.4: the divine experience believers grant at each daily reset. The payout
+    /// (DailySystemManager) and the Status screen both read it, so they show the same number.
+    /// </summary>
+    public static long DailyBelieverExp(int believers, int godLevel) =>
+        (long)Math.Max(0, believers) * Math.Max(0, godLevel) * GameConfig.GodBelieverExpPerLevel;
+
     public static int CountBelievers(string divineName)
     {
         if (string.IsNullOrEmpty(divineName)) return 0;

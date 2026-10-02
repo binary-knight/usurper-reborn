@@ -5227,6 +5227,8 @@
   "pantheon.smite_news": "[ISTENI] {0} isteni villámmal sújtotta: {1}!",
   "pantheon.smite_received": "{0} isten isteni villámmal sújtott! {1} sebzést szenvedsz!",
   "pantheon.smite_received_offline": "{0} isten isteni villámmal sújtott, amíg távol voltál!",
+  "pantheon.follower_god_renounced": "{0} lemondott az istenségéről.",
+  "pantheon.follower_now_godless": "Már egyetlen istent sem követsz.",
   "pantheon.menu_chastise": "Hívő Megfenyítése",
   "pantheon.menu_chastise_desc": "Kegyet vesz el egyik saját hívődtől",
   "pantheon.no_followers_to_chastise": "  Ma egyik hívődet sem fenyítheted meg.",
