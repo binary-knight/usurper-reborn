@@ -6807,7 +6807,7 @@ public partial class CombatEngine
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_split3")}", "bright_yellow");
                     terminal.WriteLine("");
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_shadow_appears")}", "red");
-                    result.CombatLog.Add("Manwe uses Split Form — Shadow of Manwe appears");
+                    result.CombatLog.Add("Manwe uses Split Form -- Shadow of Manwe appears");
                 }
                 else
                 {
@@ -6938,7 +6938,7 @@ public partial class CombatEngine
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_touch_forehead")}", "bright_white");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_take_back")}", "bright_yellow");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_cease_exist")}", "dark_red");
-                        result.CombatLog.Add("Creation's End — instant kill (no Worldstone)");
+                        result.CombatLog.Add("Creation's End -- instant kill (no Worldstone)");
                     }
                 }
                 else
@@ -6985,14 +6985,14 @@ public partial class CombatEngine
                         if (BossContext != null) BossContext.BossSaved = true;
                         OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.LetGoOfPower); // v1.1.12: the Creator spared, not taken
                         monster.HP = 0; // End combat peacefully
-                        result.CombatLog.Add("Player accepts The Offer — Manwe spared");
+                        result.CombatLog.Add("Player accepts The Offer -- Manwe spared");
                     }
                     else
                     {
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_no_quit")}", "bright_red");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_eyes_harden")}", "yellow");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_finish_it")}", "bright_yellow");
-                        result.CombatLog.Add("Player refuses The Offer — combat continues");
+                        result.CombatLog.Add("Player refuses The Offer -- combat continues");
                     }
                 }
                 else
