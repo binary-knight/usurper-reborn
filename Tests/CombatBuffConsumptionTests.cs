@@ -183,7 +183,9 @@ public class CombatBuffConsumptionTests
         var (engine, output) = MakeEngine("A\n", throwWhenDrained: false);
         var player = MakeBuffedPlayer();
         var (_, error, transcript) = await Run(() => engine.PlayerVsMonsters(player, new List<Monster> { LethalMonsterThatMisses() }), output);
-        error.Should().BeOfType<IOException>("transcript: {0}", transcript);
+        // v1.2.4: the closed peer is the typed ConnectionClosedException, still an IOException.
+        error.Should().BeAssignableTo<IOException>("transcript: {0}", transcript);
+        error.Should().BeOfType<ConnectionClosedException>();
         AssertBuffsConsumed(player, "closed peer");
     }
 
