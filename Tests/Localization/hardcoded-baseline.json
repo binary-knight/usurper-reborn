@@ -198,25 +198,6 @@
       "e3aaa8ba79"
     ]
   },
-  "Scripts/Locations/BankLocation.cs": {
-    "count": 14,
-    "sites": [
-      "020dc959ed",
-      "0a5b99226b",
-      "1c7263cbea",
-      "256a059d7f",
-      "356f8be10f",
-      "66bf7b9095",
-      "81d65bfb5f",
-      "8b50419c4f",
-      "904b8398df",
-      "a9d4019d2b",
-      "b0a55f83bc",
-      "bf2eba9596",
-      "f02bfb76bb",
-      "ff44d18729"
-    ]
-  },
   "Scripts/Locations/CastleLocation.cs": {
     "count": 273,
     "sites": [
@@ -534,76 +515,12 @@
       "de6a6210e3"
     ]
   },
-  "Scripts/Locations/InnLocation.cs": {
-    "count": 38,
-    "sites": [
-      "1062e0f85d",
-      "109ede07b7",
-      "12aec32c28",
-      "13cad7baf5",
-      "1690eea665",
-      "388c4d1f1a",
-      "388f260797",
-      "42e6462680",
-      "516fe4e073",
-      "5ae3673d3b",
-      "5ecea1b62f",
-      "61df53dac8",
-      "6fd7e59c12",
-      "6fff057cff",
-      "7736fcf764",
-      "7f8e8387a1",
-      "885b4f7525",
-      "990f7e9932",
-      "a2a1bcc0c1",
-      "a2a1bcc0c1",
-      "aa3796f5c4",
-      "ab3bfaa8b9",
-      "b94ae4af42",
-      "cd2393d352",
-      "cd9a6a2024",
-      "d117928713",
-      "d5943097c3",
-      "d6f40f744a",
-      "d9da9a3276",
-      "e2e05c5072",
-      "e6305bb524",
-      "e8951f4aba",
-      "ea2046903c",
-      "ec5213b274",
-      "f9d8a6d6ca",
-      "f9d8a6d6ca",
-      "fadf637985",
-      "fd20fba9f1"
-    ]
-  },
   "Scripts/Locations/LevelMasterLocation.cs": {
     "count": 3,
     "sites": [
       "57cc72fd49",
       "78263889b7",
       "ab8325d32a"
-    ]
-  },
-  "Scripts/Locations/LoveStreetLocation.cs": {
-    "count": 16,
-    "sites": [
-      "29958544fc",
-      "40d6f69ea3",
-      "787b5a4fb7",
-      "8d837fa5df",
-      "8e642d7068",
-      "98bd50e6fa",
-      "9b6001423e",
-      "ace333e2db",
-      "b45c4c37f8",
-      "b45c4c37f8",
-      "ca8d1473be",
-      "d34a6855df",
-      "d3d014fb6f",
-      "d4179ea057",
-      "e925eb72f9",
-      "ecf4f1ab91"
     ]
   },
   "Scripts/Locations/MainStreetClassic.cs": {
@@ -1323,30 +1240,6 @@
       "f0612841d6",
       "f0612841d6",
       "f61674805a"
-    ]
-  },
-  "Scripts/Systems/StreetEncounterSystem.cs": {
-    "count": 19,
-    "sites": [
-      "145c3b04bc",
-      "445e7fc790",
-      "48d8efe476",
-      "5853ac2896",
-      "6b7f4b3940",
-      "781b8fa454",
-      "7961df2961",
-      "7d455d285f",
-      "7d9585150a",
-      "7fd7788e47",
-      "91195d91db",
-      "91e8294867",
-      "a20b70d37c",
-      "af6d242eb2",
-      "ba2c7e939c",
-      "bbb61bb3ca",
-      "bcfc3213dc",
-      "cbcf3ea31e",
-      "dffba4482c"
     ]
   },
   "Scripts/Systems/TeamBalanceSystem.cs": {

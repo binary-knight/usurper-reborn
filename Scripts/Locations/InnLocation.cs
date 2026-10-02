@@ -1,5 +1,6 @@
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using UsurperRemake.BBS;
 using System;
 using System.Collections.Generic;
@@ -2841,10 +2842,10 @@ public class InnLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.Write($"{companion.Name} - {companion.Title}");
             terminal.SetColor("gray");
-            terminal.WriteLine($" ({companion.CombatRole})");
+            terminal.WriteLine($" ({RoleName(companion.CombatRole)})");
             terminal.SetColor("dark_gray");
             terminal.WriteLine($"    {companion.Description.Substring(0, Math.Min(70, companion.Description.Length))}...");
-            terminal.WriteLine($"    Level Req: {companion.RecruitLevel} | Trust: {companion.TrustLevel}%");
+            terminal.WriteLine("    " + Loc.Get("inn.recruit_req_trust", companion.RecruitLevel, companion.TrustLevel));
             terminal.WriteLine("");
             index++;
         }
@@ -2891,7 +2892,7 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.background_label", companion.BackstoryBrief));
         terminal.WriteLine("");
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("inn.combat_role_label", companion.CombatRole));
+        terminal.WriteLine(Loc.Get("inn.combat_role_label", RoleName(companion.CombatRole)));
         terminal.WriteLine(Loc.Get("inn.abilities_label", string.Join(", ", companion.Abilities)));
         terminal.WriteLine("");
 
@@ -3071,7 +3072,7 @@ public class InnLocation : BaseLocation
                     terminal.SetColor("gray");
                     terminal.WriteLine($"  {companion.Name} - {companion.Title}");
                     terminal.SetColor("dark_gray");
-                    terminal.WriteLine($"    Died: {death.Circumstance}");
+                    terminal.WriteLine("    " + Loc.Get("inn.died_label", death.Circumstance));
                 }
                 terminal.WriteLine("");
             }
@@ -3141,7 +3142,7 @@ public class InnLocation : BaseLocation
 
         // Stats line
         terminal.SetColor("dark_gray");
-        terminal.Write($"    Lvl {companion.Level} {companion.CombatRole} | ");
+        terminal.Write("    " + Loc.Get("inn.lvl_role_bar", companion.Level, RoleName(companion.CombatRole)));
 
         // HP with color coding
         terminal.SetColor(currentHP > maxHP / 2 ? "green" : currentHP > maxHP / 4 ? "yellow" : "red");
@@ -3166,12 +3167,12 @@ public class InnLocation : BaseLocation
         if (companion.PersonalQuestCompleted)
         {
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"    Quest: {companion.PersonalQuestName} (COMPLETE)");
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_complete", companion.PersonalQuestName));
         }
         else if (companion.PersonalQuestStarted)
         {
             terminal.SetColor("magenta");
-            terminal.WriteLine($"    Quest: {companion.PersonalQuestName} (In Progress)");
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_in_progress", companion.PersonalQuestName));
             if (!string.IsNullOrEmpty(companion.PersonalQuestLocationHint))
             {
                 terminal.SetColor("gray");
@@ -3181,12 +3182,12 @@ public class InnLocation : BaseLocation
         else if (companion.LoyaltyLevel >= 50 || companion.PersonalQuestAvailable)
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"    Quest: {companion.PersonalQuestName} (UNLOCKED - Talk to begin!)");
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_unlocked", companion.PersonalQuestName));
         }
         else
         {
             terminal.SetColor("dark_gray");
-            terminal.WriteLine($"    Quest: Build more loyalty ({companion.LoyaltyLevel}/50)");
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_build_loyalty", companion.LoyaltyLevel));
         }
 
         // Romance level (if applicable)
@@ -3194,7 +3195,7 @@ public class InnLocation : BaseLocation
         {
             terminal.SetColor("bright_magenta");
             string hearts = new string('*', Math.Min(companion.RomanceLevel, 10));
-            terminal.WriteLine($"    Romance: {hearts} ({companion.RomanceLevel}/10)");
+            terminal.WriteLine("    " + Loc.Get("inn.romance_row", hearts, companion.RomanceLevel));
         }
 
         terminal.WriteLine("");
@@ -3225,7 +3226,7 @@ public class InnLocation : BaseLocation
             terminal.SetColor(isCurrentlyActive ? "bright_green" : "white");
             terminal.Write($"  [{index}] {companion.Name}");
             terminal.SetColor("gray");
-            terminal.Write($" ({companion.CombatRole})");
+            terminal.Write($" ({RoleName(companion.CombatRole)})");
             if (isCurrentlyActive)
             {
                 terminal.SetColor("bright_green");
@@ -3325,10 +3326,10 @@ public class InnLocation : BaseLocation
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("inn.stats"));
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("inn.level_role", companion.Level, companion.CombatRole)}");
+        terminal.WriteLine($"  {Loc.Get("inn.level_role", companion.Level, RoleName(companion.CombatRole))}");
         terminal.WriteLine($"  {Loc.Get("inn.hp_atk_def", tempChar.MaxHP, tempChar.Strength, tempChar.Defence)}");
-        terminal.WriteLine($"  STR: {tempChar.Strength}  DEX: {tempChar.Dexterity}  AGI: {tempChar.Agility}  CON: {tempChar.Constitution}");
-        terminal.WriteLine($"  INT: {tempChar.Intelligence}  WIS: {tempChar.Wisdom}  CHA: {tempChar.Charisma}  STA: {tempChar.Stamina}");
+        terminal.WriteLine("  " + Loc.Get("inn.stat_row_physical", tempChar.Strength, tempChar.Dexterity, tempChar.Agility, tempChar.Constitution));
+        terminal.WriteLine("  " + Loc.Get("inn.stat_row_mental", tempChar.Intelligence, tempChar.Wisdom, tempChar.Charisma, tempChar.Stamina));
         if (companion.EquippedItems.Count > 0)
         {
             terminal.SetColor("gray");
@@ -3351,12 +3352,12 @@ public class InnLocation : BaseLocation
         if (companionAbilities.Count > 0)
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"  Abilities ({companionAbilities.Count}): {string.Join(", ", companionAbilities.Select(a => a.DisplayName))}");
+            WriteUnder("  ", Loc.Get("inn.abilities_count_label", companionAbilities.Count, string.Join(", ", companionAbilities.Select(a => a.DisplayName))));
         }
         else
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"  Abilities: {string.Join(", ", companion.Abilities)}");
+            WriteUnder("  ", Loc.Get("inn.abilities_label", string.Join(", ", companion.Abilities)));
         }
         terminal.WriteLine("");
 
@@ -3626,7 +3627,7 @@ public class InnLocation : BaseLocation
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(Loc.Get("inn.bond_stronger"));
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"  (Romance: {companion.RomanceLevel}/10)");
+                    terminal.WriteLine("  " + Loc.Get("inn.romance_level_tag", companion.RomanceLevel));
                 }
             }
             else
@@ -4421,9 +4422,9 @@ public class InnLocation : BaseLocation
         while (true)
         {
             terminal.ClearScreen();
-            WriteBoxHeader($"COMBAT SKILLS: {companion.Name.ToUpper()}", "bright_cyan");
+            WriteBoxHeader(Loc.Get("dungeon.skills_header", companion.Name.ToUpper()), "bright_cyan");
             terminal.SetColor("white");
-            terminal.WriteLine($"  Role: {companion.CombatRole} (as {charClass}) | Level: {companion.Level}");
+            terminal.WriteLine("  " + Loc.Get("inn.skills_role_line", RoleName(companion.CombatRole), GameConfig.GetLocalizedClassName(charClass), companion.Level));
             terminal.WriteLine("");
 
             // Get all abilities for this class at this level
@@ -4449,6 +4450,9 @@ public class InnLocation : BaseLocation
 
             int enabledCount = 0;
             int enabledSpells = 0;
+            var layout = SkillLayout.For(
+                abilities.Select(a => (a.DisplayName, SkillCost("inn.skill_cost_st", ClassAbilitySystem.GetEffectiveStaminaCost(a)), Loc.Get("ability.level_tag", a.LevelRequired)))
+                    .Concat(spells.Select(sp => (sp.DisplayName, SkillCost("inn.skill_cost_mp", sp.ManaCost), Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, sp.Level))))));
 
             // --- Abilities section ---
             if (abilities.Count > 0)
@@ -4463,28 +4467,9 @@ public class InnLocation : BaseLocation
                     bool isDisabled = companion.DisabledAbilities.Contains(ability.Id);
                     if (!isDisabled) enabledCount++;
 
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write($"  [{i + 1,2}] ");
-                    terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
-                    terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
-                    terminal.SetColor(isDisabled ? "gray" : "white");
-                    terminal.Write($"{ability.DisplayName,-24}");
-                    terminal.SetColor("darkgray");
-                    terminal.Write($" {ClassAbilitySystem.GetEffectiveStaminaCost(ability),2} ST  Lv{ability.LevelRequired,-3}  ");
-                    terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                    string abilityDesc = ability.DisplayDescription;
-                    if (IsScreenReader || abilityDesc.Length <= 35)
-                    {
-                        terminal.WriteLine(abilityDesc);
-                    }
-                    else
-                    {
-                        int breakAt = abilityDesc.LastIndexOf(' ', 35);
-                        if (breakAt <= 10) breakAt = 35;
-                        terminal.WriteLine(abilityDesc[..breakAt]);
-                        terminal.SetColor("dark_gray");
-                        terminal.WriteLine($"        {abilityDesc[breakAt..].TrimStart()}");
-                    }
+                    WriteSkillRow(layout, i + 1, isDisabled, ability.DisplayName,
+                        SkillCost("inn.skill_cost_st", ClassAbilitySystem.GetEffectiveStaminaCost(ability)),
+                        Loc.Get("ability.level_tag", ability.LevelRequired), ability.DisplayDescription);
                 }
             }
 
@@ -4504,43 +4489,23 @@ public class InnLocation : BaseLocation
                     bool isDisabled = companion.DisabledSpells.Contains(spell.Name);
                     if (!isDisabled) enabledSpells++;
 
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write($"  [{displayIdx,2}] ");
-                    terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
-                    terminal.Write(isDisabled ? "[OFF] " : "[ON]  ");
-                    terminal.SetColor(isDisabled ? "gray" : "white");
-                    terminal.Write($"{spell.DisplayName,-24}");
-                    terminal.SetColor("darkgray");
-                    terminal.Write($" {spell.ManaCost,2} MP  Lv{SpellSystem.GetLevelRequired(charClass, spell.Level),-3}  ");
-                    terminal.SetColor(isDisabled ? "darkgray" : "gray");
-                    if (IsScreenReader || spell.DisplayDescription.Length <= 35)
-                    {
-                        terminal.WriteLine(spell.DisplayDescription);
-                    }
-                    else
-                    {
-                        int breakAt = spell.DisplayDescription.LastIndexOf(' ', 35);
-                        if (breakAt <= 10) breakAt = 35;
-                        terminal.WriteLine(spell.DisplayDescription[..breakAt]);
-                        terminal.SetColor("dark_gray");
-                        terminal.WriteLine($"        {spell.DisplayDescription[breakAt..].TrimStart()}");
-                    }
+                    WriteSkillRow(layout, displayIdx, isDisabled, spell.DisplayName,
+                        SkillCost("inn.skill_cost_mp", spell.ManaCost),
+                        Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, spell.Level)), spell.DisplayDescription);
                 }
             }
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
             if (abilities.Count > 0 && spells.Count > 0)
-                terminal.WriteLine($"  {enabledCount}/{abilities.Count} abilities, {enabledSpells}/{spells.Count} spells enabled");
+                terminal.WriteLine("  " + Loc.Get("inn.abilities_spells_enabled", enabledCount, abilities.Count, enabledSpells, spells.Count));
             else if (abilities.Count > 0)
-                terminal.WriteLine($"  {enabledCount}/{abilities.Count} abilities enabled");
+                terminal.WriteLine("  " + Loc.Get("inn.abilities_enabled", enabledCount, abilities.Count));
             else
-                terminal.WriteLine($"  {enabledSpells}/{spells.Count} spells enabled");
+                terminal.WriteLine("  " + Loc.Get("inn.spells_enabled", enabledSpells, spells.Count));
             terminal.WriteLine("");
             terminal.SetColor("yellow");
-            terminal.WriteLine(IsScreenReader
-                ? "  1 through N. Toggle  A. Enable all  0. Return"
-                : "  [1-N] Toggle  [A] Enable all  [0] Return");
+            terminal.WriteLine("  " + Loc.Get(IsScreenReader ? "inn.skills_options_sr" : "inn.skills_options"));
             terminal.WriteLine("");
 
             var input = await terminal.GetInput(Loc.Get("ui.choice"));
@@ -4566,13 +4531,13 @@ public class InnLocation : BaseLocation
                     {
                         companion.DisabledAbilities.Remove(ability.Id);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  Enabled: {ability.DisplayName}");
+                        terminal.WriteLine("  " + Loc.Get("inn.enabled", ability.DisplayName));
                     }
                     else
                     {
                         companion.DisabledAbilities.Add(ability.Id);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  Disabled: {ability.DisplayName}");
+                        terminal.WriteLine("  " + Loc.Get("inn.disabled", ability.DisplayName));
                     }
                 }
                 else
@@ -4582,13 +4547,13 @@ public class InnLocation : BaseLocation
                     {
                         companion.DisabledSpells.Remove(spell.Name);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine($"  Enabled: {spell.DisplayName}");
+                        terminal.WriteLine("  " + Loc.Get("inn.enabled", spell.DisplayName));
                     }
                     else
                     {
                         companion.DisabledSpells.Add(spell.Name);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  Disabled: {spell.DisplayName}");
+                        terminal.WriteLine("  " + Loc.Get("inn.disabled", spell.DisplayName));
                     }
                 }
                 await Pacing.Wait(600);
@@ -4743,7 +4708,7 @@ public class InnLocation : BaseLocation
                     currentPlayer.ConsumeMaterial(req.materialId, req.count);
                     var mat = GameConfig.GetMaterialById(req.materialId);
                     terminal.SetColor(mat?.Color ?? "white");
-                    terminal.WriteLine($"  The {mat?.Name ?? req.materialId} dissolves into your body, fueling the transformation...");
+                    WriteUnder("  ", Loc.Get("inn.material_dissolves", mat?.Name ?? req.materialId));
                 }
                 await Pacing.Wait(500);
             }
@@ -5411,6 +5376,120 @@ public class InnLocation : BaseLocation
 
     #region Rent a Room (Online Mode)
 
+    /// <summary>
+    /// 1.2.5: the room's gold summary ("Your gold: ... | Room: ... | Total: ...") as rows of at most 79 columns. It
+    /// stays one row when it fits; otherwise a new row, indented as the first, starts at a "  |  " separator.
+    /// </summary>
+    internal static List<string> RentSummaryRows(string text)
+    {
+        var rows = new List<string>();
+        foreach (var line in text.Replace("\r", "").Split('\n'))
+        {
+            if (line.Length <= 79) { rows.Add(line); continue; }
+            string indent = new string(' ', line.Length - line.TrimStart().Length);
+            string current = "";
+            foreach (var part in line.Trim().Split("  |  "))
+            {
+                if (current.Length == 0) current = indent + part;
+                else if (current.Length + 5 + part.Length <= 79) current += "  |  " + part;
+                else { rows.Add(current); current = indent + part; }
+            }
+            rows.Add(current);
+        }
+        return rows;
+    }
+
+    /// <summary>1.2.5: a sleeper list entry, wrapped at 79 columns with later rows under the text.</summary>
+    internal static List<string> SleeperRows(int number, string text)
+    {
+        string prefix = $"  {number}. ";
+        return UIHelper.WrapAfterPrefix(prefix, text, 79)
+            .Select((row, i) => (i == 0 ? prefix : new string(' ', prefix.Length)) + row).ToList();
+    }
+
+    /// <summary>1.2.5: the mail a murdered sleeper gets, in the given language; the item name is the stored name.</summary>
+    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName) => itemName != null
+        ? Loc.GetIn(lang, "inn.mail_sleep_murder_item", murderer, $"{gold:N0}", itemName)
+        : Loc.GetIn(lang, "inn.mail_sleep_murder", murderer, $"{gold:N0}");
+
+    /// <summary>1.2.5: a companion's combat role in the player's language (inn.role_tank and so on).</summary>
+    internal static string RoleName(CombatRole role) => Loc.Get($"inn.role_{role.ToString().ToLowerInvariant()}");
+
+    /// <summary>1.2.5: writes text after a prefix, word-wrapped at 79 columns, later rows under the text.</summary>
+    private void WriteUnder(string prefix, string text)
+    {
+        var rows = UIHelper.WrapAfterPrefix(prefix, text, 79);
+        for (int i = 0; i < rows.Count; i++)
+            terminal.WriteLine((i == 0 ? prefix : new string(' ', prefix.Length)) + rows[i]);
+    }
+
+    /// <summary>
+    /// 1.2.5: the columns of the companion combat skills list, from the longest on/off tag, name, cost and level
+    /// text in the player's language. English keeps the old widths (name 24, level 5).
+    /// </summary>
+    internal sealed record SkillLayout(int TagWidth, int NameWidth, int CostWidth, int LevelWidth)
+    {
+        internal const int Width = 79;
+        internal const int ContinuationIndent = 8;
+
+        internal static SkillLayout For(IEnumerable<(string name, string cost, string level)> rows)
+        {
+            var list = rows.ToList();
+            return new SkillLayout(
+                Math.Max(Loc.Get("inn.skill_off").Length, Loc.Get("inn.skill_on").Length) + 2,
+                Math.Max(24, list.Select(r => r.name.Length).DefaultIfEmpty(0).Max()),
+                list.Select(r => r.cost.Length).DefaultIfEmpty(0).Max(),
+                Math.Max(5, list.Select(r => r.level.Length).DefaultIfEmpty(0).Max()));
+        }
+
+        /// <summary>The column the description starts at: "  [NN] " + tag + name + " " + cost + "  " + level + "  ".</summary>
+        internal int DescColumn => 7 + TagWidth + 1 + NameWidth + 1 + CostWidth + 2 + LevelWidth + 2;
+
+        /// <summary>The description split into the part on the skill's row and the rows under it.</summary>
+        internal (string first, List<string> rest) SplitDescription(string desc)
+        {
+            int room = Width - DescColumn;
+            var words = (desc ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            int taken = 0, used = 0;
+            while (room >= 12 && taken < words.Length && used + (taken > 0 ? 1 : 0) + words[taken].Length <= room)
+            {
+                used += (taken > 0 ? 1 : 0) + words[taken].Length;
+                taken++;
+            }
+            string first = string.Join(" ", words.Take(taken));
+            var rest = taken < words.Length
+                ? UIHelper.WordWrap(string.Join(" ", words.Skip(taken)), Width - ContinuationIndent)
+                : new List<string>();
+            return (first, rest);
+        }
+    }
+
+    /// <summary>A stamina or mana cost, the number right-aligned in two columns as before.</summary>
+    private static string SkillCost(string key, int cost) => Loc.Get(key, $"{cost,2}");
+
+    private void WriteSkillRow(SkillLayout layout, int index, bool isDisabled, string name, string cost, string level, string desc)
+    {
+        terminal.SetColor("bright_yellow");
+        terminal.Write($"  [{index,2}] ");
+        terminal.SetColor(isDisabled ? "darkgray" : "bright_green");
+        terminal.Write($"[{Loc.Get(isDisabled ? "inn.skill_off" : "inn.skill_on")}]".PadRight(layout.TagWidth + 1));
+        terminal.SetColor(isDisabled ? "gray" : "white");
+        terminal.Write(name.PadRight(layout.NameWidth));
+        terminal.SetColor("darkgray");
+        terminal.Write($" {cost.PadLeft(layout.CostWidth)}  {level.PadRight(layout.LevelWidth)}  ");
+        terminal.SetColor(isDisabled ? "darkgray" : "gray");
+        if (IsScreenReader)
+        {
+            terminal.WriteLine(desc);
+            return;
+        }
+        var (first, rest) = layout.SplitDescription(desc);
+        terminal.WriteLine(first);
+        terminal.SetColor("dark_gray");
+        foreach (var row in rest)
+            terminal.WriteLine(new string(' ', SkillLayout.ContinuationIndent) + row);
+    }
+
     private static (string type, string name, int baseCost, int baseHp)[] GetGuardOptions() => new[]
     {
         ("rookie_npc",  Loc.Get("inn.guard_rookie"),  GameConfig.GuardRookieBaseCost,  80),
@@ -5453,11 +5532,12 @@ public class InnLocation : BaseLocation
             {
                 terminal.SetColor("cyan");
                 foreach (var g in hiredGuards)
-                    terminal.WriteLine($"    - {g.name} (HP: {g.hp})");
+                    terminal.WriteLine("    - " + Loc.Get("inn.guard_name_hp", g.name, g.hp));
             }
             terminal.WriteLine("");
 
             var guardOptions = GetGuardOptions();
+            int guardNameWidth = Math.Max(16, guardOptions.Max(o => o.name.Length));
             terminal.SetColor("white");
             for (int i = 0; i < guardOptions.Length; i++)
             {
@@ -5466,16 +5546,17 @@ public class InnLocation : BaseLocation
                 int hp = (int)(opt.baseHp * levelMultiplier);
                 bool canAfford = currentPlayer.Gold + currentPlayer.BankGold - roomCost - totalGuardCost >= cost;
                 terminal.SetColor(canAfford ? "white" : "dark_red");
-                terminal.WriteLine($"  [{i + 1}] {opt.name,-16} {cost,6:N0}g  (HP: {hp})");
+                terminal.WriteLine($"  [{i + 1}] {opt.name.PadRight(guardNameWidth)} {Loc.Get("magic_shop.gold_short", $"{cost,6:N0}")}  {Loc.Get("inn.guard_hp_tag", hp)}");
             }
             terminal.SetColor("bright_yellow");
             terminal.Write("  [D]");
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("inn.rent_done_hiring"));
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("inn.rent_gold_summary", currentPlayer.Gold.ToString("N0"), currentPlayer.BankGold.ToString("N0"), roomCost.ToString("N0"), totalGuardCost.ToString("N0"), (roomCost + totalGuardCost).ToString("N0")));
+            foreach (var row in RentSummaryRows(Loc.Get("inn.rent_gold_summary", currentPlayer.Gold.ToString("N0"), currentPlayer.BankGold.ToString("N0"), roomCost.ToString("N0"), totalGuardCost.ToString("N0"), (roomCost + totalGuardCost).ToString("N0"))))
+                terminal.WriteLine(row);
 
-            var input = await terminal.GetInput("\n  Choice: ");
+            var input = await terminal.GetInput("\n  " + Loc.Get("ui.choice"));
             if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "D")
                 break;
 
@@ -5642,8 +5723,9 @@ public class InnLocation : BaseLocation
                 continue;
             if (npc != null && Math.Abs(npc.Level - attackerLevel) > 5)
                 continue;
-            string lvlStr = npc != null ? $" (Lvl {npc.Level})" : "";
-            terminal.WriteLine($"  {targets.Count + 1}. {npcName}{lvlStr} [SLEEPING NPC]", "yellow");
+            string lvlStr = npc != null ? $" ({Loc.Get("inn.sleeper_level", npc.Level)})" : "";
+            foreach (var row in SleeperRows(targets.Count + 1, $"{npcName}{lvlStr} [{Loc.Get("inn.sleeping_npc")}]"))
+                terminal.WriteLine(row, "yellow");
             targets.Add((npcName, true));
         }
         foreach (var s in innPlayerSleepers)
@@ -5656,8 +5738,9 @@ public class InnLocation : BaseLocation
 
             int guardCount = 0;
             try { guardCount = JsonSerializer.Deserialize<List<object>>(s.GuardsJson)?.Count ?? 0; } catch { }
-            string guardLabel = guardCount > 0 ? $" [{guardCount} guard{(guardCount != 1 ? "s" : "")}]" : "";
-            terminal.WriteLine($"  {targets.Count + 1}. {s.Username} (Lvl {targetLevel}){guardLabel} [SLEEPING PLAYER]", "red");
+            string guardLabel = guardCount > 0 ? $" [{Loc.Get(guardCount != 1 ? "inn.sleeper_guards" : "inn.sleeper_guard", guardCount)}]" : "";
+            foreach (var row in SleeperRows(targets.Count + 1, $"{s.Username} ({Loc.Get("inn.sleeper_level", targetLevel)}){guardLabel} [{Loc.Get("inn.sleeping_player")}]"))
+                terminal.WriteLine(row, "red");
             targets.Add((s.Username, false));
         }
 
@@ -5949,8 +6032,10 @@ public class InnLocation : BaseLocation
             });
             await backend.AppendSleepAttackLog(target.Username, logEntry);
 
-            await backend.SendMessageToKey(currentPlayer.Name2, target.Username, "sleep_attack",
-                $"{currentPlayer.Name2} broke into your Inn room and murdered you! They stole {stolenGold:N0} gold{(stolenItemName != null ? $" and your {stolenItemName}" : "")}.");
+            // 1.2.5: in the victim's account language. The item name is the stored (English) item name.
+            string murderer = currentPlayer.Name2;
+            await backend.SendMessageToKeyLocalized(murderer, target.Username, "sleep_attack",
+                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName));
 
             terminal.SetColor("dark_red");
             terminal.WriteLine(Loc.Get("inn.atk_leave_body", target.Username));
@@ -6048,14 +6133,14 @@ public class InnLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "S", Label = "Sleep at Inn", Category = "service", Icon = "sleep" },
-            new() { Key = "C", Label = "Companions", Category = "social", Icon = "companions" },
-            new() { Key = "T", Label = "Talk", Category = "social", Icon = "talk" },
-            new() { Key = "D", Label = "Drink", Category = "social", Icon = "drink" },
-            new() { Key = "G", Label = "Gambling", Category = "social", Icon = "gambling" },
-            new() { Key = "B", Label = "Brawl", Category = "combat", Icon = "brawl" },
-            new() { Key = "M", Label = "Mingle", Category = "social", Icon = "mingle" },
-            new() { Key = "Z", Label = "Sparring", Category = "combat", Icon = "spar" },
+            new() { Key = "S", Label = Loc.Get("inn.electron_sleep"), Category = "service", Icon = "sleep" },
+            new() { Key = "C", Label = Loc.Get("inn.companions"), Category = "social", Icon = "companions" },
+            new() { Key = "T", Label = Loc.Get("inn.bbs_talk"), Category = "social", Icon = "talk" },
+            new() { Key = "D", Label = Loc.Get("inn.bbs_drink"), Category = "social", Icon = "drink" },
+            new() { Key = "G", Label = Loc.Get("inn.bbs_gambling"), Category = "social", Icon = "gambling" },
+            new() { Key = "B", Label = Loc.Get("inn.electron_brawl"), Category = "combat", Icon = "brawl" },
+            new() { Key = "M", Label = Loc.Get("inn.electron_mingle"), Category = "social", Icon = "mingle" },
+            new() { Key = "Z", Label = Loc.Get("inn.electron_sparring"), Category = "combat", Icon = "spar" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

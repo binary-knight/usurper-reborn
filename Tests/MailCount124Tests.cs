@@ -214,7 +214,7 @@ public class MailCount124Tests : IDisposable
         string Src(params string[] p) => File.ReadAllText(Path.Combine(new[] { FindRepoRoot(), "Scripts" }.Concat(p).ToArray()));
         Src("Locations", "PantheonLocation.cs").Should().NotContain("SendMessage(godName, target.Username");
         Src("Locations", "TempleLocation.cs").Should().Contain("SendMessageToKeyLocalized(\"Temple\", godInfo.Username");   // 1.2.5: localized
-        Src("Locations", "InnLocation.cs").Should().Contain("SendMessageToKey(currentPlayer.Name2, target.Username");
+        Src("Locations", "InnLocation.cs").Should().Contain("SendMessageToKeyLocalized(murderer, target.Username");   // 1.2.5: localized
         Src("Locations", "DormitoryLocation.cs").Should().Contain("SendMessageToKey(currentPlayer.Name2, target.Username");
         Src("Locations", "ArenaLocation.cs").Should().Contain("SendMessageToKey(myUsername, defenderUsername");
         Src("Systems", "WorldBossSystem.cs").Should().NotContain("SendMessageToKey(", "1.2.5: the boss notice is no longer mailed");
