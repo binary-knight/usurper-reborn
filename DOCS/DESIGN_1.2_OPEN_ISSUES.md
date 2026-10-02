@@ -348,6 +348,15 @@ point: a single blob plus a compare-and-swap is not an atomic transfer of buyer
 gold, escrowed item, and seller proceeds; per-shop keys and a sale transaction
 in `SqlSaveBackend` are the online path).
 
+**Key note (added at 1.2.4).** The claim that Main Street `[8]` is free dates
+from the numeric layout. Since 1.1.13 the default Main Street uses district
+letters (D, I, E, T, A, M, G, H, C, S, N, O, plus `~`, `?`, Q); numeric keys
+survive only in the optional Classic Main Street layout
+(`Scripts/Locations/MainStreetClassic.cs`, where `8` maps to the Level Master).
+When 1.3 is designed, choose the Player District entry key against the current
+district key map, and decide whether it sits on Main Street or inside a
+district. This design is otherwise unchanged.
+
 **Full version** (later releases): buy filters funded from the till, upgrades
 to 15 and 20 slots, inns at 10,000,000 gold with rooms and rest benefits,
 hirelings and hours, raids reusing the castle siege call-to-arms, a bank, and a

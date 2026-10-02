@@ -19,7 +19,11 @@ Drop any of these files into `GameData/` next to the game executable. Missing fi
 | `achievements.json`      | 79 achievements and their tier rewards                                   |
 | `dialogue.json`          | ~500 lines of NPC dialogue keyed by personality                          |
 | `balance.json`           | ~30 game-balance constants (crit rate, boss scaling, daily limits…)      |
-| `equipment.json`         | **NEW in 0.57.3** — custom weapons, armor, shields, accessories          |
+| `equipment.json`         | custom weapons, armor, shields, accessories (additive, IDs 200000+)      |
+| `abilities.json`         | number tuning of existing class abilities, by ability id                 |
+| `spells.json`            | number and text tuning of existing spells, by class and spell level      |
+
+The loader reads these nine files and no others.
 
 ## Starting a mod
 
@@ -28,6 +32,17 @@ Run `UsurperReborn --export-data` once. This writes the current built-in content
 (For localizers: `UsurperReborn --export-discoveries [path]` emits the dungeon Discovery localization source keys in English, using the engine's exact key scheme, as a starting point for translating the ~600 `discovery.*` keys.)
 
 If you don't want to bother with every file, you can create just the ones you care about. The game loads each independently and falls back to built-ins for anything missing.
+
+## Tuning abilities and spells
+
+`abilities.json` and `spells.json` replace numbers on built-in entries. An entry names what it changes and sets only the fields it wants to change; every other field keeps its built-in value. `UsurperReborn --export-data` writes every built-in ability and spell with its current numbers as a template: delete the entries you do not change.
+
+- **abilities.json** entries are keyed by `id`. Settable fields: `cooldown`, `staminaCost`, `manaCost`, `levelRequired`, `baseDamage`, `baseHealing`, `defenseBonus`, `attackBonus`, `duration`.
+- **spells.json** entries are keyed by `class` and `level` (the spell's slot in that class's spell list). Settable fields: `name`, `description`, `manaCost`, `levelRequired`, `magicWords`.
+- Ranges are checked: cooldown 0 to 20, costs 0 to 1000 (spell mana cost 1 to 1000), damage and healing 0 to 100000, bonuses -100000 to 100000, duration 0 to 50, level required 1 to 100.
+- If any entry in a file is invalid (unknown id, no spell at that class and level, duplicate key, value out of range), the whole file is rejected, every problem is written to the log, and the built-in values stay. A file is never half applied.
+
+What tuning cannot do today: add a new spell or ability, remove one, change an ability's name, description or effect type, or change what a spell does beyond its mana cost, level and text. There is no editor menu for these two files; edit the JSON by hand.
 
 ## Equipment modding
 
@@ -64,14 +79,20 @@ Full schema: any public property on the `Equipment` class in `Scripts/Core/Items
 UsurperReborn --editor
 ```
 
-Works on Windows, Linux, and macOS. Pure console-mode tool; no graphical terminal needed. The editor has six top-level menus:
+Works on Windows, Linux, and macOS. Pure console-mode tool; no graphical terminal needed. The editor has five top-level menus. Equipment, NPCs, Monsters, Dreams, Dialogue and Balance sit under **Game Data / Modding**:
 
 1. **Player Saves** — pick a save, then dive into 11 nested categories covering almost every editable aspect of a character: Character Info (name/class/race/alignment/fame/knighthood), Stats & Progression (level/XP/core attributes/HP/Mana/resurrections/training), Gold & Economy, Inventory & Equipment (add items from the database, remove, equip/unequip any slot, uncurse), Spells & Abilities (learn individually or grant all), Companions (revive, set loyalty/trust/romance, recruit, dismiss), Quests (mark complete, cancel), Achievements (grant/revoke individually or all), Old Gods & Story (per-god status, seals, artifacts, NG+ cycle), Relationships & Family (per-NPC scores, divine wrath cleanup), and Status & Cleanup (cure diseases, clear poison, reset daily counters, release from prison, clear wanted level / murder weight). Every edit stays in memory until explicit Save; on save the file is backed up to `<name>.json.bak` before overwriting.
-2. **Equipment** — CRUD on `equipment.json`. Add new items, edit existing custom items, browse built-ins for reference.
-3. **NPCs** — CRUD on `npcs.json`. The 60 built-in town NPCs are seeded if no mod file exists yet.
-4. **Balance** — edit any property on `balance.json`. Uses reflection over the config class so newly-added balance properties are editable without editor changes.
-5. **Export Defaults** — write all built-in data to `GameData/` as a starting mod template. Same as `--export-data` CLI flag, but from inside the editor.
-6. **Open GameData Folder Info** — prints paths for GameData, saves, localization.
+2. **Game Data / Modding**, a nested menu with one editor per data file:
+   - **Equipment**: CRUD on `equipment.json`. Add new items, edit existing custom items, browse built-ins for reference.
+   - **NPCs**: CRUD on `npcs.json`. The 60 built-in town NPCs are seeded if no mod file exists yet.
+   - **Monsters**: monster families and tiers (`monster_families.json`).
+   - **Dreams**: narrative dreams (`dreams.json`).
+   - **Achievements**: disabled in the editor so Steam achievements cannot be cheated; `achievements.json` can still be edited by hand.
+   - **Dialogue**: NPC dialogue lines (`dialogue.json`).
+   - **Balance**: edit any property on `balance.json`. Uses reflection over the config class so newly-added balance properties are editable without editor changes.
+3. **Save File Management**: clone, delete, restore saves.
+4. **Export Defaults**: write built-in data to `GameData/` as a starting mod template, like the `--export-data` CLI flag. Its confirmation text still says 7 files; the export writes 9.
+5. **File Locations**: prints paths for GameData, saves, localization.
 
 ## Save compatibility and mods
 
@@ -88,13 +109,14 @@ For `GameData/*.json` mods, the game only reads them at startup, so editing them
 
 ## Future phases
 
-Still hardcoded (can't be modded yet) but planned:
+Shipped since this section was first written: number tuning of spells and abilities by key (`spells.json`, `abilities.json`), and editor menus for monsters, dreams and dialogue (the achievements menu is deliberately disabled).
 
-- Spells and class abilities
+Still not built:
+
+- Adding new spells or abilities (only existing ones can be tuned)
 - Location descriptions and flavor text
 - Quest templates
 - World-state editor for online multiplayer (SQLite)
-- Monster editor menu in the GUI editor (the JSON itself already works)
-- Dream, achievement, and dialogue editor menus
+- Editor menus for `abilities.json` and `spells.json`
 
 If any of these block a mod you want to make, open an issue at <https://github.com/binary-knight/usurper-reborn/issues> and we'll bump the priority.

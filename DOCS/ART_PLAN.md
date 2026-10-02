@@ -20,9 +20,11 @@ out of scope; this is the text game on every transport it has.
   (`Tests/ArtWidth124Tests.cs` holds every row to 79). Most pieces are lettering
   ("YOU DIED", "LEVEL UP", the title) drawn in blocks, which cannot be
   localized and reads as text, not art.
-- The emulator draws sixteen foreground colors only. There is no background
-  color anywhere in the markup or the color tables, and scene ANSI art is built
-  on backgrounds. The CP437 path is a translation (heavy box to double box,
+- The markup and color tables have sixteen foreground colors and no background
+  color. The splash screen is the exception: it draws a converted `.ans` file
+  with background colors by writing raw ANSI escapes
+  (`Scripts/UI/SplashScreen.cs`). Scene ANSI art is built on backgrounds, and
+  everything else cannot draw them. The CP437 path is a translation (heavy box to double box,
   look-alikes for the rest), not an encoding of what the artist drew.
 - Terminal detection is a substring guess on TTYPE (`SYNCTERM`, `NETRUNNER`
   mean CP437; `VIP`, `DUMB`, `UNKNOWN` mean plain text). Nothing parses MTTS
