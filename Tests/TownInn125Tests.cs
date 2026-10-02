@@ -328,10 +328,7 @@ public class TownInn125Tests : IDisposable
             return s.Text;
         });
         Capture($"town-inn-rent-{lang}.txt", shown);
-        // The guard options and the hired guards (the gold summary row, inn.rent_gold_summary, is not changed here).
-        var mine = Rows(shown).Where(r => Regex.IsMatch(r, @"^  \[\d\] |^    - ")).ToList();
-        mine.Should().HaveCountGreaterThan(6);
-        EveryRowFits(mine, $"{lang} room guards");
+        EveryRowFits(shown, $"{lang} room guards (2,000,000,000 gold on hand)");
         shown.Should().Contain(L(lang, "inn.guard_name_hp", L(lang, "inn.guard_drake"), "").Split('(')[0]);
         if (lang == "hu") shown.Should().NotContain("(HP: ").And.Contain($"{L("hu", "inn.guard_hp_tag", 1).Split(' ')[0]} ");
         else Rows(shown).Should().Contain(r => Regex.IsMatch(r, @"^  \[1\] Rookie Guard {5}\s*[\d,]+g  \(HP: \d+\)$"));
@@ -370,6 +367,27 @@ public class TownInn125Tests : IDisposable
     {
         foreach (var row in UsurperRemake.UI.UIHelper.WrapAfterPrefix(prefix, text, MaxWidth))
             (prefix.Length + row.Length).Should().BeLessOrEqualTo(MaxWidth);
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public void RoomGoldSummary_Fits_AtTheGoldCap(string lang)
+    {
+        long cap = (long)typeof(BankLocation).GetField("MaxGold", FS)!.GetValue(null)!;
+        InLang(lang, () =>
+        {
+            string text = Loc.Get("inn.rent_gold_summary", $"{cap:N0}", $"{cap:N0}", $"{cap:N0}", $"{cap:N0}", $"{cap * 2:N0}");
+            var rows = InnLocation.RentSummaryRows(text);
+            rows.Should().OnlyContain(r => r.Length <= MaxWidth, $"the {lang} room gold summary fits at the gold cap");
+            string.Join("  |  ", rows.Skip(1).Select(r => r.Trim())).Should().Be(text.Trim(), "only line breaks are added");
+            return 0;
+        });
+        InLang("en", () =>
+        {
+            InnLocation.RentSummaryRows(Loc.Get("inn.rent_gold_summary", "100", "0", "500", "0", "500"))
+                .Should().Equal("", "  Your gold: 100 (bank: 0)  |  Room: 500  |  Guards: 0  |  Total: 500");
+            return 0;
+        });
     }
 
     [Fact]

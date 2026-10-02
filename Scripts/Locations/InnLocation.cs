@@ -5376,6 +5376,29 @@ public class InnLocation : BaseLocation
 
     #region Rent a Room (Online Mode)
 
+    /// <summary>
+    /// 1.2.5: the room's gold summary ("Your gold: ... | Room: ... | Total: ...") as rows of at most 79 columns. It
+    /// stays one row when it fits; otherwise a new row, indented as the first, starts at a "  |  " separator.
+    /// </summary>
+    internal static List<string> RentSummaryRows(string text)
+    {
+        var rows = new List<string>();
+        foreach (var line in text.Replace("\r", "").Split('\n'))
+        {
+            if (line.Length <= 79) { rows.Add(line); continue; }
+            string indent = new string(' ', line.Length - line.TrimStart().Length);
+            string current = "";
+            foreach (var part in line.Trim().Split("  |  "))
+            {
+                if (current.Length == 0) current = indent + part;
+                else if (current.Length + 5 + part.Length <= 79) current += "  |  " + part;
+                else { rows.Add(current); current = indent + part; }
+            }
+            rows.Add(current);
+        }
+        return rows;
+    }
+
     /// <summary>1.2.5: a sleeper list entry, wrapped at 79 columns with later rows under the text.</summary>
     internal static List<string> SleeperRows(int number, string text)
     {
@@ -5530,7 +5553,8 @@ public class InnLocation : BaseLocation
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("inn.rent_done_hiring"));
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("inn.rent_gold_summary", currentPlayer.Gold.ToString("N0"), currentPlayer.BankGold.ToString("N0"), roomCost.ToString("N0"), totalGuardCost.ToString("N0"), (roomCost + totalGuardCost).ToString("N0")));
+            foreach (var row in RentSummaryRows(Loc.Get("inn.rent_gold_summary", currentPlayer.Gold.ToString("N0"), currentPlayer.BankGold.ToString("N0"), roomCost.ToString("N0"), totalGuardCost.ToString("N0"), (roomCost + totalGuardCost).ToString("N0"))))
+                terminal.WriteLine(row);
 
             var input = await terminal.GetInput("\n  " + Loc.Get("ui.choice"));
             if (string.IsNullOrWhiteSpace(input) || input.Trim().ToUpper() == "D")
