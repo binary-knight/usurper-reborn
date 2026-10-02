@@ -4097,6 +4097,52 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// 1.2.4: a player-god renounced. In one transaction every saved mortal character whose
+        /// worshippedGod is divineName has it blanked (the same field SetPlayerWorshippedGod writes;
+        /// the load rebinds Favor to no god). Returns each one's save key and its language ("en" when
+        /// unset), so each can be told once. Empty with no name or on a database error.
+        /// </summary>
+        public async Task<List<(string Key, string Language)>> ClearPlayerFollowersOf(string divineName)
+        {
+            var cleared = new List<(string Key, string Language)>();
+            if (string.IsNullOrWhiteSpace(divineName)) return cleared;
+            try
+            {
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);
+                const string Match = @"json_extract(player_data, '$.player.worshippedGod') = @god
+                        AND (json_extract(player_data, '$.player.isImmortal') IS NULL OR json_extract(player_data, '$.player.isImmortal') = 0)
+                        AND player_data != '{}' AND LENGTH(player_data) > 2";
+                using (var find = connection.CreateCommand())
+                {
+                    find.Transaction = tx;
+                    find.CommandText = $"SELECT username, json_extract(player_data, '$.player.language') FROM players WHERE {Match};";
+                    find.Parameters.AddWithValue("@god", divineName);
+                    using var reader = await Task.Run(() => find.ExecuteReader());
+                    while (reader.Read())
+                    {
+                        string lang = ReadJsonText(reader, 1);
+                        cleared.Add((reader.GetString(0), string.IsNullOrEmpty(lang) ? "en" : lang));
+                    }
+                }
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.Transaction = tx;
+                    cmd.CommandText = $"UPDATE players SET player_data = json_set(player_data, '$.player.worshippedGod', '') WHERE {Match};";
+                    cmd.Parameters.AddWithValue("@god", divineName);
+                    await Task.Run(() => cmd.ExecuteNonQuery());
+                }
+                tx.Commit();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Failed to clear the followers of {divineName}: {ex.Message}");
+                cleared.Clear();
+            }
+            return cleared;
+        }
+
         public async Task AddGodExperience(string divineName, long amount)
         {
             try

@@ -1391,6 +1391,17 @@ namespace UsurperRemake.Systems
 
             if (!await terminal.AskYesNoAsync(Loc.Get("ending.immortal_ascend_prompt"))) return false;
 
+            // Block alt characters from ascending. 1.2.4: checked first, so a refused alt keeps its
+            // throne, team and guild (it ran after the abdication, team quit and guild removal).
+            if (SqlSaveBackend.IsAltCharacter(UsurperRemake.BBS.DoorMode.GetPlayerName() ?? ""))
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_blocked")}", "red");
+                terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_main_only")}", "gray");
+                await Pacing.Wait(2000);
+                return false;
+            }
+
             // Choose divine name
             terminal.WriteLine("");
             terminal.WriteLine($"  {Loc.Get("ending.immortal_choose_name")}", "bright_cyan");
@@ -1464,16 +1475,6 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                 }
-            }
-
-            // Block alt characters from ascending
-            if (SqlSaveBackend.IsAltCharacter(UsurperRemake.BBS.DoorMode.GetPlayerName() ?? ""))
-            {
-                terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_blocked")}", "red");
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_main_only")}", "gray");
-                await Pacing.Wait(2000);
-                return false;
             }
 
             // Mark the alt slot as earned (persists even if they renounce)

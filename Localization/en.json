@@ -5410,6 +5410,8 @@
   "pantheon.smite_news": "[DIVINE] {0} struck {1} with divine lightning!",
   "pantheon.smite_received": "The god {0} has struck you with divine lightning! You take {1} damage!",
   "pantheon.smite_received_offline": "The god {0} struck you with divine lightning while you were away!",
+  "pantheon.follower_god_renounced": "{0} has renounced godhood.",
+  "pantheon.follower_now_godless": "You no longer follow any god.",
   "pantheon.menu_chastise": "Chastise Follower",
   "pantheon.menu_chastise_desc": "Take Favor from one of your own followers",
   "pantheon.no_followers_to_chastise": "  No follower of yours can be chastised today.",

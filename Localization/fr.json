@@ -5219,6 +5219,8 @@
   "pantheon.smite_news": "[DIVIN] {0} a frappé {1} de la foudre divine !",
   "pantheon.smite_received": "Le dieu {0} vous a frappé de la foudre divine ! Vous subissez {1} dégâts !",
   "pantheon.smite_received_offline": "Le dieu {0} vous a frappé de la foudre divine pendant votre absence !",
+  "pantheon.follower_god_renounced": "{0} a renoncé à la divinité.",
+  "pantheon.follower_now_godless": "Vous ne suivez plus aucun dieu.",
   "pantheon.menu_chastise": "Châtier un Fidèle",
   "pantheon.menu_chastise_desc": "Retirer de la Faveur à l'un de vos fidèles",
   "pantheon.no_followers_to_chastise": "  Aucun de vos fidèles ne peut être châtié aujourd'hui.",
