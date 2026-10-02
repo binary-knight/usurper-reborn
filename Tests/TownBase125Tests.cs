@@ -785,7 +785,7 @@ public class TownBase125Tests : IDisposable
             foreach (var key in used)
             {
                 string v = langs[lang].GetProperty(key).GetString()!;
-                v.Should().NotContain("—").And.NotContain("–");
+                v.Should().NotContain("\u2014").And.NotContain("\u2013");
             }
     }
 }
