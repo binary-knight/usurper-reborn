@@ -2009,6 +2009,9 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                // 1.2.5: System mail older than the cap goes (it never fails the reset; it logs and returns)
+                sqlBackend.PruneOldSystemMail(GameConfig.SystemMailKeepDays);
+
                 // v1.1.13: the day's treasury, reign, prisoners and guards, as one guarded court change
                 if (CastleLocation.GetCurrentKing()?.IsActive == true)
                     ProcessCourtDailyAsync().GetAwaiter().GetResult();

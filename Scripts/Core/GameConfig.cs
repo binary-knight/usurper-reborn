@@ -1237,6 +1237,10 @@ public static partial class GameConfig
     };
     public const float GroupXPPenaltyMinimum = 0.10f;           // 31+ level gap: 10% XP (floor)
 
+    // 1.2.5: online mail from the "System" sender older than this is deleted at startup and at the world-sim
+    // daily reset; mail between players is never deleted by it
+    public const int SystemMailKeepDays = 30;
+
     // ============================================================
     // World Boss System (v0.48.2; redone in v1.1.4, DOCS/WORLD_BOSS_PLAN.md)
     // ============================================================
