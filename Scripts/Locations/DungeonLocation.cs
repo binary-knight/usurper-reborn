@@ -720,6 +720,7 @@ public class DungeonLocation : BaseLocation
         guardian.MonsterColor = "bright_red";
         guardian.CanSpeak = true;
         guardian.Phrase = Loc.Get("dungeon.guardian_phrase");
+        guardian.PhraseInLanguage = () => Loc.Get("dungeon.guardian_phrase");
 
         // Run full combat using the same pattern as room combat
         var combatEngine = new CombatEngine(terminal);
@@ -5664,6 +5665,8 @@ public class DungeonLocation : BaseLocation
                 var boss = MonsterGenerator.GenerateMonster(effectiveMonsterLevel, isBoss: true, random: dungeonRandom);
                 boss.Name = GetBossName(currentFloor.Theme);
                 boss.Phrase = GetBossPhrase(currentFloor.Theme);
+                var bossTheme = currentFloor.Theme;
+                boss.PhraseInLanguage = () => GetBossPhrase(bossTheme);
                 if (monsters.Count == 0)
                     monsters.Add(boss);
                 else

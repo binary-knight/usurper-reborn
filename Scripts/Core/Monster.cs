@@ -15,6 +15,12 @@ public class Monster
     public bool GrabWeap { get; set; }                  // can weapon be taken?
     public bool GrabArm { get; set; }                   // can armor be taken?
     public string Phrase { get; set; } = "";            // intro phrase from monster
+    /// <summary>
+    /// v1.2.4: when the phrase is localized text, this builds it again in the current language, so a
+    /// group member reads the fight's opening line in their own language. Not saved.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal Func<string>? PhraseInLanguage;
     public int MagicRes { get; set; }                   // magic resistance
     public long Strength { get; set; }                  // strength
     public int Defence { get; set; }                    // defence

@@ -32162,12 +32162,13 @@ public partial class CombatEngine
             if (monsters.Count == 1)
             {
                 var m = monsters[0];
-                if (!string.IsNullOrEmpty(m.Phrase))
+                // v1.2.4: a localized phrase is built again in the reader's language, and wraps at 79
+                string phrase = m.PhraseInLanguage?.Invoke() ?? m.Phrase;
+                if (!string.IsNullOrEmpty(phrase))
                 {
-                    if (m.CanSpeak)
-                        sb.AppendLine($"\u001b[33m  {Loc.Get("combat.monster_says", m.TheNameOrName, m.Phrase)}\u001b[0m");
-                    else
-                        sb.AppendLine($"\u001b[33m  {m.TheNameOrName} {m.Phrase}\u001b[0m");
+                    string said = m.CanSpeak ? Loc.Get("combat.monster_says", m.TheNameOrName, phrase) : $"{m.TheNameOrName} {phrase}";
+                    foreach (var row in UIHelper.WordWrap(said, 77))
+                        sb.AppendLine($"\u001b[33m  {row}\u001b[0m");
                 }
                 sb.AppendLine($"\u001b[37m  {Loc.Get("combat.facing", m.GetDisplayInfo())}\u001b[0m");
             }
