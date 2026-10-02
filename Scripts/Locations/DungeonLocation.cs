@@ -3088,19 +3088,24 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
     }
 
-    private string GetEventHint(DungeonEventType eventType)
+    private string GetEventHint(DungeonEventType eventType) => Loc.Get(EventHintKey(eventType));
+
+    /// <summary>1.2.4: the event hint in `lang`, for a follower's room view.</summary>
+    private static string GetEventHintIn(DungeonEventType eventType, string lang) => Loc.GetIn(lang, EventHintKey(eventType));
+
+    private static string EventHintKey(DungeonEventType eventType)
     {
         return eventType switch
         {
-            DungeonEventType.TreasureChest => Loc.Get("dungeon.event_hint_chest"),
-            DungeonEventType.Merchant => Loc.Get("dungeon.event_hint_merchant"),
-            DungeonEventType.Shrine => Loc.Get("dungeon.event_hint_shrine"),
-            DungeonEventType.NPCEncounter => Loc.Get("dungeon.event_hint_npc"),
-            DungeonEventType.Puzzle => Loc.Get("dungeon.event_hint_puzzle"),
-            DungeonEventType.RestSpot => Loc.Get("dungeon.event_hint_rest"),
-            DungeonEventType.MysteryEvent => Loc.Get("dungeon.event_hint_mystery"),
-            DungeonEventType.Settlement => Loc.Get("dungeon.event_hint_settlement"),
-            _ => Loc.Get("dungeon.event_hint_default")
+            DungeonEventType.TreasureChest => "dungeon.event_hint_chest",
+            DungeonEventType.Merchant => "dungeon.event_hint_merchant",
+            DungeonEventType.Shrine => "dungeon.event_hint_shrine",
+            DungeonEventType.NPCEncounter => "dungeon.event_hint_npc",
+            DungeonEventType.Puzzle => "dungeon.event_hint_puzzle",
+            DungeonEventType.RestSpot => "dungeon.event_hint_rest",
+            DungeonEventType.MysteryEvent => "dungeon.event_hint_mystery",
+            DungeonEventType.Settlement => "dungeon.event_hint_settlement",
+            _ => "dungeon.event_hint_default"
         };
     }
 
@@ -3605,17 +3610,30 @@ public class DungeonLocation : BaseLocation
 
     internal static string GetThemeShortName(DungeonTheme theme)
     {
+        string? key = ThemeShortKey(theme);
+        return key == null ? theme.ToString() : Loc.Get(key);
+    }
+
+    /// <summary>1.2.4: the theme's short name in `lang`, for a follower's room view and broadcasts.</summary>
+    internal static string GetThemeShortNameIn(DungeonTheme theme, string lang)
+    {
+        string? key = ThemeShortKey(theme);
+        return key == null ? theme.ToString() : Loc.GetIn(lang, key);
+    }
+
+    private static string? ThemeShortKey(DungeonTheme theme)
+    {
         return theme switch
         {
-            DungeonTheme.Catacombs => Loc.Get("dungeon.theme_short.catacombs"),
-            DungeonTheme.Sewers => Loc.Get("dungeon.theme_short.sewers"),
-            DungeonTheme.Caverns => Loc.Get("dungeon.theme_short.caverns"),
-            DungeonTheme.AncientRuins => Loc.Get("dungeon.theme_short.ancient_ruins"),
-            DungeonTheme.DemonLair => Loc.Get("dungeon.theme_short.demon_lair"),
-            DungeonTheme.FrozenDepths => Loc.Get("dungeon.theme_short.frozen_depths"),
-            DungeonTheme.VolcanicPit => Loc.Get("dungeon.theme_short.volcanic_pit"),
-            DungeonTheme.AbyssalVoid => Loc.Get("dungeon.theme_short.abyssal_void"),
-            _ => theme.ToString()
+            DungeonTheme.Catacombs => "dungeon.theme_short.catacombs",
+            DungeonTheme.Sewers => "dungeon.theme_short.sewers",
+            DungeonTheme.Caverns => "dungeon.theme_short.caverns",
+            DungeonTheme.AncientRuins => "dungeon.theme_short.ancient_ruins",
+            DungeonTheme.DemonLair => "dungeon.theme_short.demon_lair",
+            DungeonTheme.FrozenDepths => "dungeon.theme_short.frozen_depths",
+            DungeonTheme.VolcanicPit => "dungeon.theme_short.volcanic_pit",
+            DungeonTheme.AbyssalVoid => "dungeon.theme_short.abyssal_void",
+            _ => null
         };
     }
 
@@ -5775,7 +5793,7 @@ public class DungeonLocation : BaseLocation
                 long bossGold = currentDungeonLevel * 500 + dungeonRandom.Next(1000);
                 long bossExp = currentDungeonLevel * 300;
 
-                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "Boss Defeated", fromCombat: true);
+                var (bossXPShare, bossGoldShare) = AwardDungeonReward(bossExp, bossGold, "dungeon.reward_src_boss_defeated", fromCombat: true);
 
                 if (teammates.Count > 0)
                 {
@@ -6066,7 +6084,7 @@ public class DungeonLocation : BaseLocation
         long goldFound = currentDungeonLevel * 100 + dungeonRandom.Next(currentDungeonLevel * 200);
         long expFound = currentDungeonLevel * 50 + dungeonRandom.Next(100);
 
-        var (actualXP, actualGold) = AwardDungeonReward(expFound, goldFound, "Treasure");
+        var (actualXP, actualGold) = AwardDungeonReward(expFound, goldFound, "dungeon.bbs_treasure");
 
         if (teammates.Count > 0)
         {
@@ -6291,6 +6309,15 @@ public class DungeonLocation : BaseLocation
         return (string.IsNullOrEmpty(v) || v == key) ? f.Name : v;
     }
 
+    /// <summary>1.2.4: the feature's name in `lang` (a discovery's key), else its generated name.</summary>
+    private static string ResolveFeatureNameIn(RoomFeature f, string lang)
+    {
+        if (string.IsNullOrEmpty(f.DiscoveryId)) return f.Name;
+        string key = $"discovery.{f.DiscoveryId}.name";
+        string v = Loc.GetIn(lang, key);
+        return (string.IsNullOrEmpty(v) || v == key) ? f.Name : v;
+    }
+
     private string ResolveFeatureDesc(RoomFeature f)
     {
         if (string.IsNullOrEmpty(f.DiscoveryId)) return f.Description;
@@ -6458,7 +6485,7 @@ public class DungeonLocation : BaseLocation
                     if (parts.Count > 0)
                     {
                         session?.EnqueueMessage(
-                            $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", feature.Name)} ═══\u001b[0m\n" +
+                            $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", ResolveFeatureNameIn(feature, shareLang))} ═══\u001b[0m\n" +
                             $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
                     }
                 }
@@ -6470,29 +6497,32 @@ public class DungeonLocation : BaseLocation
             }
 
             // Broadcast interaction narrative with outcome details
-            var featureSb = new System.Text.StringBuilder();
-            featureSb.AppendLine($"\u001b[96m  {player?.Name2} examines {feature.Name}...\u001b[0m");
-            if (outcome.LoreDiscovered)
-                featureSb.AppendLine("\u001b[35m  Ancient lore discovered!\u001b[0m");
-            if (outcome.DamageTaken > 0)
-                featureSb.AppendLine($"\u001b[31m  It was dangerous! {player?.Name2} took {outcome.DamageTaken} damage.\u001b[0m");
-            if (outcome.OceanInsightGained)
-                featureSb.AppendLine("\u001b[36m  A moment of spiritual insight...\u001b[0m");
-            BroadcastDungeonEvent(featureSb.ToString());
+            string examiner = player?.Name2 ?? "";
+            BroadcastDungeonEvent(lang => FeatureExamineBroadcast(lang, examiner, feature, outcome.LoreDiscovered, outcome.DamageTaken, outcome.OceanInsightGained));
         }
         else if (teammates.Count > 0)
         {
             // No rewards, but still broadcast what happened
-            var featureSb = new System.Text.StringBuilder();
-            featureSb.AppendLine($"\u001b[96m  {player?.Name2} examines {feature.Name}...\u001b[0m");
-            if (outcome.LoreDiscovered)
-                featureSb.AppendLine("\u001b[35m  Ancient lore discovered!\u001b[0m");
-            if (outcome.DamageTaken > 0)
-                featureSb.AppendLine($"\u001b[31m  It was dangerous! {player?.Name2} took {outcome.DamageTaken} damage.\u001b[0m");
-            if (outcome.OceanInsightGained)
-                featureSb.AppendLine("\u001b[36m  A moment of spiritual insight...\u001b[0m");
-            BroadcastDungeonEvent(featureSb.ToString());
+            string examiner = player?.Name2 ?? "";
+            BroadcastDungeonEvent(lang => FeatureExamineBroadcast(lang, examiner, feature, outcome.LoreDiscovered, outcome.DamageTaken, outcome.OceanInsightGained));
         }
+    }
+
+    /// <summary>
+    /// 1.2.4: what the group sees when the leader examines a feature, in the follower's language.
+    /// </summary>
+    internal static string FeatureExamineBroadcast(string lang, string examiner, RoomFeature feature,
+        bool lore, long damage, bool insight)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.AppendLine($"\u001b[96m  {Loc.GetIn(lang, "dungeon.examine_bc_examines", examiner, ResolveFeatureNameIn(feature, lang))}\u001b[0m");
+        if (lore)
+            sb.AppendLine($"\u001b[35m  {Loc.GetIn(lang, "dungeon.examine_bc_lore")}\u001b[0m");
+        if (damage > 0)
+            sb.AppendLine($"\u001b[31m  {Loc.GetIn(lang, "dungeon.examine_bc_damage", examiner, damage)}\u001b[0m");
+        if (insight)
+            sb.AppendLine($"\u001b[36m  {Loc.GetIn(lang, "dungeon.examine_bc_insight")}\u001b[0m");
+        return sb.ToString();
     }
 
     // Floors that require full clear before leaving
@@ -7004,7 +7034,7 @@ public class DungeonLocation : BaseLocation
         int goldBonus = (int)(baseGold * multiplier);
 
         // Award the bonus
-        var (clearXP, clearGold) = AwardDungeonReward(xpBonus, goldBonus, "Floor Cleared");
+        var (clearXP, clearGold) = AwardDungeonReward(xpBonus, goldBonus, "dungeon.reward_src_floor_cleared");
 
         // Display the bonus
         terminal.WriteLine("");
@@ -7176,7 +7206,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("dungeon.arrive_at_level", currentDungeonLevel));
         terminal.WriteLine(Loc.Get("dungeon.theme_display", currentFloor.Theme));
-        BroadcastDungeonEvent(lang => $"\u001b[34m  {Loc.GetIn(lang, "dungeon.bc_descends", currentDungeonLevel, currentFloor.Theme)}\u001b[0m");
+        BroadcastDungeonEvent(lang => $"\u001b[34m  {Loc.GetIn(lang, "dungeon.bc_descends", currentDungeonLevel, GetThemeShortNameIn(currentFloor.Theme, lang))}\u001b[0m");
 
         // Keep group state in sync
         var descGroup = GroupSystem.Instance?.GetGroupFor(SessionContext.Current?.Username ?? "");
@@ -8040,7 +8070,7 @@ public class DungeonLocation : BaseLocation
                 var undead = Monster.CreateMonster(
                     currentDungeonLevel, $"Undead {GameConfig.CapitalizeFirst(adventurerClass)}",
                     currentDungeonLevel * 12, currentDungeonLevel * 3, 0,
-                    "You will join me...", false, false, "Rusty Blade", "Tattered Armor",
+                    Loc.Get("dungeon.cry.join_me"), false, false, Loc.Get("dungeon.gear.rusty_blade"), Loc.Get("dungeon.gear.tattered_armor"),
                     false, false, currentDungeonLevel * 4, currentDungeonLevel * 2, currentDungeonLevel * 2
                 );
                 undead.Level = currentDungeonLevel;
@@ -8200,7 +8230,7 @@ public class DungeonLocation : BaseLocation
                 var guardian = Monster.CreateMonster(
                     currentDungeonLevel + 5, "Portal Guardian",
                     currentDungeonLevel * 18, currentDungeonLevel * 5, 0,
-                    "You should not be here!", false, false, "Void Blade", "Dimensional Armor",
+                    Loc.Get("dungeon.cry.not_be_here"), false, false, Loc.Get("dungeon.gear.void_blade"), Loc.Get("dungeon.gear.dimensional_armor"),
                     true, false, currentDungeonLevel * 6, currentDungeonLevel * 4, currentDungeonLevel * 3
                 );
                 guardian.Level = currentDungeonLevel + 5;
@@ -8331,7 +8361,7 @@ public class DungeonLocation : BaseLocation
             var duelistMonster = Monster.CreateMonster(
                 duelistLevel, duelist.Name,
                 (long)(currentPlayer.MaxHP * strengthMod), (long)(currentPlayer.Strength * strengthMod), 0,
-                duelist.GetBattleCry(), false, false, ShownDuelistWeapon(duelist.Weapon), "Duelist's Garb",
+                duelist.GetBattleCry(), false, false, ShownDuelistWeapon(duelist.Weapon), Loc.Get("dungeon.gear.duelist_garb"),
                 false, false, (long)(currentPlayer.Dexterity * strengthMod), (long)(currentPlayer.Wisdom * 0.8), 0
             );
             duelistMonster.Level = duelistLevel;
@@ -8457,9 +8487,9 @@ public class DungeonLocation : BaseLocation
             // Enraged duelist is much stronger
             int rageLevel = currentPlayer.Level + 3 + (duelist.TimesEncountered / 2);
             var angryDuelist = Monster.CreateMonster(
-                rageLevel, duelist.Name + " (Enraged)",
+                rageLevel, Loc.Get("dungeon.duelist_enraged_name", duelist.Name),
                 (long)(currentPlayer.MaxHP * 1.3), (long)(currentPlayer.Strength * 1.3), 0,
-                "DIE!", false, false, ShownDuelistWeapon(duelist.Weapon), "Duelist's Garb",
+                Loc.Get("dungeon.cry.die_enraged"), false, false, ShownDuelistWeapon(duelist.Weapon), Loc.Get("dungeon.gear.duelist_garb"),
                 false, false, currentPlayer.Dexterity, currentPlayer.Wisdom, 0
             );
             angryDuelist.Level = rageLevel;
@@ -8527,10 +8557,10 @@ public class DungeonLocation : BaseLocation
 
         public string GetBattleCry()
         {
-            if (WasInsulted) return "You will pay for your insults!";
-            if (PlayerWins > PlayerLosses + 2) return "This time will be different!";
-            if (PlayerLosses > PlayerWins + 2) return "You cannot hope to defeat me!";
-            return "An honorable fight!";
+            if (WasInsulted) return Loc.Get("dungeon.cry.duelist_insulted");
+            if (PlayerWins > PlayerLosses + 2) return Loc.Get("dungeon.cry.duelist_different");
+            if (PlayerLosses > PlayerWins + 2) return Loc.Get("dungeon.cry.duelist_cannot_defeat");
+            return Loc.Get("dungeon.cry.duelist_honorable");
         }
     }
 
@@ -8680,7 +8710,7 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("green");
                 terminal.WriteLine(Loc.Get("dungeon.chest_opens_treasure"));
 
-                var (chestXP, chestGold) = AwardDungeonReward(expGained, goldFound, "Treasure Chest");
+                var (chestXP, chestGold) = AwardDungeonReward(expGained, goldFound, "dungeon.reward_src_treasure_chest");
 
                 if (teammates.Count > 0)
                 {
@@ -8776,7 +8806,7 @@ public class DungeonLocation : BaseLocation
                 var mimic = Monster.CreateMonster(
                     mimicLevel, "Mimic",
                     mimicHP, mimicStr, mimicDef,
-                    "Fooled you!", false, false, "Teeth", "Wooden Shell",
+                    Loc.Get("dungeon.cry.fooled_you"), false, false, Loc.Get("dungeon.gear.teeth"), Loc.Get("dungeon.gear.wooden_shell"),
                     false, false, mimicPunch, mimicArmPow, mimicWeapPow
                 );
                 mimic.IsMiniBoss = true;  // Mimics are elite encounters, not floor bosses
@@ -8870,7 +8900,7 @@ public class DungeonLocation : BaseLocation
                     currentDungeonLevel, name,
                     currentDungeonLevel * (i == 0 ? 8 : 4),
                     currentDungeonLevel * 2, 0,
-                    "Attack!", false, false, "Weapon", "Armor",
+                    Loc.Get("dungeon.phrase_default_2"), false, false, Loc.Get("item.slot.weapon"), Loc.Get("item.slot.armor"),
                     false, false, currentDungeonLevel * 2, currentDungeonLevel, currentDungeonLevel * 2
                 );
                 monster.Level = currentDungeonLevel;
@@ -8910,7 +8940,7 @@ public class DungeonLocation : BaseLocation
                 var monster = Monster.CreateMonster(
                     currentDungeonLevel, $"{groupName.Substring(0, 1).ToUpper()}{groupName.Substring(1)} Leader",
                     currentDungeonLevel * 10, currentDungeonLevel * 3, 0,
-                    "No gold means death!", false, false, "Weapon", "Armor",
+                    Loc.Get("dungeon.cry.no_gold_death"), false, false, Loc.Get("item.slot.weapon"), Loc.Get("item.slot.armor"),
                     false, false, currentDungeonLevel * 3, currentDungeonLevel * 2, currentDungeonLevel * 2
                 );
                 var combatEngine = new CombatEngine(terminal);
@@ -8978,7 +9008,7 @@ public class DungeonLocation : BaseLocation
                 var monster = Monster.CreateMonster(
                     currentDungeonLevel, name,
                     currentDungeonLevel * (i == 0 ? 6 : 3), currentDungeonLevel * 2, 0,
-                    "Mind your own business!", false, false, "Knife", "Rags",
+                    Loc.Get("dungeon.cry.mind_business"), false, false, Loc.Get("dungeon.gear.knife"), Loc.Get("dungeon.gear.rags"),
                     false, false, currentDungeonLevel * 2, currentDungeonLevel, currentDungeonLevel
                 );
                 monster.Level = currentDungeonLevel;
@@ -9171,7 +9201,7 @@ public class DungeonLocation : BaseLocation
                     var expBonus = 50 + currentDungeonLevel * 15;
                     currentPlayer.Experience += expBonus;
                     terminal.WriteLine(Loc.Get("dungeon.shrine_wisdom", expBonus), "yellow");
-                    ShareEventRewardsWithGroup(currentPlayer, 0, expBonus, "Mysterious Shrine");
+                    ShareEventRewardsWithGroup(currentPlayer, 0, expBonus, "dungeon.reward_src_mysterious_shrine");
                     BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_shrine_exp", currentPlayer.Name2, expBonus)}\u001b[0m");
                     break;
                 case 3:
@@ -9208,7 +9238,7 @@ public class DungeonLocation : BaseLocation
 
             currentPlayer.Gold += stolen;
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, (int)darkGain, isGood: false, "dungeon.shrine_desecrate"); // v0.57.12: paired movement
-            ShareEventRewardsWithGroup(currentPlayer, stolen, 0, "Desecrated Shrine");
+            ShareEventRewardsWithGroup(currentPlayer, stolen, 0, "dungeon.reward_src_desecrated_shrine");
 
             // Chance of angering spirits
             if (dungeonRandom.NextDouble() < 0.3)
@@ -9220,7 +9250,7 @@ public class DungeonLocation : BaseLocation
                 var spirit = Monster.CreateMonster(
                     currentDungeonLevel + 5, "Vengeful Spirit",
                     currentDungeonLevel * 12, currentDungeonLevel * 4, 0,
-                    "You will pay for your sacrilege!", false, false, "Spectral Claws", "Ethereal Form",
+                    Loc.Get("dungeon.cry.sacrilege"), false, false, Loc.Get("dungeon.gear.spectral_claws"), Loc.Get("dungeon.gear.ethereal_form"),
                     false, false, currentDungeonLevel * 4, currentDungeonLevel * 3, currentDungeonLevel * 3
                 );
                 spirit.IsMiniBoss = true;  // Vengeful spirits are elite encounters, not floor bosses
@@ -10133,21 +10163,7 @@ public class DungeonLocation : BaseLocation
 
     private static string FormatItemBonuses(Item item)
     {
-        var bonuses = new List<string>();
-        if (item.Strength != 0) bonuses.Add($"STR {item.Strength:+#;-#;0}");
-        if (item.Defence != 0) bonuses.Add($"DEF {item.Defence:+#;-#;0}");
-        if (item.Dexterity != 0) bonuses.Add($"DEX {item.Dexterity:+#;-#;0}");
-        if (item.Wisdom != 0) bonuses.Add($"WIS {item.Wisdom:+#;-#;0}");
-        if (item.Agility != 0) bonuses.Add($"AGI {item.Agility:+#;-#;0}");
-        if (item.Charisma != 0) bonuses.Add($"CHA {item.Charisma:+#;-#;0}");
-        // CON and INT are stored in LootEffects, not as direct Item properties
-        int conFromEffects = item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Value) ?? 0;
-        int intFromEffects = item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Value) ?? 0;
-        if (conFromEffects != 0) bonuses.Add($"CON {conFromEffects:+#;-#;0}");
-        if (intFromEffects != 0) bonuses.Add($"INT {intFromEffects:+#;-#;0}");
-        if (item.HP != 0) bonuses.Add($"HP {item.HP:+#;-#;0}");
-        if (item.Mana != 0) bonuses.Add($"Mana {item.Mana:+#;-#;0}");
-        if (item.Stamina != 0) bonuses.Add($"STA {item.Stamina:+#;-#;0}");
+        var bonuses = StatBonusLabels(item);
         if (bonuses.Count > 0) return ", " + string.Join(", ", bonuses);
         return "";
     }
@@ -10155,23 +10171,30 @@ public class DungeonLocation : BaseLocation
     private static string FormatAccessoryStats(Item item)
     {
         var stats = new List<string>();
-        if (item.Attack > 0) stats.Add($"Atk +{item.Attack}");
-        if (item.Armor > 0) stats.Add($"AC +{item.Armor}");
-        if (item.Strength != 0) stats.Add($"STR {item.Strength:+#;-#;0}");
-        if (item.Defence != 0) stats.Add($"DEF {item.Defence:+#;-#;0}");
-        if (item.Dexterity != 0) stats.Add($"DEX {item.Dexterity:+#;-#;0}");
-        if (item.Wisdom != 0) stats.Add($"WIS {item.Wisdom:+#;-#;0}");
-        if (item.Agility != 0) stats.Add($"AGI {item.Agility:+#;-#;0}");
-        if (item.Charisma != 0) stats.Add($"CHA {item.Charisma:+#;-#;0}");
+        if (item.Attack > 0) stats.Add(Loc.Get("dungeon.merchant_stat_atk", item.Attack));
+        if (item.Armor > 0) stats.Add(Loc.Get("dungeon.merchant_stat_ac", item.Armor));
+        stats.AddRange(StatBonusLabels(item));
+        return stats.Count > 0 ? string.Join(", ", stats) : Loc.Get("dungeon.merchant_accessory");
+    }
+
+    /// <summary>1.2.4: an item's stat bonuses ("STR +3"), labelled in the player's language.</summary>
+    private static List<string> StatBonusLabels(Item item)
+    {
+        var bonuses = new List<string>();
+        void Add(string key, long value) { if (value != 0) bonuses.Add($"{Loc.Get(key)} {value:+#;-#;0}"); }
+        Add("stats.str", item.Strength);
+        Add("stats.def", item.Defence);
+        Add("stats.dex", item.Dexterity);
+        Add("stats.wis", item.Wisdom);
+        Add("stats.agi", item.Agility);
+        Add("stats.cha", item.Charisma);
         // CON and INT are stored in LootEffects, not as direct Item properties
-        int conFromEffects = item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Value) ?? 0;
-        int intFromEffects = item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Value) ?? 0;
-        if (conFromEffects != 0) stats.Add($"CON {conFromEffects:+#;-#;0}");
-        if (intFromEffects != 0) stats.Add($"INT {intFromEffects:+#;-#;0}");
-        if (item.HP != 0) stats.Add($"HP {item.HP:+#;-#;0}");
-        if (item.Mana != 0) stats.Add($"Mana {item.Mana:+#;-#;0}");
-        if (item.Stamina != 0) stats.Add($"STA {item.Stamina:+#;-#;0}");
-        return stats.Count > 0 ? string.Join(", ", stats) : "Accessory";
+        Add("stats.con", item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Constitution).Sum(e => e.Value) ?? 0);
+        Add("stats.int", item.LootEffects?.Where(e => e.EffectType == (int)LootGenerator.SpecialEffect.Intelligence).Sum(e => e.Value) ?? 0);
+        Add("ui.stat_hp", item.HP);
+        Add("ui.stat_mana", item.Mana);
+        Add("stats.sta", item.Stamina);
+        return bonuses;
     }
 
     private async Task PurchaseRareItem(Character player, MerchantRareItem item)
@@ -10200,7 +10223,9 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             terminal.WriteLine($"  {item.Name}");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {item.Description}");
+            // 1.2.4: a long stat list wraps at 79 (a row that fits is unchanged).
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(item.Description, UsurperRemake.UI.UIHelper.WrapWidth - 2))
+                terminal.WriteLine($"  {line}");
 
             // v1.1.12: the same per-slot comparison as combat loot, not the raw WeapPow/ArmPow totals.
             if (item.LootItem.Type == ObjType.Weapon || item.LootItem.Armor > 0)
@@ -10232,7 +10257,8 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("dungeon.merchant_acquired", item.Name.ToUpper())}");
             WriteThickDivider(39);
             terminal.SetColor("green");
-            terminal.WriteLine($"{item.Description}");
+            foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(item.Description, UsurperRemake.UI.UIHelper.WrapWidth))
+                terminal.WriteLine(line);
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("dungeon.merchant_added_inventory"));
             terminal.WriteLine("");
@@ -11216,7 +11242,7 @@ public class DungeonLocation : BaseLocation
                 foreach (var ab in abilities)
                 {
                     row++;
-                    WriteSkillToggleRow(row, ab.Name, ab.Description, disabledAbilities.Contains(ab.Id));
+                    WriteSkillToggleRow(row, ab.DisplayName, ab.DisplayDescription, disabledAbilities.Contains(ab.Id));
                 }
             }
             if (spells.Count > 0)
@@ -11276,7 +11302,11 @@ public class DungeonLocation : BaseLocation
         terminal.Write($"{name,-22}");
         terminal.SetColor("darkgray");
         string d = desc ?? "";
-        if (!IsScreenReader && d.Length > 34) d = d.Substring(0, 34);
+        // 1.2.4: the description gets what is left of 79 columns (34 at most), so a long
+        // translated name cannot push the row past 79.
+        int used = 7 + Math.Max(6, Math.Max(on.Length, offTag.Length) + 1) + Math.Max(22, name.Length) + 1;
+        int room = Math.Max(0, Math.Min(34, UsurperRemake.UI.UIHelper.WrapWidth - used));
+        if (!IsScreenReader && d.Length > room) d = d.Substring(0, room);
         terminal.WriteLine($" {d}");
     }
 
@@ -14399,7 +14429,7 @@ public class DungeonLocation : BaseLocation
                         terminal.SetColor("magenta");
                         terminal.WriteLine("");
                         terminal.WriteLine(Loc.Get("dungeon.pixie_vanish"));
-                        ShareEventRewardsWithGroup(player, pixieGold, 0, "Pixie Gift");
+                        ShareEventRewardsWithGroup(player, pixieGold, 0, "dungeon.reward_src_pixie_gift");
                         BroadcastDungeonEvent(lang => $"\u001b[35m  {Loc.GetIn(lang, "dungeon.bc_pixie_blessing", player.Name2)}\u001b[0m");
                     }
                     else
@@ -14494,7 +14524,7 @@ public class DungeonLocation : BaseLocation
                         80 + rivalLevel * 38,              // HP: comparable to real NPCs (80 + level*38)
                         10 + rivalLevel * 3,               // STR: scales with level
                         5 + rivalLevel * 2,                // DEF: real armor value
-                        "Die!", false, false, "Steel Sword", "Chain Mail",
+                        Loc.Get("dungeon.phrase_default_3"), false, false, Loc.Get("dungeon.gear.steel_sword"), Loc.Get("item.chain_mail"),
                         false, false,
                         5 + rivalLevel * 3,                // WeapPow
                         3 + rivalLevel * 2,                // ArmPow (left)
@@ -14572,7 +14602,7 @@ public class DungeonLocation : BaseLocation
                     AlignmentSystem.Instance.ChangeAlignment(player, 25, isGood: false, "dungeon.rob_explorer"); // v0.57.12: paired movement
                     terminal.WriteLine(Loc.Get("dungeon.rob_explorer_gold", reward), "red");
                     terminal.WriteLine(Loc.Get("dungeon.darkness_increases"), "dark_magenta");
-                    ShareEventRewardsWithGroup(player, reward, 0, "Robbed Explorer");
+                    ShareEventRewardsWithGroup(player, reward, 0, "dungeon.reward_src_robbed_explorer");
                     BroadcastDungeonEvent(lang => $"\u001b[31m  {Loc.GetIn(lang, "dungeon.bc_explorer_robbed", player.Name2, reward)}\u001b[0m");
                 }
                 else if (explorerChoice.ToUpper() != "L")
@@ -14585,7 +14615,7 @@ public class DungeonLocation : BaseLocation
                     AlignmentSystem.Instance.ChangeAlignment(player, 20, isGood: true, "dungeon.guide_explorer"); // v0.57.12: paired movement
                     terminal.WriteLine(Loc.Get("dungeon.explorer_reward", reward), "yellow");
                     terminal.WriteLine(Loc.Get("dungeon.chivalry_increases"), "white");
-                    ShareEventRewardsWithGroup(player, reward, 0, "Lost Explorer Rescue");
+                    ShareEventRewardsWithGroup(player, reward, 0, "dungeon.reward_src_lost_explorer_rescue");
                     BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_explorer_rescued", player.Name2, reward)}\u001b[0m");
                 }
                 else
@@ -14669,7 +14699,7 @@ public class DungeonLocation : BaseLocation
             player.Gold += goldReward;
             player.Experience += expReward;
             terminal.WriteLine(Loc.Get("dungeon.puzzle_gold_xp", goldReward, expReward));
-            ShareEventRewardsWithGroup(player, goldReward, expReward, "Riddle Solved");
+            ShareEventRewardsWithGroup(player, goldReward, expReward, "dungeon.reward_src_riddle_solved");
 
             // Chance for Ocean Philosophy fragment on high difficulty riddles
             if (difficulty >= 3 && dungeonRandom.Next(100) < 30)
@@ -14807,7 +14837,7 @@ public class DungeonLocation : BaseLocation
             player.Gold += goldReward;
             player.Experience += expReward;
             terminal.WriteLine(Loc.Get("dungeon.puzzle_gain_gold_xp", goldReward, expReward));
-            ShareEventRewardsWithGroup(player, goldReward, expReward, "Puzzle Solved");
+            ShareEventRewardsWithGroup(player, goldReward, expReward, "dungeon.reward_src_puzzle_solved");
 
             PuzzleSystem.Instance.MarkPuzzleSolved(currentDungeonLevel, puzzle.Title);
         }
@@ -15724,7 +15754,7 @@ public class DungeonLocation : BaseLocation
                 long timeWarpXp = (long)(Math.Pow(currentDungeonLevel, 1.5) * 22);
                 player.Experience += timeWarpXp;
                 terminal.WriteLine(Loc.Get("dungeon.mystery_xp_plus", timeWarpXp));
-                ShareEventRewardsWithGroup(player, 0, timeWarpXp, "Time Warp");
+                ShareEventRewardsWithGroup(player, 0, timeWarpXp, "encounter.timewarp.title");
                 BroadcastDungeonEvent(lang => $"\u001b[32m  {Loc.GetIn(lang, "dungeon.bc_time_warp", player.Name2, timeWarpXp)}\u001b[0m");
                 break;
 
@@ -15755,7 +15785,7 @@ public class DungeonLocation : BaseLocation
                 long goldRain = currentDungeonLevel * 100 + dungeonRandom.Next(500);
                 player.Gold += goldRain;
                 terminal.WriteLine(Loc.Get("dungeon.gather_gold", goldRain));
-                ShareEventRewardsWithGroup(player, goldRain, 0, "Treasure Rain");
+                ShareEventRewardsWithGroup(player, goldRain, 0, "dungeon.reward_src_treasure_rain");
                 BroadcastDungeonEvent(lang => $"\u001b[33m  {Loc.GetIn(lang, "dungeon.bc_gold_rain", player.Name2, goldRain)}\u001b[0m");
                 break;
         }
@@ -16035,7 +16065,7 @@ public class DungeonLocation : BaseLocation
             long xpReward = (long)(Math.Pow(currentDungeonLevel, 1.5) * 15 * (1 + riddle.Difficulty * 0.5));
             player.Experience += xpReward;
             terminal.WriteLine(Loc.Get("dungeon.riddle_xp", xpReward), "cyan");
-            ShareEventRewardsWithGroup(player, 0, xpReward, "Riddle Gate Solved");
+            ShareEventRewardsWithGroup(player, 0, xpReward, "dungeon.reward_src_riddle_gate_solved");
 
             // Ocean philosophy riddles grant awakening insight
             if (riddle.IsOceanPhilosophy)
@@ -16093,11 +16123,11 @@ public class DungeonLocation : BaseLocation
             level * 50,
             level * 8,
             level * 4,
-            "Your ignorance shall be your doom!",
+            Loc.Get("dungeon.cry.ignorance_doom"),
             false,
             true, // Can cast spells
-            "Stone Fist",
-            "Ancient Stone",
+            Loc.Get("dungeon.gear.stone_fist"),
+            "Ancient Stone", // English on purpose: GrabArm is set, so it can become a saved Item.Name (CombatEngine armor pickup)
             false, // canHurt
             false, // isUndead
             level * 30,  // armpow
@@ -16455,7 +16485,7 @@ public class DungeonLocation : BaseLocation
         long armPow = 1 + level / 2;
         long weapPow = 2 + level;
         return Monster.CreateMonster(level, "Traveling Merchant", hp, str, def,
-            "You'll regret this!", false, false, "Merchant's Blade", "Leather Armor",
+            Loc.Get("dungeon.cry.regret_this"), false, false, Loc.Get("dungeon.gear.merchant_blade"), Loc.Get("item.leather_armor"),
             false, false, punch, armPow, weapPow);
     }
     
@@ -16466,7 +16496,7 @@ public class DungeonLocation : BaseLocation
 
         return Monster.CreateMonster(currentDungeonLevel, name,
             currentDungeonLevel * 5, currentDungeonLevel * 2, 0,
-            "...", false, false, "Rusty Sword", "Tattered Armor",
+            "...", false, false, Loc.Get("dungeon.gear.rusty_sword"), Loc.Get("dungeon.gear.tattered_armor"),
             false, false, currentDungeonLevel * 70, 0, currentDungeonLevel * 2);
     }
 
@@ -18252,7 +18282,7 @@ public class DungeonLocation : BaseLocation
     /// The leader has already received the full amount — this gives each grouped player their share
     /// and reduces the leader's gold to their fair share. XP uses level-gap multiplier.
     /// </summary>
-    private void ShareEventRewardsWithGroup(Character leader, long goldAmount, long xpAmount, string source)
+    private void ShareEventRewardsWithGroup(Character leader, long goldAmount, long xpAmount, string sourceKey)
     {
         if (teammates == null || teammates.Count == 0) return;
         if (goldAmount <= 0 && xpAmount <= 0) return;
@@ -18296,7 +18326,7 @@ public class DungeonLocation : BaseLocation
             if (parts.Count > 0)
             {
                 session?.EnqueueMessage(
-                    $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", source)} ═══\u001b[0m\n" +
+                    $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", Loc.GetIn(shareLang, sourceKey))} ═══\u001b[0m\n" +
                     $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
             }
         }
@@ -18336,14 +18366,14 @@ public class DungeonLocation : BaseLocation
             string lang = GroupSystem.GetSession(mate.GroupPlayerUsername ?? "")?.Context?.Language ?? "en";
             if (!roomAnsiByLang.TryGetValue(lang, out var roomAnsi))
                 roomAnsiByLang[lang] = roomAnsi = BuildRoomAnsi(room, ctx.Username, lang);
-            PushRoomToSingleFollower(mate, roomAnsi, currentPlayer?.DisplayName ?? ctx.Username);
+            PushRoomToSingleFollower(mate, roomAnsi, currentPlayer?.DisplayName ?? ctx.Username, lang);
         }
     }
 
     /// <summary>
     /// Push a room view to a single follower's terminal. Clear screen + room + personal status.
     /// </summary>
-    private static void PushRoomToSingleFollower(Character follower, string roomAnsi, string leaderName)
+    private static void PushRoomToSingleFollower(Character follower, string roomAnsi, string leaderName, string lang)
     {
         var followerTerm = follower.RemoteTerminal;
         if (followerTerm == null) return;
@@ -18355,15 +18385,37 @@ public class DungeonLocation : BaseLocation
         sb.Append(roomAnsi);
 
         // Personal status bar
+        sb.Append(BuildFollowerStatusAnsi(follower, leaderName, lang));
+        sb.AppendLine();
+
+        followerTerm.WriteRawAnsi(sb.ToString());
+    }
+
+    /// <summary>
+    /// 1.2.4: the follower's own status rows under the room view, in the follower's language. The HP
+    /// row and the footer each stay on one row when they fit in 79 columns; a longer one breaks in
+    /// two (gold and potions on their own row; the key hints under "Following").
+    /// </summary>
+    internal static string BuildFollowerStatusAnsi(Character follower, string leaderName, string lang)
+    {
+        var sb = new System.Text.StringBuilder();
+        int width = UsurperRemake.UI.UIHelper.WrapWidth;
         sb.AppendLine($"\u001b[90m  {new string('─', 55)}\u001b[0m");
         int hpPct = follower.MaxHP > 0 ? (int)(follower.HP * 20 / follower.MaxHP) : 0;
         hpPct = Math.Clamp(hpPct, 0, 20);
         string hpBar = new string('#', hpPct) + new string('.', 20 - hpPct);
-        sb.AppendLine($"\u001b[37m  HP: \u001b[31m[{hpBar}]\u001b[37m {follower.HP}/{follower.MaxHP}  \u001b[33mGold: {follower.Gold:N0}  \u001b[32mPotions: {follower.Healing}/{follower.MaxPotions}\u001b[0m");
-        sb.AppendLine($"\u001b[90m  Following \u001b[97m{leaderName}\u001b[90m | [*] Inv  [P]ot  [%] Status  [Q] Leave | /party /help /say\u001b[0m");
-        sb.AppendLine();
+        string hpPart = $"\u001b[37m  {Loc.GetIn(lang, "dungeon.hp_label")}: \u001b[31m[{hpBar}]\u001b[37m {follower.HP}/{follower.MaxHP}";
+        string goldPart = $"\u001b[33m{Loc.GetIn(lang, "dungeon.follower_bar_gold", $"{follower.Gold:N0}")}  \u001b[32m{Loc.GetIn(lang, "dungeon.potion_cache_count", follower.Healing, follower.MaxPotions)}\u001b[0m";
+        string hpRow = $"{hpPart}  {goldPart}";
+        if (UsurperRemake.UI.UIHelper.VisibleLength(hpRow) <= width) sb.AppendLine(hpRow);
+        else { sb.AppendLine($"{hpPart}\u001b[0m"); sb.AppendLine($"  {goldPart}"); }
 
-        followerTerm.WriteRawAnsi(sb.ToString());
+        string following = $"\u001b[90m  {Loc.GetIn(lang, "dungeon.follower_bar_following", $"\u001b[97m{leaderName}\u001b[90m")}";
+        string keys = $"{Loc.GetIn(lang, "dungeon.follower_bar_keys")} | /party /help /say\u001b[0m";
+        string footer = $"{following} | {keys}";
+        if (UsurperRemake.UI.UIHelper.VisibleLength(footer) <= width) sb.AppendLine(footer);
+        else { sb.AppendLine($"{following}\u001b[0m"); sb.AppendLine($"\u001b[90m  {keys}"); }
+        return sb.ToString();
     }
 
     /// <summary>
@@ -18385,7 +18437,7 @@ public class DungeonLocation : BaseLocation
         string status = room.IsBossRoom ? $"\u001b[91m{Loc.GetIn(lang, "dungeon.tag_boss")}\u001b[0m"
             : room.IsCleared ? $" \u001b[92m{Loc.GetIn(lang, "dungeon.tag_cleared")}\u001b[0m"
             : room.HasMonsters ? $" \u001b[91m{Loc.GetIn(lang, "dungeon.tag_danger")}\u001b[0m" : "";
-        sb.AppendLine($"\u001b[90m  Floor {currentDungeonLevel} | {tc}{currentFloor.Theme}\u001b[90m | {dc}{stars}\u001b[0m{status}");
+        sb.AppendLine($"\u001b[90m  {Loc.GetIn(lang, "dungeon.floor", currentDungeonLevel)} | {tc}{GetThemeShortNameIn(currentFloor.Theme, lang)}\u001b[90m | {dc}{stars}\u001b[0m{status}");
         sb.AppendLine();
 
         // Description + atmosphere
@@ -18401,33 +18453,34 @@ public class DungeonLocation : BaseLocation
         // Room contents
         if (room.HasMonsters && !room.IsCleared)
             sb.AppendLine(room.IsBossRoom
-                ? "\u001b[91m  >> A powerful presence dominates this room! <<\u001b[0m"
-                : "\u001b[91m  >> Hostile creatures lurk in the shadows <<\u001b[0m");
+                ? $"\u001b[91m  {Loc.GetIn(lang, "dungeon.room_boss_presence")}\u001b[0m"
+                : $"\u001b[91m  {Loc.GetIn(lang, "dungeon.follower_hint_hostile")}\u001b[0m");
         if (room.HasTreasure && !room.TreasureLooted)
-            sb.AppendLine("\u001b[93m  >> Something valuable glints in the darkness <<\u001b[0m");
+            sb.AppendLine($"\u001b[93m  {Loc.GetIn(lang, "dungeon.follower_hint_treasure")}\u001b[0m");
         if (room.HasEvent && !room.EventCompleted)
-            sb.AppendLine($"\u001b[96m  >> {GetEventHint(room.EventType).Replace(">>", "").Replace("<<", "").Trim()} <<\u001b[0m");
+            sb.AppendLine($"\u001b[96m  >> {GetEventHintIn(room.EventType, lang).Replace(">>", "").Replace("<<", "").Trim()} <<\u001b[0m");
         if (room.HasStairsDown)
-            sb.AppendLine("\u001b[94m  >> Stairs lead down to a deeper level <<\u001b[0m");
+            sb.AppendLine($"\u001b[94m  {Loc.GetIn(lang, "dungeon.room_stairs_down")}\u001b[0m");
 
         // Unexamined features
         var unexamined = room.Features?.Where(f => !f.IsInteracted).ToList();
         if (unexamined != null && unexamined.Count > 0)
         {
-            sb.AppendLine("\u001b[96m  You notice:\u001b[0m");
+            sb.AppendLine($"\u001b[96m  {Loc.GetIn(lang, "dungeon.you_notice")}\u001b[0m");
             foreach (var f in unexamined)
-                sb.AppendLine($"\u001b[37m    - {f.Name}\u001b[0m");
+                sb.AppendLine($"\u001b[37m    - {ResolveFeatureNameIn(f, lang)}\u001b[0m");
         }
 
         // Exits
         if (room.Exits.Count > 0)
         {
-            sb.Append("\u001b[37m  Exits:");
+            sb.Append($"\u001b[37m  {Loc.GetIn(lang, "dungeon.exits")}");
             foreach (var exit in room.Exits)
             {
                 var target = currentFloor.GetRoom(exit.Value.TargetRoomId);
                 string dirKey = GetDirectionKey(exit.Key);
-                string st = target == null ? "" : target.IsCleared ? " clr" : target.IsExplored ? " exp" : " ?";
+                string st = target == null ? "" : target.IsCleared ? " " + Loc.GetIn(lang, "dungeon.exit_tag_cleared")
+                    : target.IsExplored ? " " + Loc.GetIn(lang, "dungeon.exit_tag_explored") : " ?";
                 sb.Append($" \u001b[90m[\u001b[96m{dirKey}\u001b[90m{st}\u001b[90m]");
             }
             sb.AppendLine("\u001b[0m");
@@ -18444,7 +18497,7 @@ public class DungeonLocation : BaseLocation
     /// Companions are skipped (handled by CompanionSystem).
     /// Returns (leaderXP, leaderGold).
     /// </summary>
-    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string source, bool fromCombat = false)
+    private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string sourceKey, bool fromCombat = false)
     {
         var player = GetCurrentPlayer();
         if (player == null) return (totalXP, totalGold);
@@ -18487,7 +18540,7 @@ public class DungeonLocation : BaseLocation
                     string penalty = groupXPMult < 1.0f ? $" ({(int)(groupXPMult * 100)}%)" : "";
                     string shareLang = session.Context?.Language ?? "en";
                     session.EnqueueMessage(
-                        $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", source)} ═══\u001b[0m\n" +
+                        $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", Loc.GetIn(shareLang, sourceKey))} ═══\u001b[0m\n" +
                         $"\u001b[33m  {Loc.GetIn(shareLang, "dungeon.share_gold_xp", $"{goldPerMember:N0}", $"{memberXP:N0}", penalty)}\u001b[0m");
                 }
             }
@@ -18511,7 +18564,7 @@ public class DungeonLocation : BaseLocation
     /// Returns actual (xp, gold) awarded to the leader.
     /// v1.1.11: fromCombat (the floor boss only) adds each real player's Team HQ Training to their own XP.
     /// </summary>
-    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string source, bool fromCombat = false)
+    private (long xp, long gold) AwardDungeonReward(long xp, long gold, string sourceKey, bool fromCombat = false)
     {
         var player = GetCurrentPlayer();
         if (player == null) return (xp, gold);
@@ -18522,7 +18575,7 @@ public class DungeonLocation : BaseLocation
         lock (teammates) { hasGroupedPlayers = teammates.Any(t => t.IsGroupedPlayer); }
         if (hasGroupedPlayers)
         {
-            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, source, fromCombat);
+            var (leaderXP, leaderGold) = SplitPartyRewards(xp, gold, sourceKey, fromCombat);
             if (fromCombat) leaderXP = TeamHQBonus.ApplyXP(player, leaderXP);
             player.Gold += leaderGold;
             player.Experience += leaderXP;
@@ -18651,7 +18704,9 @@ public class DungeonLocation : BaseLocation
         string leaderName = leaderSession.Context?.Engine?.CurrentPlayer?.DisplayName ?? group.LeaderUsername;
         string myName = player.DisplayName;
 
-        // Update online location
+        // Update online location. 1.2.4: kept English, like every other online_players.location
+        // value (BaseLocation stores the English Name): the row is shared, so /who and the website
+        // show it to every viewer whatever their language.
         ctx.OnlineState?.UpdateLocation($"Dungeon (Group: {leaderName})");
 
         // Notify leader and group
@@ -18666,7 +18721,7 @@ public class DungeonLocation : BaseLocation
         if (leaderRoom != null)
         {
             string roomAnsi = leaderDungeon.BuildRoomAnsi(leaderRoom, group.LeaderUsername, GameConfig.Language);
-            PushRoomToSingleFollower(player, roomAnsi, leaderName);
+            PushRoomToSingleFollower(player, roomAnsi, leaderName, GameConfig.Language);
         }
         else
         {
@@ -18823,7 +18878,7 @@ public class DungeonLocation : BaseLocation
         if (room != null)
         {
             string roomAnsi = leaderDungeon.BuildRoomAnsi(room, group.LeaderUsername, GameConfig.Language);
-            PushRoomToSingleFollower(follower, roomAnsi, leaderDungeon.currentPlayer?.DisplayName ?? group.LeaderUsername);
+            PushRoomToSingleFollower(follower, roomAnsi, leaderDungeon.currentPlayer?.DisplayName ?? group.LeaderUsername, GameConfig.Language);
         }
     }
 
