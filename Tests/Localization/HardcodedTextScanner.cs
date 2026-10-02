@@ -285,7 +285,7 @@ public static class HardcodedTextScanner
         {
             if (node is InvocationExpressionSyntax inv)
             {
-                var hit = ClassifyInvocation(inv);
+                var hit = ClassifyInvocation(inv) ?? (dashes ? ClassifyDashOnlySink(inv) : null);
                 if (hit == null) continue;
                 var (sinkName, spec) = hit.Value;
                 if (InExcludedClass(inv, excludedClasses)) continue;
@@ -366,6 +366,21 @@ public static class HardcodedTextScanner
             return (name, m);
         if (MenuHelperSinks.TryGetValue(name, out var h) && unqualified)
             return ("(helper) " + name, h);
+        return null;
+    }
+
+    private static readonly SinkSpec CombatLogAdd = new("Add", new[] { 0 });
+
+    /// <summary>
+    /// v1.2.4: sinks checked for dashes only. CombatLog.Add (receiver's last identifier "CombatLog") holds
+    /// English shown in the combat test summary; it is not counted as hardcoded text, so the ratchet
+    /// counts are unchanged.
+    /// </summary>
+    private static (string Sink, SinkSpec Spec)? ClassifyDashOnlySink(InvocationExpressionSyntax inv)
+    {
+        if (inv.Expression is MemberAccessExpressionSyntax ma && ma.Name.Identifier.ValueText == "Add"
+            && LastIdentifier(ma.Expression) == "CombatLog")
+            return ("CombatLog.Add", CombatLogAdd);
         return null;
     }
 

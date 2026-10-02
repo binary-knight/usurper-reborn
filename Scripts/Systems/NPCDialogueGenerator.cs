@@ -567,6 +567,13 @@ public static class NPCDialogueGenerator
         var line = NPCDialogueDatabase.PickLine("reaction", npc, player, eventType);
         if (line != null) return () => NPCDialogueDatabase.RenderLine(line, npc, player);
 
+        // v1.2.4: the victory fallback is a key, written in each reader's language
+        if (eventType.ToLower() == "combat_victory")
+        {
+            string key = CombatVictoryFallbackKey(npc.Personality);
+            return () => UsurperRemake.Systems.Loc.Get(key);
+        }
+
         string fallback = FallbackReaction(npc, player, eventType);
         return () => fallback;
     }
@@ -575,7 +582,7 @@ public static class NPCDialogueGenerator
     {
         return eventType.ToLower() switch
         {
-            "combat_victory" => GenerateCombatVictoryReaction(npc.Personality),
+            "combat_victory" => UsurperRemake.Systems.Loc.Get(CombatVictoryFallbackKey(npc.Personality)),
             "combat_defeat" => GenerateCombatDefeatReaction(npc.Personality),
             "combat_flee" => GenerateFleeReaction(npc.Personality),
             "ally_death" => GenerateAllyDeathReaction(npc.Personality),
@@ -879,15 +886,16 @@ public static class NPCDialogueGenerator
         return templates[_random.Next(templates.Length)];
     }
 
-    private static string GenerateCombatVictoryReaction(PersonalityProfile personality)
+    /// <summary>v1.2.4: the victory reaction used when no dialogue line fits, as a Loc key.</summary>
+    internal static string CombatVictoryFallbackKey(PersonalityProfile personality)
     {
         if (personality.Aggression > 0.7f)
-            return "Ha! That's what I like to see! Crush them all!";
+            return "npc_dialogue.rx_cv_fb_aggressive";
         if (personality.Courage > 0.7f)
-            return "Well fought! Victory is yours!";
+            return "npc_dialogue.rx_cv_fb_brave";
         if (personality.Sociability > 0.7f)
-            return "Amazing! You were incredible out there!";
-        return "Well done. You won.";
+            return "npc_dialogue.rx_cv_fb_social";
+        return "npc_dialogue.rx_cv_fb_plain";
     }
 
     private static string GenerateCombatDefeatReaction(PersonalityProfile personality)
