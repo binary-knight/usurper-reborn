@@ -349,34 +349,63 @@ public class DungeonText124Tests
             foreach (var english in new[] { "STR ", "DEF ", "DEX ", "WIS ", "AGI ", "CHA ", "CON ", "STA ", "Atk ", "AC ", "Accessory" })
                 (full + bare).Should().NotContain(english);
 
-        // The merchant shows the description on its own rows; the longest generated one wraps to fit.
+        // Every description the merchant generates is in the language.
         var (term, output) = Term("Y\n");
         var hero = Hero();
         var d = InLanguage(lang, () => Dungeon(term, hero, 100));
         var gen = typeof(DungeonLocation).GetMethod("GenerateMerchantRareItems", F)!;
-        object? longest = null;
-        string longestDesc = "";
+        Type? rareType = null;
         for (int visit = 0; visit < 40; visit++)
         {
             var items = InLanguage(lang, () => (System.Collections.IList)gen.Invoke(d, new object[] { 100 })!);
             foreach (var it in items)
             {
-                string desc = (string)it!.GetType().GetProperty("Description")!.GetValue(it)!;
+                rareType = it!.GetType();
+                string desc = (string)rareType.GetProperty("Description")!.GetValue(it)!;
                 if (lang == "hu") desc.Should().NotContain("Accessory").And.NotContain("STR ").And.NotContain("AC +");
-                if (desc.Length > longestDesc.Length) { longest = it; longestDesc = desc; }
             }
         }
-        // Skip the comparison table (combat code, not part of this screen's keys).
-        longest!.GetType().GetProperty("LootItem")!.SetValue(longest, null);
+
+        // v1.2.4: the purchase screen for the worst case, from the data rather than a random roll: the
+        // longest name the loot generator can give any template in this language, the highest price
+        // (1.5 times GameConfig.MaxItemValue, the item value bound), and the full stat list.
+        string longestName = LongestLootName(lang);
+        long highestPrice = (long)(GameConfig.MaxItemValue * 1.5);
+        string fullDesc = L(lang, "dungeon.merchant_stat_atk", 9999) + weaponTail;
+        var worst = Activator.CreateInstance(rareType!)!;
+        rareType!.GetProperty("Name")!.SetValue(worst, longestName);
+        rareType.GetProperty("Description")!.SetValue(worst, fullDesc);
+        rareType.GetProperty("Price")!.SetValue(worst, highestPrice);
+        rareType.GetProperty("Type")!.SetValue(worst, "weapon");
         string shown = await InLanguageAsync(lang, async () =>
         {
-            await (Task)typeof(DungeonLocation).GetMethod("PurchaseRareItem", F)!.Invoke(d, new object[] { hero, longest })!;
+            await (Task)typeof(DungeonLocation).GetMethod("PurchaseRareItem", F)!.Invoke(d, new object[] { hero, worst })!;
             return Shown(term, output);
         });
         Capture($"dungeon-text-merchant-purchase-{lang}.txt", shown);
         string joined = string.Join(" ", Rows(shown).Select(r => r.Trim()));
-        joined.Should().Contain(longestDesc, "the wrapped rows keep the whole description");
+        joined.Should().Contain(L(lang, "dungeon.merchant_purchase_confirm", longestName, highestPrice), "the wrapped confirm keeps the whole question");
         EveryRowFits(shown, "merchant purchase");
+    }
+
+    /// <summary>The longest name LootGenerator can give any loot template in the language.</summary>
+    private static string LongestLootName(string lang)
+    {
+        var names = LootGenerator.GetWeaponTemplates().Select(t => t.Name)
+            .Concat(LootGenerator.GetBodyArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetHeadArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetArmsArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetHandsArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetLegsArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetFeetArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetWaistArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetFaceArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetCloakArmorTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetShieldTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetRingTemplates().Select(t => t.Name))
+            .Concat(LootGenerator.GetNecklaceTemplates().Select(t => t.Name));
+        return names.SelectMany(n => LootGenerator.AllNameFormsFor(n, lang))
+            .OrderByDescending(n => n.Length).ThenBy(n => n, StringComparer.Ordinal).First();
     }
 
     private static async Task<T> InLanguageAsync<T>(string lang, Func<Task<T>> body)

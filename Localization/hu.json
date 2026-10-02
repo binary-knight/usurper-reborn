@@ -16931,7 +16931,7 @@
   "dungeon.event_hint_puzzle": ">> Különös szerkezetek borítják az egyik falat <<",
   "dungeon.event_hint_rest": ">> Ez a terület viszonylag biztonságosnak tűnik <<",
   "dungeon.event_hint_mystery": ">> Valami szokatlan ragadja meg a tekintetedet <<",
-  "dungeon.event_hint_settlement": ">> Fények és hangok elöl – egy település! <<",
+  "dungeon.event_hint_settlement": ">> Fények és hangok elöl -- egy település! <<",
   "dungeon.event_hint_default": ">> Valami érdekes van itt <<",
   "dungeon.theme_catacombs": "Ősi sírkamrák, tele nyugtalan holtakkal",
   "dungeon.theme_sewers": "Bűzös alagutak, férgektől és még rosszabbtól nyüzsögve",

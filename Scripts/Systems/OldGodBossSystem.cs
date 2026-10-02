@@ -948,6 +948,7 @@ namespace UsurperRemake.Systems
                 IsActive = true,
                 CanSpeak = true,
                 Phrase = boss.LocIntro().Length > 0 ? boss.LocIntro()[0] : "",
+                PhraseInLanguage = () => boss.LocIntro().Length > 0 ? boss.LocIntro()[0] : "",
                 // the fight's victory pays this to the whole party; HandleBossDefeated adds the leader's reward
                 Experience = boss.Level * 2000,
                 Gold = boss.Level * 500,
