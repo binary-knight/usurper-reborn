@@ -848,7 +848,7 @@ namespace UsurperRemake.Systems
             if (phase > 1)
             {
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", phase, 3)} — {GetPhaseDescription(phase)}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.phase_label", phase, 3)} -- {GetPhaseDescription(phase)}");
             }
             if (boss.Nights > 1)
             {
@@ -2090,7 +2090,7 @@ namespace UsurperRemake.Systems
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("");
-            terminal.WriteLine($"  *** {Loc.Get("world_boss.phase_label", newPhase, 3)} — {GetPhaseDescription(newPhase)} ***");
+            terminal.WriteLine($"  *** {Loc.Get("world_boss.phase_label", newPhase, 3)} -- {GetPhaseDescription(newPhase)} ***");
             string[]? dialogue = newPhase == 2 ? bossDef.LocPhase2() : bossDef.LocPhase3();
             if (dialogue != null)
             {

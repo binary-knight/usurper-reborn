@@ -764,7 +764,7 @@ public partial class MagicShopLocation : BaseLocation
                 var (slot, equip) = cursedPlayerGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage($"  {displayNum}. {equip.Name} (your {slot.GetDisplayName()}) — {listedTotal:N0} gold", "red");
+                DisplayMessage($"  {displayNum}. {equip.Name} (your {slot.GetDisplayName()}) -- {listedTotal:N0} gold", "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -780,7 +780,7 @@ public partial class MagicShopLocation : BaseLocation
                 var (ownerName, slot, equip) = cursedTeamGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage($"  {displayNum}. {equip.Name} ({ownerName}'s {slot.GetDisplayName()}) — {listedTotal:N0} gold", "red");
+                DisplayMessage($"  {displayNum}. {equip.Name} ({ownerName}'s {slot.GetDisplayName()}) -- {listedTotal:N0} gold", "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -897,7 +897,7 @@ public partial class MagicShopLocation : BaseLocation
             // Fix curse description
             if (targetItem.Description != null && targetItem.Description.Count > 1 &&
                 targetItem.Description[1] != null && targetItem.Description[1].Contains("CURSED"))
-                targetItem.Description[1] = "Purified — some power was lost in the cleansing.";
+                targetItem.Description[1] = "Purified -- some power was lost in the cleansing.";
 
             // Fix any negative magic resistance
             if (targetItem.MagicProperties.MagicResistance < 0)
@@ -2533,7 +2533,7 @@ public partial class MagicShopLocation : BaseLocation
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"—",3}  ");
+                terminal.Write($"{"--",3}  ");
             }
 
             // Price

@@ -1624,13 +1624,13 @@ public abstract class BaseLocation
             string locDisplayName = GetLocationName(LocationId);
             terminal.Write(locDisplayName);
             terminal.SetColor("gray");
-            terminal.Write(" — ");
+            terminal.Write(" -- ");
             terminal.SetColor(timeColor);
             terminal.Write(timePeriod);
 
             // Append fatigue tier label when Tired or Exhausted
             var (fatigueLabel, fatigueColor) = currentPlayer.GetFatigueTier();
-            int headerLen = locDisplayName.Length + 3 + timePeriod.Length;
+            int headerLen = locDisplayName.Length + 4 + timePeriod.Length;
             if (!string.IsNullOrEmpty(fatigueLabel) && currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
             {
                 terminal.SetColor("gray");
@@ -3667,7 +3667,7 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($" x{count}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  — {matDef.Description}");
+                terminal.WriteLine($"  -- {matDef.Description}");
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"    {Loc.Get("base.mat_found_floors", matDef.FloorMin, matDef.FloorMax)}");
                 terminal.WriteLine("");
@@ -4044,9 +4044,9 @@ public abstract class BaseLocation
             terminal.Write($"({currentPlayer.Fatigue}/100)");
             // Show penalty description
             if (currentPlayer.Fatigue >= GameConfig.FatigueExhaustedThreshold)
-                terminal.WriteLine($" — {Loc.Get("base.fatigue_exhausted_penalty")}");
+                terminal.WriteLine($" -- {Loc.Get("base.fatigue_exhausted_penalty")}");
             else if (currentPlayer.Fatigue >= GameConfig.FatigueTiredThreshold)
-                terminal.WriteLine($" — {Loc.Get("base.fatigue_tired_penalty")}");
+                terminal.WriteLine($" -- {Loc.Get("base.fatigue_tired_penalty")}");
             else
                 terminal.WriteLine("");
         }
@@ -4783,7 +4783,7 @@ public abstract class BaseLocation
                     else
                     {
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  0. ({Loc.Get("ui.none")}) — {Loc.Get("base.remove_title")}");
+                        terminal.WriteLine($"  0. ({Loc.Get("ui.none")}) -- {Loc.Get("base.remove_title")}");
                         for (int ti = 0; ti < availableTitles.Count; ti++)
                         {
                             string marker = availableTitles[ti] == currentPlayer.NobleTitle ? " *" : "";
@@ -7026,19 +7026,19 @@ public abstract class BaseLocation
             {
                 terminal.SetColor("dark_red");
                 terminal.WriteLine($"  - Blood Price (Mass Murderer): -{(int)(GameConfig.MurderWeightTier3CombatPenalty * 100)}% damage, +{(int)(GameConfig.MurderWeightTier3ShopMarkup * 100)}% shop prices, +{(int)(GameConfig.MurderWeightTier3HealPenalty * 100)}% healer costs");
-                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} -- Confess at the Church to reduce.");
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
             {
                 terminal.SetColor("red");
                 terminal.WriteLine($"  - Blood Price (Notorious Killer): -{(int)(GameConfig.MurderWeightTier2CombatPenalty * 100)}% damage, +{(int)(GameConfig.MurderWeightTier2ShopMarkup * 100)}% shop prices");
-                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} -- Confess at the Church to reduce.");
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  - Blood Price (Known Killer): +{(int)(GameConfig.MurderWeightShopMarkupPercent * 100)}% shop prices");
-                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} — Confess at the Church to reduce.");
+                terminal.WriteLine($"    Murder Weight: {currentPlayer.MurderWeight:F1} -- Confess at the Church to reduce.");
             }
 
             if (currentPlayer.IsKnighted)
@@ -8110,7 +8110,7 @@ public abstract class BaseLocation
         if (player == null) return;
 
         terminal.WriteLine("");
-        UIHelper.WriteBoxHeader(terminal, $"Equipment — {player.DisplayName}", "bright_yellow", 76);
+        UIHelper.WriteBoxHeader(terminal, $"Equipment -- {player.DisplayName}", "bright_yellow", 76);
         terminal.WriteLine("");
 
         var slots = new (EquipmentSlot slot, string label)[]
@@ -10028,7 +10028,7 @@ public abstract class BaseLocation
     private static string Truncate(string s, int maxLen)
     {
         if (s.Length <= maxLen) return s;
-        return s.Substring(0, maxLen - 1) + "…";
+        return s.Substring(0, maxLen - 3) + "...";
     }
 
     private static string GetItemStatsCompact(Item? item)

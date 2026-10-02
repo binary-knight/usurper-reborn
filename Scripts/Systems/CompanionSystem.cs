@@ -306,11 +306,11 @@ namespace UsurperRemake.Systems
 
                 BackstoryBrief = "Melodia once traveled with a legendary adventuring party, chronicling " +
                                 "their deeds in song. When they fell one by one to the dungeon's depths, " +
-                                "she opened a shop in town — but the call of adventure never truly faded. " +
+                                "she opened a shop in town -- but the call of adventure never truly faded. " +
                                 "She knows more about the Old Gods than she lets on.",
 
                 RecruitLevel = 20,
-                RecruitLocation = "Music Shop — after sharing your story",
+                RecruitLocation = "Music Shop -- after sharing your story",
 
                 BaseStats = new CompanionStats
                 {
@@ -2726,7 +2726,7 @@ namespace UsurperRemake.Systems
             }
             if (dropped > 0)
             {
-                string drop = $"{dropped} item(s) dropped on the battlefield — your inventory was full.";
+                string drop = $"{dropped} item(s) dropped on the battlefield -- your inventory was full.";
                 if (terminal != null)
                 {
                     terminal.SetColor("gray");

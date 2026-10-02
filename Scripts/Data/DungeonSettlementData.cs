@@ -25,7 +25,7 @@ public static class DungeonSettlementData
             NPCTitle = "Dwarven Smith",
             ThemeColor = "bright_yellow",
             Description = "A squat stone workshop wedged into a catacomb alcove. The ring of hammer on\nanvil echoes through the tunnels. Bones of forgotten dead have been repurposed\nas tool racks and fuel for the forge. A stocky dwarf works the bellows.",
-            FirstGreeting = "\"Hah! A surface-dweller, down in my workshop. Name's Durgan.\nI make arms from what the dead leave behind. Nothing goes to waste\ndown here. You need something fixed, sharpened, or patched up — I'm your dwarf.\"",
+            FirstGreeting = "\"Hah! A surface-dweller, down in my workshop. Name's Durgan.\nI make arms from what the dead leave behind. Nothing goes to waste\ndown here. You need something fixed, sharpened, or patched up -- I'm your dwarf.\"",
             ReturnGreeting = "\"Back again? Good. The forge is hot and I've got stock.\nWhat'll it be?\"",
             HasHealing = true,
             HasTrading = true,
@@ -35,7 +35,7 @@ public static class DungeonSettlementData
             TradeItems = new[] { "Healing Potion", "Mana Potion", "Torch", "Antidote" },
             LoreFragments = new[]
             {
-                "\"These catacombs? Old. Older than the town above. Whoever built 'em\nwasn't burying their dead — they were sealing something in.\"",
+                "\"These catacombs? Old. Older than the town above. Whoever built 'em\nwasn't burying their dead -- they were sealing something in.\"",
                 "\"The sewers below here used to be waterways for an underground city.\nThe dwarves remember, even if the humans forgot.\"",
                 "\"I found dwarvish runes on the deeper walls. Warnings, mostly.\n'Do not dig below the third foundation.' Nobody listened, of course.\"",
                 "\"There's a seal down here somewhere. Ancient magic. The kind you\ndon't break unless you want to wake something up.\"",
@@ -52,7 +52,7 @@ public static class DungeonSettlementData
             ThemeColor = "green",
             Description = "A ramshackle bazaar in a flooded sewer junction. Lanterns hang from\npipes and chains. Stalls of scavenged goods line the walkways. A wiry\nfigure in a patched coat presides over the chaos with a sharp grin.",
             FirstGreeting = "\"Well, well. Fresh meat from upstairs. Welcome to the Market,\nfriend. Everything down here has a price, and I set them all.\nDon't touch anything you can't pay for.\"",
-            ReturnGreeting = "\"My favorite customer returns. I've got new stock —\nfell off a caravan. Literally. Into the sewers.\"",
+            ReturnGreeting = "\"My favorite customer returns. I've got new stock --\nfell off a caravan. Literally. Into the sewers.\"",
             HasHealing = false,
             HasTrading = true,
             HasLore = true,
@@ -63,7 +63,7 @@ public static class DungeonSettlementData
             {
                 "\"The Rat King? That's me, obviously. Self-appointed. Nobody\nchallenged the title, so here we are.\"",
                 "\"Below the sewers, the caverns open up into something massive.\nNatural caves. Some say there's a whole underground sea down there.\"",
-                "\"I've had customers from the deep — creatures that trade in\ngems and bones. They're not hostile if you've got coin.\"",
+                "\"I've had customers from the deep -- creatures that trade in\ngems and bones. They're not hostile if you've got coin.\"",
                 "\"Word of advice: past the caverns, you hit the old ruins.\nThat's where things get... historical. And dangerous.\"",
             },
         },
@@ -103,7 +103,7 @@ public static class DungeonSettlementData
             NPCTitle = "Expedition Commander",
             ThemeColor = "bright_red",
             Description = "A fortified camp built from demon bones and salvaged timber. Torches\nburn in iron brackets. A handful of hardened soldiers maintain the\nperimeter. Their commander stands over a crude map table.",
-            FirstGreeting = "\"Stand down — they're from the surface. I'm Captain Voss,\ncommander of the Deep Expedition. We've held this position for\nthree months. Beyond here, the frozen depths begin. If you're\nheading deeper, you'll want to stock up. This is the last\nfriendly face you'll see for a long time.\"",
+            FirstGreeting = "\"Stand down -- they're from the surface. I'm Captain Voss,\ncommander of the Deep Expedition. We've held this position for\nthree months. Beyond here, the frozen depths begin. If you're\nheading deeper, you'll want to stock up. This is the last\nfriendly face you'll see for a long time.\"",
             ReturnGreeting = "\"Good to see you alive. We lost two more scouts last week.\nThe frozen depths are no joke. Resupply while you can.\"",
             HasHealing = true,
             HasTrading = true,
@@ -114,9 +114,9 @@ public static class DungeonSettlementData
             LoreFragments = new[]
             {
                 "\"We were sent down here by the crown to map the deep levels.\nThirty soldiers started. Twelve remain. The demons took the rest.\"",
-                "\"The frozen depths below — they shouldn't exist this far underground.\nSomething is generating that cold. Something enormous.\"",
+                "\"The frozen depths below -- they shouldn't exist this far underground.\nSomething is generating that cold. Something enormous.\"",
                 "\"My scouts report volcanic vents even deeper. Ice above, fire below.\nIt's as if the dungeon itself is alive and can't decide what it wants to be.\"",
-                "\"There are Old Gods sleeping in these depths. I've felt them.\nThe ground hums when you stand still long enough. Whatever you're\nseeking down here — make sure it's worth what you'll pay.\"",
+                "\"There are Old Gods sleeping in these depths. I've felt them.\nThe ground hums when you stand still long enough. Whatever you're\nseeking down here -- make sure it's worth what you'll pay.\"",
             },
         },
     };

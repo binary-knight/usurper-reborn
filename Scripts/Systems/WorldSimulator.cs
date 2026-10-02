@@ -6315,7 +6315,7 @@ public class WorldSimulator
                 _ => null
             };
             if (emotionWord != null)
-                AddGossip($"A wave of {emotionWord} swept through the {npc.CurrentLocation} — started by {npcName}");
+                AddGossip($"A wave of {emotionWord} swept through the {npc.CurrentLocation} -- started by {npcName}");
         }
     }
 

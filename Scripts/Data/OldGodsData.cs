@@ -234,7 +234,7 @@ namespace UsurperRemake.Data
                 SpecialMechanics = new Dictionary<string, string>
                 {
                     ["Charm"] = "Prevents player from attacking for 2 rounds",
-                    ["DesperatePlea"] = "At 20% HP, offers surrender—player can accept or refuse",
+                    ["DesperatePlea"] = "At 20% HP, offers surrender--player can accept or refuse",
                     ["LoveSacrifice"] = "If saved, Veloura becomes a permanent ally"
                 },
 
@@ -433,11 +433,11 @@ namespace UsurperRemake.Data
                 SpecialMechanics = new Dictionary<string, string>
                 {
                     ["ShadowStep"] = "50% chance to dodge any attack",
-                    ["TheOffer"] = "At 20% HP, offers alliance—changes entire ending path",
+                    ["TheOffer"] = "At 20% HP, offers alliance--changes entire ending path",
                     ["TruthUnveiled"] = "Reveals player's deepest secret (affects dialogue)"
                 },
 
-                LoreUnlocked = "The Weaver's Web: Noctura alone among the gods did not fall to corruption—she chose it. " +
+                LoreUnlocked = "The Weaver's Web: Noctura alone among the gods did not fall to corruption--she chose it. " +
                               "Or did she? The goddess of secrets keeps her true nature hidden even from herself. " +
                               "Some say she manipulates events to save the world. Others say she seeks only power. " +
                               "Perhaps both are true. Perhaps neither."
@@ -490,7 +490,7 @@ namespace UsurperRemake.Data
                 {
                     "AURELION: \"If you seek truth, you must earn it!\"",
                     "",
-                    "His light flares brighter—painfully so.",
+                    "His light flares brighter--painfully so.",
                     "",
                     "AURELION: \"Face the light that reveals all!\""
                 },
@@ -545,7 +545,7 @@ namespace UsurperRemake.Data
                     ["Sacrifice"] = "At 20% HP, can sacrifice himself to fully restore player"
                 },
 
-                LoreUnlocked = "The Light's Lament: Aurelion was truth itself—every honest word strengthened him, " +
+                LoreUnlocked = "The Light's Lament: Aurelion was truth itself--every honest word strengthened him, " +
                               "every lie weakened him. As mortals built societies on deception, the god of truth began to fade. " +
                               "Now he clings to existence by a thread, waiting for someone honest enough to either end his pain " +
                               "or give him new purpose."
@@ -574,7 +574,7 @@ namespace UsurperRemake.Data
 
                 IntroDialogue = new[]
                 {
-                    "The dungeon walls ARE him. The stones, the foundations—all Terravok.",
+                    "The dungeon walls ARE him. The stones, the foundations--all Terravok.",
                     "A face forms in the rock, ancient beyond imagining.",
                     "",
                     "TERRAVOK: \"WHO... DISTURBS... MY... REST...\"",
@@ -607,7 +607,7 @@ namespace UsurperRemake.Data
                 {
                     "TERRAVOK: \"I... REMEMBER... NOW...\"",
                     "",
-                    "His voice gains strength—and sorrow.",
+                    "His voice gains strength--and sorrow.",
                     "",
                     "TERRAVOK: \"I WAS... FOUNDATION... PROTECTOR...\"",
                     "TERRAVOK: \"THEY USED ME... TO BUILD THEIR PRISONS...\"",
@@ -710,7 +710,7 @@ namespace UsurperRemake.Data
 
                 Phase2Dialogue = new[]
                 {
-                    "Manwe splits into two beings—one of pure light, one of pure shadow.",
+                    "Manwe splits into two beings--one of pure light, one of pure shadow.",
                     "",
                     "LIGHT MANWE: \"We are not your enemy.\"",
                     "SHADOW MANWE: \"We are the question you must answer.\"",
@@ -748,7 +748,7 @@ namespace UsurperRemake.Data
                     "MANWE: \"And you gave me one.\"",
                     "",
                     "He reaches out and presses his hand to your chest.",
-                    "The weight of creation flows into you — every star, every stone,",
+                    "The weight of creation flows into you -- every star, every stone,",
                     "every life that ever was or will be.",
                     "",
                     "MANWE: \"It is yours now. All of it. The choice of what comes next.\"",
@@ -766,12 +766,12 @@ namespace UsurperRemake.Data
                 SpecialMechanics = new Dictionary<string, string>
                 {
                     ["DivineJudgment"] = "Reflects damage if player has negative total alignment",
-                    ["CreationsEnd"] = "Instant kill if player HP < 20%—can be blocked by artifacts",
+                    ["CreationsEnd"] = "Instant kill if player HP < 20%--can be blocked by artifacts",
                     ["SplitForm"] = "At 50% HP, becomes two enemies that must both be defeated",
                     ["TheOffer"] = "At 10% HP, combat ends and player makes final choice"
                 },
 
-                LoreUnlocked = "The Creator's Burden: Manwe was, is, and will be. He created everything—including the very " +
+                LoreUnlocked = "The Creator's Burden: Manwe was, is, and will be. He created everything--including the very " +
                               "concept of creation. But eternity is lonely, and perfection is boring. So he made mortals " +
                               "to surprise him, to grow, to change. He made gods to guide them. But it all went wrong. " +
                               "Now Manwe waits at the end of all paths, hoping someone will finally give him the answer " +
@@ -815,7 +815,7 @@ namespace UsurperRemake.Data
                     "",
                     "NOCTURA: \"Did you really think I helped you out of kindness?\"",
                     "",
-                    "Her form shifts — no longer the wounded goddess you pitied.",
+                    "Her form shifts -- no longer the wounded goddess you pitied.",
                     "She stands tall, wreathed in living shadow, eyes burning violet.",
                     "",
                     "NOCTURA: \"Every god you defeated. Every seal you broke.\"",
@@ -838,7 +838,7 @@ namespace UsurperRemake.Data
 
                 Phase2Dialogue = new[]
                 {
-                    "Noctura's form flickers — she splits into a dozen shadow copies.",
+                    "Noctura's form flickers -- she splits into a dozen shadow copies.",
                     "\"You can't kill a shadow, little one. We are EVERYWHERE.\""
                 },
 
@@ -899,7 +899,7 @@ namespace UsurperRemake.Data
                               "her hand on Floor 70, she was playing a longer game. Every god you defeated weakened the " +
                               "divine order. Every seal you broke loosened the chains on her ambition. When Manwe fell, " +
                               "she seized his fading essence to ascend beyond her station. The Shadow Weaver became " +
-                              "the Shadow Ascendant — but even stolen power has limits."
+                              "the Shadow Ascendant -- but even stolen power has limits."
             };
         }
 

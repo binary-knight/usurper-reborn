@@ -139,7 +139,7 @@ public partial class PrisonLocation : BaseLocation
                 else
                 {
                     await terminal.WriteColorLineAsync(
-                        "  From this cell you can only speak — not act.",
+                        "  From this cell you can only speak -- not act.",
                         TerminalEmulator.ColorDarkGray);
                     continue;
                 }

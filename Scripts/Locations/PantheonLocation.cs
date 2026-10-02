@@ -375,7 +375,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_green");
                     terminal.Write($"{boon.Name} {tierStr,-5}");
                     terminal.SetColor("gray");
-                    terminal.Write($" — {boon.GetEffectDescription(tier),-30}");
+                    terminal.Write($" -- {boon.GetEffectDescription(tier),-29}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12} ({cost} pts)");
                     idx++;
@@ -409,14 +409,14 @@ public class PantheonLocation : BaseLocation
                 if (!alignmentMatch)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"  {optNum,2}. {label,-25} — {boon.Description,-28} {alignTag,-12} {Loc.Get("pantheon.boon_locked")}");
+                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {boon.Description,-27} {alignTag,-12} {Loc.Get("pantheon.boon_locked")}");
                 }
                 else if (!canAfford)
                 {
                     terminal.SetColor("darkgray");
                     terminal.Write($"  {optNum,2}. ");
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"{label,-25} — {boon.GetEffectDescription(nextTier),-28} {alignTag,-12} (+{addedCost} pts) *");
+                    terminal.WriteLine($"{label,-25} -- {boon.GetEffectDescription(nextTier),-27} {alignTag,-12} (+{addedCost} pts) *");
                 }
                 else
                 {
@@ -425,7 +425,7 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_cyan");
                     terminal.Write($"{label,-25}");
                     terminal.SetColor("gray");
-                    terminal.Write($" — {boon.GetEffectDescription(nextTier),-28}");
+                    terminal.Write($" -- {boon.GetEffectDescription(nextTier),-27}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12} (+{addedCost} pts)");
                     optionMap[optNum] = (boon.Id, nextTier, addedCost);

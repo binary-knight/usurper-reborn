@@ -367,7 +367,7 @@ public static class DivineBoonRegistry
             var boon = GetBoon(boonId);
             if (boon == null) continue;
             string tierStr = tier switch { 1 => "I", 2 => "II", 3 => "III", _ => "" };
-            lines.Add($"{boon.Name} {tierStr} — {boon.GetEffectDescription(tier)}");
+            lines.Add($"{boon.Name} {tierStr} -- {boon.GetEffectDescription(tier)}");
         }
         return lines;
     }

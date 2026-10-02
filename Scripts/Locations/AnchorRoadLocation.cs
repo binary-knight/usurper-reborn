@@ -682,7 +682,7 @@ public class AnchorRoadLocation : BaseLocation
 
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("anchor_road.team_controls_town"));
-                NewsSystem.Instance.Newsy(true, $"Gang War! {currentPlayer.Team} took the town unopposed — {targetTeam.TeamName} had no living members left.");
+                NewsSystem.Instance.Newsy(true, $"Gang War! {currentPlayer.Team} took the town unopposed -- {targetTeam.TeamName} had no living members left.");
 
                 // v0.57.10 (Coosh report): persist the turf transfer to world_state
                 // immediately. Without this, a relog before the next auto-save tick

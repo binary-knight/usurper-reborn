@@ -801,7 +801,7 @@ namespace UsurperRemake.Systems
                     saveData2.Player.Darkness = 0;
                     modified = true;
                     terminal.SetColor("green");
-                    terminal.WriteLine(" Full pardon — prison and Darkness cleared.");
+                    terminal.WriteLine(" Full pardon -- prison and Darkness cleared.");
                     break;
                 default:
                     return;
@@ -1024,7 +1024,7 @@ namespace UsurperRemake.Systems
                         saveData.Player.Darkness = 0;
                         modified = true;
                         terminal.SetColor("green");
-                        terminal.WriteLine("Full pardon granted — prison and Darkness cleared.");
+                        terminal.WriteLine("Full pardon granted -- prison and Darkness cleared.");
                         break;
                     default:
                         terminal.SetColor("gray");
@@ -1422,12 +1422,12 @@ namespace UsurperRemake.Systems
             if (GameConfig.DisableOnlinePlay)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(" Online Multiplayer DISABLED — players cannot connect to the online server.");
+                terminal.WriteLine(" Online Multiplayer DISABLED -- players cannot connect to the online server.");
             }
             else
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(" Online Multiplayer ENABLED — players can connect to the online server.");
+                terminal.WriteLine(" Online Multiplayer ENABLED -- players can connect to the online server.");
             }
             DebugLogger.Instance.LogInfo("SYSOP", $"Online multiplayer {(GameConfig.DisableOnlinePlay ? "disabled" : "enabled")}");
             await terminal.PressAnyKey();

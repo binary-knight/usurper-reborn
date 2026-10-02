@@ -198,7 +198,7 @@ public static class BugReportSystem
             }
             if (info.PlayerLevel > 0)
             {
-                sb.AppendLine($"Player:   {info.PlayerName} — Lv.{info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
+                sb.AppendLine($"Player:   {info.PlayerName} -- Lv.{info.PlayerLevel} {info.PlayerRace} {info.PlayerClass}");
                 sb.AppendLine($"Location: {info.CurrentLocation}{(info.DungeonFloor > 0 ? $" (Floor {info.DungeonFloor})" : "")}");
             }
             sb.AppendLine("```");
@@ -326,7 +326,7 @@ public static class BugReportSystem
         }
         if (info.PlayerLevel > 0)
         {
-            sb.AppendLine($"| Character | {info.PlayerName} — Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass} |");
+            sb.AppendLine($"| Character | {info.PlayerName} -- Level {info.PlayerLevel} {info.PlayerRace} {info.PlayerClass} |");
             sb.AppendLine($"| HP | {info.CurrentHP}/{info.MaxHP} |");
             sb.AppendLine($"| Location | {info.CurrentLocation} |");
             if (info.DungeonFloor > 0)

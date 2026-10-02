@@ -199,7 +199,7 @@ namespace UsurperRemake.Systems
                 Priority = 25,
                 Content = new[] {
                     "Veloura visits your dreams. The garden is different now.",
-                    "A single rose blooms — white, untouched, impossibly perfect.",
+                    "A single rose blooms -- white, untouched, impossibly perfect.",
                     "'You proved it still exists,' she says. 'Love. Real love. Not the kind that takes.'",
                     "'I'd forgotten what it felt like. Thank you for reminding me.'"
                 },
@@ -266,7 +266,7 @@ namespace UsurperRemake.Systems
                 Priority = 15,
                 Content = new[] {
                     "You dream of a garden bathed in golden light.",
-                    "Two figures walk among the flowers — one blazing like the sun,",
+                    "Two figures walk among the flowers -- one blazing like the sun,",
                     "the other gentle, luminous, her laughter like wind chimes.",
                     "",
                     "A third figure watches from the treeline. A woman cloaked in shadow.",
@@ -620,7 +620,7 @@ namespace UsurperRemake.Systems
                 Content = new[] {
                     "Mira is healing a wound on your arm in the dream. There is no wound.",
                     "'Force of habit,' she says, not looking up.",
-                    "She pauses. 'Can I ask you something? If you could save everyone — every single person — but it cost you everything you are... would you?'",
+                    "She pauses. 'Can I ask you something? If you could save everyone -- every single person -- but it cost you everything you are... would you?'",
                     "She doesn't wait for an answer. She already knows what she'd choose."
                 },
                 PhilosophicalHint = "She already made her choice. Long before she asked you."
@@ -652,7 +652,7 @@ namespace UsurperRemake.Systems
                 Priority = 20,
                 Content = new[] {
                     "You dream of the crown. It's heavier than it should be.",
-                    "In the dream, it grows roots — thin gold tendrils pushing into your skull.",
+                    "In the dream, it grows roots -- thin gold tendrils pushing into your skull.",
                     "Everyone in the throne room bows. But nobody looks at you.",
                     "You try to take it off. It doesn't come off."
                 },
@@ -863,7 +863,7 @@ namespace UsurperRemake.Systems
                 FloorMin = 40, FloorMax = 60,
                 Description = "A child's drawing",
                 Content = new[] {
-                    "A crude drawing scratched into the wall — a stick figure holding a sun.",
+                    "A crude drawing scratched into the wall -- a stick figure holding a sun.",
                     "Below it, in a child's unsteady letters: \"WHEN I GROW UP I WANT TO GO HOME.\"",
                     "Something about those words hits harder than any monster ever has."
                 },
@@ -902,7 +902,7 @@ namespace UsurperRemake.Systems
                 Description = "An empty cage",
                 Content = new[] {
                     "A cage stands here, large enough to hold a god. The bars are ancient iron, thick as trees.",
-                    "The door hangs open. Claw marks score the inside — deep, desperate, patient.",
+                    "The door hangs open. Claw marks score the inside -- deep, desperate, patient.",
                     "Whatever was kept here, it got out. A long time ago.",
                     "Or maybe it was let out."
                 }

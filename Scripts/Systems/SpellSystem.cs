@@ -1630,12 +1630,12 @@ public static class SpellSystem
             case 1: // Deja Vu - Dodge next attack
                 result.SpecialEffect = "dodge_next";
                 result.Duration = 1;
-                result.Message += $" {caster.Name2} glimpses a past cycle — next attack will miss!";
+                result.Message += $" {caster.Name2} glimpses a past cycle -- next attack will miss!";
                 break;
             case 2: // Probability Shift - Target crit=0%, miss+30% for 3 rounds
                 result.SpecialEffect = "probability_shift";
                 result.Duration = 3;
-                result.Message += $" Fate twists against {target?.Name2 ?? "the enemy"} — accuracy ruined for 3 rounds!";
+                result.Message += $" Fate twists against {target?.Name2 ?? "the enemy"} -- accuracy ruined for 3 rounds!";
                 break;
             case 3: // Echo of Tomorrow - 80-110 damage, ignores 50% defense
                 int cbDmg3 = 80 + random.Next(31);
@@ -1735,7 +1735,7 @@ public static class SpellSystem
                 if (caster.UnmakingCooldown > 0)
                 {
                     result.Success = false;
-                    result.Message += $" The void hasn't recovered — Unmaking needs 1 more round!";
+                    result.Message += $" The void hasn't recovered -- Unmaking needs 1 more round!";
                     result.SpecialEffect = "fail";
                     // Refund mana since we blocked the cast
                     caster.Mana += result.ManaCost;
