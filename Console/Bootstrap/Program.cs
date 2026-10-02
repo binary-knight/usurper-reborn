@@ -322,6 +322,36 @@ namespace UsurperConsole
         }
 
         /// <summary>
+        /// Door-mode (online) cleanup: register the player as a dormitory sleeper after an
+        /// unclean exit if not already sleeping. v1.2.4: skipped when the session never loaded
+        /// or created a character (a hang-up at login or during creation).
+        /// </summary>
+        internal static async Task RegisterDoorSleeperAsync(SqlSaveBackend sleepBackend, string? username, bool hadCharacter)
+        {
+            if (!hadCharacter)
+            {
+                DoorMode.Log("Dormitory sleeper skipped (no character was loaded)");
+                return;
+            }
+            try
+            {
+                if (!string.IsNullOrEmpty(username))
+                {
+                    var sleepInfo = await sleepBackend.GetSleepingPlayerInfo(username);
+                    if (sleepInfo == null)
+                    {
+                        await sleepBackend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
+                        DoorMode.Log($"Registered '{username}' as dormitory sleeper (unclean disconnect)");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                DoorMode.Log($"Failed to register dormitory sleep: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Run the game in BBS door mode
         /// </summary>
         private static async Task RunDoorModeAsync()
@@ -538,23 +568,9 @@ namespace UsurperConsole
                         // Register as dormitory sleeper if not already sleeping (online mode only)
                         if (DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend sleepBackend)
                         {
-                            try
-                            {
-                                var username = DoorMode.OnlineUsername;
-                                if (!string.IsNullOrEmpty(username))
-                                {
-                                    var sleepInfo = await sleepBackend.GetSleepingPlayerInfo(username);
-                                    if (sleepInfo == null)
-                                    {
-                                        await sleepBackend.RegisterSleepingPlayer(username, "dormitory", "[]", 0);
-                                        DoorMode.Log($"Registered '{username}' as dormitory sleeper (unclean disconnect)");
-                                    }
-                                }
-                            }
-                            catch (Exception ex)
-                            {
-                                DoorMode.Log($"Failed to register dormitory sleep: {ex.Message}");
-                            }
+                            // v1.2.4: only when a character was loaded or created this session.
+                            await RegisterDoorSleeperAsync(sleepBackend, DoorMode.OnlineUsername,
+                                hadCharacter: GameEngine.Instance?.CurrentPlayer != null);
                         }
 
                         // Shutdown chat system

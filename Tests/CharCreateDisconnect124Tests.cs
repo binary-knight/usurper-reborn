@@ -276,11 +276,86 @@ public class CharCreateDisconnect124Tests
         (await SleeperRegisteredAfterDisconnect(hadCharacter: true)).Should().BeTrue();
     }
 
+    private static GameEngine EngineWith(Character? player)
+    {
+        var engine = (GameEngine)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(GameEngine));
+        engine.CurrentPlayer = player;
+        return engine;
+    }
+
+    /// <summary>Drives RunAsync's disconnect persistence through the seam it calls. The save is
+    /// suppressed (as for a deleted character) so no real save runs; the sleeper is what is checked.</summary>
+    private static async Task<bool> SessionSleeperAfterDisconnect(Character? player)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"usurper-charcreate-{Guid.NewGuid():N}.db");
+        try
+        {
+            var db = new SqlSaveBackend(path);
+            var session = new PlayerSession("aplayer", "MUD", new TcpClient(), new MemoryStream(), db, NewServer(), CancellationToken.None)
+            { SuppressDisconnectSave = true };
+            await session.FinishDisconnectPersistAsync(EngineWith(player));
+            return await db.GetSleepingPlayerInfo("aplayer") != null;
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { File.Delete(path); } catch { }
+        }
+    }
+
     [Fact]
-    public void PlayerSession_PassesWhetherACharacterWasLoaded()
+    public async Task SessionDisconnect_NoCharacterLoaded_RegistersNoSleeper()
+    {
+        (await SessionSleeperAfterDisconnect(null)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task SessionDisconnect_WithACharacter_RegistersTheSleeper()
+    {
+        (await SessionSleeperAfterDisconnect(new Character { Name1 = "aplayer", Name2 = "aplayer" })).Should().BeTrue();
+    }
+
+    [Fact]
+    public void PlayerSession_RunAsyncUsesTheDisconnectSeam()
     {
         var src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Server/PlayerSession.cs"));
-        src.Should().Contain("hadCharacter = player != null;");
-        src.Should().Contain("await PersistOnDisconnectAsync(emergencySave, currentKey, hadCharacter);");
+        src.Should().Contain("await FinishDisconnectPersistAsync(ctx.Engine);");
+    }
+
+    // ---- door mode (online) cleanup: same guard ----
+
+    private static async Task<bool> DoorSleeperAfterHangUp(bool hadCharacter)
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"usurper-charcreate-door-{Guid.NewGuid():N}.db");
+        try
+        {
+            var db = new SqlSaveBackend(path);
+            await UsurperConsole.Program.RegisterDoorSleeperAsync(db, "aplayer", hadCharacter);
+            return await db.GetSleepingPlayerInfo("aplayer") != null;
+        }
+        finally
+        {
+            SqliteConnection.ClearAllPools();
+            try { File.Delete(path); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task DoorHangUpBeforeACharacterExists_RegistersNoSleeper()
+    {
+        (await DoorSleeperAfterHangUp(hadCharacter: false)).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DoorUncleanExitWithACharacter_StillRegistersTheSleeper()
+    {
+        (await DoorSleeperAfterHangUp(hadCharacter: true)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void DoorCleanup_PassesWhetherACharacterWasLoaded()
+    {
+        var src = File.ReadAllText(Path.Combine(RepoRoot(), "Console/Bootstrap/Program.cs"));
+        src.Should().Contain("hadCharacter: GameEngine.Instance?.CurrentPlayer != null");
     }
 }
