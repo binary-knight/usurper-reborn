@@ -394,7 +394,7 @@ namespace UsurperRemake.BBS
                     return num - 1;
 
                 SetColor("red");
-                WriteLine("Invalid choice. Please try again.");
+                WriteLine(UsurperRemake.Systems.Loc.Get("ui.invalid_choice_retry"));
             }
         }
 
@@ -434,12 +434,12 @@ namespace UsurperRemake.BBS
                         return num;
 
                     SetColor("red");
-                    WriteLine($"Please enter a number between {min} and {max}.");
+                    WriteLine(UsurperRemake.Systems.Loc.Get("ui.number_between", min, max));
                 }
                 else
                 {
                     SetColor("red");
-                    WriteLine("Please enter a valid number.");
+                    WriteLine(UsurperRemake.Systems.Loc.Get("ui.enter_valid_number"));
                 }
             }
         }

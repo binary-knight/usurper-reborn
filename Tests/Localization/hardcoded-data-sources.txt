@@ -351,7 +351,6 @@ keyed|Scripts/Locations/MusicShopLocation.cs|decl:WarMarchSongs/tuple#3|music.so
 names|Scripts/Locations/MusicShopLocation.cs|decl:performer|NPC names
 names|Scripts/Locations/MusicShopLocation.cs|decl:seller|NPC names
 names|Scripts/Locations/WeaponShopLocation.cs|decl:shopkeeperName|shopkeeper name
-table|Scripts/Server/MudServer.cs|decl:shutdownReason|shutdown broadcast
 table|Scripts/Systems/AchievementSystem.cs|decl:achMsg|achievement broadcast
 nouns|Scripts/Systems/AchievementSystem.cs|decl:broadcastName|fallback name in broadcast
 table|Scripts/Systems/AchievementSystem.cs|decl:headerText|unlock box header

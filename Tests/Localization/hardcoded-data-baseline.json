@@ -2042,14 +2042,6 @@
       ]
     }
   },
-  "Scripts/Server/MudServer.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "3bd8f5ede9"
-      ]
-    }
-  },
   "Scripts/Systems/AchievementSystem.cs": {
     "data": {
       "count": 209,

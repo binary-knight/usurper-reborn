@@ -34,14 +34,6 @@
       "bb6d7490eb"
     ]
   },
-  "Scripts/BBS/BBSTerminalAdapter.cs": {
-    "count": 3,
-    "sites": [
-      "0c9356ce1a",
-      "7e4046459b",
-      "98e92882fd"
-    ]
-  },
   "Scripts/Core/GameEngine.cs": {
     "count": 103,
     "sites": [
@@ -194,132 +186,32 @@
       "ab8325d32a"
     ]
   },
-  "Scripts/Server/GroupSystem.cs": {
-    "count": 2,
-    "sites": [
-      "b53e087945",
-      "ccf0047ac1"
-    ]
-  },
-  "Scripts/Server/MudChatSystem.cs": {
-    "count": 48,
-    "sites": [
-      "0017b475af",
-      "15b3282dcd",
-      "1916949fba",
-      "1d22aa199c",
-      "1fa7ef8fa5",
-      "2021641bf1",
-      "24b73ba8bd",
-      "3041857c71",
-      "319fb15a37",
-      "3b3e451f26",
-      "417de27b1a",
-      "4389a2aa54",
-      "45f365488b",
-      "46d4ec3ed6",
-      "4d349171cd",
-      "4d59973416",
-      "4f15b86dbf",
-      "53bbdb3e14",
-      "5d0564745f",
-      "622b514ca9",
-      "637282df68",
-      "6e5025af42",
-      "6fcb4f7a92",
-      "779788808a",
-      "7971756e94",
-      "7e03c43caa",
-      "89c4471a23",
-      "8c8531b7c0",
-      "939020ea3e",
-      "958fb1e471",
-      "995c3d6faa",
-      "995c3d6faa",
-      "9bc889cd65",
-      "9cc3a156d1",
-      "a753dfaf4e",
-      "a82a368d3c",
-      "c32ecf9412",
-      "c74a6b6d27",
-      "d93bb50627",
-      "e65ba1f709",
-      "e7f6a89310",
-      "e7f6a89310",
-      "ea75032c4f",
-      "f067786a1b",
-      "f244ecb1a8",
-      "fa0a6bc126",
-      "faf12fa3c3",
-      "ffd676584e"
-    ]
-  },
   "Scripts/Server/MudServer.cs": {
-    "count": 26,
+    "count": 11,
     "sites": [
-      "03ce90322e",
-      "04a184c446",
-      "073920585f",
       "07b2250841",
       "1a37046fa7",
       "31adb6e854",
-      "31daff4a61",
       "42ec515056",
-      "47f7e70e04",
       "64dc17b60b",
-      "68d2a6015f",
-      "6da168ef1d",
-      "75900a2160",
       "83dcbed40f",
       "84b04239e3",
-      "8a89362f7a",
       "99342d1da1",
       "9f12615fec",
-      "ca4655c5f5",
       "df35bf3c4e",
-      "e7b28d111a",
-      "efffb63e56",
-      "f1d8f3ec55",
-      "f9360c0bab",
-      "fbb953875d",
-      "fd83a829de"
+      "e7b28d111a"
     ]
   },
   "Scripts/Server/PlayerSession.cs": {
-    "count": 5,
+    "count": 1,
     "sites": [
-      "02c591812b",
-      "089b51d48e",
-      "6c92f4b5e5",
-      "75c0aa6d40",
       "7ce347ccc3"
     ]
   },
   "Scripts/Server/RelayClient.cs": {
-    "count": 16,
-    "sites": [
-      "0d610be844",
-      "10b88862d0",
-      "17122f1a59",
-      "1ec4ba1ba3",
-      "2949792bd3",
-      "66747ca149",
-      "7b965c2102",
-      "833551549d",
-      "87181f2f9a",
-      "8cb6635b6b",
-      "8f7400536d",
-      "9ce4b2079d",
-      "a095f88738",
-      "c3f4324282",
-      "ebfde9e08b",
-      "f3f1aef12a"
-    ]
-  },
-  "Scripts/Server/RoomRegistry.cs": {
     "count": 1,
     "sites": [
-      "ed6507df3b"
+      "2949792bd3"
     ]
   },
   "Scripts/Systems/AchievementSystem.cs": {

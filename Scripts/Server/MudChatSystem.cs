@@ -274,6 +274,18 @@ public static class MudChatSystem
     /// /gos / /shout / /gc / /tell with no message — empty args means "toggle mute"
     /// rather than "show usage."
     /// </summary>
+    /// <summary>
+    /// v1.2.5: a line on this player's own screen: two columns in, word wrapped at 79 columns with
+    /// later rows under the text, so a long translation or a 30 character name does not run past the edge.
+    /// A line that fits is written as it is.
+    /// </summary>
+    private static void Line(TerminalEmulator terminal, string color, string text)
+    {
+        terminal.SetColor(color);
+        foreach (var row in MudServer.NoticeRows(text))
+            terminal.WriteLine(row);
+    }
+
     private static bool ToggleChannelMute(string username, string channelKey, string friendlyName, string sendUsage, TerminalEmulator terminal)
     {
         var server = MudServer.Instance;
@@ -298,18 +310,14 @@ public static class MudChatSystem
         if (player.MutedChannels.Contains(channelKey))
         {
             player.MutedChannels.Remove(channelKey);
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.channel_unmuted", friendlyName)}");
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  ({sendUsage}; type the command alone to mute again.)");
+            Line(terminal, "bright_green", Systems.Loc.Get("chat.channel_unmuted", friendlyName));
+            Line(terminal, "gray", Systems.Loc.Get("chat.mute_again_hint", sendUsage));
         }
         else
         {
             player.MutedChannels.Add(channelKey);
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.channel_muted", friendlyName)}");
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  ({sendUsage}; type the command alone to unmute.)");
+            Line(terminal, "bright_yellow", Systems.Loc.Get("chat.channel_muted", friendlyName));
+            Line(terminal, "gray", Systems.Loc.Get("chat.unmute_hint", sendUsage));
         }
 
         return true;
@@ -320,7 +328,7 @@ public static class MudChatSystem
         if (string.IsNullOrWhiteSpace(message))
         {
             terminal.SetColor("gray");
-            terminal.WriteLine("  Say what? Usage: /say <message>");
+            terminal.WriteLine($"  {Systems.Loc.Get("chat.usage_say")}");
             return true;
         }
 
@@ -336,9 +344,10 @@ public static class MudChatSystem
 
         // Broadcast to others in the room
         var displayName = GetChatDisplayName(username);
-        RoomRegistry.Instance.BroadcastToRoom(
+        // v1.2.5: each listener reads the line in their own language; the message is as typed.
+        RoomRegistry.Instance.BroadcastToRoomLocalized(
             location.Value,
-            $"\u001b[1;37m  {displayName} says: {message}\u001b[0m",
+            lang => $"\u001b[1;37m  {Systems.Loc.GetIn(lang, "chat.says", displayName, message)}\u001b[0m",
             excludeUsername: username,
             historyChannel: "say");
 
@@ -350,7 +359,7 @@ public static class MudChatSystem
         // v0.57.14: empty message toggles mute instead of showing usage hint.
         if (string.IsNullOrWhiteSpace(message))
         {
-            return ToggleChannelMute(username, "shout", "Shout", "Usage: /shout <message>", terminal);
+            return ToggleChannelMute(username, "shout", Systems.Loc.Get("chat.channel_shout"), Systems.Loc.Get("chat.usage_shout"), terminal);
         }
 
         // Show to sender
@@ -360,8 +369,8 @@ public static class MudChatSystem
 
         // Broadcast to ALL connected players
         var displayName = GetChatDisplayName(username);
-        RoomRegistry.Instance!.BroadcastGlobal(
-            $"\u001b[1;33m  {displayName} shouts: {message}\u001b[0m",
+        RoomRegistry.Instance!.BroadcastGlobalLocalized(
+            lang => $"\u001b[1;33m  {Systems.Loc.GetIn(lang, "chat.shouts", displayName, message)}\u001b[0m",
             excludeUsername: username,
             channelKey: "shout",
             historyChannel: "shout");
@@ -377,7 +386,7 @@ public static class MudChatSystem
         // v0.57.14: completely empty args toggles incoming-tell mute (anti-harassment).
         if (string.IsNullOrWhiteSpace(args))
         {
-            return ToggleChannelMute(username, "tell", "Incoming tells", "Usage: /tell <player> <message>", terminal);
+            return ToggleChannelMute(username, "tell", Systems.Loc.Get("chat.channel_tells"), Systems.Loc.Get("chat.usage_tell"), terminal);
         }
 
         // Parse: /tell <playername> <message>. Display names can contain spaces
@@ -402,13 +411,14 @@ public static class MudChatSystem
             if (targetPlayer?.MutedChannels?.Contains("tell") == true)
             {
                 var blockedTargetName = GetSessionDisplayName(targetSession, targetName);
-                terminal.SetColor("gray");
-                terminal.WriteLine($"  {blockedTargetName} has private messages muted. Your tell was not delivered.");
+                Line(terminal, "gray", Systems.Loc.Get("chat.tell_muted", blockedTargetName));
                 return true;
             }
 
-            targetSession.EnqueueMessage($"\u001b[35m  {displayName} tells you: {message}\u001b[0m");
-            RecordDelivered(targetSession, "tell", $"{displayName} tells you: {message}");
+            // v1.2.5: in the recipient's language.
+            string tellLine = Systems.Loc.GetIn(MudServer.LangOf(targetSession), "chat.tells_you", displayName, message);
+            targetSession.EnqueueMessage($"\u001b[35m  {tellLine}\u001b[0m");
+            RecordDelivered(targetSession, "tell", tellLine);
             var targetDisplayName = GetSessionDisplayName(targetSession, targetName);
             terminal.SetColor("magenta");
             terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.you_tell", targetDisplayName, message)}");
@@ -517,7 +527,7 @@ public static class MudChatSystem
         // v0.57.14: empty message toggles mute instead of showing usage hint.
         if (string.IsNullOrWhiteSpace(message))
         {
-            return ToggleChannelMute(username, "gossip", "Gossip", "Usage: /gossip <message>  (or /gos)", terminal);
+            return ToggleChannelMute(username, "gossip", Systems.Loc.Get("chat.channel_gossip"), Systems.Loc.Get("chat.usage_gossip"), terminal);
         }
 
         // Show to sender
@@ -527,8 +537,8 @@ public static class MudChatSystem
 
         // Broadcast to ALL connected players (global out-of-character channel)
         var displayName = GetChatDisplayName(username);
-        RoomRegistry.Instance!.BroadcastGlobal(
-            $"\u001b[92m  [Gossip] {displayName}: {message}\u001b[0m",
+        RoomRegistry.Instance!.BroadcastGlobalLocalized(
+            lang => $"\u001b[92m  {Systems.Loc.GetIn(lang, "chat.gossip_line", displayName, message)}\u001b[0m",
             excludeUsername: username,
             channelKey: "gossip",
             historyChannel: "gossip");
@@ -753,13 +763,13 @@ public static class MudChatSystem
         {
             player.MudTitle = "";
             terminal.SetColor("gray");
-            terminal.WriteLine("  Your title has been cleared.");
+            terminal.WriteLine($"  {Systems.Loc.Get("chat.title_cleared")}");
         }
         else
         {
             player.MudTitle = args.Trim();
             terminal.SetColor("gray");
-            terminal.Write("  Title set to: ");
+            terminal.Write($"  {Systems.Loc.Get("chat.title_set")}");
             terminal.WriteRawAnsi(player.MudTitle);
             terminal.WriteLine("");
         }
@@ -985,8 +995,7 @@ public static class MudChatSystem
 
             session.PendingGroupInvite = null;
             invite.Response.TrySetResult(true);
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"  You accepted {GetSessionDisplayName(invite.Inviter, invite.Inviter.Username)}'s group invite.");
+            Line(terminal, "bright_green", Systems.Loc.Get("chat.accepted_group_invite", GetSessionDisplayName(invite.Inviter, invite.Inviter.Username)));
             return true;
         }
 
@@ -1027,8 +1036,7 @@ public static class MudChatSystem
 
             session.PendingSpectateRequest = null;
             request.Response.TrySetResult(true);
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"  You accepted {GetSessionDisplayName(request.Requester, request.Requester.Username)}'s spectate request.");
+            Line(terminal, "bright_green", Systems.Loc.Get("chat.accepted_spectate", GetSessionDisplayName(request.Requester, request.Requester.Username)));
             return true;
         }
 
@@ -1049,8 +1057,7 @@ public static class MudChatSystem
             var invite = session.PendingGroupInvite;
             session.PendingGroupInvite = null;
             invite.Response.TrySetResult(false);
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  You denied {GetSessionDisplayName(invite.Inviter, invite.Inviter.Username)}'s group invite.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.denied_group_invite", GetSessionDisplayName(invite.Inviter, invite.Inviter.Username)));
             return true;
         }
 
@@ -1074,8 +1081,7 @@ public static class MudChatSystem
             var request = session.PendingSpectateRequest;
             session.PendingSpectateRequest = null;
             request.Response.TrySetResult(false);
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  You denied {GetSessionDisplayName(request.Requester, request.Requester.Username)}'s spectate request.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.denied_spectate", GetSessionDisplayName(request.Requester, request.Requester.Username)));
             return true;
         }
 
@@ -1090,13 +1096,12 @@ public static class MudChatSystem
             .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
         if (session == null || session.Spectators.Count == 0)
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  No one is watching your session.");
+            Line(terminal, "gray", Systems.Loc.Get("chat.no_spectators"));
             return true;
         }
 
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine("  Current spectators:");
+        terminal.WriteLine($"  {Systems.Loc.Get("chat.spectators_header")}");
         foreach (var spectator in session.Spectators.ToArray())
         {
             terminal.SetColor("white");
@@ -1111,15 +1116,15 @@ public static class MudChatSystem
             .TryGetValue(username.ToLowerInvariant(), out var s) == true ? s : null;
         if (session == null || session.Spectators.Count == 0)
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  No one is watching your session.");
+            Line(terminal, "gray", Systems.Loc.Get("chat.no_spectators"));
             return true;
         }
 
         foreach (var spectator in session.Spectators.ToArray())
         {
-            spectator.EnqueueMessage(
-                $"\u001b[1;33m  * {GetChatDisplayName(username)} has ended the spectator session.\u001b[0m");
+            string ownerName = GetChatDisplayName(username);
+            MudServer.EnqueueNotice(spectator, "1;33",
+                lang => Systems.Loc.GetIn(lang, "chat.spectator_session_ended", ownerName), "* ");
             spectator.SpectatingSession = null;
             spectator.IsSpectating = false;
             session.Context?.Terminal?.RemoveSpectatorStream(spectator);
@@ -1127,7 +1132,7 @@ public static class MudChatSystem
         session.Spectators.Clear();
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine("  All spectators have been removed.");
+        terminal.WriteLine($"  {Systems.Loc.Get("chat.spectators_removed")}");
         return true;
     }
 
@@ -1156,8 +1161,8 @@ public static class MudChatSystem
                 terminal.SetColor("gray");
                 terminal.WriteLine($"  {UsurperRemake.Systems.Loc.Get("chat.not_in_group")}");
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("  Usage: /group <player> -- invite a player to your group");
-                terminal.WriteLine("  All group members must be on the same team.");
+                terminal.WriteLine($"  {Systems.Loc.Get("chat.group_usage")}");
+                terminal.WriteLine($"  {Systems.Loc.Get("chat.group_same_team")}");
                 return true;
             }
 
@@ -1167,7 +1172,7 @@ public static class MudChatSystem
                 terminal.WriteLine("  ═══════════════════════════════════════════");
             }
             terminal.SetColor("bright_white");
-            terminal.WriteLine("  Your Group:");
+            terminal.WriteLine($"  {Systems.Loc.Get("chat.group_header")}");
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("bright_cyan");
@@ -1185,8 +1190,8 @@ public static class MudChatSystem
                 bool isLeader = existingGroup.IsLeader(member);
                 var memberSession = GroupSystem.GetSession(member);
                 var player = memberSession?.Context?.Engine?.CurrentPlayer;
-                var levelStr = player != null ? $" (Lv {player.Level})" : "";
-                var statusTag = isLeader ? " [Leader]" : "";
+                var levelStr = player != null ? " " + Systems.Loc.Get("chat.group_member_level", player.Level) : "";
+                var statusTag = isLeader ? " " + Systems.Loc.Get("chat.group_leader_tag") : "";
                 var displayName = memberSession != null
                     ? GetSessionDisplayName(memberSession, member)
                     : member;
@@ -1196,11 +1201,11 @@ public static class MudChatSystem
             }
 
             terminal.SetColor("gray");
-            terminal.WriteLine($"  {members.Count}/{GameConfig.GroupMaxSize} members");
+            terminal.WriteLine($"  {Systems.Loc.Get("chat.group_members", members.Count, GameConfig.GroupMaxSize)}");
             if (existingGroup.IsInDungeon)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  Status: In Dungeon (Floor {existingGroup.CurrentFloor})");
+                terminal.WriteLine($"  {Systems.Loc.Get("chat.group_in_dungeon", existingGroup.CurrentFloor)}");
             }
             return true;
         }
@@ -1220,16 +1225,14 @@ public static class MudChatSystem
         var myPlayer = mySession.Context?.Engine?.CurrentPlayer;
         if (myPlayer != null && myPlayer.Level < GameConfig.GroupMinLevel)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  You must be at least level {GameConfig.GroupMinLevel} to form a group.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_min_level", GameConfig.GroupMinLevel));
             return true;
         }
 
         // Can't be a group follower and invite (leader or unaffiliated only)
         if (mySession.IsGroupFollower)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  Only the group leader can invite new members.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_only_leader_invites"));
             return true;
         }
 
@@ -1237,16 +1240,14 @@ public static class MudChatSystem
         var targetSession = FindSessionByNameOrUsername(targetName);
         if (targetSession == null || !targetSession.IsInGame)
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  {targetName} is not online.");
+            Line(terminal, "gray", Systems.Loc.Get("chat.group_target_offline", targetName));
             return true;
         }
 
         // Can't invite spectators
         if (targetSession.IsSpectating)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  {GetSessionDisplayName(targetSession, targetSession.Username)} is currently spectating and cannot be invited.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_target_spectating", GetSessionDisplayName(targetSession, targetSession.Username)));
             return true;
         }
 
@@ -1254,8 +1255,7 @@ public static class MudChatSystem
         var targetGroup = groupSystem.GetGroupFor(targetSession.Username);
         if (targetGroup != null)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  {GetSessionDisplayName(targetSession, targetSession.Username)} is already in a group.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_target_in_group", GetSessionDisplayName(targetSession, targetSession.Username)));
             return true;
         }
 
@@ -1265,14 +1265,12 @@ public static class MudChatSystem
         {
             if (string.IsNullOrEmpty(myPlayer.Team) || string.IsNullOrEmpty(targetPlayer.Team))
             {
-                terminal.SetColor("yellow");
-                terminal.WriteLine("  Both players must be on a team to form a group.");
+                Line(terminal, "yellow", Systems.Loc.Get("chat.group_need_team"));
                 return true;
             }
             if (!myPlayer.Team.Equals(targetPlayer.Team, StringComparison.OrdinalIgnoreCase))
             {
-                terminal.SetColor("yellow");
-                terminal.WriteLine($"  {GetSessionDisplayName(targetSession, targetSession.Username)} is not on your team ({myPlayer.Team}).");
+                Line(terminal, "yellow", Systems.Loc.Get("chat.group_not_your_team", GetSessionDisplayName(targetSession, targetSession.Username), myPlayer.Team));
                 return true;
             }
         }
@@ -1280,8 +1278,7 @@ public static class MudChatSystem
         // Check target level
         if (targetPlayer != null && targetPlayer.Level < GameConfig.GroupMinLevel)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  {GetSessionDisplayName(targetSession, targetSession.Username)} must be at least level {GameConfig.GroupMinLevel} to join a group.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_target_min_level", GetSessionDisplayName(targetSession, targetSession.Username), GameConfig.GroupMinLevel));
             return true;
         }
 
@@ -1293,32 +1290,28 @@ public static class MudChatSystem
         }
         else if (!myGroup.IsLeader(username))
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  Only the group leader can invite new members.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_only_leader_invites"));
             return true;
         }
 
         // Check if group is full
         if (myGroup.IsFull)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  Your group is full ({GameConfig.GroupMaxSize}/{GameConfig.GroupMaxSize}).");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_full", GameConfig.GroupMaxSize, GameConfig.GroupMaxSize));
             return true;
         }
 
         // Check if group is in dungeon (can't invite mid-dungeon)
         if (myGroup.IsInDungeon)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  You can't invite players while the group is in the dungeon.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_no_invite_in_dungeon"));
             return true;
         }
 
         // Check if target already has a pending invite
         if (targetSession.PendingGroupInvite != null && !targetSession.PendingGroupInvite.IsExpired)
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  {GetSessionDisplayName(targetSession, targetSession.Username)} already has a pending group invite.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_target_pending", GetSessionDisplayName(targetSession, targetSession.Username)));
             return true;
         }
 
@@ -1328,10 +1321,11 @@ public static class MudChatSystem
 
         var myDisplayName = GetChatDisplayName(username);
         var targetDisplayName = GetSessionDisplayName(targetSession, targetSession.Username);
-        targetSession.EnqueueMessage(
-            $"\u001b[1;33m  * {myDisplayName} has invited you to join their dungeon group.\u001b[0m");
-        targetSession.EnqueueMessage(
-            $"\u001b[1;33m  * Type /accept to join or /deny to refuse. ({GameConfig.GroupInviteTimeoutSeconds}s)\u001b[0m");
+        // v1.2.5: in the invited player's language; /accept and /deny stay as typed.
+        MudServer.EnqueueNotice(targetSession, "1;33",
+            lang => Systems.Loc.GetIn(lang, "chat.group_invited_you", myDisplayName), "* ");
+        MudServer.EnqueueNotice(targetSession, "1;33",
+            lang => Systems.Loc.GetIn(lang, "chat.group_invite_howto", GameConfig.GroupInviteTimeoutSeconds), "* ");
 
         // Phase 8: emit graphical group-invite modal to the target's Electron
         // client. Dormant in v1 (no online-Electron yet) but wiring is ready
@@ -1344,8 +1338,7 @@ public static class MudChatSystem
                 timeoutSeconds: GameConfig.GroupInviteTimeoutSeconds);
         }
 
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"  Group invite sent to {targetDisplayName}. ({GameConfig.GroupInviteTimeoutSeconds}s to respond)");
+        Line(terminal, "bright_cyan", Systems.Loc.Get("chat.group_invite_sent", targetDisplayName, GameConfig.GroupInviteTimeoutSeconds));
 
         // Fire-and-forget: background task handles the accept/deny/timeout
         _ = ProcessGroupInviteAsync(invite, mySession, targetSession, myGroup, groupSystem);
@@ -1377,8 +1370,9 @@ public static class MudChatSystem
                 accepted = false;
                 invite.Response.TrySetResult(false);
                 targetSession.PendingGroupInvite = null;
-                targetSession.EnqueueMessage(
-                    $"\u001b[1;33m  * The group invite from {GetSessionDisplayName(leaderSession, leaderSession.Username)} has expired.\u001b[0m");
+                string leaderName = GetSessionDisplayName(leaderSession, leaderSession.Username);
+                MudServer.EnqueueNotice(targetSession, "1;33",
+                    lang => Systems.Loc.GetIn(lang, "chat.group_invite_expired_from", leaderName), "* ");
             }
         }
         catch
@@ -1391,8 +1385,8 @@ public static class MudChatSystem
         var targetName = GetSessionDisplayName(targetSession, targetSession.Username);
         if (!accepted)
         {
-            leaderSession.EnqueueMessage(
-                $"\u001b[1;33m  * {targetName} denied your group invite (or it timed out).\u001b[0m");
+            MudServer.EnqueueNotice(leaderSession, "1;33",
+                lang => Systems.Loc.GetIn(lang, "chat.group_invite_denied", targetName), "* ");
 
             // If group only has the leader (self), disband it
             lock (group.MemberUsernames)
@@ -1406,17 +1400,17 @@ public static class MudChatSystem
         // Accepted — add to group
         if (!groupSystem.AddMember(group, targetSession.Username))
         {
-            leaderSession.EnqueueMessage(
-                $"\u001b[1;33m  * Failed to add {targetName} -- group may be full.\u001b[0m");
+            MudServer.EnqueueNotice(leaderSession, "1;33",
+                lang => Systems.Loc.GetIn(lang, "chat.group_add_failed", targetName), "* ");
             return;
         }
 
-        leaderSession.EnqueueMessage(
-            $"\u001b[1;32m  * {targetName} has joined your group!\u001b[0m");
+        MudServer.EnqueueNotice(leaderSession, "1;32",
+            lang => Systems.Loc.GetIn(lang, "chat.group_joined_yours", targetName), "* ");
 
-        // Notify all other group members
-        groupSystem.NotifyGroup(group,
-            $"\u001b[1;32m  * {targetName} has joined the group!\u001b[0m",
+        // Notify all other group members, each in their own language
+        groupSystem.NotifyGroupNotice(group, "1;32",
+            lang => Systems.Loc.GetIn(lang, "chat.group_joined", targetName),
             excludeUsername: leaderSession.Username);
     }
 
@@ -1435,14 +1429,12 @@ public static class MudChatSystem
 
         if (group.IsLeader(username))
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  You are the group leader. Use /disband to disband the group.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_leader_cant_leave"));
             return true;
         }
 
         groupSystem.RemoveMember(username, "left voluntarily");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("  You have left the group.");
+        Line(terminal, "bright_green", Systems.Loc.Get("chat.group_left"));
         return true;
     }
 
@@ -1461,14 +1453,12 @@ public static class MudChatSystem
 
         if (!group.IsLeader(username))
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  Only the group leader can disband the group.");
+            Line(terminal, "yellow", Systems.Loc.Get("chat.group_only_leader_disbands"));
             return true;
         }
 
         groupSystem.DisbandGroup(username, "leader disbanded the group");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("  Your group has been disbanded.");
+        Line(terminal, "bright_green", Systems.Loc.Get("chat.group_disbanded"));
         return true;
     }
 
@@ -1764,7 +1754,7 @@ public static class MudChatSystem
         // v0.57.14: empty args toggles guild-chat mute
         if (string.IsNullOrWhiteSpace(args))
         {
-            return ToggleChannelMute(username, "guild", "Guild chat", Systems.Loc.Get("guild.usage_gc"), terminal);
+            return ToggleChannelMute(username, "guild", Systems.Loc.Get("chat.channel_guild"), Systems.Loc.Get("guild.usage_gc"), terminal);
         }
 
         string chatLabel = Systems.Loc.Get("guild.chat_label");
