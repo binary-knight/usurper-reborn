@@ -2015,7 +2015,9 @@ public partial class CombatEngine
                         if (!string.IsNullOrEmpty(reaction))
                         {
                             terminal.SetColor("cyan");
-                            terminal.WriteLine(Loc.Get("combat.npc_reaction", npc.Name2, reaction));
+                            // v1.2.5: wrapped at 79, like the victory reactions
+                            foreach (var row in NpcReactionRows(GameConfig.Language, npc.Name2, reaction))
+                                terminal.WriteLine(row);
                         }
                     }
                 }
@@ -22731,7 +22733,9 @@ public partial class CombatEngine
                     if (!string.IsNullOrEmpty(reaction))
                     {
                         terminal.SetColor("cyan");
-                        terminal.WriteLine($"  {npc.Name2}: \"{reaction}\"");
+                        // v1.2.5: the localized speaker line, wrapped at 79
+                        foreach (var row in NpcReactionRows(GameConfig.Language, npc.Name2, reaction))
+                            terminal.WriteLine(row);
                     }
                 }
             }

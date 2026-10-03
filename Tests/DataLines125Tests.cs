@@ -387,6 +387,36 @@ public class DataLines125Tests : IDisposable
         }
     }
 
+    /// <summary>
+    /// The flee and fallen-ally reactions are written to the screen through NpcReactionRows (wrapped at 79,
+    /// the reader's speaker line), as the victory reactions are: no reaction is written as one long row.
+    /// </summary>
+    [Fact]
+    public void CombatReactions_AreWrittenThroughTheWrappedRows()
+    {
+        string root = UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot();
+        var src = File.ReadAllLines(Path.Combine(root, "Scripts/Systems/CombatEngine.cs"));
+        int sites = 0;
+        for (int i = 0; i < src.Length; i++)
+        {
+            var m = Regex.Match(src[i], @"string (\w+) = \w+\.GetReaction\(");
+            if (!m.Success) continue;
+            string v = m.Groups[1].Value;
+            var after = src.Skip(i + 1).Take(8).ToList();
+            if (after.Any(l => l.Contains("farewells.Add("))) continue;   // the Electron death screen list, not a terminal row
+            after.Should().Contain(l => l.Contains($"NpcReactionRows(GameConfig.Language, ") && l.Contains($", {v})"), $"CombatEngine.cs:{i + 1}");
+            after.Should().NotContain(l => l.Contains("WriteLine(") && l.Contains(v), $"CombatEngine.cs:{i + 1}");
+            sites++;
+        }
+        sites.Should().Be(2);
+        foreach (var lang in Langs)
+            foreach (var line in OwnedLines().Where(l => l.EventType is "combat_flee" or "ally_death"))
+            {
+                string said = Render(lang, line, new NPC { Name2 = LongName }, new Player { Name2 = LongName });
+                CombatEngine.NpcReactionRows(lang, LongName, said).Should().OnlyContain(r => r.Length <= 79, $"{line.Id} in {lang}");
+            }
+    }
+
     /// <summary>The most rows a line takes in any language, as measured (the longest English story lines take three).</summary>
     private const int MaxRows = 3;
 
