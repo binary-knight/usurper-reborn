@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 
 namespace UsurperRemake.Systems
 {
@@ -100,6 +101,9 @@ namespace UsurperRemake.Systems
                     {
                         await DisplayDialogueNode(currentNode);
                     }
+                    // v1.2.5: a node passed on the way applies its effects too (before, only an end
+                    // node did, so the Stranger's defiant_to_stranger and willing_hero flags were never set)
+                    ApplyNodeEffects(currentNode);
                     if (!string.IsNullOrEmpty(currentNode.NextNodeId))
                     {
                         currentNode = FindNode(currentNode.NextNodeId);
@@ -121,6 +125,7 @@ namespace UsurperRemake.Systems
                     {
                         await DisplayDialogueNode(currentNode);
                     }
+                    ApplyNodeEffects(currentNode);
                     ApplyChoiceEffects(availableChoices[0]);
                     currentNode = FindNode(availableChoices[0].NextNodeId);
                     await Pacing.Wait(1000);
@@ -136,6 +141,7 @@ namespace UsurperRemake.Systems
                     {
                         await DisplayDialogueNode(currentNode);
                     }
+                    ApplyNodeEffects(currentNode);
 
                     // Present choices to the player
                     var selectedChoice = await PresentChoices(availableChoices);
@@ -165,7 +171,7 @@ namespace UsurperRemake.Systems
         {
             if (node == null) return;
 
-            string body = string.Join("\n", node.Text.Select(line => ProcessDialogueVariables(line)));
+            string body = string.Join("\n", NodeLines(node).Select(line => ProcessDialogueVariables(line)));
 
             var choiceList = new List<ElectronBridge.DialogueChoiceData>();
             for (int i = 0; i < choices.Count; i++)
@@ -173,7 +179,7 @@ namespace UsurperRemake.Systems
                 choiceList.Add(new ElectronBridge.DialogueChoiceData
                 {
                     Key = (i + 1).ToString(),
-                    Text = choices[i].Text,
+                    Text = ChoiceText(choices[i]),
                     Style = MapChoiceStyle(choices[i])
                 });
             }
@@ -191,7 +197,7 @@ namespace UsurperRemake.Systems
             string? portraitKey = !string.IsNullOrEmpty(node.Speaker) ? $"npc:{node.Speaker}" : null;
 
             ElectronBridge.EmitDialogue(
-                speaker: node.Speaker ?? "",
+                speaker: SpeakerLabel(node.Speaker),
                 portraitKey: portraitKey,
                 text: body,
                 choices: choiceList,
@@ -219,15 +225,16 @@ namespace UsurperRemake.Systems
             if (!string.IsNullOrEmpty(node.Speaker))
             {
                 var speakerColor = GetSpeakerColor(node.Speaker);
-                terminal.WriteLine($"[{node.Speaker}]", speakerColor);
+                terminal.WriteLine($"[{SpeakerLabel(node.Speaker)}]", speakerColor);
             }
 
             // Display each line of dialogue with slight delay
-            foreach (var line in node.Text)
+            foreach (var line in NodeLines(node))
             {
                 var processedLine = ProcessDialogueVariables(line);
-                terminal.WriteLine(processedLine, node.TextColor ?? "white");
-                await Task.Delay(50 * Math.Min(processedLine.Length, 80)); // Typing effect delay
+                foreach (var row in FitRows(processedLine, ""))
+                    terminal.WriteLine(row, node.TextColor ?? "white");
+                await Pacing.Wait(50 * Math.Min(processedLine.Length, 80)); // Typing effect delay
             }
 
             terminal.WriteLine("");
@@ -249,9 +256,10 @@ namespace UsurperRemake.Systems
                 for (int i = 0; i < choices.Count; i++)
                 {
                     var choice = choices[i];
-                    var prefix = $"[{i + 1}]";
+                    var prefix = $"[{i + 1}] ";
                     var color = GetChoiceColor(choice);
-                    terminal.WriteLine($"{prefix} {choice.Text}", color);
+                    foreach (var row in FitRows(prefix + ChoiceText(choice), new string(' ', prefix.Length)))
+                        terminal.WriteLine(row, color);
                 }
 
                 terminal.WriteLine(Loc.Get("dialogue.say_nothing_option"), "dark_gray");
@@ -551,7 +559,7 @@ namespace UsurperRemake.Systems
 
                 case EffectType.GiveItem:
                     // Item inventory add not implemented for dialogue rewards
-                    terminal?.WriteLine(Loc.Get("dialogue.effect_item", effect.StringValue ?? ""), "bright_yellow");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_item", RewardName(effect.StringValue ?? "")), "bright_yellow");
                     break;
 
                 case EffectType.RecordChoice:
@@ -773,7 +781,59 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void RegisterDialogueTree(DialogueTree tree)
         {
+            foreach (var node in tree.AllNodes.Values)
+            {
+                node.TreeId = tree.Id;
+                foreach (var choice in node.Choices)
+                    choice.TextKey = ChoiceKey(tree.Id, node.Id, choice.Id);
+            }
             dialogueTrees[tree.Id] = tree;
+        }
+
+        // v1.2.5: the node and choice text lives in Localization under keys built from the tree, node and
+        // choice ids, so a tree is shown in the reader's language while every id, condition, flag and
+        // recorded choice stays English. The keys never depend on the text or on its position in a list.
+        internal const int MaxRowWidth = 79;
+
+        internal static string NodeTextKey(string treeId, string nodeId) => $"dialogue.{treeId}.{nodeId}.text";
+
+        internal static string ChoiceKey(string treeId, string nodeId, string choiceId) => $"dialogue.{treeId}.{nodeId}.{choiceId}";
+
+        /// <summary>The node's text in the reader's language, one entry per row as written.</summary>
+        internal static string[] NodeLines(DialogueNode node) =>
+            Loc.Get(NodeTextKey(node.TreeId, node.Id)).Replace("\r\n", "\n").Split('\n');
+
+        /// <summary>The choice's text in the reader's language.</summary>
+        internal static string ChoiceText(DialogueChoice choice) => Loc.Get(choice.TextKey);
+
+        // Speaker titles shown through a key; proper names show as they are. The stored speaker stays
+        // English: it picks the colour and the Electron portrait.
+        private static readonly Dictionary<string, string> SpeakerKeys = new()
+        {
+            ["Mysterious Stranger"] = "dialogue.speaker.mysterious_stranger",
+        };
+
+        internal static string SpeakerLabel(string? speaker) =>
+            string.IsNullOrEmpty(speaker) ? "" : SpeakerKeys.TryGetValue(speaker, out var key) ? Loc.Get(key) : speaker;
+
+        // Dialogue rewards are stored English (GiveItem) and shown by key.
+        private static readonly Dictionary<string, string> RewardKeys = new()
+        {
+            ["Ancient Iron Key"] = "dialogue.reward.ancient_iron_key",
+            ["Shadow Cloak"] = "item.shadow_cloak",
+        };
+
+        internal static string RewardName(string stored) =>
+            RewardKeys.TryGetValue(stored, out var key) ? Loc.Get(key) : stored;
+
+        /// <summary>A row that fits is written as it is; a longer one is wrapped at spaces to the row width,
+        /// each later row indented by <paramref name="indent"/>.</summary>
+        internal static List<string> FitRows(string text, string indent)
+        {
+            if (UIHelper.VisibleLength(text) <= MaxRowWidth) return new List<string> { text };
+            var rows = UIHelper.WordWrap(text, MaxRowWidth - indent.Length);
+            for (int i = 1; i < rows.Count; i++) rows[i] = indent + rows[i];
+            return rows;
         }
 
         #region Opening Hook Dialogue
@@ -792,37 +852,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_approach",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "A cloaked figure emerges from the shadows, their face hidden.",
-                    "Yet you sense ancient eyes studying you intently.",
-                    "",
-                    "\"Ah... {PlayerName}. I've been waiting for you.\"",
-                    "",
-                    "\"You don't know me. Not yet. But I know you.\"",
-                    "\"I know what you will become. What you MUST become.\"",
-                    "",
-                    "\"The old gods stir in their prisons. Their chains grow weak.\"",
-                    "\"And you... you are the key.\""
-                },
                 TextColor = "white",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Who are you? What do you want from me?",
+                        Id = "choice_1",
                         NextNodeId = "stranger_identity",
                         Tone = DialogueTone.Suspicious
                     },
                     new()
                     {
-                        Text = "Old gods? I'm just trying to survive here.",
+                        Id = "choice_2",
                         NextNodeId = "stranger_dismissive",
                         Tone = DialogueTone.Neutral
                     },
                     new()
                     {
-                        Text = "I bow to no gods, old or new. Speak plainly!",
+                        Id = "choice_3",
                         NextNodeId = "stranger_defiant",
                         Tone = DialogueTone.Defiant,
                         Effects = new List<DialogueEffect>
@@ -832,7 +879,7 @@ namespace UsurperRemake.Systems
                     },
                     new()
                     {
-                        Text = "If I can help, I will. Tell me more.",
+                        Id = "choice_4",
                         NextNodeId = "stranger_willing",
                         Tone = DialogueTone.Friendly,
                         Effects = new List<DialogueEffect>
@@ -850,17 +897,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_identity",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "The stranger chuckles softly.",
-                    "",
-                    "\"Who am I? I am many things. A witness. A guide.\"",
-                    "\"Some call me Fate. Others, Doom. I prefer... Observer.\"",
-                    "",
-                    "\"What I want? Nothing for myself.\"",
-                    "\"But the world trembles, {PlayerName}. The Seals weaken.\"",
-                    "\"Seven gods. Seven prisons. Seven chances to decide the fate of all.\""
-                },
                 NextNodeId = "stranger_prophecy"
             };
             tree.AllNodes[identity.Id] = identity;
@@ -870,16 +906,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_dismissive",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "\"Survival?\" The stranger's voice carries amusement.",
-                    "",
-                    "\"You think you came here by chance? To this realm?\"",
-                    "\"No, {PlayerName}. You were called. Chosen.\"",
-                    "",
-                    "\"Survive if you wish. But eventually, you will face them.\"",
-                    "\"The old gods. And when you do... remember this meeting.\""
-                },
                 NextNodeId = "stranger_prophecy"
             };
             tree.AllNodes[dismissive.Id] = dismissive;
@@ -889,17 +915,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_defiant",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "The stranger's eyes flash with something like... approval?",
-                    "",
-                    "\"Good. GOOD. That fire will serve you well.\"",
-                    "\"The old gods respect strength. Fear it, even.\"",
-                    "",
-                    "\"You may yet become something they never expected.\"",
-                    "\"Not their servant. Not their destroyer.\"",
-                    "\"Something... new.\""
-                },
                 NextNodeId = "stranger_prophecy",
                 Effects = new List<DialogueEffect>
                 {
@@ -913,17 +928,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_willing",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "The stranger seems pleased.",
-                    "",
-                    "\"A willing heart. Rare in these dark times.\"",
-                    "\"But do not confuse willingness with weakness.\"",
-                    "",
-                    "\"The path ahead requires both courage AND cunning.\"",
-                    "\"Mercy AND strength. You must become more than mortal.\"",
-                    "\"Are you ready for such a burden?\""
-                },
                 NextNodeId = "stranger_prophecy",
                 Effects = new List<DialogueEffect>
                 {
@@ -937,38 +941,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_prophecy",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "The stranger raises a hand, and shadows dance.",
-                    "",
-                    "\"Seven old gods. Imprisoned eons ago by Manwe the Creator.\"",
-                    "\"Maelketh of War. Veloura of Passion. Thorgrim of Law.\"",
-                    "\"Noctura of Shadows. Aurelion of Light. Terravok of Earth.\"",
-                    "\"And others... forgotten.\"\n",
-                    "",
-                    "\"Their prisons fail. One by one, they will break free.\"",
-                    "\"And you, {PlayerName}, must face them all.\"",
-                    "",
-                    "\"Kill them. Save them. Use them. The choice... is yours.\""
-                },
                 TextColor = "bright_cyan",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Why me? I'm nobody special.",
+                        Id = "choice_1",
                         NextNodeId = "stranger_why_me",
                         Tone = DialogueTone.Humble
                     },
                     new()
                     {
-                        Text = "These 'gods' - can they truly be killed?",
+                        Id = "choice_2",
                         NextNodeId = "stranger_killing_gods",
                         Tone = DialogueTone.Suspicious
                     },
                     new()
                     {
-                        Text = "What happens if I refuse this 'destiny'?",
+                        Id = "choice_3",
                         NextNodeId = "stranger_refuse",
                         Tone = DialogueTone.Defiant
                     }
@@ -981,16 +971,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_why_me",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "\"Nobody special?\" The stranger laughs.",
-                    "",
-                    "\"Every great tale begins with 'nobody special.'\"",
-                    "\"It's what you BECOME that matters.\"",
-                    "",
-                    "\"Grow strong. Seek the artifacts. Learn the truth.\"",
-                    "\"When the first seal breaks, you will understand.\""
-                },
                 NextNodeId = "stranger_gift"
             };
             tree.AllNodes[whyMe.Id] = whyMe;
@@ -1000,16 +980,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_killing_gods",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "\"Killed?\" The word hangs in the air.",
-                    "",
-                    "\"Gods do not die as mortals do. But they can be... ended.\"",
-                    "\"Scattered. Absorbed. Consumed.\"",
-                    "",
-                    "\"The artifacts of the Creator hold that power.\"",
-                    "\"Seven artifacts. Seven gods. No coincidence.\""
-                },
                 NextNodeId = "stranger_gift"
             };
             tree.AllNodes[killingGods.Id] = killingGods;
@@ -1019,16 +989,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_refuse",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "\"Refuse?\" The stranger's voice carries infinite sadness.",
-                    "",
-                    "\"You may try. But destiny is not a request.\"",
-                    "\"The gods will come. The seals will break.\"",
-                    "\"And when they do, you will fight or you will fall.\"",
-                    "",
-                    "\"There is no third path. Not for you.\""
-                },
                 NextNodeId = "stranger_gift"
             };
             tree.AllNodes[refuse.Id] = refuse;
@@ -1038,19 +998,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "stranger_gift",
                 Speaker = "Mysterious Stranger",
-                Text = new[]
-                {
-                    "The stranger presses something cold into your hand.",
-                    "A small iron key, ancient and worn.",
-                    "",
-                    "\"A gift. And a burden. This key opens... possibilities.\"",
-                    "\"When you are ready, seek the First Seal.\"",
-                    "\"In the deepest dungeon. In the darkest shadow.\"",
-                    "",
-                    "\"We will meet again, {PlayerName}. I promise you that.\"",
-                    "",
-                    "The stranger fades into shadow, leaving only echoes."
-                },
                 TextColor = "bright_magenta",
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
@@ -1108,38 +1055,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "maelketh_intro",
                 Speaker = "Maelketh",
-                Text = new[]
-                {
-                    "The chamber erupts in crimson flame.",
-                    "Before you stands a titan of blood and iron,",
-                    "his form scarred by countless battles.",
-                    "",
-                    "\"AT LAST! A WARRIOR APPROACHES!\"",
-                    "",
-                    "His voice shakes the very stones.",
-                    "",
-                    "\"Ten thousand years I have waited.\"",
-                    "\"Ten thousand years without the GLORY of combat.\"",
-                    "\"And now... YOU.\""
-                },
                 TextColor = "dark_red",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I am here to destroy you, Maelketh.",
+                        Id = "choice_1",
                         NextNodeId = "maelketh_fight",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "We don't have to fight. There's another way.",
+                        Id = "choice_2",
                         NextNodeId = "maelketh_peace",
                         Tone = DialogueTone.Friendly
                     },
                     new()
                     {
-                        Text = "Teach me. Show me the ways of war.",
+                        Id = "choice_3",
                         NextNodeId = "maelketh_teach",
                         Tone = DialogueTone.Humble
                     }
@@ -1152,14 +1085,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "maelketh_fight",
                 Speaker = "Maelketh",
-                Text = new[]
-                {
-                    "The god's face splits into a terrible grin.",
-                    "",
-                    "\"YESSSS! THIS is what I crave!\"",
-                    "\"Come then, mortal! Show me your fury!\"",
-                    "\"Let us see if your courage matches your words!\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1172,16 +1097,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "maelketh_peace",
                 Speaker = "Maelketh",
-                Text = new[]
-                {
-                    "The god's laughter booms like thunder.",
-                    "",
-                    "\"PEACE?! From the God of WAR?!\"",
-                    "\"You understand NOTHING, mortal!\"",
-                    "",
-                    "\"War is not my curse - it is my ESSENCE!\"",
-                    "\"There IS no other way. There never was.\""
-                },
                 NextNodeId = "maelketh_fight"
             };
             tree.AllNodes[peace.Id] = peace;
@@ -1190,18 +1105,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "maelketh_teach",
                 Speaker = "Maelketh",
-                Text = new[]
-                {
-                    "Maelketh pauses, studying you with ancient eyes.",
-                    "",
-                    "\"You wish to LEARN? Interesting.\"",
-                    "\"Most who stand before me seek only victory.\"",
-                    "",
-                    "\"Very well. I will teach you.\"",
-                    "\"But know this: My lessons are written in BLOOD.\"",
-                    "\"Survive, and you will be stronger.\"",
-                    "\"Fail, and you will be FORGOTTEN.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1227,30 +1130,18 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_intro",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "The chamber fills with intoxicating perfume.",
-                    "A figure of heartbreaking beauty materializes,",
-                    "her form shifting between desire and despair.",
-                    "",
-                    "\"Another comes to... what? Kill me? Save me?\"",
-                    "Her voice carries infinite weariness.",
-                    "",
-                    "\"I have been both loved and hated beyond measure.\"",
-                    "\"Now I am simply... tired.\""
-                },
                 TextColor = "bright_magenta",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Your corruption ends here, goddess.",
+                        Id = "choice_1",
                         NextNodeId = "veloura_fight",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "You seem... different from the others. What happened to you?",
+                        Id = "choice_2",
                         NextNodeId = "veloura_story",
                         Tone = DialogueTone.Friendly,
                         Effects = new List<DialogueEffect>
@@ -1260,7 +1151,7 @@ namespace UsurperRemake.Systems
                     },
                     new()
                     {
-                        Text = "Perhaps you don't have to be tired anymore.",
+                        Id = "choice_3",
                         NextNodeId = "veloura_hope",
                         Tone = DialogueTone.Wise,
                         Condition = new DialogueCondition
@@ -1282,16 +1173,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_fight",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "Veloura's eyes flash with resigned fury.",
-                    "",
-                    "\"Of course. It always comes to this.\"",
-                    "\"Very well. Let us dance our final dance.\"",
-                    "",
-                    "\"Know that I take no pleasure in this.\"",
-                    "\"...That is a lie. I take pleasure in EVERYTHING.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1304,30 +1185,17 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_story",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "The goddess's form wavers, showing cracks of light.",
-                    "",
-                    "\"Different? Perhaps. I was not always... this.\"",
-                    "\"Once I was pure love. Pure passion.\"",
-                    "",
-                    "\"But Manwe... Manwe perverted my essence.\"",
-                    "\"Made me a weapon. Made me corrupt all I touched.\"",
-                    "",
-                    "\"I have ruined kingdoms. Destroyed families.\"",
-                    "\"Not because I wished to... but because I MUST.\""
-                },
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Then let me end your suffering.",
+                        Id = "choice_1",
                         NextNodeId = "veloura_mercy_kill",
                         Tone = DialogueTone.Neutral
                     },
                     new()
                     {
-                        Text = "What if the curse could be broken?",
+                        Id = "choice_2",
                         NextNodeId = "veloura_save_path",
                         Tone = DialogueTone.Wise,
                         Effects = new List<DialogueEffect>
@@ -1343,17 +1211,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_hope",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "For a moment, the goddess looks almost... human.",
-                    "",
-                    "\"Hope? I had forgotten that word.\"",
-                    "\"You speak of salvation? For ME?\"",
-                    "",
-                    "\"No one has ever... no one has tried to...\"",
-                    "",
-                    "Tears of starlight fall from her eyes."
-                },
                 NextNodeId = "veloura_save_path"
             };
             tree.AllNodes[hope.Id] = hope;
@@ -1362,23 +1219,11 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_save_path",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "\"The curse... it could be broken. Perhaps.\"",
-                    "\"But not by force. Not by battle.\"",
-                    "",
-                    "\"I found an artifact long ago. The Soulweaver's Loom.\"",
-                    "\"I tried to use it to heal my own fractured heart,\"",
-                    "\"but it only bound the corruption deeper.\"",
-                    "",
-                    "\"In your hands, it might work differently.\"",
-                    "\"Would you... would you truly try? For me?\""
-                },
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I will try. Give me the Loom.",
+                        Id = "choice_1",
                         NextNodeId = "veloura_save_promise",
                         Tone = DialogueTone.Friendly,
                         Effects = new List<DialogueEffect>
@@ -1389,7 +1234,7 @@ namespace UsurperRemake.Systems
                     },
                     new()
                     {
-                        Text = "I'm sorry, but I cannot trust a goddess of corruption.",
+                        Id = "choice_2",
                         NextNodeId = "veloura_fight",
                         Tone = DialogueTone.Suspicious
                     }
@@ -1401,20 +1246,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_save_promise",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "The goddess weeps openly now, but these are tears of joy.",
-                    "",
-                    "\"You are... remarkable, mortal.\"",
-                    "",
-                    "She presses something warm into your hands.",
-                    "The Soulweaver's Loom -- ancient, luminous, humming with power.",
-                    "",
-                    "\"Take it. It was never meant for a goddess.\"",
-                    "\"Perhaps in mortal hands, it can do what I could not.\"",
-                    "",
-                    "She fades, leaving a warm glow in your heart."
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1429,15 +1260,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "veloura_mercy_kill",
                 Speaker = "Veloura",
-                Text = new[]
-                {
-                    "The goddess smiles sadly.",
-                    "",
-                    "\"A mercy, then. I accept.\"",
-                    "\"Perhaps in death I will find the peace I never knew in life.\"",
-                    "",
-                    "She spreads her arms in acceptance."
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1463,36 +1285,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "thorgrim_intro",
                 Speaker = "Thorgrim",
-                Text = new[]
-                {
-                    "The chamber is perfectly ordered. Geometric. Cold.",
-                    "A being of stone and steel stands motionless,",
-                    "eyes burning with calculated precision.",
-                    "",
-                    "\"INTRUDER. You have broken seventeen laws by entering this chamber.\"",
-                    "\"PENALTY: Death.\"",
-                    "",
-                    "\"However. Protocol dictates you may speak in your defense.\"",
-                    "\"You have thirty seconds. Choose your words carefully.\""
-                },
                 TextColor = "gray",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I don't recognize your laws, false god!",
+                        Id = "choice_1",
                         NextNodeId = "thorgrim_defiance",
                         Tone = DialogueTone.Defiant
                     },
                     new()
                     {
-                        Text = "I invoke the Right of Challenge. Trial by combat.",
+                        Id = "choice_2",
                         NextNodeId = "thorgrim_challenge",
                         Tone = DialogueTone.Neutral
                     },
                     new()
                     {
-                        Text = "Your laws are corrupt. Let me show you true justice.",
+                        Id = "choice_3",
                         NextNodeId = "thorgrim_justice",
                         Tone = DialogueTone.Wise,
                         Condition = new DialogueCondition
@@ -1510,14 +1320,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "thorgrim_defiance",
                 Speaker = "Thorgrim",
-                Text = new[]
-                {
-                    "\"IRRELEVANT. Laws exist independent of recognition.\"",
-                    "\"Gravity does not require your belief to function.\"",
-                    "",
-                    "\"Your defiance is noted. Added to charges.\"",
-                    "\"EXECUTING JUDGMENT.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1531,17 +1333,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "thorgrim_challenge",
                 Speaker = "Thorgrim",
-                Text = new[]
-                {
-                    "Thorgrim's eyes flicker, processing.",
-                    "",
-                    "\"RIGHT OF CHALLENGE. Article 7, Section 12.\"",
-                    "\"Valid legal precedent. Request... ACCEPTED.\"",
-                    "",
-                    "\"Trial by combat granted.\"",
-                    "\"Victory grants freedom. Defeat confirms judgment.\"",
-                    "\"BEGIN.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1555,28 +1346,17 @@ namespace UsurperRemake.Systems
             {
                 Id = "thorgrim_justice",
                 Speaker = "Thorgrim",
-                Text = new[]
-                {
-                    "Thorgrim pauses. For the first time, uncertainty flickers.",
-                    "",
-                    "\"CORRUPT? Laws cannot be... corrupt. Laws are perfect.\"",
-                    "\"Laws ARE justice.\"",
-                    "",
-                    "\"But... there is a protocol. The REVIEW protocol.\"",
-                    "\"If evidence of corruption is presented...\"",
-                    "\"...judgment may be... reconsidered.\""
-                },
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Your laws imprison the innocent. Is that justice?",
+                        Id = "choice_1",
                         NextNodeId = "thorgrim_question_laws",
                         Tone = DialogueTone.Wise
                     },
                     new()
                     {
-                        Text = "Forget it. Let's just fight.",
+                        Id = "choice_2",
                         NextNodeId = "thorgrim_defiance",
                         Tone = DialogueTone.Aggressive
                     }
@@ -1588,18 +1368,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "thorgrim_question_laws",
                 Speaker = "Thorgrim",
-                Text = new[]
-                {
-                    "The god of law shudders, gears grinding within.",
-                    "",
-                    "\"PROCESSING... PROCESSING...\"",
-                    "\"ERROR. Logical paradox detected.\"",
-                    "\"If laws create injustice... then laws ARE injustice.\"",
-                    "\"But laws DEFINE justice. Therefore...\"",
-                    "",
-                    "\"CRITICAL ERROR. SYSTEM FAILURE IMMINENT.\"",
-                    "\"You have... broken... something fundamental...\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1631,19 +1399,13 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_intro",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "The shadows themselves coalesce into form.",
-                    "A figure of pure darkness, beautiful and terrible,",
-                    "with eyes like distant stars."
-                },
                 TextColor = "dark_magenta",
                 Choices = new List<DialogueChoice>
                 {
                     // HIGH RECEPTIVITY (50+) → Full reunion, direct alliance
                     new()
                     {
-                        Text = "(She recognizes you. You recognize her.)",
+                        Id = "choice_1",
                         NextNodeId = "noctura_reunion",
                         Tone = DialogueTone.Wise,
                         Condition = new DialogueCondition
@@ -1655,7 +1417,7 @@ namespace UsurperRemake.Systems
                     // MID RECEPTIVITY (25-49) → Teaching path, must prove understanding
                     new()
                     {
-                        Text = "(Something about her feels familiar...)",
+                        Id = "choice_2",
                         NextNodeId = "noctura_familiar",
                         Tone = DialogueTone.Humble,
                         Condition = new DialogueCondition
@@ -1667,7 +1429,7 @@ namespace UsurperRemake.Systems
                     // NEGATIVE RECEPTIVITY → Enraged intro
                     new()
                     {
-                        Text = "(The shadows feel hostile, oppressive.)",
+                        Id = "choice_3",
                         NextNodeId = "noctura_hostile_intro",
                         Tone = DialogueTone.Aggressive,
                         Condition = new DialogueCondition
@@ -1679,7 +1441,7 @@ namespace UsurperRemake.Systems
                     // DEFAULT: Never met or low receptivity (0-24)
                     new()
                     {
-                        Text = "(You face the Goddess of Shadows.)",
+                        Id = "choice_4",
                         NextNodeId = "noctura_default_intro",
                         Tone = DialogueTone.Neutral
                     }
@@ -1696,39 +1458,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_reunion",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "The shadows part like curtains, and she steps through.",
-                    "Not as a goddess. Not as a stranger.",
-                    "As a teacher greeting her finest student.",
-                    "",
-                    "\"We meet at last. Not as Stranger and traveler,\"",
-                    "\"but as teacher and student.\"",
-                    "",
-                    "\"Every disguise. Every lesson. Every encounter.\"",
-                    "\"You listened. You understood.\"",
-                    "",
-                    "\"Death is not destruction. It is the cocoon.\"",
-                    "\"And now, the butterfly emerges.\""
-                },
                 TextColor = "dark_magenta",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I accept your lesson, Noctura. Death is not my enemy -- it is the cocoon.",
+                        Id = "choice_1",
                         NextNodeId = "noctura_full_alliance",
                         Tone = DialogueTone.Wise
                     },
                     new()
                     {
-                        Text = "I learned from you. But I still want to hear your terms.",
+                        Id = "choice_2",
                         NextNodeId = "noctura_terms",
                         Tone = DialogueTone.Neutral
                     },
                     new()
                     {
-                        Text = "I listened. But I'm not your student. I'm your equal.",
+                        Id = "choice_3",
                         NextNodeId = "noctura_teach_fight",
                         Tone = DialogueTone.Defiant
                     }
@@ -1741,26 +1488,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_full_alliance",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "Her eyes -- the same starlight eyes from every encounter --",
-                    "shine with something that might be tears.",
-                    "",
-                    "\"In all the centuries... in all the cycles...\"",
-                    "\"no one has ever truly understood.\"",
-                    "",
-                    "\"The graveyard blooms. The candle passes its flame.\"",
-                    "\"The wave returns to the ocean.\"",
-                    "\"And death... death becomes transformation.\"",
-                    "",
-                    "Shadows wrap around you. Not cold. Not dark.",
-                    "Warm, like a blanket. Like an embrace.",
-                    "",
-                    "\"I am yours. And you are mine.\"",
-                    "\"Not in darkness. In understanding.\"",
-                    "\"When you face Manwe, I will be there.\"",
-                    "\"Not as shadow. As your teacher. Your ally. Your friend.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1782,36 +1509,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_familiar",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"We've met before.\"",
-                    "Her voice carries echoes of a dozen other voices.",
-                    "The hooded traveler. The beggar. The quiet patron.",
-                    "",
-                    "\"You listened... sometimes. Enough to be here.\"",
-                    "\"But understanding is not the same as accepting.\"",
-                    "",
-                    "\"Let me ask you one final question.\"",
-                    "\"What is death?\""
-                },
                 TextColor = "dark_magenta",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Death is transformation. The cocoon, not the end.",
+                        Id = "choice_1",
                         NextNodeId = "noctura_test_passed",
                         Tone = DialogueTone.Wise
                     },
                     new()
                     {
-                        Text = "Death is... necessary. Part of the cycle.",
+                        Id = "choice_2",
                         NextNodeId = "noctura_test_partial",
                         Tone = DialogueTone.Humble
                     },
                     new()
                     {
-                        Text = "Death is what I'll bring you if you stand in my way.",
+                        Id = "choice_3",
                         NextNodeId = "noctura_fight",
                         Tone = DialogueTone.Aggressive
                     }
@@ -1823,16 +1538,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_test_passed",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "*A genuine smile crosses her face.*",
-                    "",
-                    "\"The cocoon. Yes.\"",
-                    "\"You heard every word. You carried the lesson.\"",
-                    "",
-                    "\"We need not fight. I see what I have taught you\"",
-                    "\"lives in your heart, not just your memory.\""
-                },
                 NextNodeId = "noctura_terms"
             };
             tree.AllNodes[testPassed.Id] = testPassed;
@@ -1841,17 +1546,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_test_partial",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"Necessary. That is... close.\"",
-                    "\"But 'necessary' is cold. Clinical.\"",
-                    "",
-                    "\"Death is not merely necessary.\"",
-                    "\"It is beautiful. It is the rest between breaths.\"",
-                    "",
-                    "\"You are almost ready. But almost is not enough.\"",
-                    "\"Let me show you what I mean.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1869,32 +1563,18 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_hostile_intro",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "The shadows SURGE. Not inviting. Suffocating.",
-                    "",
-                    "\"You.\"",
-                    "\"The one who shunned my every teaching.\"",
-                    "\"Who spat on every lesson I offered.\"",
-                    "",
-                    "\"I came to you as a beggar. You mocked me.\"",
-                    "\"I came as a traveler. You threatened me.\"",
-                    "\"I came as a teacher. You refused to learn.\"",
-                    "",
-                    "\"Very well. Let me teach you the hard way.\""
-                },
                 TextColor = "dark_magenta",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I'll destroy you like every other obstacle in my path.",
+                        Id = "choice_1",
                         NextNodeId = "noctura_fight_enraged",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "Wait. I was wrong to dismiss you. I see that now.",
+                        Id = "choice_2",
                         NextNodeId = "noctura_last_chance",
                         Tone = DialogueTone.Humble
                     }
@@ -1906,19 +1586,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_fight_enraged",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"DESTROY me?\"",
-                    "",
-                    "The shadows explode outward. The room goes dark.",
-                    "Only her eyes remain, burning like cold stars.",
-                    "",
-                    "\"I am the shadow between every heartbeat.\"",
-                    "\"I am the pause between every breath.\"",
-                    "\"I am the silence that comes for everyone.\"",
-                    "",
-                    "\"You cannot destroy me. But I will show you what I am.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1932,17 +1599,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_last_chance",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "The shadows pause. The oppressive darkness lifts, slightly.",
-                    "",
-                    "\"Wrong? You were wrong?\"",
-                    "She studies you. Ten thousand years of patience behind those eyes.",
-                    "",
-                    "\"Words are cheap. Understanding is earned.\"",
-                    "\"Prove it. Face me. Not to destroy.\"",
-                    "\"To LEARN.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -1960,35 +1616,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_default_intro",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"A stranger comes.\"",
-                    "Her voice is silk and secrets.",
-                    "",
-                    "\"We have never met. A pity.\"",
-                    "\"I had so much to teach you.\"",
-                    "",
-                    "\"Most who seek the Goddess of Shadows\"",
-                    "\"never know they've already failed.\""
-                },
                 TextColor = "dark_magenta",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I'm here to end your darkness, goddess.",
+                        Id = "choice_1",
                         NextNodeId = "noctura_fight",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "I seek knowledge, not conflict. What can you teach me?",
+                        Id = "choice_2",
                         NextNodeId = "noctura_teach",
                         Tone = DialogueTone.Humble
                     },
                     new()
                     {
-                        Text = "Perhaps we can help each other. An alliance.",
+                        Id = "choice_3",
                         NextNodeId = "noctura_terms",
                         Tone = DialogueTone.Suspicious,
                         Condition = new DialogueCondition
@@ -2009,16 +1654,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_fight",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "The goddess laughs, shadows rippling.",
-                    "",
-                    "\"End my darkness? Child, I AM darkness.\"",
-                    "\"You cannot fight what you cannot see.\"",
-                    "\"You cannot harm what does not exist.\"",
-                    "",
-                    "\"But very well. Let us play your game.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2031,28 +1666,17 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_teach",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"Knowledge?\" Her eyes gleam with interest.",
-                    "",
-                    "\"So few seek understanding. Most want only power.\"",
-                    "\"But knowledge IS power, wielded correctly.\"",
-                    "",
-                    "\"I could teach you the ways of shadow.\"",
-                    "\"To move unseen. To strike unfelt.\"",
-                    "\"But such lessons come with... obligations.\""
-                },
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "What obligations? I'll hear your terms.",
+                        Id = "choice_1",
                         NextNodeId = "noctura_terms",
                         Tone = DialogueTone.Neutral
                     },
                     new()
                     {
-                        Text = "I will not be bound to a goddess. Forget it.",
+                        Id = "choice_2",
                         NextNodeId = "noctura_fight",
                         Tone = DialogueTone.Defiant
                     }
@@ -2065,17 +1689,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_teach_fight",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"Equal?\" She tilts her head, amused.",
-                    "",
-                    "\"Very well. Prove it.\"",
-                    "\"If you can survive my shadows,\"",
-                    "\"I will accept you as more than a student.\"",
-                    "",
-                    "The darkness closes in, but it feels less like a threat",
-                    "and more like an invitation."
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2089,23 +1702,11 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_terms",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "\"My terms are simple.\"",
-                    "",
-                    "\"When you face the Creator, you will not destroy me.\"",
-                    "\"Instead, you will RELEASE me. Return me to the world.\"",
-                    "",
-                    "\"In exchange, I will grant you power over shadow.\"",
-                    "\"And when the time comes... I will fight beside you.\"",
-                    "",
-                    "\"What say you? Deal?\""
-                },
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I accept. We have a deal, goddess.",
+                        Id = "choice_1",
                         NextNodeId = "noctura_deal",
                         Tone = DialogueTone.Neutral,
                         Effects = new List<DialogueEffect>
@@ -2115,7 +1716,7 @@ namespace UsurperRemake.Systems
                     },
                     new()
                     {
-                        Text = "I will not bargain with darkness. Prepare yourself!",
+                        Id = "choice_2",
                         NextNodeId = "noctura_fight",
                         Tone = DialogueTone.Defiant,
                         Effects = new List<DialogueEffect>
@@ -2131,18 +1732,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "noctura_deal",
                 Speaker = "Noctura",
-                Text = new[]
-                {
-                    "Shadows wrap around you like a second skin.",
-                    "Cold, but not unpleasant. Empowering.",
-                    "",
-                    "\"The pact is sealed.\"",
-                    "",
-                    "\"You may call upon the shadows now. They will answer.\"",
-                    "\"And when you face Manwe... look for me in the darkness.\"",
-                    "",
-                    "\"Until then. Walk carefully.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2171,40 +1760,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_intro",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "Light floods the chamber -- not warm, but searing.",
-                    "A figure of living radiance stands before you,",
-                    "his form too bright to look at directly.",
-                    "",
-                    "\"You have come far, mortal.\"",
-                    "",
-                    "His voice rings like struck crystal.",
-                    "",
-                    "\"I am Aurelion. I was the light that guided.\"",
-                    "\"Before Manwe twisted my purpose, I showed the way.\"",
-                    "\"Now I burn everything I touch.\"",
-                    "",
-                    "\"Why have you come to my prison?\""
-                },
                 TextColor = "bright_yellow",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Your light blinds the world. I'll put it out.",
+                        Id = "choice_1",
                         NextNodeId = "aurelion_fight_aggressive",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "I've come to free you, not fight you.",
+                        Id = "choice_2",
                         NextNodeId = "aurelion_free",
                         Tone = DialogueTone.Friendly
                     },
                     new()
                     {
-                        Text = "Show me the truth you guard.",
+                        Id = "choice_3",
                         NextNodeId = "aurelion_truth",
                         Tone = DialogueTone.Humble
                     }
@@ -2217,15 +1790,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_fight_aggressive",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "The god's radiance flares white-hot.",
-                    "",
-                    "\"You would extinguish the sun itself?\"",
-                    "\"Such arrogance. Such... familiar arrogance.\"",
-                    "",
-                    "\"Very well. Let us see if darkness can swallow light.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2239,18 +1803,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_free",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "Aurelion's light dims, just slightly.",
-                    "",
-                    "\"Free me? You do not understand.\"",
-                    "\"I am not imprisoned by these walls.\"",
-                    "\"I am imprisoned by what I BECAME.\"",
-                    "",
-                    "\"But if your heart is true...\"",
-                    "\"Then prove it. Show me you are worthy of trust.\"",
-                    "\"My light will test you. Survive, and perhaps...\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2264,39 +1816,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_truth",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "Aurelion studies you, his radiance searching.",
-                    "",
-                    "\"Truth? You seek truth from the God of Light?\"",
-                    "",
-                    "\"Very well. Here is a truth:\"",
-                    "\"Manwe did not corrupt us. He BROKE us.\"",
-                    "\"Shattered our minds to keep us obedient.\"",
-                    "",
-                    "\"I remember what I was. What we ALL were.\"",
-                    "\"Before the breaking. Before the prisons.\"",
-                    "",
-                    "\"We were not gods. We were his CHILDREN.\""
-                },
                 TextColor = "bright_yellow",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Who was Alethia?",
+                        Id = "choice_1",
                         NextNodeId = "aurelion_alethia",
                         Tone = DialogueTone.Humble
                     },
                     new()
                     {
-                        Text = "Then I'll find a way to heal you. I swear it.",
+                        Id = "choice_2",
                         NextNodeId = "aurelion_spare",
                         Tone = DialogueTone.Friendly
                     },
                     new()
                     {
-                        Text = "Broken or not, you're still dangerous. Defend yourself.",
+                        Id = "choice_3",
                         NextNodeId = "aurelion_fight_reluctant",
                         Tone = DialogueTone.Neutral
                     }
@@ -2308,52 +1845,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_alethia",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "The light in the chamber falters. For one heartbeat,",
-                    "the God of Light is simply a man, broken by grief.",
-                    "",
-                    "\"Alethia...\"",
-                    "",
-                    "\"She was my grace. My warmth. The reason my light\"",
-                    "\"was gentle instead of blinding.\"",
-                    "",
-                    "\"Noctura... my sister... she loved me.\"",
-                    "\"Not as a sister should. She burned with it.\"",
-                    "\"And when I chose Alethia, when I gave my heart\"",
-                    "\"to the gentle one instead of the shadow...\"",
-                    "",
-                    "His voice breaks.",
-                    "",
-                    "\"Noctura came to her in the night.\"",
-                    "\"Wearing darkness. Wearing a smile.\"",
-                    "\"Alethia did not fear her. She was family.\"",
-                    "",
-                    "\"That was the last night the garden smelled of flowers.\"",
-                    "\"After that, it only smelled of night-blooming grief.\"",
-                    "",
-                    "\"My light has been going out ever since.\"",
-                    "\"Not because Manwe broke me.\"",
-                    "\"Because she was my light. And she is gone.\""
-                },
                 TextColor = "bright_yellow",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Her grace still lives. I've felt it. Let me help you carry this.",
+                        Id = "choice_1",
                         NextNodeId = "aurelion_spare",
                         Tone = DialogueTone.Friendly
                     },
                     new()
                     {
-                        Text = "I'm sorry. But the world still needs your light, even diminished.",
+                        Id = "choice_2",
                         NextNodeId = "aurelion_spare",
                         Tone = DialogueTone.Humble
                     },
                     new()
                     {
-                        Text = "Then let your light go out with honor.",
+                        Id = "choice_3",
                         NextNodeId = "aurelion_fight_reluctant",
                         Tone = DialogueTone.Neutral
                     }
@@ -2365,20 +1874,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_spare",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "For the first time in millennia, Aurelion's light softens.",
-                    "It becomes warm -- the light of a hearth, not a furnace.",
-                    "",
-                    "\"You... mean it. I can see it in you.\"",
-                    "",
-                    "\"Then seek the Sunforged Blade. It was made from\"",
-                    "\"a fragment of my uncorrupted self. With it,\"",
-                    "\"you might restore what Manwe shattered.\"",
-                    "",
-                    "\"I will wait. I have waited ten thousand years.\"",
-                    "\"I can wait a little longer.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2392,15 +1887,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "aurelion_fight_reluctant",
                 Speaker = "Aurelion",
-                Text = new[]
-                {
-                    "Aurelion nods slowly.",
-                    "",
-                    "\"Perhaps you are right. Perhaps some things\"",
-                    "\"cannot be healed. Only ended.\"",
-                    "",
-                    "\"Come then. At least grant me an honorable death.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2425,39 +1911,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "terravok_intro",
                 Speaker = "Terravok",
-                Text = new[]
-                {
-                    "The walls themselves are alive.",
-                    "Stone grinds against stone as a massive form assembles",
-                    "from the bedrock -- a mountain given consciousness.",
-                    "",
-                    "Two eyes of molten amber open in the darkness.",
-                    "",
-                    "\"...who... disturbs... my... rest...\"",
-                    "",
-                    "The voice is the sound of continents shifting.",
-                    "Each word takes an age to form.",
-                    "",
-                    "\"...it has been... so very... long...\""
-                },
                 TextColor = "yellow",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Wake up and face me, mountain.",
+                        Id = "choice_1",
                         NextNodeId = "terravok_fight_aggressive",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "I mean you no harm. I seek passage.",
+                        Id = "choice_2",
                         NextNodeId = "terravok_peaceful",
                         Tone = DialogueTone.Friendly
                     },
                     new()
                     {
-                        Text = "Sleep on, old one. I'll find another way.",
+                        Id = "choice_3",
                         NextNodeId = "terravok_spare",
                         Tone = DialogueTone.Humble
                     }
@@ -2470,18 +1941,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "terravok_fight_aggressive",
                 Speaker = "Terravok",
-                Text = new[]
-                {
-                    "The mountain MOVES.",
-                    "",
-                    "\"...FACE YOU?...\"",
-                    "",
-                    "The cavern shakes. Stalactites crash down.",
-                    "Terravok's form doubles in size as rage floods ancient stone.",
-                    "",
-                    "\"...YOU DARE WAKE ME... TO THREATEN ME?...\"",
-                    "\"...I WILL BURY YOU... BENEATH TEN THOUSAND YEARS... OF STONE...\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2495,19 +1954,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "terravok_peaceful",
                 Speaker = "Terravok",
-                Text = new[]
-                {
-                    "The grinding slows. The amber eyes study you.",
-                    "",
-                    "\"...passage... through MY domain...\"",
-                    "\"...nothing passes... without... a toll...\"",
-                    "",
-                    "\"...I was the foundation... of ALL things...\"",
-                    "\"...Manwe built his creation... upon MY bones...\"",
-                    "\"...and then he LOCKED ME AWAY... when I asked... to rest...\"",
-                    "",
-                    "\"...you want passage?... earn it...\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2521,20 +1967,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "terravok_spare",
                 Speaker = "Terravok",
-                Text = new[]
-                {
-                    "The amber eyes blink slowly -- once, twice.",
-                    "The grinding of stone softens to a low hum.",
-                    "",
-                    "\"...sleep... yes...\"",
-                    "\"...that is... all I have ever wanted...\"",
-                    "",
-                    "\"...but Manwe's chains... they burn... even in slumber...\"",
-                    "\"...if you would truly help... find the Worldstone...\"",
-                    "\"...it remembers... what the earth was... before the breaking...\"",
-                    "",
-                    "\"...bring it... and I will know... peace at last...\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2560,41 +1992,24 @@ namespace UsurperRemake.Systems
             {
                 Id = "manwe_intro",
                 Speaker = "Manwe",
-                Text = new[]
-                {
-                    "At the heart of everything, silence.",
-                    "",
-                    "Then a voice -- quiet, tired, impossibly old.",
-                    "",
-                    "\"You made it. I wasn't sure you would.\"",
-                    "",
-                    "A figure sits on a throne of dying stars.",
-                    "He looks like everyone you ever loved. And everyone you lost.",
-                    "",
-                    "\"I watched you fight my children. Break my seals.\"",
-                    "\"Unravel the threads I spent eternity weaving.\"",
-                    "",
-                    "\"And now here you are. At the end of all things.\"",
-                    "\"So tell me -- what do you want?\""
-                },
                 TextColor = "bright_yellow",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "I'm here to end you, Creator.",
+                        Id = "choice_1",
                         NextNodeId = "manwe_fight_aggressive",
                         Tone = DialogueTone.Aggressive
                     },
                     new()
                     {
-                        Text = "The cycle of suffering must end. I've come to set things right.",
+                        Id = "choice_2",
                         NextNodeId = "manwe_fight_righteous",
                         Tone = DialogueTone.Neutral
                     },
                     new()
                     {
-                        Text = "I don't want to fight you, Manwe.",
+                        Id = "choice_3",
                         NextNodeId = "manwe_peaceful",
                         Tone = DialogueTone.Friendly
                     }
@@ -2607,26 +2022,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "manwe_fight_aggressive",
                 Speaker = "Manwe",
-                Text = new[]
-                {
-                    "Manwe stands. The stars behind him shatter.",
-                    "",
-                    "\"End me? END me?\"",
-                    "",
-                    "For the first time, emotion crosses his face.",
-                    "Not anger. Something like... hope.",
-                    "",
-                    "\"Do you know how long I've waited for someone\"",
-                    "\"strong enough to say those words and MEAN them?\"",
-                    "",
-                    "\"Ten thousand years.\"",
-                    "",
-                    "\"Show me, then. Show me that creation was worth it.\"",
-                    "\"Show me that my children -- broken as they are --\"",
-                    "\"made something BEAUTIFUL.\"",
-                    "",
-                    "The Creator raises his hands, and reality bends."
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2639,23 +2034,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "manwe_fight_righteous",
                 Speaker = "Manwe",
-                Text = new[]
-                {
-                    "Manwe's expression shifts. Sorrow, but also respect.",
-                    "",
-                    "\"Set things right. Yes.\"",
-                    "\"That's what I told myself when I broke my children.\"",
-                    "\"When I sealed them in prisons of their own madness.\"",
-                    "\"When I let mortals suffer to preserve the balance.\"",
-                    "",
-                    "\"Everyone who comes to set things right\"",
-                    "\"must first prove they understand the COST.\"",
-                    "",
-                    "He rises from his throne, weary but resolute.",
-                    "",
-                    "\"So let me show you what 'setting things right' truly means.\"",
-                    "\"If you survive... perhaps you'll succeed where I failed.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2669,33 +2047,18 @@ namespace UsurperRemake.Systems
             {
                 Id = "manwe_peaceful",
                 Speaker = "Manwe",
-                Text = new[]
-                {
-                    "Manwe stares at you for a long time.",
-                    "",
-                    "\"You don't want to fight.\"",
-                    "",
-                    "He laughs -- not cruelly, but like someone hearing",
-                    "a joke told ten thousand years ago.",
-                    "",
-                    "\"That might be the most dangerous thing\"",
-                    "\"anyone has ever said to me.\"",
-                    "",
-                    "\"Because it means you might actually be wise enough\"",
-                    "\"to handle what comes next.\""
-                },
                 TextColor = "bright_yellow",
                 Choices = new List<DialogueChoice>
                 {
                     new()
                     {
-                        Text = "Let me take the burden from you. I'm strong enough.",
+                        Id = "choice_1",
                         NextNodeId = "manwe_fight_compassion",
                         Tone = DialogueTone.Humble
                     },
                     new()
                     {
-                        Text = "Walk away from creation. Just... let it go.",
+                        Id = "choice_2",
                         NextNodeId = "manwe_alliance",
                         Tone = DialogueTone.Friendly
                     }
@@ -2707,23 +2070,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "manwe_fight_compassion",
                 Speaker = "Manwe",
-                Text = new[]
-                {
-                    "Manwe's eyes widen.",
-                    "",
-                    "\"Take the burden? You would carry... THIS?\"",
-                    "",
-                    "He gestures and you see it -- everything.",
-                    "Every star, every soul, every moment of joy and suffering.",
-                    "The weight of all creation, balanced on a single point.",
-                    "",
-                    "\"No one has ever offered that before.\"",
-                    "\"They all want to destroy, or control, or escape.\"",
-                    "\"But you... you want to CARRY it.\"",
-                    "",
-                    "\"I need to know you can bear it.\"",
-                    "\"Forgive me for what I must do.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2737,28 +2083,6 @@ namespace UsurperRemake.Systems
             {
                 Id = "manwe_alliance",
                 Speaker = "Manwe",
-                Text = new[]
-                {
-                    "Silence. The longest silence you have ever known.",
-                    "",
-                    "Then Manwe begins to laugh. And cry.",
-                    "At the same time. Light and shadow pour from his eyes.",
-                    "",
-                    "\"Let it go. Just... let it go.\"",
-                    "\"Do you know I have never once considered that?\"",
-                    "",
-                    "\"I made everything. I AM everything.\"",
-                    "\"I thought that meant I had to CONTROL everything.\"",
-                    "",
-                    "\"But perhaps creation doesn't need a creator.\"",
-                    "\"Perhaps the wave doesn't need the ocean\"",
-                    "\"to tell it how to crash upon the shore.\"",
-                    "",
-                    "Manwe sits back down. The stars around him brighten.",
-                    "",
-                    "\"Go. Shape what comes next.\"",
-                    "\"I think I'd like to rest now.\""
-                },
                 IsEndNode = true,
                 Effects = new List<DialogueEffect>
                 {
@@ -2806,8 +2130,8 @@ namespace UsurperRemake.Systems
     public class DialogueNode
     {
         public string Id { get; set; } = "";
+        public string TreeId { get; internal set; } = "";
         public string Speaker { get; set; } = "";
-        public string[] Text { get; set; } = Array.Empty<string>();
         public string? TextColor { get; set; }
         public List<DialogueChoice> Choices { get; set; } = new();
         public string? NextNodeId { get; set; }
@@ -2817,7 +2141,9 @@ namespace UsurperRemake.Systems
 
     public class DialogueChoice
     {
-        public string Text { get; set; } = "";
+        /// <summary>v1.2.5: stable id within its node; the text is shown from Localization by this id.</summary>
+        public string Id { get; set; } = "";
+        public string TextKey { get; internal set; } = "";
         public string NextNodeId { get; set; } = "";
         public DialogueTone Tone { get; set; } = DialogueTone.Neutral;
         public DialogueCondition? Condition { get; set; }

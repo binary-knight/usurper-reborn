@@ -172,8 +172,7 @@ table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|starter weapon
 table|Scripts/Systems/CharacterCreationSystem.cs|switcharm/tuple#0|starter weapon names
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Description|ability.{id}.desc
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Name|ability.{id}.name
-table|Scripts/Systems/DialogueSystem.cs|init.Text|dialogue tree node text
-names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names
+names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names: god names stay as they are; the stored English picks the colour and the Electron portrait; the Mysterious Stranger title shows through dialogue.speaker.mysterious_stranger
 nouns|Scripts/Systems/FactionSystem.cs|init.Name|faction names printed raw, InnLocation
 table|Scripts/Systems/FactionSystem.cs|init.Ranks|faction rank titles
 keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
