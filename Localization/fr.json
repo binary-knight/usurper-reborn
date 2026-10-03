@@ -27677,7 +27677,7 @@
   "permadeath.erased": "Ton personnage a été effacé.",
   "permadeath.contact_admin": "Si c'est une erreur, contacte un admin sur Discord",
   "permadeath.contact_admin2": "dans les 7 jours pour une restauration éventuelle.",
-  "permadeath.restore_hint": "Si c'est une erreur, tape /restore dans les 7 jours pour récupérer ton personnage,",
+  "permadeath.restore_hint": "Si c'est une erreur, tape /restore sous 7 jours pour le récupérer,",
   "permadeath.restore_hint2": "ou contacte un sysop sur Discord.",
   "permadeath.disconnecting": "Déconnexion."
 }

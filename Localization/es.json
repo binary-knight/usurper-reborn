@@ -27677,7 +27677,7 @@
   "permadeath.erased": "Tu personaje ha sido borrado.",
   "permadeath.contact_admin": "Si esto fue un error, contacta con un administrador en Discord",
   "permadeath.contact_admin2": "en un plazo de 7 días para una posible restauración.",
-  "permadeath.restore_hint": "Si esto fue un error, escribe /restore en un plazo de 7 días para recuperarlo,",
+  "permadeath.restore_hint": "Si fue un error, escribe /restore en un plazo de 7 días para recuperarlo,",
   "permadeath.restore_hint2": "o contacta con un sysop en Discord.",
   "permadeath.disconnecting": "Desconectando."
 }

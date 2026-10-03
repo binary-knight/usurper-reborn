@@ -971,6 +971,8 @@ public class RestWorld125Tests : IDisposable
                 foreach (var time in new[] { "dawn", "morning", "afternoon", "evening", "night" })
                     EveryRowFits(new[] { L(lang, $"daily.{place}_{time}") }, $"daily.{place}_{time} ({lang})");
             EveryRowFits(Rows(Regex.Replace(DailySystemManager.BloodMoonBroadcast(lang), "\u001b\\[[0-9;]*m", "")), $"blood moon broadcast ({lang})");
+            // CombatEngine writes the restore hint two columns in (CombatEngine.cs:22367-22368)
+            EveryRowFits(new[] { "  " + L(lang, "permadeath.restore_hint"), "  " + L(lang, "permadeath.restore_hint2") }, $"restore hint ({lang})");
         }
     }
 }

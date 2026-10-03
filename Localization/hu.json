@@ -27679,7 +27679,7 @@
   "permadeath.erased": "Karaktered eltöröltetett.",
   "permadeath.contact_admin": "Ha ez tévedés volt, keress egy admint a Discordon",
   "permadeath.contact_admin2": "7 napon belül a visszaállítás reményében.",
-  "permadeath.restore_hint": "Ha ez tévedés volt, írd be a /restore parancsot 7 napon belül a visszaállításhoz,",
+  "permadeath.restore_hint": "Ha ez tévedés volt, 7 napon belül a /restore paranccsal visszaállíthatod,",
   "permadeath.restore_hint2": "vagy keress egy sysopot a Discordon.",
   "permadeath.disconnecting": "Kapcsolat bontása."
 }
