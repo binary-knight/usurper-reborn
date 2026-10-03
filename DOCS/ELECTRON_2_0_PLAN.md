@@ -192,6 +192,7 @@ Slices 0 and 1 come first because nothing after them can be judged without them.
 6. **Decision: 1.x and Electron payloads meanwhile.** Options: freeze (no new payloads, gaps go into this plan); keep adding payloads per feature; adopt the proposal in section 6.
 7. **Decision: art.** Options: keep the current PixelLab sprites and scenes and fill gaps the same way; commission or generate a new set; no new art in 2.0 beyond what exists.
 8. **Decision: client version number.** Options: follow the game version; keep its own number.
+9. **Decision: music and sound.** The client already has the mixer (`electron-client/src/audio.js`: master, sfx, music and ui channels, looped music per location, saved volumes) and the game already emits sound ids, but `electron-client/assets/audio/` is empty. Options: no audio in 2.0; sound effects only; effects plus music per location. Terminal clients cannot play music (only the bell), so audio is a client feature. Constraints for any audio: off by default or muted with one key, never autoplaying, for screen reader players (the idle bell came from issue #90); every track licensed for commercial distribution on Steam (commissioned or licensed, not unlicensed); download size for the Steam build. Source of tracks: commission; license a library; generate.
 
 ## 6. What 1.x can do now (proposal)
 
