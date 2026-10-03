@@ -10014,13 +10014,13 @@ public partial class CombatEngine
                             if (actualPlayer.IsInventoryFull)
                             {
                                 terminal.SetColor("red");
-                                terminal.WriteLine(Loc.Get("combat.loot_displaced_dropped", displaced.Name));
+                                WriteItemRow(Loc.Get("combat.loot_displaced_dropped", ItemNames.Display(displaced)));
                             }
                             else
                             {
                                 actualPlayer.Inventory.Add(displaced);
                                 terminal.SetColor("cyan");
-                                terminal.WriteLine(Loc.Get("combat.loot_displaced_to_player", displaced.Name, player.DisplayName));
+                                WriteItemRow(Loc.Get("combat.loot_displaced_to_player", ItemNames.Display(displaced), player.DisplayName));
                             }
                         }
                     }
@@ -10178,7 +10178,7 @@ public partial class CombatEngine
                                             if (player.IsInventoryFull)
                                             {
                                                 terminal.SetColor("red");
-                                                terminal.WriteLine(Loc.Get("combat.loot_displaced_dropped", d.Name));
+                                                WriteItemRow(Loc.Get("combat.loot_displaced_dropped", ItemNames.Display(d)));
                                             }
                                             else
                                             {
@@ -10188,7 +10188,7 @@ public partial class CombatEngine
                                         if (displaced.Count > 0 && !player.IsInventoryFull)
                                         {
                                             terminal.SetColor("cyan");
-                                            terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
+                                            WriteItemRow(Loc.Get("combat.loot_displaced_to_inventory", ItemNames.Display(displaced[0])));
                                         }
                                     }
                                     // v0.60.11 (Spud report): also sync to ActiveNPCs for non-companion
@@ -10331,7 +10331,7 @@ public partial class CombatEngine
             terminal.WriteLine($"  {ItemNames.Display(lootItem)}");
             terminal.SetColor("white");
 
-            lootBroadcastSb.Add(lang => $"\u001b[37m  {ItemNames.DisplayIn(lang, lootItem.Name)}\u001b[0m");
+            lootBroadcastSb.Add(lang => $"\u001b[37m  {ItemNames.DisplayIn(lang, lootItem)}\u001b[0m");
 
             if (lootItem.Type == global::ObjType.Weapon)
             {
@@ -10440,7 +10440,7 @@ public partial class CombatEngine
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("combat.loot_unidentified"));
             terminal.WriteLine(Loc.Get("combat.loot_identify_hint"));
-            lootBroadcastSb.Add(lang => $"\u001b[35m  {Loc.GetIn(lang, "combat.loot_group_unidentified", unidName)}\u001b[0m");
+            lootBroadcastSb.Add(lang => $"\u001b[35m  {Loc.GetIn(lang, "combat.loot_group_unidentified", LootGenerator.GetUnidentifiedNameIn(lang, lootItem))}\u001b[0m");
         }
 
         terminal.WriteLine("");
@@ -10507,7 +10507,7 @@ public partial class CombatEngine
             if (lootItem.IsIdentified)
             {
                 followerTerm.SetColor(rarityColor);
-                followerTerm.WriteLine($"  {ItemNames.DisplayIn(followerLang, lootItem.Name)}");
+                followerTerm.WriteLine($"  {ItemNames.DisplayIn(followerLang, lootItem)}");
                 followerTerm.SetColor("white");
                 if (lootItem.Type == global::ObjType.Weapon)
                     followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_attack_power", lootItem.Attack));
@@ -10518,7 +10518,7 @@ public partial class CombatEngine
             }
             else
             {
-                string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+                string unidName = LootGenerator.GetUnidentifiedNameIn(followerLang, lootItem);
                 followerTerm.SetColor("magenta");
                 followerTerm.WriteLine($"  {unidName}");
                 followerTerm.SetColor("gray");
@@ -10663,7 +10663,7 @@ public partial class CombatEngine
             {
                 player.Inventory?.Add(lootItem);
                 followerTerm.SetColor("cyan");
-                string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(followerLang, lootItem.Name) : LootGenerator.GetUnidentifiedName(lootItem);
+                string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(followerLang, lootItem) : LootGenerator.GetUnidentifiedNameIn(followerLang, lootItem);
                 followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_added_inventory", invName));
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, ItemNames.Display(lootItem)));
@@ -10713,7 +10713,7 @@ public partial class CombatEngine
                                             if (player.IsInventoryFull)
                                             {
                                                 terminal.SetColor("red");
-                                                terminal.WriteLine(Loc.Get("combat.loot_displaced_dropped", d.Name));
+                                                WriteItemRow(Loc.Get("combat.loot_displaced_dropped", ItemNames.Display(d)));
                                             }
                                             else
                                             {
@@ -10723,7 +10723,7 @@ public partial class CombatEngine
                                         if (displaced.Count > 0 && !player.IsInventoryFull)
                                         {
                                             terminal.SetColor("cyan");
-                                            terminal.WriteLine(Loc.Get("combat.loot_displaced_to_inventory", displaced[0].Name));
+                                            WriteItemRow(Loc.Get("combat.loot_displaced_to_inventory", ItemNames.Display(displaced[0])));
                                         }
                                     }
                                     // v0.60.11 (Spud report): mirror the single-monster fix for the
@@ -10847,7 +10847,7 @@ public partial class CombatEngine
                     if (!winner.IsInventoryFull)
                     {
                         winner.Inventory.Add(lootItem);
-                        string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+                        string unidName = LootGenerator.GetUnidentifiedNameIn(winnerLang, lootItem);
                         winnerTerm.SetColor("cyan");
                         winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", unidName));
                     }
@@ -10956,7 +10956,7 @@ public partial class CombatEngine
                     if (!winner.IsInventoryFull)
                     {
                         winner.Inventory.Add(lootItem);
-                        winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", ItemNames.DisplayIn(winnerLang, lootItem.Name)));
+                        winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", ItemNames.DisplayIn(winnerLang, lootItem)));
                     }
                     else
                     {
@@ -10976,7 +10976,7 @@ public partial class CombatEngine
                 {
                     winner.Inventory.Add(lootItem);
                     winnerTerm.SetColor("cyan");
-                    string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(winnerLang, lootItem.Name) : LootGenerator.GetUnidentifiedName(lootItem);
+                    string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(winnerLang, lootItem) : LootGenerator.GetUnidentifiedNameIn(winnerLang, lootItem);
                     winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", invName));
                 }
                 break;
@@ -11469,7 +11469,7 @@ public partial class CombatEngine
             if (lootItem.IsIdentified)
             {
                 otherTerm.SetColor(rarityColor);
-                otherTerm.WriteLine($"  {ItemNames.DisplayIn(otherLang, lootItem.Name)}");
+                otherTerm.WriteLine($"  {ItemNames.DisplayIn(otherLang, lootItem)}");
                 otherTerm.SetColor("white");
                 if (lootItem.Type == global::ObjType.Weapon)
                     otherTerm.WriteLine(Loc.GetIn(otherLang, "combat.loot_attack_power", lootItem.Attack));
@@ -11480,7 +11480,7 @@ public partial class CombatEngine
             }
             else
             {
-                string unidName = LootGenerator.GetUnidentifiedName(lootItem);
+                string unidName = LootGenerator.GetUnidentifiedNameIn(otherLang, lootItem);
                 otherTerm.SetColor("magenta");
                 otherTerm.WriteLine($"  {unidName}");
                 otherTerm.SetColor("gray");
@@ -11574,7 +11574,7 @@ public partial class CombatEngine
             {
                 otherPlayer.Inventory?.Add(lootItem);
                 otherTerm.SetColor("cyan");
-                string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(otherLang, lootItem.Name) : LootGenerator.GetUnidentifiedName(lootItem);
+                string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(otherLang, lootItem) : LootGenerator.GetUnidentifiedNameIn(otherLang, lootItem);
                 otherTerm.WriteLine(Loc.GetIn(otherLang, "combat.added_to_inventory", invName));
                 terminal.SetColor("cyan");
                 terminal.WriteLine($"  {Loc.Get("combat.other_takes", otherName, ItemNames.Display(lootItem))}");
@@ -23127,7 +23127,7 @@ public partial class CombatEngine
             player.Gold -= goldLost;
 
             // Lose a random equipped item
-            string lostItemName = "none";
+            string lostItemName = Loc.Get("combat.death_item_none");   // v1.2.5: shown names, the reader's language
             var equippedSlots = new[] {
                 EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head,
                 EquipmentSlot.Body, EquipmentSlot.Arms, EquipmentSlot.Hands,
@@ -23141,7 +23141,7 @@ public partial class CombatEngine
                 var rng = random;   // v1.1.14: the engine RNG
                 var lostSlot = filledSlots[rng.Next(filledSlots.Count)];
                 var lostItem = player.GetEquipment(lostSlot);
-                lostItemName = lostItem?.Name ?? "equipment";
+                lostItemName = lostItem != null ? ItemNames.Display(lostItem) : Loc.Get("combat.death_item_unknown");
                 player.UnequipSlot(lostSlot);
             }
 
@@ -23155,7 +23155,7 @@ public partial class CombatEngine
                     var item = player.ConvertEquipmentToLegacyItem(equip);
                     player.UnequipSlot(slot);
                     if (item != null) player.Inventory.Add(item);
-                    demotedGear.Add($"{equip.Name} (requires Lv.{equip.MinLevel})");
+                    demotedGear.Add(Loc.Get("combat.death_unequipped_item", ItemNames.Display(equip), equip.MinLevel));
                 }
             }
 
@@ -23167,7 +23167,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.death_penalty_header"));
             terminal.WriteLine(Loc.Get("combat.death_levels_lost", levelsLost, levelBefore, player.Level), "red");
             terminal.WriteLine(Loc.Get("combat.death_gold_lost", $"{goldLost:N0}", $"{player.Gold:N0}"), "red");
-            terminal.WriteLine(Loc.Get("combat.death_item_destroyed", lostItemName), "red");
+            terminal.SetColor("red");
+            WriteItemRow(Loc.Get("combat.death_item_destroyed", lostItemName));
 
             // Show stat changes
             terminal.SetColor("gray");
@@ -23189,7 +23190,7 @@ public partial class CombatEngine
             {
                 terminal.SetColor("yellow");
                 foreach (var g in demotedGear)
-                    terminal.WriteLine(Loc.Get("combat.death_unequipped", g));
+                    WriteItemRow(Loc.Get("combat.death_unequipped", g));
             }
 
             terminal.WriteLine("");
@@ -27481,11 +27482,17 @@ public partial class CombatEngine
             // another's, and it paid half of an uncapped Value as newly made gold. The payout now sits
             // under the same per-fight cap as the gold steal, by the winner's level.
             long equipmentLootValue = 0;
+            // v1.2.5: what was salvaged, stored names, shown through ItemNames below (ItemsFound keeps stored names)
+            var salvaged = new List<(string Name, long Value)>();
 
             if (result.Opponent != null)
             {
-                long SalvageOf(Equipment? worn, string fallbackName)
+                // v1.2.5: also gives the stored name of the piece priced, which the salvage list shows (the
+                // opponent's WeaponName/ArmorName is the legacy slot's name, "None" in the reader's language
+                // when that slot is empty, and was printed as the salvaged item's name)
+                long SalvageOf(Equipment? worn, string fallbackName, out string pieceName)
                 {
+                    pieceName = fallbackName;
                     var piece = worn;
                     if (piece == null && !string.IsNullOrEmpty(fallbackName))
                     {
@@ -27494,21 +27501,22 @@ public partial class CombatEngine
                         if (byName != null && !EquipmentDatabase.IsDynamic(byName.Id)) piece = byName;
                     }
                     if (piece == null) return 0;
+                    pieceName = piece.Name;
                     return (long)(Math.Clamp(piece.Value, 0, GameConfig.MaxItemValue) * 0.5);
                 }
 
                 string opponentWeaponName = result.Opponent.WeaponName;
                 if (!string.IsNullOrEmpty(opponentWeaponName) && opponentWeaponName != "Fist" && opponentWeaponName != "None" && random.Next(100) < 30)
                 {
-                    long weaponValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.MainHand), opponentWeaponName);
-                    if (weaponValue > 0) { equipmentLootValue += weaponValue; result.ItemsFound.Add($"{opponentWeaponName} (salvaged for {weaponValue:N0}g)"); }
+                    long weaponValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.MainHand), opponentWeaponName, out var weaponPiece);
+                    if (weaponValue > 0) { equipmentLootValue += weaponValue; result.ItemsFound.Add(weaponPiece); salvaged.Add((weaponPiece, weaponValue)); }
                 }
 
                 string opponentArmorName = result.Opponent.ArmorName;
                 if (!string.IsNullOrEmpty(opponentArmorName) && opponentArmorName != "None" && opponentArmorName != "Clothes" && random.Next(100) < 25)
                 {
-                    long armorValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.Body), opponentArmorName);
-                    if (armorValue > 0) { equipmentLootValue += armorValue; result.ItemsFound.Add($"{opponentArmorName} (salvaged for {armorValue:N0}g)"); }
+                    long armorValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.Body), opponentArmorName, out var armorPiece);
+                    if (armorValue > 0) { equipmentLootValue += armorValue; result.ItemsFound.Add(armorPiece); salvaged.Add((armorPiece, armorValue)); }
                 }
 
                 long salvageCap = GameConfig.PvPGoldPerFightCap(result.Player?.Level ?? 1);
@@ -27529,9 +27537,9 @@ public partial class CombatEngine
                 terminal.SetColor("bright_cyan");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("combat.equipment_salvaged"));
-                foreach (var item in result.ItemsFound)
+                foreach (var (name, value) in salvaged)
                 {
-                    terminal.WriteLine($"  • {item}");
+                    WriteItemRow(Loc.Get("combat.salvaged_item_row", ItemNames.Display(name), $"{value:N0}"));
                 }
             }
         }
@@ -27933,7 +27941,8 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.examines_belongings", caster.DisplayName), "bright_white");
                 foreach (var itm in caster.Inventory)
                 {
-                    terminal.WriteLine(Loc.Get("combat.identify_item_row", itm.Name, itm.Type, itm.Attack, itm.Armor), "white");
+                    terminal.SetColor("white");
+                    WriteItemRow(Loc.Get("combat.identify_item_row", ItemNames.Display(itm), itm.Type, itm.Attack, itm.Armor));
                 }
                 break;
 
@@ -31991,6 +32000,15 @@ public partial class CombatEngine
     {
         string key = $"status.{status.ToString().ToLowerInvariant()}";
         return Loc.HasIn(lang, key) || Loc.HasIn("en", key) ? Loc.GetIn(lang, key).ToLower() : status.ToString().ToLower();
+    }
+
+    /// <summary>v1.2.5: a row that carries an item name, in the current colour, wrapped at 79 columns under its
+    /// own leading indent; a row that fits is written unchanged.</summary>
+    internal void WriteItemRow(string row)
+    {
+        if (UIHelper.VisibleLength(row) <= UIHelper.WrapWidth) { terminal.WriteLine(row); return; }
+        string body = row.TrimStart(' ');
+        UIHelper.WriteWrapped(terminal, body, row.Substring(0, row.Length - body.Length));
     }
 
     /// <summary>v1.2.2: "X is stunned and cannot act!" in a given language (the leader's or a follower's terminal).</summary>

@@ -853,7 +853,7 @@ public class RestWorld125Tests : IDisposable
         WorldSimulator.SpouseDeathNotice("en", "Bo", "Goblin", null, "the dungeon", null, when).Should().Contain("Location: the dungeon.");
 
         InLang("fr", () => WorldSimulator.SleepMurderMail("hu", LongName, 1234, "Long Sword"))
-            .Should().Be(L("hu", "worldsim.mail_sleep_murder_item", LongName, $"{1234:N0}", "Long Sword"));
+            .Should().Be(L("hu", "worldsim.mail_sleep_murder_item", LongName, $"{1234:N0}", L("hu", "item.long_sword")));   // v1.2.5 (data-items2): the item in the sleeper's language too
         WorldSimulator.SleepMurderMail("en", "Bo", 1234, null).Should().Be($"Bo murdered you in your sleep! Lost {1234:N0} gold.");
         WorldSimulator.SleepMurderMail("en", "Bo", 1234, "Long Sword").Should().Be($"Bo murdered you in your sleep! Lost {1234:N0} gold and Long Sword.");
         L("en", "worldsim.mail_widowed", "Bo").Should().Be("Your beloved Bo has passed away. You are now widowed.");

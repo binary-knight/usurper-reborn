@@ -258,8 +258,10 @@ public class DataItems125Tests
         InLang("hu", () => ItemNames.Display("Leather Tunic")).Should().Be(hu("item.leather_tunic"));
         InLang("fr", () => ItemNames.Display("Cursed Ring")).Should().Be(Loc.GetIn("fr", "item.cursed_ring"), "a whole template name is read before a prefix");
         // what is not an English template underneath is shown as stored
-        foreach (var stored in new[] { "Kiváló Hosszú Kard", "My Lucky Blade", "Purified Long Sword", "Long Swordfish", "" })
+        foreach (var stored in new[] { "Kiváló Hosszú Kard", "My Lucky Blade", "Long Swordfish", "" })
             InLang("hu", () => ItemNames.Display(stored)).Should().Be(stored);
+        // v1.2.5 (data-items2): "Purified " is the loot generator's poison resist word, read as a loot form
+        InLang("hu", () => ItemNames.Display("Purified Long Sword")).Should().Be($"{hu("item.effect.poison_resist.prefix")} {hu("item.long_sword")}");
         // English is the stored name, byte for byte
         foreach (var n in OwnedNames().Take(200))
             InLang("en", () => ItemNames.Display(n)).Should().Be(n);

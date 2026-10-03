@@ -283,9 +283,10 @@ public class WorldSimulator
     /// <summary>Empties the gossip pool (tests).</summary>
     internal static void ClearGossipPool() => _gossipPool.Clear();
 
-    /// <summary>v1.2.5: the mail a sleeper killed by an NPC finds, in the sleeper's language.</summary>
-    internal static string SleepMurderMail(string lang, string attacker, long gold, string? itemName) => itemName != null
-        ? Loc.GetIn(lang, "worldsim.mail_sleep_murder_item", attacker, $"{gold:N0}", itemName)
+    /// <summary>v1.2.5: the mail a sleeper killed by an NPC finds, in the sleeper's language, the stolen item's
+    /// name too (stored English, shown through ItemNames; `itemFamily` is its stored template).</summary>
+    internal static string SleepMurderMail(string lang, string attacker, long gold, string? itemName, string? itemFamily = null) => itemName != null
+        ? Loc.GetIn(lang, "worldsim.mail_sleep_murder_item", attacker, $"{gold:N0}", ItemNames.DisplayIn(lang, itemName, itemFamily))
         : Loc.GetIn(lang, "worldsim.mail_sleep_murder", attacker, $"{gold:N0}");
 
     /// <summary>
@@ -4870,7 +4871,7 @@ public class WorldSimulator
 
         if (boughtSomething && random.NextDouble() < 0.15)
         {
-            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_purchased", npc.Name, itemBought));
+            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_purchased", npc.Name, ItemNames.Display(itemBought)));   // v1.2.5: the writer's language, as the rest of the line
         }
 
         // v0.65.6: a fruitless visit (checked both shops, bought nothing) marks
@@ -7721,11 +7722,13 @@ public class WorldSimulator
 
                     // Steal 1 random item (from DynamicEquipment)
                     string? stolenItemName = null;
+                    string? stolenItemFamily = null;
                     if (saveData.Player.DynamicEquipment != null && saveData.Player.DynamicEquipment.Count > 0)
                     {
                         int idx = random.Next(saveData.Player.DynamicEquipment.Count);
                         var stolenItem = saveData.Player.DynamicEquipment[idx];
                         stolenItemName = stolenItem.Name;
+                        stolenItemFamily = stolenItem.Family;
 
                         // Remove from equipped slots
                         if (saveData.Player.EquippedItems != null)
@@ -7769,7 +7772,7 @@ public class WorldSimulator
                     SqlBackend.AppendSleepAttackLog(sleeper.Username, logEntry).GetAwaiter().GetResult();
                     // v1.2.5: in the sleeper's account language
                     SqlBackend.SendMessageToKeyLocalized(attackerNPC.Name2, sleeper.Username, "sleep_attack",
-                        lang => SleepMurderMail(lang, attackerNPC.Name2, stolenGold, stolenItemName)).GetAwaiter().GetResult();
+                        lang => SleepMurderMail(lang, attackerNPC.Name2, stolenGold, stolenItemName, stolenItemFamily)).GetAwaiter().GetResult();
 
                     DebugLogger.Instance.LogInfo("SLEEP", $"NPC {attackerNPC.Name2} killed sleeping {sleeper.Username}, stole {stolenGold}g + {stolenItemName ?? "nothing"}");
                 }

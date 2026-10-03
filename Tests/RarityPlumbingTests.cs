@@ -57,12 +57,13 @@ public class RarityPlumbingTests
         back.Family.Should().BeEmpty();
     }
 
+    // v1.2.5: the supreme being items (IDs 1001 to 1004) were removed; nothing in the game read them
+    // (ItemManager.GetItem had no caller). This test asserted their stored rarity.
     [Fact]
-    public void Supreme_items_carry_a_stored_rarity()
+    public void Supreme_items_are_gone()
     {
         ItemManager.InitializeItems();
-        var staff = ItemManager.GetItem(1004);
-        staff.Should().NotBeNull();
-        staff!.Rarity.Should().Be(EquipmentRarity.Artifact);
+        foreach (var id in new[] { 1001, 1002, 1003, 1004 })
+            ItemManager.GetItem(id).Should().BeNull();
     }
 }

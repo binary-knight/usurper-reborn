@@ -115,19 +115,20 @@ namespace UsurperRemake.Systems
             "Enchanted ", "Blessed ", "Cursed "
         };
 
-        private static readonly Dictionary<string, (float PowerMod, float ValueMod, bool IsCursed, string? MagicEffect)> QualityEffects = new()
+        // v1.2.5: the unused MagicEffect text was removed from these entries (nothing read it)
+        private static readonly Dictionary<string, (float PowerMod, float ValueMod, bool IsCursed)> QualityEffects = new()
         {
-            { "", (1.0f, 1.0f, false, null) },
-            { "Fine ", (1.1f, 1.3f, false, null) },
-            { "Quality ", (1.15f, 1.5f, false, null) },
-            { "Superior ", (1.25f, 2.0f, false, null) },
-            { "Masterwork ", (1.4f, 3.0f, false, null) },
-            { "Rusted ", (0.7f, 0.4f, false, null) },
-            { "Worn ", (0.8f, 0.5f, false, null) },
-            { "Battered ", (0.85f, 0.6f, false, null) },
-            { "Enchanted ", (1.3f, 2.5f, false, "Magic Damage +5") },
-            { "Blessed ", (1.2f, 2.0f, false, "Holy Light") },
-            { "Cursed ", (1.35f, 0.5f, true, "Drains Life") },
+            { "", (1.0f, 1.0f, false) },
+            { "Fine ", (1.1f, 1.3f, false) },
+            { "Quality ", (1.15f, 1.5f, false) },
+            { "Superior ", (1.25f, 2.0f, false) },
+            { "Masterwork ", (1.4f, 3.0f, false) },
+            { "Rusted ", (0.7f, 0.4f, false) },
+            { "Worn ", (0.8f, 0.5f, false) },
+            { "Battered ", (0.85f, 0.6f, false) },
+            { "Enchanted ", (1.3f, 2.5f, false) },
+            { "Blessed ", (1.2f, 2.0f, false) },
+            { "Cursed ", (1.35f, 0.5f, true) },
         };
 
         #endregion

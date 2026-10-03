@@ -201,6 +201,16 @@ namespace UsurperRemake.Systems
             return rec;
         }
 
+        /// <summary>
+        /// v1.2.5: notes, in an open recording, a text written in the session's language that is not a Loc
+        /// lookup (an item's shown name) with how to write it in another language. A recorded call that has it
+        /// as an argument is re-rendered with the other language's text; it is never replaced as free text.
+        /// </summary>
+        public static void RecordArgument(string text, Func<string, string> renderIn)
+        {
+            if (!string.IsNullOrEmpty(text)) _recording.Value?.AddArgument(text, renderIn);
+        }
+
         /// <summary>v1.2.4: ends the innermost recording; one begun around it records again.</summary>
         public static void EndRecording() => _recording.Value = _recording.Value?.Previous;
 
@@ -409,6 +419,7 @@ namespace UsurperRemake.Systems
     {
         private const int MaxCalls = 500;   // a recording left open cannot grow without bound
         private readonly List<(string text, string key, object[] args)> _calls = new();
+        private readonly List<(string text, Func<string, string> renderIn)> _arguments = new();
         private readonly object _lock = new();
 
         public LocRecording(string language) { Language = language; }
@@ -428,6 +439,15 @@ namespace UsurperRemake.Systems
             Previous?.Add(text, key, args);
         }
 
+        internal void AddArgument(string text, Func<string, string> renderIn)
+        {
+            lock (_lock)
+            {
+                if (_arguments.Count < MaxCalls) _arguments.Add((text, renderIn));
+            }
+            Previous?.AddArgument(text, renderIn);
+        }
+
         /// <summary>`captured` with each recorded text replaced by its rendering in `lang`.</summary>
         public string Render(string captured, string lang) => Render(captured, lang, null);
 
@@ -439,7 +459,17 @@ namespace UsurperRemake.Systems
         {
             if (string.IsNullOrEmpty(captured) || (lang == Language && substitute == null)) return captured;
             List<(string text, string key, object[] args)> calls;
-            lock (_lock) calls = new List<(string, string, object[])>(_calls);
+            List<(string text, Func<string, string> renderIn)> arguments;
+            lock (_lock)
+            {
+                calls = new List<(string, string, object[])>(_calls);
+                arguments = new List<(string, Func<string, string>)>(_arguments);
+            }
+
+            // v1.2.5: texts noted only as arguments (an item's shown name), each in `lang`
+            var argumentMap = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var (text, renderIn) in arguments)
+                if (!argumentMap.ContainsKey(text)) argumentMap[text] = renderIn(lang);
 
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var (text, key, args) in calls)
@@ -447,7 +477,9 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrWhiteSpace(text) || map.ContainsKey(text)) continue;
                 var translatedArgs = new object[args.Length];
                 for (int i = 0; i < args.Length; i++)
-                    translatedArgs[i] = args[i] is string s && map.TryGetValue(s, out var t) ? t : args[i];
+                    translatedArgs[i] = args[i] is string s
+                        ? (map.TryGetValue(s, out var t) ? t : argumentMap.TryGetValue(s, out var a) ? a : s)
+                        : args[i];
                 string rendered = substitute?.Invoke(key, translatedArgs)
                     ?? (args.Length == 0 ? Loc.GetIn(lang, key) : Loc.GetIn(lang, key, translatedArgs));
                 if (rendered != text) map[text] = rendered;
