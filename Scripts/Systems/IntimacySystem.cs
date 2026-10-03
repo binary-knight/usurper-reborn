@@ -477,7 +477,7 @@ namespace UsurperRemake.Systems
             string babyPronoun = child.Sex == CharacterSex.Male ? GameConfig.CleanFormat(Get("intimacy.pronoun_him")) : GameConfig.CleanFormat(Get("intimacy.pronoun_her"));
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.name_prompt", babyPronoun, child.Name))}");
             terminal.SetColor("white");
-            string nameInput = (await terminal.GetInput("  Name: ")).Trim();
+            string nameInput = (await terminal.GetInput(Loc.Get("intimacy.child_name_input"))).Trim();
             if (!string.IsNullOrEmpty(nameInput) && nameInput.Length <= 20)
             {
                 // Extract surname from auto-generated name (everything after first space)

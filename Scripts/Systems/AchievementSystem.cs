@@ -1215,7 +1215,7 @@ public static class AchievementSystem
             {
                 var displayName = player.Name2 ?? player.Name1;
                 _ = OnlineStateManager.Instance!.AddNews(
-                    $"{displayName} unlocked \"{achievement.Name}\"!", "quest");
+                    Loc.Get("achievement.news_unlocked", displayName, achievement.Name), "quest");
             }
 
             // Broadcast notable achievements to all online players (v0.52.0)
@@ -1410,6 +1410,18 @@ public static class AchievementSystem
     }
 
     /// <summary>
+    /// v1.2.5: the reward amounts of an unlock in the player's language ("+100 Gold +50 XP"); format is the
+    /// number format of the amounts ("" as the single popup showed them, "N0" in the summary).
+    /// </summary>
+    internal static string RewardText(long gold, long xp, string format)
+    {
+        var parts = new List<string>();
+        if (gold > 0) parts.Add(Loc.Get("achievement.reward_gold", gold.ToString(format)));
+        if (xp > 0) parts.Add(Loc.Get("achievement.reward_xp", xp.ToString(format)));
+        return string.Join(" ", parts);
+    }
+
+    /// <summary>
     /// Display a single achievement unlock notification
     /// </summary>
     private static async System.Threading.Tasks.Task ShowAchievementUnlock(TerminalEmulator terminal, Achievement achievement)
@@ -1418,7 +1430,7 @@ public static class AchievementSystem
         if (GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine("* ACHIEVEMENT UNLOCKED! *");
+            terminal.WriteLine(Loc.Get("achievement.unlocked_header"));
             terminal.SetColor(achievement.GetTierColor());
             terminal.WriteLine($"  {achievement.GetTierSymbol()} {achievement.Name}");
             terminal.SetColor("white");
@@ -1426,11 +1438,8 @@ public static class AchievementSystem
 
             if (achievement.GoldReward > 0 || achievement.ExperienceReward > 0)
             {
-                var rewards = "";
-                if (achievement.GoldReward > 0) rewards += $"+{achievement.GoldReward} Gold ";
-                if (achievement.ExperienceReward > 0) rewards += $"+{achievement.ExperienceReward} XP";
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  Rewards: {rewards}");
+                terminal.WriteLine(Loc.Get("achievement.rewards", RewardText(achievement.GoldReward, achievement.ExperienceReward, "")));
             }
 
             if (!string.IsNullOrEmpty(achievement.UnlockMessage))
@@ -1445,7 +1454,7 @@ public static class AchievementSystem
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
             terminal.Write("║");
             terminal.SetColor("bright_cyan");
-            terminal.Write($"{"* ACHIEVEMENT UNLOCKED! *",58}");
+            terminal.Write($"{Loc.Get("achievement.unlocked_header"),58}");
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
@@ -1466,10 +1475,7 @@ public static class AchievementSystem
 
             if (achievement.GoldReward > 0 || achievement.ExperienceReward > 0)
             {
-                var rewards = "";
-                if (achievement.GoldReward > 0) rewards += $"+{achievement.GoldReward} Gold ";
-                if (achievement.ExperienceReward > 0) rewards += $"+{achievement.ExperienceReward} XP";
-                string rewardLine = $"  Rewards: {rewards}";
+                string rewardLine = Loc.Get("achievement.rewards", RewardText(achievement.GoldReward, achievement.ExperienceReward, ""));
                 terminal.Write("║");
                 terminal.SetColor("bright_green");
                 terminal.Write($"{rewardLine,-58}");
@@ -1506,7 +1512,7 @@ public static class AchievementSystem
         if (GameConfig.ScreenReaderMode)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"* {achievements.Count} ACHIEVEMENTS UNLOCKED! *");
+            terminal.WriteLine(Loc.Get("achievement.unlocked_many", achievements.Count));
 
             foreach (var achievement in achievements.OrderByDescending(a => a.Tier).Take(8))
             {
@@ -1518,23 +1524,20 @@ public static class AchievementSystem
             if (achievements.Count > 8)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  ... and {achievements.Count - 8} more!");
+                terminal.WriteLine(Loc.Get("achievement.and_more", achievements.Count - 8));
             }
 
             if (totalGold > 0 || totalXP > 0)
             {
-                var rewards = "";
-                if (totalGold > 0) rewards += $"+{totalGold:N0} Gold ";
-                if (totalXP > 0) rewards += $"+{totalXP:N0} XP";
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  Total Rewards: {rewards}");
+                terminal.WriteLine(Loc.Get("achievement.total_rewards", RewardText(totalGold, totalXP, "N0")));
             }
         }
         else
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("╔══════════════════════════════════════════════════════════╗");
-            string headerText = $"* {achievements.Count} ACHIEVEMENTS UNLOCKED! *";
+            string headerText = Loc.Get("achievement.unlocked_many", achievements.Count);
             int pad = (58 - headerText.Length) / 2;
             string centeredHeader = new string(' ', pad) + headerText + new string(' ', 58 - pad - headerText.Length);
             terminal.Write("║");
@@ -1558,7 +1561,7 @@ public static class AchievementSystem
 
             if (achievements.Count > 8)
             {
-                string moreLine = $"  ... and {achievements.Count - 8} more!";
+                string moreLine = Loc.Get("achievement.and_more", achievements.Count - 8);
                 terminal.Write("║");
                 terminal.SetColor("gray");
                 terminal.Write($"{moreLine,-58}");
@@ -1570,10 +1573,7 @@ public static class AchievementSystem
 
             if (totalGold > 0 || totalXP > 0)
             {
-                var rewards = "";
-                if (totalGold > 0) rewards += $"+{totalGold:N0} Gold ";
-                if (totalXP > 0) rewards += $"+{totalXP:N0} XP";
-                string rewardLine = $"  Total Rewards: {rewards}";
+                string rewardLine = Loc.Get("achievement.total_rewards", RewardText(totalGold, totalXP, "N0"));
                 terminal.Write("║");
                 terminal.SetColor("bright_green");
                 terminal.Write($"{rewardLine,-58}");

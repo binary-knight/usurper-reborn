@@ -516,42 +516,42 @@ namespace UsurperRemake.Systems
                     // v0.57.12: paired movement — dialogue-triggered chivalry also reduces darkness
                     AlignmentSystem.Instance.ChangeAlignment(currentPlayer, effect.IntValue, isGood: true, "dialogue.add_chivalry");
                     currentPlayer.ChivNr++;
-                    terminal?.WriteLine($"(+{effect.IntValue} Chivalry)", "bright_green");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_chivalry", effect.IntValue), "bright_green");
                     break;
 
                 case EffectType.AddDarkness:
                     // v0.57.12: paired movement — dialogue-triggered darkness also reduces chivalry
                     AlignmentSystem.Instance.ChangeAlignment(currentPlayer, effect.IntValue, isGood: false, "dialogue.add_darkness");
                     currentPlayer.DarkNr++;
-                    terminal?.WriteLine($"(+{effect.IntValue} Darkness)", "dark_red");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_darkness", effect.IntValue), "dark_red");
                     break;
 
                 case EffectType.AddGold:
                     currentPlayer.Gold += effect.IntValue;
                     if (effect.IntValue > 0)
-                        terminal?.WriteLine($"(Received {effect.IntValue} gold)", "yellow");
+                        terminal?.WriteLine(Loc.Get("dialogue.effect_gold_received", effect.IntValue), "yellow");
                     else
-                        terminal?.WriteLine($"(Lost {-effect.IntValue} gold)", "red");
+                        terminal?.WriteLine(Loc.Get("dialogue.effect_gold_lost", -effect.IntValue), "red");
                     break;
 
                 case EffectType.AddExperience:
                     currentPlayer.Experience += effect.IntValue;
-                    terminal?.WriteLine($"(+{effect.IntValue} Experience)", "cyan");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_experience", effect.IntValue), "cyan");
                     break;
 
                 case EffectType.Heal:
                     currentPlayer.HP = Math.Min(currentPlayer.HP + effect.IntValue, currentPlayer.MaxHP);
-                    terminal?.WriteLine($"(Healed {effect.IntValue} HP)", "green");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_healed", effect.IntValue), "green");
                     break;
 
                 case EffectType.Damage:
                     currentPlayer.HP = Math.Max(currentPlayer.HP - effect.IntValue, 0);
-                    terminal?.WriteLine($"(Took {effect.IntValue} damage)", "red");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_damage", effect.IntValue), "red");
                     break;
 
                 case EffectType.GiveItem:
                     // Item inventory add not implemented for dialogue rewards
-                    terminal?.WriteLine($"(Received: {effect.StringValue})", "bright_yellow");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_item", effect.StringValue ?? ""), "bright_yellow");
                     break;
 
                 case EffectType.RecordChoice:
@@ -582,8 +582,8 @@ namespace UsurperRemake.Systems
                     {
                         CompanionSystem.Instance.ModifyLoyalty(loyalCompId, effect.IntValue, "dialogue choice");
                         terminal?.WriteLine(effect.IntValue > 0
-                            ? $"({effect.StringValue}'s loyalty increased)"
-                            : $"({effect.StringValue}'s loyalty decreased)", "cyan");
+                            ? Loc.Get("dialogue.effect_loyalty_up", effect.StringValue ?? "")
+                            : Loc.Get("dialogue.effect_loyalty_down", effect.StringValue ?? ""), "cyan");
                     }
                     break;
 
@@ -592,8 +592,8 @@ namespace UsurperRemake.Systems
                     {
                         CompanionSystem.Instance.ModifyTrust(trustCompId, effect.IntValue);
                         terminal?.WriteLine(effect.IntValue > 0
-                            ? $"({effect.StringValue}'s trust increased)"
-                            : $"({effect.StringValue}'s trust decreased)", "cyan");
+                            ? Loc.Get("dialogue.effect_trust_up", effect.StringValue ?? "")
+                            : Loc.Get("dialogue.effect_trust_down", effect.StringValue ?? ""), "cyan");
                     }
                     break;
 
@@ -601,7 +601,7 @@ namespace UsurperRemake.Systems
                     if (Enum.TryParse<CompanionId>(effect.StringValue, out var romCompId))
                     {
                         CompanionSystem.Instance.AdvanceRomance(romCompId);
-                        terminal?.WriteLine($"(Your relationship with {effect.StringValue} deepens)", "magenta");
+                        terminal?.WriteLine(Loc.Get("dialogue.effect_romance", effect.StringValue ?? ""), "magenta");
                     }
                     break;
 
@@ -626,14 +626,14 @@ namespace UsurperRemake.Systems
                 // Ocean Philosophy effects
                 case EffectType.GainOceanInsight:
                     OceanPhilosophySystem.Instance.GainInsight("dialogue:" + sourceNodeId); // v1.1.12: one insight per node
-                    terminal?.WriteLine("(A deeper understanding settles within you)", "bright_cyan");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_insight"), "bright_cyan");
                     break;
 
                 case EffectType.CollectWaveFragment:
                     if (Enum.TryParse<WaveFragment>(effect.StringValue, out var waveFragment))
                     {
                         OceanPhilosophySystem.Instance.CollectFragment(waveFragment);
-                        terminal?.WriteLine("(You have collected a Wave Fragment)", "cyan");
+                        terminal?.WriteLine(Loc.Get("dialogue.effect_wave_fragment"), "cyan");
                     }
                     break;
 
@@ -641,14 +641,14 @@ namespace UsurperRemake.Systems
                     if (Enum.TryParse<AwakeningMoment>(effect.StringValue, out var awakeningMoment))
                     {
                         OceanPhilosophySystem.Instance.ExperienceMoment(awakeningMoment);
-                        terminal?.WriteLine("(Something profound shifts in your understanding)", "bright_cyan");
+                        terminal?.WriteLine(Loc.Get("dialogue.effect_awakening"), "bright_cyan");
                     }
                     break;
 
                 // Amnesia effects
                 case EffectType.RevealMemory:
                     AmnesiaSystem.Instance.RevealMajorMemory(effect.StringValue ?? "");
-                    terminal?.WriteLine("(A memory surfaces from the depths...)", "cyan");
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_memory"), "cyan");
                     break;
 
                 case EffectType.TriggerDream:

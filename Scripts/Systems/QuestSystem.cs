@@ -732,6 +732,19 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.2.5: the refusal shown for a CompleteMercContract result code, in the player's language. The codes
+    /// stay English (the caller compares them); the turn-in screen printed the bare code ("not_merc").
+    /// </summary>
+    internal static string MercTurnInReasonLabel(string code) => code switch
+    {
+        "null" => Loc.Get("merc.turnin_reason_null"),
+        "not_merc" => Loc.Get("merc.turnin_reason_not_merc"),
+        "not_yours" => Loc.Get("merc.turnin_reason_not_yours"),
+        "incomplete" => Loc.Get("merc.turnin_reason_incomplete"),
+        _ => code
+    };
+
+    /// <summary>
     /// Turn in a completed merc contract: pay gold + Reputation cascade + alignment shift (Faith/Shadows
     /// only; Crown is alignment-neutral by default). Caps faction standing gain via DailyMercStandingGain
     /// to prevent "merc 30 Crown contracts in a row, jump into Crown membership instantly" exploits.

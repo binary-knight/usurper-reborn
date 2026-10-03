@@ -556,8 +556,8 @@ namespace UsurperRemake.Systems
                     // CRITICAL: Breakup or divorce!
                     if (spouse != null)
                     {
-                        messages.Add($"{npcName} has had enough of your infidelity!");
-                        messages.Add($"{npcName} demands a divorce!");
+                        messages.Add(Loc.Get("romance.jealous_enough", npcName));
+                        messages.Add(Loc.Get("romance.jealous_demands_divorce", npcName));
 
                         // Use proper divorce flow through both systems
                         if (npc != null && player != null)
@@ -574,12 +574,12 @@ namespace UsurperRemake.Systems
                             player.SpouseName = "";
                         }
 
-                        NewsSystem.Instance.Newsy(true, $"{npcName} has divorced their partner due to infidelity!");
+                        NewsSystem.Instance.Newsy(true, Loc.Get("romance.news_divorced_infidelity", npcName));
                         JealousyLevels.Remove(npcId);
                     }
                     else if (lover != null)
                     {
-                        messages.Add($"{npcName} is heartbroken and ends things with you!");
+                        messages.Add(Loc.Get("romance.jealous_heartbroken", npcName));
 
                         CurrentLovers.Remove(lover);
                         Exes.Add(npcId);
@@ -597,8 +597,8 @@ namespace UsurperRemake.Systems
                     // High jealousy: Confrontation and major relationship damage
                     if (random.NextDouble() < 0.3)
                     {
-                        messages.Add($"{npcName} confronts you about your unfaithfulness!");
-                        messages.Add($"\"How could you do this to me?!\" they cry.");
+                        messages.Add(Loc.Get("romance.jealous_confronts", npcName));
+                        messages.Add(Loc.Get("romance.jealous_cry"));
 
                         if (npc != null && player != null)
                         {
@@ -614,7 +614,7 @@ namespace UsurperRemake.Systems
                     // Medium jealousy: Suspicion and coldness
                     if (random.NextDouble() < 0.2)
                     {
-                        messages.Add($"{npcName} seems distant and suspicious of you...");
+                        messages.Add(Loc.Get("romance.jealous_suspicious", npcName));
 
                         if (npc != null && player != null)
                         {

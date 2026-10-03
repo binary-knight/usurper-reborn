@@ -220,20 +220,30 @@ namespace UsurperRemake.Systems
             _fallbackInstance = this;
         }
 
+        /// <summary>v1.2.5: a faction's name in the player's language (Factions[..].Name stays the English data).</summary>
+        internal static string NameLabel(Faction faction) => faction switch
+        {
+            Faction.TheCrown => Loc.Get("faction.name_crown"),
+            Faction.TheShadows => Loc.Get("faction.name_shadows"),
+            Faction.TheFaith => Loc.Get("faction.name_faith"),
+            _ => faction.ToString()
+        };
+
         /// <summary>
-        /// Check if player meets requirements to join a faction
+        /// Check if player meets requirements to join a faction.
+        /// v1.2.5: the reason is in the player's language; the callers (Castle, Dark Alley, Temple) show it as is.
         /// </summary>
         public (bool canJoin, string reason) CanJoinFaction(Faction faction, Character player)
         {
             if (PlayerFaction != null)
             {
                 if (PlayerFaction == faction)
-                    return (false, "You are already a member of this faction.");
-                return (false, $"You must leave {Factions[PlayerFaction.Value].Name} first.");
+                    return (false, Loc.Get("faction.join_already_member"));
+                return (false, Loc.Get("faction.join_leave_first", NameLabel(PlayerFaction.Value)));
             }
 
             if (player.Level < 10)
-                return (false, "You must reach Level 10 before joining any faction.");
+                return (false, Loc.Get("faction.join_level_10"));
 
             // No faction will accept someone they despise
             // Shadows are more tolerant — they only reject at Hostile (-50) or worse,
@@ -244,13 +254,13 @@ namespace UsurperRemake.Systems
                 : standing < 0;
             if (standingBlocked)
             {
-                string standingLabel = standing switch
+                string standingLabel = Loc.Get(standing switch
                 {
-                    <= -100 => "Hated",
-                    <= -50 => "Hostile",
-                    _ => "Unfriendly"
-                };
-                return (false, $"{Factions[faction].Name} won't accept you. Your standing is {standingLabel} ({standing:N0}). Improve your reputation first.");
+                    <= -100 => "faction.standing_hated",
+                    <= -50 => "faction.standing_hostile",
+                    _ => "faction.standing_unfriendly"
+                });
+                return (false, Loc.Get("faction.join_rejected", NameLabel(faction), standingLabel, standing.ToString("N0")));
             }
 
             // Check if player has a criminal record (high Darkness indicates criminal activity)
@@ -261,18 +271,18 @@ namespace UsurperRemake.Systems
                 Faction.TheCrown => player.Chivalry > 500 && !isCriminal
                     ? (true, "")
                     : (false, isCriminal
-                        ? "Those with a dark reputation cannot join The Crown."
-                        : "You need higher Chivalry (500+) to join The Crown."),
+                        ? Loc.Get("faction.join_crown_dark")
+                        : Loc.Get("faction.join_crown_chivalry")),
 
                 Faction.TheShadows => player.Darkness > 200 || CompletedFactionQuests.Contains("shadows_favor")
                     ? (true, "")
-                    : (false, "The Shadows require proof of your... flexibility. Darkness 200+ or complete a favor."),
+                    : (false, Loc.Get("faction.join_shadows_darkness")),
 
                 Faction.TheFaith => FactionStanding[Faction.TheFaith] >= 100
                     ? (true, "")
-                    : (false, "The Faith requires devotion. Visit the Temple, make offerings, prove your faith."),
+                    : (false, Loc.Get("faction.join_faith_devotion")),
 
-                _ => (false, "Unknown faction.")
+                _ => (false, Loc.Get("faction.join_unknown"))
             };
         }
 

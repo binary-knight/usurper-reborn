@@ -2443,7 +2443,7 @@ public partial class TempleLocation : BaseLocation
         {
             WriteSectionHeader(Loc.Get("temple.requirements_not_met"), "red");
             terminal.SetColor("yellow");
-            terminal.WriteLine(reason);
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, reason); // v1.2.5: the join reason wraps at 79
             terminal.WriteLine("");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("temple.faith_requires"));

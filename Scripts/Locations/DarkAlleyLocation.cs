@@ -1152,7 +1152,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("red");
                 WriteSectionHeader(Loc.Get("dark_alley.requirements_not_met"), "red");
                 terminal.SetColor("yellow");
-                terminal.WriteLine(reason);
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, reason); // v1.2.5: the join reason wraps at 79
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_require"));

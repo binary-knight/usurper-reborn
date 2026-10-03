@@ -174,8 +174,6 @@ keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Description|ability.{id}.desc
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Name|ability.{id}.name
 table|Scripts/Systems/DialogueSystem.cs|init.Text|dialogue tree node text
 names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names
-table|Scripts/Systems/FactionSystem.cs|return/tuple#1|faction join refusal
-table|Scripts/Systems/FactionSystem.cs|switcharm/tuple#1|faction join refusal
 nouns|Scripts/Systems/FactionSystem.cs|init.Name|faction names printed raw, InnLocation
 table|Scripts/Systems/FactionSystem.cs|init.Ranks|faction rank titles
 keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
@@ -223,7 +221,6 @@ keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Prompt|npc_story.{id}.stageN.ch
 keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Text|npc_story.{id}.stageN.choice.{key}.text
 keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Title|npc_story.{id}.title
 names|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:exSpouseName|NPC name fallback
-table|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:gender|physical description
 table|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:prefix|dialogue prefix
 names|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:targetName2|NPC name fallback
 table|Scripts/Systems/VisualNovelDialogueSystem.cs|init.Initiator|quest giver fallback
@@ -338,14 +335,10 @@ names|Scripts/Locations/MusicShopLocation.cs|decl:seller|NPC names
 names|Scripts/Locations/WeaponShopLocation.cs|decl:shopkeeperName|shopkeeper name
 table|Scripts/Systems/AchievementSystem.cs|decl:achMsg|achievement broadcast
 nouns|Scripts/Systems/AchievementSystem.cs|decl:broadcastName|fallback name in broadcast
-table|Scripts/Systems/AchievementSystem.cs|decl:headerText|unlock box header
-table|Scripts/Systems/AchievementSystem.cs|decl:moreLine|achievement list line
-table|Scripts/Systems/AchievementSystem.cs|decl:rewardLine|achievement reward line
 table|Scripts/Systems/AchievementSystem.cs|init.Description|achievement descriptions
 nouns|Scripts/Systems/AchievementSystem.cs|init.Name|achievement names
 table|Scripts/Systems/AchievementSystem.cs|init.SecretHint|achievement hint
 table|Scripts/Systems/AchievementSystem.cs|init.UnlockMessage|achievement unlock message
-table|Scripts/Systems/AchievementSystem.cs|=rewards|achievement reward line
 table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#0|amnesia dream titles
 table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#1|amnesia dream lines
 table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#0|memory fragment titles
