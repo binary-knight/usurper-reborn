@@ -549,4 +549,61 @@ public class RestEngine125Tests : IDisposable
         L("hu", "engine.feed_world_news").Should().NotBe("World News");
         L("en", "engine.news_new_adventurer", "Grim", "Warrior").Should().Be("A new adventurer arrives! Grim the Warrior begins their journey.");
     }
+
+    // ---------- catch-up buckets (leftover from the online systems piece) ----------
+
+    private static readonly (string Key, object[] Args, int Bucket)[] CatchUpNews =
+    {
+        ("news.death", new object[] { "Xaver", "Yrsa", "Zub" }, 0),
+        ("news.natural_death", new object[] { "Xaver", "Xq", 80 }, 0),
+        ("news.birth", new object[] { "Xaver", "Yrsa", "Zub" }, 1),
+        ("news.coming_of_age", new object[] { "Zub", "Xaver", "Yrsa" }, 1),
+        ("news.royal_proclaims", new object[] { "Xaver", "Xq" }, 2),
+        ("castle.news_abdicated", new object[] { "Xaver" }, 2),
+        ("castle.news_throne_seized", new object[] { "Xaver", "Xq" }, 2),
+        ("street_encounter.news.throne_guards", new object[] { "Xaver", "Yrsa" }, 2),
+        ("news.marriage", new object[] { "Xaver", "Yrsa", "Xq" }, 3),
+        ("news.divorce", new object[] { "Xaver", "Yrsa" }, 3),
+        ("news.affair", new object[] { "Xaver", "Yrsa" }, 3),
+        ("news.birthday", new object[] { "Xaver", "Xq", 30, "" }, 3),
+        ("dungeon.settlement_founded_news", new object[0], 4),
+        ("settlement.news_proposes", new object[] { "Xaver", "Xq" }, 4),
+        ("settlement.news_settler_joined", new object[] { "Xaver" }, 4),
+        ("engine.news_new_adventurer", new object[] { "Xaver", "Xq" }, 5),
+        ("level_master.reached_level_news", new object[] { "Xaver", 12 }, 5),
+    };
+
+    [Fact]
+    public void CatchUpNews_LandsInItsBucket_InEveryLanguage()
+    {
+        foreach (var lang in AllLanguages)
+            foreach (var (key, args, bucket) in CatchUpNews)
+            {
+                string news = L(lang, key, args);
+                InLang("en", () => GameEngine.CatchUpBucket(news)).Should().Be(bucket, $"[{lang}] {key}: \"{news}\"");
+            }
+        GameEngine.CatchUpBucket("Something odd happened.").Should().Be(5, "anything else is a world event");
+    }
+
+    [Fact]
+    public async Task CatchUpSummary_PutsHungarianNewsUnderItsHeadings()
+    {
+        var events = CatchUpNews.Select(n => L("hu", n.Key, n.Args)).Prepend($"═══ {L("hu", "news.new_day")} ═══").ToList();
+        var s = NewScreen();
+        await InLanguage("hu", async () => { await Run(Engine(s), "ShowCatchUpSummary", events); return 0; });
+        Capture("catch-up-hu.txt", s.Text);
+        var rows = Rows(s.Text);
+        int Heading(string key) => rows.FindIndex(r => r.Trim() == $"{L("hu", key)}:");
+        var headings = new[] { "engine.cat_deaths", "engine.cat_births", "engine.cat_royal", "engine.cat_love", "engine.cat_outskirts", "engine.cat_world_events" }
+            .Select(Heading).ToList();
+        headings.Should().OnlyContain(i => i >= 0, "every bucket has Hungarian news");
+        headings.Should().BeInAscendingOrder();
+        foreach (var (key, args, bucket) in CatchUpNews)
+        {
+            int row = rows.FindIndex(r => r.Contains(L("hu", key, args)));
+            row.Should().BeGreaterThan(headings[bucket], key);
+            if (bucket < 5) row.Should().BeLessThan(headings[bucket + 1], $"{key} is under {headings[bucket]}");
+        }
+        s.Text.Should().NotContain(L("hu", "news.new_day"), "the New Day marker is still skipped");
+    }
 }

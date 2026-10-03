@@ -7929,35 +7929,11 @@ public partial class GameEngine
             if (clean.Contains("═══") || clean.IndexOf("New Day", StringComparison.OrdinalIgnoreCase) >= 0 || string.IsNullOrWhiteSpace(clean))
                 continue;
 
-            if (clean.IndexOf("slain", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                clean.IndexOf("passed away", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                clean.IndexOf("soul moves on", StringComparison.OrdinalIgnoreCase) >= 0)
-                deaths.Add(clean);
-            else if (clean.IndexOf("proud parents", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("come of age", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("born", StringComparison.OrdinalIgnoreCase) >= 0)
-                births.Add(clean);
-            else if (clean.IndexOf("king", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("proclaims", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("throne", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("treasury", StringComparison.OrdinalIgnoreCase) >= 0)
-                political.Add(clean);
-            else if (clean.IndexOf("married", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("divorced", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("affair", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("birthday", StringComparison.OrdinalIgnoreCase) >= 0)
-                social.Add(clean);
-            else if (clean.IndexOf("settlement", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("outskirts", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("constructed", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("building", StringComparison.OrdinalIgnoreCase) >= 0)
-                settlement.Add(clean);
-            else if (clean.IndexOf("level", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("quest", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("team", StringComparison.OrdinalIgnoreCase) >= 0)
-                worldEvents.Add(clean);
-            else
-                worldEvents.Add(clean); // Default bucket
+            // v1.2.5: news is written in the writer's language, so each bucket matches its words in every
+            // language (CatchUpBucket); anything else lands in World Events.
+            var bucket = CatchUpBucket(clean);
+            (bucket == 0 ? deaths : bucket == 1 ? births : bucket == 2 ? political
+                : bucket == 3 ? social : bucket == 4 ? settlement : worldEvents).Add(clean);
         }
 
         int maxPerCat = GameConfig.CatchUpMaxEventsPerCategory;
@@ -7981,6 +7957,27 @@ public partial class GameEngine
 
         await terminal.PressAnyKey();
     }
+
+    /// <summary>
+    /// v1.2.5: the catch-up bucket of a news row: 0 deaths, 1 births, 2 royal, 3 love, 4 outskirts, 5 world
+    /// events. A bucket's words (engine.catchup_words_*, "|" separated pieces of the news texts) are matched
+    /// in every language, case-insensitively, in that order, as the English words were.
+    /// </summary>
+    internal static int CatchUpBucket(string clean)
+    {
+        for (int b = 0; b < CatchUpWordKeys.Length; b++)
+            foreach (var lang in Loc.AvailableLanguages)
+                foreach (var word in Loc.GetIn(lang.Code, CatchUpWordKeys[b]).Split('|', StringSplitOptions.RemoveEmptyEntries))
+                    if (clean.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                        return b;
+        return CatchUpWordKeys.Length;
+    }
+
+    private static readonly string[] CatchUpWordKeys =
+    {
+        "engine.catchup_words_deaths", "engine.catchup_words_births", "engine.catchup_words_royal",
+        "engine.catchup_words_love", "engine.catchup_words_outskirts"
+    };
 
     /// <summary>
     /// Display a single category of catch-up events.
