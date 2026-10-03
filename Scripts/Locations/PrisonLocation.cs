@@ -53,6 +53,9 @@ public partial class PrisonLocation : BaseLocation
     public override async Task EnterLocation(Character player, TerminalEmulator term)
     {
         if (player == null) return;
+        // v1.2.5: this override skips BaseLocation.EnterLocation, so the base player is set here;
+        // IsScreenReader reads it, and without it the screen reader menu was never shown
+        currentPlayer = player;
 
         // Check if player is actually imprisoned
         if (player.DaysInPrison <= 0)

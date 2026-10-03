@@ -233,6 +233,26 @@ public class CastleRest125Tests : IDisposable
         }
     }
 
+    [Fact]
+    public async Task APrisonerWithAScreenReader_GetsTheScreenReaderMenu()
+    {
+        CastleLocation.SetKing(LongKing());
+        var hero = Hero();
+        hero.ScreenReaderMode = true;
+        CastleLocation.GetCurrentKing().Prisoners[LongName] = new PrisonRecord { CharacterName = LongName, Crime = "Theft", Sentence = 5, BailAmount = 100 };
+        string text = await InLanguage("en", async () =>
+        {
+            var s = NewScreen("B", "Y", "");
+            var prison = new PrisonLocation(null!, s.Term);   // a fresh location: nothing set its base player before
+            await prison.EnterLocation(hero, s.Term);
+            return s.Text;
+        });
+        Capture("prison-enter-sr-en.txt", text);
+        hero.DaysInPrison.Should().Be(0, "the bail was paid and the prisoner walked out");
+        text.Should().Contain("B. Pay Bail (if bail is set)").And.Contain(L("en", "prison.sr_menu_who"))
+            .And.NotContain("IIIIIIII").And.NotContain("(B)ail Payment");
+    }
+
     private static readonly string[] BailKeys =
         { "prison.bail_amount", "prison.bail_you_have", "prison.bail_confirm", "prison.bail_keep_gold" };
 
