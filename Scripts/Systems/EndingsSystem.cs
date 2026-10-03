@@ -792,7 +792,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             Row(terminal, $"  {Loc.Get("ending.final_stats_character", player.Name2, GameConfig.GetLocalizedClassName(player.Class))}", "white");
-            Row(terminal, $"  {Loc.Get("ending.final_stats_race", player.Race)}", "white");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_race", GameConfig.GetLocalizedRaceName(player.Race))}", "white");
             Row(terminal, $"  {Loc.Get("ending.final_stats_level", player.Level)}", "cyan");
             terminal.WriteLine("");
 
@@ -847,7 +847,7 @@ namespace UsurperRemake.Systems
 
             // Character summary
             Row(terminal, $"  {Loc.Get("ending.legacy_hero_section")}", "bright_yellow");
-            Row(terminal, $"  {Loc.Get("ending.legacy_hero_desc", player.Name2, player.Race, GameConfig.GetLocalizedClassName(player.Class))}", "white");
+            Row(terminal, $"  {Loc.Get("ending.legacy_hero_desc", player.Name2, GameConfig.GetLocalizedRaceName(player.Race), GameConfig.GetLocalizedClassName(player.Class))}", "white");
             Row(terminal, $"  {Loc.Get("ending.legacy_hero_stats", player.Level, player.MKills)}", "gray");
             terminal.WriteLine("");
 
@@ -889,7 +889,7 @@ namespace UsurperRemake.Systems
                 Row(terminal, $"  {Loc.Get("ending.legacy_companions_fallen")}", "dark_red");
                 foreach (var (companion, death) in fallenCompanions)
                 {
-                    Row(terminal, $"    {Loc.Get("ending.legacy_fallen_entry", companion.Name, death.Type)}", "gray");
+                    Row(terminal, $"    {Loc.Get("ending.legacy_fallen_entry", companion.Name, DeathCauseLabel(death.Type))}", "gray");
                 }
             }
             terminal.WriteLine("");
@@ -1633,6 +1633,22 @@ namespace UsurperRemake.Systems
             "Dark" => Loc.GetIn(lang, "temple.align.dark"),
             "Balance" => Loc.GetIn(lang, "temple.align.balance"),
             _ => alignment,
+        };
+
+        /// <summary>
+        /// v1.2.5: how a companion died, in the player's language (the stored DeathType stays the enum). English
+        /// keeps the enum name it showed before.
+        /// </summary>
+        internal static string DeathCauseLabel(DeathType type) => type switch
+        {
+            DeathType.Combat => Loc.Get("ending.death_cause_combat"),
+            DeathType.Sacrifice => Loc.Get("ending.death_cause_sacrifice"),
+            DeathType.ChoiceBased => Loc.Get("ending.death_cause_choice"),
+            DeathType.MoralTrigger => Loc.Get("ending.death_cause_moral"),
+            DeathType.QuestRelated => Loc.Get("ending.death_cause_quest"),
+            DeathType.Inevitable => Loc.Get("ending.death_cause_inevitable"),
+            DeathType.TimeBased => Loc.Get("ending.death_cause_time"),
+            _ => type.ToString(),
         };
 
         /// <summary>v1.2.5: the ascension news line in the writer's language, after the English divine marker.</summary>

@@ -563,4 +563,31 @@ public class RestStory125Tests : IDisposable
                 (v.StartsWith("  ") ? v : "  " + v).TrimEnd().Length.Should().BeLessOrEqualTo(MaxWidth - 1, $"[{lang}] {key}");
             }
     }
+
+    // ---------- what the endings showed in English in every language ----------
+
+    [Fact]
+    public void DissolveWord_IsTheOneEveryPromptNames()
+    {
+        var src = File.ReadAllText(Path.Combine(UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "EndingsSystem.cs"));
+        src.Should().Contain("confirm.Trim().ToUpper() == \"DISSOLVE\"", "the typed word is English in every language");
+        foreach (var lang in AllLanguages)
+            L(lang, "ending.dissolution_confirm").Should().Contain("DISSOLVE", $"[{lang}] the prompt names the word the game accepts");
+    }
+
+    [Fact]
+    public async Task RaceAndCompanionDeath_AreInThePlayersLanguage()
+    {
+        foreach (DeathType type in Enum.GetValues(typeof(DeathType)))
+        {
+            InLang("en", () => EndingsSystem.DeathCauseLabel(type)).Should().Be(type.ToString(), "English shows what it showed");
+            foreach (var lang in AllLanguages.Where(l => l != "en"))
+                InLang(lang, () => EndingsSystem.DeathCauseLabel(type)).Should().NotBe(type.ToString(), $"[{lang}] {type} is translated");
+        }
+        var hu = await EndingFlow("hu", "PlayCredits", EndingType.Savior);
+        hu.Should().Contain(L("hu", "ending.final_stats_race", L("hu", "race.human")));
+        hu.Should().NotContain("Human");
+        var en = await EndingFlow("en", "PlayCredits", EndingType.Savior);
+        en.Should().Contain("Race: Human");
+    }
 }
