@@ -45,12 +45,25 @@ public class RestStory125Tests : IDisposable
     // awakening level).
     private static readonly FieldInfo OceanField = typeof(OceanPhilosophySystem).GetField("_fallbackInstance", SNP)!;
     private static readonly FieldInfo AmnesiaField = typeof(AmnesiaSystem).GetField("_fallbackInstance", SNP)!;
+    // The credits record the ending in the meta progression, which saves to a file: the tests use one in a
+    // temporary folder, and the story flags they set go to a fresh story.
+    private static readonly FieldInfo MetaField = typeof(MetaProgressionSystem).GetField("_fallbackInstance", SNP)!;
+    private static readonly FieldInfo StoryField = typeof(StoryProgressionSystem).GetField("_fallbackInstance", SNP)!;
     private readonly object? _oldOcean = OceanField.GetValue(null);
     private readonly object? _oldAmnesia = AmnesiaField.GetValue(null);
+    private readonly object? _oldMeta = MetaField.GetValue(null);
+    private readonly object? _oldStory = StoryField.GetValue(null);
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), $"usurper-story-{Guid.NewGuid():N}");
 
     public RestStory125Tests()
     {
+        Directory.CreateDirectory(_dir);
         OceanField.SetValue(null, new OceanPhilosophySystem());
+        StoryField.SetValue(null, new StoryProgressionSystem());
+        var meta = (MetaProgressionSystem)RuntimeHelpers.GetUninitializedObject(typeof(MetaProgressionSystem));
+        typeof(MetaProgressionSystem).GetField("data", F)!.SetValue(meta, new MetaProgressionData());
+        typeof(MetaProgressionSystem).GetField("saveFilePath", F)!.SetValue(meta, Path.Combine(_dir, "saves", "meta_progression.json"));
+        MetaField.SetValue(null, meta);
     }
 
     public void Dispose()
@@ -58,6 +71,9 @@ public class RestStory125Tests : IDisposable
         typeof(MudServer).GetField("_instance", SNP)!.SetValue(null, _oldServer);
         OceanField.SetValue(null, _oldOcean);
         AmnesiaField.SetValue(null, _oldAmnesia);
+        MetaField.SetValue(null, _oldMeta);
+        StoryField.SetValue(null, _oldStory);
+        try { Directory.Delete(_dir, true); } catch { }
     }
 
     // ---------- helpers ----------
@@ -513,6 +529,14 @@ public class RestStory125Tests : IDisposable
                 EveryRowFits(text, $"[{lang}] {name}");
             }
         }
+    }
+
+    [Fact]
+    public async Task EndingCredits_RecordInTheTestsOwnMetaFile()
+    {
+        await EndingFlow("en", "PlayCredits", EndingType.Savior);
+        MetaProgressionSystem.Instance.Should().BeSameAs(MetaField.GetValue(null));
+        File.Exists(Path.Combine(_dir, "saves", "meta_progression.json")).Should().BeTrue("the credits saved the meta progression to the tests' own file");
     }
 
     [Fact]
