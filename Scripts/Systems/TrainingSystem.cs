@@ -788,7 +788,7 @@ public static class TrainingSystem
             var proficiency = GetSkillProficiency(player, skillId);
             string profName = GetProficiencyName(proficiency);
             string profColor = GetProficiencyColor(proficiency);
-            terminal.WriteLine($" {index,2}  {skillName,-24} [{profColor}]{profName,-13}[/] {pointsInvested} pts");
+            terminal.WriteLine(Loc.Get("training.reset_row", $"{index,2}", $"{skillName,-24}", profColor, $"{profName,-13}", pointsInvested));
             index++;
         }
 

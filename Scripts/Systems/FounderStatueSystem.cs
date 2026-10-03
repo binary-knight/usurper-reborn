@@ -27,7 +27,7 @@ namespace UsurperRemake.Systems
             if (statues.Count == 0)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  No statues stand here.");
+                terminal.WriteLine(Loc.Get("founder.no_statues"));
                 await terminal.PressAnyKey();
                 return;
             }
@@ -45,7 +45,7 @@ namespace UsurperRemake.Systems
                     RenderStatueListText(terminal, location, statues);
                 }
 
-                var input = (await terminal.GetInput("  Examine which statue? (1-" + statues.Count + ", or [R]eturn): ")).Trim().ToUpperInvariant();
+                var input = (await terminal.GetInput(Loc.Get("founder.examine_prompt", statues.Count))).Trim().ToUpperInvariant();
                 if (input == "R" || input == "Q" || input == "")
                 {
                     if (GameConfig.ElectronMode) ElectronBridge.Emit("statue_close", new { });
@@ -59,19 +59,41 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>
+        /// v1.2.5: a statue's stored class name (FounderStatueData, English, "Mystic Shaman") in the player's
+        /// language; a name that is not a class is shown as stored.
+        /// </summary>
+        internal static string ClassLabel(string stored) =>
+            Enum.TryParse<CharacterClass>(stored.Replace(" ", ""), out var c) ? GameConfig.GetLocalizedClassName(c) : stored;
+
+        /// <summary>v1.2.5: a statue's stored race name ("Half-Elf") in the player's language; another one as stored.</summary>
+        internal static string RaceLabel(string stored) =>
+            Enum.TryParse<CharacterRace>(stored.Replace("-", "").Replace(" ", ""), out var r) ? GameConfig.GetLocalizedRaceName(r) : stored;
+
+        /// <summary>v1.2.5: a statue's stored ending tag in the player's language; another one as stored.</summary>
+        internal static string EndingLabel(string stored) => stored switch
+        {
+            "Savior" => Loc.Get("founder.ending_savior"),
+            "Usurper" => Loc.Get("founder.ending_usurper"),
+            "Multiple" => Loc.Get("founder.ending_multiple"),
+            "Pre-NG+" => Loc.Get("founder.ending_pre_ng"),
+            "Lost" => Loc.Get("founder.ending_lost"),
+            _ => stored
+        };
+
         private static void RenderStatueListText(
             TerminalEmulator terminal,
             FounderStatueData.StatueLocationTag location,
             List<FounderStatueData.FounderStatue> statues)
         {
             terminal.WriteLine("");
-            string locationLabel = location switch
+            string locationLabel = Loc.Get(location switch
             {
-                FounderStatueData.StatueLocationTag.Pantheon => "Pantheon: Hall of the Ascended",
-                FounderStatueData.StatueLocationTag.Castle => "Castle Courtyard: The Slayers of Manwe",
-                FounderStatueData.StatueLocationTag.MainStreetMini => "Main Square: Founders' Plinths",
-                _ => "Statues"
-            };
+                FounderStatueData.StatueLocationTag.Pantheon => "founder.place_pantheon",
+                FounderStatueData.StatueLocationTag.Castle => "founder.place_castle",
+                FounderStatueData.StatueLocationTag.MainStreetMini => "founder.place_main_street",
+                _ => "founder.place_other"
+            });
 
             if (!GameConfig.ScreenReaderMode)
             {
@@ -88,7 +110,7 @@ namespace UsurperRemake.Systems
             for (int i = 0; i < statues.Count; i++)
             {
                 var s = statues[i];
-                string crackTag = s.IsCracked ? " (cracked)" : "";
+                string crackTag = s.IsCracked ? Loc.Get("founder.cracked_tag") : "";
                 string color = s.IsCracked ? "dark_gray" : "white";
 
                 if (s.Location == FounderStatueData.StatueLocationTag.MainStreetMini)
@@ -102,13 +124,13 @@ namespace UsurperRemake.Systems
                     terminal.Write($"  [{i + 1}] ", "bright_yellow");
                     string subtitle = !string.IsNullOrEmpty(s.DivineName) && s.Location == FounderStatueData.StatueLocationTag.Pantheon
                         ? s.DivineName
-                        : $"Lv.{s.FinalLevel} {s.ClassName}";
+                        : Loc.Get("founder.level_class", s.FinalLevel, ClassLabel(s.ClassName));
                     terminal.WriteLine($"{s.DisplayName}: {subtitle}{crackTag}", color);
                 }
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {FounderStatueData.GetUniqueFounderCount()} alpha-era founders are commemorated across the world.", "gray");
+            terminal.WriteLine(Loc.Get("founder.commemorated", FounderStatueData.GetUniqueFounderCount()), "gray");
             terminal.WriteLine("");
         }
 
@@ -154,19 +176,20 @@ namespace UsurperRemake.Systems
             // Character info line
             terminal.SetColor("white");
             string identity = !string.IsNullOrEmpty(statue.DivineName) && statue.Location == FounderStatueData.StatueLocationTag.Pantheon
-                ? $"  {statue.DisplayName}, known to the heavens as {statue.DivineName}"
+                ? Loc.Get("founder.known_to_heavens", statue.DisplayName, statue.DivineName)
                 : $"  {statue.DisplayName}";
             terminal.WriteLine(identity);
 
             if (statue.FinalLevel > 0 && statue.ClassName != "Unknown")
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  Lv.{statue.FinalLevel} {statue.RaceName} {statue.ClassName}, Cycle {statue.CycleReached} {statue.EndingTag}");
+                terminal.WriteLine(Loc.Get("founder.record_line", statue.FinalLevel, RaceLabel(statue.RaceName), ClassLabel(statue.ClassName),
+                    statue.CycleReached, EndingLabel(statue.EndingTag)));
             }
             else if (statue.IsCracked)
             {
                 terminal.SetColor("dark_gray");
-                terminal.WriteLine("  (Their record was lost to misadventure.)");
+                terminal.WriteLine(Loc.Get("founder.record_lost"));
             }
             terminal.WriteLine("");
 
@@ -182,7 +205,7 @@ namespace UsurperRemake.Systems
         {
             if (GameConfig.ScreenReaderMode || GameConfig.DisableCharacterMonsterArt)
             {
-                terminal.WriteLine("  [Statue]");
+                terminal.WriteLine(Loc.Get("founder.statue_art_sr"));
                 return;
             }
 

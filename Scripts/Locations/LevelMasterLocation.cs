@@ -337,7 +337,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor(currentMaster.Color);
         terminal.Write($" {currentMaster.Name}");
         terminal.SetColor("gray");
-        terminal.Write("  XP:");
+        terminal.Write(Loc.Get("level_master.bbs_xp"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Experience:N0}");
         if (currentPlayer.Level >= GameConfig.MaxLevel)
@@ -794,7 +794,7 @@ public class LevelMasterLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        await terminal.PressAnyKey("  Press Enter to continue...");
+        await terminal.PressAnyKey("  " + Loc.Get("ui.press_enter"));
     }
 
     /// <summary>
@@ -1563,7 +1563,7 @@ public class LevelMasterLocation : BaseLocation
                 var displayName = player.Name2 ?? player.Name1;
                 if (player.Level % 5 == 0 || player.Level <= 3)
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                        $"{displayName} has reached level {player.Level}!", "combat");
+                        Loc.Get("level_master.reached_level_news", displayName, player.Level), "combat");
             }
 
             // Auto-add newly unlocked spells/abilities to empty quickbar slots

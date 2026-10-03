@@ -284,7 +284,7 @@ public class CharacterCreationSystem
         }
         catch (Exception ex)
         {
-            terminal.WriteLine($"Error during character creation: {ex.Message}", "red");
+            terminal.WriteLine(Loc.Get("character_creation.error_creation", ex.Message), "red");
             DebugLogger.Instance?.LogError("CHARCREATE", $"{ex}");
             return null;
         }
@@ -2939,8 +2939,8 @@ public class CharacterCreationSystem
         terminal.WriteLine("");
         
         terminal.WriteLine($"=== {Loc.Get("character_creation.appearance")} ===", "green");
-        terminal.WriteLine($"{Loc.Get("character_creation.height")}: {character.Height} cm", "white");
-        terminal.WriteLine($"{Loc.Get("character_creation.weight")}: {character.Weight} kg", "white");
+        terminal.WriteLine($"{Loc.Get("character_creation.height")}: {Loc.Get("character_creation.height_cm", character.Height)}", "white");
+        terminal.WriteLine($"{Loc.Get("character_creation.weight")}: {Loc.Get("character_creation.weight_kg", character.Weight)}", "white");
         terminal.WriteLine($"{Loc.Get("character_creation.eyes")}: {GameConfig.EyeColors[character.Eyes]}", "white");
         terminal.WriteLine($"{Loc.Get("character_creation.hair")}: {GameConfig.HairColors[character.Hair]}", "white");
         terminal.WriteLine($"{Loc.Get("character_creation.skin")}: {GameConfig.SkinColors[character.Skin]}", "white");

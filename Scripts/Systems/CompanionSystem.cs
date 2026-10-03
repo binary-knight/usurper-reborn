@@ -1118,37 +1118,25 @@ namespace UsurperRemake.Systems
                 _ = GameEngine.Instance.SaveCurrentGame();
         }
 
-        private string GetLastWords(Companion companion, DeathType type)
+        /// <summary>
+        /// The companion's last words as the save keeps them (CompanionDeath.LastWords): English in every
+        /// language. v1.2.5: the death scene shows them through LastWordsKey in the player's language.
+        /// </summary>
+        private string GetLastWords(Companion companion, DeathType type) => Loc.GetIn("en", LastWordsKey(companion.Id, type));
+
+        /// <summary>v1.2.5: the key of a companion's last words, for the death scene and for the stored English.</summary>
+        internal static string LastWordsKey(CompanionId id, DeathType type) => (id, type) switch
         {
-            return (companion.Id, type) switch
-            {
-                (CompanionId.Lyris, DeathType.Sacrifice) =>
-                    "I knew... when I met you... I knew this is how it ends...",
-
-                (CompanionId.Lyris, DeathType.ChoiceBased) =>
-                    "Tell Aurelion... I tried...",
-
-                (CompanionId.Aldric, DeathType.MoralTrigger) =>
-                    "I wont... let you... not like this...",
-
-                (CompanionId.Aldric, DeathType.Sacrifice) =>
-                    "Got em... this time I... got em...",
-
-                (CompanionId.Mira, DeathType.Sacrifice) =>
-                    "One more... let me heal... one more...",
-
-                (CompanionId.Mira, DeathType.QuestRelated) =>
-                    "It mattered... right? Tell me it mattered...",
-
-                (CompanionId.Vex, DeathType.Inevitable) =>
-                    "Heh... beat the schedule... by a few hours... not bad...",
-
-                (CompanionId.Vex, DeathType.Sacrifice) =>
-                    "Always wanted... to go out... on a good joke... was it funny...?",
-
-                _ => "Hey... not bad... for a... last day..."
-            };
-        }
+            (CompanionId.Lyris, DeathType.Sacrifice) => "companion.last_words_lyris_sacrifice",
+            (CompanionId.Lyris, DeathType.ChoiceBased) => "companion.last_words_lyris_choice",
+            (CompanionId.Aldric, DeathType.MoralTrigger) => "companion.last_words_aldric_moral",
+            (CompanionId.Aldric, DeathType.Sacrifice) => "companion.last_words_aldric_sacrifice",
+            (CompanionId.Mira, DeathType.Sacrifice) => "companion.last_words_mira_sacrifice",
+            (CompanionId.Mira, DeathType.QuestRelated) => "companion.last_words_mira_quest",
+            (CompanionId.Vex, DeathType.Inevitable) => "companion.last_words_vex_inevitable",
+            (CompanionId.Vex, DeathType.Sacrifice) => "companion.last_words_vex_sacrifice",
+            _ => "companion.last_words_other"
+        };
 
         /// <summary>
         /// Check if any companions should trigger their death conditions
@@ -1337,6 +1325,27 @@ namespace UsurperRemake.Systems
             await terminal.PressAnyKey(Loc.Get("companion.press_enter_welcome"));
         }
 
+        /// <summary>
+        /// v1.2.5: the FALLEN banner in the player's language: the header's letters spaced out, centred in a
+        /// 68-column frame. (The frame's middle rows were 70 columns against a 68-column top and bottom.)
+        /// </summary>
+        internal static List<string> FallenBox(string header)
+        {
+            const int inner = 66;
+            string word = string.Join("   ", header.Where(c => !char.IsWhiteSpace(c)).Select(c => c.ToString()));
+            if (word.Length > inner) word = header.Trim();
+            int left = (inner - word.Length) / 2;
+            string blank = "║" + new string(' ', inner) + "║";
+            return new List<string>
+            {
+                "╔" + new string('═', inner) + "╗",
+                blank,
+                "║" + new string(' ', left) + word + new string(' ', inner - left - word.Length) + "║",
+                blank,
+                "╚" + new string('═', inner) + "╝",
+            };
+        }
+
         private async Task DisplayDeathScene(Companion companion, DeathType type, string circumstance, TerminalEmulator terminal)
         {
             terminal.Clear();
@@ -1351,11 +1360,8 @@ namespace UsurperRemake.Systems
             }
             else
             {
-                terminal.WriteLine("╔══════════════════════════════════════════════════════════════════╗", "dark_red");
-                terminal.WriteLine("║                                                                    ║", "dark_red");
-                terminal.WriteLine("║                    F   A   L   L   E   N                          ║", "dark_red");
-                terminal.WriteLine("║                                                                    ║", "dark_red");
-                terminal.WriteLine("╚══════════════════════════════════════════════════════════════════╝", "dark_red");
+                foreach (var row in FallenBox(Loc.Get("companion.fallen_header")))
+                    terminal.WriteLine(row, "dark_red");
             }
             terminal.WriteLine("");
 
@@ -1374,7 +1380,7 @@ namespace UsurperRemake.Systems
             await Pacing.Wait(1500);
 
             // Their final words
-            string lastWords = GetLastWords(companion, type);
+            string lastWords = Loc.Get(LastWordsKey(companion.Id, type));
             terminal.SetColor("dark_cyan");
             terminal.WriteLine($"  \"{lastWords}\"");
             terminal.WriteLine("");
@@ -1405,14 +1411,14 @@ namespace UsurperRemake.Systems
 
             // Memory persists - varied by companion
             terminal.SetColor("bright_cyan");
-            string memoryLine = companion.Id switch
+            string memoryLine = Loc.Get(companion.Id switch
             {
-                CompanionId.Lyris => "  You wont forget her. You know that much.",
-                CompanionId.Aldric => "  He died doing what he always did. Standing in front of someone.",
-                CompanionId.Mira => "  She healed you. More times than you can count.",
-                CompanionId.Vex => "  You can still hear him laughing. Somehow.",
-                _ => "  You wont forget them."
-            };
+                CompanionId.Lyris => "companion.memory_lyris",
+                CompanionId.Aldric => "companion.memory_aldric",
+                CompanionId.Mira => "companion.memory_mira",
+                CompanionId.Vex => "companion.memory_vex",
+                _ => "companion.memory_other"
+            });
             terminal.WriteLine(memoryLine);
             terminal.SetColor("white");
             terminal.WriteLine("");
@@ -1432,67 +1438,67 @@ namespace UsurperRemake.Systems
             {
                 case CompanionId.Lyris:
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine("  She knew things she shouldnt have known.");
-                    terminal.WriteLine("  About you. About the gods. About all of it.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_lyris_1"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_lyris_2"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1500);
                     terminal.SetColor("cyan");
-                    terminal.WriteLine("  You never found out how much she really knew.");
-                    terminal.WriteLine("  Now you never will.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_lyris_3"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_lyris_4"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                     terminal.SetColor("bright_white");
-                    terminal.WriteLine("  Funny how much you miss someone");
-                    terminal.WriteLine("  who never told you the whole truth.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_lyris_5"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_lyris_6"));
                     break;
 
                 case CompanionId.Aldric:
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("  He lost his whole unit once. Every single one of them.");
-                    terminal.WriteLine("  Carried that around for years.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_aldric_1"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_aldric_2"));
                     await Pacing.Wait(1000);
                     terminal.SetColor("white");
                     terminal.WriteLine("");
-                    terminal.WriteLine("  This time he didnt lose anyone.");
-                    terminal.WriteLine("  Just himself.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_aldric_3"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_aldric_4"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine("  Maybe thats what he wanted all along.");
-                    terminal.WriteLine("  One fight where he didnt have to watch someone else die.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_aldric_5"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_aldric_6"));
                     break;
 
                 case CompanionId.Mira:
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine("  She lost her faith when the temple fell.");
-                    terminal.WriteLine("  Kept healing people anyway. Said she didnt know why.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_mira_1"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_mira_2"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1500);
                     terminal.SetColor("white");
-                    terminal.WriteLine("  Maybe she did know why.");
-                    terminal.WriteLine("  Maybe she just didnt want to admit it.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_mira_3"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_mira_4"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine("  She healed you because she cared.");
-                    terminal.WriteLine("  Thats it. Thats the whole reason.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_mira_5"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_mira_6"));
                     break;
 
                 case CompanionId.Vex:
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine("  He was dying the whole time you knew him.");
-                    terminal.WriteLine("  Never shut up about it either. Made jokes.");
-                    terminal.WriteLine("  Drove you crazy sometimes.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_1"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_2"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_3"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1500);
                     terminal.SetColor("white");
-                    terminal.WriteLine("  Turns out thats how he dealt with it.");
-                    terminal.WriteLine("  If you cant beat it, laugh at it.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_4"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_5"));
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                     terminal.SetColor("cyan");
-                    terminal.WriteLine("  The dungeon is quieter now.");
-                    terminal.WriteLine("  You keep expecting to hear a bad joke around the next corner.");
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_6"));
+                    terminal.WriteLine(Loc.Get("companion.philosophy_vex_7"));
                     break;
             }
 

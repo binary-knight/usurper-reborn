@@ -1207,8 +1207,7 @@ namespace UsurperRemake.Systems
 
             if (children.Count > 0)
             {
-                NewsSystem.Instance?.Newsy(true,
-                    $"{custodialParent.Name} has been granted custody of {children.Count} child(ren) in the divorce.");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("family.news_custody_granted", custodialParent.Name, children.Count));
             }
         }
 

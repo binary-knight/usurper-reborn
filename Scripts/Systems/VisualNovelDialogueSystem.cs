@@ -223,7 +223,7 @@ namespace UsurperRemake.Systems
         {
             terminal!.ClearScreen();
             string relColor = GetRelationColor(relationLevel);
-            string romanticStatus = romanceType != RomanceRelationType.None ? $" [{romanceType}]" : "";
+            string romanticStatus = romanceType != RomanceRelationType.None ? $" [{RomanceTag(romanceType)}]" : "";
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("bright_cyan");
@@ -242,7 +242,7 @@ namespace UsurperRemake.Systems
 
             // NPC description
             terminal.SetColor("gray");
-            terminal.WriteLine($"  Level {npc.Level} {npc.Race} {npc.ClassName}");
+            terminal.WriteLine(Loc.Get("dialogue.npc_profile_line", npc.Level, GameConfig.GetLocalizedRaceName(npc.Race), npc.ClassName));
 
             // Physical description based on gender and traits
             string physicalDesc = GeneratePhysicalDescription(npc);
@@ -262,13 +262,24 @@ namespace UsurperRemake.Systems
             await Pacing.Wait(100);
         }
 
+        /// <summary>v1.2.5: the romance tag of the conversation header in the player's language.</summary>
+        internal static string RomanceTag(RomanceRelationType type) => type switch
+        {
+            RomanceRelationType.Spouse => Loc.Get("love_street.tag_spouse"),
+            RomanceRelationType.Lover => Loc.Get("love_street.tag_lover"),
+            RomanceRelationType.FWB => Loc.Get("love_street.tag_fwb"),
+            RomanceRelationType.Ex => Loc.Get("dialogue.romance_tag_ex"),
+            _ => type.ToString()
+        };
+
         /// <summary>
         /// Generate a physical description for the NPC
         /// </summary>
         private string GeneratePhysicalDescription(NPC npc)
         {
+            // v1.2.5: in the player's language; the adjectives agree with the NPC's sex.
             var profile = npc.Brain?.Personality;
-            string gender = npc.Sex == CharacterSex.Female ? "She" : "He";
+            string sex = npc.Sex == CharacterSex.Female ? "she" : "he";
 
             var adjectives = new List<string>();
 
@@ -277,29 +288,30 @@ namespace UsurperRemake.Systems
                 if (profile.Sensuality > 0.7f)
                     adjectives.Add("alluring");
                 if (profile.Passion > 0.7f)
-                    adjectives.Add("intense-eyed");
+                    adjectives.Add("intense");
                 if (profile.Aggression > 0.7f)
-                    adjectives.Add("fierce-looking");
+                    adjectives.Add("fierce");
                 if (profile.Sociability > 0.7f)
                     adjectives.Add("approachable");
                 if (profile.Intelligence > 0.7f)
-                    adjectives.Add("sharp-witted");
+                    adjectives.Add("sharp");
             }
 
             if (adjectives.Count == 0)
                 adjectives.Add("unremarkable");
 
-            string raceDesc = npc.Race switch
+            string raceDesc = Loc.Get(npc.Race switch
             {
-                CharacterRace.Elf => "with graceful elven features",
-                CharacterRace.Dwarf => "with sturdy dwarven build",
-                CharacterRace.Orc => "with powerful orcish physique",
-                CharacterRace.Hobbit => "with a small but nimble frame",
-                CharacterRace.Troll => "with massive, intimidating stature",
-                _ => "of average build"
-            };
+                CharacterRace.Elf => "dialogue.phys_race_elf",
+                CharacterRace.Dwarf => "dialogue.phys_race_dwarf",
+                CharacterRace.Orc => "dialogue.phys_race_orc",
+                CharacterRace.Hobbit => "dialogue.phys_race_hobbit",
+                CharacterRace.Troll => "dialogue.phys_race_troll",
+                _ => "dialogue.phys_race_other"
+            });
 
-            return $"{gender} appears {string.Join(", ", adjectives)} {raceDesc}.";
+            string adjectiveList = string.Join(", ", adjectives.Select(a => Loc.Get($"dialogue.phys_adj_{a}_{sex}")));
+            return Loc.Get($"dialogue.phys_appears_{sex}", adjectiveList, raceDesc);
         }
 
         /// <summary>
@@ -352,7 +364,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal!.SetColor("yellow");
-            terminal.WriteLine($"  {npc.Name2} says:");
+            terminal.WriteLine(Loc.Get("base.npc_says", npc.Name2));
             terminal.SetColor("white");
             terminal.WriteLine($"  \"{greeting}\"");
             terminal.WriteLine("");
@@ -2265,7 +2277,7 @@ namespace UsurperRemake.Systems
                     {
                         terminal.SetColor("bright_red");
                         terminal.WriteLine($"  {Loc.Get("dialogue.affair_leaves_spouse", npc.Name2, exSpouseName)}");
-                        NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} for {player.Name}!");
+                        NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_left_spouse_for", npc.Name2, exSpouseName, player.Name));
                     }
                     else
                     {
@@ -2274,14 +2286,14 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_now_lover", npc.Name2)}");
-                            NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} in a scandal involving {player.Name}!");
+                            NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_left_spouse_scandal", npc.Name2, exSpouseName, player.Name));
                         }
                         else
                         {
                             terminal.SetColor("gray");
                             terminal.WriteLine($"  {Loc.Get("dialogue.lover_cap_reached", npc.Name2)}");
                             // Affair-divorce already fired; NPC is now single, not the player's lover.
-                            NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} after a scandal, but did not stay with {player.Name}.");
+                            NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_left_spouse_alone", npc.Name2, exSpouseName, player.Name));
                         }
                     }
                 }
@@ -2752,7 +2764,7 @@ namespace UsurperRemake.Systems
                 player.ID ?? "", npc.ID, player.DisplayName, npc.Name2);
 
             // Generate news
-            NewsSystem.Instance?.Newsy(true, $"{player.Name} and {npc.Name2} have gotten married! Congratulations to the happy couple!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_married", player.Name, npc.Name2));
 
             terminal.SetColor("bright_green");
             if (!GameConfig.ScreenReaderMode)

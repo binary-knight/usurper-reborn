@@ -510,7 +510,7 @@ public partial class RelationshipSystem
         if (OnlineStateManager.IsActive)
         {
             _ = OnlineStateManager.Instance!.AddNews(
-                $"{character1.Name} and {character2.Name} have been wed! Congratulations!", "romance");
+                Loc.Get("family.news_wed", character1.Name, character2.Name), "romance");
         }
 
         // Generate wedding announcement
@@ -988,7 +988,8 @@ public partial class RelationshipSystem
         int totalChildren = parent1Kids + parent2Kids;
         if (totalChildren > 0)
         {
-            NewsSystem.Instance?.Newsy(true, $"{parent1.Name} was awarded custody of {parent1Kids} child{(parent1Kids != 1 ? "ren" : "")} in the divorce from {parent2.Name}.");
+            NewsSystem.Instance?.Newsy(true, Loc.Get(parent1Kids == 1 ? "family.news_custody_awarded_one" : "family.news_custody_awarded_many",
+                parent1.Name, parent1Kids, parent2.Name));
         }
     }
     

@@ -419,9 +419,9 @@ namespace UsurperRemake.Systems
                 if (newsSystem != null)
                 {
                     if (chivalryChange >= 20)
-                        newsSystem.Newsy(true, $"{character.Name} performed a noble deed: {reason}");
+                        newsSystem.Newsy(true, Loc.Get("alignment.news_noble_deed", character.Name, reason));
                     else if (darknessChange >= 20)
-                        newsSystem.Newsy(true, $"{character.Name} committed a dark act: {reason}");
+                        newsSystem.Newsy(true, Loc.Get("alignment.news_dark_act", character.Name, reason));
                 }
             }
         }

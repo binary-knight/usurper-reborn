@@ -25,29 +25,6 @@
       "fecb22585d"
     ]
   },
-  "Scripts/Core/Player.cs": {
-    "count": 18,
-    "sites": [
-      "0e60fd8015",
-      "3a0e203a69",
-      "48c8dc5fd8",
-      "517a58342d",
-      "5ef3c3ad0b",
-      "65272ae07d",
-      "69ea612aa1",
-      "6abf3eaf31",
-      "6ca4d575c3",
-      "9cf196822c",
-      "9e1a0057c3",
-      "b29b9f46c5",
-      "b51fc573b9",
-      "cae81ce315",
-      "e1c11f6d5b",
-      "f7d0a8947b",
-      "fc13c4a4ec",
-      "fe6eeb08ac"
-    ]
-  },
   "Scripts/Locations/CastleLocation.cs": {
     "count": 1,
     "sites": [
@@ -59,14 +36,6 @@
     "sites": [
       "2ada8c9b77",
       "6bbf0c7b29"
-    ]
-  },
-  "Scripts/Locations/LevelMasterLocation.cs": {
-    "count": 3,
-    "sites": [
-      "57cc72fd49",
-      "78263889b7",
-      "ab8325d32a"
     ]
   },
   "Scripts/Server/MudServer.cs": {
@@ -98,122 +67,9 @@
     ]
   },
   "Scripts/Systems/AchievementSystem.cs": {
-    "count": 8,
-    "sites": [
-      "0248837562",
-      "12a167d164",
-      "1eada4def0",
-      "50e6a80ef3",
-      "5c5edc5805",
-      "9e7fb69f76",
-      "bde86d1388",
-      "d01ee497b2"
-    ]
-  },
-  "Scripts/Systems/AlignmentSystem.cs": {
-    "count": 2,
-    "sites": [
-      "d14527b0a9",
-      "fbd6576225"
-    ]
-  },
-  "Scripts/Systems/CharacterCreationSystem.cs": {
-    "count": 3,
-    "sites": [
-      "27bd32b23a",
-      "b298bc4cf5",
-      "ca84238a9b"
-    ]
-  },
-  "Scripts/Systems/CompanionSystem.cs": {
-    "count": 25,
-    "sites": [
-      "0223050cc4",
-      "079bb5a466",
-      "0d4bb4a411",
-      "0f031c6381",
-      "165378ec6a",
-      "1abe306f82",
-      "25f9e81cc1",
-      "2700f90df7",
-      "2b6d9790e0",
-      "419740cb8e",
-      "4705b8f847",
-      "5644639d92",
-      "5eed332237",
-      "620cecb57b",
-      "67b4b558a7",
-      "712b5803fe",
-      "7c91c15871",
-      "7dec36df63",
-      "7e1885797b",
-      "836de92a13",
-      "9436cd210a",
-      "c0267fa2a9",
-      "d5bb3af59b",
-      "e773fd5335",
-      "ffddb01d06"
-    ]
-  },
-  "Scripts/Systems/DialogueSystem.cs": {
-    "count": 17,
-    "sites": [
-      "01738c4e5a",
-      "0f555c68a9",
-      "10821ab34b",
-      "24e36aefcd",
-      "2ab091a0b3",
-      "530f51a25e",
-      "75479dc968",
-      "81a29919eb",
-      "8b2ca5033c",
-      "9dfe6c65c6",
-      "a02a5b61fd",
-      "bb023b052c",
-      "bf3a981eae",
-      "c00e8e52c3",
-      "c2bedeb581",
-      "d37bb7a12f",
-      "e9b4e6882e"
-    ]
-  },
-  "Scripts/Systems/FactionSystem.cs": {
-    "count": 4,
-    "sites": [
-      "43ff65660e",
-      "5288a73fcf",
-      "a5a19c10f2",
-      "eff824c019"
-    ]
-  },
-  "Scripts/Systems/FamilySystem.cs": {
     "count": 1,
     "sites": [
-      "ccfd6cd062"
-    ]
-  },
-  "Scripts/Systems/FounderStatueSystem.cs": {
-    "count": 7,
-    "sites": [
-      "17370e206c",
-      "22690a749f",
-      "319f9c7daf",
-      "85c996b0d8",
-      "9d4ce3fb90",
-      "ae4dae6d51",
-      "dd2df31b8a"
-    ]
-  },
-  "Scripts/Systems/IntimacySystem.cs": {
-    "count": 1,
-    "sites": [
-      "ce15cc6c49"
-    ]
-  },
-  "Scripts/Systems/LootGenerator.cs": {
-    "count": 1,
-    "sites": [
-      "582f194579"
+      "1eada4def0"
     ]
   },
   "Scripts/Systems/QuestSystem.cs": {
@@ -227,18 +83,9 @@
     ]
   },
   "Scripts/Systems/RelationshipSystem.cs": {
-    "count": 4,
-    "sites": [
-      "10c5626a13",
-      "35e152e072",
-      "75f844c62b",
-      "b0a9086961"
-    ]
-  },
-  "Scripts/Systems/RomanceTracker.cs": {
     "count": 1,
     "sites": [
-      "c9e689fa68"
+      "10c5626a13"
     ]
   },
   "Scripts/Systems/SqlSaveBackend.cs": {
@@ -255,23 +102,6 @@
       "f0612841d6",
       "f0612841d6",
       "f0612841d6"
-    ]
-  },
-  "Scripts/Systems/TrainingSystem.cs": {
-    "count": 1,
-    "sites": [
-      "e249777b23"
-    ]
-  },
-  "Scripts/Systems/VisualNovelDialogueSystem.cs": {
-    "count": 6,
-    "sites": [
-      "05c09f2f7c",
-      "180a8aacc5",
-      "36ab627d55",
-      "b586de08da",
-      "bd6366cf02",
-      "cb8cbe26a5"
     ]
   },
   "Scripts/UI/SplashScreen.cs": {

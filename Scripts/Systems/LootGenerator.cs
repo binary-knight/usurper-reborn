@@ -2473,9 +2473,10 @@ public static class LootGenerator
                         return (true, null);
 
                     // Class not in the allowed list
-                    string classList = string.Join(", ", classes);
-                    string itemType = lootItem.Type == ObjType.Shield ? "shield" : "weapon";
-                    return (false, $"Only {classList} can equip this {itemType}.");
+                    // v1.2.5: in the player's language; the class names come from the template (English enum names).
+                    string classList = string.Join(", ", classes.Select(c =>
+                        Enum.TryParse<CharacterClass>(c, out var cc) ? GameConfig.GetLocalizedClassName(cc) : c));
+                    return (false, Loc.Get(lootItem.Type == ObjType.Shield ? "item.class_only_shield" : "item.class_only_weapon", classList));
                 }
             }
 
