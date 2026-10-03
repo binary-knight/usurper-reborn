@@ -636,26 +636,6 @@ namespace UsurperRemake.BBS
                 Write(message, color);
         }
 
-        public void ShowStatusBar(string playerName, int level, int hp, int maxHp, int gold, int turns)
-        {
-            SetColor("gray");
-            WriteLine("────────────────────────────────────────────────────────");
-            Write($" {playerName}", "bright_cyan");
-            Write($" | Lv.{level}", "yellow");
-            Write($" | HP: ", "gray");
-
-            // Color HP based on percentage
-            float hpPercent = maxHp > 0 ? (float)hp / maxHp : 0;
-            string hpColor = hpPercent > 0.5f ? "green" : hpPercent > 0.25f ? "yellow" : "red";
-            Write($"{hp}/{maxHp}", hpColor);
-
-            Write($" | Gold: {gold}", "yellow");
-            Write($" | Turns: {turns}", "cyan");
-            WriteLine("");
-            SetColor("gray");
-            WriteLine("────────────────────────────────────────────────────────");
-        }
-
         public void DrawBox(int x, int y, int width, int height, string color)
         {
             SetColor(color);

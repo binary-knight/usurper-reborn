@@ -131,8 +131,7 @@ public static class MudChatSystem
             // /restore feel like a free undo to players who don't realize
             // it's only for genuine accidents, and (b) admins should gate
             // restorations to maintain the weight of the death cap.
-            // case "restore":
-            //     return HandleRestore(username, terminal);
+            // 1.2.5: the player-side HandleRestore, unreachable since then, was removed.
 
             case "group":
                 return await HandleGroup(username, args, terminal);
@@ -1129,91 +1128,6 @@ public static class MudChatSystem
 
         terminal.SetColor("bright_green");
         terminal.WriteLine("  All spectators have been removed.");
-        return true;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // /RESTORE: recover an accidentally-deleted character (v0.57.22 Tier 1)
-    // ═══════════════════════════════════════════════════════════════════
-    //
-    // Looks up the most recent entry in deleted_characters for this SSH
-    // account, restores it to the players table if within 7 days, and tells
-    // the player to log out + back in to load the restored character.
-    // Refuses to overwrite an active character (player must delete the new
-    // one first if they really want the old back).
-
-    private static bool HandleRestore(string username, TerminalEmulator terminal)
-    {
-        // Only meaningful in online (SQL-backed) mode. Single-player saves
-        // are file-based and the player can manage their own backups.
-        if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  /restore is only available on the online server.");
-            return true;
-        }
-
-        var backend = UsurperRemake.Systems.SaveSystem.Instance.Backend
-            as UsurperRemake.Systems.SqlSaveBackend;
-        if (backend == null)
-        {
-            terminal.SetColor("red");
-            terminal.WriteLine("  /restore is not available in this session.");
-            return true;
-        }
-
-        // Probe first to see if there's anything to restore.
-        var info = backend.GetMostRecentDeletedCharacter(username);
-        if (info == null)
-        {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  No deleted character is on file for your account, or the");
-            terminal.WriteLine("  7-day grace window has passed. Nothing to restore.");
-            return true;
-        }
-
-        // Show what we found and ask for explicit confirmation.
-        terminal.WriteLine("");
-        terminal.WriteLine("  Found a deleted character on file:", "bright_yellow");
-        terminal.WriteLine($"    Character:   {info.DisplayName}", "white");
-        terminal.WriteLine($"    Deleted at:  {info.DeletedAt} UTC", "gray");
-        terminal.WriteLine($"    Expires at:  {info.ExpiresAt} UTC", "gray");
-        terminal.WriteLine("");
-        terminal.WriteLine("  Restoring will replace your CURRENT character with this one.", "yellow");
-        terminal.WriteLine("  If you have an active character in this account, type /restore");
-        terminal.WriteLine("  CONFIRM to proceed (a delete-then-restore will be needed).", "gray");
-        terminal.WriteLine("");
-
-        if (backend.RestoreFromDeleted(username, out string failureReason))
-        {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine($"  '{info.DisplayName}' has been restored.");
-            terminal.SetColor("white");
-            terminal.WriteLine("  Log out and log back in to play as the restored character.");
-            return true;
-        }
-
-        terminal.SetColor("red");
-        switch (failureReason)
-        {
-            case "active_character_exists":
-                terminal.WriteLine("  You already have an active character on this account.");
-                terminal.WriteLine("  Delete the current character first, then run /restore again.");
-                terminal.SetColor("gray");
-                terminal.WriteLine("  Both characters cannot exist simultaneously on one SSH account.");
-                break;
-            case "no_archived_character":
-                terminal.WriteLine("  The archive entry vanished between probe and restore (race condition?).");
-                terminal.WriteLine("  Try /restore again. If it persists, contact a sysop.");
-                break;
-            case "no_player_row":
-                terminal.WriteLine("  Your account row was not found. Cannot restore.");
-                break;
-            default:
-                terminal.WriteLine($"  Restore failed: {failureReason}");
-                terminal.WriteLine("  Contact a sysop with this exact message.");
-                break;
-        }
         return true;
     }
 
