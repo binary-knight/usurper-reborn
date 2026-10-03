@@ -413,12 +413,54 @@ public class RestChar125Tests : IDisposable
     {
         var text = await HeaderScreen("en", TalkNpc(CharacterSex.Female, CharacterRace.Elf, true), RomanceRelationType.Lover, true);
         text.Should().Contain("  Level 12 Elf Warrior");
-        text.Should().Contain("She appears alluring, intense-eyed, fierce-looking, approachable, sharp-witted with graceful elven features.");
+        // The description wraps at 79 columns: compare its words.
+        string.Join(" ", Rows(text).Select(r => r.Trim()).Where(r => r.Length > 0))
+            .Should().Contain("She appears alluring, intense-eyed, fierce-looking, approachable, sharp-witted with graceful elven features.");
         text.Should().Contain($"{LongName} [Lover]");
         var plain = await HeaderScreen("en", TalkNpc(CharacterSex.Male, CharacterRace.Human, false), RomanceRelationType.None, true);
         plain.Should().Contain("  He appears unremarkable of average build.");
         Source("Scripts/Systems/VisualNovelDialogueSystem.cs").Should().Contain("terminal.WriteLine(Loc.Get(\"base.npc_says\", npc.Name2));");
         L("en", "base.npc_says", "Bo").Should().Be("  Bo says:");
+    }
+
+    [Fact]
+    public async Task ConversationHeader_EveryRowFits_InEveryLanguage_AndTheFrameIsWhole()
+    {
+        foreach (var lang in AllLanguages)
+            foreach (var romance in Enum.GetValues<RomanceRelationType>())
+                foreach (var sr in new[] { false, true })
+                    foreach (var sex in new[] { CharacterSex.Female, CharacterSex.Male })
+                    {
+                        var text = await HeaderScreen(lang, TalkNpc(sex, CharacterRace.Troll, true), romance, sr);
+                        EveryRowFits(text, $"[{lang}{(sr ? " sr" : "")}] {romance} conversation header");
+                        foreach (var row in Rows(text).Where(r => r.StartsWith("║") || r.StartsWith("╔") || r.StartsWith("╚")))
+                            row.Length.Should().Be(MaxWidth, $"[{lang}] the header frame is 79 columns: \"{row}\"");
+                        if (!sr)
+                            Rows(text).Should().Contain(r => r.StartsWith("║  " + LongName), "the name row is inside the frame");
+                    }
+        // The English description wraps at its words.
+        var en = await HeaderScreen("en", TalkNpc(CharacterSex.Male, CharacterRace.Troll, true), RomanceRelationType.None, true);
+        string.Join(" ", Rows(en).Select(r => r.Trim()).Where(r => r.Length > 0))
+            .Should().Contain("He appears alluring, intense-eyed, fierce-looking, approachable, sharp-witted with massive, intimidating stature.");
+    }
+
+    [Fact]
+    public void FactionRefusals_WrapAt79_WhereTheyAreShown()
+    {
+        foreach (var file in new[] { "Scripts/Locations/CastleLocation.cs", "Scripts/Locations/DarkAlleyLocation.cs", "Scripts/Locations/TempleLocation.cs" })
+        {
+            var src = Source(file);
+            src.Should().Contain("UsurperRemake.UI.UIHelper.WriteWrapped(terminal, reason);", $"{file} wraps the join refusal");
+            src.Should().NotContain("terminal.WriteLine(reason);", $"{file} has no unwrapped refusal row");
+        }
+        // The English refusals that ran past 79 columns.
+        L("en", "faction.join_faith_devotion").Length.Should().BeGreaterThan(MaxWidth);
+        foreach (var lang in AllLanguages)
+            foreach (var key in new[] { "faction.join_faith_devotion", "faction.join_shadows_darkness" })
+                UIHelper.WordWrap(L(lang, key), UIHelper.WrapWidth).Should().OnlyContain(r => r.Length <= MaxWidth);
+        var s = NewScreen();
+        UIHelper.WriteWrapped(s.Term, L("en", "faction.join_rejected", "The Shadows", "Unfriendly", "-50"));
+        EveryRowFits(s.Text, "faction refusal");
     }
 
     // ---------- news ----------

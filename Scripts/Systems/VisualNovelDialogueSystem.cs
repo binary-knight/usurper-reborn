@@ -226,12 +226,14 @@ namespace UsurperRemake.Systems
             string romanticStatus = romanceType != RomanceRelationType.None ? $" [{RomanceTag(romanceType)}]" : "";
             if (!GameConfig.ScreenReaderMode)
             {
+                // v1.2.5: the frame is 79 columns and the name row is padded to it (it was 80, and the row
+                // padded only the tag, so it ran past the frame for any name longer than 14 characters).
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+                terminal.WriteLine("╔" + new string('═', HeaderInner) + "╗");
                 terminal.SetColor(relColor);
-                terminal.WriteLine($"║  {npc.Name2}{romanticStatus,-60}  ║");
+                terminal.WriteLine("║" + $"  {npc.Name2}{romanticStatus}".PadRight(HeaderInner) + "║");
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+                terminal.WriteLine("╚" + new string('═', HeaderInner) + "╝");
             }
             else
             {
@@ -247,7 +249,7 @@ namespace UsurperRemake.Systems
             // Physical description based on gender and traits
             string physicalDesc = GeneratePhysicalDescription(npc);
             terminal.SetColor("white");
-            terminal.WriteLine($"  {physicalDesc}");
+            UIHelper.WriteWrapped(terminal, physicalDesc, "  "); // v1.2.5: wrapped at 79 (five adjectives ran past it)
             terminal.WriteLine("");
 
             // v0.62.1 (player report Lv.6 Sage on Main Street): the orange
@@ -261,6 +263,8 @@ namespace UsurperRemake.Systems
             // behind a small in-game cost so it feels earned.
             await Pacing.Wait(100);
         }
+
+        private const int HeaderInner = 77;
 
         /// <summary>v1.2.5: the romance tag of the conversation header in the player's language.</summary>
         internal static string RomanceTag(RomanceRelationType type) => type switch
