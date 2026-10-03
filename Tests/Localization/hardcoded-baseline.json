@@ -177,27 +177,6 @@
       "fe6eeb08ac"
     ]
   },
-  "Scripts/Locations/AnchorRoadLocation.cs": {
-    "count": 9,
-    "sites": [
-      "0c7585b7b4",
-      "27cedaff26",
-      "3a917cd388",
-      "3eb955b2c3",
-      "46fc5394ca",
-      "4f9e9c9e23",
-      "c9d9a3c298",
-      "e40fca1dd3",
-      "f002023868"
-    ]
-  },
-  "Scripts/Locations/ArmorShopLocation.cs": {
-    "count": 2,
-    "sites": [
-      "063d915ee7",
-      "e3aaa8ba79"
-    ]
-  },
   "Scripts/Locations/CastleLocation.cs": {
     "count": 273,
     "sites": [
@@ -476,27 +455,6 @@
       "ffb595dc30"
     ]
   },
-  "Scripts/Locations/DarkAlleyLocation.cs": {
-    "count": 8,
-    "sites": [
-      "08912fa8d4",
-      "1eb64e0ff4",
-      "2636bbab4d",
-      "4b6a39ccb3",
-      "75fbd47bb1",
-      "96370738e1",
-      "c6e147188f",
-      "fa23c3a789"
-    ]
-  },
-  "Scripts/Locations/DormitoryLocation.cs": {
-    "count": 3,
-    "sites": [
-      "3ea6493ed9",
-      "c27ebeb99c",
-      "e2e05c5072"
-    ]
-  },
   "Scripts/Locations/DungeonLocation.cs": {
     "count": 2,
     "sites": [
@@ -521,57 +479,6 @@
       "57cc72fd49",
       "78263889b7",
       "ab8325d32a"
-    ]
-  },
-  "Scripts/Locations/MainStreetClassic.cs": {
-    "count": 5,
-    "sites": [
-      "70b5bb828b",
-      "773c87bd3e",
-      "a9bee9ae4a",
-      "cf3bd59e12",
-      "db89c90983"
-    ]
-  },
-  "Scripts/Locations/MainStreetLocation.cs": {
-    "count": 9,
-    "sites": [
-      "0f27550f2c",
-      "26928a3c7d",
-      "6e77933788",
-      "a9bee9ae4a",
-      "ace4e59de7",
-      "b56365fe0e",
-      "c1479db70e",
-      "ffc916b32b",
-      "ffc916b32b"
-    ]
-  },
-  "Scripts/Locations/MarketplaceLocation.cs": {
-    "count": 3,
-    "sites": [
-      "41a0ead118",
-      "674bc46531",
-      "70aa55e009"
-    ]
-  },
-  "Scripts/Locations/PantheonLocation.cs": {
-    "count": 14,
-    "sites": [
-      "0c02518fd3",
-      "1b406e7eeb",
-      "402bc6236c",
-      "402bc6236c",
-      "574a362e00",
-      "692eb7f2ac",
-      "7590856608",
-      "7783065cd8",
-      "953610b17b",
-      "a92cc53c57",
-      "b086db0b13",
-      "b086db0b13",
-      "c8f418ae3f",
-      "cef9b46edd"
     ]
   },
   "Scripts/Locations/PrisonLocation.cs": {
@@ -638,39 +545,6 @@
     "sites": [
       "0e23a77110",
       "33305229b4"
-    ]
-  },
-  "Scripts/Locations/SanctumLocation.cs": {
-    "count": 2,
-    "sites": [
-      "1f8187d104",
-      "fb63c06e1d"
-    ]
-  },
-  "Scripts/Locations/TempleLocation.cs": {
-    "count": 13,
-    "sites": [
-      "1e0719ed70",
-      "348b70b135",
-      "440ebff78a",
-      "44ccf3292f",
-      "5faced5cf6",
-      "8c8ce9b89f",
-      "96d3f71422",
-      "a161539af0",
-      "ac18a85d09",
-      "cd7a495921",
-      "d19946f2fe",
-      "eb9616a26d",
-      "f58fdf35db"
-    ]
-  },
-  "Scripts/Locations/WeaponShopLocation.cs": {
-    "count": 3,
-    "sites": [
-      "406ce99063",
-      "4fc6793006",
-      "8f08aa828c"
     ]
   },
   "Scripts/Server/GroupSystem.cs": {

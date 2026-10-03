@@ -272,7 +272,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor(atCap ? "dark_gray" : "white");
             terminal.Write(Loc.Get(labelKey));
             terminal.SetColor("gray");
-            terminal.WriteLine($"  -- {cost} {GameConfig.MoneyType}  ({usedToday}/{dailyCap} today)");
+            terminal.WriteLine(Loc.Get("sanctum.option_cost", cost, usedToday, dailyCap));
         }
 
         private void WriteSanctumOption(string key, string label)
@@ -595,7 +595,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("yellow");
                 foreach (var line in championData.LocEntrance())
                 {
-                    terminal.WriteLine($"  {string.Format(line, currentPlayer.Name2 ?? "you")}");
+                    terminal.WriteLine($"  {string.Format(line, currentPlayer.Name2 ?? Loc.Get("sanctum.you"))}");
                 }
                 terminal.SetColor("dark_magenta");
                 terminal.WriteLine("");

@@ -494,7 +494,7 @@ public class AnchorRoadLocation : BaseLocation
                 currentPlayer.PKills++;
                 target.HP = 0;
 
-                NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} collected the bounty on {target.DisplayName}!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_bounty_collected", currentPlayer.DisplayName, target.DisplayName));
             }
             else if (result.Outcome == CombatOutcome.PlayerEscaped)
             {
@@ -682,7 +682,7 @@ public class AnchorRoadLocation : BaseLocation
 
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("anchor_road.team_controls_town"));
-                NewsSystem.Instance.Newsy(true, $"Gang War! {currentPlayer.Team} took the town unopposed -- {targetTeam.TeamName} had no living members left.");
+                NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_gang_war_unopposed", currentPlayer.Team, targetTeam.TeamName));
 
                 // v0.57.10 (Coosh report): persist the turf transfer to world_state
                 // immediately. Without this, a relog before the next auto-save tick
@@ -774,7 +774,7 @@ public class AnchorRoadLocation : BaseLocation
                         ally.CTurf = true;
                 }
 
-                NewsSystem.Instance.Newsy(true, $"Gang War! {currentPlayer.Team} defeated {targetTeam.TeamName}!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_gang_war_won", currentPlayer.Team, targetTeam.TeamName));
 
                 // v0.57.10 (Coosh report): sync the transfer to world_state before
                 // the player can log out. Without this, `OnlineStateManager.LoadSharedNPCs`
@@ -801,7 +801,7 @@ public class AnchorRoadLocation : BaseLocation
                     currentPlayer.Experience += partialXP;
                 }
 
-                NewsSystem.Instance.Newsy(true, $"Gang War! {targetTeam.TeamName} repelled {currentPlayer.Team}!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_gang_war_repelled", targetTeam.TeamName, currentPlayer.Team));
             }
         }
 
@@ -1157,12 +1157,14 @@ public class AnchorRoadLocation : BaseLocation
                     }
 
                     AchievementSystem.TryUnlock(currentPlayer, tierAchievementId);
-                    NewsSystem.Instance.Newsy(true, $"{tierTitle} {currentPlayer.DisplayName} has conquered the Anchor Road Gauntlet!");
+                    // v1.2.5: the tier title is the stored English title (GetTierTitle feeds NobleTitle)
+                    string champion = currentPlayer.DisplayName;
+                    NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_gauntlet_conquered", tierTitle, champion));
                     try
                     {
+                        // v1.2.5: each player reads it in their session language
                         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
-                            UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
-                                $"[1;33m*** {tierTitle} {currentPlayer.DisplayName} has conquered the Anchor Road Gauntlet! ***[0m");
+                            UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(lang => GauntletBroadcast(lang, tierTitle, champion));
                     }
                     catch { /* broadcast best-effort */ }
                 }
@@ -1615,7 +1617,7 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("anchor_road.town_claimed"));
                 terminal.WriteLine(Loc.Get("anchor_road.rule_wisely"));
 
-                NewsSystem.Instance.Newsy(true, $"{currentPlayer.Team} has taken control of the town!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_town_taken", currentPlayer.Team));
 
                 // v0.57.10: persist unopposed claim to world_state immediately
                 await PersistTurfTransfer();
@@ -1674,7 +1676,7 @@ public class AnchorRoadLocation : BaseLocation
             terminal.WriteLine(Loc.Get("anchor_road.abandoned_control"));
             terminal.WriteLine(Loc.Get("anchor_road.town_free"));
 
-            NewsSystem.Instance.Newsy(true, $"{currentPlayer.Team} abandoned control of the town!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_town_abandoned", currentPlayer.Team));
 
             // v0.57.10: persist abandonment to world_state immediately
             await PersistTurfTransfer();
@@ -1768,7 +1770,7 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("anchor_road.prisoner_thanks"));
 
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 50, isGood: true, "anchor_road.prison_escape"); // v0.57.12: paired movement
-                NewsSystem.Instance.Newsy(true, $"{currentPlayer.DisplayName} orchestrated a daring prison escape!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("anchor_road.news_prison_escape", currentPlayer.DisplayName));
             }
             else
             {
@@ -2137,6 +2139,10 @@ public class AnchorRoadLocation : BaseLocation
     }
 
     #endregion
+
+    /// <summary>v1.2.5: the Gauntlet broadcast as each online player reads it, in that player's language.</summary>
+    internal static string GauntletBroadcast(string lang, string tierTitle, string champion) =>
+        $"\u001b[1;33m*** {Loc.GetIn(lang, "anchor_road.news_gauntlet_conquered", tierTitle, champion)} ***\u001b[0m";
 
     /// <summary>
     /// Phase 5: emit Anchor Road (challenge hub) menu for the Electron client. Pattern B.

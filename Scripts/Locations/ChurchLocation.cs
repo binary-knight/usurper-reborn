@@ -1487,13 +1487,13 @@ namespace UsurperRemake.Locations
 
             var menu = new List<ElectronBridge.MenuItemData>
             {
-                new() { Key = "C", Label = "Donate", Category = "faith", Icon = "donate" },
-                new() { Key = "B", Label = "Buy Blessing", Category = "faith", Icon = "blessing" },
-                new() { Key = "H", Label = "Healing", Category = "service", Icon = "heal" },
-                new() { Key = "M", Label = "Marriage Ceremony", Category = "social", Icon = "marriage" },
-                new() { Key = "F", Label = "Confess", Category = "faith", Icon = "confess" },
-                new() { Key = "V", Label = "Church Records", Category = "info", Icon = "records" },
-                new() { Key = "S", Label = "Speak with Bishop", Category = "social", Icon = "bishop" },
+                new() { Key = "C", Label = Loc.Get("church.bbs_donate"), Category = "faith", Icon = "donate" },
+                new() { Key = "B", Label = Loc.Get("church.electron_blessing"), Category = "faith", Icon = "blessing" },
+                new() { Key = "H", Label = Loc.Get("church.electron_healing"), Category = "service", Icon = "heal" },
+                new() { Key = "M", Label = Loc.Get("church.electron_marriage"), Category = "social", Icon = "marriage" },
+                new() { Key = "F", Label = Loc.Get("church.bbs_confess"), Category = "faith", Icon = "confess" },
+                new() { Key = "V", Label = Loc.Get("church.electron_records"), Category = "info", Icon = "records" },
+                new() { Key = "S", Label = Loc.Get("church.electron_bishop"), Category = "social", Icon = "bishop" },
                 new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
             };
             ElectronBridge.EmitMenu(menu);

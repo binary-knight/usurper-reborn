@@ -411,7 +411,8 @@ public class GodFaithFixes1115Tests : IDisposable
         string src = Source("Locations", "PantheonLocation.cs");
         src.Should().Contain("string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news and broadcast: English");
         src.Should().Contain("string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news: English");
-        src.Should().Contain("has ascended to {GetGodTitleShared(currentPlayer.GodLevel)}!");
+        // 1.2.5: the line is keyed (in the writer's language); the rank title passed to it stays English
+        src.Should().Contain("Loc.Get(\"pantheon.news_ascended\", currentPlayer.DivineName, GetGodTitleShared(currentPlayer.GodLevel))");
     }
 
     [Fact]

@@ -1168,7 +1168,7 @@ public class HealerLocation : BaseLocation
         if (player.RHand > 0 && player.WeaponCursed &&
             !cursedItems.Any(c => c.SlotName == EquipmentSlot.MainHand.ToString()))
         {
-            cursedItems.Add((player.WeaponName ?? "Weapon", "weapon", () =>
+            cursedItems.Add((player.WeaponName ?? Loc.Get("base.item_type_weapon"), "weapon", () =>
             {
                 player.RHand = 0;
                 player.WeaponCursed = false;
@@ -1179,7 +1179,7 @@ public class HealerLocation : BaseLocation
         if (player.Body > 0 && player.ArmorCursed &&
             !cursedItems.Any(c => c.SlotName == EquipmentSlot.Body.ToString()))
         {
-            cursedItems.Add((player.ArmorName ?? "Armor", "armor", () =>
+            cursedItems.Add((player.ArmorName ?? Loc.Get("base.item_type_armor"), "armor", () =>
             {
                 player.Body = 0;
                 player.ArmorCursed = false;
@@ -1190,7 +1190,7 @@ public class HealerLocation : BaseLocation
         if (player.Shield > 0 && player.ShieldCursed &&
             !cursedItems.Any(c => c.SlotName == EquipmentSlot.OffHand.ToString()))
         {
-            cursedItems.Add(("Shield", "shield", () =>
+            cursedItems.Add((Loc.Get("base.item_type_shield"), "shield", () =>
             {
                 player.Shield = 0;
                 player.ShieldCursed = false;
@@ -1623,14 +1623,14 @@ public class HealerLocation : BaseLocation
         {
             new() { Key = "H", Label = Loc.Get("healer.menu_heal_suffix").Trim(' ', '[', ']'), Category = "service", Icon = "heal" },
             new() { Key = "F", Label = Loc.Get("healer.menu_full_suffix").Trim(' ', '[', ']'), Category = "service", Icon = "heal-full" },
-            new() { Key = "B", Label = "Buy Potions", Category = "shop", Icon = "potion" },
-            new() { Key = "M", Label = "Buy Mana Potions", Category = "shop", Icon = "mana-potion" },
-            new() { Key = "N", Label = "Buy Antidotes", Category = "shop", Icon = "antidote" },
-            new() { Key = "P", Label = "Cure Poison", Category = "service", Icon = "cure-poison" },
-            new() { Key = "C", Label = "Cure Disease", Category = "service", Icon = "cure-disease" },
-            new() { Key = "D", Label = "Remove Curse", Category = "service", Icon = "cure-curse" },
-            new() { Key = "A", Label = "Cure Addiction", Category = "service", Icon = "cure-addiction" },
-            new() { Key = "S", Label = "Player Status", Category = "info", Icon = "info" },
+            new() { Key = "B", Label = Loc.Get("healer.buy_potions"), Category = "shop", Icon = "potion" },
+            new() { Key = "M", Label = Loc.Get("healer.electron_mana_potions"), Category = "shop", Icon = "mana-potion" },
+            new() { Key = "N", Label = Loc.Get("healer.buy_antidotes"), Category = "shop", Icon = "antidote" },
+            new() { Key = "P", Label = Loc.Get("healer.electron_cure_poison"), Category = "service", Icon = "cure-poison" },
+            new() { Key = "C", Label = Loc.Get("healer.cure_disease"), Category = "service", Icon = "cure-disease" },
+            new() { Key = "D", Label = Loc.Get("magic_shop.electron_remove_curse"), Category = "service", Icon = "cure-curse" },
+            new() { Key = "A", Label = Loc.Get("healer.electron_cure_addiction"), Category = "service", Icon = "cure-addiction" },
+            new() { Key = "S", Label = Loc.Get("healer.electron_status"), Category = "info", Icon = "info" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

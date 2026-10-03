@@ -2435,7 +2435,7 @@ namespace UsurperRemake.Locations
 
             // Generate monster at player level
             var monster = MonsterGenerator.GenerateMonster(currentPlayer.Level);
-            monster.Name = "Pit " + monster.Name;
+            monster.Name = Loc.Get("dark_alley.pit_monster_name", monster.Name);
             monster.Gold *= 2; // 2x gold reward
 
             terminal.SetColor("bright_red");
@@ -2888,7 +2888,7 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine(Loc.Get("dark_alley.fence_shadow_bonus"));
                 int displayPercent = (int)(fenceRate * 100);
                 terminal.SetColor("magenta");
-                terminal.WriteLine($"  Shadows rank bonus: {displayPercent}% of item value");
+                terminal.WriteLine(Loc.Get("dark_alley.fence_shadow_rank", displayPercent));
                 terminal.WriteLine("");
             }
 
@@ -3018,7 +3018,7 @@ namespace UsurperRemake.Locations
             {
                 long manaRestore = currentPlayer.MaxMana / 2;
                 currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + manaRestore);
-                terminal.WriteLine($"  Mana restored: +{manaRestore}");
+                terminal.WriteLine(Loc.Get("dark_alley.mana_restored", manaRestore));
             }
 
             terminal.SetColor("gray");
@@ -3201,7 +3201,7 @@ namespace UsurperRemake.Locations
 
                     // Create a mugger monster at player's level
                     var mugger = MonsterGenerator.GenerateMonster(player.Level);
-                    mugger.Name = "Dark Alley Mugger";
+                    mugger.Name = Loc.Get("dark_alley.mugger_name");
 
                     var combatEngine = new CombatEngine(term);
                     await combatEngine.PlayerVsMonster(player, mugger, null, false);
@@ -3362,7 +3362,7 @@ namespace UsurperRemake.Locations
 
             // Generate enforcer at playerLevel + 5
             var enforcer = MonsterGenerator.GenerateMonster(player.Level + 5);
-            enforcer.Name = "Loan Shark Enforcer";
+            enforcer.Name = Loc.Get("dark_alley.enforcer_name");
             enforcer.Gold = 0; // No gold reward — this is punishment
 
             var combatEngine = new CombatEngine(term);
@@ -3420,9 +3420,9 @@ namespace UsurperRemake.Locations
 
                 term.SetColor("bright_red");
                 term.WriteLine("");
-                term.WriteLine("The enforcer stands over your broken body.");
+                term.WriteLine(Loc.Get("dark_alley.enforcer_broken_body"));
                 term.SetColor("red");
-                term.WriteLine("\"Consider the debt... settled.\"");
+                term.WriteLine(Loc.Get("dark_alley.enforcer_debt_settled"));
             }
 
             term.WriteLine("");
@@ -3630,11 +3630,11 @@ namespace UsurperRemake.Locations
                     if (IsScreenReader)
                     {
                         var deedName = Loc.Get($"dark_alley.deed_{deed.Id}_name");
-                        var parts = new List<string> { deedName, $"+{deed.DarknessGain} Dark" };
-                        if (deed.XPReward > 0) parts.Add($"+{deed.XPReward}XP");
-                        if (deed.GoldRewardBase > 0) parts.Add("+gold");
-                        if (deed.GoldCost > 0) parts.Add($"-{deed.GoldCost}g");
-                        if (deed.FailChance > 0) parts.Add($"{(int)(deed.FailChance * 100)}% risk");
+                        var parts = new List<string> { deedName, Loc.Get("dark_alley.deed_tag_dark", deed.DarknessGain) };
+                        if (deed.XPReward > 0) parts.Add(Loc.Get("dark_alley.deed_tag_xp", deed.XPReward));
+                        if (deed.GoldRewardBase > 0) parts.Add(Loc.Get("dark_alley.deed_tag_gold"));
+                        if (deed.GoldCost > 0) parts.Add(Loc.Get("dark_alley.deed_tag_cost", deed.GoldCost));
+                        if (deed.FailChance > 0) parts.Add(Loc.Get("dark_alley.deed_tag_risk_sr", (int)(deed.FailChance * 100)));
                         WriteSRMenuOption($"{num}", string.Join(", ", parts));
                     }
                     else
@@ -3642,13 +3642,15 @@ namespace UsurperRemake.Locations
                         terminal.SetColor("darkgray");
                         terminal.Write($"  [{num,2}] ");
                         terminal.SetColor("white");
-                        terminal.Write(Loc.Get($"dark_alley.deed_{deed.Id}_name").PadRight(28));
+                        // v1.2.5: a name of 28 or more keeps one space before its tags
+                        string shownName = Loc.Get($"dark_alley.deed_{deed.Id}_name");
+                        terminal.Write(shownName.PadRight(Math.Max(28, shownName.Length + 1)));
                         terminal.SetColor("red");
-                        terminal.Write($"+{deed.DarknessGain} Dark ");
-                        if (deed.XPReward > 0) { terminal.SetColor("cyan"); terminal.Write($"+{deed.XPReward}XP "); }
-                        if (deed.GoldRewardBase > 0) { terminal.SetColor("bright_yellow"); terminal.Write($"+gold "); }
-                        if (deed.GoldCost > 0) { terminal.SetColor("yellow"); terminal.Write($"-{deed.GoldCost}g "); }
-                        if (deed.FailChance > 0) { terminal.SetColor("darkgray"); terminal.Write($"{(int)(deed.FailChance * 100)}%risk"); }
+                        terminal.Write(Loc.Get("dark_alley.deed_tag_dark", deed.DarknessGain) + " ");
+                        if (deed.XPReward > 0) { terminal.SetColor("cyan"); terminal.Write(Loc.Get("dark_alley.deed_tag_xp", deed.XPReward) + " "); }
+                        if (deed.GoldRewardBase > 0) { terminal.SetColor("bright_yellow"); terminal.Write(Loc.Get("dark_alley.deed_tag_gold") + " "); }
+                        if (deed.GoldCost > 0) { terminal.SetColor("yellow"); terminal.Write(Loc.Get("dark_alley.deed_tag_cost", deed.GoldCost) + " "); }
+                        if (deed.FailChance > 0) { terminal.SetColor("darkgray"); terminal.Write(Loc.Get("dark_alley.deed_tag_risk", (int)(deed.FailChance * 100))); }
                         terminal.WriteLine("");
                     }
                     num++;
@@ -3875,8 +3877,8 @@ namespace UsurperRemake.Locations
                 // News event
                 if (deed.GeneratesNews && deed.NewsText != null)
                 {
-                    var newsText = deed.NewsText.Replace("{PLAYER}", currentPlayer.DisplayName);
-                    NewsSystem.Instance.Newsy(false, newsText);
+                    // v1.2.5: NewsText is the English source; the line is written from dark_alley.deed_{id}_news
+                    NewsSystem.Instance.Newsy(false, Loc.Get($"dark_alley.deed_{deed.Id}_news", currentPlayer.DisplayName));
                 }
             }
 
@@ -3910,22 +3912,22 @@ namespace UsurperRemake.Locations
 
             var menu = new List<ElectronBridge.MenuItemData>
             {
-                new() { Key = "D", Label = "Drug Palace", Category = "evil", Icon = "drug" },
-                new() { Key = "S", Label = "Steroid Shop", Category = "evil", Icon = "steroid" },
-                new() { Key = "O", Label = "Orbs Health Club", Category = "service", Icon = "orb" },
-                new() { Key = "G", Label = "Groggo Magic", Category = "shop", Icon = "magic" },
-                new() { Key = "B", Label = "Beer Hut", Category = "social", Icon = "beer" },
-                new() { Key = "A", Label = "Alchemist Heaven", Category = "shop", Icon = "alchemist" },
-                new() { Key = "J", Label = "Shadows Faction", Category = "team", Icon = "shadow" },
-                new() { Key = "W", Label = "Pay Tribute", Category = "social", Icon = "tribute" },
-                new() { Key = "M", Label = "Black Market", Category = "shop", Icon = "market" },
-                new() { Key = "I", Label = "Informant", Category = "social", Icon = "informant" },
-                new() { Key = "P", Label = "Pickpocket", Category = "evil", Icon = "pickpocket" },
-                new() { Key = "C", Label = "Gambling Den", Category = "social", Icon = "dice" },
-                new() { Key = "T", Label = "The Pit", Category = "combat", Icon = "pit" },
-                new() { Key = "L", Label = "Loan Shark", Category = "shop", Icon = "loan" },
-                new() { Key = "N", Label = "Safe House", Category = "service", Icon = "safe" },
-                new() { Key = "E", Label = "Evil Deeds", Category = "evil", Icon = "evil" },
+                new() { Key = "D", Label = Loc.Get("dark_alley.drug_palace"), Category = "evil", Icon = "drug" },
+                new() { Key = "S", Label = Loc.Get("dark_alley.steroid_shop"), Category = "evil", Icon = "steroid" },
+                new() { Key = "O", Label = Loc.Get("dark_alley.orbs_club"), Category = "service", Icon = "orb" },
+                new() { Key = "G", Label = Loc.Get("dark_alley.electron_groggo"), Category = "shop", Icon = "magic" },
+                new() { Key = "B", Label = Loc.Get("dark_alley.electron_beer_hut"), Category = "social", Icon = "beer" },
+                new() { Key = "A", Label = Loc.Get("dark_alley.electron_alchemist"), Category = "shop", Icon = "alchemist" },
+                new() { Key = "J", Label = Loc.Get("dark_alley.electron_shadows"), Category = "team", Icon = "shadow" },
+                new() { Key = "W", Label = Loc.Get("dark_alley.electron_tribute"), Category = "social", Icon = "tribute" },
+                new() { Key = "M", Label = Loc.Get("dark_alley.black_market"), Category = "shop", Icon = "market" },
+                new() { Key = "I", Label = Loc.Get("dark_alley.informant"), Category = "social", Icon = "informant" },
+                new() { Key = "P", Label = Loc.Get("dark_alley.sr_pickpocket"), Category = "evil", Icon = "pickpocket" },
+                new() { Key = "C", Label = Loc.Get("dark_alley.sr_gambling_den"), Category = "social", Icon = "dice" },
+                new() { Key = "T", Label = Loc.Get("dark_alley.electron_pit"), Category = "combat", Icon = "pit" },
+                new() { Key = "L", Label = Loc.Get("dark_alley.sr_loan_shark"), Category = "shop", Icon = "loan" },
+                new() { Key = "N", Label = Loc.Get("dark_alley.sr_safe_house"), Category = "service", Icon = "safe" },
+                new() { Key = "E", Label = Loc.Get("dark_alley.evil_deeds"), Category = "evil", Icon = "evil" },
                 new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
             };
             ElectronBridge.EmitMenu(menu);

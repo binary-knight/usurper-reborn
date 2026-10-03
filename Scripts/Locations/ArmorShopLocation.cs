@@ -166,7 +166,7 @@ public class ArmorShopLocation : BaseLocation
             if (IsScreenReader)
             {
                 string slotLabel = currentItem != null
-                    ? $"{slot.GetDisplayName()} - {currentItem.Name} (AC:{currentItem.ArmorClass})"
+                    ? $"{slot.GetDisplayName()} - {currentItem.Name} {Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass)}"
                     : $"{slot.GetDisplayName()} - {Loc.Get("shop.empty")}";
                 WriteSRMenuOption($"{num}", slotLabel);
             }
@@ -188,7 +188,7 @@ public class ArmorShopLocation : BaseLocation
                     terminal.SetColor("bright_cyan");
                     terminal.Write($"{currentItem.Name}");
                     terminal.SetColor("gray");
-                    terminal.Write($" (AC:{currentItem.ArmorClass})");
+                    terminal.Write(" " + Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass));
                 }
                 else
                 {
@@ -242,7 +242,7 @@ public class ArmorShopLocation : BaseLocation
         {
             var currentItem = currentPlayer.GetEquipment(slot);
             string slotLabel = currentItem != null
-                ? $"{slot.GetDisplayName()} - {currentItem.Name} (AC:{currentItem.ArmorClass})"
+                ? $"{slot.GetDisplayName()} - {currentItem.Name} {Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass)}"
                 : $"{slot.GetDisplayName()} - {Loc.Get("shop.empty")}";
             WriteSRMenuOption($"{num}", slotLabel);
             num++;
@@ -917,7 +917,7 @@ public class ArmorShopLocation : BaseLocation
                 terminal.Write($"{num}. ");
                 terminal.SetColor("white");
                 terminal.Write($"{item.Name}");
-                terminal.Write($" (AC:{item.Armor})");
+                terminal.Write(" " + Loc.Get("armor_shop.ac_tag", item.Armor));
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("armor_shop.sell_for_gold", FormatNumber(displayPrice)));
                 num++;
@@ -1260,17 +1260,17 @@ public class ArmorShopLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "1", Label = "Body Armor", Category = "browse", Icon = "armor-body" },
-            new() { Key = "2", Label = "Head", Category = "browse", Icon = "armor-head" },
-            new() { Key = "3", Label = "Arms", Category = "browse", Icon = "armor-arms" },
-            new() { Key = "4", Label = "Hands", Category = "browse", Icon = "armor-hands" },
-            new() { Key = "5", Label = "Legs", Category = "browse", Icon = "armor-legs" },
-            new() { Key = "6", Label = "Feet", Category = "browse", Icon = "armor-feet" },
-            new() { Key = "7", Label = "Waist", Category = "browse", Icon = "armor-waist" },
-            new() { Key = "8", Label = "Face", Category = "browse", Icon = "armor-face" },
-            new() { Key = "9", Label = "Cloak", Category = "browse", Icon = "armor-cloak" },
-            new() { Key = "S", Label = "Sell Armor", Category = "sell", Icon = "sell" },
-            new() { Key = "A", Label = "Auto-Buy Best", Category = "service", Icon = "auto-buy" },
+            new() { Key = "1", Label = Loc.Get("armor_shop.electron_body"), Category = "browse", Icon = "armor-body" },
+            new() { Key = "2", Label = Loc.Get("ui.head"), Category = "browse", Icon = "armor-head" },
+            new() { Key = "3", Label = Loc.Get("ui.arms"), Category = "browse", Icon = "armor-arms" },
+            new() { Key = "4", Label = Loc.Get("ui.hands"), Category = "browse", Icon = "armor-hands" },
+            new() { Key = "5", Label = Loc.Get("ui.legs"), Category = "browse", Icon = "armor-legs" },
+            new() { Key = "6", Label = Loc.Get("ui.feet"), Category = "browse", Icon = "armor-feet" },
+            new() { Key = "7", Label = Loc.Get("ui.waist"), Category = "browse", Icon = "armor-waist" },
+            new() { Key = "8", Label = Loc.Get("ui.face"), Category = "browse", Icon = "armor-face" },
+            new() { Key = "9", Label = Loc.Get("ui.cloak"), Category = "browse", Icon = "armor-cloak" },
+            new() { Key = "S", Label = Loc.Get("armor_shop.sell_armor"), Category = "sell", Icon = "sell" },
+            new() { Key = "A", Label = Loc.Get("armor_shop.electron_auto_buy"), Category = "service", Icon = "auto-buy" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

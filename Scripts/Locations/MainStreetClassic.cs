@@ -295,10 +295,11 @@ public partial class MainStreetLocation
             if (ClassicOnlineShows(StreetPlace.Arena, view)) terminal.WriteLine($"  6 - {Loc.Get("main_street.arena_pvp")}");
             if (ClassicOnlineShows(StreetPlace.WorldBoss, view)) terminal.WriteLine($"  7 - {Loc.Get("main_street.world_boss")}");
             if (ClassicOnlineShows(StreetPlace.Guilds, view)) terminal.WriteLine($"  R - {Loc.Get("menu.action.guilds")}");
-            terminal.WriteLine($"  /say message - {Loc.Get("main_street.broadcast_chat")}");
-            terminal.WriteLine($"  /tell player message - {Loc.Get("main_street.private_message")}");
-            terminal.WriteLine($"  /who - {Loc.Get("main_street.see_online")}");
-            terminal.WriteLine($"  /news - {Loc.Get("main_street.recent_news")}");
+            // v1.2.5: the commands stay as typed; their argument words and descriptions are keyed
+            terminal.WriteLine(SlashHelpRow("/say", Loc.Get("main_street.classic_arg_message"), Loc.Get("main_street.broadcast_chat")));
+            terminal.WriteLine(SlashHelpRow("/tell", Loc.Get("main_street.classic_arg_player_message"), Loc.Get("main_street.private_message")));
+            terminal.WriteLine(SlashHelpRow("/who", "", Loc.Get("main_street.see_online")));
+            terminal.WriteLine(SlashHelpRow("/news", "", Loc.Get("main_street.recent_news")));
             terminal.WriteLine("");
         }
     }
@@ -662,7 +663,7 @@ public partial class MainStreetLocation
             case "DEV":
             case "CHEATER":
             case "DEVMENU":
-                terminal.WriteLine("  The dev menu has been removed. Use the admin console.", "gray");
+                terminal.WriteLine(Loc.Get("main_street.dev_menu_removed"), "gray");
                 return false;
 
             default:

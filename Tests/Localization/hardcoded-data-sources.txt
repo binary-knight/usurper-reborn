@@ -119,22 +119,16 @@ table|Scripts/Data/WorldBossData.cs|init.Element|element printed raw, WorldBossS
 names|Scripts/Data/WorldBossData.cs|init.Title|boss titles, kept English by design
 
 # --- Scripts/Locations --------------------------------------------------------------------------
-nouns|Scripts/Locations/ArenaLocation.cs|decl:ClassNames|class names in arena.confirm_attack
 names|Scripts/Locations/ArenaLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/ArmorShopLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/ArmorShopLocation.cs|decl:slotLabel|screen reader menu option
 names|Scripts/Locations/ArmorShopLocation.cs|decl:shopkeeperName|shopkeeper name
 names|Scripts/Locations/ChurchLocation.cs|=LocationName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/ChurchLocation.cs|=bishopName|NPC name
 names|Scripts/Locations/ChurchLocation.cs|=priestName|NPC name
 names|Scripts/Locations/DarkAlleyLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/DarkAlleyLocation.cs|decl:parts|screen reader menu option
-nouns|Scripts/Locations/DarkAlleyLocation.cs|=enforcer.Name|monster name in combat
-nouns|Scripts/Locations/DarkAlleyLocation.cs|=monster.Name|monster name in combat
-nouns|Scripts/Locations/DarkAlleyLocation.cs|=mugger.Name|monster name in combat
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#1|dark_alley.deed_{id}_name
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#2|dark_alley.deed_{id}_desc
-table|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#17|deed news text, Newsy
+keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#17|dark_alley.deed_{id}_news
 names|Scripts/Locations/DungeonLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#2/tuple#1|event choice label
 table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#3/tuple#1|event choice label
@@ -152,7 +146,6 @@ names|Scripts/Locations/DungeonLocation.cs|init.Name|unique NPC name
 table|Scripts/Locations/DungeonLocation.cs|=memberTypes|monster names
 nouns|Scripts/Locations/DungeonLocation.cs|=name|monster name
 names|Scripts/Locations/HealerLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/HealerLocation.cs|call:Add#0/tuple#0|slot label in shop.cursed_item_healer
 names|Scripts/Locations/HealerLocation.cs|decl:HealerName|shop name
 names|Scripts/Locations/HealerLocation.cs|decl:Manager|NPC name
 names|Scripts/Locations/HomeLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
@@ -165,11 +158,7 @@ names|Scripts/Locations/LoveStreetLocation.cs|new:Gigolo#0|gigolo names
 names|Scripts/Locations/PrisonLocation.cs|decl:vexName|NPC name
 nouns|Scripts/Locations/PrisonWalkLocation.cs|decl:guardNames|guard names are role titles, shown in combat
 table|Scripts/Locations/QuestHallLocation.cs|decl:status|quest status in the Electron quest list
-table|Scripts/Locations/TempleLocation.cs|decl:alignment|alignment label
-table|Scripts/Locations/TempleLocation.cs|decl:godAlignment|alignment in temple.alignment_info
-table|Scripts/Locations/TempleLocation.cs|decl:stats|stat name in temple.stat_diminish
 names|Scripts/Locations/TempleLocation.cs|=LocationName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-nouns|Scripts/Locations/TempleLocation.cs|=statName|stat name in temple.sanctum_stat_gain
 
 # --- Scripts/Systems ----------------------------------------------------------------------------
 table|Scripts/Systems/ArchetypeTracker.cs|switcharm/tuple#0|ending archetype title, EndingsSystem
@@ -355,9 +344,6 @@ table|Scripts/Locations/MagicShopLocation.cs|decl:NamedEnchantTags/tuple#1|encha
 nouns|Scripts/Locations/MagicShopLocation.cs|=targetEquip.Name|item name prefix, stored, English in every language (GearSetFamilyResolver)
 nouns|Scripts/Locations/MagicShopLocation.cs|=targetItem.Name|item name prefix, stored, English in every language (GearSetFamilyResolver)
 names|Scripts/Locations/MainStreetLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-nouns|Scripts/Locations/MainStreetLocation.cs|decl:categoryName|achievements box header
-table|Scripts/Locations/MainStreetLocation.cs|decl:onlineTag|character list location column
-table|Scripts/Locations/MainStreetLocation.cs|decl:site|Old God floor column
 names|Scripts/Locations/MainStreetLocation.cs|decl:allGods/tuple#1|Old God names
 names|Scripts/Locations/MusicShopLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 keyed|Scripts/Locations/MusicShopLocation.cs|decl:BattleHymnSongs/tuple#0|music.song.{pool}.{i}.*
@@ -376,9 +362,6 @@ keyed|Scripts/Locations/MusicShopLocation.cs|decl:WarMarchSongs/tuple#1|music.so
 keyed|Scripts/Locations/MusicShopLocation.cs|decl:WarMarchSongs/tuple#3|music.song.{pool}.{i}.*
 names|Scripts/Locations/MusicShopLocation.cs|decl:performer|NPC names
 names|Scripts/Locations/MusicShopLocation.cs|decl:seller|NPC names
-table|Scripts/Locations/PantheonLocation.cs|decl:alignTag|boon list tag
-table|Scripts/Locations/PantheonLocation.cs|decl:newsEntry|news and broadcast
-table|Scripts/Locations/PantheonLocation.cs|decl:onTag|target picker tag
 names|Scripts/Locations/WeaponShopLocation.cs|decl:shopkeeperName|shopkeeper name
 table|Scripts/Server/MudServer.cs|decl:shutdownReason|shutdown broadcast
 table|Scripts/Systems/AchievementSystem.cs|decl:achMsg|achievement broadcast

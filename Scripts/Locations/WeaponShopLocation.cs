@@ -187,8 +187,8 @@ public class WeaponShopLocation : BaseLocation
         var mainHand = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
         var offHand = currentPlayer.GetEquipment(EquipmentSlot.OffHand);
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("shop.main_hand")} {(mainHand != null ? $"{mainHand.Name} (Pow:{mainHand.WeaponPower})" : Loc.Get("shop.empty"))}");
-        terminal.WriteLine($"{Loc.Get("shop.off_hand")} {(offHand != null ? (offHand.WeaponType == WeaponType.Shield || offHand.WeaponType == WeaponType.Buckler || offHand.WeaponType == WeaponType.TowerShield ? $"{offHand.Name} (AC:{offHand.ShieldBonus})" : $"{offHand.Name} (Pow:{offHand.WeaponPower})") : (mainHand?.Handedness == WeaponHandedness.TwoHanded ? Loc.Get("shop.using_2h") : Loc.Get("shop.empty")))}");
+        terminal.WriteLine($"{Loc.Get("shop.main_hand")} {(mainHand != null ? $"{mainHand.Name} {Loc.Get("weapon_shop.pow_tag", mainHand.WeaponPower)}" : Loc.Get("shop.empty"))}");
+        terminal.WriteLine($"{Loc.Get("shop.off_hand")} {(offHand != null ? (offHand.WeaponType == WeaponType.Shield || offHand.WeaponType == WeaponType.Buckler || offHand.WeaponType == WeaponType.TowerShield ? $"{offHand.Name} {Loc.Get("armor_shop.ac_tag", offHand.ShieldBonus)}" : $"{offHand.Name} {Loc.Get("weapon_shop.pow_tag", offHand.WeaponPower)}") : (mainHand?.Handedness == WeaponHandedness.TwoHanded ? Loc.Get("shop.using_2h") : Loc.Get("shop.empty")))}");
         terminal.WriteLine("");
 
         ShowNPCsInLocation();
@@ -1726,7 +1726,8 @@ public class WeaponShopLocation : BaseLocation
             {
                 Key = (i + 1).ToString(),
                 Name = item.Name,
-                Slot = category == WeaponCategory.Shields ? "Shield" : "Weapon",
+                // v1.2.5: shown on the item card only (game-ui.js prints item.slot); never matched
+                Slot = Loc.Get(category == WeaponCategory.Shields ? "base.item_type_shield" : "base.item_type_weapon"),
                 Price = item.Value,
                 Power = power,
                 MinLevel = item.MinLevel,
@@ -1773,12 +1774,12 @@ public class WeaponShopLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "1", Label = "One-Handed", Category = "browse", Icon = "sword" },
-            new() { Key = "2", Label = "Two-Handed", Category = "browse", Icon = "greatsword" },
-            new() { Key = "3", Label = "Bows", Category = "browse", Icon = "bow" },
-            new() { Key = "4", Label = "Shields", Category = "browse", Icon = "shield" },
-            new() { Key = "S", Label = "Sell Weapon", Category = "sell", Icon = "sell" },
-            new() { Key = "I", Label = "Identify Item", Category = "service", Icon = "identify" },
+            new() { Key = "1", Label = Loc.Get("equip.class_one_handed"), Category = "browse", Icon = "sword" },
+            new() { Key = "2", Label = Loc.Get("equip.class_two_handed"), Category = "browse", Icon = "greatsword" },
+            new() { Key = "3", Label = Loc.Get("weapon_shop.cat_bows"), Category = "browse", Icon = "bow" },
+            new() { Key = "4", Label = Loc.Get("weapon_shop.cat_shields"), Category = "browse", Icon = "shield" },
+            new() { Key = "S", Label = Loc.Get("weapon_shop.electron_sell"), Category = "sell", Icon = "sell" },
+            new() { Key = "I", Label = Loc.Get("shop.identify"), Category = "service", Icon = "identify" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);
