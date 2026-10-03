@@ -236,7 +236,6 @@ table|Scripts/UI/ANSIArt.cs|decl:Death|art with words, CombatEngine
 table|Scripts/UI/ANSIArt.cs|decl:DungeonEntrance|art with words, DungeonLocation
 table|Scripts/UI/ANSIArt.cs|decl:LevelUp|art with words, LevelMasterLocation
 table|Scripts/UI/ANSIArt.cs|decl:Treasure|art with words, DungeonLocation
-table|Scripts/UI/TerminalEmulator.cs|EqualsValueClause|WaitForKeyPress default prompt
 
 # --- more tables (second survey pass) -----------------------------------------------------------
 # Not listed on purpose: Electron payload slots (MenuItemData labels and similar, counted in the
@@ -244,16 +243,10 @@ table|Scripts/UI/TerminalEmulator.cs|EqualsValueClause|WaitForKeyPress default p
 # output calls), NPC memory descriptions that only the web dashboard shows, and GMCP labels for MUD clients.
 nouns|Scripts/AI/GoalSystem.cs|decl:avengerName|fallback name in revenge news
 nouns|Scripts/AI/GoalSystem.cs|decl:targetName|fallback name in revenge news
-table|Scripts/Core/GameEngine.cs|call:Add#0/tuple#0|recovery menu labels
 nouns|Scripts/Core/GameEngine.cs|decl:displayName|fallback name in the online who list
-nouns|Scripts/Core/GameEngine.cs|decl:guardName|name in engine.guard_fought_off
 names|Scripts/Core/GameEngine.cs|decl:locations|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 table|Scripts/Core/GameEngine.cs|decl:name|fallback NPC name
 nouns|Scripts/Core/GameEngine.cs|decl:ngDisplayName|fallback name in the online who list
-table|Scripts/Core/GameEngine.cs|decl:reason|load failure reason
-table|Scripts/Core/GameEngine.cs|decl:sizeChange|repair result line
-table|Scripts/Core/GameEngine.cs|decl:statusTag|save slot status tag
-table|Scripts/Core/GameEngine.cs|decl:targetDisplay|quest update line
 names|Scripts/Core/GameEngine.cs|decl:fonts|font names
 nouns|Scripts/Core/Items.cs|decl:armor/tuple#0|classic armor names become loot names
 nouns|Scripts/Core/Items.cs|decl:weapons/tuple#0|classic weapon names become loot names

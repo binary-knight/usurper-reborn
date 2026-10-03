@@ -1035,7 +1035,8 @@ public partial class TerminalEmulator
             if (idleMinutes >= DoorMode.IdleTimeoutMinutes - 1 && !_idleWarningShown)
             {
                 WriteLine("", "white");
-                WriteLine("*** WARNING: You will be disconnected in 1 minute due to inactivity! ***", "bright_yellow");
+                foreach (var row in FramedRows(UsurperRemake.Systems.Loc.Get("ui.idle_warning")))
+                    WriteLine(row, "bright_yellow");
                 WriteLine("", "white");
                 _idleWarningShown = true;
             }
@@ -1126,14 +1127,26 @@ public partial class TerminalEmulator
     }
 
     /// <summary>
+    /// v1.2.5: "*** text ***" in rows of at most 79 columns: one row when it fits, else the text word wrapped
+    /// with the frame on the first and the last row.
+    /// </summary>
+    internal static List<string> FramedRows(string text)
+    {
+        string framed = $"*** {text} ***";
+        if (framed.Length <= UsurperRemake.UI.UIHelper.WrapWidth) return new List<string> { framed };
+        return UsurperRemake.UI.UIHelper.WordWrap(framed, UsurperRemake.UI.UIHelper.WrapWidth);
+    }
+
+    /// <summary>
     /// Handle idle timeout — auto-save and disconnect the player.
     /// </summary>
     private async Task HandleIdleTimeout()
     {
         WriteLine("", "white");
-        WriteLine("*** IDLE TIMEOUT ***", "bright_red");
-        WriteLine($"No input received for {DoorMode.IdleTimeoutMinutes} minutes.", "yellow");
-        WriteLine("Auto-saving and disconnecting...", "yellow");
+        foreach (var row in FramedRows(UsurperRemake.Systems.Loc.Get("ui.idle_timeout_title")))
+            WriteLine(row, "bright_red");
+        WriteLine(UsurperRemake.Systems.Loc.Get("ui.idle_no_input", DoorMode.IdleTimeoutMinutes), "yellow");
+        WriteLine(UsurperRemake.Systems.Loc.Get("ui.auto_saving_disconnecting"), "yellow");
         await AutoSaveAndExit("idle timeout");
     }
 
@@ -1143,9 +1156,10 @@ public partial class TerminalEmulator
     private async Task HandleSessionExpired()
     {
         WriteLine("", "white");
-        WriteLine("*** TIME LIMIT REACHED ***", "bright_red");
-        WriteLine("Your session time has expired.", "yellow");
-        WriteLine("Auto-saving and disconnecting...", "yellow");
+        foreach (var row in FramedRows(UsurperRemake.Systems.Loc.Get("ui.time_limit_title")))
+            WriteLine(row, "bright_red");
+        WriteLine(UsurperRemake.Systems.Loc.Get("ui.session_expired"), "yellow");
+        WriteLine(UsurperRemake.Systems.Loc.Get("ui.auto_saving_disconnecting"), "yellow");
         await AutoSaveAndExit("session time expired");
     }
 
@@ -1394,7 +1408,7 @@ public partial class TerminalEmulator
         {
             WriteLine($"{i + 1}. {options[i].Text}", "yellow");
         }
-        WriteLine("0. Go back", "gray");
+        WriteLine($"0. {UsurperRemake.Systems.Loc.Get("ui.go_back")}", "gray");
         WriteLine("");
         
         while (true)
@@ -1407,7 +1421,7 @@ public partial class TerminalEmulator
                     return choice - 1;
             }
 
-            WriteLine("Invalid choice!", "red");
+            WriteLine(UsurperRemake.Systems.Loc.Get("engine.invalid_choice"), "red");
         }
     }
     
@@ -1447,13 +1461,25 @@ public partial class TerminalEmulator
         WriteLine("║                         ██║  ██║███████╗██████╔╝╚██████╔╝██║  ██║██║ ╚████║║", "bright_yellow");
         WriteLine("║                         ╚═╝  ╚═╝╚══════╝╚═════╝  ╚═════╝ ╚═╝  ╚═╝╚═╝  ╚═══╝║", "bright_yellow");
         WriteLine("║                                                                              ║", "bright_blue");
-        WriteLine("║                          A Classic BBS Door Game Remake                     ║", "bright_cyan");
-        WriteLine("║                              With Advanced NPC AI                           ║", "bright_cyan");
+        WriteLine(TitleBoxRow(UsurperRemake.Systems.Loc.Get("ui.title_tagline_1"), 26), "bright_cyan");
+        WriteLine(TitleBoxRow(UsurperRemake.Systems.Loc.Get("ui.title_tagline_2"), 30), "bright_cyan");
         WriteLine("║                                                                              ║", "bright_blue");
         WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝", "bright_blue");
         WriteLine("", "white");
     }
     
+    /// <summary>
+    /// v1.2.5: a row of the fallback title box (77 columns inside): the text `left` columns in, as the English
+    /// rows were, or centred when it does not fit there, cut at 77.
+    /// </summary>
+    internal static string TitleBoxRow(string text, int left)
+    {
+        const int inner = 77;
+        if (text.Length > inner) text = text.Substring(0, inner);
+        if (left + text.Length > inner) left = (inner - text.Length) / 2;
+        return "║" + new string(' ', left) + text + new string(' ', inner - left - text.Length) + "║";
+    }
+
     private void DisplayANSI(string ansiContent)
     {
         // Simple ANSI parser - in a full implementation this would be much more complex
@@ -1500,7 +1526,7 @@ public partial class TerminalEmulator
     {
         // For now, just display it as a regular line
         // In a full implementation, this would set a persistent status bar
-        WriteLine($"[Status] {statusText}", "bright_cyan");
+        WriteLine(UsurperRemake.Systems.Loc.Get("ui.status_line", statusText), "bright_cyan");
     }
     
     public async Task PressAnyKey(string? message = null)
@@ -1725,10 +1751,11 @@ public partial class TerminalEmulator
         return await GetInput(prompt);
     }
     
-    public async Task WaitForKeyPress(string message = "Press Enter to continue...")
+    public async Task WaitForKeyPress(string? message = null)
     {
         // v1.1.13: a pause; a command typed here is kept for the next prompt
-        await PauseForLine(message);
+        // v1.2.5: the default prompt in the player's language (ui.press_enter, the same English)
+        await PauseForLine(message ?? UsurperRemake.Systems.Loc.Get("ui.press_enter"));
     }
     
     // Additional compatibility methods
@@ -1916,11 +1943,11 @@ public partial class TerminalEmulator
             {
                 if (result >= min && result <= max)
                     return result;
-                WriteLine($"Please enter a number between {min} and {max}.", "red");
+                WriteLine(UsurperRemake.Systems.Loc.Get("ui.number_between", min, max), "red");
             }
             else
             {
-                WriteLine("Please enter a valid number.", "red");
+                WriteLine(UsurperRemake.Systems.Loc.Get("ui.enter_valid_number"), "red");
             }
         }
     }
