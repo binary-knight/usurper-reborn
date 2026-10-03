@@ -718,6 +718,23 @@ public class CastleRest125Tests : IDisposable
             .Should().NotContain(r => r.Contains(".GetTitle()"), "the news shows TitleLabel(); GetTitle feeds stored values only");
     }
 
+    [Theory]
+    [InlineData("en")] [InlineData("hu")] [InlineData("it")]
+    public void RoyalPetitionNews_CallsAQueenAQueen(string lang)
+    {
+        var queen = new Character { Name2 = LongName, Sex = CharacterSex.Female, King = true };
+        var king = new Character { Name2 = LongName, Sex = CharacterSex.Male, King = true };
+        InLang(lang, () => NPCPetitionSystem.RulerTitle(queen)).Should().Be(L(lang, "castle.queen"));
+        InLang(lang, () => NPCPetitionSystem.RulerTitle(king)).Should().Be(L(lang, "castle.king"));
+        if (lang == "en")
+            InLang("en", () => Loc.Get("petition.news_tax_granted", NPCPetitionSystem.RulerTitle(queen), "Ann", "Bo"))
+                .Should().Be("Queen Ann granted tax relief to Bo. The people approve!");
+        string src = Src("Systems", "NPCPetitionSystem.cs");
+        Regex.Matches(src, @"Loc\.Get\(""petition\.news_[a-z_]+"", RulerTitle\(player\), player\.Name2").Count
+            .Should().Be(9, "every royal ruling's news names the ruler by their own title");
+        src.Should().NotContain("Loc.Get(\"castle.king\"), player.Name2");
+    }
+
     // ================= stored and matched values stay English =================
 
     [Theory]
