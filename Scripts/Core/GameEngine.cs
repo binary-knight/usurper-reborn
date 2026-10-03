@@ -517,7 +517,7 @@ public partial class GameEngine
         {
             // ── Full menu for MUD/local/Steam ──
             terminal.SetColor("darkgray");
-            terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_play") : "  ── PLAY ─────────────────────────────────────────────────────────────────");
+            terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_play") : SectionRule("engine.section_play_visual"));
             if (mainSave != null)
                 WriteMenuKey("1", Loc.Get("engine.menu_play", mainSave.PlayerName));
             if (altSave != null)
@@ -536,7 +536,7 @@ public partial class GameEngine
             terminal.WriteLine("");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_info") : "  ── INFO ─────────────────────────────────────────────────────────────────");
+            terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_info") : SectionRule("engine.section_info_visual"));
             WriteMenuKey("I", Loc.Get("engine.menu_story_full"));
             WriteMenuKey("H", Loc.Get("engine.menu_history_full"));
             WriteMenuKey("B", Loc.Get("engine.menu_bbs_full"));
@@ -548,7 +548,7 @@ public partial class GameEngine
             terminal.WriteLine("");
 
             terminal.SetColor("darkgray");
-            terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_accessibility") : "  ── ACCESSIBILITY ────────────────────────────────────────────────────────");
+            terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.section_accessibility") : SectionRule("engine.section_accessibility_visual"));
             terminal.SetColor("darkgray");
             terminal.Write("  [");
             terminal.SetColor("bright_yellow");
@@ -658,7 +658,7 @@ public partial class GameEngine
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
+                    WriteRows(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
                     await Pacing.Wait(2000);
                     await RunBBSDoorMode();
                     return;
@@ -1160,7 +1160,20 @@ public partial class GameEngine
     }
 
     /// <summary>
-    /// Generate news about NPC activities
+    /// v1.2.5: an NPC's CurrentLocation (stored English, "Main Street", "Magic Shop", sometimes "MainStreet") in the
+    /// news writer's language: its location.name key when there is one. English keeps the stored text, as the
+    /// news always read ("was seen at the Inn", not "at the The Inn").
+    /// </summary>
+    internal static string NpcPlaceLabel(string? location)
+    {
+        if (string.IsNullOrEmpty(location)) return "";
+        if (GameConfig.Language == "en") return location;
+        string key = "location.name." + location.Replace(" ", "");
+        return Loc.Has(key) ? Loc.Get(key) : location;
+    }
+
+    /// <summary>
+    /// Generate news about NPC activities (v1.2.5: in the writer's language, as other news)
     /// </summary>
     private void GenerateNPCNews(NPC npc, Random random)
     {
@@ -1172,20 +1185,20 @@ public partial class GameEngine
         // Alignment-based news
         if (npc.Darkness > npc.Chivalry + 200)
         {
-            newsItems.Add($"{npc.Name2} was seen lurking in the shadows");
-            newsItems.Add($"{npc.Name2} threatened a merchant");
-            newsItems.Add($"Guards are watching {npc.Name2} closely");
+            newsItems.Add(Loc.Get("engine.npc_news_lurking", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_threatened", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_watched", npc.Name2));
         }
         else if (npc.Chivalry > npc.Darkness + 200)
         {
-            newsItems.Add($"{npc.Name2} helped a lost child find their parents");
-            newsItems.Add($"{npc.Name2} donated gold to the temple");
-            newsItems.Add($"{npc.Name2} protected a merchant from thieves");
+            newsItems.Add(Loc.Get("engine.npc_news_lost_child", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_donated", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_protected", npc.Name2));
         }
         else
         {
-            newsItems.Add($"{npc.Name2} was seen at the {npc.CurrentLocation}");
-            newsItems.Add($"{npc.Name2} is looking for adventure partners");
+            newsItems.Add(Loc.Get("engine.npc_news_seen_at", npc.Name2, NpcPlaceLabel(npc.CurrentLocation)));
+            newsItems.Add(Loc.Get("engine.npc_news_partners", npc.Name2));
         }
 
         // Class-based news
@@ -1193,14 +1206,14 @@ public partial class GameEngine
         {
             case CharacterClass.Warrior:
             case CharacterClass.Barbarian:
-                newsItems.Add($"{npc.Name2} challenged someone to a duel");
+                newsItems.Add(Loc.Get("engine.npc_news_duel", npc.Name2));
                 break;
             case CharacterClass.Magician:
             case CharacterClass.Sage:
-                newsItems.Add($"{npc.Name2} was seen studying ancient tomes");
+                newsItems.Add(Loc.Get("engine.npc_news_tomes", npc.Name2));
                 break;
             case CharacterClass.Assassin:
-                newsItems.Add($"Rumors swirl about {npc.Name2}'s latest target");
+                newsItems.Add(Loc.Get("engine.npc_news_target", npc.Name2));
                 break;
         }
 
@@ -1237,7 +1250,7 @@ public partial class GameEngine
         var newsSystem = NewsSystem.Instance;
         if (newsSystem != null)
         {
-            newsSystem.Newsy(true, $"{luckyNPC.Name2} has reached level {luckyNPC.Level}!");
+            newsSystem.Newsy(true, Loc.Get("level_master.reached_level_news", luckyNPC.Name2, luckyNPC.Level));
         }
     }
     
@@ -1669,7 +1682,7 @@ public partial class GameEngine
                         }
                         catch (System.Exception ex)
                         {
-                            terminal.WriteLine($"Editor error: {ex.Message}", "red");
+                            terminal.WriteLine(Loc.Get("engine.editor_error", ex.Message), "red");
                             await Pacing.Wait(2000);
                         }
                         finally
@@ -2029,20 +2042,20 @@ public partial class GameEngine
             if (GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {i + 1}. {p.Username} ({p.ConnectionType}){watching}");
+                terminal.WriteLine($"  {i + 1}. {p.Username} ({ConnectionLabel(GameConfig.Language, p.ConnectionType)}){watching}");
             }
             else
             {
                 terminal.SetColor("bright_yellow");
                 terminal.Write($"  [{i + 1}] ");
                 terminal.SetColor("white");
-                terminal.WriteLine($"{p.Username} [{p.ConnectionType}]{watching}");
+                terminal.WriteLine($"{p.Username} [{ConnectionLabel(GameConfig.Language, p.ConnectionType)}]{watching}");
             }
         }
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.spectator_consent"));
+        WriteRows(Loc.Get("engine.spectator_consent"));
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("engine.spectator_select"));
@@ -2080,10 +2093,7 @@ public partial class GameEngine
         }
 
         // Notify the target
-        target.EnqueueMessage(
-            $"\u001b[1;35m  * {myUsername} wants to watch your session (Spectator Mode).\u001b[0m");
-        target.EnqueueMessage(
-            $"\u001b[1;35m  * Type /accept to allow or /deny to refuse.\u001b[0m");
+        NotifySpectateRequest(target, myUsername);
 
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("engine.spectator_sent", target.Username));
@@ -2161,8 +2171,7 @@ public partial class GameEngine
         terminal.MessageSource = null;
 
         // Notify the target
-        targetSession.EnqueueMessage(
-            $"\u001b[1;33m  * {mySession.Username} is now watching your session.\u001b[0m");
+        NotifySpectateStarted(targetSession, mySession.Username);
 
         // Show spectator header
         terminal.ClearScreen();
@@ -2227,8 +2236,7 @@ public partial class GameEngine
                 if (UsurperRemake.Server.MudServer.Instance?.ActiveSessions.ContainsKey(
                     targetSession.Username.ToLowerInvariant()) == true)
                 {
-                    targetSession.EnqueueMessage(
-                        $"\u001b[1;33m  * {mySession.Username} stopped watching your session.\u001b[0m");
+                    NotifySpectateStopped(targetSession, mySession.Username);
                 }
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[RunSpectatorLoop] Failed to notify spectate target on disconnect: {ex.Message}"); }
@@ -2313,8 +2321,8 @@ public partial class GameEngine
                     // normally. Saves will be flagged when the listing fell back to
                     // filename-only metadata (the JSON deserialize threw — likely a
                     // bloated save) or when the only file on disk is an emergency dump.
-                    string statusTag = mostRecentSave.IsEmergency ? " [EMERGENCY SAVE]"
-                        : mostRecentSave.IsRecovered ? " [RECOVERY]"
+                    string statusTag = mostRecentSave.IsEmergency ? Loc.Get("engine.save_tag_emergency")
+                        : mostRecentSave.IsRecovered ? Loc.Get("engine.save_tag_recovery")
                         : "";
                     string statusColor = mostRecentSave.IsEmergency ? "bright_red"
                         : mostRecentSave.IsRecovered ? "yellow"
@@ -2327,40 +2335,23 @@ public partial class GameEngine
 
                     if (GameConfig.ScreenReaderMode)
                     {
-                        terminal.SetColor("white");
                         string saveTimeStr = mostRecentSave.SaveTime.Year >= 2020 ? mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                        terminal.WriteLine(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, localizedClass, mostRecentSave.Level, mostRecentSave.SaveType, saveTimeStr) + statusTag);
+                        WriteRows(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, localizedClass, mostRecentSave.Level, SaveTypeLabel(mostRecentSave.SaveType), saveTimeStr) + statusTag, "white");
                     }
                     else
                     {
-                        terminal.SetColor("darkgray");
-                        terminal.Write($"[");
-                        terminal.SetColor("bright_cyan");
-                        terminal.Write($"{i + 1}");
-                        terminal.SetColor("darkgray");
-                        terminal.Write("] ");
-                        terminal.SetColor("white");
-                        terminal.Write($"{mostRecentSave.PlayerName}");
-                        if (!string.IsNullOrEmpty(statusTag))
+                        foreach (var (text, color) in SaveListRow(i + 1, mostRecentSave.PlayerName,
+                            string.IsNullOrEmpty(statusTag) ? $" ({localizedClass})" : statusTag,
+                            string.IsNullOrEmpty(statusTag) ? "cyan" : statusColor,
+                            Loc.Get("engine.save_slot_level", mostRecentSave.Level),
+                            SaveTypeLabel(mostRecentSave.SaveType), mostRecentSave.IsAutosave,
+                            mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss")))
                         {
-                            terminal.SetColor(statusColor);
-                            terminal.Write(statusTag);
+                            if (text == "\n") { terminal.WriteLine(""); continue; }
+                            terminal.SetColor(color);
+                            terminal.Write(text);
                         }
-                        else
-                        {
-                            terminal.SetColor("cyan");
-                            terminal.Write($" ({localizedClass})");
-                        }
-                        terminal.SetColor("gray");
-                        terminal.Write(Loc.Get("engine.save_slot_level", mostRecentSave.Level));
-                        terminal.SetColor("darkgray");
-                        terminal.Write(" | ");
-                        terminal.SetColor(mostRecentSave.IsAutosave ? "yellow" : "green");
-                        terminal.Write(mostRecentSave.SaveType);
-                        terminal.SetColor("darkgray");
-                        terminal.Write(" | ");
-                        terminal.SetColor("gray");
-                        terminal.WriteLine(mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                        terminal.WriteLine("");
                     }
                 }
             }
@@ -2500,12 +2491,12 @@ public partial class GameEngine
                     : save.IsAutosave ? "yellow"
                     : "bright_green";
                 terminal.SetColor(typeColor);
-                terminal.Write($"{save.SaveType.PadRight(12)}");
+                terminal.Write($"{SaveTypeLabel(save.SaveType).PadRight(12)}");
 
                 terminal.SetColor("gray");
                 if (save.IsRecovered)
                 {
-                    terminal.Write("(unparsed -- will open recovery menu)");
+                    terminal.Write(Loc.Get("engine.save_unparsed"));
                 }
                 else
                 {
@@ -2561,10 +2552,12 @@ public partial class GameEngine
                     // IsRecovered when GetAllSaves' deserialize throws — almost
                     // always OOM on a bloated save — so it's correct to assume
                     // bloat here.
+                    // v1.2.5: the reason is shown in the player's language, so the bloat assumption is
+                    // passed as a flag instead of the English words the detector matches.
                     string reason = selectedSave.IsEmergency
-                        ? "This is an emergency save (Ctrl+C dump). The regular save for this character was lost or never written."
-                        : "Save file failed to parse during listing -- the save is likely bloated or too large. Not enough memory to load it normally. Recovery options below.";
-                    await ShowLoadFailureWithRecovery(selectedSave.FileName, reason);
+                        ? Loc.Get("engine.reason_emergency")
+                        : Loc.Get("engine.reason_unparsed");
+                    await ShowLoadFailureWithRecovery(selectedSave.FileName, reason, assumeBloat: !selectedSave.IsEmergency);
                     return;
                 }
                 await LoadSaveByFileName(selectedSave.FileName);
@@ -2630,7 +2623,7 @@ public partial class GameEngine
             var (saveData, loadError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (saveData == null)
             {
-                await ShowLoadFailureWithRecovery(fileName, loadError ?? "Unknown error -- save file could not be parsed.");
+                await ShowLoadFailureWithRecovery(fileName, loadError ?? Loc.Get("engine.reason_unknown"));
                 return;
             }
 
@@ -2638,7 +2631,7 @@ public partial class GameEngine
             if (saveData.Player == null)
             {
                 // v0.57.14: no player data — treat like a failed load and show recovery
-                await ShowLoadFailureWithRecovery(fileName, "Save file parsed successfully but contains no player data. The save may have been written incompletely.");
+                await ShowLoadFailureWithRecovery(fileName, Loc.Get("engine.reason_no_player"));
                 return;
             }
 
@@ -3083,9 +3076,7 @@ public partial class GameEngine
                 // Global login announcement (suppress for invisible wizards)
                 if (mudServer != null && playerSession != null && !playerSession.IsWizInvisible)
                 {
-                    mudServer.BroadcastToAll(
-                        $"\u001b[1;33m  {displayName} has entered the realm. [{connType}]\u001b[0m",
-                        excludeUsername: sessionKey);
+                    AnnounceToRealm(mudServer, sessionKey, "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", displayName, ConnectionLabel(lang, connType)));
                 }
             }
 
@@ -3222,7 +3213,7 @@ public partial class GameEngine
             else if (currentPlayer.HP <= 0)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine("  You awaken at the threshold between life and death...");
+                terminal.WriteLine(Loc.Get("engine.void_awaken"));
                 terminal.WriteLine("");
                 // Apply Accept Your Fate penalties since they tried to dodge death
                 int levelsLost = Math.Min(5, currentPlayer.Level - 1);
@@ -3234,14 +3225,14 @@ public partial class GameEngine
                         currentPlayer.Level--;
                     }
                     currentPlayer.Experience = LevelMasterLocation.GetExperienceForLevel(currentPlayer.Level);
-                    terminal.WriteLine($"  You lose {levelsLost} levels. (Now level {currentPlayer.Level})", "red");
+                    terminal.WriteLine(Loc.Get("engine.void_levels", levelsLost, currentPlayer.Level), "red");
                 }
                 long goldLost = (long)(currentPlayer.Gold * 0.75);
                 currentPlayer.Gold -= goldLost;
-                terminal.WriteLine($"  You lose {goldLost:N0} gold.", "red");
+                terminal.WriteLine(Loc.Get("engine.void_gold", goldLost.ToString("N0")), "red");
                 currentPlayer.RecalculateStats();
                 currentPlayer.HP = Math.Max(1, (int)(currentPlayer.MaxHP * 0.1));
-                terminal.WriteLine("  The void releases you, diminished.", "gray");
+                terminal.WriteLine(Loc.Get("engine.void_release"), "gray");
                 terminal.WriteLine("");
                 await terminal.PressAnyKey();
                 startLocation = GameLocation.MainStreet;
@@ -3285,19 +3276,19 @@ public partial class GameEngine
     /// broken save when they do), or return to the main menu and manually investigate.
     /// Goal: never make a player think their saves silently disappeared.
     /// </summary>
-    private async Task ShowLoadFailureWithRecovery(string fileName, string errorMessage)
+    private async Task ShowLoadFailureWithRecovery(string fileName, string errorMessage, bool assumeBloat = false)
     {
         terminal.WriteLine("");
         terminal.WriteLine("========================================================================", "red");
-        terminal.WriteLine("  SAVE LOAD FAILED", "bright_red");
+        terminal.WriteLine(Loc.Get("engine.lf_title"), "bright_red");
         terminal.WriteLine("========================================================================", "red");
         terminal.WriteLine("");
-        terminal.WriteLine("The game could not load your save. Your save file is still on disk --", "yellow");
-        terminal.WriteLine("it was NOT deleted. Details below so you can recover it.", "yellow");
+        terminal.WriteLine(Loc.Get("engine.lf_intro_1"), "yellow");
+        terminal.WriteLine(Loc.Get("engine.lf_intro_2"), "yellow");
         terminal.WriteLine("");
 
-        terminal.WriteLine("Error:", "bright_white");
-        terminal.WriteLine($"  {errorMessage}", "red");
+        terminal.WriteLine(Loc.Get("engine.lf_error"), "bright_white");
+        WriteRows($"  {errorMessage}", "red");
         terminal.WriteLine("");
 
         // Discover recovery files
@@ -3310,7 +3301,7 @@ public partial class GameEngine
 
         if (!string.IsNullOrEmpty(saveDir) && System.IO.Directory.Exists(saveDir))
         {
-            terminal.WriteLine("Save folder:", "bright_white");
+            terminal.WriteLine(Loc.Get("engine.lf_save_folder"), "bright_white");
             terminal.WriteLine($"  {saveDir}", "cyan");
             terminal.WriteLine("");
 
@@ -3319,7 +3310,7 @@ public partial class GameEngine
             if (System.IO.File.Exists(backupPath))
             {
                 var info = new System.IO.FileInfo(backupPath);
-                recoveryOptions.Add(($"Backup from {info.LastWriteTime:yyyy-MM-dd HH:mm}", backupPath));
+                recoveryOptions.Add((Loc.Get("engine.lf_label_backup", info.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), backupPath));
             }
 
             // Timestamped autosaves (most recent first)
@@ -3332,7 +3323,7 @@ public partial class GameEngine
                     .ToList();
                 foreach (var fi in autosaves)
                 {
-                    recoveryOptions.Add(($"Autosave from {fi.LastWriteTime:yyyy-MM-dd HH:mm}", fi.FullName));
+                    recoveryOptions.Add((Loc.Get("engine.lf_label_autosave", fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), fi.FullName));
                 }
             }
             catch { }
@@ -3342,7 +3333,7 @@ public partial class GameEngine
             if (System.IO.File.Exists(emergencyPath))
             {
                 var info = new System.IO.FileInfo(emergencyPath);
-                recoveryOptions.Add(($"Emergency autosave from {info.LastWriteTime:yyyy-MM-dd HH:mm}", emergencyPath));
+                recoveryOptions.Add((Loc.Get("engine.lf_label_emergency", info.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), emergencyPath));
             }
         }
 
@@ -3360,7 +3351,7 @@ public partial class GameEngine
         // over the bloat threshold (~10 MB — well under the 5 MB SAVE_AUDIT
         // warning ceiling but a realistic upper bound for healthy saves), assume
         // bloat and offer [R] regardless of the error text.
-        bool isBloatError = errorMessage != null && (
+        bool isBloatError = assumeBloat || errorMessage != null && (
             errorMessage.Contains("Not enough memory", StringComparison.OrdinalIgnoreCase) ||
             errorMessage.Contains("too large", StringComparison.OrdinalIgnoreCase) ||
             errorMessage.Contains("more data than", StringComparison.OrdinalIgnoreCase) ||
@@ -3398,38 +3389,38 @@ public partial class GameEngine
 
         if (recoveryOptions.Count > 0)
         {
-            terminal.WriteLine("Recovery files found:", "bright_white");
+            terminal.WriteLine(Loc.Get("engine.lf_found"), "bright_white");
             for (int i = 0; i < recoveryOptions.Count; i++)
             {
                 terminal.WriteLine($"  [{i + 1}] {recoveryOptions[i].label}", "bright_cyan");
                 terminal.WriteLine($"      {recoveryOptions[i].path}", "dark_gray");
             }
             terminal.WriteLine("");
-            terminal.WriteLine("Options:", "bright_white");
-            terminal.WriteLine("  [1-" + recoveryOptions.Count + "] Try to load a recovery file", "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_options"), "bright_white");
+            terminal.WriteLine(Loc.Get("engine.lf_opt_load", recoveryOptions.Count), "yellow");
             if (isBloatError)
             {
-                terminal.WriteLine("  [R]    Auto-repair the bloated save file (recommended)", "bright_green");
+                terminal.WriteLine(Loc.Get("engine.lf_opt_repair"), "bright_green");
             }
-            terminal.WriteLine("  [N]    Start a NEW character (will overwrite the broken save)", "yellow");
-            terminal.WriteLine("  [Q]    Return to main menu without loading", "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_opt_new"), "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_opt_quit"), "yellow");
         }
         else
         {
-            terminal.WriteLine("No backup or autosave files were found alongside the save.", "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_none_found"), "yellow");
             terminal.WriteLine("");
-            terminal.WriteLine("Manual recovery steps:", "bright_white");
-            terminal.WriteLine("  1. Open the save folder above in a file browser", "gray");
-            terminal.WriteLine("  2. Open the save file in a text editor (e.g. Notepad, VS Code)", "gray");
-            terminal.WriteLine("  3. The JSON at the top of the file contains your character data", "gray");
+            terminal.WriteLine(Loc.Get("engine.lf_manual"), "bright_white");
+            terminal.WriteLine(Loc.Get("engine.lf_manual_1"), "gray");
+            terminal.WriteLine(Loc.Get("engine.lf_manual_2"), "gray");
+            terminal.WriteLine(Loc.Get("engine.lf_manual_3"), "gray");
             terminal.WriteLine("");
-            terminal.WriteLine("Options:", "bright_white");
+            terminal.WriteLine(Loc.Get("engine.lf_options"), "bright_white");
             if (isBloatError)
             {
-                terminal.WriteLine("  [R]    Auto-repair the bloated save file (recommended)", "bright_green");
+                terminal.WriteLine(Loc.Get("engine.lf_opt_repair"), "bright_green");
             }
-            terminal.WriteLine("  [N]    Start a NEW character (will overwrite the broken save)", "yellow");
-            terminal.WriteLine("  [Q]    Return to main menu without loading", "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_opt_new"), "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_opt_quit"), "yellow");
         }
         terminal.WriteLine("");
 
@@ -3460,7 +3451,7 @@ public partial class GameEngine
                 offerAutoRepair: isBloatError);
         }
 
-        var choice = (await terminal.GetInput("Your choice: ")).Trim().ToUpperInvariant();
+        var choice = (await terminal.GetInput(Loc.Get("ui.your_choice"))).Trim().ToUpperInvariant();
 
         if (choice == "Q" || string.IsNullOrEmpty(choice))
         {
@@ -3476,7 +3467,7 @@ public partial class GameEngine
         if (choice == "N")
         {
             terminal.WriteLine("");
-            terminal.WriteLine("Starting new character...", "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_starting_new"), "yellow");
             await Pacing.Wait(800);
             await CreateNewGame(fileName);
             return;
@@ -3487,7 +3478,7 @@ public partial class GameEngine
         {
             var (label, path) = recoveryOptions[recoveryIndex - 1];
             terminal.WriteLine("");
-            terminal.WriteLine($"Attempting to load {label}...", "yellow");
+            terminal.WriteLine(Loc.Get("engine.lf_attempting", label), "yellow");
             await Pacing.Wait(800);
 
             // Use the filename (not full path) — SaveSystem loads from SaveDirectory.
@@ -3497,8 +3488,8 @@ public partial class GameEngine
             if (recoveryData?.Player == null)
             {
                 terminal.WriteLine("");
-                terminal.WriteLine("That recovery file also failed to load.", "red");
-                terminal.WriteLine($"  {recoveryError ?? "Missing player data"}", "red");
+                terminal.WriteLine(Loc.Get("engine.lf_recovery_failed"), "red");
+                WriteRows($"  {recoveryError ?? Loc.Get("engine.lf_missing_player")}", "red");
                 terminal.WriteLine("");
                 await terminal.PressAnyKey();
                 // Re-enter the recovery menu so the player can pick a different file.
@@ -3506,7 +3497,7 @@ public partial class GameEngine
                 // errorMessage. Pre-fix, if the primary failed for a non-OOM reason
                 // but a recovery file OOMed, the re-entered menu still showed the
                 // primary's error and never offered [R] auto-repair.
-                await ShowLoadFailureWithRecovery(fileName, recoveryError ?? errorMessage);
+                await ShowLoadFailureWithRecovery(fileName, recoveryError ?? errorMessage, assumeBloat: recoveryError == null && assumeBloat);
                 return;
             }
 
@@ -3516,14 +3507,14 @@ public partial class GameEngine
             {
                 string primaryPath = System.IO.Path.Combine(saveDir, fileName);
                 System.IO.File.Copy(path, primaryPath, overwrite: true);
-                terminal.WriteLine("Recovery file restored as primary save.", "bright_green");
+                terminal.WriteLine(Loc.Get("engine.lf_restored"), "bright_green");
                 terminal.WriteLine("");
                 await Pacing.Wait(1000);
                 await LoadSaveByFileName(fileName);
             }
             catch (Exception ex)
             {
-                terminal.WriteLine($"Could not copy recovery file: {ex.Message}", "red");
+                WriteRows(Loc.Get("engine.lf_copy_failed", ex.Message), "red");
                 await Pacing.Wait(3000);
             }
             return;
@@ -3544,20 +3535,20 @@ public partial class GameEngine
     {
         terminal.WriteLine("");
         terminal.WriteLine("========================================================================", "bright_green");
-        terminal.WriteLine("  AUTOMATIC SAVE REPAIR", "bright_green");
+        terminal.WriteLine(Loc.Get("engine.rp_title"), "bright_green");
         terminal.WriteLine("========================================================================", "bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine("This will read the bloated save and write a trimmed version", "yellow");
-        terminal.WriteLine("with oversized lists clipped down to safe limits. Your character,", "yellow");
-        terminal.WriteLine("inventory, level, gold, and quests are preserved. Some NPC history", "yellow");
-        terminal.WriteLine("(old memories, prisoners, encounters) will be discarded.", "yellow");
+        terminal.WriteLine(Loc.Get("engine.rp_intro_1"), "yellow");
+        terminal.WriteLine(Loc.Get("engine.rp_intro_2"), "yellow");
+        terminal.WriteLine(Loc.Get("engine.rp_intro_3"), "yellow");
+        terminal.WriteLine(Loc.Get("engine.rp_intro_4"), "yellow");
         terminal.WriteLine("");
 
         string saveDir;
         try { saveDir = SaveSystem.Instance.GetSaveDirectory(); }
         catch (Exception ex)
         {
-            terminal.WriteLine($"Could not access save folder: {ex.Message}", "red");
+            WriteRows(Loc.Get("engine.rp_no_folder", ex.Message), "red");
             await terminal.PressAnyKey();
             return;
         }
@@ -3569,13 +3560,13 @@ public partial class GameEngine
 
         string primaryPath = System.IO.Path.Combine(saveDir, fileName);
         if (System.IO.File.Exists(primaryPath))
-            candidates.Add(("Primary save", primaryPath));
+            candidates.Add((Loc.Get("engine.rp_label_primary"), primaryPath));
 
         string baseName = System.IO.Path.GetFileNameWithoutExtension(fileName);
 
         string backupPath = System.IO.Path.Combine(saveDir, $"{baseName}_backup.json");
         if (System.IO.File.Exists(backupPath))
-            candidates.Add(("Backup", backupPath));
+            candidates.Add((Loc.Get("engine.rp_label_backup"), backupPath));
 
         try
         {
@@ -3584,7 +3575,7 @@ public partial class GameEngine
                 .OrderByDescending(fi => fi.LastWriteTime)
                 .Take(3);
             foreach (var fi in autosaves)
-                candidates.Add(($"Autosave {fi.LastWriteTime:yyyy-MM-dd HH:mm}", fi.FullName));
+                candidates.Add((Loc.Get("engine.rp_label_autosave", fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), fi.FullName));
         }
         catch (Exception autoEx) { DebugLogger.Instance.LogWarning("SAVE", $"Recovery: could not enumerate autosaves: {autoEx.Message}"); }
 
@@ -3595,18 +3586,18 @@ public partial class GameEngine
                 .Select(p => new System.IO.FileInfo(p))
                 .OrderByDescending(fi => fi.LastWriteTime);
             foreach (var fi in emergencies)
-                candidates.Add(($"Emergency {fi.LastWriteTime:yyyy-MM-dd HH:mm}", fi.FullName));
+                candidates.Add((Loc.Get("engine.rp_label_emergency", fi.LastWriteTime.ToString("yyyy-MM-dd HH:mm")), fi.FullName));
         }
         catch (Exception emergEx) { DebugLogger.Instance.LogWarning("SAVE", $"Recovery: could not enumerate emergency saves: {emergEx.Message}"); }
 
         // Legacy single-file emergency fallback.
         string legacyEmergency = System.IO.Path.Combine(saveDir, "emergency_autosave.json");
         if (System.IO.File.Exists(legacyEmergency))
-            candidates.Add(("Legacy emergency", legacyEmergency));
+            candidates.Add((Loc.Get("engine.rp_label_legacy"), legacyEmergency));
 
         if (candidates.Count == 0)
         {
-            terminal.WriteLine("No save files found to repair.", "red");
+            terminal.WriteLine(Loc.Get("engine.rp_none"), "red");
             await terminal.PressAnyKey();
             return;
         }
@@ -3617,7 +3608,7 @@ public partial class GameEngine
 
         foreach (var (label, path) in candidates)
         {
-            terminal.WriteLine($"Repairing: {label}...", "yellow");
+            terminal.WriteLine(Loc.Get("engine.rp_repairing", label), "yellow");
             terminal.WriteLine($"  {path}", "dark_gray");
 
             UsurperRemake.Systems.SaveFileRepair.RepairResult result;
@@ -3627,22 +3618,22 @@ public partial class GameEngine
             }
             catch (Exception ex)
             {
-                terminal.WriteLine($"  Repair threw: {ex.GetType().Name}: {ex.Message}", "red");
+                WriteRows(Loc.Get("engine.rp_threw", ex.GetType().Name, ex.Message), "red");
                 continue;
             }
 
             if (!result.Success)
             {
-                terminal.WriteLine($"  Repair failed: {result.ErrorMessage}", "red");
+                WriteRows(Loc.Get("engine.rp_failed", result.ErrorMessage), "red");
                 continue;
             }
 
             long origMB = result.OriginalSizeBytes / (1024 * 1024);
             long newMB = result.RepairedSizeBytes / (1024 * 1024);
             string sizeChange = origMB > 0
-                ? $"{origMB} MB -> {newMB} MB"
-                : $"{result.OriginalSizeBytes / 1024} KB -> {result.RepairedSizeBytes / 1024} KB";
-            terminal.WriteLine($"  Repair complete: {sizeChange}, {result.TrimmedFields.Count} field(s) trimmed.", "bright_green");
+                ? Loc.Get("engine.rp_size_mb", origMB, newMB)
+                : Loc.Get("engine.rp_size_kb", result.OriginalSizeBytes / 1024, result.RepairedSizeBytes / 1024);
+            terminal.WriteLine(Loc.Get("engine.rp_complete", sizeChange, result.TrimmedFields.Count), "bright_green");
 
             // If the repaired file isn't already the primary, copy it over.
             if (!string.Equals(path, primaryPath, StringComparison.OrdinalIgnoreCase))
@@ -3650,17 +3641,17 @@ public partial class GameEngine
                 try
                 {
                     System.IO.File.Copy(path, primaryPath, overwrite: true);
-                    terminal.WriteLine($"  Restored {label} as primary save.", "bright_green");
+                    terminal.WriteLine(Loc.Get("engine.rp_restored", label), "bright_green");
                 }
                 catch (Exception ex)
                 {
-                    terminal.WriteLine($"  Could not copy repaired file to primary: {ex.Message}", "red");
+                    WriteRows(Loc.Get("engine.rp_copy_failed", ex.Message), "red");
                     continue;
                 }
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine("Attempting to load the repaired save...", "yellow");
+            terminal.WriteLine(Loc.Get("engine.rp_loading"), "yellow");
             await Pacing.Wait(800);
 
             // Verify it loads. LoadSaveByFileName runs the full restoration pipeline.
@@ -3670,22 +3661,22 @@ public partial class GameEngine
             var (verifyData, verifyError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (verifyData?.Player != null)
             {
-                terminal.WriteLine("Repair succeeded -- loading character now.", "bright_green");
+                terminal.WriteLine(Loc.Get("engine.rp_succeeded"), "bright_green");
                 terminal.WriteLine("");
                 await Pacing.Wait(1000);
                 await LoadSaveByFileName(fileName);
                 return;
             }
 
-            terminal.WriteLine($"  Repair completed but load still failed: {verifyError}", "red");
-            terminal.WriteLine("  Trying next candidate...", "yellow");
+            WriteRows(Loc.Get("engine.rp_still_failed", verifyError ?? ""), "red");
+            terminal.WriteLine(Loc.Get("engine.rp_next"), "yellow");
             terminal.WriteLine("");
         }
 
         terminal.WriteLine("");
-        terminal.WriteLine("All repair attempts failed. The save may have damage beyond bloat", "red");
-        terminal.WriteLine("(corrupt JSON, version mismatch, etc.). Please report this with your", "red");
-        terminal.WriteLine("save folder so we can investigate.", "red");
+        terminal.WriteLine(Loc.Get("engine.rp_all_failed_1"), "red");
+        terminal.WriteLine(Loc.Get("engine.rp_all_failed_2"), "red");
+        terminal.WriteLine(Loc.Get("engine.rp_all_failed_3"), "red");
         terminal.WriteLine("");
         await terminal.PressAnyKey();
     }
@@ -3734,14 +3725,14 @@ public partial class GameEngine
             string targetDisplay = !string.IsNullOrEmpty(quest.TargetNPCName)
                 ? quest.TargetNPCName
                 : quest.Objectives.FirstOrDefault(o =>
-                    !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? "Unknown";
+                    !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? Loc.Get("combat.unknown_name");
 
             // v1.1.14: paid only under the quest's claim, as the bounty payouts are
             if (SettleDeadNpcQuest(player, quest, out long rewardAmount) != true) continue;
 
             if (!shown) { terminal.WriteLine(""); shown = true; }
-            terminal.WriteLine($"  Quest Update: {targetDisplay} has perished.", "yellow");
-            terminal.WriteLine($"  \"{quest.GetDisplayTitle()}\" auto-completed. Reward: {rewardAmount:N0} gold.", "bright_green");
+            WriteRows(Loc.Get("engine.quest_perished", targetDisplay), "yellow");
+            WriteRows(Loc.Get("engine.quest_auto_completed", quest.GetDisplayTitle(), rewardAmount.ToString("N0")), "bright_green");
             terminal.WriteLine("");
 
             DebugLogger.Instance.LogInfo("QUEST", $"Auto-completed quest '{quest.Title}' for {player.DisplayName} — target NPC '{targetDisplay}' is permadead. Reward: {rewardAmount:N0}g");
@@ -4107,7 +4098,7 @@ public partial class GameEngine
 
                 foreach (var entry in attackLog)
                 {
-                    string attacker = entry["attacker"]?.GetValue<string>() ?? "Unknown";
+                    string attacker = SleepAttackerName(entry);
                     string result = entry["result"]?.GetValue<string>() ?? "unknown";
                     long goldStolen = 0;
                     try { goldStolen = entry["gold_stolen"]?.GetValue<long>() ?? 0; } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ProcessSleepReport] Failed to parse gold_stolen: {ex.Message}"); }
@@ -4124,7 +4115,7 @@ public partial class GameEngine
                         foreach (var gf in guardArr)
                         {
                             if (gf == null) continue;
-                            string guardName = gf["guard"]?.GetValue<string>() ?? "Guard";
+                            string guardName = gf["guard"]?.GetValue<string>() ?? Loc.Get("inn.guard_default");
                             string guardResult = gf["result"]?.GetValue<string>() ?? "unknown";
 
                             if (guardResult == "guard_won")
@@ -4286,7 +4277,7 @@ public partial class GameEngine
             {
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("engine.inheritance_waiting", pending.Count));
+                foreach (var row in WrapRows(Loc.Get("engine.inheritance_waiting", pending.Count))) terminal.WriteLine(row);
                 terminal.WriteLine("");
                 // the same pause the delivered path takes: the /boss screen clears right after this
                 await Pacing.Wait(1500);
@@ -4358,7 +4349,7 @@ public partial class GameEngine
             if (itemsOverflowed > 0)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("engine.inheritance_overflow", itemsOverflowed));
+                foreach (var row in WrapRows(Loc.Get("engine.inheritance_overflow", itemsOverflowed))) terminal.WriteLine(row);
             }
             terminal.WriteLine("");
 
@@ -4501,8 +4492,8 @@ public partial class GameEngine
                         section.Items.Add(new ElectronBridge.NewsFeedItem
                         {
                             Text = defenderWon
-                                ? $"You defeated {attack.AttackerName} in self-defense"
-                                : $"{attack.AttackerName} defeated you",
+                                ? Loc.Get("engine.feed_pvp_won", attack.AttackerName)
+                                : Loc.Get("engine.feed_pvp_lost", attack.AttackerName),
                             Type = "pvp_attack",
                             GoldDelta = defenderWon ? attack.GoldStolen : -attack.GoldStolen,
                             IsGood = defenderWon,
@@ -4514,7 +4505,7 @@ public partial class GameEngine
 
                 if (news.Count > 0)
                 {
-                    var section = new ElectronBridge.NewsFeedSection { Title = "World News", Icon = "scroll" };
+                    var section = new ElectronBridge.NewsFeedSection { Title = Loc.Get("engine.feed_world_news"), Icon = "scroll" };
                     foreach (var n in news)
                     {
                         section.Items.Add(new ElectronBridge.NewsFeedItem
@@ -4529,7 +4520,7 @@ public partial class GameEngine
 
                 if (directMessages.Count > 0)
                 {
-                    var section = new ElectronBridge.NewsFeedSection { Title = "Messages", Icon = "letter" };
+                    var section = new ElectronBridge.NewsFeedSection { Title = Loc.Get("engine.feed_messages"), Icon = "letter" };
                     foreach (var msg in directMessages)
                     {
                         string msgText = msg.Message.Length > 80 ? msg.Message.Substring(0, 77) + "..." : msg.Message;
@@ -5100,7 +5091,7 @@ public partial class GameEngine
                     var (fallenName, fallenLevel, fallenClass, heirloomGold) = legacy.Value;
                     currentPlayer.Gold += heirloomGold;
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("engine.legacy_claimed", fallenName, fallenLevel, heirloomGold), "bright_magenta");
+                    WriteRows(Loc.Get("engine.legacy_claimed", fallenName, fallenLevel, heirloomGold), "bright_magenta");
                     terminal.WriteLine(Loc.Get("engine.legacy_claimed_hint"), "gray");
                     await Pacing.Wait(2500);
                     DebugLogger.Instance.LogInfo("GOLD",
@@ -5164,7 +5155,7 @@ public partial class GameEngine
             var displayName = currentPlayer.Name2 ?? currentPlayer.Name1;
             var className = currentPlayer.ClassName;
             _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                $"A new adventurer arrives! {displayName} the {className} begins their journey.", "quest");
+                Loc.Get("engine.news_new_adventurer", displayName, className), "quest");
             // Update online_players display_name from BBS username to character name
             await OnlineStateManager.Instance!.UpdateDisplayName(displayName);
 
@@ -5225,7 +5216,7 @@ public partial class GameEngine
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("aldric_quest.lost_contact")}");
-            terminal.WriteLine($"  {Loc.Get("aldric_quest.need_someone")}");
+            WriteRows($"  {Loc.Get("aldric_quest.need_someone")}");
             terminal.WriteLine($"  {Loc.Get("aldric_quest.just_enter")}");
             terminal.WriteLine($"  {Loc.Get("aldric_quest.for_treasure")}");
             terminal.WriteLine("");
@@ -5267,16 +5258,12 @@ public partial class GameEngine
             // Global login announcement
             if (ngMudServer != null && ngPlayerSession != null && !ngPlayerSession.IsWizInvisible)
             {
-                ngMudServer.BroadcastToAll(
-                    $"\u001b[1;33m  {ngDisplayName} has entered the realm. [{ngConnType}]\u001b[0m",
-                    excludeUsername: ngSessionKey);
+                AnnounceToRealm(ngMudServer, ngSessionKey, "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", ngDisplayName, ConnectionLabel(lang, ngConnType)));
 
                 // New player welcome broadcast (not NG+ rerolls)
                 if (!isNgPlus)
                 {
-                    ngMudServer.BroadcastToAll(
-                        $"\u001b[1;36m  *** {ngDisplayName} is a new adventurer! Type /gos to welcome them! ***\u001b[0m",
-                        excludeUsername: ngSessionKey);
+                    AnnounceToRealm(ngMudServer, ngSessionKey, "1;36", lang => Loc.GetIn(lang, "engine.new_adventurer_welcome", ngDisplayName));
                 }
             }
         }
@@ -7763,7 +7750,7 @@ public partial class GameEngine
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.innkeeper_quote"));
+        WriteRows(Loc.Get("engine.innkeeper_quote"));
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();
@@ -7812,14 +7799,14 @@ public partial class GameEngine
 
         string timeDesc;
         if (absenceDays >= 1.0)
-            timeDesc = $"{absenceDays:F1} days";
+            timeDesc = Loc.Get("engine.away_days", absenceDays.ToString("F1"));
         else if (absence.TotalHours >= 1.0)
-            timeDesc = $"{absence.TotalHours:F1} hours";
+            timeDesc = Loc.Get("engine.away_hours", absence.TotalHours.ToString("F1"));
         else
-            timeDesc = $"{(int)absence.TotalMinutes} minutes";
+            timeDesc = Loc.Get("engine.away_minutes", (int)absence.TotalMinutes);
 
-        terminal.WriteLine($"  While you were away ({timeDesc})...", "bright_yellow");
-        terminal.WriteLine($"  The world continued without you.", "cyan");
+        terminal.WriteLine(Loc.Get("engine.away_header", timeDesc), "bright_yellow");
+        terminal.WriteLine(Loc.Get("engine.away_world"), "cyan");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════", "bright_cyan");
         terminal.WriteLine("", "white");
@@ -7875,7 +7862,7 @@ public partial class GameEngine
                     {
                         // BBS and screen reader: use WriteLine (no \r support)
                         if (tick % (progressInterval * 5) == 0 || tick == totalTicks)
-                            terminal.WriteLine($"  Simulating... {pct}%", "gray");
+                            terminal.WriteLine(Loc.Get("engine.simulating", pct), "gray");
                     }
                     else
                     {
@@ -7913,7 +7900,7 @@ public partial class GameEngine
     {
         if (events.Count == 0)
         {
-            terminal.WriteLine("  The realm was quiet in your absence.", "gray");
+            terminal.WriteLine(Loc.Get("engine.realm_quiet"), "gray");
             terminal.WriteLine("", "white");
             await terminal.PressAnyKey();
             return;
@@ -7938,35 +7925,11 @@ public partial class GameEngine
             if (clean.Contains("═══") || clean.IndexOf("New Day", StringComparison.OrdinalIgnoreCase) >= 0 || string.IsNullOrWhiteSpace(clean))
                 continue;
 
-            if (clean.IndexOf("slain", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                clean.IndexOf("passed away", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                clean.IndexOf("soul moves on", StringComparison.OrdinalIgnoreCase) >= 0)
-                deaths.Add(clean);
-            else if (clean.IndexOf("proud parents", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("come of age", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("born", StringComparison.OrdinalIgnoreCase) >= 0)
-                births.Add(clean);
-            else if (clean.IndexOf("king", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("proclaims", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("throne", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("treasury", StringComparison.OrdinalIgnoreCase) >= 0)
-                political.Add(clean);
-            else if (clean.IndexOf("married", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("divorced", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("affair", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("birthday", StringComparison.OrdinalIgnoreCase) >= 0)
-                social.Add(clean);
-            else if (clean.IndexOf("settlement", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("outskirts", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("constructed", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("building", StringComparison.OrdinalIgnoreCase) >= 0)
-                settlement.Add(clean);
-            else if (clean.IndexOf("level", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("quest", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                     clean.IndexOf("team", StringComparison.OrdinalIgnoreCase) >= 0)
-                worldEvents.Add(clean);
-            else
-                worldEvents.Add(clean); // Default bucket
+            // v1.2.5: news is written in the writer's language, so each bucket matches its words in every
+            // language (CatchUpBucket); anything else lands in World Events.
+            var bucket = CatchUpBucket(clean);
+            (bucket == 0 ? deaths : bucket == 1 ? births : bucket == 2 ? political
+                : bucket == 3 ? social : bucket == 4 ? settlement : worldEvents).Add(clean);
         }
 
         int maxPerCat = GameConfig.CatchUpMaxEventsPerCategory;
@@ -7992,6 +7955,39 @@ public partial class GameEngine
     }
 
     /// <summary>
+    /// v1.2.5: the catch-up bucket of a news row: 0 deaths, 1 births, 2 royal, 3 love, 4 outskirts, 5 world
+    /// events. A bucket's words (engine.catchup_words_*, "|" separated pieces of the news texts) are matched
+    /// in every language, case-insensitively, at the start of a word, in that order.
+    /// </summary>
+    internal static int CatchUpBucket(string clean)
+    {
+        for (int b = 0; b < CatchUpWordKeys.Length; b++)
+            foreach (var lang in Loc.AvailableLanguages)
+                foreach (var word in Loc.GetIn(lang.Code, CatchUpWordKeys[b]).Split('|', StringSplitOptions.RemoveEmptyEntries))
+                    if (StartsAWord(clean, word))
+                        return b;
+        return CatchUpWordKeys.Length;
+    }
+
+    /// <summary>
+    /// v1.2.5: true when `word` appears in `text` at the start of a word (case-insensitive), so "king" matches
+    /// "King" and "kingdom" but not "lurking".
+    /// </summary>
+    private static bool StartsAWord(string text, string word)
+    {
+        for (int i = text.IndexOf(word, StringComparison.OrdinalIgnoreCase); i >= 0;
+             i = text.IndexOf(word, i + 1, StringComparison.OrdinalIgnoreCase))
+            if (i == 0 || !char.IsLetter(text[i - 1])) return true;
+        return false;
+    }
+
+    private static readonly string[] CatchUpWordKeys =
+    {
+        "engine.catchup_words_deaths", "engine.catchup_words_births", "engine.catchup_words_royal",
+        "engine.catchup_words_love", "engine.catchup_words_outskirts"
+    };
+
+    /// <summary>
     /// Display a single category of catch-up events.
     /// </summary>
     private void ShowCatchUpCategory(string title, List<string> events, int max, string color)
@@ -8013,7 +8009,7 @@ public partial class GameEngine
         }
 
         if (events.Count > max)
-            terminal.WriteLine($"    ...and {events.Count - max} more", "dark_gray");
+            terminal.WriteLine(Loc.Get("engine.catchup_more", events.Count - max), "dark_gray");
 
         terminal.WriteLine("", "white");
     }
@@ -8108,10 +8104,6 @@ public partial class GameEngine
     
     // Placeholder methods for game actions
     private async Task ShowInstructions() => await ShowStoryIntroduction();
-    private async Task ListPlayers() => await ShowInfoScreen("Player List", "Player list will be here...");
-    private async Task ShowTeams() => await ShowInfoScreen("Teams", "Team information will be here...");
-    private async Task ShowGameSettings() => await ShowInfoScreen("Game Settings", "Game settings will be here...");
-    private async Task ShowStatus() => await ShowInfoScreen("Status", $"Player: {currentPlayer?.DisplayName}\nLevel: {currentPlayer?.Level}\nHP: {currentPlayer?.HP}/{currentPlayer?.MaxHP}");
 
 #if !STEAM_BUILD
     private async Task ShowSupportPage()
@@ -8145,29 +8137,20 @@ public partial class GameEngine
         terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.support_how_sr") : Loc.Get("engine.support_how_visual"));
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("engine.support_sponsor"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.support_sponsor_desc"));
+        WriteLabelled(Loc.Get("engine.support_sponsor"), Loc.Get("engine.support_sponsor_desc"));
         terminal.WriteLine(Loc.Get("engine.support_sponsor_desc2"));
         terminal.SetColor("bright_green");
         terminal.WriteLine("  https://github.com/sponsors/binary-knight");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("engine.support_star"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.support_star_desc"));
+        WriteLabelled(Loc.Get("engine.support_star"), Loc.Get("engine.support_star_desc"));
         terminal.WriteLine(Loc.Get("engine.support_star_desc2"));
         terminal.WriteLine(Loc.Get("engine.support_star_desc3"));
         terminal.SetColor("bright_green");
         terminal.WriteLine("  https://github.com/binary-knight/usurper-reborn");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("engine.support_steam"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.support_steam_desc"));
+        WriteLabelled(Loc.Get("engine.support_steam"), Loc.Get("engine.support_steam_desc"));
         terminal.WriteLine(Loc.Get("engine.support_steam_desc2"));
         terminal.WriteLine("");
 
@@ -8180,7 +8163,7 @@ public partial class GameEngine
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("engine.support_thanks_1"));
-        terminal.WriteLine(Loc.Get("engine.support_thanks_2"));
+        WriteRows(Loc.Get("engine.support_thanks_2"));
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -8229,49 +8212,49 @@ public partial class GameEngine
         terminal.SetColor("bright_white");
         terminal.Write("  Shurato's Heavenly Sphere      ");
         terminal.SetColor("gray");
-        terminal.Write("EleBBS      ");
+        terminal.Write("EleBBS     ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("shsbbs.net");
 
         terminal.SetColor("bright_white");
         terminal.Write("  The X-BIT BBS                  ");
         terminal.SetColor("gray");
-        terminal.Write("Synchronet  ");
+        terminal.Write("Synchronet ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("x-bit.org:23 / ssh -p 22222");
 
         terminal.SetColor("bright_white");
         terminal.Write("  The UNIX-BIT BBS               ");
         terminal.SetColor("gray");
-        terminal.Write("Synchronet  ");
+        terminal.Write("Synchronet ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("x-bit.org:1336 / ssh -p 1337");
 
         terminal.SetColor("bright_white");
         terminal.Write("  Lunatics Unleashed             ");
         terminal.SetColor("gray");
-        terminal.Write("Mystic      ");
+        terminal.Write("Mystic     ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("lunaticsunleashed.ddns.net:2333");
 
         terminal.SetColor("bright_white");
         terminal.Write("  A-Net Online                   ");
         terminal.SetColor("gray");
-        terminal.Write("Synchronet  ");
+        terminal.Write("Synchronet ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("bbs.a-net.online:1337 / ssh -p 1338");
 
         terminal.SetColor("bright_white");
         terminal.Write("  Nite Eyes BBS                  ");
         terminal.SetColor("gray");
-        terminal.Write("Mystic      ");
+        terminal.Write("Mystic     ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("bbs.lizardmaster.com");
 
         terminal.SetColor("bright_white");
         terminal.Write("  Looney Bin BBS                 ");
         terminal.SetColor("gray");
-        terminal.Write("-           ");
+        terminal.Write("-          ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("looneybinbbs.com:2023");
 
@@ -8294,7 +8277,7 @@ public partial class GameEngine
         terminal.WriteLine("    https://github.com/binary-knight/usurper-reborn");
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.bbs_include_info"));
+        WriteRows(Loc.Get("engine.bbs_include_info"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8466,14 +8449,14 @@ public partial class GameEngine
         terminal.WriteLine($"                           {Loc.Get("engine.story_golden_age")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_golden_1"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_2"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_3"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_4"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_5"));
+        WriteRows(Loc.Get("engine.story_golden_1"));
+        WriteRows(Loc.Get("engine.story_golden_2"));
+        WriteRows(Loc.Get("engine.story_golden_3"));
+        WriteRows(Loc.Get("engine.story_golden_4"));
+        WriteRows(Loc.Get("engine.story_golden_5"));
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.story_golden_6"));
+        WriteRows(Loc.Get("engine.story_golden_6"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8500,18 +8483,18 @@ public partial class GameEngine
         terminal.WriteLine($"                            {Loc.Get("engine.story_sundering")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_sundering_1"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_2"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_3"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_4"));
+        WriteRows(Loc.Get("engine.story_sundering_1"));
+        WriteRows(Loc.Get("engine.story_sundering_2"));
+        WriteRows(Loc.Get("engine.story_sundering_3"));
+        WriteRows(Loc.Get("engine.story_sundering_4"));
         terminal.WriteLine("");
         terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("engine.story_sundering_5"));
+        WriteRows(Loc.Get("engine.story_sundering_5"));
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_sundering_6"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_7"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_8"));
+        WriteRows(Loc.Get("engine.story_sundering_6"));
+        WriteRows(Loc.Get("engine.story_sundering_7"));
+        WriteRows(Loc.Get("engine.story_sundering_8"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8538,21 +8521,21 @@ public partial class GameEngine
         terminal.WriteLine($"                          {Loc.Get("engine.story_avarice")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_1"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_2"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_3"));
+        WriteRows(Loc.Get("engine.story_avarice_1"));
+        WriteRows(Loc.Get("engine.story_avarice_2"));
+        WriteRows(Loc.Get("engine.story_avarice_3"));
         terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_4"));
+        WriteRows(Loc.Get("engine.story_avarice_4"));
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_5"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_6"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_7"));
+        WriteRows(Loc.Get("engine.story_avarice_5"));
+        WriteRows(Loc.Get("engine.story_avarice_6"));
+        WriteRows(Loc.Get("engine.story_avarice_7"));
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_8"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_9"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_10"));
+        WriteRows(Loc.Get("engine.story_avarice_8"));
+        WriteRows(Loc.Get("engine.story_avarice_9"));
+        WriteRows(Loc.Get("engine.story_avarice_10"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8579,23 +8562,23 @@ public partial class GameEngine
         terminal.WriteLine($"                          {Loc.Get("engine.story_begins")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_begins_1"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_2"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_3"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_4"));
+        WriteRows(Loc.Get("engine.story_begins_1"));
+        WriteRows(Loc.Get("engine.story_begins_2"));
+        WriteRows(Loc.Get("engine.story_begins_3"));
+        WriteRows(Loc.Get("engine.story_begins_4"));
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("engine.story_begins_5"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_6"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_7"));
+        WriteRows(Loc.Get("engine.story_begins_5"));
+        WriteRows(Loc.Get("engine.story_begins_6"));
+        WriteRows(Loc.Get("engine.story_begins_7"));
         terminal.WriteLine("");
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine(Loc.Get("engine.story_begins_8"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_9"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_10"));
+        WriteRows(Loc.Get("engine.story_begins_8"));
+        WriteRows(Loc.Get("engine.story_begins_9"));
+        WriteRows(Loc.Get("engine.story_begins_10"));
         terminal.WriteLine("");
         terminal.SetColor("bright_white");
-        terminal.WriteLine(Loc.Get("engine.story_begins_11"));
+        WriteRows(Loc.Get("engine.story_begins_11"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8603,22 +8586,154 @@ public partial class GameEngine
         await terminal.WaitForKey();
     }
     
-    private async Task ShowInfoScreen(string title, string content)
+    /// <summary>
+    /// v1.2.5: a main menu section rule ("  ── PLAY ───..."), the localized title of `key` filled with
+    /// rule glyphs to 75 columns, as the English literal was.
+    /// </summary>
+    internal static string SectionRule(string key)
     {
-        terminal.ClearScreen();
-        terminal.SetColor("bright_cyan");
-        terminal.WriteLine(title);
-        if (!GameConfig.ScreenReaderMode)
+        string t = Loc.Get(key);
+        return t + new string('─', Math.Max(3, 75 - t.Length));
+    }
+
+    /// <summary>
+    /// v1.2.5: the save type of a listed save in the player's language. FileSaveBackend fills SaveInfo.SaveType
+    /// with English words that are only shown, never compared or written to disk; SqlSaveBackend fills it
+    /// already localized (save.type_online), which passes through like any other value.
+    /// </summary>
+    internal static string SaveTypeLabel(string? saveType) => saveType switch
+    {
+        "Manual Save" => Loc.Get("engine.save_type_manual"),
+        "Autosave" => Loc.Get("engine.save_type_autosave"),
+        "Backup" => Loc.Get("engine.save_type_backup"),
+        "Emergency" => Loc.Get("engine.save_type_emergency"),
+        "Recovery" => Loc.Get("engine.save_type_recovery"),
+        _ => saveType ?? ""
+    };
+
+    /// <summary>
+    /// v1.2.5: one save of the save list as coloured pieces ("\n" ends a row): "[n] name (class) - Level x |
+    /// type | time" on one row when it fits in 79 columns, else the type and time on a second row under the
+    /// name. A 30 character name with a long class name made the one row about 98 columns wide.
+    /// </summary>
+    internal static List<(string Text, string Color)> SaveListRow(int number, string name, string tagOrClass, string tagColor,
+        string level, string saveType, bool autosave, string time)
+    {
+        var row = new List<(string, string)>
         {
-            terminal.SetColor("cyan");
-            terminal.WriteLine(new string('═', title.Length));
+            ("[", "darkgray"), (number.ToString(), "bright_cyan"), ("] ", "darkgray"), (name, "white"),
+            (tagOrClass, tagColor), (level, "gray")
+        };
+        int head = 1 + number.ToString().Length + 2 + name.Length + tagOrClass.Length + level.Length;
+        if (head + 3 + saveType.Length + 3 + time.Length <= UsurperRemake.UI.UIHelper.WrapWidth)
+            row.Add((" | ", "darkgray"));
+        else
+        {
+            row.Add(("\n", ""));
+            row.Add((new string(' ', 3 + number.ToString().Length), "gray"));
         }
-        terminal.WriteLine("");
+        row.Add((saveType, autosave ? "yellow" : "green"));
+        row.Add((" | ", "darkgray"));
+        row.Add((time, "gray"));
+        return row;
+    }
+
+    /// <summary>
+    /// v1.2.5: a line word wrapped at 79 columns, later rows indented like the first, for text with a
+    /// part of unknown length (an error message from the save backend, a quest title).
+    /// </summary>
+    internal static List<string> WrapRows(string text)
+    {
+        int indent = 0;
+        while (indent < text.Length && text[indent] == ' ') indent++;
+        if (UsurperRemake.UI.UIHelper.VisibleLength(text) <= UsurperRemake.UI.UIHelper.WrapWidth)
+            return new List<string> { text };
+        string pad = new string(' ', indent);
+        return UsurperRemake.UI.UIHelper.WordWrap(text.Substring(indent), UsurperRemake.UI.UIHelper.WrapWidth - indent)
+            .Select(r => pad + r).ToList();
+    }
+
+    private void WriteRows(string text, string color)
+    {
+        foreach (var row in WrapRows(text))
+            terminal.WriteLine(row, color);
+    }
+
+    /// <summary>
+    /// v1.2.5: a yellow label and its white text on one row when they fit in 79 columns, else the text on the
+    /// rows under the label, four columns in.
+    /// </summary>
+    private void WriteLabelled(string label, string text)
+    {
+        terminal.SetColor("bright_yellow");
+        if (label.Length + text.Length <= UsurperRemake.UI.UIHelper.WrapWidth)
+        {
+            terminal.Write(label);
+            terminal.SetColor("white");
+            terminal.WriteLine(text);
+            return;
+        }
+        terminal.WriteLine(label);
         terminal.SetColor("white");
-        terminal.WriteLine(content);
-        terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("ui.press_enter"));
-        await terminal.WaitForKey();
+        WriteRows("    " + text.TrimStart());
+    }
+
+    /// <summary>v1.2.5: WrapRows in the current colour.</summary>
+    private void WriteRows(string text)
+    {
+        foreach (var row in WrapRows(text))
+            terminal.WriteLine(row);
+    }
+
+    /// <summary>
+    /// v1.2.5: a connection type as shown in `lang`. The stored type ("Web", "SSH", "Local", "Unknown"...) stays
+    /// English in online_players and the session; "Local" and "Unknown" (or none) are shown translated, the
+    /// protocol names as they are.
+    /// </summary>
+    internal static string ConnectionLabel(string lang, string? connectionType) => connectionType switch
+    {
+        null or "" or "Unknown" => Loc.GetIn(lang, "combat.unknown_name"),
+        "Local" => Loc.GetIn(lang, "chat.via_local"),
+        _ => connectionType
+    };
+
+    /// <summary>v1.2.5: the attacker of a sleep attack log entry; a missing name is shown in the reader's language.</summary>
+    internal static string SleepAttackerName(JsonNode entry) =>
+        entry["attacker"]?.GetValue<string>() ?? Loc.Get("combat.unknown_name");
+
+    /// <summary>v1.2.5: the spectate request to the watched player, in that player's language.</summary>
+    internal static void NotifySpectateRequest(UsurperRemake.Server.PlayerSession target, string requester)
+    {
+        UsurperRemake.Server.MudServer.EnqueueNotice(target, "1;35",
+            lang => Loc.GetIn(lang, "engine.spectate_request", requester), "* ");
+        UsurperRemake.Server.MudServer.EnqueueNotice(target, "1;35",
+            lang => Loc.GetIn(lang, "engine.spectate_request_hint"), "* ");
+    }
+
+    /// <summary>v1.2.5: "X is now watching your session." to the watched player, in that player's language.</summary>
+    internal static void NotifySpectateStarted(UsurperRemake.Server.PlayerSession target, string watcher) =>
+        UsurperRemake.Server.MudServer.EnqueueNotice(target, "1;33",
+            lang => Loc.GetIn(lang, "engine.spectate_started", watcher), "* ");
+
+    /// <summary>v1.2.5: "X stopped watching your session." to the watched player, in that player's language.</summary>
+    internal static void NotifySpectateStopped(UsurperRemake.Server.PlayerSession target, string watcher) =>
+        UsurperRemake.Server.MudServer.EnqueueNotice(target, "1;33",
+            lang => Loc.GetIn(lang, "mud.stopped_watching", watcher), "* ");
+
+    /// <summary>
+    /// v1.2.5: an announcement to every other player in the game, built in each one's language and
+    /// word wrapped at 79 columns (MudServer.EnqueueNotice). The same players as BroadcastToAll: in the
+    /// game, not spectating, not a group follower.
+    /// </summary>
+    internal static void AnnounceToRealm(UsurperRemake.Server.MudServer server, string excludeKey, string ansi, Func<string, string> buildText)
+    {
+        foreach (var kvp in server.ActiveSessions)
+        {
+            if (kvp.Key == excludeKey.ToLowerInvariant()) continue;
+            var session = kvp.Value;
+            if (!session.IsInGame || session.IsSpectating || session.IsGroupFollower) continue;
+            UsurperRemake.Server.MudServer.EnqueueNotice(session, ansi, buildText);
+        }
     }
 
     // Placeholder initialization methods
