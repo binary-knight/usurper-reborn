@@ -121,14 +121,14 @@ public class ChallengeSystem
                 var pendingChallenger = NPCSpawnSystem.Instance?.GetNPCByName(_pendingChallenge.ChallengerName);
                 if (pendingChallenger != null && pendingChallenger.IsAlive && king.IsActive)
                 {
-                    NewsSystem.Instance?.Newsy(true, $"{pendingChallenger.Name} storms the castle to challenge {king.GetTitle()} {king.Name}!");
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_storms_castle", pendingChallenger.Name, king.TitleLabel(), king.Name));
                     ExecuteNPCThroneChallenge(pendingChallenger, king);
                 }
                 _pendingChallenge = null;
             }
             else
             {
-                NewsSystem.Instance?.Newsy(false, $"{_pendingChallenge.ChallengerName} prepares their forces... the challenge approaches!");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("challenge.news_prepares", _pendingChallenge.ChallengerName));
             }
             return; // Don't start new challenges while one is pending
         }
@@ -203,7 +203,7 @@ public class ChallengeSystem
                 TicksRemaining = GameConfig.NPCChallengeWarningTicks
             };
 
-            NewsSystem.Instance?.Newsy(true, $"THREAT: {npcChallenger.Name} (Level {npcChallenger.Level}) has declared intent to challenge for the throne!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_threat", npcChallenger.Name, npcChallenger.Level));
 
             // 1.2.5: no mail to the king for the threat (it came with every challenge); the news carries it,
             // and the outcome is mailed (ExecuteNPCThroneChallenge)
@@ -249,7 +249,7 @@ public class ChallengeSystem
             CityControlSystem.Instance.ForceLeaveTeam(challenger);
         }
 
-        NewsSystem.Instance?.Newsy(true, $"{challenger.Name} has challenged {king.GetTitle()} {king.Name} for the throne!");
+        NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_challenged", challenger.Name, king.TitleLabel(), king.Name));
         // GD.Print($"[Challenge] {challenger.Name} challenges for the throne!");
 
         // Check if there are any human guards who need to be notified
@@ -267,7 +267,7 @@ public class ChallengeSystem
                 TicksRemaining = 2  // Combat delayed for 2 ticks
             };
 
-            NewsSystem.Instance?.Newsy(true, $"URGENT: Royal Guards are being summoned to defend the throne!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_guards_summoned"));
             // GD.Print($"[Challenge] Defense event created - human guards will be notified");
             return;  // Don't process combat yet
         }
@@ -281,7 +281,7 @@ public class ChallengeSystem
             if (!king.ActiveDefenseEvent.IsExpired)
             {
                 // Still waiting for human guards
-                NewsSystem.Instance?.Newsy(false, $"{challenger.Name} awaits at the castle gates...");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("challenge.news_awaits", challenger.Name));
                 return;
             }
 
@@ -292,7 +292,7 @@ public class ChallengeSystem
                 if (!king.ActiveDefenseEvent.PlayerResponded)
                 {
                     losses.LoyaltyPenalties.Add((guard.Name, 15));
-                    NewsSystem.Instance?.Newsy(false, $"Guard {guard.Name}'s loyalty questioned for failing to defend the throne!");
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("challenge.news_guard_loyalty", guard.Name));
                 }
             }
 
@@ -354,7 +354,7 @@ public class ChallengeSystem
             if (monsterHP <= 0)
             {
                 losses.MonstersSlain.Add(monster.Name);
-                NewsSystem.Instance?.Newsy(true, $"{challenger.Name} slew the monster guard {monster.Name}!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_slew_monster", challenger.Name, monster.Name));
             }
             else if (monsterHP < monster.HP)
                 losses.MonsterWounds.Add((monster.Name, monster.HP - monsterHP));
@@ -362,7 +362,7 @@ public class ChallengeSystem
 
         if (challengerHP <= 0)
         {
-            NewsSystem.Instance?.Newsy(true, $"{challenger.Name} was defeated by the monster guards!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_lost_to_monsters", challenger.Name));
             return false;
         }
 
@@ -383,7 +383,7 @@ public class ChallengeSystem
             if (guard.Loyalty < 30 && random.Next(100) < 30)
             {
                 losses.GuardsLost.Add(guard.Name);
-                NewsSystem.Instance?.Newsy(true, $"Cowardly guard {guard.Name} fled instead of fighting!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_guard_fled", guard.Name));
                 continue;
             }
 
@@ -391,7 +391,7 @@ public class ChallengeSystem
             if (guard.Loyalty < 15 && random.Next(100) < 20)
             {
                 losses.GuardsLost.Add(guard.Name);
-                NewsSystem.Instance?.Newsy(true, $"BETRAYAL! Guard {guard.Name} has joined {challenger.Name}'s cause!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_guard_betrayal", guard.Name, challenger.Name));
                 challengerHP += 100;  // Boost from having an ally
                 continue;
             }
@@ -423,13 +423,13 @@ public class ChallengeSystem
             if (guardHP <= 0)
             {
                 losses.GuardsLost.Add(guard.Name);
-                NewsSystem.Instance?.Newsy(true, $"{challenger.Name} defeated guard {guard.Name}!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_defeated_guard", challenger.Name, guard.Name));
             }
         }
 
         if (challengerHP <= 0)
         {
-            NewsSystem.Instance?.Newsy(true, $"{challenger.Name} was defeated by the Royal Guards!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_lost_to_guards", challenger.Name));
             return false;
         }
 
@@ -506,13 +506,13 @@ public class ChallengeSystem
         if (kingHP <= 0)
         {
             NewsSystem.Instance?.Newsy(true,
-                $"{challenger.Name} has DEFEATED {king.GetTitle()} {king.Name} in combat!");
+                Loc.Get("challenge.news_king_defeated", challenger.Name, king.TitleLabel(), king.Name));
             return true;
         }
         else
         {
             NewsSystem.Instance?.Newsy(true,
-                $"{challenger.Name} was defeated by {king.GetTitle()} {king.Name}!");
+                Loc.Get("challenge.news_lost_to_king", challenger.Name, king.TitleLabel(), king.Name));
             return false;
         }
     }
@@ -574,7 +574,7 @@ public class ChallengeSystem
 
         var kingData = CastleLocation.GetCurrentKing() ?? template;
         NewsSystem.Instance?.Newsy(true,
-            $"ALL HAIL {kingData.GetTitle()} {newKing.Name}! A new monarch sits upon the throne!");
+            Loc.Get("challenge.news_new_monarch", kingData.TitleLabel(), newKing.Name));
 
         // GD.Print($"[Challenge] {newKing.Name} crowned as new {kingData.GetTitle()}");
     }
@@ -622,13 +622,13 @@ public class ChallengeSystem
                 heir.King = true;
 
                 NewsSystem.Instance?.Newsy(true,
-                    $"The designated heir {heir.Name} has claimed the throne! ALL HAIL {heirKingData.GetTitle()} {heir.Name}!");
+                    Loc.Get("challenge.news_heir_claims", heir.Name, heirKingData.TitleLabel(), heir.Name));
                 _lastDesignatedHeir = null;
                 return;
             }
             else
             {
-                NewsSystem.Instance?.Newsy(false, $"The designated heir {_lastDesignatedHeir} could not be found or is not eligible.");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("challenge.news_heir_missing", _lastDesignatedHeir));
             }
             _lastDesignatedHeir = null;
         }
@@ -680,7 +680,7 @@ public class ChallengeSystem
         newKing.King = true;
 
         NewsSystem.Instance?.Newsy(true,
-            $"{newKing.Name} has claimed the empty throne! ALL HAIL {kingData.GetTitle()} {newKing.Name}!");
+            Loc.Get("challenge.news_empty_throne", newKing.Name, kingData.TitleLabel(), newKing.Name));
 
         // GD.Print($"[Challenge] {newKing.Name} claimed empty throne");
     }
@@ -744,7 +744,7 @@ public class ChallengeSystem
         }
 
         NewsSystem.Instance?.Newsy(true,
-            $"'{challengerTeamName}' is challenging for city control!");
+            Loc.Get("challenge.news_city_challenge", challengerTeamName));
 
         // GD.Print($"[Challenge] Team '{challengerTeamName}' challenges for city control");
 
@@ -848,7 +848,7 @@ public class ChallengeSystem
             }).GetAwaiter().GetResult();
         }
 
-        NewsSystem.Instance?.Newsy(true, $"{npc.Name} was thrown in prison for {days} days!");
+        NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_imprisoned", npc.Name, days));
     }
 
     /// <summary>

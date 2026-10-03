@@ -40,7 +40,8 @@ public class PrisonActivitySystem
     }
 
     /// <summary>
-    /// Activity descriptions for display
+    /// Activity descriptions, the English source of the prison.activity_{id}_name, _desc and _effect keys.
+    /// v1.2.5: the screen shows them through ActivityName, ActivityDescription and ActivityEffect.
     /// </summary>
     public static readonly Dictionary<PrisonActivity, (string Name, string Description, string Effect)> ActivityInfo = new()
     {
@@ -53,6 +54,19 @@ public class PrisonActivitySystem
         { PrisonActivity.Planning, ("Planning", "Strategize your future moves", "+1-2 Charisma") },
         { PrisonActivity.Praying, ("Praying", "Seek divine guidance", "+10-20 Chivalry or Darkness") }
     };
+
+    /// <summary>v1.2.5: the Loc key id of an activity (pushups, shadow_boxing, ...).</summary>
+    internal static string ActivityKeyId(PrisonActivity activity) =>
+        activity == PrisonActivity.ShadowBoxing ? "shadow_boxing" : activity.ToString().ToLowerInvariant();
+
+    /// <summary>v1.2.5: an activity's name in the player's language.</summary>
+    public static string ActivityName(PrisonActivity activity) => Loc.Get($"prison.activity_{ActivityKeyId(activity)}_name");
+
+    /// <summary>v1.2.5: an activity's description in the player's language.</summary>
+    public static string ActivityDescription(PrisonActivity activity) => Loc.Get($"prison.activity_{ActivityKeyId(activity)}_desc");
+
+    /// <summary>v1.2.5: an activity's effect in the player's language.</summary>
+    public static string ActivityEffect(PrisonActivity activity) => Loc.Get($"prison.activity_{ActivityKeyId(activity)}_effect");
 
     /// <summary>
     /// Perform a prison activity for a character
@@ -301,7 +315,7 @@ public class PrisonActivitySystem
                     if (CastleLocation.GetCurrentKing()?.Prisoners.ContainsKey(prisonerName) == true)
                         CastleLocation.CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == prisonerName) > 0)
                             .GetAwaiter().GetResult();
-                    NewsSystem.Instance?.Newsy(true, $"{prisoner.Name} has been released from prison.");
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("prison.news_released", prisoner.Name));
                 }
             }
         }

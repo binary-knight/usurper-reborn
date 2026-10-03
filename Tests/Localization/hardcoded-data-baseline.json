@@ -244,13 +244,10 @@
   },
   "Scripts/Core/King.cs": {
     "data": {
-      "count": 21,
+      "count": 17,
       "sites": [
-        "0914d79e96",
         "0aaffbe643",
-        "0b72c4f608",
         "0beed1fdf2",
-        "2db938c64b",
         "3feb69d4ef",
         "59784cb7ea",
         "5a67b5afaf",
@@ -263,7 +260,6 @@
         "bac6ba58f7",
         "ca18507100",
         "ce7c1f963e",
-        "e2f4a99d6a",
         "fb71618f53",
         "fc7b19af26",
         "fe8d5f7764"
@@ -1972,43 +1968,6 @@
       ]
     }
   },
-  "Scripts/Locations/HomeLocation.cs": {
-    "data": {
-      "count": 5,
-      "sites": [
-        "091f7513ae",
-        "1484a73975",
-        "375eaec2f1",
-        "724fb797f7",
-        "e5929adfd6"
-      ]
-    },
-    "electron": {
-      "count": 20,
-      "sites": [
-        "3f9c792958",
-        "455e1f9728",
-        "483edcd8b2",
-        "4bf35f1a42",
-        "654afa2df3",
-        "680099b072",
-        "6a8b634217",
-        "779a25fabd",
-        "847b65716a",
-        "93c2fdc827",
-        "a260d217a9",
-        "a5216a5cf2",
-        "b0db98c9df",
-        "c0cbedf35f",
-        "d7fe37af38",
-        "dab832dfbe",
-        "db3742bbcf",
-        "dc44341b8b",
-        "eb8316f6ae",
-        "ee9c51d8ec"
-      ]
-    }
-  },
   "Scripts/Locations/LevelMasterLocation.cs": {
     "data": {
       "count": 5,
@@ -2053,45 +2012,6 @@
       "count": 1,
       "sites": [
         "3cbf5aa8eb"
-      ]
-    }
-  },
-  "Scripts/Locations/PrisonLocation.cs": {
-    "electron": {
-      "count": 9,
-      "sites": [
-        "79f33db6a1",
-        "7e5ab9ac5c",
-        "85547ebb94",
-        "8a556df5e7",
-        "8faaa23f94",
-        "b51303ff38",
-        "db3742bbcf",
-        "ef783c61bc",
-        "f46b72ed2e"
-      ]
-    }
-  },
-  "Scripts/Locations/PrisonWalkLocation.cs": {
-    "data": {
-      "count": 8,
-      "sites": [
-        "0701c95f9e",
-        "0e43a1602a",
-        "27be7824a2",
-        "3487f8fb23",
-        "869a60976c",
-        "a304711d3c",
-        "b1f4d6d30c",
-        "ea3466acca"
-      ]
-    },
-    "electron": {
-      "count": 3,
-      "sites": [
-        "3eb1f0bad4",
-        "5137465139",
-        "db3742bbcf"
       ]
     }
   },
@@ -4245,37 +4165,6 @@
         "efac2bf174",
         "f3dff013b2",
         "fe22dd472c"
-      ]
-    }
-  },
-  "Scripts/Systems/PrisonActivitySystem.cs": {
-    "data": {
-      "count": 24,
-      "sites": [
-        "08b11f1560",
-        "11ac003fac",
-        "146f01451c",
-        "19d8625937",
-        "1b1b94bbdc",
-        "1eba5c3286",
-        "206132eea6",
-        "2109d2f9e0",
-        "298d1d85f2",
-        "34875e0fb8",
-        "4d7e763e91",
-        "550b021b97",
-        "6ff5abaa39",
-        "7797e4fa0e",
-        "7bba567507",
-        "8081be88f9",
-        "9099c15cae",
-        "a666a7ffc1",
-        "ab291c3a31",
-        "be2c581855",
-        "cd1ffb0b12",
-        "d185d1c8b6",
-        "f3ea57fd74",
-        "ff0f607463"
       ]
     }
   },

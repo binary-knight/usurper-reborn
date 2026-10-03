@@ -190,89 +190,12 @@
       "6bbf0c7b29"
     ]
   },
-  "Scripts/Locations/HomeLocation.cs": {
-    "count": 6,
-    "sites": [
-      "266885b56f",
-      "3a6ab55ed1",
-      "9954a51f30",
-      "a734c65542",
-      "bdf8d976c3",
-      "de6a6210e3"
-    ]
-  },
   "Scripts/Locations/LevelMasterLocation.cs": {
     "count": 3,
     "sites": [
       "57cc72fd49",
       "78263889b7",
       "ab8325d32a"
-    ]
-  },
-  "Scripts/Locations/PrisonLocation.cs": {
-    "count": 54,
-    "sites": [
-      "0286997257",
-      "08c54dbc0b",
-      "11e81208ee",
-      "1658c715d8",
-      "223b8e9e11",
-      "2274c2dc22",
-      "2274c2dc22",
-      "27544f2be8",
-      "2b3a1f45e5",
-      "2e1729ed52",
-      "315cce7080",
-      "315cce7080",
-      "3662b404be",
-      "37699f266a",
-      "4adb9a03d0",
-      "4cd27a22aa",
-      "4f35020acb",
-      "5e94b0fbb8",
-      "6828268642",
-      "6b9bd3c14e",
-      "7d0c2810da",
-      "7d4fecb0b5",
-      "83c16e505a",
-      "8ecb61eaff",
-      "904601cd97",
-      "906ef0e68e",
-      "92f1876a8f",
-      "95911b6cc3",
-      "992ddd6b44",
-      "9b54fd54ba",
-      "9c9f82af29",
-      "a089aa23ce",
-      "a161a6fdd7",
-      "a3df2d795b",
-      "affd68aa05",
-      "b01deb07d3",
-      "b31d4a6f19",
-      "bcc9835b00",
-      "bff0ad119a",
-      "c0e0322365",
-      "c4fcdc8c05",
-      "cbcd2568cc",
-      "d477814149",
-      "d5ad60cf93",
-      "d6c1d22557",
-      "d7425a00a4",
-      "df794d7e6a",
-      "eea3fa5c43",
-      "f00b0e5970",
-      "f1ddf30d54",
-      "f2d6773562",
-      "f367d4b5cd",
-      "f70930f9b7",
-      "ffbd32e93f"
-    ]
-  },
-  "Scripts/Locations/PrisonWalkLocation.cs": {
-    "count": 2,
-    "sites": [
-      "0e23a77110",
-      "33305229b4"
     ]
   },
   "Scripts/Server/GroupSystem.cs": {
@@ -460,48 +383,12 @@
       "8f762aac57"
     ]
   },
-  "Scripts/Systems/ChallengeSystem.cs": {
-    "count": 21,
-    "sites": [
-      "024bf8d6aa",
-      "05a732abce",
-      "1603b0f584",
-      "2b61e21373",
-      "2e6baab384",
-      "2fb8978825",
-      "4b212182cb",
-      "57bb1a7875",
-      "5c2645ad23",
-      "5de914628b",
-      "65c7436032",
-      "6a51ff1264",
-      "8ec6f31707",
-      "a15ab51678",
-      "aacd23e229",
-      "c324ec2551",
-      "c4ba0a4840",
-      "cb9695bc3b",
-      "e17410581f",
-      "e3e80bbb7f",
-      "ef45e34bf0"
-    ]
-  },
   "Scripts/Systems/CharacterCreationSystem.cs": {
     "count": 3,
     "sites": [
       "27bd32b23a",
       "b298bc4cf5",
       "ca84238a9b"
-    ]
-  },
-  "Scripts/Systems/CityControlSystem.cs": {
-    "count": 5,
-    "sites": [
-      "6fba754fa5",
-      "9c88bf304e",
-      "b74769e520",
-      "bbf14670ae",
-      "eb7881435d"
     ]
   },
   "Scripts/Systems/CompanionSystem.cs": {
@@ -678,33 +565,6 @@
       "cd4152bafb"
     ]
   },
-  "Scripts/Systems/NPCPetitionSystem.cs": {
-    "count": 22,
-    "sites": [
-      "02ce131898",
-      "08dfaf006e",
-      "09cbc563e6",
-      "0f0a990755",
-      "110ca488bd",
-      "2fd20447b0",
-      "37cb0bd47c",
-      "4731e30db4",
-      "64e6d321aa",
-      "6b3bcf4d44",
-      "731e89d94d",
-      "8203f159f3",
-      "84d16066f8",
-      "89de379507",
-      "96161ff90e",
-      "a1550ff655",
-      "a30daacf46",
-      "a9e7b15bf2",
-      "aacb7cfcba",
-      "ad38c9c4d5",
-      "bb8fb89262",
-      "ffda74c0ef"
-    ]
-  },
   "Scripts/Systems/NewsSystem.cs": {
     "count": 13,
     "sites": [
@@ -751,12 +611,6 @@
     "count": 1,
     "sites": [
       "828f0d32e7"
-    ]
-  },
-  "Scripts/Systems/PrisonActivitySystem.cs": {
-    "count": 1,
-    "sites": [
-      "4f3ab4c0e8"
     ]
   },
   "Scripts/Systems/QuestSystem.cs": {
