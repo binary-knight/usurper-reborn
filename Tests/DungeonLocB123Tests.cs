@@ -688,7 +688,11 @@ public class DungeonLocB123Tests
             "ui.feet", "ui.cloak", "ui.waist", "ui.neck", "dungeon.slot_l_ring", "dungeon.slot_r_ring" }.Select(k => L(lang, k)).ToList();
         int width = Math.Max(10, slotNames.Max(n => n.Length) + 1);
         if (lang == "es") width.Should().BeGreaterThan(10, "a Spanish slot name runs past ten columns");
-        text.Should().Contain("    " + L(lang, "inn.equip_slot_weapon").PadRight(width) + longest.Name);
+        // v1.2.5: the item shows in the reader's language (ItemNames), its stored name stays English
+        string shown = Loc.GetIn(lang, LootGenerator.TemplateLocKey(longest.Name));
+        if (lang != "en") shown.Should().NotBe(longest.Name);
+        text.Should().Contain("    " + L(lang, "inn.equip_slot_weapon").PadRight(width) + shown);
+        text.Should().Contain("    1. " + shown);
         if (lang == "en") text.Should().Contain("    Weapon    " + longest.Name, "the English column is ten wide as before");
         if (lang == "hu") text.Should().NotContain("Equipped:").And.NotContain("Backpack:").And.NotContain("L.Ring").And.NotContain("HP Potions");
         EveryRowFits(text, "follower inventory");
@@ -698,8 +702,8 @@ public class DungeonLocB123Tests
             "    " + L(lang, "dungeon.follower_nothing_equipped"),
             "  " + L(lang, "inventory.backpack_empty"),
             "  " + L(lang, "inventory.cannot_equip", "You need level 100 to use this."),
-            "  " + L(lang, "dungeon.follower_cannot_be_equipped", longest.Name),
-            "  " + L(lang, "dungeon.follower_unequipped", longest.Name),
+            "  " + L(lang, "dungeon.follower_cannot_be_equipped", shown),
+            "  " + L(lang, "dungeon.follower_unequipped", shown),
             "  " + L(lang, "dungeon.follower_cannot_unequip"),
         };
         EveryRowFits(string.Join("\n", other), "follower inventory messages");

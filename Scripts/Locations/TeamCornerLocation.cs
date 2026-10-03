@@ -3240,7 +3240,7 @@ public class TeamCornerLocation : BaseLocation
             if (currentItem != null)
             {
                 terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-                terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("ui.unidentified"));
+                terminal.Write(currentItem.IsIdentified ? ItemNames.Display(currentItem) : Loc.Get("ui.unidentified"));
                 if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
                 terminal.WriteLine("");
             }
@@ -3299,7 +3299,7 @@ public class TeamCornerLocation : BaseLocation
             if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))   // v1.1.13: the listed instance
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", ItemNames.Display(selectedItem)));
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -3337,7 +3337,7 @@ public class TeamCornerLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("team.equipped_success", target.DisplayName, selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equipped_success", target.DisplayName, ItemNames.Display(selectedItem)));
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
@@ -3398,7 +3398,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"[{slot.GetDisplayName(),-12}] ");
             terminal.SetColor("white");
-            terminal.Write($"{item.Name}");
+            terminal.Write($"{ItemNames.Display(item)}");
             if (item.IsCursed)
             {
                 terminal.SetColor("red");
@@ -3427,7 +3427,7 @@ public class TeamCornerLocation : BaseLocation
         if (selectedItem.IsCursed)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.cursed_cannot_remove", selectedItem.Name));
+            terminal.WriteLine(Loc.Get("team.cursed_cannot_remove", ItemNames.Display(selectedItem)));
             await Pacing.Wait(2000);
             return;
         }
@@ -3446,7 +3446,7 @@ public class TeamCornerLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("team.took_item", unequipped.Name, target.DisplayName));
+            terminal.WriteLine(Loc.Get("team.took_item", ItemNames.Display(unequipped), target.DisplayName));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.item_added_inventory"));
         }
@@ -3500,7 +3500,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 if (item.IsCursed)
                 {
-                    cursedItems.Add(item.Name);
+                    cursedItems.Add(ItemNames.Display(item));
                     continue;
                 }
                 if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first

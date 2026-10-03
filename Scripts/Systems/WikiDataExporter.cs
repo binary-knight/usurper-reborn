@@ -112,7 +112,7 @@ public static class WikiDataExporter
     private static object Items() => EquipmentDatabase.GetBuiltInTemplates().Select(item => new
     {
         id = item.Id,
-        name = Names(null, item.Name),
+        name = Names(ItemNames.KeyOf(item.Name), item.Name),   // v1.2.5: each language its own name; en is the stored name
         description = item.Description,
         slot = item.Slot,
         handedness = item.Handedness,

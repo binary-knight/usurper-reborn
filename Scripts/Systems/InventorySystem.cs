@@ -117,7 +117,7 @@ namespace UsurperRemake.Systems
                 return new
                 {
                     slot = s.ToString(),
-                    name = item.IsIdentified ? item.Name : "???",
+                    name = item.IsIdentified ? ItemNames.Display(item) : "???",
                     attack = item.WeaponPower,
                     defense = item.ArmorClass,
                     rarity = item.Rarity.ToString().ToLower(),
@@ -127,7 +127,7 @@ namespace UsurperRemake.Systems
 
             var backpack = player.Inventory?.Select(item => new
             {
-                name = item.Name,
+                name = ItemNames.Display(item),
                 type = item.Type.ToString(),
                 attack = item.Attack,
                 defense = item.Armor,
@@ -225,7 +225,7 @@ namespace UsurperRemake.Systems
                                         ElectronBridge.Emit("inventory_slot_pick", new
                                         {
                                             itemIndex = idx,
-                                            itemName = item.Name,
+                                            itemName = ItemNames.Display(item),
                                             options
                                         });
                                         continue; // Wait for next input (EQUIP:idx:SlotName)
@@ -245,12 +245,12 @@ namespace UsurperRemake.Systems
                                         if (removeIdx >= 0)
                                             player.Inventory.RemoveAt(removeIdx);
                                         player.RecalculateStats();
-                                        resultMessage = Loc.Get("inventory.equipped_item", item.Name) + (equipMsg != "" ? $" ({equipMsg})" : "");
+                                        resultMessage = Loc.Get("inventory.equipped_item", ItemNames.Display(item)) + (equipMsg != "" ? $" ({equipMsg})" : "");
                                         resultType = "success";
                                     }
                                     else
                                     {
-                                        resultMessage = equipMsg != "" ? equipMsg : Loc.Get("inventory.cannot_equip", item.Name); // v1.1.1: template has {0}
+                                        resultMessage = equipMsg != "" ? equipMsg : Loc.Get("inventory.cannot_equip", ItemNames.Display(item)); // v1.1.1: template has {0}
                                         resultType = "error";
                                     }
                                 }
@@ -292,7 +292,7 @@ namespace UsurperRemake.Systems
                                     var legacyItem = player.ConvertEquipmentToLegacyItem(unequipped);
                                     player.Inventory.Add(legacyItem);
                                     player.RecalculateStats();
-                                    resultMessage = Loc.Get("inventory.unequipped_item", unequipped.Name);
+                                    resultMessage = Loc.Get("inventory.unequipped_item", ItemNames.Display(unequipped));
                                     resultType = "success";
                                 }
                                 else
@@ -318,7 +318,7 @@ namespace UsurperRemake.Systems
                             else
                             {
                                 player.Inventory.RemoveAt(idx);
-                                resultMessage = Loc.Get("inventory.dropped_item", item.Name);
+                                resultMessage = Loc.Get("inventory.dropped_item", ItemNames.Display(item));
                                 resultType = "success";
                             }
                         }
@@ -567,7 +567,7 @@ namespace UsurperRemake.Systems
                         _ => "white"
                     };
                     terminal.SetColor(itemColor);
-                    terminal.Write(item.Name);
+                    terminal.Write(ItemNames.Display(item));
                     if (item.IsCursed)
                     {
                         // v1.1.12: cursed items are tagged in the backpack list.
@@ -651,7 +651,7 @@ namespace UsurperRemake.Systems
             {
                 // Color based on rarity
                 terminal.SetColor(GetRarityColor(item.Rarity));
-                terminal.Write(item.Name);
+                terminal.Write(ItemNames.Display(item));
 
                 // Show key stats
                 terminal.SetColor("gray");
@@ -921,7 +921,7 @@ namespace UsurperRemake.Systems
             if (item.IsIdentified)
             {
                 terminal.SetColor("yellow");
-                terminal.Write($"  {item.Name}");
+                terminal.Write($"  {ItemNames.Display(item)}");
                 if (item.IsCursed)
                 {
                     // v1.1.12: and in the item view.
@@ -1006,14 +1006,14 @@ namespace UsurperRemake.Systems
                     if (item.IsCursed)
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", item.Name));
+                        terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", ItemNames.Display(item)));
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"));
                         await Pacing.Wait(2000);
                     }
                     else
                     {
-                        string dropName = item.IsIdentified ? item.Name : LootGenerator.GetUnidentifiedName(item);
+                        string dropName = item.IsIdentified ? ItemNames.Display(item) : LootGenerator.GetUnidentifiedName(item);
                         player.Inventory.Remove(item);
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("inventory.dropped_item", dropName));
@@ -1169,7 +1169,7 @@ namespace UsurperRemake.Systems
                 terminal.SetColor("white");
                 terminal.WriteLine($"  {Loc.Get("inventory.comparison")} ({slotDisplayName}):");
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  {Loc.Get("inventory.currently_equipped")}{currentEquip.Name}");
+                terminal.WriteLine($"  {Loc.Get("inventory.currently_equipped")}{ItemNames.Display(currentEquip)}");
 
                 // Compare primary stat
                 if (item.Type == ObjType.Weapon)
@@ -1293,7 +1293,7 @@ namespace UsurperRemake.Systems
                 player.Inventory.RemoveAt(itemIndex);
 
                 terminal.SetColor("green");
-                terminal.WriteLine(Loc.Get("inventory.equipped", item.Name));
+                terminal.WriteLine(Loc.Get("inventory.equipped", ItemNames.Display(item)));
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("gray");
@@ -1385,7 +1385,7 @@ namespace UsurperRemake.Systems
             if (mainHandItem != null)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(mainHandItem.Name);
+                terminal.WriteLine(ItemNames.Display(mainHandItem));
             }
             else
             {
@@ -1398,7 +1398,7 @@ namespace UsurperRemake.Systems
             if (offHandItem != null)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(offHandItem.Name);
+                terminal.WriteLine(ItemNames.Display(offHandItem));
             }
             else
             {
@@ -1450,13 +1450,13 @@ namespace UsurperRemake.Systems
                     var item = player.Inventory[index - 1];
                     if (item.IsCursed)
                     {
-                        terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", item.Name), "red");
+                        terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", ItemNames.Display(item)), "red");
                         terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"), "gray");
                         await Pacing.Wait(2000);
                         return;
                     }
                     player.Inventory.RemoveAt(index - 1);
-                    terminal.WriteLine(Loc.Get("inventory.dropped_item", item.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("inventory.dropped_item", ItemNames.Display(item)), "yellow");
                     await Pacing.Wait(1000);
                 }
                 else
@@ -1479,7 +1479,7 @@ namespace UsurperRemake.Systems
             if (currentItem.IsCursed)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("inventory.cursed_cant_unequip", currentItem.Name));
+                terminal.WriteLine(Loc.Get("inventory.cursed_cant_unequip", ItemNames.Display(currentItem)));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"));
                 await Pacing.Wait(2000);
@@ -1498,7 +1498,7 @@ namespace UsurperRemake.Systems
                 player.RecalculateStats();
 
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("inventory.unequipped", unequipped.Name));
+                terminal.WriteLine(Loc.Get("inventory.unequipped", ItemNames.Display(unequipped)));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("inventory.returned_backpack"));
                 await Pacing.Wait(1500);
@@ -1571,7 +1571,7 @@ namespace UsurperRemake.Systems
             if (currentItem != null)
             {
                 terminal.SetColor(GetRarityColor(currentItem.Rarity));
-                terminal.WriteLine(currentItem.Name);
+                terminal.WriteLine(ItemNames.Display(currentItem));
                 DisplayItemDetails(currentItem);
             }
             else

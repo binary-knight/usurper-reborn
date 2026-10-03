@@ -560,7 +560,7 @@ public partial class MagicShopLocation : BaseLocation
 
                 DisplayMessage(Loc.Get("magic_shop.identify_ritual", _ownerName), "gray");
                 DisplayMessage("");
-                DisplayMessage(Loc.Get("magic_shop.identify_result", item.Name), "bright_green");
+                DisplayMessage(Loc.Get("magic_shop.identify_result", ItemNames.Display(item)), "bright_green");
                 DisplayMessage("");
 
                 // Show full item details
@@ -572,7 +572,7 @@ public partial class MagicShopLocation : BaseLocation
     private void DisplayItemDetails(Item item)
     {
         WriteSectionHeader(Loc.Get("magic_shop.item_properties"), "cyan");
-        DisplayMessage($"{Loc.Get("ui.name_label")}: {item.Name}", "white");
+        DisplayMessage($"{Loc.Get("ui.name_label")}: {ItemNames.Display(item)}", "white");
         DisplayMessage($"{Loc.Get("ui.value_label")}: {item.Value:N0} {Loc.Get("shop.gold_crowns")}", "yellow");
         
         if (item.Strength != 0) DisplayMessage($"{Loc.Get("ui.stat_strength")}: {(item.Strength > 0 ? "+" : "")}{item.Strength}", "green");
@@ -603,7 +603,7 @@ public partial class MagicShopLocation : BaseLocation
         // Restrictions
         if (item.OnlyForGood) DisplayMessage(Loc.Get("shop.alignment_good_only"), "blue");
         if (item.OnlyForEvil) DisplayMessage(Loc.Get("shop.alignment_evil_only"), "red");
-        if (item.IsCursed) DisplayMessage(Loc.Get("shop.cursed_warning", item.Name), "darkred");
+        if (item.IsCursed) DisplayMessage(Loc.Get("shop.cursed_warning", ItemNames.Display(item)), "darkred");
     }
     
     private void BuyHealingPotions(Character player)
@@ -769,7 +769,7 @@ public partial class MagicShopLocation : BaseLocation
                 var item = cursedItems[i];
                 long removalCost = CalculateCurseRemovalCost(item, player);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage(Loc.Get("magic_shop.cursed_item_entry", $"{displayNum}", item.Name, $"{listedTotal:N0}"), "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_item_entry", $"{displayNum}", ItemNames.Display(item), $"{listedTotal:N0}"), "red");
                 DisplayCurseDetails(item);
             }
         }
@@ -785,7 +785,7 @@ public partial class MagicShopLocation : BaseLocation
                 var (slot, equip) = cursedPlayerGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage(Loc.Get("magic_shop.cursed_worn_entry", $"{displayNum}", equip.Name, slot.GetDisplayName(), $"{listedTotal:N0}"), "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_worn_entry", $"{displayNum}", ItemNames.Display(equip), slot.GetDisplayName(), $"{listedTotal:N0}"), "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -801,7 +801,7 @@ public partial class MagicShopLocation : BaseLocation
                 var (ownerName, slot, equip) = cursedTeamGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage(Loc.Get("magic_shop.cursed_team_entry", $"{displayNum}", equip.Name, ownerName, slot.GetDisplayName(), $"{listedTotal:N0}"), "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_team_entry", $"{displayNum}", ItemNames.Display(equip), ownerName, slot.GetDisplayName(), $"{listedTotal:N0}"), "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -857,14 +857,14 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm", targetItem.Name, $"{curseTotalWithTax:N0}")))
+        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm", ItemNames.Display(targetItem), $"{curseTotalWithTax:N0}")))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
 
             // Dramatic curse removal scene
             DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.curse_scene_1", _ownerName, targetItem.Name), "gray");
+            DisplayMessage(Loc.Get("magic_shop.curse_scene_1", _ownerName, ItemNames.Display(targetItem)), "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_2"), "gray");
             await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_3"), "magenta");
@@ -924,7 +924,7 @@ public partial class MagicShopLocation : BaseLocation
             if (targetItem.MagicProperties.MagicResistance < 0)
                 targetItem.MagicProperties.MagicResistance = Math.Abs(targetItem.MagicProperties.MagicResistance) / 2;
 
-            DisplayMessage(Loc.Get("magic_shop.curse_success", targetItem.Name), "bright_green");
+            DisplayMessage(Loc.Get("magic_shop.curse_success", ItemNames.Display(targetItem)), "bright_green");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_1"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_2"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_3"), "cyan");
@@ -959,14 +959,14 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm_team", ownerName, targetEquip.Name, $"{curseTotalWithTax:N0}")))
+        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm_team", ownerName, ItemNames.Display(targetEquip), $"{curseTotalWithTax:N0}")))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
 
             // Dramatic curse removal scene
             DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.curse_team_scene_1", _ownerName, ownerName, targetEquip.Name), "gray");
+            DisplayMessage(Loc.Get("magic_shop.curse_team_scene_1", _ownerName, ownerName, ItemNames.Display(targetEquip)), "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_2"), "gray");
             await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_3"), "magenta");
@@ -1007,7 +1007,7 @@ public partial class MagicShopLocation : BaseLocation
             if (targetEquip.MagicResistance < 0)
                 targetEquip.MagicResistance = Math.Abs(targetEquip.MagicResistance) / 2;
 
-            DisplayMessage(Loc.Get("magic_shop.curse_team_success", ownerName, targetEquip.Name), "bright_green");
+            DisplayMessage(Loc.Get("magic_shop.curse_team_success", ownerName, ItemNames.Display(targetEquip)), "bright_green");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_1"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_2"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_team_relieved", ownerName), "cyan");
@@ -1139,7 +1139,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             var item = enchantableItems[i];
             string status = item.IsCursed ? Loc.Get("shop.cursed_no_enchant") : "";
-            DisplayMessage($"{i + 1}. {item.Name}{status}", item.IsCursed ? "red" : "white");
+            DisplayMessage($"{i + 1}. {ItemNames.Display(item)}{status}", item.IsCursed ? "red" : "white");
         }
 
         DisplayMessage("");
@@ -1182,7 +1182,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.old_enchant_confirm", targetItem.Name, $"{enchTotalWithTax:N0}")))
+        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.old_enchant_confirm", ItemNames.Display(targetItem), $"{enchTotalWithTax:N0}")))
             return;
 
         player.Gold -= enchTotalWithTax;
@@ -1207,7 +1207,7 @@ public partial class MagicShopLocation : BaseLocation
             case 2:
             case 3:
                 ApplyStatEnchant(targetItem, statChoice, bonus);
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_flows", targetItem.Name), "magenta");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_flows", ItemNames.Display(targetItem)), "magenta");
                 break;
 
             case 4: // Divine Blessing
@@ -1218,7 +1218,7 @@ public partial class MagicShopLocation : BaseLocation
                 targetItem.Attack += 3;
                 targetItem.MagicProperties.Wisdom += 3;
                 DisplayMessage(Loc.Get("magic_shop.old_enchant_divine"), "bright_yellow");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_blessed", targetItem.Name), "blue");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_blessed", ItemNames.Display(targetItem)), "blue");
                 break;
 
             case 5: // Ocean's Touch
@@ -1226,7 +1226,7 @@ public partial class MagicShopLocation : BaseLocation
                 targetItem.Wisdom += 2;
                 targetItem.MagicProperties.Wisdom += 2;
                 DisplayMessage(Loc.Get("magic_shop.old_enchant_salt"), "cyan");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_ocean", targetItem.Name), "blue");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_ocean", ItemNames.Display(targetItem)), "blue");
                 DisplayMessage(Loc.Get("magic_shop.old_enchant_waves_remember"), "gray");
                 break;
 
@@ -1234,7 +1234,7 @@ public partial class MagicShopLocation : BaseLocation
                 targetItem.MagicProperties.MagicResistance += 20;
                 targetItem.Defence += 2;
                 DisplayMessage(Loc.Get("magic_shop.old_enchant_runes"), "yellow");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_protect", targetItem.Name), "green");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_protect", ItemNames.Display(targetItem)), "green");
                 break;
         }
 
@@ -1985,7 +1985,7 @@ public partial class MagicShopLocation : BaseLocation
             // Item name with enchant/cursed tags
             string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
             string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
-            string displayName = equip.Name + enchTag + cursedTag;
+            string displayName = ItemNames.Display(equip) + enchTag + cursedTag;
             if (displayName.Length > 34) displayName = displayName.Substring(0, 31) + "...";
 
             if (equip.IsCursed)
@@ -2068,7 +2068,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Show enchantment options
         terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("magic_shop.enchanting_title", selectedEquip.Name), "magenta");
+        WriteBoxHeader(Loc.Get("magic_shop.enchanting_title", ItemNames.Display(selectedEquip)), "magenta");
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
@@ -2196,7 +2196,7 @@ public partial class MagicShopLocation : BaseLocation
         string enchantDesc = (tierChoice <= 4 || (tierChoice >= 10 && tierChoice <= 12)) ? $"+{selectedTier.bonus} {StatLabel(statChoice)}" : TierDescription(tierChoice - 1);
         terminal.WriteLine("");
         WriteTemplate("  ", Loc.Get("magic_shop.enchant_confirm_line", "{0}", "{1}", "{2}"), "yellow",
-            (selectedEquip.Name, selectedEquip.GetRarityColor()), (TierName(tierChoice - 1), "bright_magenta"), (enchantDesc, "yellow"));
+            (ItemNames.Display(selectedEquip), selectedEquip.GetRarityColor()), (TierName(tierChoice - 1), "bright_magenta"), (enchantDesc, "yellow"));
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("magic_shop.enchant_cost", $"{enchantCost:N0}")}");
         // Show material cost in confirmation
@@ -2357,12 +2357,12 @@ public partial class MagicShopLocation : BaseLocation
 
         // Dramatic enchantment scene
         DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.enchant_anvil", _ownerName, selectedEquip.Name), "gray");
+        DisplayMessage(Loc.Get("magic_shop.enchant_anvil", _ownerName, ItemNames.Display(selectedEquip)), "gray");
         await Pacing.Wait(500);
         DisplayMessage(Loc.Get("magic_shop.enchant_sparks"), "magenta");
         await Pacing.Wait(500);
         DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.enchant_result", selectedEquip.Name, enchanted.Name), "bright_green");
+        DisplayMessage(Loc.Get("magic_shop.enchant_result", ItemNames.Display(selectedEquip), ItemNames.Display(enchanted)), "bright_green");
 
         // Track stats
         player.Statistics?.RecordEnchantment(enchantCost);
@@ -2556,7 +2556,7 @@ public partial class MagicShopLocation : BaseLocation
             if (equip != null && equip.GetEnchantmentCount() > 0)
             {
                 enchantedItems.Add((slot, equip));
-                DisplayMessage($"  ({idx}) {slot}: {equip.Name} [E:{equip.GetEnchantmentCount()}]", equip.GetRarityColor());
+                DisplayMessage($"  ({idx}) {slot}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]", equip.GetRarityColor());
                 idx++;
             }
         }
@@ -2599,7 +2599,7 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.remove_enchant_confirm", rmEquip.Name)))
+        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.remove_enchant_confirm", ItemNames.Display(rmEquip))))
         {
             await terminal.WaitForKey();
             return;
@@ -2713,7 +2713,7 @@ public partial class MagicShopLocation : BaseLocation
                 terminal.SetColor("cyan");
                 terminal.Write($"  {Loc.Get("magic_shop.equipped_label")} ");
                 terminal.SetColor("bright_white");
-                terminal.Write(currentItem.Name);
+                terminal.Write(ItemNames.Display(currentItem));
                 var eqStats = GetAccessoryBonusDescription(currentItem);
                 if (!string.IsNullOrEmpty(eqStats)) { terminal.SetColor("green"); terminal.Write($"  {eqStats}"); }
                 terminal.WriteLine("");
@@ -2758,7 +2758,7 @@ public partial class MagicShopLocation : BaseLocation
 
             // Name (colored by rarity if affordable, dim if not)
             terminal.SetColor(canBuy ? item.GetRarityColor() : "darkgray");
-            terminal.Write($"{item.Name,-26}");
+            terminal.Write(ItemNames.Column(item, 26));
 
             // Level requirement
             if (item.MinLevel > 1)
@@ -2939,7 +2939,7 @@ public partial class MagicShopLocation : BaseLocation
         // Show item detail before purchase
         terminal.WriteLine("");
         terminal.SetColor("bright_white");
-        terminal.WriteLine($"  {item.Name}");
+        terminal.WriteLine($"  {ItemNames.Display(item)}");
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("weapon_shop.reforge_rarity")}: ");
         terminal.SetColor(item.GetRarityColor());
@@ -2958,7 +2958,7 @@ public partial class MagicShopLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, price);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, ItemNames.Display(item), price);
 
         // v1.2.4 (design item C): [H]aggle over the pre-tax price; tax is recomputed on the agreed amount
         while (true)
@@ -3015,7 +3015,7 @@ public partial class MagicShopLocation : BaseLocation
                 var invItem = player.ConvertEquipmentToLegacyItem(item);
                 player.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", item.Name)}");
+                terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
             }
             else
             {
@@ -3076,7 +3076,7 @@ public partial class MagicShopLocation : BaseLocation
                 {
                     player.RecalculateStats();
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  {Loc.Get("magic_shop.now_wearing", item.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("magic_shop.now_wearing", ItemNames.Display(item))}");
                 }
                 else
                 {
@@ -3084,7 +3084,7 @@ public partial class MagicShopLocation : BaseLocation
                     var invItem = player.ConvertEquipmentToLegacyItem(item);
                     player.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", item.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
                 }
             }
         }
@@ -3094,7 +3094,7 @@ public partial class MagicShopLocation : BaseLocation
             var invItem = player.ConvertEquipmentToLegacyItem(item);
             player.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", item.Name)}");
+            terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
         }
 
         player.Statistics?.RecordPurchase(totalWithTax);
@@ -3169,7 +3169,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.Write($"  {i + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write($"{item.Name,-30}");
+            terminal.Write(ItemNames.Column(item, 30));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("magic_shop.sell_for_gold", sellPrice.ToString("N0")));
         }
@@ -3230,7 +3230,7 @@ public partial class MagicShopLocation : BaseLocation
                     player.Statistics?.RecordSale(sellPrice);
                     player.Inventory.RemoveAt(i);
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  {Loc.Get("shop.sold_single", item.Name, $"{sellPrice:N0}")}");
+                    terminal.WriteLine($"  {Loc.Get("shop.sold_single", ItemNames.Display(item), $"{sellPrice:N0}")}");
                     await SaveSystem.Instance.AutoSave(player);
                     break;
                 }

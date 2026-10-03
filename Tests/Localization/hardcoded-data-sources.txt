@@ -189,9 +189,9 @@ nouns|Scripts/Systems/MoralParadoxSystem.cs|init.Name|paradox titles
 table|Scripts/Systems/MoralParadoxSystem.cs|init.OceanPhilosophyReflection|paradox reflection
 table|Scripts/Systems/MoralParadoxSystem.cs|init.Outcome|paradox outcome
 table|Scripts/Systems/MoralParadoxSystem.cs|init.Setup|paradox setup
-table|Scripts/Systems/NPCItemGenerator.cs|decl:QualityPrefixes|item name prefix
-table|Scripts/Systems/NPCItemGenerator.cs|dictpair#0|NPC item names
-nouns|Scripts/Systems/NPCItemGenerator.cs|init.Name|fallback item names
+keyed|Scripts/Systems/NPCItemGenerator.cs|decl:QualityPrefixes|stored English name prefix; ItemNames shows it through item.rarity.fine/superior/cursed or item.quality.*
+keyed|Scripts/Systems/NPCItemGenerator.cs|dictpair#0|stored English template names and prefixes; ItemNames shows item.{TemplateLocKey} and the prefix keys
+keyed|Scripts/Systems/NPCItemGenerator.cs|init.Name|stored English fallback names; ItemNames shows item.{TemplateLocKey}
 table|Scripts/Systems/OceanPhilosophySystem.cs|init.[k]=|ambient wisdom, MagicShopLocation
 table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#0|wave fragment title printed raw, DungeonLocation
 table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#1|wave fragment text printed raw, DungeonLocation
@@ -241,10 +241,8 @@ names|Scripts/Core/GameEngine.cs|decl:locations|place name, also a location.name
 table|Scripts/Core/GameEngine.cs|decl:name|fallback NPC name
 nouns|Scripts/Core/GameEngine.cs|decl:ngDisplayName|fallback name in the online who list
 names|Scripts/Core/GameEngine.cs|decl:fonts|font names
-nouns|Scripts/Core/Items.cs|decl:armor/tuple#0|classic armor names become loot names
-nouns|Scripts/Core/Items.cs|decl:weapons/tuple#0|classic weapon names become loot names
-table|Scripts/Core/Items.cs|=name|item display name
-table|Scripts/Core/Items.cs|=reason|equip refusal in team.cannot_use_item
+keyed|Scripts/Core/Items.cs|decl:ClassicArmorTable/tuple#0|stored English on picked-up armour; ItemNames shows item.{TemplateLocKey}
+keyed|Scripts/Core/Items.cs|decl:ClassicWeaponTable/tuple#0|stored English on picked-up weapons; ItemNames shows item.{TemplateLocKey}
 table|Scripts/Core/King.cs|decl:AvailableMonsters/tuple#0|castle guard monster names: stored on the court (MonsterGuard.Name) and matched by name (ChallengeSystem DefenceLosses, CastleLocation dismiss), so they stay English
 table|Scripts/Core/King.cs|decl:Role|court member role "Advisor": saved in CourtMemberSaveData, shown through CastleLocation.CourtRoleLabel
 table|Scripts/Core/King.cs|=name|fallback king name: becomes the stored King.Name, matched by name everywhere
@@ -261,7 +259,7 @@ table|Scripts/Data/DialogueLines_Greetings.cs|init.Text|NPC greeting lines, NPCD
 table|Scripts/Data/DialogueLines_Memory.cs|init.Text|NPC memory lines, NPCDialogueDatabase.GetBestLine
 table|Scripts/Data/DialogueLines_MoodPrefixes.cs|init.Text|NPC mood prefixes, NPCDialogueDatabase.GetBestLine
 table|Scripts/Data/DialogueLines_Reactions.cs|init.Text|NPC reaction lines, NPCDialogueDatabase.GetBestLine
-nouns|Scripts/Data/EquipmentData.cs|init.Name|shop equipment names printed raw
+keyed|Scripts/Data/EquipmentData.cs|init.Name|stored English item names; ItemNames shows item.{TemplateLocKey} by EquipmentData id
 keyed|Scripts/Data/GauntletChampionData.cs|decl:CrowdAmbiance|gauntlet.crowd_ambiance.{i}
 keyed|Scripts/Data/GauntletChampionData.cs|decl:WarmupWaveFlavor|gauntlet.warmup.{i}
 keyed|Scripts/Data/GauntletChampionData.cs|init.CrowdReaction|gauntlet.champ.{id}.crowd
@@ -435,8 +433,8 @@ names|Scripts/Systems/WorldSimulator.cs|decl:TeamNamePrefixes|team names
 names|Scripts/Systems/WorldSimulator.cs|decl:TeamNameSuffixes|team names
 
 # --- tables built through helper calls in Scripts/Data -------------------------------------------
-nouns|Scripts/Data/EquipmentData.cs|call:CreateArmor#1|armor names printed raw in the shops
-nouns|Scripts/Data/EquipmentData.cs|call:CreateAccessory#1|accessory names printed raw in the shops
+keyed|Scripts/Data/EquipmentData.cs|call:CreateArmor#1|stored English armour names; ItemNames shows item.{TemplateLocKey} by EquipmentData id
+keyed|Scripts/Data/EquipmentData.cs|call:CreateAccessory#1|stored English accessory names; ItemNames shows item.{TemplateLocKey} by EquipmentData id
 keyed|Scripts/Data/DiscoveryData.cs|call:D#5|discovery.{id}.* via DiscoverySystem.Resolve
 keyed|Scripts/Data/DiscoveryData.cs|call:D#6|discovery.{id}.* via DiscoverySystem.Resolve
 keyed|Scripts/Data/DiscoveryData.cs|call:Narr#0|discovery.{id}.* via DiscoverySystem.Resolve

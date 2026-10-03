@@ -392,7 +392,7 @@ namespace UsurperRemake.Systems
                     {
                         player.Inventory.Add(item);
                         // v1.1.12: an unidentified find keeps its disguise, as combat loot does.
-                        string shownName = item.IsIdentified ? item.Name : LootGenerator.GetUnidentifiedName(item);
+                        string shownName = item.IsIdentified ? ItemNames.Display(item) : LootGenerator.GetUnidentifiedName(item);
                         Msg(terminal, "bright_green", Loc.Get("discovery.effect.loot", shownName));
                         ShowFoundGear(terminal, player, item);
                         return;

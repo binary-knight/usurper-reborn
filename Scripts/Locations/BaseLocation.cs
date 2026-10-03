@@ -5118,7 +5118,7 @@ public abstract class BaseLocation
             {
                 var item = inv[i];
                 string display = item.IsIdentified
-                    ? item.Name
+                    ? ItemNames.Display(item)
                     : LootGenerator.GetUnidentifiedName(item);
 
                 terminal.SetColor("bright_yellow");
@@ -5177,7 +5177,7 @@ public abstract class BaseLocation
 
             terminal.SetColor("bright_green");
             string takenName = chosenItem.IsIdentified
-                ? chosenItem.Name
+                ? ItemNames.Display(chosenItem)
                 : LootGenerator.GetUnidentifiedName(chosenItem);
             terminal.WriteLine(Loc.Get("party_inv.taken", takenName, member.DisplayName));
 
@@ -8204,7 +8204,7 @@ public abstract class BaseLocation
 
             // Item name with rarity color
             terminal.SetColor(GetEquipmentRarityColor(item.Rarity));
-            terminal.WriteLine(item.IsIdentified ? item.Name : Loc.Get("base.unidentified"));
+            terminal.WriteLine(item.IsIdentified ? ItemNames.Display(item) : Loc.Get("base.unidentified"));
 
             // Accumulate totals
             totalWP += item.WeaponPower;
@@ -8338,7 +8338,7 @@ public abstract class BaseLocation
         {
             // Color based on rarity
             terminal.SetColor(GetEquipmentRarityColor(item.Rarity));
-            terminal.Write(item.Name);
+            terminal.Write(ItemNames.Display(item));
 
             // Show key stats
             var stats = GetEquipmentStatSummary(item);
@@ -10479,7 +10479,7 @@ public abstract class BaseLocation
 
         // Confirm
         terminal.SetColor("yellow");
-        terminal.Write(Loc.Get("base.auction_list_confirm", item.Name, price.ToString("N0"), chosenLabel, listingFee.ToString("N0")));
+        terminal.Write(Loc.Get("base.auction_list_confirm", ItemNames.Display(item), price.ToString("N0"), chosenLabel, listingFee.ToString("N0")));
         if (!await terminal.AskYesNoAsync("")) return;
 
         string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
@@ -10493,13 +10493,13 @@ public abstract class BaseLocation
             CityControlSystem.Instance.ProcessSaleTax(listingFee);
 
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("base.auction_listed", item.Name, price.ToString("N0"), listingFee.ToString("N0"), chosenLabel));
+            terminal.WriteLine(Loc.Get("base.auction_listed", ItemNames.Display(item), price.ToString("N0"), listingFee.ToString("N0"), chosenLabel));
 
             // Global announcement
             // v1.2.5: each player reads the announcement in their own language
             string lister = currentPlayer.DisplayName, listedItem = item.Name, listedPrice = price.ToString("N0");
             UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(
-                lang => $"\u001b[93m  {Loc.GetIn(lang, "base.auction_push_listed", lister, listedItem, listedPrice, AuctionDurationLabel(chosenHours, lang))}\u001b[0m",
+                lang => $"\u001b[93m  {Loc.GetIn(lang, "base.auction_push_listed", lister, ItemNames.DisplayIn(lang, listedItem), listedPrice, AuctionDurationLabel(chosenHours, lang))}\u001b[0m",
                 excludeUsername: UsurperRemake.Server.SessionContext.Current?.Username);
         }
         else
@@ -10826,7 +10826,7 @@ public abstract class BaseLocation
             else
             {
                 terminal.SetColor(item.GetRarityColor());
-                terminal.Write(item.Name);
+                terminal.Write(ItemNames.Display(item));
                 WriteEquipmentStatSummary(item);
                 terminal.WriteLine("");
             }
@@ -10914,7 +10914,7 @@ public abstract class BaseLocation
             if (lItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(Truncate(lItem.IsIdentified ? lItem.Name : "???", leftNameWidth - 1).PadRight(leftNameWidth));
+                terminal.Write(Truncate(lItem.IsIdentified ? ItemNames.Display(lItem) : "???", leftNameWidth - 1).PadRight(leftNameWidth));
             }
             else
             {
@@ -10933,7 +10933,7 @@ public abstract class BaseLocation
             if (rItem != null)
             {
                 terminal.SetColor("gray");
-                terminal.Write(Truncate(rItem.IsIdentified ? rItem.Name : "???", rightNameWidth));
+                terminal.Write(Truncate(rItem.IsIdentified ? ItemNames.Display(rItem) : "???", rightNameWidth));
             }
             else
             {
@@ -11159,9 +11159,9 @@ public abstract class BaseLocation
                 equippedCount++;
                 terminal.SetColor("bright_green");
                 if (currentItem != null)
-                    terminal.WriteLine(Loc.Get("inn.equip_best_upgraded", slot.GetDisplayName(), currentItem.Name, bestCandidate.item.Name));
+                    terminal.WriteLine(Loc.Get("inn.equip_best_upgraded", slot.GetDisplayName(), ItemNames.Display(currentItem), ItemNames.Display(bestCandidate.item)));
                 else
-                    terminal.WriteLine(Loc.Get("inn.equip_best_equipped", slot.GetDisplayName(), bestCandidate.item.Name));
+                    terminal.WriteLine(Loc.Get("inn.equip_best_equipped", slot.GetDisplayName(), ItemNames.Display(bestCandidate.item)));
             }
             else
             {
@@ -11464,7 +11464,7 @@ public abstract class BaseLocation
             else
             {
                 terminal.SetColor(item.GetRarityColor());
-                terminal.Write(item.Name);
+                terminal.Write(ItemNames.Display(item));
                 WriteEquipmentStatSummary(item);
             }
 
