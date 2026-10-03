@@ -255,8 +255,8 @@ namespace UsurperRemake.Systems
         internal static async Task ChooseAgain(TerminalEmulator terminal)
         {
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.choose_again_must")}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.choose_again_no_return")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.choose_again_must")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.choose_again_no_return")}", "gray");
             terminal.WriteLine("");
             await terminal.PressAnyKey(Loc.Get("ending.press_enter_choose_again"));
         }
@@ -309,13 +309,13 @@ namespace UsurperRemake.Systems
 
             foreach (var (line, color) in lines)
             {
-                terminal.WriteLine($"  {line}", color);
+                Row(terminal, $"  {line}", color);
                 await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.usurper_the_end")}", "dark_red");
-            terminal.WriteLine($"  {Loc.Get("ending.usurper_subtitle")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.usurper_the_end")}", "dark_red");
+            Row(terminal, $"  {Loc.Get("ending.usurper_subtitle")}", "gray");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
@@ -371,13 +371,13 @@ namespace UsurperRemake.Systems
 
             foreach (var (line, color) in lines)
             {
-                terminal.WriteLine($"  {line}", color);
+                Row(terminal, $"  {line}", color);
                 await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.savior_the_end")}", "bright_green");
-            terminal.WriteLine($"  {Loc.Get("ending.savior_subtitle")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.savior_the_end")}", "bright_green");
+            Row(terminal, $"  {Loc.Get("ending.savior_subtitle")}", "gray");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
@@ -434,13 +434,13 @@ namespace UsurperRemake.Systems
 
             foreach (var (line, color) in lines)
             {
-                terminal.WriteLine($"  {line}", color);
+                Row(terminal, $"  {line}", color);
                 await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.defiant_the_end")}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.defiant_subtitle")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.defiant_the_end")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.defiant_subtitle")}", "gray");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
@@ -530,13 +530,13 @@ namespace UsurperRemake.Systems
 
             foreach (var (line, color) in lines)
             {
-                terminal.WriteLine($"  {line}", color);
+                Row(terminal, $"  {line}", color);
                 await Pacing.Wait(150);
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.awakening_the_end")}", "bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("ending.awakening_subtitle")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.awakening_the_end")}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.awakening_subtitle")}", "gray");
             terminal.WriteLine("");
 
             // Mark Ocean Philosophy complete
@@ -621,12 +621,12 @@ namespace UsurperRemake.Systems
 
             foreach (var (line, color) in lines)
             {
-                terminal.WriteLine($"  {line}", color);
+                Row(terminal, $"  {line}", color);
                 await Pacing.Wait(200);
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.dissolution_dots")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.dissolution_dots")}", "gray");
             terminal.WriteLine("");
 
             await Pacing.Wait(3000);
@@ -636,11 +636,11 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             terminal.WriteLine("", "white");
             terminal.WriteLine("", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.dissolution_save_delete_warn")}", "dark_red");
-            terminal.WriteLine($"  {Loc.Get("ending.dissolution_cannot_undo")}", "dark_red");
+            Row(terminal, $"  {Loc.Get("ending.dissolution_save_delete_warn")}", "dark_red");
+            Row(terminal, $"  {Loc.Get("ending.dissolution_cannot_undo")}", "dark_red");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.dissolution_enlightenment")}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.dissolution_letting_go")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.dissolution_enlightenment")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.dissolution_letting_go")}", "bright_yellow");
             terminal.WriteLine("");
 
             var confirm = await terminal.GetInputAsync(Loc.Get("ending.dissolution_confirm"));
@@ -648,8 +648,8 @@ namespace UsurperRemake.Systems
             if (confirm.Trim().ToUpper() == "DISSOLVE")
             {
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_farewell_1")}", "bright_cyan");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_farewell_2")}", "bright_cyan");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_farewell_1")}", "bright_cyan");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_farewell_2")}", "bright_cyan");
                 terminal.WriteLine("");
 
                 // Delete the player's save file - this character's journey is complete
@@ -663,17 +663,17 @@ namespace UsurperRemake.Systems
 
                 terminal.Clear();
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_the_end")}", "white");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_the_end")}", "white");
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_story_finished")}", "gray");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_save_deleted")}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_story_finished")}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_save_deleted")}", "gray");
                 terminal.WriteLine("");
             }
             else
             {
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_not_ready_1")}", "yellow");
-                terminal.WriteLine($"  {Loc.Get("ending.dissolution_not_ready_2")}", "yellow");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_not_ready_1")}", "yellow");
+                Row(terminal, $"  {Loc.Get("ending.dissolution_not_ready_2")}", "yellow");
                 terminal.WriteLine("");
 
                 // Revert to standard True Ending
@@ -696,8 +696,8 @@ namespace UsurperRemake.Systems
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_cyan");
             terminal.WriteLine("");
-            terminal.WriteLine($"                        {Loc.Get("ending.credits_title")}", "bright_yellow");
-            terminal.WriteLine($"                          {Loc.Get("ending.credits_subtitle")}", "yellow");
+            Row(terminal, $"                        {Loc.Get("ending.credits_title")}", "bright_yellow");
+            Row(terminal, $"                          {Loc.Get("ending.credits_subtitle")}", "yellow");
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_cyan");
@@ -763,7 +763,7 @@ namespace UsurperRemake.Systems
                 }
                 else
                 {
-                    terminal.WriteLine($"  {line}", color);
+                    Row(terminal, $"  {line}", color);
                     await Pacing.Wait(800);
                 }
             }
@@ -786,32 +786,32 @@ namespace UsurperRemake.Systems
             var story = StoryProgressionSystem.Instance;
 
             terminal.WriteLine("");
-            terminal.WriteLine($"                    {Loc.Get("ending.final_stats_header")}", "bright_yellow");
+            Row(terminal, $"                    {Loc.Get("ending.final_stats_header")}", "bright_yellow");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "gray");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_character", player.Name2, GameConfig.GetLocalizedClassName(player.Class))}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_race", player.Race)}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_level", player.Level)}", "cyan");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_character", player.Name2, GameConfig.GetLocalizedClassName(player.Class))}", "white");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_race", player.Race)}", "white");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_level", player.Level)}", "cyan");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_monsters", player.MKills)}", "red");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_players", player.PKills)}", "dark_red");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_gold", player.Gold + player.BankGold)}", "yellow");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_monsters", player.MKills)}", "red");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_players", player.PKills)}", "dark_red");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_gold", player.Gold + player.BankGold)}", "yellow");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_chivalry", player.Chivalry)}", "bright_green");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_darkness", player.Darkness)}", "dark_red");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_chivalry", player.Chivalry)}", "bright_green");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_darkness", player.Darkness)}", "dark_red");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_artifacts", story.CollectedArtifacts.Count)}", "bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_seals", story.CollectedSeals.Count)}", "bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_choices", story.MajorChoices.Count)}", "white");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_artifacts", story.CollectedArtifacts.Count)}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_seals", story.CollectedSeals.Count)}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_choices", story.MajorChoices.Count)}", "white");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_ending", GetEndingName(ending))}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.final_stats_cycle", story.CurrentCycle)}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_ending", GetEndingName(ending))}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.final_stats_cycle", story.CurrentCycle)}", "bright_magenta");
             terminal.WriteLine("");
 
             if (!GameConfig.ScreenReaderMode)
@@ -846,9 +846,9 @@ namespace UsurperRemake.Systems
             var romance = RomanceTracker.Instance;
 
             // Character summary
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_section")}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_desc", player.Name2, player.Race, GameConfig.GetLocalizedClassName(player.Class))}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_hero_stats", player.Level, player.MKills)}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.legacy_hero_section")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.legacy_hero_desc", player.Name2, player.Race, GameConfig.GetLocalizedClassName(player.Class))}", "white");
+            Row(terminal, $"  {Loc.Get("ending.legacy_hero_stats", player.Level, player.MKills)}", "gray");
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
@@ -861,35 +861,35 @@ namespace UsurperRemake.Systems
             else if (alignment > -200) alignDesc = Loc.Get("ending.legacy_align_neutral");
             else if (alignment > -500) alignDesc = Loc.Get("ending.legacy_align_dark");
             else alignDesc = Loc.Get("ending.legacy_align_evil");
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_known_as", alignDesc)}", "white");
+            Row(terminal, $"  {Loc.Get("ending.legacy_known_as", alignDesc)}", "white");
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
 
             // Companions
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_companions_section")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.legacy_companions_section")}", "bright_yellow");
             var activeCompanions = companions.GetActiveCompanions();
             var fallenCompanions = companions.GetFallenCompanions().ToList();
 
             if (activeCompanions.Any())
             {
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_companions_active")}", "green");
+                Row(terminal, $"  {Loc.Get("ending.legacy_companions_active")}", "green");
                 foreach (var c in activeCompanions)
                 {
-                    terminal.WriteLine($"    {Loc.Get("ending.legacy_companion_entry", c.Name, c.Level)}", "white");
+                    Row(terminal, $"    {Loc.Get("ending.legacy_companion_entry", c.Name, c.Level)}", "white");
                 }
             }
             else
             {
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_companions_alone")}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.legacy_companions_alone")}", "gray");
             }
 
             if (fallenCompanions.Count > 0)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_companions_fallen")}", "dark_red");
+                Row(terminal, $"  {Loc.Get("ending.legacy_companions_fallen")}", "dark_red");
                 foreach (var (companion, death) in fallenCompanions)
                 {
-                    terminal.WriteLine($"    {Loc.Get("ending.legacy_fallen_entry", companion.Name, death.Type)}", "gray");
+                    Row(terminal, $"    {Loc.Get("ending.legacy_fallen_entry", companion.Name, death.Type)}", "gray");
                 }
             }
             terminal.WriteLine("");
@@ -897,50 +897,50 @@ namespace UsurperRemake.Systems
             await Pacing.Wait(300);
 
             // Romance
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_love_section")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.legacy_love_section")}", "bright_yellow");
             if (romance.Spouses.Count > 0)
             {
                 var spouse = romance.Spouses[0];
                 var spouseName = !string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId;
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_married_to", spouseName)}", "bright_magenta");
+                Row(terminal, $"  {Loc.Get("ending.legacy_married_to", spouseName)}", "bright_magenta");
                 if (spouse.Children > 0)
                 {
-                    terminal.WriteLine($"  {Loc.Get("ending.legacy_children", spouse.Children, spouse.Children > 1 ? Loc.Get("ending.legacy_children_plural") : "")}", "magenta");
+                    Row(terminal, $"  {Loc.Get("ending.legacy_children", spouse.Children, spouse.Children > 1 ? Loc.Get("ending.legacy_children_plural") : "")}", "magenta");
                 }
             }
             else if (romance.CurrentLovers.Count > 0)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_lovers", romance.CurrentLovers.Count)}", "magenta");
+                Row(terminal, $"  {Loc.Get("ending.legacy_lovers", romance.CurrentLovers.Count)}", "magenta");
             }
             else
             {
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_no_romance")}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.legacy_no_romance")}", "gray");
             }
 
             if (romance.ExSpouses.Count > 0)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.legacy_divorces", romance.ExSpouses.Count)}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.legacy_divorces", romance.ExSpouses.Count)}", "gray");
             }
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
 
             // World impact
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_world_section")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.legacy_world_section")}", "bright_yellow");
             await ShowWorldImpact(player, ending, story, terminal);
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
 
             // Achievements unlocked
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_achievements_section")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.legacy_achievements_section")}", "bright_yellow");
             await ShowNotableAchievements(player, terminal);
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
 
             // Jungian Archetype reveal
-            terminal.WriteLine($"  {Loc.Get("ending.legacy_archetype_section")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.legacy_archetype_section")}", "bright_yellow");
             await ShowArchetypeReveal(player, terminal);
             terminal.WriteLine("");
 
@@ -957,8 +957,8 @@ namespace UsurperRemake.Systems
                 _ => Loc.Get("ending.quote_default")
             };
             terminal.WriteLine("");
-            terminal.WriteLine($"  {quote}", "bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("ending.quote_attribution", player.Name2)}", "gray");
+            Row(terminal, $"  {quote}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.quote_attribution", player.Name2)}", "gray");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
@@ -984,60 +984,60 @@ namespace UsurperRemake.Systems
 
             if (savedGods > destroyedGods)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_gods_saved", savedGods, destroyedGods)}", "green");
-                terminal.WriteLine($"  {Loc.Get("ending.world_gods_saved_desc")}", "white");
+                Row(terminal, $"  {Loc.Get("ending.world_gods_saved", savedGods, destroyedGods)}", "green");
+                Row(terminal, $"  {Loc.Get("ending.world_gods_saved_desc")}", "white");
             }
             else if (destroyedGods > savedGods)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_gods_destroyed", destroyedGods, savedGods)}", "dark_red");
-                terminal.WriteLine($"  {Loc.Get("ending.world_gods_destroyed_desc")}", "white");
+                Row(terminal, $"  {Loc.Get("ending.world_gods_destroyed", destroyedGods, savedGods)}", "dark_red");
+                Row(terminal, $"  {Loc.Get("ending.world_gods_destroyed_desc")}", "white");
             }
             else
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_gods_uncertain")}", "yellow");
+                Row(terminal, $"  {Loc.Get("ending.world_gods_uncertain")}", "yellow");
             }
 
             // Economy impact
             long totalWealth = player.Gold + player.BankGold;
             if (totalWealth > 1000000)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_wealth_rich")}", "yellow");
+                Row(terminal, $"  {Loc.Get("ending.world_wealth_rich")}", "yellow");
             }
             else if (totalWealth > 100000)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_wealth_decent")}", "yellow");
+                Row(terminal, $"  {Loc.Get("ending.world_wealth_decent")}", "yellow");
             }
 
             // Combat impact
             if (player.MKills > 10000)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_kills_legend")}", "red");
+                Row(terminal, $"  {Loc.Get("ending.world_kills_legend")}", "red");
             }
             else if (player.MKills > 1000)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_kills_bloody")}", "red");
+                Row(terminal, $"  {Loc.Get("ending.world_kills_bloody")}", "red");
             }
 
             // Story choices
             if (story.MajorChoices.Count > 10)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.world_choices", story.MajorChoices.Count)}", "bright_magenta");
+                Row(terminal, $"  {Loc.Get("ending.world_choices", story.MajorChoices.Count)}", "bright_magenta");
             }
 
             // Ending-specific impact
             switch (ending)
             {
                 case EndingType.Usurper:
-                    terminal.WriteLine($"  {Loc.Get("ending.world_usurper")}", "dark_red");
+                    Row(terminal, $"  {Loc.Get("ending.world_usurper")}", "dark_red");
                     break;
                 case EndingType.Savior:
-                    terminal.WriteLine($"  {Loc.Get("ending.world_savior")}", "bright_green");
+                    Row(terminal, $"  {Loc.Get("ending.world_savior")}", "bright_green");
                     break;
                 case EndingType.Defiant:
-                    terminal.WriteLine($"  {Loc.Get("ending.world_defiant")}", "bright_yellow");
+                    Row(terminal, $"  {Loc.Get("ending.world_defiant")}", "bright_yellow");
                     break;
                 case EndingType.TrueEnding:
-                    terminal.WriteLine($"  {Loc.Get("ending.world_true")}", "bright_cyan");
+                    Row(terminal, $"  {Loc.Get("ending.world_true")}", "bright_cyan");
                     break;
             }
         }
@@ -1067,13 +1067,13 @@ namespace UsurperRemake.Systems
 
             if (notableAchievements.Count == 0)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.achievement_beginning")}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.achievement_beginning")}", "gray");
             }
             else
             {
                 foreach (var achievement in notableAchievements.Take(5))
                 {
-                    terminal.WriteLine($"  * {achievement}", "bright_cyan");
+                    Row(terminal, $"  * {achievement}", "bright_cyan");
                 }
             }
         }
@@ -1092,13 +1092,13 @@ namespace UsurperRemake.Systems
             var (name, title, description, color) = ArchetypeTracker.GetArchetypeInfo(dominant);
             var quote = ArchetypeTracker.GetArchetypeQuote(dominant);
 
-            terminal.WriteLine($"  {Loc.Get("ending.archetype_intro")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.archetype_intro")}", "white");
             terminal.WriteLine("");
 
             await Pacing.Wait(500);
 
-            terminal.WriteLine($"  *** {name.ToUpper()} ***", color);
-            terminal.WriteLine($"  \"{title}\"", color);
+            Row(terminal, $"  *** {name.ToUpper()} ***", color);
+            Row(terminal, $"  \"{title}\"", color);
             terminal.WriteLine("");
 
             await Pacing.Wait(500);
@@ -1128,28 +1128,28 @@ namespace UsurperRemake.Systems
 
             // Show secondary archetype
             var (secName, secTitle, _, secColor) = ArchetypeTracker.GetArchetypeInfo(secondary);
-            terminal.WriteLine($"  {Loc.Get("ending.archetype_secondary", secName, secTitle)}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.archetype_secondary", secName, secTitle)}", "gray");
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
 
             // Show the archetype quote
-            terminal.WriteLine($"  {quote}", "bright_cyan");
+            Row(terminal, $"  {quote}", "bright_cyan");
             terminal.WriteLine("");
 
             // Show some stats that contributed to this determination
             terminal.SetColor("darkgray");
-            terminal.WriteLine($"  {Loc.Get("ending.archetype_stats_header")}");
+            Row(terminal, $"  {Loc.Get("ending.archetype_stats_header")}");
             if (tracker.MonstersKilled > 0)
-                terminal.WriteLine($"    {Loc.Get("ending.archetype_combat", tracker.MonstersKilled, tracker.BossesDefeated)}");
+                Row(terminal, $"    {Loc.Get("ending.archetype_combat", tracker.MonstersKilled, tracker.BossesDefeated)}");
             if (tracker.DungeonFloorsExplored > 0)
-                terminal.WriteLine($"    {Loc.Get("ending.archetype_exploration", tracker.DungeonFloorsExplored)}");
+                Row(terminal, $"    {Loc.Get("ending.archetype_exploration", tracker.DungeonFloorsExplored)}");
             if (tracker.SpellsCast > 0)
-                terminal.WriteLine($"    {Loc.Get("ending.archetype_magic", tracker.SpellsCast)}");
+                Row(terminal, $"    {Loc.Get("ending.archetype_magic", tracker.SpellsCast)}");
             if (tracker.RomanceEncounters > 0)
-                terminal.WriteLine($"    {Loc.Get("ending.archetype_romance", tracker.RomanceEncounters, tracker.MarriagesFormed)}");
+                Row(terminal, $"    {Loc.Get("ending.archetype_romance", tracker.RomanceEncounters, tracker.MarriagesFormed)}");
             if (tracker.SealsCollected > 0 || tracker.ArtifactsCollected > 0)
-                terminal.WriteLine($"    {Loc.Get("ending.archetype_wisdom", tracker.SealsCollected, tracker.ArtifactsCollected)}");
+                Row(terminal, $"    {Loc.Get("ending.archetype_wisdom", tracker.SealsCollected, tracker.ArtifactsCollected)}");
         }
 
         /// <summary>
@@ -1216,13 +1216,13 @@ namespace UsurperRemake.Systems
             if (companions.GetFallenCompanions().Any())
                 unlocks.Add((Loc.Get("ending.unlock_survivor_name"), Loc.Get("ending.unlock_survivor_desc"), "gray"));
 
-            terminal.WriteLine($"  {Loc.Get("ending.unlocks_intro")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.unlocks_intro")}", "white");
             terminal.WriteLine("");
 
             foreach (var (name, description, color) in unlocks)
             {
-                terminal.WriteLine($"  [{name}]", color);
-                terminal.WriteLine($"    {description}", "gray");
+                Row(terminal, $"  [{name}]", color);
+                Row(terminal, $"    {description}", "gray");
                 terminal.WriteLine("");
                 await Pacing.Wait(300);
             }
@@ -1233,7 +1233,7 @@ namespace UsurperRemake.Systems
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "gray");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.unlocks_apply_ngplus")}", "bright_green");
+            Row(terminal, $"  {Loc.Get("ending.unlocks_apply_ngplus")}", "bright_green");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
@@ -1288,33 +1288,33 @@ namespace UsurperRemake.Systems
             terminal.SetColor("bright_yellow");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_yellow");
-            terminal.WriteLine($"              {Loc.Get("ending.immortal_header")}", "bright_yellow");
+            Row(terminal, $"              {Loc.Get("ending.immortal_header")}", "bright_yellow");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_yellow");
             terminal.WriteLine("");
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_power")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_coil")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.immortal_power")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.immortal_coil")}", "white");
             terminal.WriteLine("");
 
             await Pacing.Wait(800);
 
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_manwe_1")}", "bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_manwe_2")}", "bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_manwe_3")}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.immortal_manwe_1")}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.immortal_manwe_2")}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.immortal_manwe_3")}", "bright_magenta");
             terminal.WriteLine("");
 
             await Pacing.Wait(800);
 
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_as_god")}", "bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_benefit_1")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_benefit_2")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_benefit_3")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_benefit_4")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.immortal_as_god")}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.immortal_benefit_1")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.immortal_benefit_2")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.immortal_benefit_3")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.immortal_benefit_4")}", "white");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_renounce")}", "gray");
+            Row(terminal, $"  {Loc.Get("ending.immortal_renounce")}", "gray");
             terminal.WriteLine("");
 
             if (!await terminal.AskYesNoAsync(Loc.Get("ending.immortal_ascend_prompt"))) return false;
@@ -1324,22 +1324,22 @@ namespace UsurperRemake.Systems
             if (SqlSaveBackend.IsAltCharacter(UsurperRemake.BBS.DoorMode.GetPlayerName() ?? ""))
             {
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_blocked")}", "red");
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_alt_main_only")}", "gray");
+                Row(terminal, $"  {Loc.Get("ending.immortal_alt_blocked")}", "red");
+                Row(terminal, $"  {Loc.Get("ending.immortal_alt_main_only")}", "gray");
                 await Pacing.Wait(2000);
                 return false;
             }
 
             // Choose divine name
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_choose_name")}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.immortal_choose_name")}", "bright_cyan");
             string divineName = "";
             while (true)
             {
                 divineName = (await terminal.GetInputAsync(Loc.Get("ending.immortal_name_prompt"))).Trim();
                 if (divineName.Length >= 3 && divineName.Length <= 30)
                     break;
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_name_invalid")}", "red");
+                Row(terminal, $"  {Loc.Get("ending.immortal_name_invalid")}", "red");
             }
 
             // Determine alignment from ending
@@ -1352,12 +1352,12 @@ namespace UsurperRemake.Systems
                 if (!await CastleLocation.AbdicatePlayerThroneAsync(player, AscensionAbdicationReason))
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine($"  {Loc.Get("castle.court_change_failed")}");
+                    Row(terminal, $"  {Loc.Get("castle.court_change_failed")}");
                     await Pacing.Wait(1500);
                     return false;
                 }
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_abdicated")}", "bright_yellow");
+                Row(terminal, $"  {Loc.Get("ending.immortal_abdicated")}", "bright_yellow");
                 terminal.WriteLine("");
                 await Pacing.Wait(1500);
             }
@@ -1373,7 +1373,7 @@ namespace UsurperRemake.Systems
             {
                 new TeamSystem().QuitTeam(player);
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  {Loc.Get("ending.immortal_team_dissolved")}");
+                Row(terminal, $"  {Loc.Get("ending.immortal_team_dissolved")}");
                 terminal.WriteLine("");
                 await Pacing.Wait(1000);
             }
@@ -1392,7 +1392,7 @@ namespace UsurperRemake.Systems
                 {
                     guildSys.RemoveMember(ctxAscend.Username);
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine($"  {Loc.Get("ending.immortal_guild_lost")}");
+                    Row(terminal, $"  {Loc.Get("ending.immortal_guild_lost")}");
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                 }
@@ -1417,8 +1417,8 @@ namespace UsurperRemake.Systems
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("  ════════════════════════════════════════════════════════════");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_ascended", divineName, PantheonLocation.AlignmentLabel(alignment))}", "bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_ascended_msg")}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.immortal_ascended", divineName, PantheonLocation.AlignmentLabel(alignment))}", "bright_yellow");
+            Row(terminal, $"  {Loc.Get("ending.immortal_ascended_msg")}", "bright_yellow");
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("  ════════════════════════════════════════════════════════════");
@@ -1461,7 +1461,7 @@ namespace UsurperRemake.Systems
             catch { /* best effort */ }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_enter_pantheon")}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.immortal_enter_pantheon")}", "bright_cyan");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey(Loc.Get("ending.immortal_enter_prompt"));
@@ -1501,47 +1501,47 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_magenta");
-            terminal.WriteLine($"                  {Loc.Get("ending.ngplus_header")}", "bright_magenta");
+            Row(terminal, $"                  {Loc.Get("ending.ngplus_header")}", "bright_magenta");
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("═══════════════════════════════════════════════════════════════════", "bright_magenta");
             terminal.WriteLine("");
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_stirs")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_voice")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_stirs")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_voice")}", "white");
             terminal.WriteLine("");
 
             await Pacing.Wait(800);
 
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_again_1")}", "bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_again_2")}", "bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_again_3")}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_again_1")}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_again_2")}", "bright_magenta");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_again_3")}", "bright_magenta");
             terminal.WriteLine("");
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_wheel")}", "bright_cyan");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_wheel")}", "bright_cyan");
             terminal.WriteLine("");
 
             var cycle = StoryProgressionSystem.Instance.CurrentCycle;
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_current_cycle", cycle)}", "yellow");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_next_cycle", cycle + 1)}", "green");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_current_cycle", cycle)}", "yellow");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_next_cycle", cycle + 1)}", "green");
             terminal.WriteLine("");
 
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_bonuses")}", "bright_green");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_bonus_stats")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_bonus_xp")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_bonus_artifacts")}", "white");
-            terminal.WriteLine($"  {Loc.Get("ending.ngplus_bonus_dialogue")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_bonuses")}", "bright_green");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_bonus_stats")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_bonus_xp")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_bonus_artifacts")}", "white");
+            Row(terminal, $"  {Loc.Get("ending.ngplus_bonus_dialogue")}", "white");
 
             // Show which prestige classes this ending unlocks
             var newClasses = PrestigeClassRows(ending);
             if (newClasses.Count > 0)
             {
-                terminal.WriteLine($"  {Loc.Get("ending.ngplus_prestige_intro")}", "white");
+                Row(terminal, $"  {Loc.Get("ending.ngplus_prestige_intro")}", "white");
                 foreach (var cls in newClasses)
-                    terminal.WriteLine($"      {cls}", "bright_cyan");
+                    Row(terminal, $"      {cls}", "bright_cyan");
             }
             terminal.WriteLine("");
 
@@ -1566,6 +1566,19 @@ namespace UsurperRemake.Systems
         #endregion
 
         #region Display Helpers
+
+        /// <summary>
+        /// v1.2.5: a row of ending text, word wrapped at 79 columns with later rows under the text (a row that
+        /// fits is written as it is), in the colour given or the current one.
+        /// </summary>
+        internal static void Row(TerminalEmulator terminal, string text, string? color = null)
+        {
+            foreach (var row in GameEngine.WrapRows(text))
+            {
+                if (color == null) terminal.WriteLine(row);
+                else terminal.WriteLine(row, color);
+            }
+        }
 
         /// <summary>
         /// v1.2.5: the reason passed with the abdication before an ascension. It stays English: CastleLocation's

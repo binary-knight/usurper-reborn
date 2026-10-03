@@ -473,4 +473,70 @@ public class RestStory125Tests : IDisposable
         InLang("hu", () => { story.RecordChoice("final_ending", EndingType.Savior.ToString(), 0); return 0; });
         story.MajorChoices["final_ending"].SelectedOption.Should().Be("Savior");
     }
+
+    // ---------- 79 columns in every ending screen ----------
+
+    private static async Task<string> EndingFlow(string lang, string method, EndingType? ending, params string[] input)
+    {
+        var s = NewScreen(input);
+        var player = new Character
+        {
+            Name1 = LongName, Name2 = LongName, Level = 100, MKills = 99999, PKills = 9999,
+            Gold = 999999999, BankGold = 999999999, Chivalry = 99999, Darkness = 0,
+        };
+        var m = typeof(EndingsSystem).GetMethod(method, F)!;
+        var args = ending.HasValue ? new object[] { player, ending.Value, s.Term } : new object[] { player, s.Term };
+        await InLanguage(lang, async () => { await (Task)m.Invoke(new EndingsSystem(), args)!; return 0; }, screenReader: true);
+        return s.Text;
+    }
+
+    [Fact]
+    public async Task EndingScreens_EveryRowFits_InEveryLanguage_WithALongName()
+    {
+        foreach (var lang in AllLanguages)
+        {
+            var screens = new List<(string, string)>
+            {
+                ("usurper", await EndingFlow(lang, "PlayUsurperEnding", null)),
+                ("savior", await EndingFlow(lang, "PlaySaviorEnding", null)),
+                ("defiant", await EndingFlow(lang, "PlayDefiantEnding", null)),
+                ("true", await EndingFlow(lang, "PlayEnhancedTrueEnding", null)),
+                ("dissolution", await EndingFlow(lang, "PlayDissolutionEnding", null, "")),
+                ("new game plus", await EndingFlow(lang, "OfferNewGamePlus", EndingType.Secret, "n")),
+                ("immortality", await EndingFlow(lang, "OfferImmortality", EndingType.Savior, "n")),
+            };
+            foreach (var e in new[] { EndingType.Usurper, EndingType.Savior, EndingType.Defiant, EndingType.TrueEnding })
+                screens.Add(($"credits {e}", await EndingFlow(lang, "PlayCredits", e)));
+            foreach (var (name, text) in screens)
+            {
+                if (lang == "hu") Capture($"ending-{name.Replace(' ', '-')}-hu-sr.txt", text);
+                EveryRowFits(text, $"[{lang}] {name}");
+            }
+        }
+    }
+
+    [Fact]
+    public void EndingRows_WrapAt79_UnderTheirText()
+    {
+        var s = NewScreen();
+        string longRow = "  " + string.Join(" ", Enumerable.Repeat("wordy", 30));
+        EndingsSystem.Row(s.Term, longRow, "white");
+        EndingsSystem.Row(s.Term, "  A short row.");
+        var rows = Rows(s.Text).Where(r => r.Length > 0).ToList();
+        rows.Count.Should().Be(4);
+        foreach (var row in rows) { row.Length.Should().BeLessOrEqualTo(MaxWidth); row.Should().StartWith("  "); }
+        rows[^1].Should().Be("  A short row.");
+        // Every indented text row of the endings goes through Row.
+        var src = File.ReadAllText(Path.Combine(UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "EndingsSystem.cs"));
+        Regex.Matches(src, "terminal\\.WriteLine\\(\\$\" ").Count.Should().Be(0, "each indented text row is wrapped at 79");
+        // The prompts fit too.
+        foreach (var lang in AllLanguages)
+            foreach (var key in new[] { "ending.dissolution_confirm", "ending.dissolution_press_enter", "ending.immortal_ascend_prompt",
+                "ending.immortal_enter_prompt", "ending.immortal_name_prompt", "ending.ngplus_begin_prompt", "ending.press_enter",
+                "ending.press_enter_choose_again" })
+            {
+                var v = L(lang, key);
+                (v.StartsWith("  ") ? v : "  " + v).TrimEnd().Length.Should().BeLessOrEqualTo(MaxWidth - 1, $"[{lang}] {key}");
+            }
+    }
 }
