@@ -967,7 +967,7 @@ public class TownRest125Tests : IDisposable
         foreach (var key in added)
         {
             foreach (var lang in AllLanguages)
-                langs[lang].GetProperty(key).GetString().Should().NotContain("—").And.NotContain("–", $"{lang} {key}");
+                langs[lang].GetProperty(key).GetString().Should().NotContain("\u2014").And.NotContain("\u2013", $"{lang} {key}");
             if (!SameInHungarian.Contains(key))
                 langs["hu"].GetProperty(key).GetString().Should().NotBe(langs["en"].GetProperty(key).GetString(), $"{key} is translated");
         }
