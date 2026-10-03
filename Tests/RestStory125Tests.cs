@@ -40,9 +40,24 @@ public class RestStory125Tests : IDisposable
 
     private readonly MudServer? _oldServer = MudServer.Instance;
 
+    // The endings and the dreams change the awakening and the recovered memories; the tests run on fresh
+    // copies and the tests that follow in the collection get the ones they had (the Magic Shop reads the
+    // awakening level).
+    private static readonly FieldInfo OceanField = typeof(OceanPhilosophySystem).GetField("_fallbackInstance", SNP)!;
+    private static readonly FieldInfo AmnesiaField = typeof(AmnesiaSystem).GetField("_fallbackInstance", SNP)!;
+    private readonly object? _oldOcean = OceanField.GetValue(null);
+    private readonly object? _oldAmnesia = AmnesiaField.GetValue(null);
+
+    public RestStory125Tests()
+    {
+        OceanField.SetValue(null, new OceanPhilosophySystem());
+    }
+
     public void Dispose()
     {
         typeof(MudServer).GetField("_instance", SNP)!.SetValue(null, _oldServer);
+        OceanField.SetValue(null, _oldOcean);
+        AmnesiaField.SetValue(null, _oldAmnesia);
     }
 
     // ---------- helpers ----------
