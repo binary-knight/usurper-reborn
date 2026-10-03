@@ -509,6 +509,54 @@ public class Castle125Tests : IDisposable
             L("hu", "castle.quest_desc", L("hu", $"castle.quest_type_{i}")).Length.Should().BeLessOrEqualTo(MaxWidth);
     }
 
+    private static List<Quest> QuestDb() => (List<Quest>)typeof(QuestSystem).GetField("questDatabase", S)!.GetValue(null)!;
+
+    private static async Task<string> AskForAQuest(string lang, Character hero) => await InLanguage(lang, async () =>
+    {
+        var castle = new CastleLocation();
+        var s = At(castle, hero, false, "N", "", "");
+        await Run(castle, "AudienceRequestQuest");
+        return s.Text;
+    });
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")] [InlineData("fr")]
+    public async Task APlayerWithARoyalQuest_CannotTakeASecond_InAnyLanguage(string lang)
+    {
+        var king = LongKing(CharacterSex.Male);
+        CastleLocation.SetKing(king);
+        var hero = Hero();
+        hero.Name2 = "Questor " + lang;
+        Quest? first = null;
+        try
+        {
+            first = InLang(lang, () => QuestSystem.CreateRoyalAudienceQuest(hero, king.Name, 2, 100, 100, CastleLocation.RoyalQuestTypes[1]));
+            first.TitleKey.Should().Be(QuestSystem.RoyalCommissionTitleKey);
+            first.Comment.Should().Be(CastleLocation.RoyalQuestTypes[1], "the description is stored in English");
+            int before = QuestDb().Count;
+            string text = await AskForAQuest(lang, hero);
+            Capture($"castle-quest-active-{lang}.txt", text);
+            EveryRowFits(text, $"{lang} royal quest already active");
+            QuestDb().Count.Should().Be(before, "no second royal quest is made");
+            text.Should().Contain(L(lang, "castle.quest_already_active"));
+            string shown = InLang(lang, () => first.GetDisplayTitle());
+            shown.Should().Be(L(lang, "quest.royal_commission", L(lang, "castle.quest_type_1")));
+            text.Replace("\n", " ").Should().Contain(L(lang, "castle.quest_type_1").Split(' ')[0]);
+            if (lang != "en") InLang(lang, () => first.GetDisplayTitle()).Should().NotContain(CastleLocation.RoyalQuestTypes[1], "the title is not built from the English description");
+        }
+        finally { if (first != null) QuestDb().Remove(first); }
+    }
+
+    [Fact]
+    public void ARoyalQuestFromBefore125_IsStillFound_ByItsEnglishDescription()
+    {
+        // A quest saved by 1.2.4 in Hungarian: no TitleKey, the title in Hungarian, the comment the English description.
+        var legacy = new Quest { Initiator = "Al", Title = L("hu", "quest.royal_commission", CastleLocation.RoyalQuestTypes[0]), Comment = CastleLocation.RoyalQuestTypes[0] };
+        QuestSystem.IsRoyalCommission(legacy).Should().BeTrue();
+        QuestSystem.IsRoyalCommission(new Quest { Initiator = "Al", Title = "Royal Commission: something", Comment = "a bounty" }).Should().BeFalse();
+        Src().Should().Contain("q.Initiator == currentKing.Name && QuestSystem.IsRoyalCommission(q)").And.NotContain("StartsWith(\"Royal Commission\")");
+    }
+
     // ================= knighting =================
 
     private static readonly string[] KnightRows =

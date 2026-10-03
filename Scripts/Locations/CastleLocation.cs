@@ -7060,7 +7060,7 @@ public class CastleLocation : BaseLocation
         {
             // Check if player already has an active royal quest
             var existingRoyalQuest = QuestSystem.GetActiveQuestsForPlayer(currentPlayer.Name2)
-                .FirstOrDefault(q => q.Initiator == currentKing.Name && q.Title.StartsWith("Royal Commission"));
+                .FirstOrDefault(q => q.Initiator == currentKing.Name && QuestSystem.IsRoyalCommission(q));   // v1.2.5: not by its title, which is in the player's language
 
             if (existingRoyalQuest != null)
             {
@@ -7069,7 +7069,8 @@ public class CastleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("castle.quest_already_active"));
                 terminal.WriteLine("");
                 terminal.SetColor("white");
-                terminal.WriteLine(Loc.Get("castle.quest_active_title", existingRoyalQuest.Title));
+                // v1.2.5: word-wrapped to 79 columns (the row was up to 87 in English, 99 in other languages)
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("castle.quest_active_title", existingRoyalQuest.GetDisplayTitle()), "", 79);
                 terminal.WriteLine(Loc.Get("castle.quest_days_remaining", existingRoyalQuest.DaysRemaining));
                 terminal.WriteLine("");
                 terminal.SetColor("gray");
@@ -7136,7 +7137,7 @@ public class CastleLocation : BaseLocation
                     {
                         terminal.WriteLine("");
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("castle.quest_objective", quest.Objectives[0].Description));
+                        terminal.WriteLine(Loc.Get("castle.quest_objective", Loc.Get($"castle.quest_type_{questType}")));   // the objective holds the English description
                         if (quest.Objectives[0].RequiredProgress > 1)
                         {
                             terminal.WriteLine(Loc.Get("castle.quest_target", quest.Objectives[0].TargetName, quest.Objectives[0].RequiredProgress));

@@ -2362,9 +2362,20 @@ public partial class QuestSystem
     /// Create a special royal quest from a direct audience with the king
     /// These are personal quests given directly to the player with better rewards
     /// </summary>
+    /// <summary>v1.2.5: the TitleKey every royal audience quest carries.</summary>
+    public const string RoyalCommissionTitleKey = "quest.royal_commission";
+
+    /// <summary>
+    /// v1.2.5: a royal audience quest, in any language. A quest made before 1.2.5 has no TitleKey, but its Comment
+    /// is always the English description from CastleLocation.RoyalQuestTypes.
+    /// </summary>
+    public static bool IsRoyalCommission(Quest q) =>
+        q != null && (q.TitleKey == RoyalCommissionTitleKey || Array.IndexOf(CastleLocation.RoyalQuestTypes, q.Comment) >= 0);
+
     public static Quest CreateRoyalAudienceQuest(Character player, string kingName, int difficulty,
         long goldReward, long xpReward, string questDescription)
     {
+        int royalType = Array.IndexOf(CastleLocation.RoyalQuestTypes, questDescription);
         // Determine quest type based on description
         QuestTarget questTarget;
         QuestObjectiveType objectiveType;
@@ -2418,7 +2429,11 @@ public partial class QuestSystem
 
         var quest = new Quest
         {
-            Title = Loc.Get("quest.royal_commission", questDescription),
+            // v1.2.5: the shown title is built in the viewer's language from TitleKey; Title is the legacy
+            // fallback. The description (Comment) stays the English text the type was read from.
+            Title = Loc.Get("quest.royal_commission", royalType >= 0 ? Loc.Get($"castle.quest_type_{royalType}") : questDescription),
+            TitleKey = RoyalCommissionTitleKey,
+            TitleArgs = new List<string> { royalType >= 0 ? $"loc:castle.quest_type_{royalType}" : questDescription },
             Initiator = kingName,
             QuestType = QuestType.SingleQuest,
             QuestTarget = questTarget,
