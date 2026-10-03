@@ -42,6 +42,7 @@ public class RestEngine125Tests : IDisposable
 
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"usurper-rest-{Guid.NewGuid():N}");
     private readonly MudServer? _oldServer = MudServer.Instance;
+    private readonly ISaveBackend _oldBackend = SaveSystem.Instance.Backend;
     private SqlSaveBackend? _db;
 
     public RestEngine125Tests()
@@ -52,6 +53,9 @@ public class RestEngine125Tests : IDisposable
     public void Dispose()
     {
         typeof(MudServer).GetField("_instance", SNP)!.SetValue(null, _oldServer);
+        // The tests that follow in the collection keep the save backend they had (TeamSlots1114Tests counts
+        // team members through it).
+        SaveSystem.InitializeWithBackend(_oldBackend);
         if (_db != null) SqliteConnection.ClearAllPools();
         try { Directory.Delete(_dir, true); } catch { }
     }
