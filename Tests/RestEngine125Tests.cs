@@ -741,4 +741,34 @@ public class RestEngine125Tests : IDisposable
         GameEngine.CatchUpBucket("King Xaver proclaims: taxes").Should().Be(2);
         GameEngine.CatchUpBucket("Xaver blessed the kingdom").Should().Be(2);
     }
+
+    // ---------- "Unknown" fallbacks (review follow-up) ----------
+
+    [Fact]
+    public void UnknownFallbacks_AreShownInTheReadersLanguage_AndTheStoredTypeStaysEnglish()
+    {
+        var entry = System.Text.Json.Nodes.JsonNode.Parse("{\"result\":\"attacker_won\"}")!;
+        InLang("hu", () => GameEngine.SleepAttackerName(entry)).Should().Be(L("hu", "combat.unknown_name")).And.NotBe("Unknown");
+        InLang("en", () => GameEngine.SleepAttackerName(entry)).Should().Be("Unknown");
+        InLang("hu", () => GameEngine.SleepAttackerName(System.Text.Json.Nodes.JsonNode.Parse("{\"attacker\":\"Grim\"}")!)).Should().Be("Grim");
+
+        GameEngine.ConnectionLabel("hu", "Unknown").Should().Be(L("hu", "combat.unknown_name"));
+        GameEngine.ConnectionLabel("hu", null).Should().Be(L("hu", "combat.unknown_name"));
+        GameEngine.ConnectionLabel("hu", "Local").Should().Be(L("hu", "chat.via_local"));
+        GameEngine.ConnectionLabel("hu", "SSH").Should().Be("SSH");
+        foreach (var t in new[] { "Unknown", "Local", "Web", "SSH", "MUD", "BBS", "Steam", "Electron" })
+            GameEngine.ConnectionLabel("en", t).Should().Be(t, "English shows the stored type as before");
+
+        // The realm announcement shows it in each reader's language; the stored value is untouched.
+        var server = NewServer();
+        var hu = Online(server, "reader_hu", "hu");
+        var en = Online(server, "reader_en", "en");
+        string stored = "Unknown";
+        GameEngine.AnnounceToRealm(server, "newcomer", "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", "Grim", GameEngine.ConnectionLabel(lang, stored)));
+        Drain(hu).Single().Should().Be("  " + L("hu", "engine.entered_realm", "Grim", L("hu", "combat.unknown_name")));
+        Drain(en).Single().Should().Be("  Grim has entered the realm. [Unknown]");
+        stored.Should().Be("Unknown");
+        Src("Core", "GameEngine.cs").Should().Contain("ConnectionLabel(lang, connType)").And.Contain("ConnectionLabel(lang, ngConnType)")
+            .And.Contain("var connType = ctx?.ConnectionType ?? \"Unknown\";", "the type passed to SwitchIdentity is stored, so it stays English");
+    }
 }

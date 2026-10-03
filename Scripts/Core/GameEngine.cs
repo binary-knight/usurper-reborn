@@ -2042,14 +2042,14 @@ public partial class GameEngine
             if (GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("white");
-                terminal.WriteLine($"  {i + 1}. {p.Username} ({p.ConnectionType}){watching}");
+                terminal.WriteLine($"  {i + 1}. {p.Username} ({ConnectionLabel(GameConfig.Language, p.ConnectionType)}){watching}");
             }
             else
             {
                 terminal.SetColor("bright_yellow");
                 terminal.Write($"  [{i + 1}] ");
                 terminal.SetColor("white");
-                terminal.WriteLine($"{p.Username} [{p.ConnectionType}]{watching}");
+                terminal.WriteLine($"{p.Username} [{ConnectionLabel(GameConfig.Language, p.ConnectionType)}]{watching}");
             }
         }
 
@@ -3076,7 +3076,7 @@ public partial class GameEngine
                 // Global login announcement (suppress for invisible wizards)
                 if (mudServer != null && playerSession != null && !playerSession.IsWizInvisible)
                 {
-                    AnnounceToRealm(mudServer, sessionKey, "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", displayName, connType));
+                    AnnounceToRealm(mudServer, sessionKey, "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", displayName, ConnectionLabel(lang, connType)));
                 }
             }
 
@@ -4098,7 +4098,7 @@ public partial class GameEngine
 
                 foreach (var entry in attackLog)
                 {
-                    string attacker = entry["attacker"]?.GetValue<string>() ?? "Unknown";
+                    string attacker = SleepAttackerName(entry);
                     string result = entry["result"]?.GetValue<string>() ?? "unknown";
                     long goldStolen = 0;
                     try { goldStolen = entry["gold_stolen"]?.GetValue<long>() ?? 0; } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ProcessSleepReport] Failed to parse gold_stolen: {ex.Message}"); }
@@ -5258,7 +5258,7 @@ public partial class GameEngine
             // Global login announcement
             if (ngMudServer != null && ngPlayerSession != null && !ngPlayerSession.IsWizInvisible)
             {
-                AnnounceToRealm(ngMudServer, ngSessionKey, "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", ngDisplayName, ngConnType));
+                AnnounceToRealm(ngMudServer, ngSessionKey, "1;33", lang => Loc.GetIn(lang, "engine.entered_realm", ngDisplayName, ConnectionLabel(lang, ngConnType)));
 
                 // New player welcome broadcast (not NG+ rerolls)
                 if (!isNgPlus)
@@ -8684,6 +8684,22 @@ public partial class GameEngine
         foreach (var row in WrapRows(text))
             terminal.WriteLine(row);
     }
+
+    /// <summary>
+    /// v1.2.5: a connection type as shown in `lang`. The stored type ("Web", "SSH", "Local", "Unknown"...) stays
+    /// English in online_players and the session; "Local" and "Unknown" (or none) are shown translated, the
+    /// protocol names as they are.
+    /// </summary>
+    internal static string ConnectionLabel(string lang, string? connectionType) => connectionType switch
+    {
+        null or "" or "Unknown" => Loc.GetIn(lang, "combat.unknown_name"),
+        "Local" => Loc.GetIn(lang, "chat.via_local"),
+        _ => connectionType
+    };
+
+    /// <summary>v1.2.5: the attacker of a sleep attack log entry; a missing name is shown in the reader's language.</summary>
+    internal static string SleepAttackerName(JsonNode entry) =>
+        entry["attacker"]?.GetValue<string>() ?? Loc.Get("combat.unknown_name");
 
     /// <summary>v1.2.5: the spectate request to the watched player, in that player's language.</summary>
     internal static void NotifySpectateRequest(UsurperRemake.Server.PlayerSession target, string requester)
