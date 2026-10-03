@@ -26295,7 +26295,7 @@
   "castle.arrest_sentence_one": "  Büntetés: {0} nap",
   "castle.arrest_sentence_many": "  Büntetés: {0} nap",
   "castle.arrest_next_action": "  A következő lépésednél börtönbe kerülsz.",
-  "castle.news_imprisoned": "{0} {1} bebörtönözte {2} játékost ezért: {3}!",
+  "castle.news_imprisoned": "{0} {1} bebörtönözte őt: {2}, bűntett: {3}!",
   "castle.mail_pardoned": "{0} {1} kegyelmet adott neked! Szabad vagy!",
   "castle.news_pardoned": "{0} {1} kegyelmet adott neki: {2}!",
   "castle.mail_executed": "{0} {1} halálra ítélt! Hajszál híján megúsztad, de elvesztetted aranyad 10%-át.",
