@@ -167,7 +167,7 @@ public class DataLines125Tests : IDisposable
             {
                 Loc.HasIn(lang, key).Should().BeTrue($"{key} in {lang}");
                 string v = Loc.GetIn(lang, key);
-                v.Should().NotContain("—").And.NotContain("–").And.NotContain("…");
+                v.Should().NotContain("\u2014").And.NotContain("\u2013").And.NotContain("\u2026");
                 if (lang == "en") continue;
                 v.Should().NotBe(Loc.GetIn("en", key), $"{key} has its own {lang} text");
                 v.Should().NotContain("--", $"{key} in {lang}");
