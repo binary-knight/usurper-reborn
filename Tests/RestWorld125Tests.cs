@@ -512,6 +512,7 @@ public class RestWorld125Tests : IDisposable
             string fr = EventScreen("fr");
             fr.Should().Contain(L("fr", "world_boss.victory_event_title"));
             Regex.Replace(fr, @"\s+", " ").Should().Contain(L("fr", "world_boss.victory_event_desc"), "the description is shown, wrapped at 79 columns");
+            EveryRowFits(fr, "world events screen (fr, the victory description is 87 columns)");
         }
         finally { events.ClearAllEvents(); }
     }
