@@ -1,4 +1,5 @@
 using UsurperRemake.Utils;
+using UsurperRemake.Systems;
 using System;
 using System.Collections.Generic;
 
@@ -95,6 +96,11 @@ public class King
     {
         return Sex == CharacterSex.Male ? "King" : "Queen";
     }
+
+    /// <summary>
+    /// v1.2.5: the royal title in the current language, for news and screens. GetTitle stays the stored English.
+    /// </summary>
+    public string TitleLabel() => Loc.Get(Sex == CharacterSex.Male ? "castle.king" : "castle.queen");
     
     /// <summary>
     /// Calculate daily expenses for the royal court
@@ -229,12 +235,12 @@ public class King
             if (guard.Loyalty <= 10)
             {
                 guardsToRemove.Add(guard);
-                news.Add((true, $"Guard {guard.Name} has deserted the royal service!"));
+                news.Add((true, Loc.Get("castle.news_guard_deserted", guard.Name)));
             }
             else if (guard.Loyalty <= 25 && random.Next(100) < 10)
             {
                 guardsToRemove.Add(guard);
-                news.Add((true, $"Disgruntled guard {guard.Name} has abandoned their post!"));
+                news.Add((true, Loc.Get("castle.news_guard_abandoned", guard.Name)));
             }
         }
         foreach (var deserter in guardsToRemove)
@@ -249,12 +255,12 @@ public class King
             var escapedMonsters = court.MonsterGuards.Where(_ => random.Next(100) < 10).ToList();
             foreach (var monster in escapedMonsters)
             {
-                news.Add((true, $"The unfed {monster.Name} has escaped from the castle moat!"));
+                news.Add((true, Loc.Get("castle.news_monster_escaped", monster.Name)));
                 court.MonsterGuards.Remove(monster);
             }
 
             if (court.Guards.Count > 0 || court.MonsterGuards.Count > 0)
-                news.Add((false, $"Royal treasury crisis! Guards and monsters go unpaid!"));
+                news.Add((false, Loc.Get("castle.news_treasury_crisis")));
         }
         return news;
     }

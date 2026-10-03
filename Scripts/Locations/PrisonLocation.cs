@@ -53,6 +53,9 @@ public partial class PrisonLocation : BaseLocation
     public override async Task EnterLocation(Character player, TerminalEmulator term)
     {
         if (player == null) return;
+        // v1.2.5: this override skips BaseLocation.EnterLocation, so the base player is set here;
+        // IsScreenReader reads it, and without it the screen reader menu was never shown
+        currentPlayer = player;
 
         // Check if player is actually imprisoned
         if (player.DaysInPrison <= 0)
@@ -139,7 +142,7 @@ public partial class PrisonLocation : BaseLocation
                 else
                 {
                     await terminal.WriteColorLineAsync(
-                        "  From this cell you can only speak -- not act.",
+                        $"  {Loc.Get("prison.speak_only")}",
                         TerminalEmulator.ColorDarkGray);
                     continue;
                 }
@@ -276,9 +279,12 @@ public partial class PrisonLocation : BaseLocation
         // Prison header
         if (!IsScreenReader)
         {
-            await terminal.WriteColorLineAsync("IIIIIIIIIIIIIIIIIIIIIIII", TerminalEmulator.ColorCyan);
-            await terminal.WriteColorLineAsync($"III {Loc.Get("prison.title")} III", TerminalEmulator.ColorCyan);
-            await terminal.WriteColorLineAsync("IIIIIIIIIIIIIIIIIIIIIIII", TerminalEmulator.ColorCyan);
+            // v1.2.5: the bar is at least as wide as the framed title in the player's language
+            string title = Loc.Get("prison.title");
+            string bar = new string('I', Math.Max(24, title.Length + 8)), pillar = bar[..3];
+            await terminal.WriteColorLineAsync(bar, TerminalEmulator.ColorCyan);
+            await terminal.WriteColorLineAsync($"{pillar} {title} {pillar}", TerminalEmulator.ColorCyan);
+            await terminal.WriteColorLineAsync(bar, TerminalEmulator.ColorCyan);
         }
         else
         {
@@ -305,8 +311,8 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_escape"));
             await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_status"));
             await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_activities"));
-            await terminal.WriteLineAsync("B. Pay Bail (if bail is set)");
-            await terminal.WriteLineAsync("P. Petition the King for release");
+            await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_bail"));
+            await terminal.WriteLineAsync(Loc.Get("prison.sr_menu_petition"));
 
             var currentPlayer = gameEngine?.CurrentPlayer;
             if (currentPlayer != null && CanMeetVex(currentPlayer))
@@ -321,7 +327,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync(Loc.Get("prison.menu_row1"));
             await terminal.WriteLineAsync(Loc.Get("prison.menu_row2"));
             await terminal.WriteLineAsync(Loc.Get("prison.menu_row3"));
-            await terminal.WriteLineAsync("(B)ail Payment              (P)etition for Release");
+            await terminal.WriteLineAsync(Loc.Get("prison.menu_row4"));
 
             // Check for Vex companion availability - get player from game engine
             var currentPlayer = gameEngine?.CurrentPlayer;
@@ -414,7 +420,7 @@ public partial class PrisonLocation : BaseLocation
     {
         if (player.IsMurderConvict)
         {
-            await terminal.WriteColorLineAsync("  Murder convicts are not eligible for bail.", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_murder")}", TerminalEmulator.ColorRed);
             await Pacing.Wait(1500);
             return false;
         }
@@ -422,7 +428,7 @@ public partial class PrisonLocation : BaseLocation
         var king = CastleLocation.GetCurrentKing();
         if (king == null)
         {
-            await terminal.WriteColorLineAsync("  There is no king to accept bail.", TerminalEmulator.ColorYellow);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_no_king")}", TerminalEmulator.ColorYellow);
             await Pacing.Wait(2000);
             return false;
         }
@@ -431,35 +437,35 @@ public partial class PrisonLocation : BaseLocation
         string playerName = player.DisplayName ?? player.Name2 ?? "";
         if (!king.Prisoners.TryGetValue(playerName, out var record))
         {
-            await terminal.WriteColorLineAsync("  No bail has been set for you.", TerminalEmulator.ColorYellow);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_none")}", TerminalEmulator.ColorYellow);
             await Pacing.Wait(2000);
             return false;
         }
 
         if (record.BailAmount <= 0)
         {
-            await terminal.WriteColorLineAsync("  The king has not set bail for your release.", TerminalEmulator.ColorYellow);
-            await terminal.WriteColorLineAsync("  You must wait, escape, or petition for clemency.", TerminalEmulator.ColorDarkGray);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_not_set")}", TerminalEmulator.ColorYellow);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_wait")}", TerminalEmulator.ColorDarkGray);
             await Pacing.Wait(2000);
             return false;
         }
 
         await terminal.WriteLineAsync();
-        await terminal.WriteColorLineAsync($"  Bail is set at {record.BailAmount:N0} gold.", TerminalEmulator.ColorCyan);
-        await terminal.WriteColorLineAsync($"  You have {player.Gold:N0} gold.", TerminalEmulator.ColorWhite);
+        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_amount", $"{record.BailAmount:N0}")}", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_you_have", $"{player.Gold:N0}")}", TerminalEmulator.ColorWhite);
         await terminal.WriteLineAsync();
 
         if (player.Gold < record.BailAmount)
         {
-            await terminal.WriteColorLineAsync("  You cannot afford bail.", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_cannot_afford")}", TerminalEmulator.ColorRed);
             await Pacing.Wait(2000);
             return false;
         }
 
-        await terminal.WriteColorAsync($"  Pay {record.BailAmount:N0} gold for your freedom? (Y/N): ", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorAsync($"  {Loc.Get("prison.bail_confirm", $"{record.BailAmount:N0}")}", TerminalEmulator.ColorCyan);
         if (!await terminal.AskYesNoAsync(""))
         {
-            await terminal.WriteColorLineAsync("  You decide to keep your gold... for now.", TerminalEmulator.ColorDarkGray);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_keep_gold")}", TerminalEmulator.ColorDarkGray);
             await Pacing.Wait(1500);
             return false;
         }
@@ -469,18 +475,18 @@ public partial class PrisonLocation : BaseLocation
         long bailPaid = record.BailAmount;
         if (!await PayBailAsync(CastleLocation.TreasuryOsm(), player, playerName, bailPaid))
         {
-            await terminal.WriteColorLineAsync($"  {Loc.Get("castle.court_change_failed")}", TerminalEmulator.ColorRed);
+            await WriteWrappedAsync(Loc.Get("castle.court_change_failed"), TerminalEmulator.ColorRed);
             await Pacing.Wait(2000);
             return false;
         }
 
         await terminal.WriteLineAsync();
-        await terminal.WriteColorLineAsync($"  You pay {bailPaid:N0} gold to the jailer.", TerminalEmulator.ColorYellow);
-        await terminal.WriteColorLineAsync("  The cell door swings open.", TerminalEmulator.ColorGreen);
-        await terminal.WriteColorLineAsync("  You are free!", TerminalEmulator.ColorGreen);
+        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_paid", $"{bailPaid:N0}")}", TerminalEmulator.ColorYellow);
+        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_door_opens")}", TerminalEmulator.ColorGreen);
+        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_free")}", TerminalEmulator.ColorGreen);
         await terminal.WriteLineAsync();
 
-        NewsSystem.Instance?.Newsy(true, $"{playerName} paid {bailPaid:N0} gold bail and was released from prison.");
+        NewsSystem.Instance?.Newsy(true, Loc.Get("prison.news_bail_paid", playerName, $"{bailPaid:N0}"));
 
         await terminal.WaitForKey();
         return true; // Exit prison
@@ -543,7 +549,7 @@ public partial class PrisonLocation : BaseLocation
         var king = CastleLocation.GetCurrentKing();
         if (king == null)
         {
-            await terminal.WriteColorLineAsync("  There is no king to petition.", TerminalEmulator.ColorYellow);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_no_king")}", TerminalEmulator.ColorYellow);
             await Pacing.Wait(2000);
             return;
         }
@@ -551,13 +557,13 @@ public partial class PrisonLocation : BaseLocation
         string playerName = player.DisplayName ?? player.Name2 ?? "";
 
         await terminal.ClearScreenAsync();
-        await terminal.WriteColorLineAsync("  ═══ PETITION TO THE CROWN ═══", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync($"  ═══ {Loc.Get("prison.petition_header")} ═══", TerminalEmulator.ColorCyan);
         await terminal.WriteLineAsync();
-        await terminal.WriteColorLineAsync("  You send a formal petition to the throne:", TerminalEmulator.ColorWhite);
+        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_intro")}", TerminalEmulator.ColorWhite);
         await terminal.WriteLineAsync();
-        await terminal.WriteColorLineAsync("  1. Request bail be set (if none is set)", TerminalEmulator.ColorCyan);
-        await terminal.WriteColorLineAsync("  2. Plead for clemency (request pardon)", TerminalEmulator.ColorCyan);
-        await terminal.WriteColorLineAsync("  0. Cancel", TerminalEmulator.ColorDarkGray);
+        await terminal.WriteColorLineAsync($"  1. {Loc.Get("prison.petition_opt_bail")}", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync($"  2. {Loc.Get("prison.petition_opt_clemency")}", TerminalEmulator.ColorCyan);
+        await terminal.WriteColorLineAsync($"  0. {Loc.Get("ui.cancel")}", TerminalEmulator.ColorDarkGray);
         await terminal.WriteLineAsync();
 
         string choice = await terminal.ReadLineAsync();
@@ -568,7 +574,7 @@ public partial class PrisonLocation : BaseLocation
             bool hasBail = king.Prisoners.TryGetValue(playerName, out var record) && record?.BailAmount > 0;
             if (hasBail)
             {
-                await terminal.WriteColorLineAsync($"  Bail is already set at {record!.BailAmount:N0} gold.", TerminalEmulator.ColorYellow);
+                await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_already_set", $"{record!.BailAmount:N0}")}", TerminalEmulator.ColorYellow);
             }
             else
             {
@@ -580,14 +586,14 @@ public partial class PrisonLocation : BaseLocation
                     // meets the same amount
                     if (await SetBailAsync(CastleLocation.TreasuryOsm(), playerName, bailAmount))
                     {
-                        await terminal.WriteColorLineAsync($"  The king considers your petition...", TerminalEmulator.ColorWhite);
+                        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_considers")}", TerminalEmulator.ColorWhite);
                         await Pacing.Wait(1500);
-                        await terminal.WriteColorLineAsync($"  Bail has been set at {bailAmount:N0} gold.", TerminalEmulator.ColorGreen);
-                        await terminal.WriteColorLineAsync($"  Use [B] to pay bail.", TerminalEmulator.ColorCyan);
+                        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_set_now", $"{bailAmount:N0}")}", TerminalEmulator.ColorGreen);
+                        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.bail_use_b")}", TerminalEmulator.ColorCyan);
                     }
                     else
                     {
-                        await terminal.WriteColorLineAsync("  The king cannot find your prison record.", TerminalEmulator.ColorRed);
+                        await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_no_record")}", TerminalEmulator.ColorRed);
                     }
                 }
                 else
@@ -601,14 +607,14 @@ public partial class PrisonLocation : BaseLocation
                             try
                             {
                                 string kingUsername = king.Name.ToLowerInvariant();
-                                await backend.SendMessage(playerName, kingUsername, "petition",
-                                    $"{playerName} petitions from prison: \"Please set bail for my release! I await your mercy, Your Majesty.\"");
+                                await backend.SendMessageLocalized(playerName, kingUsername, "petition",
+                                    lang => BailPetitionMail(lang, playerName));
                             }
                             catch { }
                         }
                     }
-                    await terminal.WriteColorLineAsync("  Your petition has been sent to the king.", TerminalEmulator.ColorCyan);
-                    await terminal.WriteColorLineAsync("  You must wait for a royal response.", TerminalEmulator.ColorDarkGray);
+                    await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_sent")}", TerminalEmulator.ColorCyan);
+                    await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_await")}", TerminalEmulator.ColorDarkGray);
                 }
             }
         }
@@ -624,7 +630,7 @@ public partial class PrisonLocation : BaseLocation
                 int pardonChance = 10 + (int)(player.Chivalry / 50);
                 pardonChance = Math.Clamp(pardonChance, 5, 40);
 
-                await terminal.WriteColorLineAsync("  The king considers your plea for mercy...", TerminalEmulator.ColorWhite);
+                await terminal.WriteColorLineAsync($"  {Loc.Get("prison.plea_considers")}", TerminalEmulator.ColorWhite);
                 await Pacing.Wait(2000);
 
                 // v1.1.13: a court prison record is removed in one guarded court change; an arrest without one
@@ -633,16 +639,16 @@ public partial class PrisonLocation : BaseLocation
                     && await PardonAsync(CastleLocation.TreasuryOsm(), player, playerName))
                 {
 
-                    await terminal.WriteColorLineAsync("  \"Very well. I shall show mercy this once.\"", TerminalEmulator.ColorGreen);
-                    await terminal.WriteColorLineAsync("  The king pardons you! You are free!", TerminalEmulator.ColorGreen);
-                    NewsSystem.Instance?.Newsy(true, $"The king pardoned {playerName} after a plea for clemency.");
+                    await terminal.WriteColorLineAsync($"  {Loc.Get("prison.plea_mercy")}", TerminalEmulator.ColorGreen);
+                    await terminal.WriteColorLineAsync($"  {Loc.Get("prison.plea_pardoned")}", TerminalEmulator.ColorGreen);
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("prison.news_pardoned", playerName));
                     await terminal.WaitForKey();
                     return;
                 }
                 else
                 {
-                    await terminal.WriteColorLineAsync("  \"Your crimes have not been forgotten.\"", TerminalEmulator.ColorRed);
-                    await terminal.WriteColorLineAsync("  The king denies your petition.", TerminalEmulator.ColorRed);
+                    await terminal.WriteColorLineAsync($"  {Loc.Get("prison.plea_not_forgotten")}", TerminalEmulator.ColorRed);
+                    await terminal.WriteColorLineAsync($"  {Loc.Get("prison.plea_denied")}", TerminalEmulator.ColorRed);
                 }
             }
             else
@@ -656,14 +662,14 @@ public partial class PrisonLocation : BaseLocation
                         try
                         {
                             string kingUsername = king.Name.ToLowerInvariant();
-                            await backend.SendMessage(playerName, kingUsername, "petition",
-                                $"{playerName} pleads from prison: \"I beg for clemency! Please pardon my crimes, Your Majesty.\"");
+                            await backend.SendMessageLocalized(playerName, kingUsername, "petition",
+                                lang => ClemencyPleaMail(lang, playerName));
                         }
                         catch { }
                     }
                 }
-                await terminal.WriteColorLineAsync("  Your plea for clemency has been sent to the king.", TerminalEmulator.ColorCyan);
-                await terminal.WriteColorLineAsync("  You must wait for a royal response.", TerminalEmulator.ColorDarkGray);
+                await terminal.WriteColorLineAsync($"  {Loc.Get("prison.plea_sent")}", TerminalEmulator.ColorCyan);
+                await terminal.WriteColorLineAsync($"  {Loc.Get("prison.petition_await")}", TerminalEmulator.ColorDarkGray);
             }
         }
 
@@ -695,12 +701,11 @@ public partial class PrisonLocation : BaseLocation
         int i = 1;
         foreach (var activity in activities)
         {
-            var info = PrisonActivitySystem.ActivityInfo[activity];
             await terminal.WriteColorAsync($"({i}) ", TerminalEmulator.ColorYellow);
-            await terminal.WriteAsync($"{info.Name,-15} ");
-            await terminal.WriteColorAsync($"{info.Effect}", TerminalEmulator.ColorGreen);
+            await terminal.WriteAsync($"{PrisonActivitySystem.ActivityName(activity),-15} ");
+            await terminal.WriteColorAsync(PrisonActivitySystem.ActivityEffect(activity), TerminalEmulator.ColorGreen);
             await terminal.WriteLineAsync();
-            await terminal.WriteColorLineAsync($"    {info.Description}", TerminalEmulator.ColorDarkGray);
+            await terminal.WriteColorLineAsync($"    {PrisonActivitySystem.ActivityDescription(activity)}", TerminalEmulator.ColorDarkGray);
             i++;
         }
 
@@ -783,7 +788,7 @@ public partial class PrisonLocation : BaseLocation
 
         if (player.IsMurderConvict)
         {
-            await terminal.WriteColorLineAsync("  Maximum security. The door is sealed with enchanted locks.", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.door_max_security")}", TerminalEmulator.ColorRed);
             await Pacing.Wait(1500);
             return;
         }
@@ -807,7 +812,7 @@ public partial class PrisonLocation : BaseLocation
         if (player.IsMurderConvict)
         {
             await terminal.WriteLineAsync();
-            await terminal.WriteColorLineAsync("  The guards laugh. \"Murderers don't make demands.\"", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.demand_murderer")}", TerminalEmulator.ColorRed);
             await Pacing.Wait(1500);
             return;
         }
@@ -824,14 +829,8 @@ public partial class PrisonLocation : BaseLocation
 
         // Random guard response (Pascal: case random(5))
         var random = new System.Random();
-        string response = random.Next(5) switch
-        {
-            0 => GameConfig.PrisonDemandResponse1,
-            1 => GameConfig.PrisonDemandResponse2,
-            2 => GameConfig.PrisonDemandResponse3,
-            3 => GameConfig.PrisonDemandResponse4,
-            _ => GameConfig.PrisonDemandResponse5
-        };
+        // v1.2.5: the five answers (GameConfig.PrisonDemandResponse1-5 in English) in the player's language
+        string response = Loc.Get($"prison.demand_response_{random.Next(5) + 1}");
 
         await terminal.WriteColorLineAsync(response, TerminalEmulator.ColorMagenta);
         await terminal.WriteLineAsync(Loc.Get("prison.released_probably"));
@@ -848,12 +847,12 @@ public partial class PrisonLocation : BaseLocation
                     string playerName = player.DisplayName ?? player.Name2 ?? "";
                     try
                     {
-                        await backend.SendMessage(playerName, king.Name, "petition",
-                            $"{playerName} demands release from prison: \"LET ME OUT! I demand to be freed at once!\"");
+                        await backend.SendMessageLocalized(playerName, king.Name, "petition",
+                            lang => DemandReleaseMail(lang, playerName));
                     }
                     catch { }
                 }
-                await terminal.WriteColorLineAsync("  Your demands echo through the dungeon halls...", TerminalEmulator.ColorDarkGray);
+                await terminal.WriteColorLineAsync($"  {Loc.Get("prison.demand_echo")}", TerminalEmulator.ColorDarkGray);
             }
         }
     }
@@ -866,9 +865,9 @@ public partial class PrisonLocation : BaseLocation
         if (player.IsMurderConvict)
         {
             await terminal.WriteColorLineAsync("", TerminalEmulator.ColorRed);
-            await terminal.WriteColorLineAsync("  You are in MAXIMUM SECURITY for murder.", TerminalEmulator.ColorRed);
-            await terminal.WriteColorLineAsync("  There is absolutely no chance of escape.", TerminalEmulator.ColorRed);
-            await terminal.WriteColorLineAsync("  You must serve your full sentence.", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.escape_max_security")}", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.escape_no_chance")}", TerminalEmulator.ColorRed);
+            await terminal.WriteColorLineAsync($"  {Loc.Get("prison.escape_full_sentence")}", TerminalEmulator.ColorRed);
             await Pacing.Wait(2000);
             return false;
         }
@@ -906,7 +905,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteColorLineAsync(Loc.Get("prison.escape_failed"), TerminalEmulator.ColorRed);
 
             // Generate news about failed escape
-            NewsSystem.Instance.Newsy(true, $"{player.DisplayName} failed to escape from the Royal Prison!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("prison.news_escape_failed", player.DisplayName));
 
             await terminal.WriteLineAsync(Loc.Get("prison.guards_heard"));
             await terminal.WriteLineAsync(Loc.Get("prison.sentence_extended"));
@@ -919,7 +918,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteColorLineAsync(Loc.Get("prison.escape_success"), TerminalEmulator.ColorGreen);
 
             // Generate news about successful escape
-            NewsSystem.Instance.Newsy(true, $"{player.DisplayName} has escaped from the Royal Prison!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("prison.news_escaped", player.DisplayName));
 
             await terminal.WriteLineAsync();
             await Pacing.Wait(1000);
@@ -1011,7 +1010,7 @@ public partial class PrisonLocation : BaseLocation
 
     private string GetRaceDisplay(CharacterRace race)
     {
-        return race.ToString();
+        return GameConfig.GetLocalizedRaceName(race);
     }
 
     private Task<bool> IsPlayerOnline(Character player)
@@ -1047,6 +1046,25 @@ public partial class PrisonLocation : BaseLocation
         int daysLeft = player.DaysInPrison;
         return Task.FromResult(Loc.Get("prison.location_status", daysLeft, player.PrisonEscapes));
     }
+
+    /// <summary>v1.2.5: text wrapped to 79 columns, each row indented by two spaces.</summary>
+    private async Task WriteWrappedAsync(string text, string color)
+    {
+        foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(text, 77))
+            await terminal.WriteColorLineAsync("  " + line, color);
+    }
+
+    /// <summary>v1.2.5: a prisoner's bail petition to a human monarch, in the monarch's language.</summary>
+    internal static string BailPetitionMail(string lang, string prisoner) =>
+        Loc.GetIn(lang, "prison.mail_petition_bail", prisoner);
+
+    /// <summary>v1.2.5: a prisoner's plea for clemency to a human monarch, in the monarch's language.</summary>
+    internal static string ClemencyPleaMail(string lang, string prisoner) =>
+        Loc.GetIn(lang, "prison.mail_plea_clemency", prisoner);
+
+    /// <summary>v1.2.5: a prisoner's demand for release to a human monarch, in the monarch's language.</summary>
+    internal static string DemandReleaseMail(string lang, string prisoner) =>
+        Loc.GetIn(lang, "prison.mail_demand_release", prisoner);
 
     #region Vex Companion Recruitment
 
@@ -1246,7 +1264,7 @@ public partial class PrisonLocation : BaseLocation
             await terminal.WriteLineAsync();
 
             // Generate news
-            NewsSystem.Instance.Newsy(true, $"{player.DisplayName} escaped from the Royal Prison with {vexName}'s help!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("prison.news_vex_escape", player.DisplayName, vexName));
         }
 
         // Free the player
@@ -1327,7 +1345,7 @@ public partial class PrisonLocation : BaseLocation
 
         ElectronBridge.EmitLocation(
             name: Loc.Get("prison.title"),
-            description: $"Days remaining: {player.DaysInPrison}",
+            description: Loc.Get("engine.days_remaining", player.DaysInPrison),
             timeOfDay: "");
 
         bool isManaClass = player is Player p && p.IsManaClass;
@@ -1341,22 +1359,22 @@ public partial class PrisonLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "W", Label = "Who is here?", Category = "info", Icon = "list" },
-            new() { Key = "D", Label = "Demand release", Category = "social", Icon = "shout" },
-            new() { Key = "O", Label = "Open the cell door", Category = "action", Icon = "door" },
-            new() { Key = "E", Label = "Escape attempt", Category = "danger", Icon = "escape" },
-            new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
-            new() { Key = "A", Label = "Activities", Category = "action", Icon = "activity" },
-            new() { Key = "B", Label = "Pay Bail", Category = "shop", Icon = "gold" },
-            new() { Key = "P", Label = "Petition the King", Category = "social", Icon = "petition" },
+            new() { Key = "W", Label = Loc.Get("prison.electron_who"), Category = "info", Icon = "list" },
+            new() { Key = "D", Label = Loc.Get("prison.electron_demand"), Category = "social", Icon = "shout" },
+            new() { Key = "O", Label = Loc.Get("prison.electron_open"), Category = "action", Icon = "door" },
+            new() { Key = "E", Label = Loc.Get("prison.electron_escape"), Category = "danger", Icon = "escape" },
+            new() { Key = "S", Label = Loc.Get("menu.action.status"), Category = "info", Icon = "info" },
+            new() { Key = "A", Label = Loc.Get("prison.electron_activities"), Category = "action", Icon = "activity" },
+            new() { Key = "B", Label = Loc.Get("prison.electron_bail"), Category = "shop", Icon = "gold" },
+            new() { Key = "P", Label = Loc.Get("prison.electron_petition"), Category = "social", Icon = "petition" },
         };
 
         if (CanMeetVex(player))
         {
-            menu.Add(new() { Key = "V", Label = "Speak with Vex", Category = "social", Icon = "vex" });
+            menu.Add(new() { Key = "V", Label = Loc.Get("prison.electron_vex"), Category = "social", Icon = "vex" });
         }
 
-        menu.Add(new() { Key = "Q", Label = "Wait / Quit", Category = "navigate", Icon = "back" });
+        menu.Add(new() { Key = "Q", Label = Loc.Get("prison.electron_quit"), Category = "navigate", Icon = "back" });
 
         ElectronBridge.EmitMenu(menu);
     }

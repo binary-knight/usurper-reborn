@@ -122,7 +122,7 @@ public partial class PrisonWalkLocation : BaseLocation
                 await terminal.WriteLineAsync();
                 await terminal.WriteAsync($"{Loc.Get("prison_walk.prompt")} (");
                 await terminal.WriteColorAsync("?", TerminalEmulator.ColorYellow);
-                await terminal.WriteAsync(" for menu) :");
+                await terminal.WriteAsync(Loc.Get("prison.prompt_suffix"));
             }
             else
             {
@@ -277,7 +277,7 @@ public partial class PrisonWalkLocation : BaseLocation
     private async Task ShowPrisonerInfo(Character prisoner)
     {
         await terminal.WriteColorAsync(prisoner.DisplayName, TerminalEmulator.ColorCyan);
-        await terminal.WriteAsync($" the {GetRaceDisplay(prisoner.Race)}");
+        await terminal.WriteAsync($" {Loc.Get("prison.the_race", GetRaceDisplay(prisoner.Race))}");
 
         // Show if online/offline/dead
         if (await IsPlayerOnline(prisoner))
@@ -444,21 +444,21 @@ public partial class PrisonWalkLocation : BaseLocation
         return guards;
     }
 
-    private string GetGuardName(int index)
+    /// <summary>v1.2.5: the guard keys. The guards live only in this fight (BattlePrisonGuards), so their names
+    /// are in the player's language.</summary>
+    internal static readonly string[] GuardNameKeys =
     {
-        var guardNames = new[]
-        {
-            "Royal Guard",
-            "Prison Warden",
-            "Iron Fist Guard",
-            "Dungeon Keeper",
-            "Jailer",
-            "Tower Guard",
-            "Cell Block Guardian",
-            "Sheriff's Deputy"
-        };
-        return guardNames[index % guardNames.Length];
-    }
+        "base.royal_guard",
+        "prison_walk.guard_warden",
+        "prison_walk.guard_iron_fist",
+        "prison_walk.guard_dungeon_keeper",
+        "prison_walk.guard_jailer",
+        "prison_walk.guard_tower",
+        "prison_walk.guard_cell_block",
+        "prison_walk.guard_deputy"
+    };
+
+    internal static string GetGuardName(int index) => Loc.Get(GuardNameKeys[index % GuardNameKeys.Length]);
     
     private async Task<bool> BattlePrisonGuards(Character player, List<Character> guards)
     {
@@ -681,7 +681,7 @@ public partial class PrisonWalkLocation : BaseLocation
     
     private string GetRaceDisplay(CharacterRace race)
     {
-        return race.ToString();
+        return GameConfig.GetLocalizedRaceName(race);
     }
     
     private Task<bool> IsPlayerOnline(Character player)
@@ -736,9 +736,9 @@ public partial class PrisonWalkLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "P", Label = "List prisoners", Category = "info", Icon = "list" },
-            new() { Key = "F", Label = "Free a prisoner", Category = "danger", Icon = "escape" },
-            new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
+            new() { Key = "P", Label = Loc.Get("prison_walk.electron_list"), Category = "info", Icon = "list" },
+            new() { Key = "F", Label = Loc.Get("prison_walk.electron_free"), Category = "danger", Icon = "escape" },
+            new() { Key = "S", Label = Loc.Get("menu.action.status"), Category = "info", Icon = "info" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

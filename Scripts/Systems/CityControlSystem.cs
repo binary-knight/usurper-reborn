@@ -247,7 +247,7 @@ public class CityControlSystem
         if (string.IsNullOrEmpty(controllingTeam) || currentControllers.Count == 0)
         {
             TransferCityControl(challengerTeam);
-            NewsSystem.Instance?.Newsy(true, $"'{challengerTeam}' has taken control of the city!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("city.news_taken_control", challengerTeam));
             return true;
         }
 
@@ -287,14 +287,14 @@ public class CityControlSystem
             // Challengers win!
             TransferCityControl(challengerTeam);
             NewsSystem.Instance?.Newsy(true,
-                $"'{challengerTeam}' defeated '{controllingTeam}' and now controls the city!");
+                Loc.Get("city.news_defeated_control", challengerTeam, controllingTeam));
             return true;
         }
         else
         {
             // Defenders hold
             NewsSystem.Instance?.Newsy(true,
-                $"'{controllingTeam}' successfully defended the city against '{challengerTeam}'!");
+                Loc.Get("city.news_defended", controllingTeam, challengerTeam));
             return false;
         }
     }
@@ -354,7 +354,7 @@ public class CityControlSystem
             player.CTurf = false;
         }
 
-        NewsSystem.Instance?.Newsy(true, $"The city is no longer under team control!");
+        NewsSystem.Instance?.Newsy(true, Loc.Get("city.news_no_control"));
     }
 
     /// <summary>
@@ -380,7 +380,7 @@ public class CityControlSystem
         character.CTurf = false;
         character.TeamRec = 0;
 
-        NewsSystem.Instance?.Newsy(true, $"{character.Name2} has left '{oldTeam}'.");
+        NewsSystem.Instance?.Newsy(true, Loc.Get("city.news_left_team", character.Name2, oldTeam));
         // GD.Print($"[CityControl] {character.Name2} forced to leave team '{oldTeam}'");
     }
 

@@ -476,7 +476,7 @@ namespace UsurperRemake.Systems
                     EmotionalImpact = 0.3f
                 });
 
-                NewsSystem.Instance?.Newsy($"{player.Name2} helped {petitioner.Name2} through a difficult time.");
+                NewsSystem.Instance?.Newsy(Loc.Get("petition.news_helped_marriage", player.Name2, petitioner.Name2));
             }
             else
             {
@@ -542,7 +542,7 @@ namespace UsurperRemake.Systems
                 });
 
                 AlignmentSystem.Instance.ChangeAlignment(player, 5, isGood: true, "petition.save_marriage"); // v0.57.12: paired movement
-                NewsSystem.Instance?.Newsy($"{player.Name2} intervened to save the marriage of {petitioner.Name2} and {spouse.Name2}.");
+                NewsSystem.Instance?.Newsy(Loc.Get("petition.news_saved_marriage", player.Name2, petitioner.Name2, spouse.Name2));
             }
             else
             {
@@ -570,7 +570,7 @@ namespace UsurperRemake.Systems
                     EmotionalImpact = 0.3f
                 });
 
-                NewsSystem.Instance?.Newsy($"{player.Name2} confronted {spouse.Name2} about their treatment of {petitioner.Name2}.");
+                NewsSystem.Instance?.Newsy(Loc.Get("petition.news_confronted_spouse", player.Name2, spouse.Name2, petitioner.Name2));
             }
 
             await terminal.PressAnyKey();
@@ -619,7 +619,7 @@ namespace UsurperRemake.Systems
                 });
 
                 AlignmentSystem.Instance.ChangeAlignment(player, 15, isGood: false, "petition.exploit_scandal"); // v0.57.12: paired movement
-                NewsSystem.Instance?.Newsy($"Scandalous rumors swirl about {player.Name2} and {petitioner.Name2}...");
+                NewsSystem.Instance?.Newsy(Loc.Get("petition.news_scandal", player.Name2, petitioner.Name2));
             }
             else
             {
@@ -735,7 +735,7 @@ namespace UsurperRemake.Systems
                         terminal.WriteLine($"\n  {Loc.Get("petition.wingman.success_overjoyed", suitor.Name2, reward)}");
 
                         AlignmentSystem.Instance.ChangeAlignment(player, 3, isGood: true, "petition.wingman"); // v0.57.12: paired movement
-                        NewsSystem.Instance?.Newsy($"{player.Name2} played matchmaker for {suitor.Name2} and {crushName}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_matchmaker", player.Name2, suitor.Name2, crushName));
                     }
                     else
                     {
@@ -789,7 +789,7 @@ namespace UsurperRemake.Systems
                                 EmotionalImpact = -0.7f
                             });
 
-                            NewsSystem.Instance?.Newsy($"{suitor.Name2} discovered {player.Name2}'s betrayal!");
+                            NewsSystem.Instance?.Newsy(Loc.Get("petition.news_betrayal", suitor.Name2, player.Name2));
                         }
                     }
                     break;
@@ -908,7 +908,7 @@ namespace UsurperRemake.Systems
                         player.Gold += reward;
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"\n  {Loc.Get("petition.mediate.success_thanks", reward)}");
-                        NewsSystem.Instance?.Newsy($"{player.Name2} successfully mediated a custody dispute between {petitioner.Name2} and {exName}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_custody_mediated", player.Name2, petitioner.Name2, exName));
                     }
                     else
                     {
@@ -949,7 +949,7 @@ namespace UsurperRemake.Systems
                         });
                     }
 
-                    NewsSystem.Instance?.Newsy($"{player.Name2} sided with {petitioner.Name2} in a custody dispute with {exName}.");
+                    NewsSystem.Instance?.Newsy(Loc.Get("petition.news_custody_sided_petitioner", player.Name2, petitioner.Name2, exName));
                     break;
 
                 case "X" when exSpouse != null: // Side with ex
@@ -971,7 +971,7 @@ namespace UsurperRemake.Systems
                         InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = 0.4f
                     });
 
-                    NewsSystem.Instance?.Newsy($"{player.Name2} sided with {exName} against {petitioner.Name2} in a custody dispute.");
+                    NewsSystem.Instance?.Newsy(Loc.Get("petition.news_custody_sided_ex", player.Name2, exName, petitioner.Name2));
                     break;
 
                 default: // Ignore
@@ -993,6 +993,11 @@ namespace UsurperRemake.Systems
         /// v1.1.14: a ruling's cost out of the treasury, as one guarded court change that refuses when the stored
         /// treasury is short. False (refusal shown, nothing granted) when it is short or the court changed.
         /// </summary>
+        /// <summary>v1.2.5: the ruling monarch's title (King or Queen) for the royal petition news, in the
+        /// writer's language. The news called a queen "King" before.</summary>
+        internal static string RulerTitle(Character ruler) =>
+            Loc.Get(ruler.Sex == CharacterSex.Male ? "castle.king" : "castle.queen");
+
         private static async Task<bool> PayRulingAsync(King king, long cost, TerminalEmulator terminal)
         {
             if (king.Treasury < cost)
@@ -1099,7 +1104,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Saved, Description = $"King {player.Name2} granted me tax relief",
                             InvolvedCharacter = player.Name2, Importance = 0.8f, EmotionalImpact = 0.6f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} granted tax relief to {petitioner.Name2}. The people approve!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_tax_granted", RulerTitle(player), player.Name2, petitioner.Name2));
                     }
                     else if (choice.ToUpper() == "H")
                     {
@@ -1108,7 +1113,7 @@ namespace UsurperRemake.Systems
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"\n  {Loc.Get("petition.royal.tax_halve_result", cost)}");
                         AlignmentSystem.Instance.ChangeAlignment(player, 2, isGood: true, "petition.royal.tax_halve"); // v0.57.12: paired movement
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} offered partial tax relief to {petitioner.Name2}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_tax_partial", RulerTitle(player), player.Name2, petitioner.Name2));
                     }
                     else
                     {
@@ -1122,7 +1127,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Insulted, Description = $"King {player.Name2} denied my plea for tax relief",
                             InvolvedCharacter = player.Name2, Importance = 0.6f, EmotionalImpact = -0.4f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} denied tax relief to {petitioner.Name2}. Grumbling grows.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_tax_denied", RulerTitle(player), player.Name2, petitioner.Name2));
                     }
                     break;
 
@@ -1137,7 +1142,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Defended, Description = $"King {player.Name2} ordered justice for my complaint",
                             InvolvedCharacter = player.Name2, Importance = 0.8f, EmotionalImpact = 0.5f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} ordered an investigation on behalf of {petitioner.Name2}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_investigation", RulerTitle(player), player.Name2, petitioner.Name2));
                     }
                     else if (choice.ToUpper() == "C")
                     {
@@ -1176,7 +1181,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Saved, Description = $"King {player.Name2} sent guards to protect us",
                             InvolvedCharacter = player.Name2, Importance = 0.8f, EmotionalImpact = 0.5f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} deployed guards to protect citizens from dungeon creatures.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_guards_deployed", RulerTitle(player), player.Name2));
                     }
                     else if (choice.ToUpper() == "P")
                     {
@@ -1190,7 +1195,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Defended, Description = $"King {player.Name2} promised to personally protect us",
                             InvolvedCharacter = player.Name2, Importance = 0.9f, EmotionalImpact = 0.6f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} vows to personally deal with the dungeon threat!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_king_vows", RulerTitle(player), player.Name2));
                     }
                     else
                     {
@@ -1202,7 +1207,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Abandoned, Description = $"King {player.Name2} ignored our plea for protection",
                             InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = -0.5f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} dismissed reports of dungeon creatures. Citizens are worried.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_threat_dismissed", RulerTitle(player), player.Name2));
                     }
                     break;
 
@@ -1219,7 +1224,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Helped, Description = $"King {player.Name2} blessed my marriage",
                             InvolvedCharacter = player.Name2, Importance = 0.8f, EmotionalImpact = 0.6f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} blessed the marriage of {petitioner.Name2}. Celebrations ensued!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_marriage_blessed", RulerTitle(player), player.Name2, petitioner.Name2));
                     }
                     else
                     {
@@ -1233,7 +1238,7 @@ namespace UsurperRemake.Systems
                             Type = MemoryType.Insulted, Description = $"King {player.Name2} denied my marriage blessing",
                             InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = -0.5f
                         });
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} denied a marriage blessing to {petitioner.Name2}. People whisper of tyranny.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_marriage_denied", RulerTitle(player), player.Name2, petitioner.Name2));
                     }
                     break;
             }
@@ -1307,7 +1312,7 @@ namespace UsurperRemake.Systems
                         }
 
                         AlignmentSystem.Instance.ChangeAlignment(player, 10, isGood: true, "petition.dying_forgive"); // v0.57.12: paired movement
-                        NewsSystem.Instance?.Newsy($"{player.Name2} honored the dying wish of {elder.Name2}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_dying_wish", player.Name2, elder.Name2));
                     }
                     else
                     {
@@ -1361,7 +1366,7 @@ namespace UsurperRemake.Systems
                             Description = $"{player.Name2} listened to my final confession",
                             InvolvedCharacter = player.Name2, Importance = 0.9f, EmotionalImpact = 0.5f
                         });
-                        NewsSystem.Instance?.Newsy($"The elderly {elder.Name2} shared a deathbed confession with {player.Name2}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_confession", elder.Name2, player.Name2));
                     }
                     else
                     {
@@ -1431,7 +1436,7 @@ namespace UsurperRemake.Systems
                             Description = $"{player.Name2} promised to protect my loved ones",
                             InvolvedCharacter = player.Name2, Importance = 1.0f, EmotionalImpact = 0.8f
                         });
-                        NewsSystem.Instance?.Newsy($"{player.Name2} vowed to protect the family of the aging {elder.Name2}.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("petition.news_protect_family", player.Name2, elder.Name2));
                     }
                     else
                     {
@@ -1546,7 +1551,7 @@ namespace UsurperRemake.Systems
                         InvolvedCharacter = player.Name2, Importance = 0.7f, EmotionalImpact = 0.3f
                     });
 
-                    NewsSystem.Instance?.Newsy($"{warner.Name2} shared intelligence with {player.Name2} about growing threats.");
+                    NewsSystem.Instance?.Newsy(Loc.Get("petition.news_intelligence", warner.Name2, player.Name2));
                     break;
 
                 case "A": // Acknowledge
