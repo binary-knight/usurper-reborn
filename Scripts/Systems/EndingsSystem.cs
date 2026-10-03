@@ -247,12 +247,18 @@ namespace UsurperRemake.Systems
                 if (startedNgPlus) return; // Player started NG+
 
                 // Player declined both — loop back and offer again
-                terminal.WriteLine("");
-                terminal.WriteLine("  You must choose: ascend to godhood or begin the cycle anew.", "bright_yellow");
-                terminal.WriteLine("  There is no going back to the mortal world after defeating Manwe.", "gray");
-                terminal.WriteLine("");
-                await terminal.PressAnyKey("  Press Enter to choose again...");
+                await ChooseAgain(terminal);
             }
+        }
+
+        /// <summary>v1.2.5: the notice when the player declined both ascension and New Game+.</summary>
+        internal static async Task ChooseAgain(TerminalEmulator terminal)
+        {
+            terminal.WriteLine("");
+            terminal.WriteLine($"  {Loc.Get("ending.choose_again_must")}", "bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("ending.choose_again_no_return")}", "gray");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter_choose_again"));
         }
 
         #region Ending Sequences
@@ -440,80 +446,6 @@ namespace UsurperRemake.Systems
             await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
         }
 
-        private async Task PlayTrueEnding(Character player, TerminalEmulator terminal)
-        {
-            terminal.Clear();
-            await Pacing.Wait(1000);
-
-            terminal.WriteLine("");
-            if (!GameConfig.ScreenReaderMode)
-            {
-                terminal.WriteLine("╔═══════════════════════════════════════════════════════════════════╗", "bright_magenta");
-                terminal.WriteLine("║                   T H E   T R U E   E N D I N G                   ║", "bright_magenta");
-                terminal.WriteLine("║                      Seeker of Balance                            ║", "bright_magenta");
-                terminal.WriteLine("╚═══════════════════════════════════════════════════════════════════╝", "bright_magenta");
-            }
-            else
-            {
-                terminal.WriteLine(Loc.Get("ending.true_sr_title"), "bright_magenta");
-            }
-            terminal.WriteLine("");
-
-            await Pacing.Wait(2000);
-
-            var lines = new[]
-            {
-                (Loc.Get("ending.true_line_1"), "bright_cyan"),
-                (Loc.Get("ending.true_line_2"), "bright_cyan"),
-                (Loc.Get("ending.true_line_3"), "bright_cyan"),
-                (Loc.Get("ending.true_line_4"), "bright_cyan"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_5"), "bright_yellow"),
-                (Loc.Get("ending.true_line_6"), "yellow"),
-                (Loc.Get("ending.true_line_7"), "yellow"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_8"), "cyan"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_9"), "yellow"),
-                (Loc.Get("ending.true_line_10"), "yellow"),
-                (Loc.Get("ending.true_line_11"), "yellow"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_12"), "white"),
-                (Loc.Get("ending.true_line_13"), "white"),
-                (Loc.Get("ending.true_line_14"), "white"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_15"), "cyan"),
-                (Loc.Get("ending.true_line_16"), "cyan"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_17"), "yellow"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_18"), "bright_magenta"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_19"), "bright_magenta"),
-                (Loc.Get("ending.true_line_20"), "bright_magenta"),
-                (Loc.Get("ending.true_line_21"), "bright_magenta"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_22"), "bright_cyan"),
-                (Loc.Get("ending.true_line_23"), "bright_cyan"),
-                ("", "white"),
-                (Loc.Get("ending.true_line_24"), "bright_magenta"),
-                (Loc.Get("ending.true_line_25"), "bright_magenta")
-            };
-
-            foreach (var (line, color) in lines)
-            {
-                terminal.WriteLine($"  {line}", color);
-                await Pacing.Wait(200);
-            }
-
-            terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.true_the_end")}", "bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("ending.true_subtitle")}", "gray");
-            terminal.WriteLine("");
-
-            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
-        }
-
         /// <summary>
         /// Enhanced True Ending with Ocean Philosophy integration
         /// Includes the revelation that player is a fragment of Manwe
@@ -526,10 +458,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
             {
-                terminal.WriteLine("╔═══════════════════════════════════════════════════════════════════╗", "bright_cyan");
-                terminal.WriteLine("║            T H E   T R U E   A W A K E N I N G                    ║", "bright_cyan");
-                terminal.WriteLine("║           \"You are the Ocean, dreaming of being a wave\"           ║", "bright_cyan");
-                terminal.WriteLine("╚═══════════════════════════════════════════════════════════════════╝", "bright_cyan");
+                foreach (var row in TitleBoxRows(Loc.Get("ending.awakening_header"), Loc.Get("ending.awakening_sr_title_2")))
+                    terminal.WriteLine(row, "bright_cyan");
             }
             else
             {
@@ -630,10 +560,8 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
             {
-                terminal.WriteLine("╔═══════════════════════════════════════════════════════════════════╗", "white");
-                terminal.WriteLine("║                     D I S S O L U T I O N                         ║", "white");
-                terminal.WriteLine("║              \"No more cycles. No more grasping.\"                  ║", "white");
-                terminal.WriteLine("╚═══════════════════════════════════════════════════════════════════╝", "white");
+                foreach (var row in TitleBoxRows(Loc.Get("ending.dissolution_header"), Loc.Get("ending.dissolution_sr_title_2")))
+                    terminal.WriteLine(row, "white");
             }
             else
             {
@@ -1415,20 +1343,13 @@ namespace UsurperRemake.Systems
             }
 
             // Determine alignment from ending
-            string alignment = ending switch
-            {
-                EndingType.Savior => "Light",
-                EndingType.Usurper => "Dark",
-                EndingType.Defiant => "Balance",
-                EndingType.TrueEnding => "Balance",
-                _ => "Balance"
-            };
+            string alignment = AscensionAlignment(ending);
 
             // Auto-abdicate if player is the king
             if (player.King)
             {
                 // v1.1.13: the abdication is written first; there is no ascension when it fails
-                if (!await CastleLocation.AbdicatePlayerThroneAsync(player, "abdicated the throne to ascend to godhood"))
+                if (!await CastleLocation.AbdicatePlayerThroneAsync(player, AscensionAbdicationReason))
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine($"  {Loc.Get("castle.court_change_failed")}");
@@ -1452,7 +1373,7 @@ namespace UsurperRemake.Systems
             {
                 new TeamSystem().QuitTeam(player);
                 terminal.SetColor("bright_yellow");
-                terminal.WriteLine($"  Your mortal team bonds dissolve in the divine ascension.");
+                terminal.WriteLine($"  {Loc.Get("ending.immortal_team_dissolved")}");
                 terminal.WriteLine("");
                 await Pacing.Wait(1000);
             }
@@ -1471,7 +1392,7 @@ namespace UsurperRemake.Systems
                 {
                     guildSys.RemoveMember(ctxAscend.Username);
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine($"  Your guild crest tarnishes and falls away. The faithful have no guild.");
+                    terminal.WriteLine($"  {Loc.Get("ending.immortal_guild_lost")}");
                     terminal.WriteLine("");
                     await Pacing.Wait(1000);
                 }
@@ -1496,7 +1417,7 @@ namespace UsurperRemake.Systems
             if (!GameConfig.ScreenReaderMode)
                 terminal.WriteLine("  ════════════════════════════════════════════════════════════");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("ending.immortal_ascended", divineName, alignment)}", "bright_yellow");
+            terminal.WriteLine($"  {Loc.Get("ending.immortal_ascended", divineName, PantheonLocation.AlignmentLabel(alignment))}", "bright_yellow");
             terminal.WriteLine($"  {Loc.Get("ending.immortal_ascended_msg")}", "bright_yellow");
             terminal.WriteLine("");
             if (!GameConfig.ScreenReaderMode)
@@ -1508,16 +1429,15 @@ namespace UsurperRemake.Systems
             await GodDomainPicker.PickAsync(player, terminal);
 
             // Write news
-            NewsSystem.Instance?.Newsy(true,
-                $"[DIVINE] {player.Name2} has ascended to godhood as {divineName}!");
+            NewsSystem.Instance?.Newsy(true, AscensionNews(player.Name2, divineName));
 
             // Broadcast to all online players
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
                 try
                 {
-                    MudServer.Instance?.BroadcastToAll(
-                        $"\r\n\x1b[1;33m  {divineName}, Lesser Spirit of {alignment}\r\n  has ascended to the Divine Realm!\x1b[0m\r\n",
+                    MudServer.Instance?.BroadcastLocalized(
+                        lang => AscensionBroadcast(lang, divineName, alignment),
                         excludeUsername: player.DisplayName);
                 }
                 catch { /* broadcast is optional */ }
@@ -1616,29 +1536,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ending.ngplus_bonus_dialogue")}", "white");
 
             // Show which prestige classes this ending unlocks
-            var newClasses = new List<string>();
-            switch (ending)
-            {
-                case EndingType.Savior:
-                    newClasses.Add("Tidesworn (Holy)");
-                    newClasses.Add("Wavecaller (Good)");
-                    break;
-                case EndingType.Defiant:
-                    newClasses.Add("Cyclebreaker (Neutral)");
-                    break;
-                case EndingType.Usurper:
-                    newClasses.Add("Abysswarden (Dark)");
-                    newClasses.Add("Voidreaver (Evil)");
-                    break;
-                case EndingType.TrueEnding:
-                case EndingType.Secret:
-                    newClasses.Add("Tidesworn (Holy)");
-                    newClasses.Add("Wavecaller (Good)");
-                    newClasses.Add("Cyclebreaker (Neutral)");
-                    newClasses.Add("Abysswarden (Dark)");
-                    newClasses.Add("Voidreaver (Evil)");
-                    break;
-            }
+            var newClasses = PrestigeClassRows(ending);
             if (newClasses.Count > 0)
             {
                 terminal.WriteLine($"  {Loc.Get("ending.ngplus_prestige_intro")}", "white");
@@ -1663,6 +1561,95 @@ namespace UsurperRemake.Systems
             }
 
             return false;
+        }
+
+        #endregion
+
+        #region Display Helpers
+
+        /// <summary>
+        /// v1.2.5: the reason passed with the abdication before an ascension. It stays English: CastleLocation's
+        /// ReignEndedNews matches it to write the godhood news in the writer's language.
+        /// </summary>
+        internal const string AscensionAbdicationReason = "abdicated the throne to ascend to godhood";
+
+        /// <summary>
+        /// v1.2.5: the god alignment an ending gives (stored in GodAlignment; it stays English because
+        /// DivineBoonRegistry and the boon alignments compare it). Shown through AlignmentIn.
+        /// </summary>
+        internal static string AscensionAlignment(EndingType ending) => ending switch
+        {
+            EndingType.Savior => "Light",
+            EndingType.Usurper => "Dark",
+            EndingType.Defiant => "Balance",
+            EndingType.TrueEnding => "Balance",
+            _ => "Balance"
+        };
+
+        /// <summary>
+        /// v1.2.5: a two-row title box, 67 columns inside (69 wide): the ending's spaced title and its subtitle,
+        /// each centred. A row longer than the box is word wrapped inside it.
+        /// </summary>
+        internal static List<string> TitleBoxRows(string title, string subtitle)
+        {
+            const int inner = 67;
+            var rows = new List<string> { "╔" + new string('═', inner) + "╗" };
+            foreach (var text in new[] { title, subtitle })
+            {
+                var lines = UIHelper.VisibleLength(text) <= inner - 2
+                    ? new List<string> { text }
+                    : UIHelper.WordWrap(text, inner - 2);
+                foreach (var line in lines)
+                {
+                    int len = UIHelper.VisibleLength(line);
+                    int left = (inner - len) / 2;
+                    rows.Add("║" + new string(' ', left) + line + new string(' ', inner - left - len) + "║");
+                }
+            }
+            rows.Add("╚" + new string('═', inner) + "╝");
+            return rows;
+        }
+
+        /// <summary>
+        /// v1.2.5: a stored god alignment (Light, Dark, Balance; it stays English in GodAlignment, which
+        /// DivineBoonRegistry compares) in the given language.
+        /// </summary>
+        internal static string AlignmentIn(string lang, string alignment) => alignment switch
+        {
+            "Light" => Loc.GetIn(lang, "temple.align.light"),
+            "Dark" => Loc.GetIn(lang, "temple.align.dark"),
+            "Balance" => Loc.GetIn(lang, "temple.align.balance"),
+            _ => alignment,
+        };
+
+        /// <summary>v1.2.5: the ascension news line in the writer's language, after the English divine marker.</summary>
+        internal static string AscensionNews(string name, string divineName) =>
+            PantheonLocation.DivineNews(Loc.Get("ending.news_ascended", name, divineName));
+
+        /// <summary>v1.2.5: the ascension announcement for one online player, in that player's language.</summary>
+        internal static string AscensionBroadcast(string lang, string divineName, string alignment) =>
+            $"\r\n\x1b[1;33m  {Loc.GetIn(lang, "ending.immortal_ascended", divineName, AlignmentIn(lang, alignment))}" +
+            $"\r\n  {Loc.GetIn(lang, "ending.immortal_ascended_msg")}\x1b[0m\r\n";
+
+        /// <summary>
+        /// v1.2.5: the prestige classes an ending unlocks, as shown ("Tidesworn (Holy)"), in the player's language.
+        /// The unlock itself is CompletedEndings; these rows are display only.
+        /// </summary>
+        internal static List<string> PrestigeClassRows(EndingType ending)
+        {
+            var classes = ending switch
+            {
+                EndingType.Savior => new[] { ("tidesworn", "holy"), ("wavecaller", "good") },
+                EndingType.Defiant => new[] { ("cyclebreaker", "neutral") },
+                EndingType.Usurper => new[] { ("abysswarden", "dark"), ("voidreaver", "evil") },
+                EndingType.TrueEnding or EndingType.Secret => new[]
+                {
+                    ("tidesworn", "holy"), ("wavecaller", "good"), ("cyclebreaker", "neutral"),
+                    ("abysswarden", "dark"), ("voidreaver", "evil")
+                },
+                _ => Array.Empty<(string, string)>()
+            };
+            return classes.Select(c => $"{Loc.Get("class." + c.Item1)} ({Loc.Get("alignment." + c.Item2)})").ToList();
         }
 
         #endregion

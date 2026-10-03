@@ -317,10 +317,10 @@ namespace UsurperRemake.Systems
 
             terminal.WriteLine("");
             terminal.SetColor("gray");
-            terminal.WriteLine("  ...You wake with tears on your face.");
+            terminal.WriteLine($"  {Loc.Get("amnesia.dream_wake")}");
             terminal.WriteLine("");
 
-            await terminal.PressAnyKey("  Press Enter to continue...");
+            await terminal.PressAnyKey(Loc.Get("ending.press_enter"));
 
             // Dreams may trigger memory recovery
             CheckMemoryTrigger(TriggerType.Dream, player);
@@ -387,57 +387,11 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Display a recovered memory to the player
-        /// </summary>
-        public async Task DisplayMemory(MemoryFragment fragment, TerminalEmulator terminal)
-        {
-            if (!MemoryData.TryGetValue(fragment, out var data)) return;
-
-            terminal.ClearScreen();
-            terminal.SetColor("cyan");
-            terminal.WriteLine("");
-            terminal.WriteLine("  ========================================");
-            terminal.WriteLine($"    MEMORY: {data.Title}");
-            terminal.WriteLine("  ========================================");
-            terminal.WriteLine("");
-
-            terminal.SetColor("bright_cyan");
-            foreach (var line in data.Lines)
-            {
-                terminal.WriteLine($"    {line}");
-                await Pacing.Wait(1200);
-            }
-
-            terminal.WriteLine("");
-            terminal.SetColor("gray");
-
-            await terminal.PressAnyKey("  Press Enter to return to reality...");
-        }
-
-        /// <summary>
         /// Get the percentage of memories recovered
         /// </summary>
         public float GetRecoveryProgress()
         {
             return (float)RecoveredMemories.Count / MemoryData.Count;
-        }
-
-        /// <summary>
-        /// Get a hint about what the player is forgetting
-        /// </summary>
-        public string GetAmnesiaHint()
-        {
-            int recovered = RecoveredMemories.Count;
-
-            return recovered switch
-            {
-                0 => "Your past is a void. You remember nothing before the dormitory.",
-                1 or 2 => "Fragments surface in dreams. Something vast lurks in your forgotten past.",
-                3 or 4 => "You were... more. Much more. The dreams speak of creation itself.",
-                5 or 6 => "The dreams feel less like memories and more like confessions.",
-                7 or 8 => "You are beginning to understand what you forgot. And why.",
-                _ => "The veil is thin now. The truth waits just beyond..."
-            };
         }
 
         /// <summary>
