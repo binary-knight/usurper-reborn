@@ -227,6 +227,36 @@ public class DataNpcDialogue125Tests : IDisposable
         DialogueLines_MoodPrefixes.GetLines().First().Text.Should().StartWith("{npc_name} is humming a tune");
     }
 
+    /// <summary>
+    /// The slots these tables held English in (removed from hardcoded-data-sources.txt when they emptied)
+    /// still hold none: a row written back as an English literal is found here.
+    /// </summary>
+    [Fact]
+    public void FormerTextSlots_StayEmpty()
+    {
+        var slots = new (string File, string Slot)[]
+        {
+            ("Scripts/Data/DialogueLines_Greetings.cs", "init.Text"),
+            ("Scripts/Data/DialogueLines_MoodPrefixes.cs", "init.Text"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "init.[k]=/tuple#0"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "init.[k]=/tuple#1"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "decl:genericTopics"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "decl:templates"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "init.[k]="),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "init.Phrases"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "init.Titles"),
+            ("Scripts/Systems/NPCDialogueGenerator.cs", "init.Topics"),
+        };
+        var sources = slots.Select(s => new UsurperReborn.Tests.Localization.DataTextScanner.Source("table", s.File, s.Slot, "former table")).ToList();
+        string root = UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot();
+        foreach (var file in slots.Select(s => s.File).Distinct())
+        {
+            var result = UsurperReborn.Tests.Localization.DataTextScanner.ScanSource(file, File.ReadAllText(Path.Combine(root, file)),
+                Array.Empty<UsurperReborn.Tests.Localization.HardcodedTextScanner.Exclusion>(), sources);
+            result.Sites.Should().BeEmpty($"{file} keeps its text in Localization/*.json");
+        }
+    }
+
     /// <summary>The English the generator showed before 1.2.5, with its misspellings fixed.</summary>
     [Theory]
     [InlineData("npc_gen.greet.married.4", "Don't you ever scare me like that again.")]
