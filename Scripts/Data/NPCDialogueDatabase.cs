@@ -202,17 +202,20 @@ namespace UsurperRemake.Data
 
         /// <summary>
         /// v1.2.5: the named placeholders of a line's English text and the argument each becomes in its
-        /// npc_dialogue key. A key may also use {5} (a "good morning" salutation) and {6} ("all morning"),
-        /// so a language can say the time of day without gluing a word to its own.
+        /// npc_dialogue key, in the order they are replaced. "Good {time_of_day}" is {5} (the salutation of
+        /// the hour) and "all {time_of_day}" is {6}, so no language glues a word to the time of day.
         /// </summary>
-        private static readonly string[] Placeholders =
-            { "{player_name}", "{npc_name}", "{player_title}", "{time_of_day}", "{player_class}" };
+        private static readonly (string Named, string Arg)[] Placeholders =
+        {
+            ("Good {time_of_day}", "{5}"), ("all {time_of_day}", "{6}"),
+            ("{player_name}", "{0}"), ("{npc_name}", "{1}"), ("{player_title}", "{2}"), ("{time_of_day}", "{3}"), ("{player_class}", "{4}"),
+        };
 
         /// <summary>v1.2.5: a line's English text with its named placeholders as key arguments.</summary>
         internal static string ToTemplate(string text)
         {
-            for (int i = 0; i < Placeholders.Length; i++)
-                text = text.Replace(Placeholders[i], "{" + i + "}");
+            foreach (var (named, arg) in Placeholders)
+                text = text.Replace(named, arg);
             return text;
         }
 
@@ -223,8 +226,8 @@ namespace UsurperRemake.Data
         internal static string BuiltInText(string id)
         {
             string text = UsurperRemake.Systems.Loc.GetIn("en", "npc_dialogue." + id);
-            for (int i = 0; i < Placeholders.Length; i++)
-                text = text.Replace("{" + i + "}", Placeholders[i]);
+            foreach (var (named, arg) in Placeholders)
+                text = text.Replace(arg, named);
             return text;
         }
 

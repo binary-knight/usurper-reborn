@@ -254,9 +254,7 @@ names|Scripts/Core/NPC.cs|decl:locations|place name, also a location.name.{id} k
 table|Scripts/Core/NPC.cs|decl:status|NPC status, DormitoryLocation
 names|Scripts/Core/Child.cs|decl:femaleNames|given names
 names|Scripts/Core/Child.cs|decl:maleNames|given names
-table|Scripts/Data/DialogueLines_Greetings.cs|init.Text|NPC greeting lines, NPCDialogueDatabase.GetBestLine
 table|Scripts/Data/DialogueLines_Memory.cs|init.Text|NPC memory lines, NPCDialogueDatabase.GetBestLine
-table|Scripts/Data/DialogueLines_MoodPrefixes.cs|init.Text|NPC mood prefixes, NPCDialogueDatabase.GetBestLine
 table|Scripts/Data/DialogueLines_Reactions.cs|init.Text|NPC reaction lines, NPCDialogueDatabase.GetBestLine
 keyed|Scripts/Data/EquipmentData.cs|init.Name|stored English item names; ItemNames shows item.{TemplateLocKey} by EquipmentData id
 keyed|Scripts/Data/GauntletChampionData.cs|decl:CrowdAmbiance|gauntlet.crowd_ambiance.{i}
@@ -385,14 +383,6 @@ keyed|Scripts/Systems/LootGenerator.cs|dictpair#1/tuple#0|item.effect.{effect}.n
 keyed|Scripts/Systems/LootGenerator.cs|dictpair#1/tuple#1|item.effect.{effect}.prefix
 keyed|Scripts/Systems/LootGenerator.cs|dictpair#1/tuple#2|item.effect.{effect}.suffix
 names|Scripts/Systems/NewsSystem.cs|EqualsValueClause|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Systems/NPCDialogueGenerator.cs|init.[k]=/tuple#0|generated dialogue prefix
-table|Scripts/Systems/NPCDialogueGenerator.cs|init.[k]=/tuple#1|generated dialogue suffix
-table|Scripts/Systems/NPCDialogueGenerator.cs|decl:genericTopics|small talk
-table|Scripts/Systems/NPCDialogueGenerator.cs|decl:templates|topic comment
-table|Scripts/Systems/NPCDialogueGenerator.cs|init.[k]=|relationship greetings
-table|Scripts/Systems/NPCDialogueGenerator.cs|init.Phrases|vocabulary phrases
-table|Scripts/Systems/NPCDialogueGenerator.cs|init.Titles|vocabulary titles
-table|Scripts/Systems/NPCDialogueGenerator.cs|init.Topics|small talk topics
 names|Scripts/Systems/NPCSpawnSystem.cs|decl:ImmigrantFemaleNames|NPC first names
 names|Scripts/Systems/NPCSpawnSystem.cs|decl:ImmigrantMaleNames|NPC first names
 names|Scripts/Systems/NPCSpawnSystem.cs|decl:ImmigrantSurnames|NPC surnames

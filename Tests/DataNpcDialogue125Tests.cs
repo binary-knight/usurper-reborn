@@ -206,10 +206,7 @@ public class DataNpcDialogue125Tests : IDisposable
                 Args(Loc.GetIn(lang, key)).Should().BeEquivalentTo(Args(Loc.GetIn("en", key)), $"{key} in {lang}");
             foreach (var key in DbKeys())
             {
-                var en = Args(Loc.GetIn("en", key));
-                var tr = Args(Loc.GetIn(lang, key));
-                tr.Except(new[] { "3", "5", "6" }).Should().BeEquivalentTo(en.Except(new[] { "3" }), $"{key} in {lang}");
-                if (en.Contains("3")) tr.Intersect(new[] { "3", "5", "6" }).Should().NotBeEmpty($"{key} in {lang} says the time");
+                Args(Loc.GetIn(lang, key)).Should().BeEquivalentTo(Args(Loc.GetIn("en", key)), $"{key} in {lang}");
             }
         }
     }
