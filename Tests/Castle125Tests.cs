@@ -483,8 +483,10 @@ public class Castle125Tests : IDisposable
     [Fact]
     public void RoyalQuestDescriptions_GoToQuestSystemInEnglish_AndAreShownKeyed()
     {
-        // "creatures" in type 2 is read before "floor": it was a monster quest at bfecaf1 and still is
-        var expected = new[] { QuestTarget.Monster, QuestTarget.ReachFloor, QuestTarget.Monster, QuestTarget.ReachFloor, QuestTarget.DefeatNPC };
+        // Type 2 ("Clear a dungeon floor of all hostile creatures") is a floor to clear; it was read as a monster
+        // quest until 1.2.5 because "creature" was checked before "floor".
+        var expected = new[] { QuestTarget.Monster, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.ReachFloor, QuestTarget.DefeatNPC };
+        var objective = new[] { QuestObjectiveType.KillMonsters, QuestObjectiveType.ReachDungeonFloor, QuestObjectiveType.ClearDungeonFloor, QuestObjectiveType.ReachDungeonFloor, QuestObjectiveType.KillBoss };
         CastleLocation.RoyalQuestTypes.Should().HaveCount(5);
         InLang("hu", () =>
         {
@@ -495,7 +497,8 @@ public class Castle125Tests : IDisposable
                 var quest = QuestSystem.CreateRoyalAudienceQuest(Hero(), "Queen Test", 2, 100, 100, CastleLocation.RoyalQuestTypes[i]);
                 try
                 {
-                    quest.QuestTarget.Should().Be(expected[i], $"QuestSystem reads the English words of type {i}");
+                    quest.QuestTarget.Should().Be(expected[i], $"QuestSystem reads type {i}");
+                    quest.Objectives[0].ObjectiveType.Should().Be(objective[i]);
                     quest.Comment.Should().Be(CastleLocation.RoyalQuestTypes[i]);
                 }
                 finally { ((List<Quest>)typeof(QuestSystem).GetField("questDatabase", S)!.GetValue(null)!).Remove(quest); }
@@ -545,6 +548,17 @@ public class Castle125Tests : IDisposable
             if (lang != "en") InLang(lang, () => first.GetDisplayTitle()).Should().NotContain(CastleLocation.RoyalQuestTypes[1], "the title is not built from the English description");
         }
         finally { if (first != null) QuestDb().Remove(first); }
+    }
+
+    [Fact]
+    public void AQuestDescriptionFromElsewhere_IsReadByItsWords_FloorFirst()
+    {
+        QuestSystem.RoyalQuestKind(-1, "Clear a dungeon floor of all hostile creatures").Should().Be(2);
+        QuestSystem.RoyalQuestKind(-1, "Slay the creatures").Should().Be(0);
+        QuestSystem.RoyalQuestKind(-1, "Bring back an artifact").Should().Be(1);
+        QuestSystem.RoyalQuestKind(-1, "Find a criminal").Should().Be(4);
+        QuestSystem.RoyalQuestKind(-1, "Look around").Should().Be(3);
+        for (int i = 0; i < 5; i++) QuestSystem.RoyalQuestKind(i, "monster").Should().Be(i);
     }
 
     [Fact]

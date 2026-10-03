@@ -2372,6 +2372,19 @@ public partial class QuestSystem
     public static bool IsRoyalCommission(Quest q) =>
         q != null && (q.TitleKey == RoyalCommissionTitleKey || Array.IndexOf(CastleLocation.RoyalQuestTypes, q.Comment) >= 0);
 
+    /// <summary>v1.2.5: 0 monsters, 1 artifact (a floor to reach), 2 a floor to clear, 3 investigation (a floor to
+    /// reach), 4 a criminal; a RoyalQuestTypes index is its own kind.</summary>
+    internal static int RoyalQuestKind(int royalType, string questDescription)
+    {
+        if (royalType >= 0) return royalType;
+        string d = questDescription ?? "";
+        if (d.Contains("floor") || d.Contains("clear")) return 2;
+        if (d.Contains("monster") || d.Contains("creature")) return 0;
+        if (d.Contains("artifact") || d.Contains("recover")) return 1;
+        if (d.Contains("criminal") || d.Contains("hunt")) return 4;
+        return 3;
+    }
+
     public static Quest CreateRoyalAudienceQuest(Character player, string kingName, int difficulty,
         long goldReward, long xpReward, string questDescription)
     {
@@ -2390,14 +2403,18 @@ public partial class QuestSystem
         int maxAccessibleFloor = Math.Min(GameConfig.MaxDungeonLevel, player.Level + 10);
         int ClampFloor(int raw) => Math.Clamp(raw, 1, maxAccessibleFloor);
 
-        if (questDescription.Contains("monster") || questDescription.Contains("creature"))
+        // v1.2.5: the type is read from the quest's index in CastleLocation.RoyalQuestTypes; only a description
+        // from elsewhere is read by its words, floor first ("Clear a dungeon floor of all hostile creatures" was
+        // read as a monster quest because "creature" was checked first).
+        int kind = RoyalQuestKind(royalType, questDescription);
+        if (kind == 0)
         {
             questTarget = QuestTarget.Monster;
             objectiveType = QuestObjectiveType.KillMonsters;
             targetValue = 5 + difficulty * 3; // 8, 11, 14, 17 monsters
             targetName = GetRandomMonsterForLevel(player.Level);
         }
-        else if (questDescription.Contains("artifact") || questDescription.Contains("recover"))
+        else if (kind == 1)
         {
             // FindArtifact removed (no tracking/completion code) — treat as dungeon exploration
             questTarget = QuestTarget.ReachFloor;
@@ -2405,14 +2422,14 @@ public partial class QuestSystem
             targetValue = ClampFloor(player.Level + difficulty * 3);
             targetName = $"Floor {targetValue}";
         }
-        else if (questDescription.Contains("floor") || questDescription.Contains("clear"))
+        else if (kind == 2)
         {
             questTarget = QuestTarget.ClearFloor;
             objectiveType = QuestObjectiveType.ClearDungeonFloor;
             targetValue = ClampFloor(player.Level - 5 + difficulty * 5); // Near player level
             targetName = $"Floor {targetValue}";
         }
-        else if (questDescription.Contains("criminal") || questDescription.Contains("hunt"))
+        else if (kind == 4)
         {
             questTarget = QuestTarget.DefeatNPC;
             objectiveType = QuestObjectiveType.KillBoss;
