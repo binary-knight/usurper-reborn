@@ -152,17 +152,11 @@ table|Scripts/Locations/QuestHallLocation.cs|decl:status|quest status in the Ele
 names|Scripts/Locations/TempleLocation.cs|=LocationName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 
 # --- Scripts/Systems ----------------------------------------------------------------------------
-table|Scripts/Systems/ArchetypeTracker.cs|switcharm/tuple#0|ending archetype title, EndingsSystem
-table|Scripts/Systems/ArchetypeTracker.cs|switcharm/tuple#1|ending archetype subtitle
-table|Scripts/Systems/ArchetypeTracker.cs|switcharm/tuple#2|ending archetype text
 table|Scripts/Systems/ArtifactSystem.cs|dictpair#0|artifact stat bonus label
 table|Scripts/Systems/ArtifactSystem.cs|init.Description|artifact description
 table|Scripts/Systems/ArtifactSystem.cs|init.LoreText|artifact lore
 table|Scripts/Systems/ArtifactSystem.cs|init.SpecialAbility|artifact ability
 names|Scripts/Systems/ArtifactSystem.cs|init.Name|unique artifact names
-table|Scripts/Systems/BetrayalSystem.cs|init.BetrayalDialogue|betrayal dialogue
-table|Scripts/Systems/BetrayalSystem.cs|init.Motivations|betrayal motivations
-table|Scripts/Systems/BetrayalSystem.cs|init.RedemptionPath|betrayal.path_to_redemption argument
 names|Scripts/Systems/BetrayalSystem.cs|init.NPCName|NPC names
 table|Scripts/Systems/CharacterCreationSystem.cs|dictpair#1|class abbreviations in the race list
 table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|starter weapon description
@@ -180,17 +174,9 @@ names|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#0|god names
 keyed|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#1|god.epithet.*
 keyed|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#4|god.desc.*
 names|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#5|god names
-table|Scripts/Systems/MoralParadoxSystem.cs|init.Label|paradox option
-nouns|Scripts/Systems/MoralParadoxSystem.cs|init.Name|paradox titles
-table|Scripts/Systems/MoralParadoxSystem.cs|init.OceanPhilosophyReflection|paradox reflection
-table|Scripts/Systems/MoralParadoxSystem.cs|init.Outcome|paradox outcome
-table|Scripts/Systems/MoralParadoxSystem.cs|init.Setup|paradox setup
 keyed|Scripts/Systems/NPCItemGenerator.cs|decl:QualityPrefixes|stored English name prefix; ItemNames shows it through item.rarity.fine/superior/cursed or item.quality.*
 keyed|Scripts/Systems/NPCItemGenerator.cs|dictpair#0|stored English template names and prefixes; ItemNames shows item.{TemplateLocKey} and the prefix keys
 keyed|Scripts/Systems/NPCItemGenerator.cs|init.Name|stored English fallback names; ItemNames shows item.{TemplateLocKey}
-table|Scripts/Systems/OceanPhilosophySystem.cs|init.[k]=|ambient wisdom, MagicShopLocation
-table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#0|wave fragment title printed raw, DungeonLocation
-table|Scripts/Systems/OceanPhilosophySystem.cs|new:WaveFragmentData#1|wave fragment text printed raw, DungeonLocation
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#0|prison.activity_{id}_name
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#1|prison.activity_{id}_desc
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#2|prison.activity_{id}_effect
@@ -329,10 +315,6 @@ table|Scripts/Systems/AchievementSystem.cs|init.Description|achievement descript
 nouns|Scripts/Systems/AchievementSystem.cs|init.Name|achievement names
 table|Scripts/Systems/AchievementSystem.cs|init.SecretHint|achievement hint
 table|Scripts/Systems/AchievementSystem.cs|init.UnlockMessage|achievement unlock message
-table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#0|amnesia dream titles
-table|Scripts/Systems/AmnesiaSystem.cs|new:DreamData#1|amnesia dream lines
-table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#0|memory fragment titles
-table|Scripts/Systems/AmnesiaSystem.cs|new:MemoryFragmentData#1|memory fragment lines
 names|Scripts/Systems/CombatEngine.cs|init.Name|unique boss name
 table|Scripts/Systems/CombatMessages.cs|init.[k]=|attack verbs
 table|Scripts/Systems/CompanionSystem.cs|decl:drop|companion drop line

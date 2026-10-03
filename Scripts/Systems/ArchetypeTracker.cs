@@ -510,122 +510,42 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get archetype name and description
+        /// Get archetype name and description.
+        /// v1.2.5: the name, title and description are shown in the reader's language, from keys built from the
+        /// archetype's enum name (the stored id is the enum's number); the colour stays here.
         /// </summary>
         public static (string name, string title, string description, string color) GetArchetypeInfo(JungianArchetype archetype)
         {
-            return archetype switch
-            {
-                JungianArchetype.Hero => (
-                    "The Hero",
-                    "Champion of the Realm",
-                    "You faced every challenge head-on, conquering monsters and bosses alike. " +
-                    "Your courage in battle defined your journey. The realm will remember you as a warrior who never backed down.",
-                    "bright_yellow"
-                ),
-                JungianArchetype.Caregiver => (
-                    "The Caregiver",
-                    "Guardian of Souls",
-                    "You chose protection over destruction, healing over harm. " +
-                    "Your companions survived because of your sacrifice. The realm knows you as one who puts others first.",
-                    "bright_green"
-                ),
-                JungianArchetype.Explorer => (
-                    "The Explorer",
-                    "Seeker of Horizons",
-                    "No dungeon floor was too deep, no secret too hidden. " +
-                    "You mapped the unknown and collected what others feared to touch. Curiosity was your compass.",
-                    "cyan"
-                ),
-                JungianArchetype.Rebel => (
-                    "The Rebel",
-                    "Breaker of Chains",
-                    "You refused to play by their rules. Authority meant nothing to you. " +
-                    "Whether through darkness or defiance, you carved your own path through a world that tried to contain you.",
-                    "bright_red"
-                ),
-                JungianArchetype.Sage => (
-                    "The Sage",
-                    "Keeper of Ancient Wisdom",
-                    "Knowledge was your true treasure. You collected seals, understood the Ocean's truth, " +
-                    "and sought meaning beyond mere combat. The mysteries of the realm revealed themselves to you.",
-                    "bright_blue"
-                ),
-                JungianArchetype.Magician => (
-                    "The Magician",
-                    "Weaver of Reality",
-                    "Magic flowed through your actions. You didn't just fight - you transformed. " +
-                    "Spells were your language, and the arcane was your domain. Reality bent to your will.",
-                    "bright_magenta"
-                ),
-                JungianArchetype.Ruler => (
-                    "The Ruler",
-                    "Master of Dominion",
-                    "You accumulated power, wealth, and influence. Leadership came naturally. " +
-                    "Whether as king or kingmaker, you understood that true strength lies in control.",
-                    "yellow"
-                ),
-                JungianArchetype.Creator => (
-                    "The Creator",
-                    "Architect of Dreams",
-                    "Building and crafting defined your journey. Where others destroyed, you made something new. " +
-                    "Your legacy is not in what you conquered, but in what you created.",
-                    "white"
-                ),
-                JungianArchetype.Innocent => (
-                    "The Innocent",
-                    "Keeper of Faith",
-                    "Despite the darkness, you maintained your purity. Mercy over vengeance, hope over despair. " +
-                    "The realm's corruption could not touch your soul. You proved goodness can survive.",
-                    "bright_white"
-                ),
-                JungianArchetype.Lover => (
-                    "The Lover",
-                    "Heart of Passion",
-                    "Connection was your quest. Romance, intimacy, and emotional bonds drove your choices. " +
-                    "The realm remembers not your battles, but your loves - and perhaps, your heartbreaks.",
-                    "bright_red"
-                ),
-                JungianArchetype.Jester => (
-                    "The Jester",
-                    "Fool's Wisdom",
-                    "Life was never too serious for you. Jokes, tricks, and unexpected choices marked your path. " +
-                    "Where others saw gravity, you found levity. The realm learned to laugh again.",
-                    "bright_yellow"
-                ),
-                JungianArchetype.Everyman => (
-                    "The Everyman",
-                    "Common Champion",
-                    "You weren't the mightiest or the cleverest, but you were reliable. " +
-                    "Team player, steady hand, always there when needed. True heroism doesn't require a crown.",
-                    "gray"
-                ),
-                _ => ("Unknown", "Mysterious One", "Your nature defies classification.", "white")
-            };
+            string key = KeyId(archetype);
+            return (Loc.Get($"archetype.{key}.name"), Loc.Get($"archetype.{key}.title"),
+                Loc.Get($"archetype.{key}.description"), ColorOf(archetype));
         }
 
-        /// <summary>
-        /// Get a personalized quote based on archetype
-        /// </summary>
-        public static string GetArchetypeQuote(JungianArchetype archetype)
+        /// <summary>v1.2.5: the id the archetype's keys are built from, "unknown" for a value outside the enum.</summary>
+        internal static string KeyId(JungianArchetype archetype) =>
+            Enum.IsDefined(typeof(JungianArchetype), archetype) ? archetype.ToString() : "unknown";
+
+        private static string ColorOf(JungianArchetype archetype) => archetype switch
         {
-            return archetype switch
-            {
-                JungianArchetype.Hero => "\"A hero is someone who has given their life to something bigger than themselves.\" - Joseph Campbell",
-                JungianArchetype.Caregiver => "\"The greatest gift is a portion of thyself.\" - Ralph Waldo Emerson",
-                JungianArchetype.Explorer => "\"Not all those who wander are lost.\" - J.R.R. Tolkien",
-                JungianArchetype.Rebel => "\"Well-behaved women seldom make history.\" - Laurel Thatcher Ulrich",
-                JungianArchetype.Sage => "\"The only true wisdom is knowing you know nothing.\" - Socrates",
-                JungianArchetype.Magician => "\"Magic is believing in yourself. If you can do that, you can make anything happen.\" - Goethe",
-                JungianArchetype.Ruler => "\"Heavy is the head that wears the crown.\" - Shakespeare",
-                JungianArchetype.Creator => "\"Every act of creation is first an act of destruction.\" - Picasso",
-                JungianArchetype.Innocent => "\"Blessed are the pure in heart, for they shall see God.\" - Matthew 5:8",
-                JungianArchetype.Lover => "\"Love is composed of a single soul inhabiting two bodies.\" - Aristotle",
-                JungianArchetype.Jester => "\"If we couldn't laugh we would all go insane.\" - Robert Frost",
-                JungianArchetype.Everyman => "\"It's a dangerous business going out your door.\" - J.R.R. Tolkien",
-                _ => "\"Know thyself.\" - Oracle of Delphi"
-            };
-        }
+            JungianArchetype.Hero => "bright_yellow",
+            JungianArchetype.Caregiver => "bright_green",
+            JungianArchetype.Explorer => "cyan",
+            JungianArchetype.Rebel => "bright_red",
+            JungianArchetype.Sage => "bright_blue",
+            JungianArchetype.Magician => "bright_magenta",
+            JungianArchetype.Ruler => "yellow",
+            JungianArchetype.Creator => "white",
+            JungianArchetype.Innocent => "bright_white",
+            JungianArchetype.Lover => "bright_red",
+            JungianArchetype.Jester => "bright_yellow",
+            JungianArchetype.Everyman => "gray",
+            _ => "white"
+        };
+
+        /// <summary>
+        /// Get a personalized quote based on archetype (v1.2.5: in the reader's language)
+        /// </summary>
+        public static string GetArchetypeQuote(JungianArchetype archetype) => Loc.Get($"archetype.{KeyId(archetype)}.quote");
 
         #endregion
 
