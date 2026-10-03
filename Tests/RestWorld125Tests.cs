@@ -819,6 +819,8 @@ public class RestWorld125Tests : IDisposable
         foreach (var lang in new[] { "en" }.Concat(OtherLanguages))
         {
             GameEngine.CatchUpBucket(L(lang, "world_init.news_reign", L(lang, "castle.king"), LongName, 30)).Should().Be(2, $"the reign news ({lang})");
+            GameEngine.CatchUpBucket(L(lang, "world_init.news_reign", L(lang, "castle.queen"), LongName, 30)).Should().Be(2, $"a queen's reign news ({lang})");
+            GameEngine.CatchUpBucket(L(lang, "world_init.history_claimed", 25, L(lang, "castle.queen"), LongName)).Should().Be(2, $"a queen's throne news ({lang})");
             GameEngine.CatchUpBucket(L(lang, "world_init.history_claimed", 25, L(lang, "castle.king"), LongName)).Should().Be(2, $"the throne news ({lang})");
             GameEngine.CatchUpBucket(L(lang, "combat.news_god_ascended", LongName, L(lang, "god.title.5"))).Should()
                 .Be(GameEngine.CatchUpBucket(L("en", "combat.news_god_ascended", LongName, L("en", "god.title.5"))), $"the god news ({lang})");
