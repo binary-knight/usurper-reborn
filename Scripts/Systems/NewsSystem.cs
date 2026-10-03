@@ -252,10 +252,14 @@ public partial class NewsSystem
         Newsy(prefix + Loc.Get(completed ? "news.quest_completed" : "news.quest_failed", playerName, questDescription));
     }
 
-    public void WriteTeamNews(string teamName, string event_description)
+    /// <summary>
+    /// A team news row: a headline ("Gang Recruitment!") and the event. v1.2.5: every caller passes a
+    /// headline, which the row printed as "Team Gang Recruitment!: ..."; it is now the headline, then the event.
+    /// </summary>
+    public void WriteTeamNews(string headline, string event_description)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "⚑ ";
-        Newsy(prefix + Loc.Get("news.team", teamName, event_description));
+        Newsy($"{prefix}{headline} {event_description}");
     }
 
     public void WritePrisonNews(string playerName, string event_description)

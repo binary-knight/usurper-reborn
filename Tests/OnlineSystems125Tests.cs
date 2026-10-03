@@ -336,7 +336,7 @@ public class OnlineSystems125Tests : IDisposable
         n.WriteRoyalNews(LongName, "taxes are lowered");
         n.WriteQuestNews(LongName, "Slay the wyrm", true);
         n.WriteQuestNews(LongName, "Slay the wyrm", false);
-        n.WriteTeamNews("Iron Fist", "a deed");
+        n.WriteTeamNews("Gang Recruitment!", "Bo joined Iron Fist!");
     }
 
     [Fact]
@@ -359,7 +359,7 @@ public class OnlineSystems125Tests : IDisposable
             $"\u2654 King {LongName} proclaims: taxes are lowered",
             $"\u2694 {LongName} completed quest: Slay the wyrm",
             $"\u2694 {LongName} failed quest: Slay the wyrm",
-            "\u2691 Team Iron Fist: a deed",
+            "\u2691 Gang Recruitment! Bo joined Iron Fist!",
         });
         GameConfig.ScreenReaderMode.Should().Be(sr);
     }
@@ -378,7 +378,7 @@ public class OnlineSystems125Tests : IDisposable
         {
             "news.death", "news.birth", "news.natural_death", "news.coming_of_age", "news.birthday", "news.npc_level_up",
             "news.marriage", "news.divorce", "news.affair", "news.royal_proclaims", "news.quest_completed", "news.quest_failed",
-            "news.team", "news.place_church", "news.place_castle",
+            "news.place_church", "news.place_castle",
         });
 
         // shown to an English reader exactly as it was written
@@ -449,8 +449,7 @@ public class OnlineSystems125Tests : IDisposable
         var news = CaptureNews("hu", _ => new TeamSystem().QuitTeam(hero).Should().BeTrue());
         hero.Team.Should().Be("");
         string team = $"{GameConfig.NewsColorHighlight}Iron Fist{GameConfig.NewsColorDefault}";
-        news.Should().ContainSingle().Which.Should().Be("\u2691 " + L("hu", "news.team", L("hu", "team.news_dissolved_header"),
-            L("hu", "team.news_dissolved", team)));
+        news.Should().ContainSingle().Which.Should().Be("\u2691 " + L("hu", "team.news_dissolved_header") + " " + L("hu", "team.news_dissolved", team));
         NoEnglishLeft(news[0], new[] { "team.news_dissolved_header", "team.news_dissolved" });
 
         // a team name is a stored, player-chosen name: never translated
@@ -458,6 +457,20 @@ public class OnlineSystems125Tests : IDisposable
         var formed = CaptureNews("hu", _ => new TeamSystem().CreateTeam(founder, "Iron Fist", "pw").Should().BeTrue());
         founder.Team.Should().Be("Iron Fist");
         formed.Single().Should().Contain("Iron Fist").And.Contain(L("hu", "team.news_formed_header"));
+    }
+
+    [Fact]
+    public void TeamNews_ShowsTheHeadline_NotTeamHeadlineColon()
+    {
+        var news = CaptureNews("en", n =>
+        {
+            new TeamSystem().QuitTeam(new Character { Name2 = "Bo", Team = "Iron Fist", TeamPW = "pw" });
+            n.WriteTeamNews(Loc.Get("street_encounter.gang.news_header"), Loc.Get("street_encounter.gang.news_joined", "Bo", "Iron Fist"));
+        });
+        news.Should().Equal(
+            $"\u2691 Gang Dissolved! Gang {GameConfig.NewsColorHighlight}Iron Fist{GameConfig.NewsColorDefault} has been disbanded!",
+            "\u2691 Gang Recruitment! Bo joined Iron Fist!");
+        news.Should().NotContain(r => r.Contains("Team Gang") || r.Contains("!:"));
     }
 
     [Fact]
