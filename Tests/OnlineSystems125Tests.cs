@@ -742,6 +742,9 @@ public class OnlineSystems125Tests : IDisposable
         });
         InLang("hu", () => Db.GetPlayerSaves("savekey")).Should().ContainSingle().Which.SaveType.Should().Be(L("hu", "save.type_online"));
         InLang("en", () => Db.GetPlayerSaves("savekey")).Single().SaveType.Should().Be("Online Save");
+        // GameEngine's save list pads the save type to 12 columns (save.SaveType.PadRight(12))
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            L(lang, "save.type_online").Length.Should().BeLessOrEqualTo(12, $"[{lang}] the save type fits its column");
 
         Exec("INSERT INTO pvp_log (attacker, defender, attacker_level, defender_level, winner, gold_stolen) VALUES ('gone1', 'gone2', 5, 6, 'gone1', 10);");
         var fights = await InLanguage("hu", () => Db.GetRecentPvPFights(5));
