@@ -1160,7 +1160,20 @@ public partial class GameEngine
     }
 
     /// <summary>
-    /// Generate news about NPC activities
+    /// v1.2.5: an NPC's CurrentLocation (stored English, "Main Street", "Magic Shop", sometimes "MainStreet") in the
+    /// news writer's language: its location.name key when there is one. English keeps the stored text, as the
+    /// news always read ("was seen at the Inn", not "at the The Inn").
+    /// </summary>
+    internal static string NpcPlaceLabel(string? location)
+    {
+        if (string.IsNullOrEmpty(location)) return "";
+        if (GameConfig.Language == "en") return location;
+        string key = "location.name." + location.Replace(" ", "");
+        return Loc.Has(key) ? Loc.Get(key) : location;
+    }
+
+    /// <summary>
+    /// Generate news about NPC activities (v1.2.5: in the writer's language, as other news)
     /// </summary>
     private void GenerateNPCNews(NPC npc, Random random)
     {
@@ -1172,20 +1185,20 @@ public partial class GameEngine
         // Alignment-based news
         if (npc.Darkness > npc.Chivalry + 200)
         {
-            newsItems.Add($"{npc.Name2} was seen lurking in the shadows");
-            newsItems.Add($"{npc.Name2} threatened a merchant");
-            newsItems.Add($"Guards are watching {npc.Name2} closely");
+            newsItems.Add(Loc.Get("engine.npc_news_lurking", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_threatened", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_watched", npc.Name2));
         }
         else if (npc.Chivalry > npc.Darkness + 200)
         {
-            newsItems.Add($"{npc.Name2} helped a lost child find their parents");
-            newsItems.Add($"{npc.Name2} donated gold to the temple");
-            newsItems.Add($"{npc.Name2} protected a merchant from thieves");
+            newsItems.Add(Loc.Get("engine.npc_news_lost_child", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_donated", npc.Name2));
+            newsItems.Add(Loc.Get("engine.npc_news_protected", npc.Name2));
         }
         else
         {
-            newsItems.Add($"{npc.Name2} was seen at the {npc.CurrentLocation}");
-            newsItems.Add($"{npc.Name2} is looking for adventure partners");
+            newsItems.Add(Loc.Get("engine.npc_news_seen_at", npc.Name2, NpcPlaceLabel(npc.CurrentLocation)));
+            newsItems.Add(Loc.Get("engine.npc_news_partners", npc.Name2));
         }
 
         // Class-based news
@@ -1193,14 +1206,14 @@ public partial class GameEngine
         {
             case CharacterClass.Warrior:
             case CharacterClass.Barbarian:
-                newsItems.Add($"{npc.Name2} challenged someone to a duel");
+                newsItems.Add(Loc.Get("engine.npc_news_duel", npc.Name2));
                 break;
             case CharacterClass.Magician:
             case CharacterClass.Sage:
-                newsItems.Add($"{npc.Name2} was seen studying ancient tomes");
+                newsItems.Add(Loc.Get("engine.npc_news_tomes", npc.Name2));
                 break;
             case CharacterClass.Assassin:
-                newsItems.Add($"Rumors swirl about {npc.Name2}'s latest target");
+                newsItems.Add(Loc.Get("engine.npc_news_target", npc.Name2));
                 break;
         }
 
@@ -7944,16 +7957,28 @@ public partial class GameEngine
     /// <summary>
     /// v1.2.5: the catch-up bucket of a news row: 0 deaths, 1 births, 2 royal, 3 love, 4 outskirts, 5 world
     /// events. A bucket's words (engine.catchup_words_*, "|" separated pieces of the news texts) are matched
-    /// in every language, case-insensitively, in that order, as the English words were.
+    /// in every language, case-insensitively, at the start of a word, in that order.
     /// </summary>
     internal static int CatchUpBucket(string clean)
     {
         for (int b = 0; b < CatchUpWordKeys.Length; b++)
             foreach (var lang in Loc.AvailableLanguages)
                 foreach (var word in Loc.GetIn(lang.Code, CatchUpWordKeys[b]).Split('|', StringSplitOptions.RemoveEmptyEntries))
-                    if (clean.IndexOf(word, StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (StartsAWord(clean, word))
                         return b;
         return CatchUpWordKeys.Length;
+    }
+
+    /// <summary>
+    /// v1.2.5: true when `word` appears in `text` at the start of a word (case-insensitive), so "king" matches
+    /// "King" and "kingdom" but not "lurking".
+    /// </summary>
+    private static bool StartsAWord(string text, string word)
+    {
+        for (int i = text.IndexOf(word, StringComparison.OrdinalIgnoreCase); i >= 0;
+             i = text.IndexOf(word, i + 1, StringComparison.OrdinalIgnoreCase))
+            if (i == 0 || !char.IsLetter(text[i - 1])) return true;
+        return false;
     }
 
     private static readonly string[] CatchUpWordKeys =

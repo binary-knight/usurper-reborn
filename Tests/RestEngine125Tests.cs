@@ -687,4 +687,58 @@ public class RestEngine125Tests : IDisposable
         foreach (var lang in AllLanguages)
             L(lang, "engine.use_resurrection_prompt").Length.Should().BeLessOrEqualTo(MaxWidth, $"[{lang}] the resurrection question fits");
     }
+
+    // ---------- NPC activity news (review follow-up) ----------
+
+    private static readonly string[] NpcNewsKeys =
+    {
+        "engine.npc_news_lurking", "engine.npc_news_threatened", "engine.npc_news_watched", "engine.npc_news_lost_child",
+        "engine.npc_news_donated", "engine.npc_news_protected", "engine.npc_news_partners", "engine.npc_news_duel",
+        "engine.npc_news_tomes", "engine.npc_news_target"
+    };
+
+    [Fact]
+    public void NpcActivityNews_IsWrittenInTheWritersLanguage_AndSortsUnderWorldEvents()
+    {
+        var npc = new NPC { Name1 = "Xaver", Name2 = "Xaver", Class = CharacterClass.Sage, Darkness = 1000, Chivalry = 0, CurrentLocation = "Magic Shop" };
+        var engine = (GameEngine)RuntimeHelpers.GetUninitializedObject(typeof(GameEngine));
+        foreach (var lang in new[] { "hu", "en" })
+        {
+            var written = InLang(lang, () =>
+            {
+                var buffer = new List<string>();
+                NewsSystem.Instance.SetCatchUpBuffer(buffer);
+                try
+                {
+                    for (int seed = 0; seed < 40; seed++)
+                        typeof(GameEngine).GetMethod("GenerateNPCNews", F)!.Invoke(engine, new object[] { npc, new Random(seed) });
+                }
+                finally { NewsSystem.Instance.ClearCatchUpBuffer(); }
+                return buffer.Distinct().ToList();
+            });
+            var expected = new[] { "engine.npc_news_lurking", "engine.npc_news_threatened", "engine.npc_news_watched", "engine.npc_news_tomes" }
+                .Select(k => L(lang, k, "Xaver")).ToList();
+            written.Should().BeEquivalentTo(expected, $"[{lang}] dark sage news in the writer's language");
+        }
+        // Every fragment sorts under World Events in every language, as the English ones do.
+        foreach (var lang in AllLanguages)
+        {
+            foreach (var key in NpcNewsKeys)
+                GameEngine.CatchUpBucket(L(lang, key, "Xaver")).Should().Be(5, $"[{lang}] {key}");
+            GameEngine.CatchUpBucket(L(lang, "engine.npc_news_seen_at", "Xaver", InLang(lang, () => GameEngine.NpcPlaceLabel("Main Street"))))
+                .Should().Be(5, $"[{lang}] seen at Main Street");
+        }
+        // English keeps the stored place text; another language shows the place's own name.
+        InLang("en", () => L("en", "engine.npc_news_seen_at", "Xaver", GameEngine.NpcPlaceLabel("Inn"))).Should().Be("Xaver was seen at the Inn");
+        InLang("hu", () => GameEngine.NpcPlaceLabel("Magic Shop")).Should().Be(L("hu", "location.name.MagicShop"));
+        InLang("hu", () => GameEngine.NpcPlaceLabel("The Divine Realm")).Should().Be("The Divine Realm", "a place with no key is shown as stored");
+    }
+
+    [Fact]
+    public void CatchUpWords_MatchAtTheStartOfAWord()
+    {
+        GameEngine.CatchUpBucket(L("en", "engine.npc_news_lurking", "Xaver")).Should().Be(5, "\"lurking\" is not \"king\"");
+        GameEngine.CatchUpBucket("King Xaver proclaims: taxes").Should().Be(2);
+        GameEngine.CatchUpBucket("Xaver blessed the kingdom").Should().Be(2);
+    }
 }
