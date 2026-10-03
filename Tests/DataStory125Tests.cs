@@ -207,7 +207,7 @@ public class DataStory125Tests : IDisposable
                 text.Should().NotBe(en, $"{key} is translated in {lang}");
             }
             foreach (var lang in AllLanguages)
-                langs[lang][key].Should().NotContain("—").And.NotContain("–", $"{key} in {lang} has no dashes");
+                langs[lang][key].Should().NotContain("\u2014").And.NotContain("\u2013", $"{key} in {lang} has no dashes");
         }
     }
 
