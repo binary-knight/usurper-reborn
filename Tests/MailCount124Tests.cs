@@ -218,7 +218,7 @@ public class MailCount124Tests : IDisposable
         Src("Locations", "DormitoryLocation.cs").Should().Contain("SendMessageToKeyLocalized(murderer, target.Username");   // 1.2.5: localized
         Src("Locations", "ArenaLocation.cs").Should().Contain("SendMessageToKey(myUsername, defenderUsername");
         Src("Systems", "WorldBossSystem.cs").Should().NotContain("SendMessageToKey(", "1.2.5: the boss notice is no longer mailed");
-        Src("Systems", "WorldSimulator.cs").Should().Contain("SendMessageToKey(\"The Town Crier\", username").And.Contain("SendMessageToKey(attackerNPC.Name2, sleeper.Username");
+        Src("Systems", "WorldSimulator.cs").Should().Contain("SendMessageToKeyLocalized(\"The Town Crier\", username").And.Contain("SendMessageToKeyLocalized(attackerNPC.Name2, sleeper.Username");   // 1.2.5: localized
         Src("Server", "MudServer.cs").Should().Contain("SendMessageToKey(\"Admin\", target");
 
         string mailbox = Src("Locations", "BaseLocation.cs");
