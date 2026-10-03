@@ -227,6 +227,22 @@ public class DataNpcDialogue125Tests : IDisposable
         DialogueLines_MoodPrefixes.GetLines().First().Text.Should().StartWith("{npc_name} is humming a tune");
     }
 
+    /// <summary>The English the generator showed before 1.2.5, with its misspellings fixed.</summary>
+    [Theory]
+    [InlineData("npc_gen.greet.married.4", "Don't you ever scare me like that again.")]
+    [InlineData("npc_gen.greet.passion.4", "Hey! Was hoping you'd show up.")]
+    [InlineData("npc_gen.phrase.assassin.2", "Don't ask questions you don't want answers to.")]
+    [InlineData("npc_gen.phrase.mystic.4", "You've got a strange aura.")]
+    [InlineData("npc_gen.context.low_level.3", "Careful out there. It's rough for newcomers.")]
+    [InlineData("npc_gen.mod.high_intelligence.2", "Here's the thing. {0}")]
+    [InlineData("npc_gen.mod.high_loyalty.3", "{0} I don't go back on my word.")]
+    [InlineData("npc_gen.mod.high_bravery.1", "{0} I'm not afraid of anything.")]
+    [InlineData("npc_gen.mod.high_bravery.2", "{0} Let 'em come.")]
+    [InlineData("npc_gen.farewell.love.4", "I'll be thinking about you.")]
+    [InlineData("npc_gen.topic_line.5", "What's the deal with {0} these days?")]
+    [InlineData("npc_gen.rx.flee.plain", "Yeah, let's get out of here.")]
+    public void FixedEnglishWording(string key, string english) => Loc.GetIn("en", key).Should().Be(english);
+
     // ---------------------------------------------------------------- selection
 
     private static List<string> PickKeys(string lang, int seed, Func<NPC, Player, NPCDialogueGenerator.NpcLine> pick)
