@@ -580,6 +580,36 @@ public class DataStory125Tests : IDisposable
         }
     }
 
+    [Fact]
+    public void ThePathToRedemption_Wraps_InFiveLanguages()
+    {
+        foreach (var id in new[] { "KingsAdvisor", "TheStranger", "TeamBetrayal", "RomanticBetrayal" })
+            foreach (var lang in AllLanguages)
+            {
+                var text = InLang(lang, () =>
+                {
+                    FreshWorld();
+                    var bs = new BetrayalSystem();
+                    Profiles(bs)[id].IsPendingBetrayal = true;
+                    bs.ExecuteBetrayal(id, Hero(), NewScreen().Term).GetAwaiter().GetResult();
+                    var s = NewScreen();
+                    var hero = Hero();
+                    hero.Chivalry = 0;
+                    bs.AttemptForgiveness(id, hero, s.Term).GetAwaiter().GetResult().Should().BeFalse("the conditions are not met");
+                    return s.Text;
+                });
+                EveryRowFits(text, $"[{lang}] forgiveness {id}");
+                var redemption = Loc.HasIn("en", BetrayalSystem.TextKey(id, "redemption")) ? Loc.GetIn(lang, BetrayalSystem.TextKey(id, "redemption")) : null;
+                if (redemption != null)
+                {
+                    var flat = string.Join(" ", Rows(text).Select(r => r.Trim()).Where(r => r.Length > 0));
+                    flat.Should().Contain(Loc.GetIn(lang, "betrayal.path_to_redemption", redemption), $"[{lang}] {id} shows its path, wrapped");
+                }
+            }
+        // the English row of the advisor was 86 columns before it wrapped
+        Loc.GetIn("en", "betrayal.path_to_redemption", Loc.GetIn("en", "betrayal.KingsAdvisor.redemption")).Length.Should().Be(86);
+    }
+
     // ---------- 6. saved state ----------
 
     [Fact]

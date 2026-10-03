@@ -439,7 +439,9 @@ namespace UsurperRemake.Systems
             if (!canForgive)
             {
                 terminal.WriteLine(Loc.Get("betrayal.conditions_not_met"), "yellow");
-                terminal.WriteLine(Loc.Get("betrayal.path_to_redemption", RedemptionText(profile) ?? Loc.Get("ui.none")), "gray");
+                // v1.2.5: the row ran past 79 columns in every language; it wraps at spaces
+                foreach (var row in GameEngine.WrapRows(Loc.Get("betrayal.path_to_redemption", RedemptionText(profile) ?? Loc.Get("ui.none"))))
+                    terminal.WriteLine(row, "gray");
                 return false;
             }
 
