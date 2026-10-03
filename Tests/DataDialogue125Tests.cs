@@ -438,6 +438,7 @@ public class DataDialogue125Tests
             StoryProgressionSystem.Instance.FullReset();
             SaveSystem.Instance.RestoreStorySystems(back);
             var story = StoryProgressionSystem.Instance;
+            story.HasStoryFlag("defiant_to_stranger").Should().BeTrue("the defiant answer's node sets it");
             story.HasStoryFlag("met_mysterious_stranger").Should().BeTrue();
             story.HasStoryFlag("has_ancient_key").Should().BeTrue();
             story.ExportStringFlags().Keys.Should().OnlyContain(k => Regex.IsMatch(k, "^[a-z0-9_]+$"), $"{lang}: flags are ids");
@@ -448,6 +449,26 @@ public class DataDialogue125Tests
         {
             Walk(lang, "mysterious_stranger_intro", Array.Empty<int>());
             StoryProgressionSystem.Instance.MajorChoices["stranger_intro"].SelectedOption.Should().Be("completed", lang);
+        }
+    }
+
+    [Fact]
+    public void ANodePassedOnTheWay_AppliesItsEffects_SoTheStrangerAnswersSetTheirFlags()
+    {
+        foreach (var lang in AllLanguages)
+        {
+            Walk(lang, "mysterious_stranger_intro", new[] { 2 });
+            StoryProgressionSystem.Instance.HasStoryFlag("defiant_to_stranger").Should().BeTrue($"{lang}: the defiant answer");
+            StoryProgressionSystem.Instance.HasStoryFlag("willing_hero").Should().BeFalse(lang);
+
+            Walk(lang, "mysterious_stranger_intro", new[] { 3 });
+            StoryProgressionSystem.Instance.HasStoryFlag("willing_hero").Should().BeTrue($"{lang}: the willing answer");
+            StoryProgressionSystem.Instance.HasStoryFlag("defiant_to_stranger").Should().BeFalse(lang);
+
+            Walk(lang, "mysterious_stranger_intro", new[] { 0 });
+            StoryProgressionSystem.Instance.HasStoryFlag("willing_hero").Should().BeFalse(lang);
+            StoryProgressionSystem.Instance.HasStoryFlag("defiant_to_stranger").Should().BeFalse(lang);
+            StoryProgressionSystem.Instance.HasStoryFlag("met_mysterious_stranger").Should().BeTrue(lang);
         }
     }
 

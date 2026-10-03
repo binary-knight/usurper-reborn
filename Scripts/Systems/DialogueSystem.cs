@@ -101,6 +101,9 @@ namespace UsurperRemake.Systems
                     {
                         await DisplayDialogueNode(currentNode);
                     }
+                    // v1.2.5: a node passed on the way applies its effects too (before, only an end
+                    // node did, so the Stranger's defiant_to_stranger and willing_hero flags were never set)
+                    ApplyNodeEffects(currentNode);
                     if (!string.IsNullOrEmpty(currentNode.NextNodeId))
                     {
                         currentNode = FindNode(currentNode.NextNodeId);
@@ -122,6 +125,7 @@ namespace UsurperRemake.Systems
                     {
                         await DisplayDialogueNode(currentNode);
                     }
+                    ApplyNodeEffects(currentNode);
                     ApplyChoiceEffects(availableChoices[0]);
                     currentNode = FindNode(availableChoices[0].NextNodeId);
                     await Pacing.Wait(1000);
@@ -137,6 +141,7 @@ namespace UsurperRemake.Systems
                     {
                         await DisplayDialogueNode(currentNode);
                     }
+                    ApplyNodeEffects(currentNode);
 
                     // Present choices to the player
                     var selectedChoice = await PresentChoices(availableChoices);
