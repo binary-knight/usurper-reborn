@@ -888,4 +888,62 @@ public class RestWorld125Tests : IDisposable
         s.Text.Should().NotContain(" TIP ");
         EveryRowFits(s.Text, "tip box (hu)");
     }
+    // ================= DailySystemManager and PermadeathHelper rows =================
+
+    [Fact]
+    public void DailyRows_ThatCouldPass79_AreWrapped_AndGriefStagesAreInTheReadersLanguage()
+    {
+        var rows = new (string Key, object[] Args)[]
+        {
+            ("daily.loan_interest", new object[] { $"{9_999_999L:N0}", $"{99_999_999L:N0}", 99 }),
+            ("daily.royal_debt_early", new object[] { $"{99_999_999L:N0}", 99, GameConfig.RoyalLoanChivalryLossEarly }),
+            ("daily.royal_debt_bounty", new object[] { 99, GameConfig.RoyalLoanChivalryLossMid }),
+            ("daily.royal_debt_late", new object[] { 999, GameConfig.RoyalLoanChivalryLossLate }),
+        };
+        foreach (var lang in new[] { "en", "hu" })
+        {
+            foreach (var (key, args) in rows)
+                EveryRowFits(UsurperRemake.UI.UIHelper.WordWrap(L(lang, key, args)), $"{key} ({lang})");
+            string grief = InLang(lang, () => Loc.Get("daily.grief_evolved",
+                DailySystemManager.GriefStageLabel(GriefStage.Bargaining), DailySystemManager.GriefStageLabel(GriefStage.Depression)));
+            EveryRowFits(UsurperRemake.UI.UIHelper.WordWrap(grief), $"grief row ({lang})");
+            if (lang == "hu")
+            {
+                grief.Should().Be(L("hu", "daily.grief_evolved", L("hu", "daily.grief_stage_bargaining"), L("hu", "daily.grief_stage_depression")));
+                grief.Should().NotContain("Bargaining").And.NotContain("Depression");
+            }
+            else grief.Should().Be("Your grief has evolved... (Bargaining -> Depression)");
+        }
+
+        string src = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "DailySystemManager.cs"));
+        Regex.Matches(src, Regex.Escape("WriteRows(terminal, Loc.Get(\"daily.loan_interest\"")).Count.Should().Be(2);
+        foreach (var key in new[] { "royal_debt_early", "royal_debt_bounty", "royal_debt_late" })
+            src.Should().Contain($"WriteRows(terminal, Loc.Get(\"daily.{key}\"");
+        Regex.Matches(src, Regex.Escape("GriefStageLabel(previousStage), GriefStageLabel(grief.CurrentStage)")).Count.Should().Be(2);
+    }
+
+    [Fact]
+    public void BloodMoonBroadcast_AndEulogy_AreInEachReadersLanguage_AndFit79()
+    {
+        DailySystemManager.BloodMoonBroadcast("hu").Should().Contain(L("hu", "daily.blood_moon_broadcast"));
+        DailySystemManager.BloodMoonBroadcast("en").Should().Be($"\r\n\u001b[1;31m  ★ {L("en", "daily.blood_moon_broadcast")} ★\u001b[0m\r\n");
+        File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "DailySystemManager.cs"))
+            .Should().Contain("MudServer.Instance?.BroadcastLocalized(BloodMoonBroadcast)");
+
+        foreach (var lang in new[] { "en", "hu" })
+        {
+            string eulogy = InLang("fr", () => PermadeathHelper.EulogyBroadcast(lang, LongName, 100, CharacterClass.Warrior, LongName));
+            var shown = Rows(Regex.Replace(eulogy, "\u001b\\[[0-9;]*m", "")).Where(r => r.Length > 0).ToList();
+            EveryRowFits(shown, $"eulogy broadcast ({lang})");
+            string expectedClass = InLang(lang, () => GameConfig.GetLocalizedClassName(CharacterClass.Warrior));
+            string flat = Regex.Replace(string.Join(" ", shown), @"\s+", " ");
+            flat.Should().Contain(Regex.Replace(L(lang, "permadeath.eulogy", LongName, 100, expectedClass, LongName), @"\s+", " "));
+        }
+        PermadeathHelper.EulogyBroadcast("en", "Bo", 5, CharacterClass.Warrior, "Al")
+            .Should().Be($"\u001b[1;31m\r\n  *** {L("en", "permadeath.eulogy", "Bo", 5, "Warrior", "Al")} ***\r\n\u001b[0m");
+        File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "PermadeathHelper.cs"))
+            .Should().Contain("UIHelper.WriteWrapped(terminal, Loc.Get(\"permadeath.legacy_recorded\"), \"  \")");
+        foreach (var lang in new[] { "en", "hu" })
+            EveryRowFits(UsurperRemake.UI.UIHelper.WordWrap(L(lang, "permadeath.legacy_recorded"), MaxWidth - 2).Select(r => "  " + r), $"legacy row ({lang})");
+    }
 }
