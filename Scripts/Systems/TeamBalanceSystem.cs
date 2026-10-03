@@ -243,6 +243,25 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// v1.2.5: one fee entry in the reader's language as rows of (text, colour) pieces:
+        /// "  Name (Lv 12): ", "1,234 gold " and "(reason)" on one row when they fit 79 columns,
+        /// otherwise the reason on the next row, indented.
+        /// </summary>
+        internal static List<List<(string Text, string Color)>> FeeRows(string name, int level, long fee, string reason)
+        {
+            string who = $"  {name} {Loc.Get("chat.group_member_level", level)}: ";
+            string gold = Loc.Get("anchor_road.gold_amount", $"{fee:N0}") + " ";
+            string why = $"({reason})";
+            var first = new List<(string, string)> { (who, "gray"), (gold, "yellow") };
+            if (who.Length + gold.Length + why.Length <= 79)
+            {
+                first.Add((why, "darkgray"));
+                return new List<List<(string, string)>> { first };
+            }
+            return new List<List<(string, string)>> { first, new() { ("    " + why, "darkgray") } };
+        }
+
+        /// <summary>
         /// Display fee information to terminal
         /// </summary>
         public async System.Threading.Tasks.Task DisplayFeeInfo(
@@ -277,12 +296,15 @@ namespace UsurperRemake.Systems
                 {
                     if (fee > 0)
                     {
-                        terminal.SetColor("gray");
-                        terminal.Write($"  {npc.Name} (Lv {npc.Level}): ");
-                        terminal.SetColor("yellow");
-                        terminal.Write($"{fee:N0} gold ");
-                        terminal.SetColor("darkgray");
-                        terminal.WriteLine($"({reason})");
+                        foreach (var row in FeeRows(npc.Name, npc.Level, fee, reason))
+                        {
+                            foreach (var (text, color) in row)
+                            {
+                                terminal.SetColor(color);
+                                terminal.Write(text);
+                            }
+                            terminal.WriteLine("");
+                        }
                     }
                 }
 

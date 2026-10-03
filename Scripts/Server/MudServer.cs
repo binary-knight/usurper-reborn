@@ -1026,7 +1026,7 @@ public class MudServer
             // Process registration
             if (isRegistration)
             {
-                var (regSuccess, regMessage) = await sqlBackend.RegisterPlayer(username!, password!, effectiveIp);
+                var (regSuccess, regMessage) = await sqlBackend.RegisterPlayer(username!, password!, effectiveIp, authLang);
                 if (!regSuccess)
                 {
                     Console.Error.WriteLine($"[MUD] Registration failed for '{username}': {regMessage}");
@@ -1057,7 +1057,7 @@ public class MudServer
                 break; // end the attempt loop; connection closes below
             }
 
-            var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp);
+            var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp, authLang);
             if (!success)
             {
                 RecordFailedLogin(effectiveIp);

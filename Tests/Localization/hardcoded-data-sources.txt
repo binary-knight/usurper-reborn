@@ -184,14 +184,10 @@ keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
 names|Scripts/Systems/FeatureInteractionSystem.cs|init.RevealsOldGod|Old God names
 table|Scripts/Systems/FileSaveBackend.cs|init.SaveType|save type in the save list
 table|Scripts/Systems/FileSaveBackend.cs|return/tuple#1|load error shown by GameEngine
-table|Scripts/Systems/GuildSystem.cs|=errorMessage|guild error, MudChatSystem
 names|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#0|god names
 keyed|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#1|god.epithet.*
 keyed|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#4|god.desc.*
 names|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#5|god names
-table|Scripts/Systems/MailSystem.cs|init.Lines|mail body
-table|Scripts/Systems/MailSystem.cs|init.Sender|mail sender label
-table|Scripts/Systems/MailSystem.cs|init.Subject|mail subject
 table|Scripts/Systems/MoralParadoxSystem.cs|init.Label|paradox option
 nouns|Scripts/Systems/MoralParadoxSystem.cs|init.Name|paradox titles
 table|Scripts/Systems/MoralParadoxSystem.cs|init.OceanPhilosophyReflection|paradox reflection
@@ -433,13 +429,7 @@ table|Scripts/Systems/SpellSystem.cs|=result.RollInfo|spell roll info
 keyed|Scripts/Systems/SpellSystem.cs|new:SpellInfo#1|spell.{class}.{level}.name
 keyed|Scripts/Systems/SpellSystem.cs|new:SpellInfo#2|spell.{class}.{level}.desc
 names|Scripts/Systems/SpellSystem.cs|new:SpellInfo#5|invented incantation words
-table|Scripts/Systems/SqlSaveBackend.cs|decl:msg|login failure message
-table|Scripts/Systems/SqlSaveBackend.cs|decl:returnMsg|in game message
-nouns|Scripts/Systems/SqlSaveBackend.cs|init.AttackerName|fallback name in the PvP log
-nouns|Scripts/Systems/SqlSaveBackend.cs|init.DefenderName|fallback name in the PvP log
 names|Scripts/Systems/SqlSaveBackend.cs|init.Location|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Systems/SqlSaveBackend.cs|init.SaveType|save slot type
-table|Scripts/Systems/SqlSaveBackend.cs|=msg|ban reason in the login message
 keyed|Scripts/Systems/StrangerEncounterSystem.cs|init.ClosingNarration|stranger.scripted.{type}.closing.{i}
 keyed|Scripts/Systems/StrangerEncounterSystem.cs|init.Dialogue|stranger.scripted.{type}.dialogue.{i}
 keyed|Scripts/Systems/StrangerEncounterSystem.cs|init.IntroNarration|stranger.scripted.{type}.intro.{i}
@@ -452,12 +442,6 @@ names|Scripts/Systems/StreetEncounterSystem.cs|decl:fallbackNames|gang names
 names|Scripts/Systems/StreetEncounterSystem.cs|decl:hunterNames|bounty hunter personal names
 keyed|Scripts/Systems/StreetEncounterSystem.cs|init.Name|street_encounter.merchant.item.*
 table|Scripts/Systems/StreetEncounterSystem.cs|init.Role|court role "Advisor": saved in CourtMemberSaveData and compared by CastleLocation, so it stays English; CastleLocation prints it raw
-table|Scripts/Systems/TeamSystem.cs|decl:GangWarHeaders|news header
-table|Scripts/Systems/TeamSystem.cs|decl:lossMessage|mail body
-table|Scripts/Systems/TeamSystem.cs|decl:lossSubject|mail subject
-table|Scripts/Systems/TeamSystem.cs|decl:mailMessage|mail body
-table|Scripts/Systems/TeamSystem.cs|decl:mailSubject|mail subject
-table|Scripts/Systems/TeamSystem.cs|decl:turfMessage|news, Newsy
 table|Scripts/Systems/VersionChecker.cs|=DownloadError|update download error
 table|Scripts/Systems/WorldEventSystem.cs|=CurrentKingDecree|king decree in news and the events screen
 table|Scripts/Systems/WorldEventSystem.cs|decl:DistantNewsTemplates/tuple#0|distant news type

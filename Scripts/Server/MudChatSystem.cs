@@ -1499,7 +1499,7 @@ public static class MudChatSystem
         terminal.WriteLine($"  {Systems.Loc.Get("guild.label_members")}");
         foreach (var m in info.Members)
         {
-            string rankTag = m.Rank != "Member" ? $" [{m.Rank}]" : "";
+            string rankTag = m.Rank != "Member" ? $" [{Systems.GuildSystem.RankLabel(m.Rank)}]" : "";
             terminal.WriteLine($"    {m.DisplayName}{rankTag}");
         }
         terminal.SetColor("gray");
@@ -1737,7 +1737,7 @@ public static class MudChatSystem
         terminal.SetColor("gray");
         foreach (var m in info.Members)
         {
-            string rankTag = m.Rank != "Member" ? $" [{m.Rank}]" : "";
+            string rankTag = m.Rank != "Member" ? $" [{Systems.GuildSystem.RankLabel(m.Rank)}]" : "";
             terminal.WriteLine($"    {m.DisplayName}{rankTag}");
         }
         return true;
@@ -2111,14 +2111,15 @@ public static class MudChatSystem
         if (error != null) { terminal.WriteLine($"  {error}", "yellow"); return true; }
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {Systems.Loc.Get("guild.rank_set", targetPlayer, newRank)}");
+        terminal.WriteLine($"  {Systems.Loc.Get("guild.rank_set", targetPlayer, Systems.GuildSystem.RankLabel(newRank))}");
 
         // Notify target (if online)
         var targetSession = MudServer.Instance?.ActiveSessions.TryGetValue(targetUsername, out var ts) == true ? ts : null;
         try
         {
             targetSession?.Context?.Terminal?.SetColor("bright_yellow");
-            targetSession?.Context?.Terminal?.WriteLine($"\r\n  {Systems.Loc.Get("guild.rank_changed_notification", newRank, GetChatDisplayName(username))}\r\n");
+            string targetLang = targetSession?.Context?.Language ?? GameConfig.Language;
+            targetSession?.Context?.Terminal?.WriteLine($"\r\n  {Systems.Loc.GetIn(targetLang, "guild.rank_changed_notification", Systems.GuildSystem.RankLabel(newRank, targetLang), GetChatDisplayName(username))}\r\n");
         }
         catch { }
 

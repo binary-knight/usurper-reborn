@@ -60,6 +60,16 @@ public class GuildSystem
     /// <summary>
     /// Check if a rank can perform a given action.
     /// </summary>
+    /// <summary>
+    /// v1.2.5: a stored rank (Leader, Officer, Member) as shown in <paramref name="lang"/> (the session's
+    /// language when null). Display only: storage and the typed rank words stay English.
+    /// </summary>
+    public static string RankLabel(string rank, string? lang = null)
+    {
+        string? key = rank switch { "Leader" => "guild.rank_leader", "Officer" => "guild.rank_officer", "Member" => "guild.rank_member", _ => null };
+        return key == null ? rank : Loc.GetIn(lang ?? GameConfig.Language, key);
+    }
+
     public static bool RankCanInvite(string rank) => rank == "Leader" || rank == "Officer";
     public static bool RankCanWithdraw(string rank) => rank == "Leader" || rank == "Officer";
     public static bool RankCanKick(string rank) => rank == "Leader";
@@ -307,16 +317,16 @@ public class GuildSystem
     public string? CreateGuild(string leaderUsername, string guildName, string displayName)
     {
         if (string.IsNullOrWhiteSpace(guildName) || guildName.Length < 2 || guildName.Length > 30)
-            return "Guild name must be 2-30 characters.";
+            return Loc.Get("guild.err_name_length");
 
         if (GetPlayerGuild(leaderUsername) != null)
-            return "You are already in a guild. Leave first with /gleave.";
+            return Loc.Get("guild.err_already_in_guild");
 
         // v0.60.0: gods don't create or join guilds (parity with TeamSystem and the
         // AddMember filter below). An ascended player is venerated, not enrolled.
         var ctxCreate = UsurperRemake.Server.SessionContext.Current;
         if (ctxCreate?.Player != null && string.Equals(ctxCreate.Username, leaderUsername, StringComparison.OrdinalIgnoreCase) && ctxCreate.Player.IsImmortal)
-            return "Gods do not lead guilds.";
+            return Loc.Get("guild.err_gods_lead");
 
         try
         {
@@ -329,7 +339,7 @@ public class GuildSystem
                 checkCmd.CommandText = "SELECT COUNT(*) FROM guilds WHERE name = @name COLLATE NOCASE";
                 checkCmd.Parameters.AddWithValue("@name", guildName);
                 if (Convert.ToInt64(checkCmd.ExecuteScalar()) > 0)
-                    return $"A guild named '{guildName}' already exists.";
+                    return Loc.Get("guild.err_name_taken", guildName);
             }
 
             // Create guild
@@ -362,7 +372,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to create guild: {ex.Message}");
-            return "Failed to create guild. Please try again.";
+            return Loc.Get("guild.err_create_failed");
         }
     }
 
@@ -372,7 +382,7 @@ public class GuildSystem
     public string? AddMember(string username, string guildName)
     {
         if (GetPlayerGuild(username) != null)
-            return "That player is already in a guild.";
+            return Loc.Get("guild.err_player_in_guild");
 
         // v0.60.0: gods-not-recruitable parity with TeamSystem.IsRecruitable. An ascended
         // player is venerated, not joined. Without this filter, an immortal could accept
@@ -383,11 +393,11 @@ public class GuildSystem
         // username (account-level), not on a Character reference.
         var ctx = UsurperRemake.Server.SessionContext.Current;
         if (ctx?.Player != null && string.Equals(ctx.Username, username, StringComparison.OrdinalIgnoreCase) && ctx.Player.IsImmortal)
-            return "Gods do not join guilds.";
+            return Loc.Get("guild.err_gods_join");
 
         int count = GetMemberCount(guildName);
         if (count >= MaxGuildMembers)
-            return "Guild is full.";
+            return Loc.Get("guild.err_full");
 
         try
         {
@@ -409,7 +419,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to add member: {ex.Message}");
-            return "Failed to add member.";
+            return Loc.Get("guild.err_add_failed");
         }
     }
 
@@ -498,7 +508,7 @@ public class GuildSystem
     {
         var guildName = GetPlayerGuild(username);
         if (guildName == null)
-            return "Not in a guild.";
+            return Loc.Get("guild.err_not_in_guild");
 
         try
         {
@@ -571,7 +581,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to remove member: {ex.Message}");
-            return "Failed to leave guild.";
+            return Loc.Get("guild.err_leave_failed");
         }
     }
 
@@ -582,9 +592,9 @@ public class GuildSystem
     {
         var guildName = GetPlayerGuild(username);
         if (guildName == null)
-            return "Not in a guild.";
+            return Loc.Get("guild.err_not_in_guild");
         if (amount <= 0)
-            return "Amount must be positive.";
+            return Loc.Get("guild.err_amount_positive");
 
         try
         {
@@ -601,7 +611,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to deposit: {ex.Message}");
-            return "Failed to deposit gold.";
+            return Loc.Get("guild.err_deposit_gold_failed");
         }
     }
 
@@ -749,10 +759,10 @@ public class GuildSystem
     public string? AcceptInvite(string username)
     {
         if (!pendingInvites.TryRemove(username, out var invite))
-            return "No pending guild invite.";
+            return Loc.Get("guild.err_no_invite");
 
         if (DateTime.UtcNow > invite.ExpiresAt)
-            return "That invite has expired.";
+            return Loc.Get("guild.err_invite_expired");
 
         return AddMember(username, invite.GuildName);
     }
@@ -837,10 +847,10 @@ public class GuildSystem
     public string? SetMemberRank(string leaderUsername, string targetUsername, string newRank)
     {
         var guildName = GetPlayerGuild(leaderUsername);
-        if (guildName == null) return "You are not in a guild.";
-        if (!IsGuildLeader(leaderUsername, guildName)) return "Only the guild leader can set ranks.";
+        if (guildName == null) return Loc.Get("guild.not_in_guild");
+        if (!IsGuildLeader(leaderUsername, guildName)) return Loc.Get("guild.err_leader_sets_ranks");
         if (string.Equals(leaderUsername, targetUsername, StringComparison.OrdinalIgnoreCase))
-            return "You cannot change your own rank.";
+            return Loc.Get("guild.err_own_rank");
 
         var targetGuild = GetPlayerGuild(targetUsername);
         if (!string.Equals(targetGuild, guildName, StringComparison.OrdinalIgnoreCase))
@@ -848,7 +858,7 @@ public class GuildSystem
 
         // Validate rank
         if (newRank != "Officer" && newRank != "Member")
-            return "Valid ranks: Officer, Member";
+            return Loc.Get("guild.err_valid_ranks");
 
         try
         {
@@ -864,7 +874,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to set rank: {ex.Message}");
-            return "Failed to set rank.";
+            return Loc.Get("guild.err_rank_failed");
         }
     }
 
@@ -874,10 +884,10 @@ public class GuildSystem
     public string? TransferLeadership(string currentLeader, string newLeader)
     {
         var guildName = GetPlayerGuild(currentLeader);
-        if (guildName == null) return "You are not in a guild.";
-        if (!IsGuildLeader(currentLeader, guildName)) return "Only the guild leader can transfer leadership.";
+        if (guildName == null) return Loc.Get("guild.not_in_guild");
+        if (!IsGuildLeader(currentLeader, guildName)) return Loc.Get("guild.err_leader_transfers");
         if (string.Equals(currentLeader, newLeader, StringComparison.OrdinalIgnoreCase))
-            return "You are already the leader.";
+            return Loc.Get("guild.err_already_leader");
 
         var targetGuild = GetPlayerGuild(newLeader);
         if (!string.Equals(targetGuild, guildName, StringComparison.OrdinalIgnoreCase))
@@ -902,7 +912,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to transfer leadership: {ex.Message}");
-            return "Failed to transfer leadership.";
+            return Loc.Get("guild.err_transfer_failed");
         }
     }
 
@@ -912,14 +922,14 @@ public class GuildSystem
     public string? WithdrawGold(string username, long amount)
     {
         var guildName = GetPlayerGuild(username);
-        if (guildName == null) return "Not in a guild.";
-        if (amount <= 0) return "Amount must be positive.";
+        if (guildName == null) return Loc.Get("guild.err_not_in_guild");
+        if (amount <= 0) return Loc.Get("guild.err_amount_positive");
 
         string rank = GetMemberRank(username);
-        if (!RankCanWithdraw(rank)) return "Your rank does not allow gold withdrawals.";
+        if (!RankCanWithdraw(rank)) return Loc.Get("guild.err_rank_no_gold");
 
         if (rank == "Officer" && amount > OfficerGoldWithdrawLimit)
-            return $"Officers can withdraw up to {OfficerGoldWithdrawLimit:N0} gold per transaction.";
+            return Loc.Get("guild.err_officer_limit", $"{OfficerGoldWithdrawLimit:N0}");
 
         try
         {
@@ -932,7 +942,7 @@ public class GuildSystem
                 checkCmd.CommandText = "SELECT bank_gold FROM guilds WHERE name = @guild COLLATE NOCASE";
                 checkCmd.Parameters.AddWithValue("@guild", guildName);
                 long bankGold = Convert.ToInt64(checkCmd.ExecuteScalar() ?? 0);
-                if (bankGold < amount) return $"Guild bank only has {bankGold:N0} gold.";
+                if (bankGold < amount) return Loc.Get("guild.err_bank_only_has", $"{bankGold:N0}");
             }
 
             using var cmd = conn.CreateCommand();
@@ -940,13 +950,13 @@ public class GuildSystem
             cmd.Parameters.AddWithValue("@amount", amount);
             cmd.Parameters.AddWithValue("@guild", guildName);
             int rows = cmd.ExecuteNonQuery();
-            if (rows == 0) return "Insufficient gold in guild bank.";
+            if (rows == 0) return Loc.Get("guild.err_bank_insufficient");
             return null;
         }
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to withdraw gold: {ex.Message}");
-            return "Failed to withdraw gold.";
+            return Loc.Get("guild.err_withdraw_gold_failed");
         }
     }
 
@@ -956,12 +966,12 @@ public class GuildSystem
     public string? DepositItem(string username, string itemName, string itemJson)
     {
         var guildName = GetPlayerGuild(username);
-        if (guildName == null) return "Not in a guild.";
+        if (guildName == null) return Loc.Get("guild.err_not_in_guild");
 
         // Check item count
         int itemCount = GetBankItemCount(guildName);
         if (itemCount >= MaxBankItems)
-            return $"Guild bank is full ({MaxBankItems} items max).";
+            return Loc.Get("guild.err_bank_full", MaxBankItems);
 
         try
         {
@@ -980,7 +990,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to deposit item: {ex.Message}");
-            return "Failed to deposit item.";
+            return Loc.Get("guild.err_deposit_item_failed");
         }
     }
 
@@ -992,10 +1002,10 @@ public class GuildSystem
     {
         errorMessage = null;
         var guildName = GetPlayerGuild(username);
-        if (guildName == null) { errorMessage = "Not in a guild."; return null; }
+        if (guildName == null) { errorMessage = Loc.Get("guild.err_not_in_guild"); return null; }
 
         string rank = GetMemberRank(username);
-        if (!RankCanWithdraw(rank)) { errorMessage = "Your rank does not allow item withdrawals."; return null; }
+        if (!RankCanWithdraw(rank)) { errorMessage = Loc.Get("guild.err_rank_no_items"); return null; }
 
         try
         {
@@ -1015,7 +1025,7 @@ public class GuildSystem
                 itemJson = getCmd.ExecuteScalar()?.ToString();
             }
 
-            if (itemJson == null) { transaction.Rollback(); errorMessage = "Item not found in guild bank."; return null; }
+            if (itemJson == null) { transaction.Rollback(); errorMessage = Loc.Get("guild.err_item_not_found"); return null; }
 
             // Delete the item
             using var delCmd = conn.CreateCommand();
@@ -1030,7 +1040,7 @@ public class GuildSystem
         catch (Exception ex)
         {
             DebugLogger.Instance?.LogError("GUILD", $"Failed to withdraw item: {ex.Message}");
-            errorMessage = "Failed to withdraw item.";
+            errorMessage = Loc.Get("guild.err_withdraw_item_failed");
             return null;
         }
     }
