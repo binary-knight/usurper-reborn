@@ -477,7 +477,7 @@ public class RestWorld125Tests : IDisposable
             var huTexts = keys.Select(k => Loc.GetIn("hu", k)).ToList();
             foreach (var item in written)
             {
-                string text = item.StartsWith("☆ ") ? item.Substring(2) : item;
+                string text = item.StartsWith("\u2606 ") ? item.Substring(2) : item;
                 huTexts.Any(t => Regex.IsMatch(text, "^" + Regex.Escape(t).Replace(@"\{0}", ".+").Replace(@"\{1}", ".+") + "$"))
                     .Should().BeTrue($"\"{text}\" is a Hungarian distant news text");
             }
@@ -926,7 +926,7 @@ public class RestWorld125Tests : IDisposable
     public void BloodMoonBroadcast_AndEulogy_AreInEachReadersLanguage_AndFit79()
     {
         DailySystemManager.BloodMoonBroadcast("hu").Should().Contain(L("hu", "daily.blood_moon_broadcast"));
-        DailySystemManager.BloodMoonBroadcast("en").Should().Be($"\r\n\u001b[1;31m  ★ {L("en", "daily.blood_moon_broadcast")} ★\u001b[0m\r\n");
+        DailySystemManager.BloodMoonBroadcast("en").Should().Be($"\r\n\u001b[1;31m  \u2605 {L("en", "daily.blood_moon_broadcast")} \u2605\u001b[0m\r\n");
         File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "DailySystemManager.cs"))
             .Should().Contain("MudServer.Instance?.BroadcastLocalized(BloodMoonBroadcast)");
 
