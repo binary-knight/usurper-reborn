@@ -1521,6 +1521,35 @@ public class Equipment
         catch (System.Text.Json.JsonException) { return null; }
     }
 
+    /// <summary>v1.2.5: after a change to an enchanted item that is not an enchant (a reforge), move the recorded
+    /// base by the same change, so removal later keeps that change and takes off only the enchants. Each number
+    /// moves by (now - before), never above the item's new value and never below the smaller of its old base and
+    /// zero; a flag or the name that changed takes its new state. No record, nothing to do.</summary>
+    public void ShiftEnchantBase(Equipment before)
+    {
+        var record = GetEnchantBase();
+        if (record == null) return;
+        var was = before.ToEnchantBaseRecord();
+        var now = ToEnchantBaseRecord();
+        foreach (var prop in typeof(EnchantBaseRecord).GetProperties())
+        {
+            if (prop.PropertyType == typeof(int))
+            {
+                int b = (int)prop.GetValue(record)!, w = (int)prop.GetValue(was)!, n = (int)prop.GetValue(now)!;
+                long moved = (long)b + n - w;
+                prop.SetValue(record, (int)Math.Clamp(moved, Math.Min(b, 0), Math.Max(n, Math.Min(b, 0))));
+            }
+            else if (prop.PropertyType == typeof(long))
+            {
+                long b = (long)prop.GetValue(record)!, w = (long)prop.GetValue(was)!, n = (long)prop.GetValue(now)!;
+                prop.SetValue(record, Math.Clamp(b + n - w, Math.Min(b, 0), Math.Max(n, Math.Min(b, 0))));
+            }
+            else if (!Equals(prop.GetValue(was), prop.GetValue(now)))
+                prop.SetValue(record, prop.GetValue(now));
+        }
+        EnchantBase = System.Text.Json.JsonSerializer.Serialize(record);
+    }
+
     #region Fluent Setters (for builder pattern)
 
     // Primary stat bonuses

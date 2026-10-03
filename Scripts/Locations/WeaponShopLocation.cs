@@ -1370,6 +1370,7 @@ public class WeaponShopLocation : BaseLocation
 
     internal static void ApplyReforge(Equipment weapon, Equipment reforged)
     {
+        var before = weapon.Clone();
         weapon.WeaponPower = reforged.WeaponPower;
         weapon.Rarity = reforged.Rarity;
         weapon.StrengthBonus = reforged.StrengthBonus;
@@ -1390,6 +1391,7 @@ public class WeaponShopLocation : BaseLocation
         weapon.PoisonDamage = reforged.PoisonDamage;
         weapon.Value = reforged.Value;
         weapon.ClampStats();
+        weapon.ShiftEnchantBase(before);   // v1.2.5: an enchant removal later keeps the reforge
     }
 
     internal static int RerollStat(int original, double variance, double rarityBoost, Random rng, int bound, int minValue = int.MinValue)

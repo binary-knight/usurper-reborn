@@ -270,6 +270,41 @@ public class MagicFix125Tests
         Form(thief.GetEquipment(EquipmentSlot.Head)!).Should().Be(before, "removal lands at the item's base");
     }
 
+    [Theory]
+    [InlineData(1)] [InlineData(2)] [InlineData(3)] [InlineData(4)] [InlineData(5)]
+    public async Task EnchantThenReforgeThenRemove_GivesTheReforgedBase(int seed)
+    {
+        var hero = Hero();
+        var sword = new Equipment
+        {
+            Name = "Broadsword", Slot = EquipmentSlot.MainHand, Handedness = WeaponHandedness.OneHanded, WeaponType = WeaponType.Sword,
+            WeaponPower = 40, StrengthBonus = 10, DexterityBonus = 10, MinLevel = 1, Value = 1000, Rarity = EquipmentRarity.Rare,
+        };
+        hero.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(sword);
+        foreach (var m in GameConfig.CraftingMaterials) hero.AddMaterial(m.Id, 5);
+        await Enchant(hero, 2, 3);     // +4 Dex
+        await Enchant(hero, 13);       // Phoenix Fire, +20 power and the fire flag
+        var weapon = hero.GetEquipment(EquipmentSlot.MainHand)!;
+        weapon.Name.Should().Be("Broadsword +4 Dex (Phoenix Fire)");
+
+        WeaponShopLocation.ApplyReforge(weapon, WeaponShopLocation.RollReforge(weapon, hero.Level, new Random(seed), out _));
+        var reforged = weapon.Clone();
+
+        await Remove(hero);
+        var back = hero.GetEquipment(EquipmentSlot.MainHand)!;
+        back.Name.Should().Be("Broadsword");
+        back.HasFireEnchant.Should().BeFalse("the fire enchant goes");
+        back.DexterityBonus.Should().Be(Math.Max(0, reforged.DexterityBonus - 4), "the reforged Dexterity less the enchant's 4");
+        back.WeaponPower.Should().Be(Math.Max(0, reforged.WeaponPower - 20), "the reforged power less Phoenix Fire's 20");
+        back.StrengthBonus.Should().Be(reforged.StrengthBonus, "a stat no enchant touched keeps its reforged value");
+        back.Rarity.Should().Be(reforged.Rarity, "the reforge's rarity stays");
+        foreach (var (got, max) in new[] { (back.DexterityBonus, reforged.DexterityBonus), (back.WeaponPower, reforged.WeaponPower),
+                     (back.StrengthBonus, reforged.StrengthBonus), (back.ArmorClass, reforged.ArmorClass) })
+            got.Should().BeLessOrEqualTo(max, "removal never adds anything");
+        back.Value.Should().BeLessOrEqualTo(reforged.Value);
+        back.GetEnchantmentCount().Should().Be(0);
+    }
+
     [Fact]
     public async Task AfterRemoval_TheEnchantLimitStillHolds_AndTheSameKindCanGoOnOnce()
     {
