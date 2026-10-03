@@ -316,20 +316,13 @@ names|Scripts/Locations/AnchorRoadLocation.cs|BaseConstructorInitializer#1|place
 names|Scripts/Locations/BankLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|decl:BankerName|NPC name
 names|Scripts/Locations/BaseLocation.cs|decl:fonts|font names
-table|Scripts/Locations/CastleLocation.cs|=currentPlayer.NobleTitle|noble title prefix in chat
-table|Scripts/Locations/CastleLocation.cs|decl:knightNews|news, Newsy
-table|Scripts/Locations/CastleLocation.cs|decl:OrphanBackstories|orphan backstory
-table|Scripts/Locations/CastleLocation.cs|decl:prompt|castle prompt
-table|Scripts/Locations/CastleLocation.cs|decl:questTypes|quest type in castle.quest_desc
-table|Scripts/Locations/CastleLocation.cs|decl:role|mercenary role in castle.commissioned_merc
-table|Scripts/Locations/CastleLocation.cs|decl:sexStr|orphan list
-table|Scripts/Locations/CastleLocation.cs|decl:soulDesc|orphan temperament
-table|Scripts/Locations/CastleLocation.cs|decl:status|heir status
-table|Scripts/Locations/CastleLocation.cs|decl:title|trial, knighting and proclaim text
-table|Scripts/Locations/CastleLocation.cs|decl:typeStr|orphan list
-table|Scripts/Locations/CastleLocation.cs|EqualsValueClause|reign end reason in monarch history
-nouns|Scripts/Locations/CastleLocation.cs|init.Name|armory item and guard names
-nouns|Scripts/Locations/CastleLocation.cs|=itemName|item in castle.armory_cant_afford
+table|Scripts/Locations/CastleLocation.cs|=currentPlayer.NobleTitle|King/Queen stored in NobleTitle: compared in CastleLocation (TriggerRebellion, AbdicatePlayerThroneAsync), saved, the chat prefix (MudChatSystem); shown keyed by NobleTitleLabel
+keyed|Scripts/Locations/CastleLocation.cs|decl:OrphanBackstories|castle.orphan_backstory_N; stored in RoyalOrphan.BackgroundStory in English, shown by OrphanBackstoryText
+keyed|Scripts/Locations/CastleLocation.cs|decl:RoyalQuestTypes|castle.quest_type_N; English passed to QuestSystem.CreateRoyalAudienceQuest, which matches words in it
+keyed|Scripts/Locations/CastleLocation.cs|decl:role|castle.role_tank, castle.role_dps, castle.role_support; stored RoyalMercenary.Role and the MercenaryNames key, shown by MercRoleLabel
+table|Scripts/Locations/CastleLocation.cs|decl:title|knight title Sir/Dame stored in NobleTitle and the unlocked titles (compared in SanctumLocation, GameEngine, BaseLocation); shown keyed by NobleTitleLabel
+table|Scripts/Locations/CastleLocation.cs|EqualsValueClause|reign end reason "Died", stored in the monarch history and shown as stored
+nouns|Scripts/Locations/CastleLocation.cs|init.Name|armory item names, stored on the item (the shown name is keyed: castle.armory_item_*)
 names|Scripts/Locations/CastleLocation.cs|decl:firstNames|guard names
 names|Scripts/Locations/CastleLocation.cs|decl:OrphanNamesFemale|orphan names
 names|Scripts/Locations/CastleLocation.cs|decl:OrphanNamesMale|orphan names
