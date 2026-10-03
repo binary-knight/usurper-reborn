@@ -428,6 +428,39 @@ public static partial class MailSystem
         player.GrantPermanentStat(StatKind.Charisma, GameConfig.BirthdayLoveGift);
     }
 
+    /// <summary>
+    /// v1.2.5: the letter an option label shows in brackets, in the reader's language ("(T)apasztalat" is T,
+    /// "(L) Amour" is L); empty when the label has none.
+    /// </summary>
+    internal static string OptionLetter(string label)
+    {
+        int open = label.IndexOf('('), close = open < 0 ? -1 : label.IndexOf(')', open + 1);
+        return close > open + 1 ? label.Substring(open + 1, close - open - 1).Trim().ToUpperInvariant() : "";
+    }
+
+    /// <summary>
+    /// v1.2.5: the birthday gift a typed letter picks, as E, L, A or S, by the letters the options show in
+    /// the reader's language (Hungarian shows T, S, Ö and K); empty for any other input.
+    /// </summary>
+    internal static string BirthdayChoice(string? input)
+    {
+        string typed = (input ?? "").Trim().ToUpperInvariant();
+        if (typed.Length == 0) return "";
+        foreach (var (key, choice) in new[] { ("mail.birthday_experience", "E"), ("mail.birthday_love", "L"), ("mail.birthday_adopt", "A"), ("mail.birthday_skip", "S") })
+            if (typed == OptionLetter(Loc.Get(key))) return choice;
+        return "";
+    }
+
+    /// <summary>v1.2.5: Y or N for a typed letter, by the letters the yes and no options show in the reader's language; empty otherwise.</summary>
+    internal static string YesNoChoice(string? input, string yesKey, string noKey)
+    {
+        string typed = (input ?? "").Trim().ToUpperInvariant();
+        if (typed.Length == 0) return "";
+        if (typed == OptionLetter(Loc.Get(yesKey))) return "Y";
+        if (typed == OptionLetter(Loc.Get(noKey))) return "N";
+        return "";
+    }
+
     private static async Task ProcessBirthdayMail(MailRecord mail, TerminalUI terminal)
     {
         terminal.WriteLine(Loc.Get("mail.birthday_choose"), "bright_yellow");
@@ -436,13 +469,13 @@ public static partial class MailSystem
         terminal.WriteLine(Loc.Get("mail.birthday_adopt"), "white");
         terminal.WriteLine(Loc.Get("mail.birthday_skip"), "white");
         
-        var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
+        var choice = BirthdayChoice(await terminal.GetInputAsync(Loc.Get("ui.your_choice")));
         var gameEngine = GameEngine.Instance;
         var player = gameEngine?.CurrentPlayer;
         
         if (player == null) return;
         
-        switch (choice.ToUpper())
+        switch (choice)
         {
             case "E":
                 player.Experience += GameConfig.BirthdayExperienceGift;
@@ -478,13 +511,13 @@ public static partial class MailSystem
         terminal.WriteLine(Loc.Get("mail.guard_yes"), "white");
         terminal.WriteLine(Loc.Get("mail.guard_no"), "white");
         
-        var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
+        var choice = YesNoChoice(await terminal.GetInputAsync(Loc.Get("ui.your_choice")), "mail.guard_yes", "mail.guard_no");
         var gameEngine = GameEngine.Instance;
         var player = gameEngine?.CurrentPlayer;
         
         if (player == null) return;
         
-        switch (choice.ToUpper())
+        switch (choice)
         {
             case "Y":
                 player.BGuardNr = 1; // Assign guard position
@@ -513,9 +546,9 @@ public static partial class MailSystem
             terminal.WriteLine(Loc.Get("mail.marriage_yes"), "white");
             terminal.WriteLine(Loc.Get("mail.marriage_no"), "white");
             
-            var choice = await terminal.GetInputAsync(Loc.Get("ui.your_choice"));
+            var choice = YesNoChoice(await terminal.GetInputAsync(Loc.Get("ui.your_choice")), "mail.marriage_yes", "mail.marriage_no");
             
-            switch (choice.ToUpper())
+            switch (choice)
             {
                 case "Y":
                     terminal.WriteLine(Loc.Get("mail.marriage_accepted"), "bright_green");

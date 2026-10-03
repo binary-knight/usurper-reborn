@@ -572,6 +572,36 @@ public class OnlineSystems125Tests : IDisposable
     }
 
     [Fact]
+    public void MailAnswers_TakeTheLettersTheOptionsShow()
+    {
+        InLang("en", () =>
+        {
+            new[] { "e", "L", "a", "S", "x", "" }.Select(MailSystem.BirthdayChoice).Should().Equal("E", "L", "A", "S", "", "");
+            MailSystem.YesNoChoice("y", "mail.guard_yes", "mail.guard_no").Should().Be("Y");
+            MailSystem.YesNoChoice("N", "mail.marriage_yes", "mail.marriage_no").Should().Be("N");
+            return 0;
+        });
+        InLang("hu", () =>
+        {
+            // Hungarian shows (T)apasztalat, (S)zerelem, (Ö)rökbefogadás, (K)ihagyás, (I)gen, (N)em
+            new[] { "t", "S", "ö", "K", "E" }.Select(MailSystem.BirthdayChoice).Should().Equal("E", "L", "A", "S", "");
+            MailSystem.YesNoChoice("i", "mail.guard_yes", "mail.guard_no").Should().Be("Y");
+            MailSystem.YesNoChoice("Y", "mail.marriage_yes", "mail.marriage_no").Should().Be("");
+            MailSystem.YesNoChoice("n", "mail.marriage_yes", "mail.marriage_no").Should().Be("N");
+            return 0;
+        });
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            InLang(lang, () =>
+            {
+                var letters = new[] { "mail.birthday_experience", "mail.birthday_love", "mail.birthday_adopt", "mail.birthday_skip" }
+                    .Select(k => MailSystem.OptionLetter(Loc.Get(k))).ToList();
+                letters.Should().OnlyHaveUniqueItems().And.NotContain("", $"[{lang}] every gift shows its own letter");
+                MailSystem.OptionLetter(Loc.Get("mail.guard_yes")).Should().NotBe(MailSystem.OptionLetter(Loc.Get("mail.guard_no")));
+                return 0;
+            });
+    }
+
+    [Fact]
     public void MarriageMail_TheAnswerFollowsTheFlag_NotTheSubjectText()
     {
         Src("Systems", "MailSystem.cs").Should().Contain("if (mail.IsProposal)").And.NotContain("Subject.Contains(");
