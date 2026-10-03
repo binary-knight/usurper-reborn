@@ -245,6 +245,32 @@ public class MagicFix125Tests
     }
 
     [Fact]
+    public async Task AnEnchantedItemStolenInTheDormitory_KeepsItsRecordAndCount_AndRemovalLandsAtBase()
+    {
+        var victim = Wearing("Leather Cap", 0);
+        string before = Form(victim.GetEquipment(EquipmentSlot.Head)!);
+        await Enchant(victim, 13);
+        await Enchant(victim, 2, 3);
+        var cap = victim.GetEquipment(EquipmentSlot.Head)!;
+        var saved = Save(victim).DynamicEquipment.Single(d => d.Name == cap.Name);
+
+        // the thief's side: the stolen item, into the bag, and worn
+        var stolen = DormitoryLocation.StolenEquipmentFrom(saved, cap.Name);
+        EquipmentDatabase.RegisterDynamic(stolen);
+        var thief = Hero();
+        var bagItem = thief.ConvertEquipmentToLegacyItem(stolen);
+        var worn = Character.BuildEquipmentFromItem(bagItem, EquipmentSlot.Head, WeaponHandedness.None, WeaponType.None);
+        thief.EquippedItems[EquipmentSlot.Head] = EquipmentDatabase.RegisterDynamic(worn);
+        var onThief = thief.GetEquipment(EquipmentSlot.Head)!;
+        onThief.EnchantBase.Should().Be(cap.EnchantBase, "the record comes with the stolen item");
+        onThief.GetEnchantmentCount().Should().Be(2, "the enchant count comes with it, so the limit holds");
+        onThief.GetEnchantedKinds().Should().BeEquivalentTo(cap.GetEnchantedKinds());
+
+        await Remove(thief);
+        Form(thief.GetEquipment(EquipmentSlot.Head)!).Should().Be(before, "removal lands at the item's base");
+    }
+
+    [Fact]
     public async Task AfterRemoval_TheEnchantLimitStillHolds_AndTheSameKindCanGoOnOnce()
     {
         var hero = Wearing("Leather Cap", 0);
