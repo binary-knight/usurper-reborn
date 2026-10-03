@@ -662,7 +662,7 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("white");
         terminal.Write(Loc.Get("castle.bbs_majesty_treasury"));
         terminal.SetColor("bright_yellow");
-        terminal.Write($"{currentKing.Treasury:N0}g");
+        terminal.Write(Loc.Get("magic_shop.gold_short", $"{currentKing.Treasury:N0}"));
         terminal.SetColor("gray");
         terminal.Write(Loc.Get("castle.bbs_guards", currentKing.Guards.Count, GameConfig.MaxRoyalGuards));
         terminal.Write(Loc.Get("castle.bbs_prisoners", currentKing.Prisoners.Count));
@@ -1169,6 +1169,62 @@ public class CastleLocation : BaseLocation
         "The ruler has fallen in battle." => Loc.Get("castle.vacant_battle"),
         _ => reason
     };
+
+    /// <summary>v1.2.5: a stored English reign end reason (the monarch history) in the player's language; an
+    /// unknown one is shown as stored.</summary>
+    internal static string EndReasonLabel(string? stored)
+    {
+        string r = stored ?? "";
+        switch (r)
+        {
+            case "Died": return Loc.Get("castle.end_died");
+            case "Died of old age": return Loc.Get("castle.end_old_age");
+            case "Fell in battle": return Loc.Get("castle.end_battle");
+            case "Abdicated": return Loc.Get("castle.end_abdicated");
+            case "abdicated the throne to ascend to godhood": return Loc.Get("castle.end_godhood");
+            case "abdicated the throne to start anew": return Loc.Get("castle.end_anew");
+            case "left the throne and the realm": return Loc.Get("castle.end_left");
+        }
+        if (r.StartsWith("Defeated by ", StringComparison.Ordinal))
+            return Loc.Get("castle.end_defeated_by", r.Substring("Defeated by ".Length));
+        if (r.StartsWith("Overthrown by ", StringComparison.Ordinal) && r.EndsWith(" siege", StringComparison.Ordinal) && r.Length > 20)
+            return Loc.Get("castle.end_siege", r.Substring(14, r.Length - 20));
+        return r;
+    }
+
+    private static readonly string[] CourtRoleKeys =
+    {
+        "castle.d3_role_advisor", "castle.d3_role_chaplain", "castle.d3_role_spymaster", "castle.court_role_advisor",
+        "castle.court_role_steward", "castle.court_role_marshal", "castle.court_role_spymaster", "castle.court_role_treasurer",
+    };
+
+    /// <summary>v1.2.5: a stored court role in the player's language. Roles are stored in English (WorldSimulator,
+    /// StreetEncounterSystem, the sponsored heir since 1.2.5); a sponsored heir's role stored before 1.2.5 in its
+    /// sponsor's language is matched in every language. An unknown role is shown as stored.</summary>
+    internal static string CourtRoleLabel(string? stored)
+    {
+        string r = stored ?? "";
+        foreach (var key in CourtRoleKeys)
+            if (Loc.GetIn("en", key) == r) return Loc.Get(key);
+        foreach (var lang in Loc.LoadedLanguages)
+            foreach (var key in CourtRoleKeys)
+                if (Loc.GetIn(lang, key) == r) return Loc.Get(key);
+        return r;
+    }
+
+    /// <summary>v1.2.5: a court faction in the player's language.</summary>
+    internal static string CourtFactionLabel(CourtFaction faction) =>
+        faction == CourtFaction.None ? Loc.Get("ui.none") : Loc.Get($"castle.court_faction_{faction.ToString().ToLowerInvariant()}");
+
+    internal static string CourtFactionLabel(int faction) => CourtFactionLabel((CourtFaction)faction);
+
+    /// <summary>v1.2.5: a quest target QuestSystem names "Floor N" in English, shown in the player's language.</summary>
+    internal static string QuestTargetLabel(string? target)
+    {
+        string t = target ?? "";
+        return t.StartsWith("Floor ", StringComparison.Ordinal) && int.TryParse(t.Substring(6), out int floor)
+            ? Loc.Get("dungeon.floor", floor) : t;
+    }
 
     // ---- mail and live notices to another player, built in that player's language ----
 
@@ -2985,7 +3041,16 @@ public class CastleLocation : BaseLocation
             foreach (var monarch in monarchHistory.OrderByDescending(m => m.CoronationDate))
             {
                 terminal.SetColor("white");
-                terminal.WriteLine($"{i,-3} {monarch.Name,-25} {NobleTitleLabel(monarch.Title),-8} {monarch.DaysReigned,-12} {monarch.EndReason,-15}");
+                string reason = EndReasonLabel(monarch.EndReason);
+                string row = $"{i,-3} {monarch.Name,-25} {NobleTitleLabel(monarch.Title),-8} {monarch.DaysReigned,-12} {reason}";
+                if (row.Length <= 79)
+                    terminal.WriteLine(row);
+                else
+                {
+                    // v1.2.5: a long name or reason puts the reason on the next row, under its column
+                    terminal.WriteLine($"{i,-3} {monarch.Name,-25} {NobleTitleLabel(monarch.Title),-8} {monarch.DaysReigned}");
+                    terminal.WriteLine($"{new string(' ', 4)}{reason}");
+                }
                 i++;
             }
             terminal.WriteLine("");
@@ -4028,8 +4093,8 @@ public class CastleLocation : BaseLocation
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("castle.orphan_type_orphaned"));
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.orphan_mother", orphan.MotherName ?? "Unknown"));
-            terminal.WriteLine(Loc.Get("castle.orphan_father", orphan.FatherName ?? "Unknown"));
+            terminal.WriteLine(Loc.Get("castle.orphan_mother", orphan.MotherName ?? Loc.Get("castle.orphan_unknown")));
+            terminal.WriteLine(Loc.Get("castle.orphan_father", orphan.FatherName ?? Loc.Get("castle.orphan_unknown")));
             terminal.WriteLine(Loc.Get("castle.orphan_race", GameConfig.GetLocalizedRaceName(orphan.Race)));
             string soulDesc = Loc.Get(orphan.Soul > 200 ? "castle.soul_pure" :
                               orphan.Soul > 100 ? "castle.soul_good" :
@@ -4532,7 +4597,7 @@ public class CastleLocation : BaseLocation
             var faction = DetermineFactionForNPC(npc);
 
             terminal.SetColor("white");
-            terminal.WriteLine($"{i,-3} {npc.Name,-20} {npc.Level,-8} {dowry:N0,-12} {Loc.Get("castle.candidate_entry", "", faction).Trim()}");
+            terminal.WriteLine($"{i,-3} {npc.Name,-20} {npc.Level,-8} {dowry:N0,-12} {Loc.Get("castle.candidate_entry", "", CourtFactionLabel(faction)).Trim()}");
             i++;
         }
 
@@ -4682,7 +4747,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("castle.dowry_received", dowry.ToString("N0")));
-            terminal.WriteLine(Loc.Get("castle.faction_loyalty_up", faction));
+            terminal.WriteLine(Loc.Get("castle.faction_loyalty_up", CourtFactionLabel(faction)));
             terminal.WriteLine("");
 
             NewsSystem.Instance?.Newsy(true,
@@ -4804,7 +4869,7 @@ public class CastleLocation : BaseLocation
 
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("castle.divorced", spouseName));
-            terminal.WriteLine(Loc.Get("castle.faction_furious", faction));
+            terminal.WriteLine(Loc.Get("castle.faction_furious", CourtFactionLabel(faction)));
 
             NewsSystem.Instance?.Newsy(true,
                 Loc.Get("castle.news_royal_divorce", KingTitle(), currentKing.Name, spouseName));
@@ -4840,7 +4905,7 @@ public class CastleLocation : BaseLocation
         else
         {
             terminal.SetColor("white");
-            terminal.WriteLine($"{Loc.Get("castle.header_role"),-18} {Loc.Get("castle.header_name"),-25} {Loc.Get("castle.header_faction"),-15} {Loc.Get("castle.header_loyalty"),-10} {Loc.Get("castle.header_influence")}");
+            terminal.WriteLine($"{Loc.Get("castle.header_role"),-18} {Loc.Get("castle.header_name"),-23} {Loc.Get("castle.header_faction"),-15} {Loc.Get("castle.header_loyalty"),-10} {Loc.Get("castle.header_influence")}");
             WriteDivider(78);
 
             foreach (var member in currentKing.CourtMembers)
@@ -4850,11 +4915,18 @@ public class CastleLocation : BaseLocation
                 string plottingMark = member.IsPlotting ? " *" : "";
 
                 terminal.SetColor("white");
-                terminal.Write($"{member.Role,-18} ");
+                terminal.Write($"{CourtRoleLabel(member.Role),-18} ");
                 terminal.SetColor("cyan");
-                terminal.Write($"{member.Name,-25} ");
+                // v1.2.5: the name column is 23 (the header was 81 columns); a longer name keeps its own row
+                if (member.Name.Length > 23)
+                {
+                    terminal.WriteLine(member.Name);
+                    terminal.Write(new string(' ', 43));
+                }
+                else
+                    terminal.Write($"{member.Name,-23} ");
                 terminal.SetColor("gray");
-                terminal.Write($"{member.Faction,-15} ");
+                terminal.Write($"{CourtFactionLabel(member.Faction),-15} ");
                 terminal.SetColor(loyaltyColor);
                 terminal.Write($"{member.LoyaltyToKing}%{plottingMark,-7} ");
                 terminal.SetColor("white");
@@ -4920,7 +4992,7 @@ public class CastleLocation : BaseLocation
                           avgLoyalty >= 40 ? "yellow" : "red";
 
             terminal.SetColor("white");
-            terminal.Write($"  {group.Key,-15}: ");
+            terminal.Write($"  {CourtFactionLabel(group.Key),-15}: ");
             terminal.SetColor(color);
             terminal.WriteLine($"{status} ({avgLoyalty}%)");
         }
@@ -4985,7 +5057,7 @@ public class CastleLocation : BaseLocation
         {
             var m = currentKing.CourtMembers[i];
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.court_member_entry", i + 1, m.Name, m.Role, m.Faction));
+            terminal.WriteLine(Loc.Get("castle.court_member_entry", i + 1, m.Name, CourtRoleLabel(m.Role), CourtFactionLabel(m.Faction)));
         }
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.number_cancel"));
@@ -5208,7 +5280,7 @@ public class CastleLocation : BaseLocation
         {
             var m = currentKing.CourtMembers[i];
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.promote_entry", i + 1, m.Name, m.Role, m.Influence));
+            terminal.WriteLine(Loc.Get("castle.promote_entry", i + 1, m.Name, CourtRoleLabel(m.Role), m.Influence));
         }
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.number_cancel"));
@@ -5670,25 +5742,27 @@ public class CastleLocation : BaseLocation
         // Determine track and assign faction + court entry.
         UsurperRemake.Systems.Faction? faction = null;
         global::CourtFaction courtFaction = global::CourtFaction.Loyalists;
-        string roleName = Loc.Get("castle.d3_role_advisor");
+        string roleKey = "castle.d3_role_advisor";
         if (chosen.Chivalry > 200)
         {
             faction = UsurperRemake.Systems.Faction.TheFaith;
             courtFaction = global::CourtFaction.Faithful;
-            roleName = Loc.Get("castle.d3_role_chaplain");
+            roleKey = "castle.d3_role_chaplain";
         }
         else if (chosen.Darkness > 200)
         {
             faction = UsurperRemake.Systems.Faction.TheShadows;
             courtFaction = global::CourtFaction.Militarists;
-            roleName = Loc.Get("castle.d3_role_spymaster");
+            roleKey = "castle.d3_role_spymaster";
         }
         else
         {
             faction = UsurperRemake.Systems.Faction.TheCrown;
             courtFaction = global::CourtFaction.Loyalists;
-            roleName = Loc.Get("castle.d3_role_advisor");
+            roleKey = "castle.d3_role_advisor";
         }
+
+        string roleName = Loc.Get(roleKey), roleStored = Loc.GetIn("en", roleKey);
 
         // v1.1.13: the appointment is one guarded court change; the faction and the Fame cost follow it
         int influence = 40 + Random.Shared.Next(20);
@@ -5698,7 +5772,7 @@ public class CastleLocation : BaseLocation
                 {
                     Name = chosen.Name2,
                     Faction = (int)courtFaction,
-                    Role = roleName,
+                    Role = roleStored,   // v1.2.5: stored in English, shown by CourtRoleLabel
                     Influence = influence,
                     LoyaltyToKing = 80, // family loyalty is high
                 });
@@ -7140,7 +7214,7 @@ public class CastleLocation : BaseLocation
                         terminal.WriteLine(Loc.Get("castle.quest_objective", Loc.Get($"castle.quest_type_{questType}")));   // the objective holds the English description
                         if (quest.Objectives[0].RequiredProgress > 1)
                         {
-                            terminal.WriteLine(Loc.Get("castle.quest_target", quest.Objectives[0].TargetName, quest.Objectives[0].RequiredProgress));
+                            terminal.WriteLine(Loc.Get("castle.quest_target", QuestTargetLabel(quest.Objectives[0].TargetName), quest.Objectives[0].RequiredProgress));
                         }
                     }
 

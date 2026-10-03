@@ -452,6 +452,113 @@ public class Castle125Tests : IDisposable
         src.Should().Contain("if (childRow.Length <= 79)").And.Contain("Loc.Get(\"castle.d3_child_track\", track)");
     }
 
+    // ================= stored values shown keyed: history, court, parents, gold =================
+
+    private static readonly (string Stored, string Key, string? Arg)[] EndReasons =
+    {
+        ("Died", "castle.end_died", null), ("Died of old age", "castle.end_old_age", null), ("Fell in battle", "castle.end_battle", null),
+        ("Abdicated", "castle.end_abdicated", null), ("abdicated the throne to ascend to godhood", "castle.end_godhood", null),
+        ("abdicated the throne to start anew", "castle.end_anew", null), ("left the throne and the realm", "castle.end_left", null),
+        ("Defeated by " + LongName, "castle.end_defeated_by", LongName), ("Overthrown by Wolves of the North siege", "castle.end_siege", "Wolves of the North"),
+    };
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public async Task MonarchHistory_ShowsTheStoredEndReasons_InThePlayersLanguage_AndFits(string lang)
+    {
+        CastleLocation.SetKing(LongKing());
+        var field = typeof(CastleLocation).GetField("monarchHistory", S)!;
+        var saved = (List<MonarchRecord>)field.GetValue(null)!;
+        var list = EndReasons.Select((r, i) => new MonarchRecord { Name = LongName, Title = i % 2 == 0 ? "Queen" : "King", DaysReigned = 1000 + i,
+            EndReason = r.Stored, CoronationDate = DateTime.Now.AddDays(-i) }).ToList();
+        field.SetValue(null, list);
+        try
+        {
+            string text = await InLanguage(lang, async () =>
+            {
+                var castle = new CastleLocation();
+                var s = At(castle, Hero(), false, "");
+                await Run(castle, "ShowMonarchHistory");
+                return s.Text;
+            });
+            Capture($"castle-history-{lang}.txt", text);
+            EveryRowFits(text, $"{lang} monarch history");
+            foreach (var (stored, key, arg) in EndReasons)
+            {
+                string shown = arg == null ? L(lang, key) : L(lang, key, arg);
+                InLang(lang, () => CastleLocation.EndReasonLabel(stored)).Should().Be(shown);
+                text.Should().Contain(shown);
+                if (lang == "en") shown.Should().Be(stored, "the English reads as stored");
+            }
+            if (lang == "hu") text.Should().NotContain("Defeated by").And.NotContain("Fell in battle").And.NotContain("siege").And.NotContain("Queen");
+            list.Select(m => m.EndReason).Should().Equal(EndReasons.Select(r => r.Stored), "the stored reasons are untouched");
+            InLang("hu", () => CastleLocation.EndReasonLabel("Swallowed by a dragon")).Should().Be("Swallowed by a dragon");
+        }
+        finally { field.SetValue(null, saved); }
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("hu")]
+    public async Task CourtRolesAndFactions_AreShownInThePlayersLanguage(string lang)
+    {
+        var king = LongKing();
+        string[] roles = { "Royal Advisor", "Court Steward", "Marshal", "Spymaster", "Treasurer", "Advisor", L("hu", "castle.d3_role_chaplain"), "Keeper of Hounds" };
+        var factions = new[] { CourtFaction.Loyalists, CourtFaction.Reformists, CourtFaction.Militarists, CourtFaction.Merchants, CourtFaction.Faithful };
+        for (int i = 0; i < roles.Length; i++)
+            king.CourtMembers.Add(new CourtMember { Name = i == 0 ? LongName : $"Member {i}", Role = roles[i], Faction = factions[i % factions.Length], LoyaltyToKing = 50, Influence = 50 });
+        CastleLocation.SetKing(king);
+        string text = await InLanguage(lang, async () =>
+        {
+            var castle = new CastleLocation();
+            var s = At(castle, Hero(), false, "", "");
+            await Run(castle, "ViewCourtPolitics");
+            return s.Text;
+        });
+        Capture($"castle-court-{lang}.txt", text);
+        EveryRowFits(text, $"{lang} royal court");
+        foreach (var key in new[] { "castle.d3_role_advisor", "castle.court_role_steward", "castle.court_role_marshal", "castle.court_role_spymaster",
+                     "castle.court_role_treasurer", "castle.court_role_advisor", "castle.d3_role_chaplain" })
+            text.Should().Contain(L(lang, key), key);
+        foreach (var f in factions) text.Should().Contain(L(lang, $"castle.court_faction_{f.ToString().ToLowerInvariant()}"));
+        text.Should().Contain("Keeper of Hounds", "an unknown role is shown as stored");
+        if (lang == "hu") text.Should().NotContain("Court Steward").And.NotContain("Treasurer").And.NotContain("Loyalists").And.NotContain("Reformists");
+        king.CourtMembers.Select(m => m.Role).Should().Equal(roles, "the stored roles are untouched");
+        string src = Src();
+        src.Should().Contain("string roleName = Loc.Get(roleKey), roleStored = Loc.GetIn(\"en\", roleKey);")
+            .And.Contain("Role = roleStored,", "a sponsored heir's role is stored in English");
+    }
+
+    [Fact]
+    public async Task UnknownParents_AndTheBbsTreasury_AreInHungarian()
+    {
+        var king = LongKing();
+        king.Orphans.Add(RealOrphan("Pip", 10, CharacterSex.Male));
+        CastleLocation.SetKing(king);
+        string text = await InLanguage("hu", async () =>
+        {
+            var castle = new CastleLocation();
+            var s = At(castle, Hero(), true, "1", "");
+            await Run(castle, "ViewOrphanDetails");
+            return s.Text;
+        });
+        text.Should().Contain(L("hu", "castle.orphan_mother", L("hu", "castle.orphan_unknown"))).And.NotContain("Unknown");
+        string bbs = await InLanguage("hu", async () =>
+        {
+            var castle = new CastleLocation();
+            var s = At(castle, Hero(), true);
+            await Run(castle, "DisplayRoyalCastleInteriorBBS");
+            return s.Text;
+        }, compact: true);
+        bbs.Should().Contain(L("hu", "magic_shop.gold_short", "123,456,789")).And.NotContain("123,456,789g");
+    }
+
+    [Fact]
+    public void FloorTargets_AreShownInThePlayersLanguage()
+    {
+        InLang("hu", () => CastleLocation.QuestTargetLabel("Floor 45")).Should().Be(L("hu", "dungeon.floor", 45));
+        InLang("hu", () => CastleLocation.QuestTargetLabel("Goblin")).Should().Be("Goblin");
+    }
+
     // ================= the armory =================
 
     [Theory]
