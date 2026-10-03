@@ -1,7 +1,7 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs
 ---
 A combat status, an addiction and a persistent affliction are not interchangeable. Read Status and the treatment menu to identify what is wrong.

@@ -1,7 +1,7 @@
 ---
 title: The Sanctum
 path: /wiki/en/world/sanctum/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Locations/SanctumLocation.cs
 ---
 The Sanctum offers charitable and honor-oriented activities. It is separate from the Temple and the Castle's political menu.
