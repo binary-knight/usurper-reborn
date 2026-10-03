@@ -280,4 +280,223 @@ public class RestWorld125Tests : IDisposable
         NoEnglishLeft(hu, new[] { "maint.mail_team_departure" });
         MaintenanceSystem.RecipientLanguage(MaintPlayer("hu")).Should().Be("hu");
     }
+    // ================= news: catch-up buckets and gossip =================
+
+    private static readonly string[] OtherLanguages = { "es", "fr", "hu", "it" };
+
+    /// <summary>The catch-up bucket of a news text written in each language is the bucket of the English one.</summary>
+    private static void SameCatchUpBucket(string key, params object[] args)
+    {
+        string en = L("en", key, args);
+        int expected = GameEngine.CatchUpBucket(en);
+        foreach (var lang in OtherLanguages)
+            GameEngine.CatchUpBucket(L(lang, key, args)).Should().Be(expected,
+                $"{key} written in {lang} (\"{L(lang, key, args)}\") sorts into the catch-up heading of the English \"{en}\"");
+    }
+
+    /// <summary>A news text written in each language is gossip for a reader of that language when the English one is.</summary>
+    private static void SameGossip(string key, params object[] args)
+    {
+        bool expected = InLang("en", () => NewsSystem.GossipKeywordsForReader()).Any(k => L("en", key, args).Contains(k, StringComparison.OrdinalIgnoreCase));
+        expected.Should().BeTrue($"{key} is gossip in English");
+        foreach (var lang in OtherLanguages)
+        {
+            string text = L(lang, key, args);
+            InLang(lang, () => NewsSystem.GossipKeywordsForReader()).Any(k => text.Contains(k, StringComparison.OrdinalIgnoreCase))
+                .Should().BeTrue($"{key} written in {lang} (\"{text}\") is gossip for a {lang} reader");
+        }
+    }
+
+    /// <summary>What Newsy writes while the body runs, in the writer's language.</summary>
+    private static List<string> NewsWritten(string lang, Action body)
+    {
+        var buffer = new List<string>();
+        NewsSystem.Instance.SetCatchUpBuffer(buffer);
+        try { InLang(lang, () => { body(); return 0; }); }
+        finally { NewsSystem.Instance.ClearCatchUpBuffer(); }
+        return buffer;
+    }
+
+    // ================= WorldEventSystem =================
+
+    private static readonly WorldEventSystem.EventType[] ShownEvents =
+    {
+        WorldEventSystem.EventType.KingMartialLaw, WorldEventSystem.EventType.PlagueOutbreak,
+        WorldEventSystem.EventType.WinterSolstice, WorldEventSystem.EventType.AncientRelicFound,
+    };
+
+    private static List<string> EventKeys(WorldEventSystem.EventType t) =>
+        new[] { "title", "desc", "decree" }.Select(p => WorldEventSystem.EventKey(t, p)).Where(k => Loc.HasIn("en", k)).ToList();
+
+    private static string EventScreen(string lang)
+    {
+        var s = NewScreen();
+        InLang(lang, () => { WorldEventSystem.Instance.DisplayWorldStatus(s.Term); return 0; });
+        return s.Text;
+    }
+
+    [Fact]
+    public void WorldEventsScreen_InHungarian_HasNoEnglish_AndEveryRowFits()
+    {
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            events.ClearAllEvents();
+            string emptyHu = EventScreen("hu");
+            emptyHu.Should().Contain(L("hu", "world_event.none_active"));
+            NoEnglishLeft(emptyHu, new[] { "world_event.screen_title", "world_event.none_active", "world_event.modifiers" });
+
+            InLang("hu", () => { foreach (var t in ShownEvents) events.ForceEvent(t, 10); return 0; });
+            string hu = EventScreen("hu"), en = EventScreen("en");
+            Capture("world-events-hu.txt", hu);
+            Capture("world-events-en.txt", en);
+            EveryRowFits(hu, "world events screen (hu)");
+            EveryRowFits(en, "world events screen (en)");
+            NoEnglishLeft(hu, ShownEvents.SelectMany(EventKeys).Concat(new[] { "world_event.screen_title",
+                "world_event.days_remaining", "world_event.modifiers", "world_event.mod_prices", "world_event.mod_xp",
+                "world_event.mod_stats", "world_event.royal_decree" }));
+            hu.Should().Contain(L("hu", "world_event.king_martial_law.title")).And.Contain(L("hu", "world_event.king_martial_law.decree"));
+
+            // English as before
+            Rows(en).Should().Contain("           WORLD EVENTS").And.Contain("  * Martial Law")
+                .And.Contain("    The King declares martial law. Dark Alley is closed!").And.Contain("Current Modifiers:")
+                .And.Contain("Royal Decree:").And.Contain("  \"By Royal Decree: Martial law is in effect. Lawbreakers will be punished!\"")
+                .And.Contain("  Gold: +30%").And.Contain("  Stats: -2");
+            en.Should().MatchRegex(@"\n    \(\d+ days remaining\)");
+        }
+        finally { events.ClearAllEvents(); }
+    }
+
+    [Fact]
+    public void WorldEventRows_FitInEnglishAndHungarian_ForEveryEvent()
+    {
+        foreach (var lang in new[] { "en", "hu" })
+            foreach (WorldEventSystem.EventType t in Enum.GetValues(typeof(WorldEventSystem.EventType)))
+            {
+                var rows = UsurperRemake.UI.UIHelper.WordWrap(L(lang, WorldEventSystem.EventKey(t, "desc")), MaxWidth - 4).Select(r => "    " + r)
+                    .Append("  * " + L(lang, WorldEventSystem.EventKey(t, "title")));
+                if (Loc.HasIn("en", WorldEventSystem.EventKey(t, "decree")))
+                    rows = rows.Append($"  \"{L(lang, WorldEventSystem.EventKey(t, "decree"))}\"");
+                EveryRowFits(rows, $"{t} ({lang})");
+                L(lang, WorldEventSystem.EventKey(t, "title")).Length.Should().BeLessOrEqualTo(MaxWidth - 4, $"the {t} title fits one row ({lang})");
+            }
+        WorldEventSystem.ScreenTitleRow(L("hu", "world_event.screen_title")).Length.Should().BeLessOrEqualTo(MaxWidth);
+    }
+
+    [Fact]
+    public void WorldEvents_StoreEnglish_AndShowTheReadersLanguage_AfterSaveAndReload()
+    {
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            events.ClearAllEvents();
+            InLang("hu", () => { events.ForceEvent(WorldEventSystem.EventType.KingTaxIncrease, 10); events.ForceEvent(WorldEventSystem.EventType.GoldRush, 10); return 0; });
+            var stored = events.GetActiveEvents();
+            stored.Select(e => e.Title).Should().Equal("Royal Tax Increase", "Gold Rush");
+            stored.Select(e => e.Description).Should().Equal("The King has raised taxes! Shop prices increase by 20%.",
+                "Gold discovered in the mines! +50% gold from all sources.");
+            events.CurrentKingDecree.Should().Be("By Royal Decree: Taxes are raised to fund the kingdom's defense!");
+
+            // Save and reload the way the save file does it (JSON), then read the screen in Hungarian
+            var data = (List<WorldEventData>)typeof(SaveSystem).GetMethod("SerializeActiveEvents", F)!.Invoke(SaveSystem.Instance, null)!;
+            var json = System.Text.Json.JsonSerializer.Serialize(data);
+            events.ClearAllEvents();
+            events.RestoreFromSaveData(System.Text.Json.JsonSerializer.Deserialize<List<WorldEventData>>(json)!, 10);
+            events.GetActiveEvents().Select(e => e.Title).Should().Equal("Royal Tax Increase", "Gold Rush");
+            events.CurrentKingDecree.Should().Be("By Royal Decree: Taxes are raised to fund the kingdom's defense!");
+            string hu = EventScreen("hu");
+            hu.Should().Contain(L("hu", "world_event.king_tax_increase.title")).And.Contain(L("hu", "world_event.gold_rush.desc"))
+                .And.Contain(L("hu", "world_event.king_tax_increase.decree"));
+            NoEnglishLeft(hu, EventKeys(WorldEventSystem.EventType.KingTaxIncrease).Concat(EventKeys(WorldEventSystem.EventType.GoldRush)));
+
+            // A decree that is not one of the stored ones is shown as stored
+            WorldEventSystem.DecreeLabel("A decree from an older save").Should().Be("A decree from an older save");
+        }
+        finally { events.ClearAllEvents(); }
+    }
+
+    [Fact]
+    public void WorldEventNews_IsWrittenOnceInTheWritersLanguage_AndSortsAsTheEnglish()
+    {
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            events.ClearAllEvents();
+            var hu = NewsWritten("hu", () => events.ForceEvent(WorldEventSystem.EventType.KingWarDeclaration, 10));
+            hu.Should().Equal(L("hu", "world_event.news_event", L("hu", "world_event.king_war_declaration.title"), L("hu", "world_event.king_war_declaration.desc")),
+                L("hu", "world_event.king_war_declaration.decree"));
+            events.ClearAllEvents();
+            var en = NewsWritten("en", () => events.ForceEvent(WorldEventSystem.EventType.KingWarDeclaration, 10));
+            en.Should().Equal("Declaration of War: The King declares war! Combat XP +25%, but danger increases.",
+                "By Royal Decree: War is declared against the Northern Hordes!");
+        }
+        finally { events.ClearAllEvents(); }
+
+        foreach (WorldEventSystem.EventType t in Enum.GetValues(typeof(WorldEventSystem.EventType)))
+        {
+            if (t == WorldEventSystem.EventType.WorldBossVictory) continue;
+            string id = WorldEventSystem.EventKeyId(t);
+            foreach (var lang in new[] { "en" }.Concat(OtherLanguages))
+            {
+                string news = L(lang, "world_event.news_event", L(lang, $"world_event.{id}.title"), L(lang, $"world_event.{id}.desc"));
+                GameEngine.CatchUpBucket(news).Should().Be(GameEngine.CatchUpBucket(L("en", "world_event.news_event", L("en", $"world_event.{id}.title"), L("en", $"world_event.{id}.desc"))),
+                    $"the {t} news in {lang} (\"{news}\") sorts as the English one");
+                string ended = L(lang, "world_event.news_ended", L(lang, $"world_event.{id}.title"));
+                GameEngine.CatchUpBucket(ended).Should().Be(GameEngine.CatchUpBucket(L("en", "world_event.news_ended", L("en", $"world_event.{id}.title"))),
+                    $"the end of {t} in {lang} (\"{ended}\") sorts as the English one");
+            }
+            if (Loc.HasIn("en", $"world_event.{id}.decree")) SameCatchUpBucket($"world_event.{id}.decree");
+        }
+        SameCatchUpBucket("world_event.news_plague_subsided");
+        SameCatchUpBucket("world_event.news_peace_returned");
+    }
+
+    [Fact]
+    public void DistantNews_IsWrittenInTheWritersLanguage_AndSortsAsTheEnglish()
+    {
+        var keys = new List<string>();
+        foreach (var (cat, n) in new[] { ("war", 7), ("trade", 7), ("plague", 5), ("discovery", 6), ("political", 6), ("disaster", 6), ("monster", 7), ("player", 7) })
+            for (int i = 1; i <= n; i++) keys.Add($"world_event.distant_{cat}_{i}");
+        foreach (var key in keys)
+        {
+            Loc.HasIn("en", key).Should().BeTrue(key);
+            SameCatchUpBucket(key, "Ashenmoor", key.Contains("player") ? LongName : "Duskhollow");
+        }
+        L("en", "world_event.distant_war_3", "Ashenmoor", "Duskhollow").Should().Be("A ceasefire was declared between Ashenmoor and Duskhollow.");
+        L("en", "world_event.distant_player_3", "Ashenmoor", LongName).Should().Be($"The fame of {LongName} has reached even Ashenmoor.");
+
+        var events = WorldEventSystem.Instance;
+        string? prevPlayer = events.NotablePlayerName;
+        try
+        {
+            events.NotablePlayerName = LongName;
+            var written = new List<string>();
+            for (int day = 5000; day < 5040; day++)
+                written.AddRange(NewsWritten("hu", () => events.GenerateDistantWorldNews(day)));
+            written.Should().NotBeEmpty();
+            var huTexts = keys.Select(k => Loc.GetIn("hu", k)).ToList();
+            foreach (var item in written)
+            {
+                string text = item.StartsWith("☆ ") ? item.Substring(2) : item;
+                huTexts.Any(t => Regex.IsMatch(text, "^" + Regex.Escape(t).Replace(@"\{0}", ".+").Replace(@"\{1}", ".+") + "$"))
+                    .Should().BeTrue($"\"{text}\" is a Hungarian distant news text");
+            }
+        }
+        finally { events.NotablePlayerName = prevPlayer; }
+    }
+
+    [Fact]
+    public void MartialLaw_ClosesTheDarkAlley_InTheReadersLanguage()
+    {
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            events.ClearAllEvents();
+            events.ForceEvent(WorldEventSystem.EventType.KingMartialLaw, 10);
+            InLang("hu", () => events.IsLocationAccessible("Dark Alley")).Should().Be((false, L("hu", "world_event.martial_law_closed")));
+            InLang("en", () => events.IsLocationAccessible("Dark Alley")).Should().Be((false, "The Dark Alley is closed under martial law!"));
+        }
+        finally { events.ClearAllEvents(); }
+    }
 }
+

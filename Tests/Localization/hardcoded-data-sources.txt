@@ -436,13 +436,6 @@ names|Scripts/Systems/StreetEncounterSystem.cs|decl:hunterNames|bounty hunter pe
 keyed|Scripts/Systems/StreetEncounterSystem.cs|init.Name|street_encounter.merchant.item.*
 table|Scripts/Systems/StreetEncounterSystem.cs|init.Role|court role "Advisor": saved in CourtMemberSaveData and compared by CastleLocation, so it stays English; CastleLocation prints it raw
 table|Scripts/Systems/VersionChecker.cs|=DownloadError|update download error
-table|Scripts/Systems/WorldEventSystem.cs|=CurrentKingDecree|king decree in news and the events screen
-table|Scripts/Systems/WorldEventSystem.cs|decl:DistantNewsTemplates/tuple#0|distant news type
-table|Scripts/Systems/WorldEventSystem.cs|decl:DistantNewsTemplates/tuple#1|distant news text
-table|Scripts/Systems/WorldEventSystem.cs|decl:PlayerReferencedTemplates|news templates
-table|Scripts/Systems/WorldEventSystem.cs|=evt.Description|event description in news and the events screen
-table|Scripts/Systems/WorldEventSystem.cs|=evt.Title|event title in news and the events screen
-table|Scripts/Systems/WorldEventSystem.cs|return/tuple#1|event refusal text
 names|Scripts/Systems/WorldEventSystem.cs|decl:DistantRegions|region names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:femaleFirstNames|NPC names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:lastNames|NPC surnames

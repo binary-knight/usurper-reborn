@@ -524,24 +524,6 @@
       "cb8cbe26a5"
     ]
   },
-  "Scripts/Systems/WorldEventSystem.cs": {
-    "count": 13,
-    "sites": [
-      "05c5deb88b",
-      "0975c0afcc",
-      "16f196d5de",
-      "2e7f81e40e",
-      "30f0fd457c",
-      "4a07b9688f",
-      "4df1d47247",
-      "578aee153d",
-      "72e5d912af",
-      "7b83a7d066",
-      "8ed7679694",
-      "aef726a9f1",
-      "af153f28a6"
-    ]
-  },
   "Scripts/Systems/WorldInitializerSystem.cs": {
     "count": 2,
     "sites": [
