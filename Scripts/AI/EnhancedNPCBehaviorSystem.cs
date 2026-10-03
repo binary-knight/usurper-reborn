@@ -1,3 +1,4 @@
+using UsurperRemake.Systems;
 using UsurperRemake.Utils;
 using System;
 using System.Collections.Generic;
@@ -153,9 +154,9 @@ public class EnhancedNPCBehaviorSystem
         
         MailSystem.SendSystemMail(npc.Name2, 
             $"{GameConfig.NewsColorPlayer}{header}{GameConfig.NewsColorDefault}",
-            $"You found {GameConfig.ItemColor}{newItem.Name}{GameConfig.NewsColorDefault} {locationDesc}.",
+            Loc.Get("npc_behavior.loot_found", $"{GameConfig.ItemColor}{newItem.Name}{GameConfig.NewsColorDefault}", locationDesc),
             situationText,
-            $"The {GameConfig.ItemColor}{newItem.Name}{GameConfig.NewsColorDefault} is worth approximately {GameConfig.GoldColor}{newItem.Value:N0}{GameConfig.NewsColorDefault} gold.");
+            Loc.Get("npc_behavior.loot_worth", $"{GameConfig.ItemColor}{newItem.Name}{GameConfig.NewsColorDefault}", $"{GameConfig.GoldColor}{newItem.Value:N0}{GameConfig.NewsColorDefault}"));
     }
     
     #endregion
@@ -230,7 +231,7 @@ public class EnhancedNPCBehaviorSystem
         // GD.Print($"Removing NPC team: {gangName}");
         
         // Generate news
-        NewsSystem.Instance.Newsy($"{GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault} ceased to exist!", false, GameConfig.NewsCategory.General);
+        NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_gang_ceased", $"{GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}"), false, GameConfig.NewsCategory.General);
         
         // Remove all members from gang
         var gangMembers = npcs.Where(n => n.Team == gangName).ToList();
@@ -239,7 +240,7 @@ public class EnhancedNPCBehaviorSystem
         {
             if (member.AI == CharacterAI.Computer)
             {
-                NewsSystem.Instance.Newsy($"{GameConfig.NewsColorPlayer}{member.Name2}{GameConfig.NewsColorDefault} left the team.", false, GameConfig.NewsCategory.General);
+                NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_left_team", $"{GameConfig.NewsColorPlayer}{member.Name2}{GameConfig.NewsColorDefault}"), false, GameConfig.NewsCategory.General);
                 
                 // Clear team data
                 member.Team = "";
@@ -286,7 +287,7 @@ public class EnhancedNPCBehaviorSystem
                 recruited++;
                 
                 // Generate news
-                NewsSystem.Instance.Newsy($"{GameConfig.NewsColorPlayer}{npc.Name2}{GameConfig.NewsColorDefault} has been recruited to {GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}", true, GameConfig.NewsCategory.General);
+                NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_recruited", $"{GameConfig.NewsColorPlayer}{npc.Name2}{GameConfig.NewsColorDefault}", $"{GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}"), true, GameConfig.NewsCategory.General);
             }
         }
     }
@@ -350,10 +351,10 @@ public class EnhancedNPCBehaviorSystem
         
         // Generate gang war header
         var header = GetGangWarHeader();
-        var announcement = $"{GameConfig.TeamColor}{gang1}{GameConfig.NewsColorDefault} challenged {GameConfig.TeamColor}{gang2}{GameConfig.NewsColorDefault}";
-        var turfText = turfWar ? "A challenge for Town Control!" : "";
+        var announcement = Loc.Get("npc_behavior.news_gang_challenge", header, $"{GameConfig.TeamColor}{gang1}{GameConfig.NewsColorDefault}", $"{GameConfig.TeamColor}{gang2}{GameConfig.NewsColorDefault}");
+        var turfText = turfWar ? Loc.Get("npc_behavior.news_turf_challenge") : "";
         
-        NewsSystem.Instance.Newsy($"{header} {announcement} {turfText}", false, GameConfig.NewsCategory.General);
+        NewsSystem.Instance.Newsy($"{announcement} {turfText}", false, GameConfig.NewsCategory.General);
         
         // Reset HP for all participants
         foreach (var member in team1.Concat(team2))
@@ -369,7 +370,7 @@ public class EnhancedNPCBehaviorSystem
         {
             round++;
             
-            NewsSystem.Instance.Newsy($"Round {round} results:", false, GameConfig.NewsCategory.General);
+            NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_round_results", round), false, GameConfig.NewsCategory.General);
             
             // Pair up fighters and conduct battles
             await ConductRoundBattles(team1, team2, result);
@@ -431,15 +432,8 @@ public class EnhancedNPCBehaviorSystem
     /// </summary>
     private string GetGangWarHeader()
     {
-        return random.Next(6) switch
-        {
-            0 => "Gang War!",
-            1 => "Team Bash!",
-            2 => "Team War!",
-            3 => "Turf War!",
-            4 => "Gang Fight!",
-            _ => "Rival Gangs Clash!"
-        };
+        // v1.2.5: the gang war headers TeamSystem shows (team.war_header_1..6)
+        return Loc.Get($"team.war_header_{random.Next(1, 7)}");
     }
     
     #endregion
@@ -512,14 +506,7 @@ public class EnhancedNPCBehaviorSystem
     /// </summary>
     private string GetRandomLootHeader()
     {
-        var headers = new[]
-        {
-            "Automated NPC Report",
-            "NPC Inventory Update", 
-            "Equipment Change Notice",
-            "Item Discovery Alert"
-        };
-        return headers[random.Next(headers.Length)];
+        return Loc.Get($"npc_behavior.loot_header_{random.Next(1, 5)}");
     }
     
     /// <summary>
@@ -579,7 +566,7 @@ public class EnhancedNPCBehaviorSystem
     private Task PlaceItemInBackpack(Character npc, ItemDetails item, int slot, bool shout) { return Task.CompletedTask; }
     private Task HandleFullInventory(Character npc, ItemDetails item, bool shout) { return Task.CompletedTask; }
     private Task ReinventoryAllItems(Character npc) { return Task.CompletedTask; }
-    private string GetLocationDescription(int location) { return "in the dungeons"; }
+    private string GetLocationDescription(int location) { return Loc.Get("npc_behavior.loot_in_dungeons"); }
     private string GetSituationText(int situation, ItemDetails newItem, ItemDetails? oldItem) { return ""; }
     private Task InitializeMaintenanceData(List<Character> npcs) { return Task.CompletedTask; }
     private Task ProcessNPCMaintenance(Character npc, bool kingFound) { return Task.CompletedTask; }
@@ -609,7 +596,7 @@ public class EnhancedNPCBehaviorSystem
             // Generate news about the kill
             string victimName = victim.Name2 ?? victim.Name1;
             string killerName = killer.Name2 ?? killer.Name1;
-            string location = victim.CurrentLocation ?? "Unknown Location";
+            string location = victim.CurrentLocation ?? Loc.Get("npc_behavior.unknown_location");
 
             NewsSystem.Instance.WriteDeathNews(victimName, killerName, location);
         }

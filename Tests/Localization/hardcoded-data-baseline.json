@@ -1,29 +1,4 @@
 {
-  "Scripts/AI/EnhancedNPCBehaviors.cs": {
-    "data": {
-      "count": 9,
-      "sites": [
-        "01a8097e3f",
-        "038e295e21",
-        "19d9b4c69c",
-        "3e08c0da4a",
-        "576de53108",
-        "78bcf77df4",
-        "971c3d84b7",
-        "a018fb08b8",
-        "d4148e58ab"
-      ]
-    }
-  },
-  "Scripts/AI/GoalSystem.cs": {
-    "data": {
-      "count": 2,
-      "sites": [
-        "7ff5088275",
-        "ad9b0f5e31"
-      ]
-    }
-  },
   "Scripts/Core/GameConfig.cs": {
     "data": {
       "count": 101,
@@ -2737,57 +2712,6 @@
         "f8044a558e",
         "f94ee5cdab",
         "fc7cd63e78"
-      ]
-    }
-  },
-  "Scripts/Systems/CulturalMemeSystem.cs": {
-    "data": {
-      "count": 44,
-      "sites": [
-        "029ea2b029",
-        "0b5858024b",
-        "1697c46017",
-        "1e6bdce4cc",
-        "24dc6df183",
-        "403d688964",
-        "417acbe226",
-        "47b5a11a62",
-        "4a68a66e6e",
-        "4c189eaf2e",
-        "5374135069",
-        "601fd191b8",
-        "664c861524",
-        "666f3faf6d",
-        "6b21d07c20",
-        "728780c27a",
-        "76314fae2f",
-        "7cc1afa419",
-        "7e7db0e202",
-        "838e6cc4c6",
-        "a8a28c5b1c",
-        "a9da15b140",
-        "aa4ae26b80",
-        "b50d62d972",
-        "beb2262127",
-        "ca17650573",
-        "cd6d90699f",
-        "cef94703ab",
-        "d0996bcc3c",
-        "d18a8efc8b",
-        "d216c9e5de",
-        "ded905699a",
-        "e22a0c900e",
-        "e4a830ad09",
-        "e6f0569b72",
-        "e97a4d9eff",
-        "ef6b1fbaed",
-        "ef928d894c",
-        "f00d3cad7d",
-        "f26aafc811",
-        "f2852e06d9",
-        "f4352e483c",
-        "f5c2e86554",
-        "fc29eb442f"
       ]
     }
   },

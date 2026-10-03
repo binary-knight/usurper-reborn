@@ -170,9 +170,9 @@ public class SocialInfluenceSystem
         if (Math.Abs(speakerOpinion) > 0.5f && _random.NextDouble() < 0.15)
         {
             if (speakerOpinion < 0)
-                NewsSystem.Instance?.Newsy($"{speakerName} was overheard warning {listenerName} about {subject}");
+                NewsSystem.Instance?.Newsy(Loc.Get("social.news_warning", speakerName, listenerName, subject));
             else
-                NewsSystem.Instance?.Newsy($"{speakerName} sang {subject}'s praises to {listenerName}");
+                NewsSystem.Instance?.Newsy(Loc.Get("social.news_praise", speakerName, subject, listenerName));
         }
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogDebug("SOCIAL",
@@ -301,8 +301,7 @@ public class SocialInfluenceSystem
         // Generate news for multiple witnesses (unless caller already generates its own news)
         if (!suppressNews && witnesses.Count >= 2)
         {
-            string verb = GetWitnessVerb(eventType);
-            NewsSystem.Instance?.Newsy($"Several townsfolk witnessed {actorName} {verb} {targetName} at the {location}");
+            NewsSystem.Instance?.Newsy(Loc.Get(WitnessNewsKey(eventType), actorName, targetName, GameEngine.NpcPlaceLabel(location)));
         }
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogDebug("SOCIAL",
@@ -323,6 +322,36 @@ public class SocialInfluenceSystem
             WitnessEventType.SawBrawl => -0.15f,
             _ => 0f
         };
+    }
+
+    /// <summary>v1.2.5: the witness news of an event type (the verb is part of each language's sentence).</summary>
+    internal static string WitnessNewsKey(WitnessEventType eventType) => eventType switch
+    {
+        WitnessEventType.SawAttack => "social.news_witnessed_attack",
+        WitnessEventType.SawTheft => "social.news_witnessed_steal",
+        WitnessEventType.SawGenerosity => "social.news_witnessed_help",
+        WitnessEventType.SawChallenge => "social.news_witnessed_challenge",
+        WitnessEventType.SawMurder => "social.news_witnessed_murder",
+        WitnessEventType.SawDefense => "social.news_witnessed_defend",
+        WitnessEventType.SawHealing => "social.news_witnessed_heal",
+        WitnessEventType.SawBrawl => "social.news_witnessed_brawl",
+        _ => "social.news_witnessed_other"
+    };
+
+    /// <summary>v1.2.5: a faction's name in the writer's language (the English name stays in NPC memories).</summary>
+    internal static string FactionLabel(Faction? faction) => faction switch
+    {
+        Faction.TheCrown => Loc.Get("faction.name_crown"),
+        Faction.TheShadows => Loc.Get("faction.name_shadows"),
+        Faction.TheFaith => Loc.Get("faction.name_faith"),
+        _ => Loc.Get("social.faction_unknown")
+    };
+
+    /// <summary>v1.2.5: a stored emergent role (Defender, Merchant, ...) in the writer's language.</summary>
+    internal static string RoleLabel(string? role)
+    {
+        string key = $"social.role_{(role ?? "").ToLowerInvariant()}";
+        return Loc.Has(key) ? Loc.Get(key) : role ?? "";
     }
 
     private static string GetWitnessVerb(WitnessEventType eventType)
@@ -409,7 +438,7 @@ public class SocialInfluenceSystem
             EmotionalImpact = 0.2f
         });
 
-        NewsSystem.Instance?.Newsy($"{recruiterName} recruited {targetName} into {factionName}");
+        NewsSystem.Instance?.Newsy(Loc.Get("social.news_recruited", recruiterName, targetName, FactionLabel(recruiter.NPCFaction)));
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("SOCIAL",
             $"Faction recruitment: {recruiterName} recruited {targetName} into {factionName}");
@@ -467,7 +496,7 @@ public class SocialInfluenceSystem
             if (npc.RoleStabilityTicks == ROLE_ADAPTATION_INTERVAL_TICKS * 2) // After ~1 hour
             {
                 string npcName = npc.Name2 ?? npc.Name;
-                NewsSystem.Instance?.Newsy($"{npcName} has become known as the town's {npc.EmergentRole}");
+                NewsSystem.Instance?.Newsy(Loc.Get("social.news_role_known", npcName, RoleLabel(npc.EmergentRole)));
             }
         }
 
@@ -524,7 +553,7 @@ public class SocialInfluenceSystem
                 if (!string.IsNullOrEmpty(oldRole) && oldRole != bestRole)
                 {
                     string npcName = candidate.Name2 ?? candidate.Name;
-                    NewsSystem.Instance?.Newsy($"{npcName} has taken up a new calling as {bestRole}");
+                    NewsSystem.Instance?.Newsy(Loc.Get("social.news_new_calling", npcName, RoleLabel(bestRole)));
                 }
 
                 UsurperRemake.Systems.DebugLogger.Instance?.LogDebug("SOCIAL",
@@ -655,9 +684,9 @@ public class SocialInfluenceSystem
         if (npcsThatKnow >= 20 && _random.NextDouble() < 0.05)
         {
             if (spreaderOpinion > 0)
-                NewsSystem.Instance?.Newsy($"Tales of {playerName}'s heroism have spread across the realm");
+                NewsSystem.Instance?.Newsy(Loc.Get("social.news_heroism", playerName));
             else
-                NewsSystem.Instance?.Newsy($"Dark whispers about {playerName} circulate through the taverns");
+                NewsSystem.Instance?.Newsy(Loc.Get("social.news_dark_whispers", playerName));
         }
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogDebug("SOCIAL",

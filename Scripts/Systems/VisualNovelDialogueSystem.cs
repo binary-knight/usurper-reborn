@@ -1602,7 +1602,7 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("bright_red");
                             terminal.WriteLine(GameConfig.ScreenReaderMode ? $"  {Loc.Get("dialogue.affair_forbidden")}" : $"  ♥ {Loc.Get("dialogue.affair_forbidden")} ♥");
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             terminal.WriteLine("");
                             terminal.SetColor("gray");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_now", npc.Name2)}");
@@ -1612,19 +1612,19 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("red");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_tension")}");
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             break;
 
                         case AffairMilestone.EmotionalConnection:
                             terminal.SetColor("magenta");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_spark")}");
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             break;
 
                         default: // Flirting
                             terminal.SetColor("bright_magenta");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             break;
                     }
 
@@ -1642,7 +1642,7 @@ namespace UsurperRemake.Systems
                         else
                             terminal.WriteLine($"  {Loc.Get("dialogue.narr_decision_made")}");
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"  {divorceCheck.Reason}");
+                        UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, divorceCheck.Reason, "  ");
                         terminal.WriteLine("");
 
                         // Offer player a choice - become spouse or just lovers
@@ -1694,7 +1694,7 @@ namespace UsurperRemake.Systems
                     // v0.64.1 audit fix: removed double-count (caller increments).
 
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {affairResult.Message}");
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
 
                     if (affairResult.SpouseNoticed)
                     {

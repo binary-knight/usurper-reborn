@@ -271,7 +271,7 @@ public static class EnhancedNPCBehaviors
         }
         
         // Generate news
-        NewsSystem.Instance.Newsy($"{GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault} ceased to exist!", false, GameConfig.NewsCategory.General);
+        NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_gang_ceased", $"{GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}"), false, GameConfig.NewsCategory.General);
     }
     
     private static void RecruitGangMembers(string gangName, List<NPC> npcs)
@@ -299,7 +299,7 @@ public static class EnhancedNPCBehaviors
             {
 
                 // Generate news
-                NewsSystem.Instance.Newsy($"{GameConfig.NewsColorPlayer}{candidate.Name2}{GameConfig.NewsColorDefault} has been recruited to {GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}", true, GameConfig.NewsCategory.General);
+                NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_recruited", $"{GameConfig.NewsColorPlayer}{candidate.Name2}{GameConfig.NewsColorDefault}", $"{GameConfig.TeamColor}{gangName}{GameConfig.NewsColorDefault}"), true, GameConfig.NewsCategory.General);
             }
         }
     }
@@ -332,7 +332,8 @@ public static class EnhancedNPCBehaviors
 
             // Generate news about the conversion
             NewsSystem.Instance?.Newsy(
-                $"{GameConfig.NewsColorPlayer}{target.Name2}{GameConfig.NewsColorDefault} was converted to the faith of {believer.WorshippedGod} by {GameConfig.NewsColorPlayer}{believer.Name2}{GameConfig.NewsColorDefault}",
+                Loc.Get("npc_behavior.news_converted", $"{GameConfig.NewsColorPlayer}{target.Name2}{GameConfig.NewsColorDefault}",
+                    believer.WorshippedGod, $"{GameConfig.NewsColorPlayer}{believer.Name2}{GameConfig.NewsColorDefault}"),
                 true, GameConfig.NewsCategory.General);
         }
     }
@@ -422,13 +423,13 @@ public static class EnhancedNPCBehaviors
     
     private static string GetGangWarHeader()
     {
-        var headers = new[] { "Gang War!", "Team Bash!", "Team War!", "Turf War!", "Gang Fight!", "Rival Gangs Clash!" };
-        return headers[random.Next(headers.Length)];
+        // v1.2.5: the gang war headers TeamSystem shows (team.war_header_1..6), in the writer's language
+        return Loc.Get($"team.war_header_{random.Next(1, 7)}");
     }
     
     private static void GenerateGangWarNews(string header, string gang1, string gang2)
     {
-        NewsSystem.Instance.Newsy($"{header} {GameConfig.TeamColor}{gang1}{GameConfig.NewsColorDefault} challenged {GameConfig.TeamColor}{gang2}{GameConfig.NewsColorDefault}", false, GameConfig.NewsCategory.General);
+        NewsSystem.Instance.Newsy(Loc.Get("npc_behavior.news_gang_challenge", header, $"{GameConfig.TeamColor}{gang1}{GameConfig.NewsColorDefault}", $"{GameConfig.TeamColor}{gang2}{GameConfig.NewsColorDefault}"), false, GameConfig.NewsCategory.General);
     }
     
     private static void ConductGangBattles(List<NPC> team1, List<NPC> team2, GangWarResult result)
@@ -680,14 +681,14 @@ public static class EnhancedNPCBehaviors
         {
             NewsSystem.Instance?.WriteNews(
                 GameConfig.NewsCategory.Marriage,
-                $"♥ {npc1.Name2} and {npc2.Name2} have entered a polyamorous union!"
+                "\u2665 " + Loc.Get("npc_behavior.news_poly_union", npc1.Name2, npc2.Name2)
             );
         }
         else
         {
             NewsSystem.Instance?.WriteNews(
                 GameConfig.NewsCategory.Marriage,
-                $"Wedding Bells! {npc1.Name2} and {npc2.Name2} have gotten married!"
+                Loc.Get("npc_behavior.news_wedding", npc1.Name2, npc2.Name2)
             );
         }
 
@@ -700,7 +701,7 @@ public static class EnhancedNPCBehaviors
     public static AffairResult ProcessAffairAttempt(NPC marriedNpc, Character player, float seductionSuccess)
     {
         var profile = marriedNpc.Brain?.Personality;
-        if (profile == null) return new AffairResult { Success = false, Message = "They seem unresponsive." };
+        if (profile == null) return new AffairResult { Success = false, Message = Loc.Get("npc_behavior.affair_unresponsive") };
 
         var affair = NPCMarriageRegistry.Instance.GetOrCreateAffair(marriedNpc.ID, player.ID);
 
@@ -725,7 +726,7 @@ public static class EnhancedNPCBehaviors
                 {
                     Success = true,
                     Milestone = AffairMilestone.BecameLovers,
-                    Message = $"{marriedNpc.Name2} looks at you with desire. \"I know this is wrong, but I can't resist you anymore...\""
+                    Message = Loc.Get("npc_behavior.affair_lovers", marriedNpc.Name2)
                 };
             }
             else if (affair.AffairProgress >= 75 && affair.SecretMeetings >= 3)
@@ -734,7 +735,7 @@ public static class EnhancedNPCBehaviors
                 {
                     Success = true,
                     Milestone = AffairMilestone.SecretRendezvous,
-                    Message = $"{marriedNpc.Name2} whispers, \"Meet me tonight... alone. My spouse doesn't need to know.\""
+                    Message = Loc.Get("npc_behavior.affair_rendezvous", marriedNpc.Name2)
                 };
             }
             else if (affair.AffairProgress >= 50)
@@ -743,7 +744,7 @@ public static class EnhancedNPCBehaviors
                 {
                     Success = true,
                     Milestone = AffairMilestone.EmotionalConnection,
-                    Message = $"{marriedNpc.Name2}'s eyes linger on you. \"I shouldn't feel this way about you...\""
+                    Message = Loc.Get("npc_behavior.affair_connection", marriedNpc.Name2)
                 };
             }
             else
@@ -752,7 +753,7 @@ public static class EnhancedNPCBehaviors
                 {
                     Success = true,
                     Milestone = AffairMilestone.Flirting,
-                    Message = $"{marriedNpc.Name2} blushes despite themselves. \"You're quite charming, aren't you?\""
+                    Message = Loc.Get("npc_behavior.affair_flirting", marriedNpc.Name2)
                 };
             }
         }
@@ -786,14 +787,14 @@ public static class EnhancedNPCBehaviors
                 {
                     Success = false,
                     SpouseNoticed = true,
-                    Message = $"{marriedNpc.Name2} glances nervously toward where their spouse might be. \"We shouldn't...\""
+                    Message = Loc.Get("npc_behavior.affair_nervous", marriedNpc.Name2)
                 };
             }
 
             return new AffairResult
             {
                 Success = false,
-                Message = $"{marriedNpc.Name2} maintains their composure. \"I'm married, you know.\""
+                Message = Loc.Get("npc_behavior.affair_composed", marriedNpc.Name2)
             };
         }
     }
@@ -882,8 +883,8 @@ public static class EnhancedNPCBehaviors
             {
                 WillDivorce = true,
                 Reason = affair.SpouseSuspicion >= 80
-                    ? $"{marriedNpc.Name2} says, \"{marriedNpc.SpouseName} found out about us... I've made my choice. I choose you.\""
-                    : $"{marriedNpc.Name2} takes your hand. \"I can't live this lie anymore. I'm leaving {marriedNpc.SpouseName} for you.\""
+                    ? Loc.Get("npc_behavior.divorce_found_out", marriedNpc.Name2, marriedNpc.SpouseName)
+                    : Loc.Get("npc_behavior.divorce_leaving", marriedNpc.Name2, marriedNpc.SpouseName)
             };
         }
 
@@ -989,7 +990,7 @@ public static class EnhancedNPCBehaviors
             // path, so emit the scandal headline on top.
             NewsSystem.Instance?.WriteNews(
                 GameConfig.NewsCategory.Marriage,
-                $"Scandal and Romance! {npc.Name2} left {oldSpouseName} and immediately married {player.Name}!"
+                Loc.Get("npc_behavior.news_scandal_married", npc.Name2, oldSpouseName, player.Name)
             );
 
         }
@@ -1004,14 +1005,14 @@ public static class EnhancedNPCBehaviors
             {
                 NewsSystem.Instance?.WriteNews(
                     GameConfig.NewsCategory.Marriage,
-                    $"Scandal! {npc.Name2} has left {oldSpouseName} for the adventurer {player.Name}!"
+                    Loc.Get("npc_behavior.news_scandal_left", npc.Name2, oldSpouseName, player.Name)
                 );
             }
             else
             {
                 NewsSystem.Instance?.WriteNews(
                     GameConfig.NewsCategory.Marriage,
-                    $"Scandal! {npc.Name2} has left {oldSpouseName} after a tryst with {player.Name}, but the adventurer's heart was already too full to keep them."
+                    Loc.Get("npc_behavior.news_scandal_tryst", npc.Name2, oldSpouseName, player.Name)
                 );
             }
         }

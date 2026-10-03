@@ -163,7 +163,9 @@ public class WorldSimulator
     // Gossip system - pool of recent events NPCs can spread as rumors
     private class GossipItem
     {
-        public string Text { get; set; } = "";
+        public string Text { get; set; } = "";   // v1.2.5: the English text, which the pool compares
+        public string Key { get; set; } = "";
+        public object[] Args { get; set; } = Array.Empty<object>();
         public int TimesShared { get; set; }
         public int MaxShares { get; set; } // 2-3 shares before it's old news
     }
@@ -252,16 +254,34 @@ public class WorldSimulator
 
     /// <summary>
     /// Add a gossip item to the pool. Sociable NPCs will spread it via news later.
+    /// v1.2.5: a gossip is a key and its arguments; the pool keeps its English text to compare, and the news
+    /// shows it in the writer's language when it is spread (GossipText).
     /// </summary>
-    public static void AddGossip(string text)
+    public static void AddGossip(string key, params object[] args)
     {
-        if (string.IsNullOrEmpty(text)) return;
+        if (string.IsNullOrEmpty(key)) return;
+        string text = Loc.GetIn("en", key, args);
         // Avoid duplicate gossip
         if (_gossipPool.Any(g => g.Text == text)) return;
-        _gossipPool.Add(new GossipItem { Text = text, TimesShared = 0, MaxShares = 2 + Random.Shared.Next(2) });
+        _gossipPool.Add(new GossipItem { Text = text, Key = key, Args = args, TimesShared = 0, MaxShares = 2 + Random.Shared.Next(2) });
         while (_gossipPool.Count > MaxGossipPoolSize)
             _gossipPool.RemoveAt(0);
     }
+
+    /// <summary>v1.2.5: a gossip in the writer's language; a location argument is shown by its place name.</summary>
+    internal static string GossipText(string key, object[] args)
+    {
+        var shown = (object[])args.Clone();
+        if (key == "worldsim.gossip_brawl" && shown.Length > 2) shown[2] = GameEngine.NpcPlaceLabel(shown[2]?.ToString());
+        if (key.StartsWith("worldsim.gossip_wave_") && shown.Length > 0) shown[0] = GameEngine.NpcPlaceLabel(shown[0]?.ToString());
+        return Loc.Get(key, shown);
+    }
+
+    /// <summary>The English texts of the gossip pool (tests read it).</summary>
+    internal static List<string> GossipPoolTexts() => _gossipPool.Select(g => g.Text).ToList();
+
+    /// <summary>Empties the gossip pool (tests).</summary>
+    internal static void ClearGossipPool() => _gossipPool.Clear();
 
     // Team name generators for NPC-formed teams - Ocean/Manwe themed for lore
     private static readonly string[] TeamNamePrefixes = new[]
@@ -6314,7 +6334,7 @@ public class WorldSimulator
                 _ => null
             };
             if (emotionWord != null)
-                AddGossip($"A wave of {emotionWord} swept through the {npc.CurrentLocation} -- started by {npcName}");
+                AddGossip($"worldsim.gossip_wave_{emotionWord}", npc.CurrentLocation, npcName);
         }
     }
 
@@ -6341,7 +6361,7 @@ public class WorldSimulator
         var gossip = _gossipPool[random.Next(_gossipPool.Count)];
         string gossiperName = gossiper.Name2 ?? gossiper.Name;
 
-        NewsSystem.Instance?.Newsy($"{gossiperName} is telling anyone who'll listen: \"{gossip.Text}\"");
+        NewsSystem.Instance?.Newsy(Loc.Get("worldsim.news_gossip", gossiperName, GossipText(gossip.Key, gossip.Args)));
 
         gossip.TimesShared++;
         if (gossip.TimesShared >= gossip.MaxShares)
@@ -7231,7 +7251,7 @@ public class WorldSimulator
                     // Witnesses observe the brawl
                     SocialInfluenceSystem.RecordWitnesses(npcs, npc.CurrentLocation,
                         npc.Name2 ?? npc.Name, enemy.Name2 ?? enemy.Name, WitnessEventType.SawBrawl);
-                    AddGossip($"{npc.Name2 ?? npc.Name} got into a brawl with {enemy.Name2 ?? enemy.Name} at the {npc.CurrentLocation}");
+                    AddGossip("worldsim.gossip_brawl", npc.Name2 ?? npc.Name, enemy.Name2 ?? enemy.Name, npc.CurrentLocation);
                 }
 
                 // Record combat for daily cap
@@ -7333,7 +7353,7 @@ public class WorldSimulator
         // Witnesses observe the theft
         SocialInfluenceSystem.RecordWitnesses(npcs, thief.CurrentLocation, thiefName, victimName, WitnessEventType.SawTheft);
         NewsSystem.Instance?.Newsy($"{thiefName} was caught pickpocketing {victimName} at the {thief.CurrentLocation}! {stolenAmount} gold went missing.");
-        AddGossip($"{thiefName} stole from {victimName}");
+        AddGossip("worldsim.gossip_stole", thiefName, victimName);
 
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"{thiefName} stole {stolenAmount}g from {victimName}");
     }
@@ -7393,7 +7413,7 @@ public class WorldSimulator
 
         // Generate news
         NewsSystem.Instance?.Newsy($"{challengerName} publicly challenged {targetName} at the {challenger.CurrentLocation}! {winnerName} emerged victorious.");
-        AddGossip($"{winnerName} bested {loserName} in a public challenge");
+        AddGossip("worldsim.gossip_bested", winnerName, loserName);
 
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"Challenge: {challengerName} vs {targetName} - {winnerName} won");
     }

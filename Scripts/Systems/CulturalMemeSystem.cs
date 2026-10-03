@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UsurperRemake.Systems;
 
 /// <summary>
 /// Cultural Meme System — Ideas and trends that spread through NPC conversations.
@@ -45,63 +46,71 @@ public class CulturalMemeSystem
     private static readonly CulturalMemeTemplate[] MemeTemplates = new[]
     {
         // Danger memes
-        new CulturalMemeTemplate("dungeon_danger", "Dungeon Peril", "Tales of dungeon horrors spread",
+        new CulturalMemeTemplate("dungeon_danger",
             MemeCategory.Danger, new Dictionary<string, float> { ["dungeon"] = 0.6f, ["heal"] = 1.3f, ["train"] = 1.2f }),
-        new CulturalMemeTemplate("bandit_fear", "Bandit Scare", "Fear of bandits grips the town",
+        new CulturalMemeTemplate("bandit_fear",
             MemeCategory.Danger, new Dictionary<string, float> { ["dungeon"] = 0.7f, ["castle"] = 1.3f, ["train"] = 1.2f }),
-        new CulturalMemeTemplate("plague_dread", "Plague Dread", "Whispers of sickness fill the air",
+        new CulturalMemeTemplate("plague_dread",
             MemeCategory.Danger, new Dictionary<string, float> { ["temple"] = 1.5f, ["heal"] = 1.4f, ["inn"] = 0.7f }),
 
         // Prosperity memes
-        new CulturalMemeTemplate("gold_rush", "Gold Rush", "Everyone's chasing fortune",
+        new CulturalMemeTemplate("gold_rush",
             MemeCategory.Prosperity, new Dictionary<string, float> { ["shop"] = 1.4f, ["bank"] = 1.5f, ["marketplace"] = 1.3f, ["dungeon"] = 1.2f }),
-        new CulturalMemeTemplate("merchant_bounty", "Merchant's Bounty", "The merchants are generous today",
+        new CulturalMemeTemplate("merchant_bounty",
             MemeCategory.Prosperity, new Dictionary<string, float> { ["shop"] = 1.5f, ["marketplace"] = 1.4f }),
-        new CulturalMemeTemplate("crafting_craze", "Crafting Craze", "A passion for craftsmanship sweeps the town",
+        new CulturalMemeTemplate("crafting_craze",
             MemeCategory.Prosperity, new Dictionary<string, float> { ["shop"] = 1.3f, ["train"] = 1.2f }),
 
         // Faith memes
-        new CulturalMemeTemplate("divine_blessing", "Divine Blessing", "The gods smile upon the faithful",
+        new CulturalMemeTemplate("divine_blessing",
             MemeCategory.Faith, new Dictionary<string, float> { ["temple"] = 1.8f, ["heal"] = 1.3f }),
-        new CulturalMemeTemplate("spiritual_awakening", "Spiritual Awakening", "A wave of devotion sweeps the realm",
+        new CulturalMemeTemplate("spiritual_awakening",
             MemeCategory.Faith, new Dictionary<string, float> { ["temple"] = 1.6f, ["church"] = 1.5f, ["dark_alley"] = 0.7f }),
-        new CulturalMemeTemplate("holy_pilgrimage", "Holy Pilgrimage", "Pilgrims flock to the temple",
+        new CulturalMemeTemplate("holy_pilgrimage",
             MemeCategory.Faith, new Dictionary<string, float> { ["temple"] = 1.7f, ["move"] = 1.2f }),
 
         // Unrest memes
-        new CulturalMemeTemplate("tax_outrage", "Tax Outrage", "Anger over the king's taxes grows",
+        new CulturalMemeTemplate("tax_outrage",
             MemeCategory.Unrest, new Dictionary<string, float> { ["castle"] = 0.5f, ["dark_alley"] = 1.5f, ["inn"] = 1.3f }),
-        new CulturalMemeTemplate("throne_doubt", "Throne Doubt", "Doubts about the ruler spread",
+        new CulturalMemeTemplate("throne_doubt",
             MemeCategory.Unrest, new Dictionary<string, float> { ["castle"] = 1.4f, ["dark_alley"] = 1.3f }),
-        new CulturalMemeTemplate("freedom_call", "Call to Freedom", "Voices cry out for liberty",
+        new CulturalMemeTemplate("freedom_call",
             MemeCategory.Unrest, new Dictionary<string, float> { ["dark_alley"] = 1.6f, ["castle"] = 0.6f }),
 
         // Social memes
-        new CulturalMemeTemplate("festival_spirit", "Festival Spirit", "A festive mood fills the town",
+        new CulturalMemeTemplate("festival_spirit",
             MemeCategory.Social, new Dictionary<string, float> { ["inn"] = 1.5f, ["love_street"] = 1.4f, ["marketplace"] = 1.3f }),
-        new CulturalMemeTemplate("love_season", "Love Season", "Romance is in the air",
+        new CulturalMemeTemplate("love_season",
             MemeCategory.Social, new Dictionary<string, float> { ["love_street"] = 1.8f, ["inn"] = 1.3f }),
-        new CulturalMemeTemplate("dance_craze", "Dance Craze", "A new dance has everyone moving",
+        new CulturalMemeTemplate("dance_craze",
             MemeCategory.Social, new Dictionary<string, float> { ["inn"] = 1.5f, ["love_street"] = 1.3f }),
-        new CulturalMemeTemplate("storytelling_nights", "Storytelling Nights", "Tales are being told at the Inn",
+        new CulturalMemeTemplate("storytelling_nights",
             MemeCategory.Social, new Dictionary<string, float> { ["inn"] = 1.6f }),
 
         // War memes
-        new CulturalMemeTemplate("battle_call", "Battle Call", "Warriors rally for combat",
+        new CulturalMemeTemplate("battle_call",
             MemeCategory.War, new Dictionary<string, float> { ["dungeon"] = 1.4f, ["train"] = 1.5f, ["shop"] = 1.2f }),
-        new CulturalMemeTemplate("arms_race", "Arms Race", "Everyone's gearing up",
+        new CulturalMemeTemplate("arms_race",
             MemeCategory.War, new Dictionary<string, float> { ["shop"] = 1.5f, ["train"] = 1.3f, ["dungeon"] = 1.2f }),
-        new CulturalMemeTemplate("hero_worship", "Hero Worship", "Admiration for warriors grows",
+        new CulturalMemeTemplate("hero_worship",
             MemeCategory.War, new Dictionary<string, float> { ["train"] = 1.4f, ["dungeon"] = 1.3f, ["inn"] = 1.2f }),
 
         // Mystery memes
-        new CulturalMemeTemplate("ancient_prophecy", "Ancient Prophecy", "Whispers of an old prophecy resurface",
+        new CulturalMemeTemplate("ancient_prophecy",
             MemeCategory.Mystery, new Dictionary<string, float> { ["dungeon"] = 1.3f, ["temple"] = 1.3f, ["move"] = 1.2f }),
-        new CulturalMemeTemplate("dungeon_treasure", "Dungeon Treasure", "Rumors of a great treasure below",
+        new CulturalMemeTemplate("dungeon_treasure",
             MemeCategory.Mystery, new Dictionary<string, float> { ["dungeon"] = 1.6f, ["shop"] = 1.2f }),
-        new CulturalMemeTemplate("strange_omens", "Strange Omens", "Unusual signs appear across the land",
+        new CulturalMemeTemplate("strange_omens",
             MemeCategory.Mystery, new Dictionary<string, float> { ["temple"] = 1.3f, ["dungeon"] = 1.2f, ["move"] = 1.2f }),
     };
+
+    /// <summary>v1.2.5: a meme's name in the writer's language (from its id); one without a key is shown as stored.</summary>
+    internal static string NameLabel(CulturalMeme meme) =>
+        Loc.Has($"meme.{meme.Id}.name") ? Loc.Get($"meme.{meme.Id}.name") : meme.Name;
+
+    /// <summary>v1.2.5: a meme's description in the writer's language (from its id).</summary>
+    internal static string DescriptionLabel(CulturalMeme meme) =>
+        Loc.Has($"meme.{meme.Id}.desc") ? Loc.Get($"meme.{meme.Id}.desc") : meme.Description;
 
     // ========================================================================
     // Meme Generation
@@ -161,7 +170,7 @@ public class CulturalMemeSystem
         EnsureLocationStrength(originLocation);
         _locationMemeStrength[originLocation][meme.Id] = meme.GlobalStrength;
 
-        NewsSystem.Instance?.Newsy($"A new idea is stirring in {originLocation}: \"{meme.Name}\" -- {meme.Description}");
+        NewsSystem.Instance?.Newsy(Loc.Get("meme.news_new", GameEngine.NpcPlaceLabel(originLocation), NameLabel(meme), DescriptionLabel(meme)));
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogInfo("SOCIAL",
             $"New cultural meme: \"{meme.Name}\" ({meme.Category}) originated at {originLocation} by {originName}");
@@ -233,7 +242,7 @@ public class CulturalMemeSystem
         // Occasional news
         if (meme.SpreadCount % 10 == 0 && _random.NextDouble() < 0.3)
         {
-            NewsSystem.Instance?.Newsy($"The idea of \"{meme.Name}\" continues to spread through the realm");
+            NewsSystem.Instance?.Newsy(Loc.Get("meme.news_spreading", NameLabel(meme)));
         }
 
         UsurperRemake.Systems.DebugLogger.Instance?.LogDebug("SOCIAL",
@@ -282,7 +291,7 @@ public class CulturalMemeSystem
                 locDict.Remove(dead.Id);
 
             if (_random.NextDouble() < 0.3)
-                NewsSystem.Instance?.Newsy($"The idea of \"{dead.Name}\" has faded from popular interest");
+                NewsSystem.Instance?.Newsy(Loc.Get("meme.news_faded", NameLabel(dead)));
 
             UsurperRemake.Systems.DebugLogger.Instance?.LogDebug("SOCIAL",
                 $"Meme expired: \"{dead.Name}\" after {dead.SpreadCount} total spreads");
@@ -490,12 +499,13 @@ public class CulturalMemeTemplate
     public MemeCategory Category { get; }
     public Dictionary<string, float> ActivityModifiers { get; }
 
-    public CulturalMemeTemplate(string id, string name, string description,
-        MemeCategory category, Dictionary<string, float> activityModifiers)
+    /// <summary>v1.2.5: the name and description are the English texts of meme.{id}.name and .desc; a meme
+    /// stores them in English (saves are unchanged) and news shows them in the writer's language.</summary>
+    public CulturalMemeTemplate(string id, MemeCategory category, Dictionary<string, float> activityModifiers)
     {
         Id = id;
-        Name = name;
-        Description = description;
+        Name = Loc.GetIn("en", $"meme.{id}.name");
+        Description = Loc.GetIn("en", $"meme.{id}.desc");
         Category = category;
         ActivityModifiers = activityModifiers;
     }

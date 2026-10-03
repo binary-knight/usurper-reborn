@@ -1,39 +1,4 @@
 {
-  "Scripts/AI/EnhancedNPCBehaviorSystem.cs": {
-    "count": 6,
-    "sites": [
-      "0f342a13d8",
-      "8567a2ee22",
-      "98125e7cd7",
-      "b8d85881ff",
-      "d709c43e8f",
-      "f4eec7fca9"
-    ]
-  },
-  "Scripts/AI/EnhancedNPCBehaviors.cs": {
-    "count": 9,
-    "sites": [
-      "0f421e0c23",
-      "5b5ee1c300",
-      "71813564c7",
-      "775300d737",
-      "841ba65467",
-      "aa2856aa92",
-      "b8d85881ff",
-      "d90c237de3",
-      "e2099371e7"
-    ]
-  },
-  "Scripts/AI/GoalSystem.cs": {
-    "count": 5,
-    "sites": [
-      "0300563212",
-      "3abe9e4cf5",
-      "738373b515",
-      "9674d27811",
-      "bb6d7490eb"
-    ]
-  },
   "Scripts/Core/GameEngine.cs": {
     "count": 21,
     "sites": [
@@ -206,14 +171,6 @@
       "ffddb01d06"
     ]
   },
-  "Scripts/Systems/CulturalMemeSystem.cs": {
-    "count": 3,
-    "sites": [
-      "7c2921576d",
-      "a723702b6a",
-      "e2d9d67555"
-    ]
-  },
   "Scripts/Systems/DailySystemManager.cs": {
     "count": 4,
     "sites": [
@@ -341,19 +298,6 @@
     "count": 1,
     "sites": [
       "c9e689fa68"
-    ]
-  },
-  "Scripts/Systems/SocialInfluenceSystem.cs": {
-    "count": 8,
-    "sites": [
-      "263ffa0680",
-      "b1d135a31e",
-      "b96c453987",
-      "c9104db871",
-      "e75f34c15c",
-      "e837d4b00d",
-      "e95bb0ee8a",
-      "f0e5e50a0c"
     ]
   },
   "Scripts/Systems/SqlSaveBackend.cs": {
@@ -539,7 +483,7 @@
     ]
   },
   "Scripts/Systems/WorldSimulator.cs": {
-    "count": 45,
+    "count": 44,
     "sites": [
       "0b1f0b90e5",
       "0cbceb4a64",
@@ -560,7 +504,6 @@
       "5c6817ac9d",
       "637a811aef",
       "63d4ef8bf1",
-      "74267f4730",
       "7b79442804",
       "800e92c7c0",
       "84fecd292d",

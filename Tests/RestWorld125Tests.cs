@@ -515,4 +515,208 @@ public class RestWorld125Tests : IDisposable
         }
         finally { events.ClearAllEvents(); }
     }
+    // ================= CulturalMemeSystem =================
+
+    private static readonly string[] MemeIds =
+    {
+        "dungeon_danger", "bandit_fear", "plague_dread", "gold_rush", "merchant_bounty", "crafting_craze", "divine_blessing",
+        "spiritual_awakening", "holy_pilgrimage", "tax_outrage", "throne_doubt", "freedom_call", "festival_spirit",
+        "love_season", "dance_craze", "storytelling_nights", "battle_call", "arms_race", "hero_worship",
+        "ancient_prophecy", "dungeon_treasure", "strange_omens",
+    };
+
+    private static CulturalMeme MemeFromTemplate(string id)
+    {
+        var templates = (CulturalMemeTemplate[])typeof(CulturalMemeSystem).GetField("MemeTemplates", SF)!.GetValue(null)!;
+        var t = templates.Single(x => x.Id == id);
+        return new CulturalMeme { Id = t.Id, Name = t.Name, Description = t.Description, Category = t.Category, GlobalStrength = 0.6f };
+    }
+
+    [Fact]
+    public void Memes_StoreEnglish_EvenWhenWrittenInHungarian_AndKeepItThroughSaveAndReload()
+    {
+        var templates = (CulturalMemeTemplate[])typeof(CulturalMemeSystem).GetField("MemeTemplates", SF)!.GetValue(null)!;
+        templates.Select(t => t.Id).Should().BeEquivalentTo(MemeIds);
+        var meme = InLang("hu", () => MemeFromTemplate("tax_outrage"));
+        meme.Name.Should().Be("Tax Outrage");
+        meme.Description.Should().Be("Anger over the king's taxes grows");
+        InLang("hu", () => MemeFromTemplate("dungeon_danger")).Name.Should().Be("Dungeon Peril");
+
+        var sys = new CulturalMemeSystem();
+        var active = (List<CulturalMeme>)typeof(CulturalMemeSystem).GetField("_activeMemes", F)!.GetValue(sys)!;
+        active.Add(meme);
+        var json = System.Text.Json.JsonSerializer.Serialize(sys.ExportSaveData());
+        var restored = new CulturalMemeSystem();
+        restored.RestoreFromSaveData(System.Text.Json.JsonSerializer.Deserialize<CulturalMemeSaveData>(json));
+        var back = ((List<CulturalMeme>)typeof(CulturalMemeSystem).GetField("_activeMemes", F)!.GetValue(restored)!).Single();
+        back.Name.Should().Be("Tax Outrage");
+        InLang("hu", () => CulturalMemeSystem.NameLabel(back)).Should().Be(L("hu", "meme.tax_outrage.name"));
+        InLang("hu", () => CulturalMemeSystem.DescriptionLabel(back)).Should().Be(L("hu", "meme.tax_outrage.desc"));
+        CulturalMemeSystem.NameLabel(new CulturalMeme { Id = "from_an_old_save", Name = "Old Idea" }).Should().Be("Old Idea");
+    }
+
+    [Fact]
+    public void MemeNews_IsWrittenInTheWritersLanguage_AndSortsAsTheEnglish()
+    {
+        var sys = new CulturalMemeSystem();
+        var active = (List<CulturalMeme>)typeof(CulturalMemeSystem).GetField("_activeMemes", F)!.GetValue(sys)!;
+        List<string> news = new();
+        for (int i = 0; i < 60 && news.Count == 0; i++)
+        {
+            var dead = MemeFromTemplate("throne_doubt");
+            dead.GlobalStrength = 0.01f;
+            active.Add(dead);
+            news = NewsWritten("hu", () => sys.DecayMemes());
+        }
+        news.Should().Equal(L("hu", "meme.news_faded", L("hu", "meme.throne_doubt.name")));
+        NoEnglishLeft(news[0], new[] { "meme.news_faded", "meme.throne_doubt.name" });
+
+        foreach (var id in MemeIds)
+        {
+            foreach (var lang in new[] { "en" }.Concat(OtherLanguages))
+            {
+                string place = InLang(lang, () => GameEngine.NpcPlaceLabel("Main Street"));
+                var pairs = new[]
+                {
+                    (L(lang, "meme.news_new", place, L(lang, $"meme.{id}.name"), L(lang, $"meme.{id}.desc")),
+                     L("en", "meme.news_new", "Main Street", L("en", $"meme.{id}.name"), L("en", $"meme.{id}.desc"))),
+                    (L(lang, "meme.news_spreading", L(lang, $"meme.{id}.name")), L("en", "meme.news_spreading", L("en", $"meme.{id}.name"))),
+                    (L(lang, "meme.news_faded", L(lang, $"meme.{id}.name")), L("en", "meme.news_faded", L("en", $"meme.{id}.name"))),
+                };
+                foreach (var (written, english) in pairs)
+                    GameEngine.CatchUpBucket(written).Should().Be(GameEngine.CatchUpBucket(english), $"\"{written}\" ({lang}) sorts as \"{english}\"");
+            }
+        }
+        L("en", "meme.news_new", "Main Street", "Gold Rush", "Everyone's chasing fortune")
+            .Should().Be("A new idea is stirring in Main Street: \"Gold Rush\" -- Everyone's chasing fortune");
+    }
+
+    // ================= SocialInfluenceSystem =================
+
+    private static NPC BrainNpc(string name, string location)
+    {
+        var npc = new NPC { Name1 = name, Name2 = name, Level = 10, HP = 100, MaxHP = 100, BaseMaxHP = 100, CurrentLocation = location };
+        var profile = PersonalityProfile.GenerateForArchetype("commoner");
+        npc.Personality = profile;
+        npc.Brain = new NPCBrain(npc, profile);
+        npc.EmotionalState = npc.Brain.Emotions;
+        return npc;
+    }
+
+    private static readonly string[] SocialNewsKeys =
+    {
+        "social.news_warning", "social.news_praise", "social.news_witnessed_attack", "social.news_witnessed_steal",
+        "social.news_witnessed_help", "social.news_witnessed_challenge", "social.news_witnessed_murder",
+        "social.news_witnessed_defend", "social.news_witnessed_heal", "social.news_witnessed_brawl",
+        "social.news_witnessed_other", "social.news_recruited", "social.news_role_known", "social.news_new_calling",
+        "social.news_heroism", "social.news_dark_whispers",
+    };
+
+    [Fact]
+    public void WitnessNews_IsWrittenInTheWritersLanguage_AndTheMemoryStaysEnglish()
+    {
+        var npcs = new List<NPC> { BrainNpc("Witness One", "Main Street"), BrainNpc("Witness Two", "Main Street") };
+        var news = NewsWritten("hu", () => SocialInfluenceSystem.RecordWitnesses(npcs, "Main Street", LongName, "Bo", WitnessEventType.SawTheft));
+        news.Should().Equal(L("hu", "social.news_witnessed_steal", LongName, "Bo", L("hu", "location.name.MainStreet")));
+        NoEnglishLeft(news[0], new[] { "social.news_witnessed_steal" });
+        npcs[0].Brain.Memory.AllMemories.Select(e => e.Description).Should().Contain($"Saw {LongName} steal from Bo");
+
+        var en = NewsWritten("en", () => SocialInfluenceSystem.RecordWitnesses(npcs, "Main Street", LongName, "Bo", WitnessEventType.SawBrawl));
+        en.Should().Equal($"Several townsfolk witnessed {LongName} brawl with Bo at the Main Street");
+
+        foreach (var key in SocialNewsKeys)
+            SameCatchUpBucket(key, LongName, "Bo", key.Contains("witnessed") ? "Main Street" : "Merchant");
+        InLang("hu", () => SocialInfluenceSystem.RoleLabel("Merchant")).Should().Be(L("hu", "social.role_merchant"));
+        InLang("hu", () => SocialInfluenceSystem.FactionLabel(Faction.TheFaith)).Should().Be(L("hu", "faction.name_faith"));
+        SocialInfluenceSystem.RoleLabel("Unheard Of").Should().Be("Unheard Of");
+        L("en", "social.news_role_known", LongName, L("en", "social.role_defender")).Should().Be($"{LongName} has become known as the town's Defender");
+    }
+
+    // ================= EnhancedNPCBehaviors =================
+
+    private static readonly string[] AffairKeys =
+    {
+        "npc_behavior.affair_lovers", "npc_behavior.affair_rendezvous", "npc_behavior.affair_connection",
+        "npc_behavior.affair_flirting", "npc_behavior.affair_nervous", "npc_behavior.affair_composed",
+    };
+
+    [Fact]
+    public void AffairMessages_AreInThePlayersLanguage_AndWrapIn79Columns()
+    {
+        var npc = new NPC { Name1 = LongName, Name2 = LongName, SpouseName = LongName };
+        InLang("hu", () => EnhancedNPCBehaviors.ProcessAffairAttempt(npc, new Player { Name2 = "Bo" }, 1f).Message)
+            .Should().Be(L("hu", "npc_behavior.affair_unresponsive"));
+        InLang("en", () => EnhancedNPCBehaviors.ProcessAffairAttempt(npc, new Player { Name2 = "Bo" }, 1f).Message)
+            .Should().Be("They seem unresponsive.");
+
+        foreach (var lang in new[] { "en", "hu" })
+            foreach (var key in AffairKeys.Append("npc_behavior.divorce_found_out").Append("npc_behavior.divorce_leaving"))
+            {
+                var rows = UsurperRemake.UI.UIHelper.WordWrap(L(lang, key, LongName, LongName), MaxWidth - 2).Select(r => "  " + r);
+                EveryRowFits(rows, $"{key} ({lang})");
+            }
+        NoEnglishLeft(string.Join("\n", AffairKeys.Select(k => L("hu", k, LongName))), AffairKeys);
+        L("en", "npc_behavior.affair_composed", "Bo").Should().Be("Bo maintains their composure. \"I'm married, you know.\"");
+
+        // The dialogue writes them wrapped
+        string vn = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "VisualNovelDialogueSystem.cs"));
+        Regex.Matches(vn, Regex.Escape("terminal.WriteLine($\"  {affairResult.Message}\")")).Count.Should().Be(0);
+        Regex.Matches(vn, Regex.Escape("UIHelper.WriteWrapped(terminal!, affairResult.Message, \"  \")")).Count.Should().Be(5);
+        vn.Should().Contain("UIHelper.WriteWrapped(terminal!, divorceCheck.Reason, \"  \")");
+    }
+
+    [Fact]
+    public void RomanceNews_IsGossip_AndSortsAsTheEnglish_InEveryLanguage()
+    {
+        foreach (var key in new[] { "npc_behavior.news_wedding", "npc_behavior.news_poly_union", "npc_behavior.news_scandal_married",
+                     "npc_behavior.news_scandal_left", "npc_behavior.news_scandal_tryst" })
+        {
+            SameCatchUpBucket(key, LongName, "Bo", "Al");
+            SameGossip(key, LongName, "Bo", "Al");
+        }
+        foreach (var key in new[] { "npc_behavior.news_gang_ceased", "npc_behavior.news_recruited", "npc_behavior.news_converted",
+                     "npc_behavior.news_gang_challenge", "npc_behavior.news_left_team", "npc_behavior.news_turf_challenge",
+                     "npc_behavior.news_round_results" })
+            SameCatchUpBucket(key, LongName, "Bo", "Al");
+        L("en", "npc_behavior.news_wedding", "Bo", "Al").Should().Be("Wedding Bells! Bo and Al have gotten married!");
+        L("en", "npc_behavior.news_converted", "Bo", "Solarius", "Al").Should().Be("Bo was converted to the faith of Solarius by Al");
+    }
+
+    // ================= GoalSystem and the gossip pool =================
+
+    private static readonly string[] GossipKeys =
+    {
+        "goal.gossip_rich", "goal.gossip_seized", "goal.gossip_city", "goal.gossip_followers", "goal.gossip_blood",
+        "goal.gossip_revenge", "worldsim.gossip_wave_rage", "worldsim.gossip_wave_panic", "worldsim.gossip_wave_celebration",
+        "worldsim.gossip_wave_grief", "worldsim.gossip_brawl", "worldsim.gossip_stole", "worldsim.gossip_bested",
+    };
+
+    [Fact]
+    public void Gossip_IsPooledInEnglish_AndToldInTheWritersLanguage()
+    {
+        WorldSimulator.ClearGossipPool();
+        try
+        {
+            InLang("hu", () => { WorldSimulator.AddGossip("goal.gossip_blood", LongName, "Bo"); WorldSimulator.AddGossip("goal.gossip_blood", LongName, "Bo"); return 0; });
+            WorldSimulator.GossipPoolTexts().Should().Equal($"{LongName} took blood for blood from Bo");
+        }
+        finally { WorldSimulator.ClearGossipPool(); }
+
+        string hu = InLang("hu", () => Loc.Get("worldsim.news_gossip", "Bo", WorldSimulator.GossipText("worldsim.gossip_brawl", new object[] { LongName, "Al", "Main Street" })));
+        hu.Should().Be(L("hu", "worldsim.news_gossip", "Bo", L("hu", "worldsim.gossip_brawl", LongName, "Al", L("hu", "location.name.MainStreet"))));
+        NoEnglishLeft(hu, new[] { "worldsim.news_gossip", "worldsim.gossip_brawl" });
+        InLang("en", () => Loc.Get("worldsim.news_gossip", "Bo", WorldSimulator.GossipText("worldsim.gossip_wave_rage", new object[] { "Inn", "Al" })))
+            .Should().Be("Bo is telling anyone who'll listen: \"A wave of rage swept through the Inn -- started by Al\"");
+
+        foreach (var key in GossipKeys)
+            foreach (var lang in new[] { "en" }.Concat(OtherLanguages))
+            {
+                string written = L(lang, "worldsim.news_gossip", "Bo", L(lang, key, key.Contains("wave") ? "Main Street" : LongName, "Al", "Main Street"));
+                string english = L("en", "worldsim.news_gossip", "Bo", L("en", key, key.Contains("wave") ? "Main Street" : LongName, "Al", "Main Street"));
+                GameEngine.CatchUpBucket(written).Should().Be(GameEngine.CatchUpBucket(english), $"\"{written}\" ({lang}) sorts as \"{english}\"");
+            }
+        foreach (var key in new[] { "goal.news_fortune", "goal.news_controls_city", "goal.news_alliance", "goal.news_avenged", "goal.news_settled" })
+            SameCatchUpBucket(key, LongName, "Bo");
+        L("en", "goal.news_avenged", LongName, L("en", "goal.target_enemy")).Should().Be($"{LongName} has avenged the blood of their kin. their enemy is dead.");
+    }
 }
