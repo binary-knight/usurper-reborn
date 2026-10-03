@@ -638,6 +638,42 @@ public class OnlineSystems125Tests : IDisposable
             .Select(k => L("hu", k, "1"))), new[] { "guild.err_name_length", "guild.err_not_in_guild", "guild.err_own_rank", "guild.err_officer_limit", "guild.err_item_not_found" });
     }
 
+    [Fact]
+    public void GuildRanks_AreShownInTheReadersLanguage_StoredAndTypedInEnglish()
+    {
+        _ = Db;
+        var before = GuildSystem.Instance;
+        var instance = typeof(GuildSystem).GetProperty("Instance")!;
+        var guilds = new GuildSystem(_path);
+        try
+        {
+            guilds.CreateGuild("leader", "Iron Hand", "Iron Hand").Should().BeNull();
+            guilds.AddMember("second", "Iron Hand").Should().BeNull();
+            guilds.SetMemberRank("leader", "second", "Officer").Should().BeNull();
+            var lookup = typeof(UsurperRemake.Server.MudChatSystem).GetMethod("HandleGuildLookup", BindingFlags.NonPublic | BindingFlags.Static)!;
+            foreach (var lang in new[] { "en", "hu" })
+            {
+                var s = NewScreen();
+                InLang(lang, () => lookup.Invoke(null, new object[] { "leader", "Iron Hand", s.Term }));
+                Capture($"guild-info-{lang}.txt", s.Text);
+                EveryRowFits(s.Text, $"guild info ({lang})");
+                if (lang == "en")
+                    s.Text.Should().Contain("[Leader]").And.Contain("[Officer]");
+                else
+                    s.Text.Should().Contain($"[{L("hu", "guild.rank_leader")}]").And.Contain($"[{L("hu", "guild.rank_officer")}]")
+                        .And.NotContain("[Leader]").And.NotContain("[Officer]");
+            }
+            NoEnglishLeft(L("hu", "guild.rank_leader") + L("hu", "guild.rank_officer") + L("hu", "guild.rank_member"),
+                new[] { "guild.rank_leader", "guild.rank_officer", "guild.rank_member" });
+            GuildSystem.RankLabel("Member", "hu").Should().Be(L("hu", "guild.rank_member"));
+            GuildSystem.RankLabel("Founder", "hu").Should().Be("Founder", "an unknown stored rank is shown as stored");
+            Scalar("SELECT rank FROM guild_members WHERE username = 'second'").Should().Be("Officer", "storage stays English");
+            Scalar("SELECT rank FROM guild_members WHERE username = 'leader'").Should().Be("Leader");
+            Src("Server", "MudChatSystem.cs").Should().Contain("newRank = \"Officer\"").And.Contain("newRank = \"Member\"", "the typed rank words stay English");
+        }
+        finally { instance.SetValue(null, before); }
+    }
+
     // ================= TeamBalanceSystem =================
 
     [Fact]

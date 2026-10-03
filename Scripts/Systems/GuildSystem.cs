@@ -60,6 +60,16 @@ public class GuildSystem
     /// <summary>
     /// Check if a rank can perform a given action.
     /// </summary>
+    /// <summary>
+    /// v1.2.5: a stored rank (Leader, Officer, Member) as shown in <paramref name="lang"/> (the session's
+    /// language when null). Display only: storage and the typed rank words stay English.
+    /// </summary>
+    public static string RankLabel(string rank, string? lang = null)
+    {
+        string? key = rank switch { "Leader" => "guild.rank_leader", "Officer" => "guild.rank_officer", "Member" => "guild.rank_member", _ => null };
+        return key == null ? rank : Loc.GetIn(lang ?? GameConfig.Language, key);
+    }
+
     public static bool RankCanInvite(string rank) => rank == "Leader" || rank == "Officer";
     public static bool RankCanWithdraw(string rank) => rank == "Leader" || rank == "Officer";
     public static bool RankCanKick(string rank) => rank == "Leader";
