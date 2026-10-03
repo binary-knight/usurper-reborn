@@ -131,7 +131,7 @@ public class RestEngine125Tests : IDisposable
     {
         foreach (var row in rows)
         {
-            if (row.Length > 0 && "╔║╚".IndexOf(row[0]) >= 0)
+            if (row.Length > 0 && "╔║╚+|".IndexOf(row[0]) >= 0)
                 row.Length.Should().BeLessOrEqualTo(MaxWidth + 1, $"the {screen} box keeps its width: \"{row}\"");
             else
                 row.Length.Should().BeLessOrEqualTo(MaxWidth, $"every row of the {screen} fits in {MaxWidth} columns: \"{row}\"");
@@ -641,5 +641,50 @@ public class RestEngine125Tests : IDisposable
             InLang(lang, () => GameEngine.WrapRows(Loc.Get("engine.save_slot_sr_display", 10, LongName, "Mystic Shaman", 100,
                 Loc.Get("save.type_online"), "2026-10-03 23:59:59") + Loc.Get("engine.save_tag_emergency")))
                 .Should().OnlyContain(r => r.Length <= MaxWidth, $"[{lang}] the screen reader row wraps");
+    }
+
+    // ---------- rows of other engine screens that ran past 79 columns ----------
+
+    [Fact]
+    public async Task StorySupportAndBbsScreens_FitInEveryLanguage()
+    {
+        foreach (var lang in AllLanguages)
+            foreach (var method in new[] { "ShowStoryIntroduction", "ShowSupportPage", "ShowBBSList" })
+            {
+                var s = NewScreen();
+                await InLanguage(lang, async () => { await Run(Engine(s), method); return 0; });
+                EveryRowFits(s.Text, $"{method} ({lang})");
+                if (lang == "en" && method == "ShowStoryIntroduction")
+                    s.Text.Should().Contain(Loc.GetIn("en", "engine.story_golden_1"), "an English row that fits is written as it is");
+            }
+    }
+
+    [Fact]
+    public void LongEngineNotices_WrapAt79()
+    {
+        var notices = new (string Key, object[] Args)[]
+        {
+            ("engine.alt_level_required", new object[] { 25 }),
+            ("engine.inheritance_waiting", new object[] { 12 }),
+            ("engine.inheritance_overflow", new object[] { 12 }),
+            ("engine.legacy_claimed", new object[] { LongName, 100, 2_000_000_000L.ToString("N0") }),
+            ("engine.spectator_consent", new object[0]),
+            ("engine.innkeeper_quote", new object[0]),
+        };
+        var src = Src("Core", "GameEngine.cs");
+        foreach (var (key, args) in notices)
+        {
+            src.Should().MatchRegex($"(WriteRows|WrapRows)\\(Loc\\.Get\\(\"{Regex.Escape(key)}\"", $"{key} is written through WrapRows");
+            foreach (var lang in AllLanguages)
+            {
+                var rows = GameEngine.WrapRows(L(lang, key, args));
+                EveryRowFits(rows, $"{key} ({lang})");
+                string.Join(" ", rows).Split(' ', StringSplitOptions.RemoveEmptyEntries).Should()
+                    .Equal(L(lang, key, args).Split(' ', StringSplitOptions.RemoveEmptyEntries), $"[{lang}] {key} loses no words");
+            }
+        }
+        src.Should().Contain("WriteRows($\"  {Loc.Get(\"aldric_quest.need_someone\")}\");");
+        foreach (var lang in AllLanguages)
+            L(lang, "engine.use_resurrection_prompt").Length.Should().BeLessOrEqualTo(MaxWidth, $"[{lang}] the resurrection question fits");
     }
 }

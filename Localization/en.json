@@ -9137,7 +9137,7 @@
   "engine.bbs_list_title": "BBS LIST - Play Usurper Reborn Online!",
   "engine.bbs_list_desc_1": "  The following BBSes are running Usurper Reborn as a door game.",
   "engine.bbs_list_desc_2": "  Connect via telnet or SSH to play online!",
-  "engine.bbs_list_header": "  BBS Name                       Software    Address",
+  "engine.bbs_list_header": "  BBS Name                       Software   Address",
   "engine.bbs_sysop_question": "  Are you a SysOp running Usurper Reborn on your BBS?",
   "engine.bbs_get_listed": "  Get listed here! Open an issue or discussion at:",
   "engine.bbs_include_info": "  Include your BBS name, address, and software. We'd love to add you!",

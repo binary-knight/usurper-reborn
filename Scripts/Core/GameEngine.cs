@@ -658,7 +658,7 @@ public partial class GameEngine
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
+                    WriteRows(Loc.Get("engine.alt_level_required", GameConfig.AltSlotUnlockLevel), "red");
                     await Pacing.Wait(2000);
                     await RunBBSDoorMode();
                     return;
@@ -2042,7 +2042,7 @@ public partial class GameEngine
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.spectator_consent"));
+        WriteRows(Loc.Get("engine.spectator_consent"));
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("engine.spectator_select"));
@@ -4264,7 +4264,7 @@ public partial class GameEngine
             {
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("engine.inheritance_waiting", pending.Count));
+                foreach (var row in WrapRows(Loc.Get("engine.inheritance_waiting", pending.Count))) terminal.WriteLine(row);
                 terminal.WriteLine("");
                 // the same pause the delivered path takes: the /boss screen clears right after this
                 await Pacing.Wait(1500);
@@ -4336,7 +4336,7 @@ public partial class GameEngine
             if (itemsOverflowed > 0)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("engine.inheritance_overflow", itemsOverflowed));
+                foreach (var row in WrapRows(Loc.Get("engine.inheritance_overflow", itemsOverflowed))) terminal.WriteLine(row);
             }
             terminal.WriteLine("");
 
@@ -5078,7 +5078,7 @@ public partial class GameEngine
                     var (fallenName, fallenLevel, fallenClass, heirloomGold) = legacy.Value;
                     currentPlayer.Gold += heirloomGold;
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("engine.legacy_claimed", fallenName, fallenLevel, heirloomGold), "bright_magenta");
+                    WriteRows(Loc.Get("engine.legacy_claimed", fallenName, fallenLevel, heirloomGold), "bright_magenta");
                     terminal.WriteLine(Loc.Get("engine.legacy_claimed_hint"), "gray");
                     await Pacing.Wait(2500);
                     DebugLogger.Instance.LogInfo("GOLD",
@@ -5203,7 +5203,7 @@ public partial class GameEngine
             terminal.WriteLine("");
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("aldric_quest.lost_contact")}");
-            terminal.WriteLine($"  {Loc.Get("aldric_quest.need_someone")}");
+            WriteRows($"  {Loc.Get("aldric_quest.need_someone")}");
             terminal.WriteLine($"  {Loc.Get("aldric_quest.just_enter")}");
             terminal.WriteLine($"  {Loc.Get("aldric_quest.for_treasure")}");
             terminal.WriteLine("");
@@ -7737,7 +7737,7 @@ public partial class GameEngine
         }
 
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.innkeeper_quote"));
+        WriteRows(Loc.Get("engine.innkeeper_quote"));
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();
@@ -8112,29 +8112,20 @@ public partial class GameEngine
         terminal.WriteLine(GameConfig.ScreenReaderMode ? Loc.Get("engine.support_how_sr") : Loc.Get("engine.support_how_visual"));
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("engine.support_sponsor"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.support_sponsor_desc"));
+        WriteLabelled(Loc.Get("engine.support_sponsor"), Loc.Get("engine.support_sponsor_desc"));
         terminal.WriteLine(Loc.Get("engine.support_sponsor_desc2"));
         terminal.SetColor("bright_green");
         terminal.WriteLine("  https://github.com/sponsors/binary-knight");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("engine.support_star"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.support_star_desc"));
+        WriteLabelled(Loc.Get("engine.support_star"), Loc.Get("engine.support_star_desc"));
         terminal.WriteLine(Loc.Get("engine.support_star_desc2"));
         terminal.WriteLine(Loc.Get("engine.support_star_desc3"));
         terminal.SetColor("bright_green");
         terminal.WriteLine("  https://github.com/binary-knight/usurper-reborn");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("engine.support_steam"));
-        terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.support_steam_desc"));
+        WriteLabelled(Loc.Get("engine.support_steam"), Loc.Get("engine.support_steam_desc"));
         terminal.WriteLine(Loc.Get("engine.support_steam_desc2"));
         terminal.WriteLine("");
 
@@ -8147,7 +8138,7 @@ public partial class GameEngine
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("engine.support_thanks_1"));
-        terminal.WriteLine(Loc.Get("engine.support_thanks_2"));
+        WriteRows(Loc.Get("engine.support_thanks_2"));
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -8196,49 +8187,49 @@ public partial class GameEngine
         terminal.SetColor("bright_white");
         terminal.Write("  Shurato's Heavenly Sphere      ");
         terminal.SetColor("gray");
-        terminal.Write("EleBBS      ");
+        terminal.Write("EleBBS     ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("shsbbs.net");
 
         terminal.SetColor("bright_white");
         terminal.Write("  The X-BIT BBS                  ");
         terminal.SetColor("gray");
-        terminal.Write("Synchronet  ");
+        terminal.Write("Synchronet ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("x-bit.org:23 / ssh -p 22222");
 
         terminal.SetColor("bright_white");
         terminal.Write("  The UNIX-BIT BBS               ");
         terminal.SetColor("gray");
-        terminal.Write("Synchronet  ");
+        terminal.Write("Synchronet ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("x-bit.org:1336 / ssh -p 1337");
 
         terminal.SetColor("bright_white");
         terminal.Write("  Lunatics Unleashed             ");
         terminal.SetColor("gray");
-        terminal.Write("Mystic      ");
+        terminal.Write("Mystic     ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("lunaticsunleashed.ddns.net:2333");
 
         terminal.SetColor("bright_white");
         terminal.Write("  A-Net Online                   ");
         terminal.SetColor("gray");
-        terminal.Write("Synchronet  ");
+        terminal.Write("Synchronet ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("bbs.a-net.online:1337 / ssh -p 1338");
 
         terminal.SetColor("bright_white");
         terminal.Write("  Nite Eyes BBS                  ");
         terminal.SetColor("gray");
-        terminal.Write("Mystic      ");
+        terminal.Write("Mystic     ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("bbs.lizardmaster.com");
 
         terminal.SetColor("bright_white");
         terminal.Write("  Looney Bin BBS                 ");
         terminal.SetColor("gray");
-        terminal.Write("-           ");
+        terminal.Write("-          ");
         terminal.SetColor("bright_green");
         terminal.WriteLine("looneybinbbs.com:2023");
 
@@ -8261,7 +8252,7 @@ public partial class GameEngine
         terminal.WriteLine("    https://github.com/binary-knight/usurper-reborn");
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.bbs_include_info"));
+        WriteRows(Loc.Get("engine.bbs_include_info"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8433,14 +8424,14 @@ public partial class GameEngine
         terminal.WriteLine($"                           {Loc.Get("engine.story_golden_age")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_golden_1"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_2"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_3"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_4"));
-        terminal.WriteLine(Loc.Get("engine.story_golden_5"));
+        WriteRows(Loc.Get("engine.story_golden_1"));
+        WriteRows(Loc.Get("engine.story_golden_2"));
+        WriteRows(Loc.Get("engine.story_golden_3"));
+        WriteRows(Loc.Get("engine.story_golden_4"));
+        WriteRows(Loc.Get("engine.story_golden_5"));
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.story_golden_6"));
+        WriteRows(Loc.Get("engine.story_golden_6"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8467,18 +8458,18 @@ public partial class GameEngine
         terminal.WriteLine($"                            {Loc.Get("engine.story_sundering")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_sundering_1"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_2"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_3"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_4"));
+        WriteRows(Loc.Get("engine.story_sundering_1"));
+        WriteRows(Loc.Get("engine.story_sundering_2"));
+        WriteRows(Loc.Get("engine.story_sundering_3"));
+        WriteRows(Loc.Get("engine.story_sundering_4"));
         terminal.WriteLine("");
         terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("engine.story_sundering_5"));
+        WriteRows(Loc.Get("engine.story_sundering_5"));
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_sundering_6"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_7"));
-        terminal.WriteLine(Loc.Get("engine.story_sundering_8"));
+        WriteRows(Loc.Get("engine.story_sundering_6"));
+        WriteRows(Loc.Get("engine.story_sundering_7"));
+        WriteRows(Loc.Get("engine.story_sundering_8"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8505,21 +8496,21 @@ public partial class GameEngine
         terminal.WriteLine($"                          {Loc.Get("engine.story_avarice")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_1"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_2"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_3"));
+        WriteRows(Loc.Get("engine.story_avarice_1"));
+        WriteRows(Loc.Get("engine.story_avarice_2"));
+        WriteRows(Loc.Get("engine.story_avarice_3"));
         terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_4"));
+        WriteRows(Loc.Get("engine.story_avarice_4"));
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_5"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_6"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_7"));
+        WriteRows(Loc.Get("engine.story_avarice_5"));
+        WriteRows(Loc.Get("engine.story_avarice_6"));
+        WriteRows(Loc.Get("engine.story_avarice_7"));
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("engine.story_avarice_8"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_9"));
-        terminal.WriteLine(Loc.Get("engine.story_avarice_10"));
+        WriteRows(Loc.Get("engine.story_avarice_8"));
+        WriteRows(Loc.Get("engine.story_avarice_9"));
+        WriteRows(Loc.Get("engine.story_avarice_10"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8546,23 +8537,23 @@ public partial class GameEngine
         terminal.WriteLine($"                          {Loc.Get("engine.story_begins")}");
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("engine.story_begins_1"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_2"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_3"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_4"));
+        WriteRows(Loc.Get("engine.story_begins_1"));
+        WriteRows(Loc.Get("engine.story_begins_2"));
+        WriteRows(Loc.Get("engine.story_begins_3"));
+        WriteRows(Loc.Get("engine.story_begins_4"));
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine(Loc.Get("engine.story_begins_5"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_6"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_7"));
+        WriteRows(Loc.Get("engine.story_begins_5"));
+        WriteRows(Loc.Get("engine.story_begins_6"));
+        WriteRows(Loc.Get("engine.story_begins_7"));
         terminal.WriteLine("");
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine(Loc.Get("engine.story_begins_8"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_9"));
-        terminal.WriteLine(Loc.Get("engine.story_begins_10"));
+        WriteRows(Loc.Get("engine.story_begins_8"));
+        WriteRows(Loc.Get("engine.story_begins_9"));
+        WriteRows(Loc.Get("engine.story_begins_10"));
         terminal.WriteLine("");
         terminal.SetColor("bright_white");
-        terminal.WriteLine(Loc.Get("engine.story_begins_11"));
+        WriteRows(Loc.Get("engine.story_begins_11"));
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -8641,6 +8632,32 @@ public partial class GameEngine
     {
         foreach (var row in WrapRows(text))
             terminal.WriteLine(row, color);
+    }
+
+    /// <summary>
+    /// v1.2.5: a yellow label and its white text on one row when they fit in 79 columns, else the text on the
+    /// rows under the label, four columns in.
+    /// </summary>
+    private void WriteLabelled(string label, string text)
+    {
+        terminal.SetColor("bright_yellow");
+        if (label.Length + text.Length <= UsurperRemake.UI.UIHelper.WrapWidth)
+        {
+            terminal.Write(label);
+            terminal.SetColor("white");
+            terminal.WriteLine(text);
+            return;
+        }
+        terminal.WriteLine(label);
+        terminal.SetColor("white");
+        WriteRows("    " + text.TrimStart());
+    }
+
+    /// <summary>v1.2.5: WrapRows in the current colour.</summary>
+    private void WriteRows(string text)
+    {
+        foreach (var row in WrapRows(text))
+            terminal.WriteLine(row);
     }
 
     /// <summary>v1.2.5: the spectate request to the watched player, in that player's language.</summary>

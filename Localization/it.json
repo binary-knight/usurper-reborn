@@ -8923,7 +8923,7 @@
   "engine.bbs_list_title": "LISTA BBS - Gioca a Usurper Reborn online!",
   "engine.bbs_list_desc_1": "  Le seguenti BBS hanno Usurper Reborn come gioco door.",
   "engine.bbs_list_desc_2": "  Connettiti via telnet o SSH per giocare online!",
-  "engine.bbs_list_header": "  Nome BBS                        Software    Indirizzo",
+  "engine.bbs_list_header": "  Nome BBS                        Software   Indirizzo",
   "engine.bbs_sysop_question": "  Sei un SysOp che gestisce Usurper Reborn sulla tua BBS?",
   "engine.bbs_get_listed": "  Fatti aggiungere qui! Apri una issue o discussione su:",
   "engine.bbs_include_info": "  Includi il nome della tua BBS, indirizzo e software. Saremo felici di aggiungerti!",
