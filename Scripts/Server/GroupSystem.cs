@@ -83,7 +83,9 @@ public class GroupSystem
         var leavingName = !string.IsNullOrEmpty(leavingPlayer?.Name2) ? leavingPlayer.Name2
             : !string.IsNullOrEmpty(leavingPlayer?.Name1) ? leavingPlayer.Name1
             : username;
-        NotifyGroup(group, $"\u001b[1;33m  * {leavingName} has left the group ({reason}).\u001b[0m", excludeUsername: username);
+        NotifyGroupNotice(group, "1;33",
+            lang => UsurperRemake.Systems.Loc.GetIn(lang, "group.member_left", leavingName, ReasonLabel(lang, reason)),
+            excludeUsername: username);
 
         // If only leader remains, disband
         lock (group.MemberUsernames)
@@ -131,8 +133,8 @@ public class GroupSystem
                 .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
             if (session != null)
             {
-                session.EnqueueMessage(
-                    $"\u001b[1;33m  * Your group has been disbanded ({reason}).\u001b[0m");
+                MudServer.EnqueueNotice(session, "1;33",
+                    lang => UsurperRemake.Systems.Loc.GetIn(lang, "group.disbanded_reason", ReasonLabel(lang, reason)), "* ");
 
                 // Signal follower loops to exit
                 session.IsGroupFollower = false;
@@ -142,6 +144,48 @@ public class GroupSystem
         }
 
         group.IsInDungeon = false;
+    }
+
+    /// <summary>
+    /// v1.2.5: a leave or disband reason in a member's language. The reasons are fixed English strings
+    /// passed by the callers (here, MudChatSystem, PlayerSession and CombatEngine "leader fell in combat");
+    /// they stay English as passed and are mapped only for display. Any other reason is shown as passed.
+    /// </summary>
+    internal static string ReasonLabel(string lang, string reason)
+    {
+        string? key = reason switch
+        {
+            "left voluntarily" => "group.reason_left_voluntarily",
+            "disconnected" => "group.reason_disconnected",
+            "leader disconnected" => "group.reason_leader_disconnected",
+            "no members joined" => "group.reason_no_members",
+            "leader disbanded the group" => "group.reason_leader_disbanded",
+            "leader fell in combat" => "group.reason_leader_fell",
+            "group too small" => "group.reason_too_small",
+            _ => null
+        };
+        return key == null ? reason : UsurperRemake.Systems.Loc.GetIn(lang, key);
+    }
+
+    /// <summary>
+    /// v1.2.5: a "* " notice to each member in their own language, wrapped at 79 columns
+    /// (MudServer.EnqueueNotice).
+    /// </summary>
+    public void NotifyGroupNotice(DungeonGroup group, string ansi, Func<string, string> buildText, string? excludeUsername = null)
+    {
+        List<string> members;
+        lock (group.MemberUsernames)
+        {
+            members = new List<string>(group.MemberUsernames);
+        }
+        foreach (var member in members)
+        {
+            if (excludeUsername != null && member.Equals(excludeUsername, StringComparison.OrdinalIgnoreCase))
+                continue;
+            var session = MudServer.Instance?.ActiveSessions
+                .TryGetValue(member.ToLowerInvariant(), out var s) == true ? s : null;
+            if (session != null) MudServer.EnqueueNotice(session, ansi, buildText, "* ");
+        }
     }
 
     /// <summary>Get all active groups.</summary>

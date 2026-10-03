@@ -103,7 +103,11 @@ public class RoomRegistry
                     _rooms.TryRemove(location, out _);
             }
 
-            BroadcastToRoom(location, $"\u001b[90m{session.ActiveCharacterName} has disconnected.\u001b[0m", excludeUsername: session.Username);
+            // v1.2.5: each player in the room reads it in their own language.
+            string name = session.ActiveCharacterName;
+            BroadcastToRoomLocalized(location,
+                lang => $"\u001b[90m{UsurperRemake.Systems.Loc.GetIn(lang, "mud.room_disconnected", name)}\u001b[0m",
+                excludeUsername: session.Username);
         }
     }
 
@@ -176,7 +180,8 @@ public class RoomRegistry
     /// string (typically built with Loc.GetIn(lang, ...)). For announcements built in one player's
     /// session (e.g. a boss kill) that other players should read in their own language.
     /// </summary>
-    public void BroadcastToRoomLocalized(GameLocation location, Func<string, string> buildMessage, string? excludeUsername = null)
+    // v1.2.5: historyChannel, as in BroadcastToRoom, keeps the line each recipient read in their /history.
+    public void BroadcastToRoomLocalized(GameLocation location, Func<string, string> buildMessage, string? excludeUsername = null, string? historyChannel = null)
     {
         if (IsPrivateLocation(location) || !_rooms.TryGetValue(location, out var room))
             return;
@@ -188,7 +193,10 @@ public class RoomRegistry
                 continue;
 
             string lang = kvp.Value.Context?.Language ?? "en";
-            kvp.Value.EnqueueMessage(buildMessage(lang));
+            string rendered = buildMessage(lang);
+            kvp.Value.EnqueueMessage(rendered);
+            if (historyChannel != null)
+                MudChatSystem.RecordDelivered(kvp.Value, historyChannel, rendered);
         }
     }
 
@@ -200,6 +208,15 @@ public class RoomRegistry
         var server = MudServer.Instance;
         if (server != null)
             server.BroadcastToAll(message, excludeUsername, channelKey, historyChannel);
+    }
+
+    /// <summary>
+    /// v1.2.5: BroadcastGlobal rendered per recipient in each session's own language, with the same
+    /// channel mutes and /history recording.
+    /// </summary>
+    public void BroadcastGlobalLocalized(Func<string, string> buildMessage, string? excludeUsername = null, string? channelKey = null, string? historyChannel = null)
+    {
+        MudServer.Instance?.BroadcastLocalized(buildMessage, excludeUsername, channelKey, historyChannel);
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
@@ -39,18 +40,36 @@ public static class RelayClient
         // Otherwise, prompt for credentials and try connecting in a loop
         var stdout = Console.OpenStandardOutput();
 
+        // v1.2.5: the relay's menu and prompts in a language the player picks with [G], as at the
+        // direct connection gate (MudServer.InteractiveAuthAsync). The relay has no account yet, so the
+        // choice is for these screens only; the game then uses the account's saved language.
+        string lang = "en";
+        UsurperRemake.Systems.Loc.Initialize();
+        var langCodes = UsurperRemake.Systems.Loc.AvailableLanguages?.Select(l => l.Code).ToList()
+            ?? new System.Collections.Generic.List<string> { "en" };
+        if (langCodes.Count == 0) langCodes.Add("en");
+        string L(string key, params object[] args) => UsurperRemake.Systems.Loc.GetIn(lang, key, args);
+
         for (int attempt = 0; attempt < MAX_AUTH_ATTEMPTS; attempt++)
         {
             if (ct.IsCancellationRequested) return;
 
             // Show auth menu
-            await ShowAuthMenu(stdout, ct);
+            await ShowAuthMenu(stdout, lang, ct);
 
             var choice = (await ReadStdinLine(ct))?.Trim();
             if (string.IsNullOrEmpty(choice)) continue;
 
             var choiceUpper = choice.ToUpperInvariant();
             if (choiceUpper == "Q") return;
+            if (choiceUpper == "G")
+            {
+                // Next installed language; does not use up an attempt.
+                int idx = langCodes.IndexOf(lang);
+                lang = langCodes[(idx + 1) % langCodes.Count];
+                attempt--;
+                continue;
+            }
 
             // Support direct AUTH passthrough from game client (OnlinePlaySystem sends AUTH via SSH)
             if (choice.StartsWith("AUTH:", StringComparison.Ordinal))
@@ -61,7 +80,7 @@ public static class RelayClient
                     bool directConnected = await ConnectAndBridge(
                         authResult.Value.username, authResult.Value.password,
                         port, authResult.Value.connectionType, ct,
-                        isRegistration: authResult.Value.isRegistration);
+                        isRegistration: authResult.Value.isRegistration, lang: lang);
                     if (directConnected) return;
                     continue; // Auth failed, loop back
                 }
@@ -73,12 +92,12 @@ public static class RelayClient
             if (choiceUpper == "L")
             {
                 // Login
-                await WriteAnsi(stdout, "\r\n\u001b[1;37m  Username: \u001b[0m");
+                await WriteAnsi(stdout, $"\r\n\u001b[1;37m  {L("auth.username")}\u001b[0m");
                 await stdout.FlushAsync(ct);
                 authUsername = (await ReadStdinLine(ct))?.Trim();
                 if (string.IsNullOrEmpty(authUsername)) continue;
 
-                await WriteAnsi(stdout, "\u001b[1;37m  Password: \u001b[0m");
+                await WriteAnsi(stdout, $"\u001b[1;37m  {L("auth.password")}\u001b[0m");
                 await stdout.FlushAsync(ct);
                 authPassword = (await ReadPasswordLine(stdout, ct))?.Trim();
                 if (string.IsNullOrEmpty(authPassword)) continue;
@@ -86,36 +105,36 @@ public static class RelayClient
             else if (choiceUpper == "R")
             {
                 // Register
-                await WriteAnsi(stdout, "\r\n\u001b[1;32m  Choose a username: \u001b[0m");
+                await WriteAnsi(stdout, $"\r\n\u001b[1;32m  {L("auth.reg_username")} \u001b[0m");
                 await stdout.FlushAsync(ct);
                 authUsername = (await ReadStdinLine(ct))?.Trim();
                 if (string.IsNullOrEmpty(authUsername)) continue;
 
                 if (authUsername.Length < 2 || authUsername.Length > 20)
                 {
-                    await WriteAnsi(stdout, "\r\n\u001b[1;31m  Username must be 2-20 characters.\u001b[0m\r\n\r\n");
+                    await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {L("auth.err_username_len")}\u001b[0m\r\n\r\n");
                     await stdout.FlushAsync(ct);
                     continue;
                 }
 
-                await WriteAnsi(stdout, "\u001b[1;32m  Choose a password: \u001b[0m");
+                await WriteAnsi(stdout, $"\u001b[1;32m  {L("auth.reg_password")} \u001b[0m");
                 await stdout.FlushAsync(ct);
                 authPassword = (await ReadPasswordLine(stdout, ct))?.Trim();
                 if (string.IsNullOrEmpty(authPassword)) continue;
 
                 if (authPassword.Length < 4)
                 {
-                    await WriteAnsi(stdout, "\r\n\u001b[1;31m  Password must be at least 4 characters.\u001b[0m\r\n\r\n");
+                    await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {L("auth.err_password_len")}\u001b[0m\r\n\r\n");
                     await stdout.FlushAsync(ct);
                     continue;
                 }
 
-                await WriteAnsi(stdout, "\u001b[1;32m  Confirm password: \u001b[0m");
+                await WriteAnsi(stdout, $"\u001b[1;32m  {L("auth.reg_confirm")} \u001b[0m");
                 await stdout.FlushAsync(ct);
                 var confirm = (await ReadPasswordLine(stdout, ct))?.Trim();
                 if (authPassword != confirm)
                 {
-                    await WriteAnsi(stdout, "\r\n\u001b[1;31m  Passwords do not match.\u001b[0m\r\n\r\n");
+                    await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {L("auth.err_password_match")}\u001b[0m\r\n\r\n");
                     await stdout.FlushAsync(ct);
                     continue;
                 }
@@ -129,14 +148,14 @@ public static class RelayClient
             // ConnectAndBridge returns true if successfully connected and played,
             // false if auth failed (we should retry)
             bool isReg = choiceUpper == "R";
-            bool connected = await ConnectAndBridge(authUsername!, authPassword, port, connectionType, ct, isRegistration: isReg, rawTerminal: true);
+            bool connected = await ConnectAndBridge(authUsername!, authPassword, port, connectionType, ct, isRegistration: isReg, rawTerminal: true, lang: lang);
             if (connected)
                 return; // Session completed (player quit or disconnected)
 
             // Auth failed — loop back to prompt
         }
 
-        await WriteAnsi(stdout, "\r\n\u001b[1;31m  Too many attempts. Goodbye.\u001b[0m\r\n");
+        await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {L("auth.too_many")}\u001b[0m\r\n");
         await stdout.FlushAsync(ct);
     }
 
@@ -212,7 +231,7 @@ public static class RelayClient
     /// </param>
     private static async Task<bool> ConnectAndBridge(
         string username, string? password, int port, string connectionType, CancellationToken ct,
-        bool isRegistration = false, bool rawTerminal = false)
+        bool isRegistration = false, bool rawTerminal = false, string lang = "en")
     {
         TcpClient? client = null;
         IDisposable? rawMode = null;
@@ -351,7 +370,7 @@ public static class RelayClient
         {
             Console.Error.WriteLine($"[RELAY] Cannot connect to game server on port {port}: {ex.Message}");
             var stdout = Console.OpenStandardOutput();
-            await WriteAnsi(stdout, "\r\n\u001b[1;31m  Game server is not available. Please try again later.\u001b[0m\r\n");
+            await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {UsurperRemake.Systems.Loc.GetIn(lang, "auth.server_unavailable")}\u001b[0m\r\n");
             await stdout.FlushAsync(ct);
             return false;
         }
@@ -366,26 +385,33 @@ public static class RelayClient
         }
     }
 
-    private static async Task ShowAuthMenu(Stream stdout, CancellationToken ct)
+    private static async Task ShowAuthMenu(Stream stdout, string lang, CancellationToken ct)
     {
-        await WriteAnsi(stdout, "\u001b[2J\u001b[H"); // Clear screen
-        await WriteAnsi(stdout, "\u001b[1;36m");
-        await WriteAnsi(stdout, "╔══════════════════════════════════════════════════════════════════════════════╗\r\n");
-        await WriteAnsi(stdout, "\u001b[1;37m");
-        await WriteAnsi(stdout, "║                      Welcome to Usurper Reborn Online                      ║\r\n");
-        await WriteAnsi(stdout, "\u001b[1;36m");
-        await WriteAnsi(stdout, "╠══════════════════════════════════════════════════════════════════════════════╣\r\n");
-        await WriteAnsi(stdout, "\u001b[0;37m");
-        await WriteAnsi(stdout, "║                                                                              ║\r\n");
-        await WriteAnsi(stdout, "║  \u001b[1;36m[L]\u001b[0;37m Login to existing account                                             ║\r\n");
-        await WriteAnsi(stdout, "║  \u001b[1;32m[R]\u001b[0;37m Register new account                                                  ║\r\n");
-        await WriteAnsi(stdout, "║  \u001b[1;31m[Q]\u001b[0;37m Quit                                                                  ║\r\n");
-        await WriteAnsi(stdout, "║                                                                              ║\r\n");
-        await WriteAnsi(stdout, "\u001b[1;36m");
-        await WriteAnsi(stdout, "╚══════════════════════════════════════════════════════════════════════════════╝\r\n");
-        await WriteAnsi(stdout, "\u001b[0m");
-        await WriteAnsi(stdout, "\r\n  Choice: ");
+        foreach (var line in AuthMenuText(lang))
+            await WriteAnsi(stdout, line);
         await stdout.FlushAsync(ct);
+    }
+
+    /// <summary>
+    /// v1.2.5: the relay's login menu in a language: the 79 column box (MudServer.AuthBoxRows) with
+    /// [L] [R] [G] [Q], and the choice prompt. [G] shows the language and picks the next one.
+    /// </summary>
+    internal static System.Collections.Generic.List<string> AuthMenuText(string lang)
+    {
+        string L(string key) => UsurperRemake.Systems.Loc.GetIn(lang, key);
+        string langName = lang;
+        foreach (var ll in UsurperRemake.Systems.Loc.AvailableLanguages)
+            if (ll.Code == lang) { langName = ll.Name; break; }
+        var text = new System.Collections.Generic.List<string> { "\u001b[2J\u001b[H" }; // Clear screen
+        foreach (var row in MudServer.AuthBoxRows(L("auth.relay_title"), new[] {
+            ("1;36", "L", L("auth.login")),
+            ("1;32", "R", L("auth.register")),
+            ("1;35", "G", $"{L("auth.language")} ({langName})"),
+            ("1;31", "Q", L("auth.quit")) }))
+            text.Add(row + "\r\n");
+        text.Add("\u001b[0m");
+        text.Add($"\r\n  {L("auth.choice")} ");
+        return text;
     }
 
     /// <summary>Write ANSI text to a stream.</summary>

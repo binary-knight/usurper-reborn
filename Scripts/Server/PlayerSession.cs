@@ -469,40 +469,13 @@ public class PlayerSession : IDisposable
             catch { }
 
             // Clean up spectator references
-            try
-            {
-                // Notify anyone spectating us that we disconnected
-                foreach (var spectator in Spectators.ToArray())
-                {
-                    spectator.EnqueueMessage($"\u001b[1;33m  * The player you were watching has disconnected.\u001b[0m");
-                    spectator.SpectatingSession = null;
-                    spectator.IsSpectating = false;
-                }
-                ctx.Terminal?.ClearSpectatorStreams();
-                Spectators.Clear();
-
-                // If we were spectating someone, remove ourselves
-                if (SpectatingSession != null)
-                {
-                    SpectatingSession.Spectators.Remove(this);
-                    SpectatingSession.Context?.Terminal?.RemoveSpectatorStream(this);
-                    SpectatingSession.EnqueueMessage(
-                        $"\u001b[1;33m  * {Username} stopped watching your session.\u001b[0m");
-                    SpectatingSession = null;
-                    IsSpectating = false;
-                }
-            }
+            try { EndSpectatingOnDisconnect(ctx.Terminal); }
             catch { }
 
             // Global logout announcement (suppress for invisible wizards)
             try
             {
-                if (!IsWizInvisible)
-                {
-                    _server.BroadcastToAll(
-                        $"\u001b[1;33m  {(Context?.Engine?.CurrentPlayer?.DisplayName ?? Username)} has left the realm.\u001b[0m",
-                        excludeUsername: Username);
-                }
+                if (!IsWizInvisible) AnnounceLeftRealm();
             }
             catch { }
 
@@ -552,6 +525,44 @@ public class PlayerSession : IDisposable
         }
     }
 
+    /// <summary>
+    /// v1.2.5 (moved out of the session's cleanup): tell anyone watching this session that it ended, and
+    /// the player this session watched that it stopped, each in their own language.
+    /// </summary>
+    internal void EndSpectatingOnDisconnect(TerminalEmulator? ownTerminal)
+    {
+        // Notify anyone spectating us that we disconnected
+        foreach (var spectator in Spectators.ToArray())
+        {
+            MudServer.EnqueueNotice(spectator, "1;33",
+                lang => UsurperRemake.Systems.Loc.GetIn(lang, "engine.spectator_disconnected").Trim(), "* ");
+            spectator.SpectatingSession = null;
+            spectator.IsSpectating = false;
+        }
+        ownTerminal?.ClearSpectatorStreams();
+        Spectators.Clear();
+
+        // If we were spectating someone, remove ourselves
+        if (SpectatingSession != null)
+        {
+            SpectatingSession.Spectators.Remove(this);
+            SpectatingSession.Context?.Terminal?.RemoveSpectatorStream(this);
+            MudServer.EnqueueNotice(SpectatingSession, "1;33",
+                lang => UsurperRemake.Systems.Loc.GetIn(lang, "mud.stopped_watching", Username), "* ");
+            SpectatingSession = null;
+            IsSpectating = false;
+        }
+    }
+
+    /// <summary>v1.2.5: "X has left the realm." to every other player, in each one's language.</summary>
+    internal void AnnounceLeftRealm()
+    {
+        string leaving = Context?.Engine?.CurrentPlayer?.DisplayName ?? Username;
+        _server.BroadcastLocalized(
+            lang => $"\u001b[1;33m  {UsurperRemake.Systems.Loc.GetIn(lang, "mud.left_realm", leaving)}\u001b[0m",
+            excludeUsername: Username);
+    }
+
     /// <summary>Enqueue a message to be displayed at the player's next input prompt.</summary>
     public void EnqueueMessage(string message)
     {
@@ -559,18 +570,19 @@ public class PlayerSession : IDisposable
     }
 
     /// <summary>Gracefully disconnect this session with a message.</summary>
-    public async Task DisconnectAsync(string reason)
+    public Task DisconnectAsync(string reason) => DisconnectAsync(_ => reason);
+
+    /// <summary>
+    /// v1.2.5: disconnect with the reason built in this player's language (Context.Language). The callers
+    /// run on server tasks (the idle watchdog, the admin poller), outside the session's own flow.
+    /// </summary>
+    public async Task DisconnectAsync(Func<string, string> reasonIn)
     {
         try
         {
             if (_tcpClient.Connected && Context?.Terminal != null)
             {
-                Context.Terminal.WriteLine("");
-                Context.Terminal.SetColor("bright_red");
-                Context.Terminal.WriteLine($"  *** {reason} ***");
-                Context.Terminal.SetColor("yellow");
-                Context.Terminal.WriteLine("  Your game has been auto-saved.");
-                Context.Terminal.SetColor("white");
+                WriteDisconnectLines(Context.Terminal, Context.Language ?? "en", reasonIn);
                 await Task.Delay(2000); // Give time for message to reach client
             }
         }
@@ -581,6 +593,17 @@ public class PlayerSession : IDisposable
         // Close the TCP connection so any blocking ReadLineAsync() unblocks
         try { _stream.Close(); } catch { }
         try { _tcpClient.Close(); } catch { }
+    }
+
+    /// <summary>v1.2.5: the disconnect reason and the auto-save line, in `lang`.</summary>
+    internal static void WriteDisconnectLines(TerminalEmulator terminal, string lang, Func<string, string> reasonIn)
+    {
+        terminal.WriteLine("");
+        terminal.SetColor("bright_red");
+        terminal.WriteLine($"  *** {reasonIn(lang)} ***");
+        terminal.SetColor("yellow");
+        terminal.WriteLine($"  {UsurperRemake.Systems.Loc.GetIn(lang, "mud.auto_saved")}");
+        terminal.SetColor("white");
     }
 
     public void Dispose()
