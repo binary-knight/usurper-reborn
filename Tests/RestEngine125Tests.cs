@@ -719,6 +719,7 @@ public class RestEngine125Tests : IDisposable
             var expected = new[] { "engine.npc_news_lurking", "engine.npc_news_threatened", "engine.npc_news_watched", "engine.npc_news_tomes" }
                 .Select(k => L(lang, k, "Xaver")).ToList();
             written.Should().BeEquivalentTo(expected, $"[{lang}] dark sage news in the writer's language");
+            if (lang == "hu") NoEnglishLeft(string.Join("\n", written), NpcNewsKeys.Take(3).Append("engine.npc_news_tomes"));
         }
         // Every fragment sorts under World Events in every language, as the English ones do.
         foreach (var lang in AllLanguages)
