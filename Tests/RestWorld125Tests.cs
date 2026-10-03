@@ -196,6 +196,8 @@ public class RestWorld125Tests : IDisposable
         Capture("maintenance-hu.txt", hu);
         EveryRowFits(en, "maintenance screen (en)");
         EveryRowFits(hu, "maintenance screen (hu)");
+        foreach (var lang in new[] { "es", "fr", "it" })
+            EveryRowFits(await MaintenanceScreen(lang), $"maintenance screen ({lang})");
         NoEnglishLeft(hu, MaintScreenKeys);
         hu.Should().Contain(L("hu", "maint.bard_songs", LongName)).And.Contain(L("hu", "maint.type_scheduled"))
             .And.Contain(L("hu", "maint.economy_complete"));
@@ -211,7 +213,7 @@ public class RestWorld125Tests : IDisposable
     [Fact]
     public void Maintenance_RowsNotReachedHere_FitInEnglishAndHungarian()
     {
-        foreach (var lang in new[] { "en", "hu" })
+        foreach (var lang in AllLanguages)
         {
             var rows = new List<string>
             {
@@ -256,6 +258,9 @@ public class RestWorld125Tests : IDisposable
         interest.Lines.Should().Equal(L("hu", "maint.mail_interest_line1"),
             L("hu", "maint.mail_interest_line2", 1_000_000L * GameConfig.DefaultBankInterest / 100));
         foreach (var m in mails) EveryRowFits(m.Lines, "maintenance mail (hu)");
+        foreach (var lang in AllLanguages)
+            EveryRowFits(new[] { L(lang, "maint.mail_potions_line1"), L(lang, "maint.mail_potions_line2", 999_999),
+                L(lang, "maint.mail_interest_line1"), L(lang, "maint.mail_interest_line2", 999_999_999L) }, $"maintenance mail ({lang})");
         NoEnglishLeft(string.Join("\n", mails.SelectMany(m => m.Lines.Append(m.Subject))),
             new[] { "maint.mail_potions_subject", "maint.mail_potions_line1", "maint.mail_potions_line2",
                 "maint.mail_interest_subject", "maint.mail_interest_line1", "maint.mail_interest_line2" });
@@ -283,6 +288,9 @@ public class RestWorld125Tests : IDisposable
     // ================= news: catch-up buckets and gossip =================
 
     private static readonly string[] OtherLanguages = { "es", "fr", "hu", "it" };
+
+    // v1.2.5 review: the rows this piece writes fit 79 columns in every language
+    private static readonly string[] AllLanguages = { "en", "es", "fr", "hu", "it" };
 
     /// <summary>The catch-up bucket of a news text written in each language is the bucket of the English one.</summary>
     private static void SameCatchUpBucket(string key, params object[] args)
@@ -352,6 +360,8 @@ public class RestWorld125Tests : IDisposable
             Capture("world-events-en.txt", en);
             EveryRowFits(hu, "world events screen (hu)");
             EveryRowFits(en, "world events screen (en)");
+            foreach (var lang in new[] { "es", "fr", "it" })
+                EveryRowFits(EventScreen(lang), $"world events screen ({lang})");
             NoEnglishLeft(hu, ShownEvents.SelectMany(EventKeys).Concat(new[] { "world_event.screen_title",
                 "world_event.days_remaining", "world_event.modifiers", "world_event.mod_prices", "world_event.mod_xp",
                 "world_event.mod_stats", "world_event.royal_decree" }));
@@ -370,13 +380,13 @@ public class RestWorld125Tests : IDisposable
     [Fact]
     public void WorldEventRows_FitInEnglishAndHungarian_ForEveryEvent()
     {
-        foreach (var lang in new[] { "en", "hu" })
+        foreach (var lang in AllLanguages)
             foreach (WorldEventSystem.EventType t in Enum.GetValues(typeof(WorldEventSystem.EventType)))
             {
                 var rows = UsurperRemake.UI.UIHelper.WordWrap(L(lang, WorldEventSystem.EventKey(t, "desc")), MaxWidth - 4).Select(r => "    " + r)
                     .Append("  * " + L(lang, WorldEventSystem.EventKey(t, "title")));
                 if (Loc.HasIn("en", WorldEventSystem.EventKey(t, "decree")))
-                    rows = rows.Append($"  \"{L(lang, WorldEventSystem.EventKey(t, "decree"))}\"");
+                    rows = rows.Concat(UsurperRemake.UI.UIHelper.WordWrap($"\"{L(lang, WorldEventSystem.EventKey(t, "decree"))}\"", MaxWidth - 2).Select(r => "  " + r));
                 EveryRowFits(rows, $"{t} ({lang})");
                 L(lang, WorldEventSystem.EventKey(t, "title")).Length.Should().BeLessOrEqualTo(MaxWidth - 4, $"the {t} title fits one row ({lang})");
             }
@@ -655,7 +665,7 @@ public class RestWorld125Tests : IDisposable
         InLang("en", () => EnhancedNPCBehaviors.ProcessAffairAttempt(npc, new Player { Name2 = "Bo" }, 1f).Message)
             .Should().Be("They seem unresponsive.");
 
-        foreach (var lang in new[] { "en", "hu" })
+        foreach (var lang in AllLanguages)
             foreach (var key in AffairKeys.Append("npc_behavior.divorce_found_out").Append("npc_behavior.divorce_leaving"))
             {
                 var rows = UsurperRemake.UI.UIHelper.WordWrap(L(lang, key, LongName, LongName), MaxWidth - 2).Select(r => "  " + r);
@@ -906,7 +916,7 @@ public class RestWorld125Tests : IDisposable
             ("daily.royal_debt_bounty", new object[] { 99, GameConfig.RoyalLoanChivalryLossMid }),
             ("daily.royal_debt_late", new object[] { 999, GameConfig.RoyalLoanChivalryLossLate }),
         };
-        foreach (var lang in new[] { "en", "hu" })
+        foreach (var lang in AllLanguages)
         {
             foreach (var (key, args) in rows)
                 EveryRowFits(UsurperRemake.UI.UIHelper.WordWrap(L(lang, key, args)), $"{key} ({lang})");
@@ -918,7 +928,7 @@ public class RestWorld125Tests : IDisposable
                 grief.Should().Be(L("hu", "daily.grief_evolved", L("hu", "daily.grief_stage_bargaining"), L("hu", "daily.grief_stage_depression")));
                 grief.Should().NotContain("Bargaining").And.NotContain("Depression");
             }
-            else grief.Should().Be("Your grief has evolved... (Bargaining -> Depression)");
+            else if (lang == "en") grief.Should().Be("Your grief has evolved... (Bargaining -> Depression)");
         }
 
         string src = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "DailySystemManager.cs"));
@@ -936,7 +946,7 @@ public class RestWorld125Tests : IDisposable
         File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "DailySystemManager.cs"))
             .Should().Contain("MudServer.Instance?.BroadcastLocalized(BloodMoonBroadcast)");
 
-        foreach (var lang in new[] { "en", "hu" })
+        foreach (var lang in AllLanguages)
         {
             string eulogy = InLang("fr", () => PermadeathHelper.EulogyBroadcast(lang, LongName, 100, CharacterClass.Warrior, LongName));
             var shown = Rows(Regex.Replace(eulogy, "\u001b\\[[0-9;]*m", "")).Where(r => r.Length > 0).ToList();
@@ -949,7 +959,18 @@ public class RestWorld125Tests : IDisposable
             .Should().Be($"\u001b[1;31m\r\n  *** {L("en", "permadeath.eulogy", "Bo", 5, "Warrior", "Al")} ***\r\n\u001b[0m");
         File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "PermadeathHelper.cs"))
             .Should().Contain("UIHelper.WriteWrapped(terminal, Loc.Get(\"permadeath.legacy_recorded\"), \"  \")");
-        foreach (var lang in new[] { "en", "hu" })
+        foreach (var lang in AllLanguages)
             EveryRowFits(UsurperRemake.UI.UIHelper.WordWrap(L(lang, "permadeath.legacy_recorded"), MaxWidth - 2).Select(r => "  " + r), $"legacy row ({lang})");
+    }
+    [Fact]
+    public void TimeOfDayRows_AndBloodMoonBroadcast_Fit79_InEveryLanguage()
+    {
+        foreach (var lang in AllLanguages)
+        {
+            foreach (var place in new[] { "dungeon", "surface" })
+                foreach (var time in new[] { "dawn", "morning", "afternoon", "evening", "night" })
+                    EveryRowFits(new[] { L(lang, $"daily.{place}_{time}") }, $"daily.{place}_{time} ({lang})");
+            EveryRowFits(Rows(Regex.Replace(DailySystemManager.BloodMoonBroadcast(lang), "\u001b\\[[0-9;]*m", "")), $"blood moon broadcast ({lang})");
+        }
     }
 }
