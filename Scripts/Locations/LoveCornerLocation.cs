@@ -66,16 +66,16 @@ public class LoveCornerLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "A", Label = "Approach Somebody", Category = "social", Icon = "approach" },
-            new() { Key = "C", Label = "Children in Realm", Category = "info", Icon = "children" },
-            new() { Key = "D", Label = "Divorce", Category = "social", Icon = "divorce" },
-            new() { Key = "E", Label = "Examine Child", Category = "social", Icon = "child" },
-            new() { Key = "V", Label = "Gossip Monger", Category = "social", Icon = "gossip" },
-            new() { Key = "M", Label = "Married Couples", Category = "info", Icon = "marriage" },
-            new() { Key = "P", Label = "Personal Relations", Category = "social", Icon = "relations" },
-            new() { Key = "G", Label = "Gift Shop", Category = "shop", Icon = "gift" },
-            new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
-            new() { Key = "L", Label = "Love History", Category = "info", Icon = "history" },
+            new() { Key = "A", Label = Loc.Get("love_corner.approach_header"), Category = "social", Icon = "approach" },
+            new() { Key = "C", Label = Loc.Get("love_corner.electron_children"), Category = "info", Icon = "children" },
+            new() { Key = "D", Label = Loc.Get("love_corner.electron_divorce"), Category = "social", Icon = "divorce" },
+            new() { Key = "E", Label = Loc.Get("love_corner.electron_examine_child"), Category = "social", Icon = "child" },
+            new() { Key = "V", Label = Loc.Get("love_corner.electron_gossip"), Category = "social", Icon = "gossip" },
+            new() { Key = "M", Label = Loc.Get("love_corner.electron_married"), Category = "info", Icon = "marriage" },
+            new() { Key = "P", Label = Loc.Get("love_corner.electron_relations"), Category = "social", Icon = "relations" },
+            new() { Key = "G", Label = Loc.Get("love_corner.gift_shop"), Category = "shop", Icon = "gift" },
+            new() { Key = "S", Label = Loc.Get("menu.action.status"), Category = "info", Icon = "info" },
+            new() { Key = "L", Label = Loc.Get("love_corner.electron_history"), Category = "info", Icon = "history" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

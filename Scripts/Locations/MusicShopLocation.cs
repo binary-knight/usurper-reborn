@@ -1307,10 +1307,10 @@ public class MusicShopLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "B", Label = "Buy Instruments", Category = "browse", Icon = "instrument" },
-            new() { Key = "P", Label = "Hire Performance", Category = "service", Icon = "music" },
-            new() { Key = "T", Label = "Talk to Melodia", Category = "social", Icon = "talk" },
-            new() { Key = "L", Label = "Lore Songs", Category = "info", Icon = "scroll" },
+            new() { Key = "B", Label = Loc.Get("music_shop.buy_instruments"), Category = "browse", Icon = "instrument" },
+            new() { Key = "P", Label = Loc.Get("music_shop.electron_performance"), Category = "service", Icon = "music" },
+            new() { Key = "T", Label = Loc.Get("music_shop.talk_melodia"), Category = "social", Icon = "talk" },
+            new() { Key = "L", Label = Loc.Get("music_shop.electron_lore_songs"), Category = "info", Icon = "scroll" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

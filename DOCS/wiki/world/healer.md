@@ -1,7 +1,7 @@
 ---
 title: The Healer
 path: /wiki/en/world/healer/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs
 ---
 The Healer treats more than missing HP. Decide whether you need wound treatment, supplies, addiction rehab or Mental therapy.

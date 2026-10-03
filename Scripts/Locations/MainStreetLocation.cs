@@ -167,12 +167,10 @@ public partial class MainStreetLocation : BaseLocation
             terminal.Write($"{onlineCount}");
             terminal.SetColor("darkgray");
             terminal.Write("  |  ");
-            terminal.SetColor("cyan");
-            terminal.Write("/say");
+            WriteSlashCommand("/say");
             terminal.SetColor("darkgray");
             terminal.Write($" {Loc.Get("main_street.to_chat")}  |  ");
-            terminal.SetColor("cyan");
-            terminal.Write("/who");
+            WriteSlashCommand("/who");
             terminal.SetColor("darkgray");
             terminal.WriteLine($" {Loc.Get("main_street.for_player_list")}");
         }
@@ -545,6 +543,69 @@ public partial class MainStreetLocation : BaseLocation
         EmitElectronEvents();
     }
 
+    /// <summary>v1.2.5: a slash command as typed (never translated), in the command colour.</summary>
+    private void WriteSlashCommand(string command)
+    {
+        terminal.SetColor("cyan");
+        terminal.Write(command);
+    }
+
+    /// <summary>v1.2.5: a slash command help row; the command as typed, then its argument words and description.</summary>
+    internal static string SlashHelpRow(string command, string args, string desc) =>
+        $"  {(args.Length > 0 ? command + " " + args : command)} - {desc}";
+
+    /// <summary>
+    /// v1.2.5: an achievement row's " - description" after the given columns; words that would pass column 79
+    /// continue on the next rows, indented 7.
+    /// </summary>
+    private void WriteAchievementTail(int used, string text)
+    {
+        var rows = WrapWords(text, 79 - used - 3, 79 - 7);
+        terminal.WriteLine($" - {rows[0]}");
+        foreach (var row in rows.Skip(1))
+            terminal.WriteLine($"{new string(' ', 7)}{row}");
+    }
+
+    /// <summary>v1.2.5: words in rows: the first at most firstWidth wide, the others at most width.</summary>
+    internal static List<string> WrapWords(string text, int firstWidth, int width)
+    {
+        var rows = new List<string>();
+        string line = "";
+        int avail = Math.Max(10, firstWidth);
+        foreach (var word in (text ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
+        {
+            string next = line.Length == 0 ? word : line + " " + word;
+            if (line.Length > 0 && next.Length > avail)
+            {
+                rows.Add(line);
+                line = word;
+                avail = width;
+            }
+            else line = next;
+        }
+        rows.Add(line);
+        return rows;
+    }
+
+    /// <summary>v1.2.5: the one-letter sex tag of the citizen list in the player's language.</summary>
+    internal static string SexTag(CharacterSex sex) => Loc.Get(sex == CharacterSex.Male ? "main_street.sex_male" : "main_street.sex_female");
+
+    /// <summary>v1.2.5: an achievement category name in the player's language; null is All.</summary>
+    internal static string AchievementCategoryLabel(AchievementCategory? category) =>
+        Loc.Get("main_street.achieve_cat_" + (category?.ToString().ToLowerInvariant() ?? "all"));
+
+    /// <summary>
+    /// v1.2.5: a citizen list row: marker, name (18 or longer), sex, level, class (10 or longer) and the tail
+    /// (hit points, place or R.I.P.). A tail that would pass column 79 goes on the next row, indented.
+    /// </summary>
+    internal static List<string> CitizenRows(string marker, string name, string sex, int level, string className, string tail)
+    {
+        string head = $"  {marker} {name,-18} {sex} {Loc.Get("main_street.citizen_lv", level)} {className,-10}";
+        if (head.Length + 1 + tail.Length <= 79)
+            return new List<string> { $"{head} {tail}" };
+        return new List<string> { head.TrimEnd(), $"{new string(' ', 6)}{tail}" };
+    }
+
     /// <summary>
     /// Emit structured JSON events for the Electron graphical client
     /// </summary>
@@ -553,6 +614,8 @@ public partial class MainStreetLocation : BaseLocation
         if (!GameConfig.ElectronMode) return;
 
         // Location
+        // The client picks the Main Street scene by this English name (electron-client/src/game-ui.js sceneMap,
+        // _setLocation, _applyScene), so it is an id and stays English.
         ElectronBridge.EmitLocation("Main Street",
             Loc.Get("main_street.desc_standing", GetTownName()),
             GetTimeOfDay());
@@ -573,29 +636,29 @@ public partial class MainStreetLocation : BaseLocation
         int tier = currentPlayer.Level <= 2 ? 1 : currentPlayer.Level <= 4 ? 2 : 3;
         var menuItems = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "D", Label = "Dungeons", Category = "explore", Icon = "dungeon" },
+            new() { Key = "D", Label = Loc.Get("menu.action.dungeon"), Category = "explore", Icon = "dungeon" },
         };
         if (tier >= 2)
         {
-            menuItems.Add(new() { Key = "I", Label = "Inn", Category = "services", Icon = "inn" });
-            menuItems.Add(new() { Key = "W", Label = "Weapon Shop", Category = "services", Icon = "weapons" });
-            menuItems.Add(new() { Key = "A", Label = "Armor Shop", Category = "services", Icon = "armor" });
-            menuItems.Add(new() { Key = "M", Label = "Magic Shop", Category = "services", Icon = "magic" });
-            menuItems.Add(new() { Key = "B", Label = "Bank", Category = "services", Icon = "bank" });
-            menuItems.Add(new() { Key = "1", Label = "Healer", Category = "services", Icon = "healer" });
-            menuItems.Add(new() { Key = "T", Label = "Temple", Category = "services", Icon = "temple" });
+            menuItems.Add(new() { Key = "I", Label = Loc.Get("menu.action.inn"), Category = "services", Icon = "inn" });
+            menuItems.Add(new() { Key = "W", Label = Loc.Get("menu.action.weapon_shop"), Category = "services", Icon = "weapons" });
+            menuItems.Add(new() { Key = "A", Label = Loc.Get("menu.action.armor_shop"), Category = "services", Icon = "armor" });
+            menuItems.Add(new() { Key = "M", Label = Loc.Get("menu.action.magic_shop"), Category = "services", Icon = "magic" });
+            menuItems.Add(new() { Key = "B", Label = Loc.Get("menu.action.bank"), Category = "services", Icon = "bank" });
+            menuItems.Add(new() { Key = "1", Label = Loc.Get("menu.action.healer"), Category = "services", Icon = "healer" });
+            menuItems.Add(new() { Key = "T", Label = Loc.Get("menu.action.temple"), Category = "services", Icon = "temple" });
         }
         if (tier >= 3)
         {
-            menuItems.Add(new() { Key = "E", Label = "Wilderness", Category = "explore", Icon = "wilderness" });
-            menuItems.Add(new() { Key = ">", Label = "Outskirts", Category = "explore", Icon = "outskirts" });
-            menuItems.Add(new() { Key = "U", Label = "Music Shop", Category = "services", Icon = "music" });
-            menuItems.Add(new() { Key = "V", Label = "Level Master", Category = "progress", Icon = "training" });
-            menuItems.Add(new() { Key = "2", Label = "Quest Hall", Category = "progress", Icon = "quests" });
-            menuItems.Add(new() { Key = "H", Label = "Home", Category = "progress", Icon = "home" });
+            menuItems.Add(new() { Key = "E", Label = Loc.Get("location.name.Wilderness"), Category = "explore", Icon = "wilderness" });
+            menuItems.Add(new() { Key = ">", Label = Loc.Get("menu.action.settlement"), Category = "explore", Icon = "outskirts" });
+            menuItems.Add(new() { Key = "U", Label = Loc.Get("menu.action.music_shop"), Category = "services", Icon = "music" });
+            menuItems.Add(new() { Key = "V", Label = Loc.Get("menu.action.level_master"), Category = "progress", Icon = "training" });
+            menuItems.Add(new() { Key = "2", Label = Loc.Get("menu.action.quest_hall"), Category = "progress", Icon = "quests" });
+            menuItems.Add(new() { Key = "H", Label = Loc.Get("menu.action.home"), Category = "progress", Icon = "home" });
         }
-        menuItems.Add(new() { Key = "S", Label = "Status", Category = "info", Icon = "status" });
-        menuItems.Add(new() { Key = "Q", Label = "Quit Game", Category = "info", Icon = "quit" });
+        menuItems.Add(new() { Key = "S", Label = Loc.Get("menu.action.status"), Category = "info", Icon = "status" });
+        menuItems.Add(new() { Key = "Q", Label = Loc.Get("menu.action.quit_game"), Category = "info", Icon = "quit" });
         ElectronBridge.EmitMenu(menuItems);
 
         // NPCs present
@@ -616,7 +679,7 @@ public partial class MainStreetLocation : BaseLocation
 
     private string GetNPCActivity(NPC npc)
     {
-        return "going about their business";
+        return Loc.Get("main_street.npc_activity_default");
     }
 
     /// <summary>
@@ -740,7 +803,7 @@ public partial class MainStreetLocation : BaseLocation
             case "DEV":
             case "CHEATER":
             case "DEVMENU":
-                terminal.WriteLine("  The dev menu has been removed. Use the admin console.", "gray");
+                terminal.WriteLine(Loc.Get("main_street.dev_menu_removed"), "gray");
                 return false;
 
             default:
@@ -812,7 +875,7 @@ public partial class MainStreetLocation : BaseLocation
         string playerFameName = !string.IsNullOrEmpty(currentPlayer.NobleTitle)
             ? $"{currentPlayer.NobleTitle} {currentPlayer.DisplayName}"
             : currentPlayer.DisplayName;
-        allCharacters.Add((playerFameName, currentPlayer.Level, currentPlayer.Class.ToString(), currentPlayer.Experience, "Main Street", true, currentPlayer.IsAlive));
+        allCharacters.Add((playerFameName, currentPlayer.Level, GameConfig.GetLocalizedClassName(currentPlayer.Class), currentPlayer.Experience, Loc.Get("location.name.MainStreet"), true, currentPlayer.IsAlive));
 
         // Add other online players from the database
         if (UsurperRemake.Systems.OnlineStateManager.IsActive)
@@ -826,8 +889,8 @@ public partial class MainStreetLocation : BaseLocation
                     if (op.DisplayName.Equals(currentPlayer.DisplayName, StringComparison.OrdinalIgnoreCase))
                         continue;
 
-                    string className = ((CharacterClass)op.ClassId).ToString();
-                    string onlineTag = op.IsOnline ? "[ON]" : "";
+                    string className = GameConfig.GetLocalizedClassName(op.ClassId);
+                    string onlineTag = op.IsOnline ? Loc.Get("main_street.online_tag") : "";
                     // NobleTitle is the single source of truth for title display -- arena
                     // tiers, knighthood, and meta-progression titles all live here.
                     string fameDisplayName = !string.IsNullOrEmpty(op.NobleTitle)
@@ -845,7 +908,7 @@ public partial class MainStreetLocation : BaseLocation
             foreach (var npc in npcs)
             {
                 string location = string.IsNullOrEmpty(npc.CurrentLocation) ? "???" : npc.CurrentLocation;
-                allCharacters.Add((npc.Name, npc.Level, npc.Class.ToString(), npc.Experience, location, false, npc.IsAlive));
+                allCharacters.Add((npc.Name, npc.Level, GameConfig.GetLocalizedClassName(npc.Class), npc.Experience, location, false, npc.IsAlive));
             }
         }
 
@@ -928,9 +991,9 @@ public partial class MainStreetLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get("main_street.fame_page", currentPage + 1, totalPages));
             var options = new List<string>();
-            if (currentPage > 0) options.Add("[P]rev");
-            if (currentPage < totalPages - 1) options.Add("[N]ext");
-            options.Add("[R]eturn");
+            if (currentPage > 0) options.Add(Loc.Get("main_street.nav_prev"));
+            if (currentPage < totalPages - 1) options.Add(Loc.Get("main_street.nav_next"));
+            options.Add(Loc.Get("main_street.nav_return"));
             terminal.WriteLine($"  {string.Join("  ", options)}");
 
             string input = (await terminal.GetKeyInput()).ToUpperInvariant();
@@ -976,12 +1039,14 @@ public partial class MainStreetLocation : BaseLocation
             // Always show player first
             WriteSectionHeader(Loc.Get("main_street.section_players"), "bright_green");
             terminal.SetColor("yellow");
-            string playerSex = currentPlayer.Sex == CharacterSex.Male ? "M" : "F";
+            string playerSex = SexTag(currentPlayer.Sex);
             // NobleTitle drives title display in the citizen list.
             string citizenName = !string.IsNullOrEmpty(currentPlayer.NobleTitle)
                 ? $"{currentPlayer.NobleTitle} {currentPlayer.DisplayName}"
                 : currentPlayer.DisplayName;
-            terminal.WriteLine($"  * {citizenName,-18} {playerSex} Lv{currentPlayer.Level,3} {currentPlayer.Class,-10} HP:{currentPlayer.HP}/{currentPlayer.MaxHP} {Loc.Get("main_street.citizens_you_tag")}");
+            foreach (var row in CitizenRows("*", citizenName, playerSex, currentPlayer.Level, GameConfig.GetLocalizedClassName(currentPlayer.Class),
+                         $"{Loc.Get("main_street.citizen_hp", currentPlayer.HP, currentPlayer.MaxHP)} {Loc.Get("main_street.citizens_you_tag")}"))
+                terminal.WriteLine(row);
             terminal.WriteLine("");
 
             if (!viewingDead)
@@ -1004,10 +1069,10 @@ public partial class MainStreetLocation : BaseLocation
                                        npc.Level > currentPlayer.Level - 5 ? "white" : "gray";
 
                         terminal.SetColor(color);
-                        string classStr = npc.Class.ToString();
+                        string classStr = GameConfig.GetLocalizedClassName(npc.Class);
                         string locationStr = string.IsNullOrEmpty(npc.CurrentLocation) ? "???" : npc.CurrentLocation;
-                        string sex = npc.Sex == CharacterSex.Male ? "M" : "F";
-                        terminal.WriteLine($"  - {npc.Name,-18} {sex} Lv{npc.Level,3} {classStr,-10} @ {locationStr}");
+                        foreach (var row in CitizenRows("-", npc.Name, SexTag(npc.Sex), npc.Level, classStr, $"@ {locationStr}"))
+                            terminal.WriteLine(row);
                     }
                 }
                 else
@@ -1031,9 +1096,10 @@ public partial class MainStreetLocation : BaseLocation
                     {
                         var npc = deadNPCs[i];
                         terminal.SetColor("dark_gray");
-                        string sex = npc.Sex == CharacterSex.Male ? "M" : "F";
-                        string deathMarker = IsScreenReader ? "(dead)" : "†";
-                        terminal.WriteLine($"  {deathMarker} {npc.Name,-18} {sex} Lv{npc.Level,3} {npc.Class,-10} - {Loc.Get("main_street.rip")}");
+                        string deathMarker = IsScreenReader ? Loc.Get("main_street.citizen_dead") : "†";
+                        foreach (var row in CitizenRows(deathMarker, npc.Name, SexTag(npc.Sex), npc.Level, GameConfig.GetLocalizedClassName(npc.Class),
+                                     $"- {Loc.Get("main_street.rip")}"))
+                            terminal.WriteLine(row);
                     }
                 }
                 else
@@ -1055,11 +1121,11 @@ public partial class MainStreetLocation : BaseLocation
             terminal.SetColor("cyan");
             var options = new List<string>();
             int maxPages = viewingDead ? totalDeadPages : totalAlivePages;
-            if (currentPage > 0) options.Add("[P]rev");
-            if (currentPage < maxPages - 1) options.Add("[N]ext");
-            if (!viewingDead && deadNPCs.Count > 0) options.Add("[D]ead");
-            if (viewingDead) options.Add("[A]live");
-            options.Add("[R]eturn");
+            if (currentPage > 0) options.Add(Loc.Get("main_street.nav_prev"));
+            if (currentPage < maxPages - 1) options.Add(Loc.Get("main_street.nav_next"));
+            if (!viewingDead && deadNPCs.Count > 0) options.Add(Loc.Get("main_street.nav_dead"));
+            if (viewingDead) options.Add(Loc.Get("main_street.nav_alive"));
+            options.Add(Loc.Get("main_street.nav_return"));
 
             terminal.WriteLine($"  {string.Join("  ", options)}");
             terminal.WriteLine("");
@@ -1231,8 +1297,9 @@ public partial class MainStreetLocation : BaseLocation
 
         // Display achievements
         terminal.ClearScreen();
-        var categoryName = selectedCategory?.ToString() ?? "All";
-        WriteBoxHeader($"{categoryName.ToUpper()} ACHIEVEMENTS", "bright_yellow");
+        string categoryName = AchievementCategoryLabel(selectedCategory);
+        string achievementsHeader = Loc.Get("main_street.achieve_header", categoryName).ToUpper();
+        WriteBoxHeader(achievementsHeader, "bright_yellow");
         terminal.WriteLine("");
 
         var achievementsToShow = selectedCategory.HasValue
@@ -1245,8 +1312,9 @@ public partial class MainStreetLocation : BaseLocation
             bool isUnlocked = achievements.IsUnlocked(achievement.Id);
 
             // Show tier symbol and name
+            string tierSymbol = achievement.GetTierSymbol();
             terminal.SetColor(achievement.GetTierColor());
-            terminal.Write($" {achievement.GetTierSymbol()} ");
+            terminal.Write($" {tierSymbol} ");
 
             if (isUnlocked)
             {
@@ -1255,14 +1323,14 @@ public partial class MainStreetLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.Write(achievement.Name);
                 terminal.SetColor("gray");
-                terminal.WriteLine($" - {achievement.Description}");
+                WriteAchievementTail(2 + tierSymbol.Length + 2 + achievement.Name.Length, achievement.Description);
 
                 // Show unlock date
                 var unlockDate = achievements.GetUnlockDate(achievement.Id);
                 if (unlockDate.HasValue)
                 {
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"     Unlocked: {GameConfig.FormatDate(unlockDate.Value, currentPlayer.DateFormatPreference)}   +{achievement.PointValue} pts");
+                    terminal.WriteLine(Loc.Get("main_street.achieve_unlocked_date", GameConfig.FormatDate(unlockDate.Value, currentPlayer.DateFormatPreference), achievement.PointValue));
                 }
             }
             else
@@ -1275,14 +1343,14 @@ public partial class MainStreetLocation : BaseLocation
                     terminal.SetColor("gray");
                     terminal.Write("???");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($" - {achievement.SecretHint}");
+                    WriteAchievementTail(2 + tierSymbol.Length + 4 + 3, achievement.SecretHint);
                 }
                 else
                 {
                     terminal.SetColor("gray");
                     terminal.Write(achievement.Name);
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($" - {achievement.Description}");
+                    WriteAchievementTail(2 + tierSymbol.Length + 4 + achievement.Name.Length, achievement.Description);
                 }
             }
 
@@ -1297,7 +1365,7 @@ public partial class MainStreetLocation : BaseLocation
                 var key = await terminal.GetKeyInput();
                 if (key?.ToUpper() == "Q") return;
                 terminal.ClearScreen();
-                WriteBoxHeader($"{categoryName.ToUpper()} ACHIEVEMENTS", "bright_yellow");
+                WriteBoxHeader(achievementsHeader, "bright_yellow");
                 terminal.WriteLine("");
             }
         }
@@ -1971,7 +2039,7 @@ public partial class MainStreetLocation : BaseLocation
 
         foreach (var (godType, godName, floor) in allGods)
         {
-            string site = godType == OldGodType.Aurelion ? Loc.Get("temple.room.deep") : $"Fl.{floor}";
+            string site = godType == OldGodType.Aurelion ? Loc.Get("temple.room.deep") : Loc.Get("main_street.god_floor", floor);
             if (story.OldGodStates.TryGetValue(godType, out var godState) &&
                 godState.HasBeenEncountered)
             {

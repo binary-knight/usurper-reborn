@@ -1,7 +1,7 @@
 ---
 title: The Old Church
 path: /wiki/en/world/church/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Locations/ChurchLocation.cs, Scripts/Systems/GodDeedSystem.cs
 ---
 The Church is distinct from the Temple. Its menu includes donations, purchased blessings, healing services, marriage, confession, records and speaking with the Bishop. Entry and services have their own conditions.

@@ -705,8 +705,7 @@ public partial class TempleLocation : BaseLocation
                     terminal.WriteLine(Loc.Get("temple.multiple_matches"), "yellow");
                     foreach (var match in matches)
                     {
-                        string alignment = match.Goodness > match.Darkness ? "(Light)" : match.Darkness > match.Goodness ? "(Dark)" : "(Neutral)";
-                        terminal.WriteLine($"  - {match.Name} {alignment}", "white");
+                        terminal.WriteLine($"  - {match.Name} ({GodAlignmentLabel(match)})", "white");
                     }
                     terminal.WriteLine(Loc.Get("temple.be_more_specific"), "gray");
                     continue;
@@ -714,10 +713,9 @@ public partial class TempleLocation : BaseLocation
             }
 
             // Show selected god and ask for confirmation
-            string godAlignment = selectedGod.Goodness > selectedGod.Darkness ? "Light" :
-                                  selectedGod.Darkness > selectedGod.Goodness ? "Dark" : "Neutral";
-            string alignColor = godAlignment == "Light" ? "bright_cyan" :
-                               godAlignment == "Dark" ? "dark_red" : "yellow";
+            int godSide = Math.Sign(selectedGod.Goodness - selectedGod.Darkness);
+            string godAlignment = GodAlignmentLabel(selectedGod);
+            string alignColor = godSide > 0 ? "bright_cyan" : godSide < 0 ? "dark_red" : "yellow";
 
             terminal.WriteLine("");
             terminal.SetColor(alignColor);
@@ -1349,7 +1347,7 @@ public partial class TempleLocation : BaseLocation
         story.SetStoryFlag("had_divine_vision", true);
 
         // Generate news
-        NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} received a vision from the gods at the Temple.");
+        NewsSystem.Instance.Newsy(false, Loc.Get("temple.news_vision", currentPlayer.Name2));
     }
 
     /// <summary>
@@ -1424,13 +1422,13 @@ public partial class TempleLocation : BaseLocation
                 switch (result.Outcome)
                 {
                     case BossOutcome.Defeated:
-                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} destroyed Aurelion, the Fading Light! Truth dies in darkness.");
+                        NewsSystem.Instance.Newsy(true, Loc.Get("temple.news_aurelion_destroyed", currentPlayer.Name2));
                         break;
                     case BossOutcome.Saved:
-                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} saved Aurelion, the Fading Light! Truth lives on within them.");
+                        NewsSystem.Instance.Newsy(true, Loc.Get("temple.news_aurelion_saved", currentPlayer.Name2));
                         break;
                     case BossOutcome.Allied:
-                        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has allied with Aurelion, the Fading Light!");
+                        NewsSystem.Instance.Newsy(true, Loc.Get("temple.news_aurelion_allied", currentPlayer.Name2));
                         break;
                     case BossOutcome.NotFought:
                         break; // v1.1.15: not entered for a Mental collapse, no news
@@ -1607,9 +1605,8 @@ public partial class TempleLocation : BaseLocation
         ApplyFactionEffectForSacrifice(godName, (int)Math.Max(1, powerGained / 10));
 
         // Generate news
-        NewsSystem.Instance.Newsy(false, weapon
-            ? $"{currentPlayer.Name2} sacrificed their weapon to {godName} at the Temple."
-            : $"{currentPlayer.Name2} sacrificed their armor to {godName} at the Temple.");
+        NewsSystem.Instance.Newsy(false, Loc.Get(weapon ? "temple.news_sacrificed_weapon" : "temple.news_sacrificed_armor",
+            currentPlayer.Name2, godName));
 
         await Pacing.Wait(2500);
     }
@@ -1767,16 +1764,16 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("temple.divine_fury"), "bright_red");
 
                 // Lose a random base stat point
-                string[] stats = { "Strength", "Dexterity", "Constitution", "Intelligence", "Wisdom", "Charisma" };
-                string lostStat = stats[random.Next(stats.Length)];
-                switch (lostStat)
+                // v1.2.5: the stat is picked by its index; its name is shown in the player's language
+                string lostStat;
+                switch (random.Next(6))
                 {
-                    case "Strength": currentPlayer.BaseStrength = Math.Max(1, currentPlayer.BaseStrength - 1); break;
-                    case "Dexterity": currentPlayer.BaseDexterity = Math.Max(1, currentPlayer.BaseDexterity - 1); break;
-                    case "Constitution": currentPlayer.BaseConstitution = Math.Max(1, currentPlayer.BaseConstitution - 1); break;
-                    case "Intelligence": currentPlayer.BaseIntelligence = Math.Max(1, currentPlayer.BaseIntelligence - 1); break;
-                    case "Wisdom": currentPlayer.BaseWisdom = Math.Max(1, currentPlayer.BaseWisdom - 1); break;
-                    case "Charisma": currentPlayer.BaseCharisma = Math.Max(1, currentPlayer.BaseCharisma - 1); break;
+                    case 0: currentPlayer.BaseStrength = Math.Max(1, currentPlayer.BaseStrength - 1); lostStat = Loc.Get("ui.stat_strength"); break;
+                    case 1: currentPlayer.BaseDexterity = Math.Max(1, currentPlayer.BaseDexterity - 1); lostStat = Loc.Get("ui.stat_dexterity"); break;
+                    case 2: currentPlayer.BaseConstitution = Math.Max(1, currentPlayer.BaseConstitution - 1); lostStat = Loc.Get("ui.stat_constitution"); break;
+                    case 3: currentPlayer.BaseIntelligence = Math.Max(1, currentPlayer.BaseIntelligence - 1); lostStat = Loc.Get("ui.stat_intelligence"); break;
+                    case 4: currentPlayer.BaseWisdom = Math.Max(1, currentPlayer.BaseWisdom - 1); lostStat = Loc.Get("ui.stat_wisdom"); break;
+                    default: currentPlayer.BaseCharisma = Math.Max(1, currentPlayer.BaseCharisma - 1); lostStat = Loc.Get("ui.stat_charisma"); break;
                 }
                 currentPlayer.RecalculateStats();
                 terminal.WriteLine(Loc.Get("temple.stat_diminish", lostStat, lostStat), "red");
@@ -1787,7 +1784,7 @@ public partial class TempleLocation : BaseLocation
         }
 
         // Generate news
-        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} desecrated the altar of {god.Name}! The gods are furious!");
+        NewsSystem.Instance.Newsy(true, Loc.Get("temple.news_desecrated", currentPlayer.Name2, god.Name));
 
         await Pacing.Wait(3000);
     }
@@ -1886,7 +1883,7 @@ public partial class TempleLocation : BaseLocation
         await sealSystem.CollectSeal(currentPlayer, UsurperRemake.Systems.SealType.Creation, terminal);
 
         // Generate news
-        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} discovered the Seal of Creation in the Temple!");
+        NewsSystem.Instance.Newsy(true, Loc.Get("temple.news_seal_creation", currentPlayer.Name2));
 
         refreshMenu = true;
     }
@@ -2018,8 +2015,8 @@ public partial class TempleLocation : BaseLocation
                     var p = kvp.Value.Context?.Engine?.CurrentPlayer;
                     if (p != null && p.DivineName == worshippedImmortal)
                     {
-                        kvp.Value.EnqueueMessage(
-                            $"\u001b[1;33m  ✦ {currentPlayer.Name2} prayed to you! +10 divine experience. ✦\u001b[0m");
+                        // v1.2.5: in the god's session language
+                        kvp.Value.EnqueueMessage(PrayedToYouMessage(kvp.Value.Context?.Language ?? "en", currentPlayer.Name2, 10));
                         break;
                     }
                 }
@@ -2312,7 +2309,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.companion_death_warning"));
 
             // Generate news
-            NewsSystem.Instance.Newsy(false, $"{currentPlayer.Name2} found {mira.Name} praying at an empty altar in the Temple.");
+            NewsSystem.Instance.Newsy(false, Loc.Get("temple.news_found_mira", currentPlayer.Name2, mira.Name));
         }
     }
 
@@ -2552,7 +2549,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine("");
 
         // Generate news
-        NewsSystem.Instance.Newsy(true, $"{currentPlayer.Name2} has joined The Faith and sworn the Sacred Oath!");
+        NewsSystem.Instance.Newsy(true, Loc.Get("temple.news_joined_faith", currentPlayer.Name2));
 
         // Log to debug
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("FACTION", $"{currentPlayer.Name2} joined The Faith");
@@ -2642,16 +2639,16 @@ public partial class TempleLocation : BaseLocation
         StatKind sanctumStat;
         switch (rng.Next(9))
         {
-            case 0: sanctumStat = StatKind.Strength; statName = "Strength"; break;
-            case 1: sanctumStat = StatKind.Defence; statName = "Defence"; break;
-            case 2: sanctumStat = StatKind.Stamina; statName = "Stamina"; break;
-            case 3: sanctumStat = StatKind.Agility; statName = "Agility"; break;
-            case 4: sanctumStat = StatKind.Charisma; statName = "Charisma"; break;
-            case 5: sanctumStat = StatKind.Dexterity; statName = "Dexterity"; break;
-            case 6: sanctumStat = StatKind.Wisdom; statName = "Wisdom"; break;
-            case 7: sanctumStat = StatKind.Intelligence; statName = "Intelligence"; break;
-            case 8: sanctumStat = StatKind.Constitution; statName = "Constitution"; break;
-            default: sanctumStat = StatKind.Strength; statName = "Strength"; break;
+            case 0: sanctumStat = StatKind.Strength; statName = Loc.Get("ui.stat_strength"); break;
+            case 1: sanctumStat = StatKind.Defence; statName = Loc.Get("combat.status_defence_label"); break;
+            case 2: sanctumStat = StatKind.Stamina; statName = Loc.Get("ui.stat_stamina"); break;
+            case 3: sanctumStat = StatKind.Agility; statName = Loc.Get("ui.stat_agility"); break;
+            case 4: sanctumStat = StatKind.Charisma; statName = Loc.Get("ui.stat_charisma"); break;
+            case 5: sanctumStat = StatKind.Dexterity; statName = Loc.Get("ui.stat_dexterity"); break;
+            case 6: sanctumStat = StatKind.Wisdom; statName = Loc.Get("ui.stat_wisdom"); break;
+            case 7: sanctumStat = StatKind.Intelligence; statName = Loc.Get("ui.stat_intelligence"); break;
+            case 8: sanctumStat = StatKind.Constitution; statName = Loc.Get("ui.stat_constitution"); break;
+            default: sanctumStat = StatKind.Strength; statName = Loc.Get("ui.stat_strength"); break;
         }
         currentPlayer.GrantPermanentStat(sanctumStat, 1);
 
@@ -2844,8 +2841,9 @@ public partial class TempleLocation : BaseLocation
         // Notify the god if online
         if (DoorMode.IsOnlineMode && chosen.IsOnline && UsurperRemake.Server.MudServer.Instance != null)
         {
-            UsurperRemake.Server.MudServer.Instance.SendToPlayer(chosen.Username,
-                $"\u001b[1;33m  ✦ A mortal named {currentPlayer.Name2} now worships you! ✦\u001b[0m");
+            // v1.2.5: in the god's session language
+            string mortal = currentPlayer.Name2;
+            UsurperRemake.Server.MudServer.Instance.SendToPlayerLocalized(chosen.Username, lang => NewWorshipperMessage(lang, mortal));
         }
 
         terminal.WriteLine("");
@@ -2895,8 +2893,8 @@ public partial class TempleLocation : BaseLocation
                 if (godPlayer != null && godPlayer.IsImmortal && godPlayer.DivineName == currentPlayer.WorshippedGod)
                 {
                     godPlayer.GodExperience += power;
-                    kvp.Value.EnqueueMessage(
-                        $"\u001b[1;33m  ✦ {currentPlayer.Name2} sacrificed {amount:N0} gold at your altar! +{power} divine experience. ✦\u001b[0m");
+                    // v1.2.5: in the god's session language
+                    kvp.Value.EnqueueMessage(GoldSacrificedMessage(kvp.Value.Context?.Language ?? "en", currentPlayer.Name2, amount, power));
                     delivered = true;
                     break;
                 }
@@ -3547,6 +3545,27 @@ public partial class TempleLocation : BaseLocation
     /// Phase 4: emit Temple menu state for the Electron client. Top-level
     /// menu only. Pattern B.
     /// </summary>
+    /// <summary>
+    /// v1.2.5: a god's side (Light, Dark or Neutral, from its Goodness and Darkness) in the player's language.
+    /// Display only; nothing stores or compares it.
+    /// </summary>
+    internal static string GodAlignmentLabel(God god) =>
+        god.Goodness > god.Darkness ? Loc.Get("temple.align.light")
+        : god.Darkness > god.Goodness ? Loc.Get("temple.align.dark")
+        : Loc.Get("ui.neutral");
+
+    /// <summary>v1.2.5: to a player god's session, in that session's language: a mortal prayed.</summary>
+    internal static string PrayedToYouMessage(string lang, string mortal, int exp) =>
+        $"\u001b[1;33m  \u2726 {Loc.GetIn(lang, "temple.msg_prayed_to_you", mortal, exp)} \u2726\u001b[0m";
+
+    /// <summary>v1.2.5: to a player god's session, in that session's language: a new worshipper.</summary>
+    internal static string NewWorshipperMessage(string lang, string mortal) =>
+        $"\u001b[1;33m  \u2726 {Loc.GetIn(lang, "temple.msg_new_worshipper", mortal)} \u2726\u001b[0m";
+
+    /// <summary>v1.2.5: to a player god's session, in that session's language: gold sacrificed at the altar.</summary>
+    internal static string GoldSacrificedMessage(string lang, string mortal, long amount, long power) =>
+        $"\u001b[1;33m  \u2726 {Loc.GetIn(lang, "temple.msg_gold_sacrificed", mortal, $"{amount:N0}", power)} \u2726\u001b[0m";
+
     private void EmitElectronEvents()
     {
         var player = GetCurrentPlayer();
@@ -3568,14 +3587,14 @@ public partial class TempleLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = GameConfig.TempleMenuWorship, Label = "Worship", Category = "faith", Icon = "worship" },
-            new() { Key = GameConfig.TempleMenuAltars, Label = "Altars", Category = "info", Icon = "altar" },
-            new() { Key = GameConfig.TempleMenuContribute, Label = "Contribute", Category = "faith", Icon = "donate" },
-            new() { Key = GameConfig.TempleMenuDesecrate, Label = "Desecrate", Category = "evil", Icon = "desecrate" },
-            new() { Key = "F", Label = "The Faith", Category = "info", Icon = "scripture" },
-            new() { Key = "O", Label = "Confess", Category = "faith", Icon = "confess" },
-            new() { Key = "M", Label = "Mira (Bishop)", Category = "social", Icon = "bishop" },
-            new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
+            new() { Key = GameConfig.TempleMenuWorship, Label = Loc.Get("temple.electron_worship"), Category = "faith", Icon = "worship" },
+            new() { Key = GameConfig.TempleMenuAltars, Label = Loc.Get("temple.electron_altars"), Category = "info", Icon = "altar" },
+            new() { Key = GameConfig.TempleMenuContribute, Label = Loc.Get("temple.electron_contribute"), Category = "faith", Icon = "donate" },
+            new() { Key = GameConfig.TempleMenuDesecrate, Label = Loc.Get("temple.electron_desecrate"), Category = "evil", Icon = "desecrate" },
+            new() { Key = "F", Label = Loc.Get("temple.room.faith"), Category = "info", Icon = "scripture" },
+            new() { Key = "O", Label = Loc.Get("church.bbs_confess"), Category = "faith", Icon = "confess" },
+            new() { Key = "M", Label = Loc.Get("temple.electron_mira"), Category = "social", Icon = "bishop" },
+            new() { Key = "S", Label = Loc.Get("menu.action.status"), Category = "info", Icon = "info" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

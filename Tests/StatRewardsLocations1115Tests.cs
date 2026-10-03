@@ -193,8 +193,12 @@ public class StatRewardsLocations1115Tests
     public void TheSanctum_MapsEveryRoll_ToAGrant()
     {
         string body = Body(File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Locations/TempleLocation.cs")), "private async Task VisitInnerSanctum(");
+        // 1.2.5: the stat's name is shown in the player's language (Defence through combat.status_defence_label)
         foreach (var s in new[] { "Strength", "Defence", "Stamina", "Agility", "Charisma", "Dexterity", "Wisdom", "Intelligence", "Constitution" })
-            body.Should().Contain($"sanctumStat = StatKind.{s}; statName = \"{s}\";");
+        {
+            string key = s == "Defence" ? "combat.status_defence_label" : $"ui.stat_{s.ToLowerInvariant()}";
+            body.Should().Contain($"sanctumStat = StatKind.{s}; statName = Loc.Get(\"{key}\");");
+        }
         body.Should().Contain("currentPlayer.GrantPermanentStat(sanctumStat, 1);");
     }
 

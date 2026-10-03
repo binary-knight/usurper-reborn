@@ -16,6 +16,11 @@ namespace UsurperRemake.Locations;
 /// </summary>
 public class DormitoryLocation : BaseLocation
 {
+    /// <summary>v1.2.5: the mail a sleeper murdered in the Dormitory gets, in the given language; the item name is the stored name.</summary>
+    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName) => itemName != null
+        ? Loc.GetIn(lang, "dormitory.mail_sleep_murder_item", murderer, $"{gold:N0}", itemName)
+        : Loc.GetIn(lang, "dormitory.mail_sleep_murder", murderer, $"{gold:N0}");
+
     private List<NPC> sleepers = new();
     private readonly Random rng = new();
 
@@ -653,7 +658,7 @@ public class DormitoryLocation : BaseLocation
             WorldSimulator.WakeUpNPC(npcName);
 
             // Post news
-            try { OnlineStateManager.Instance?.AddNews($"{currentPlayer.Name2} murdered {npcName} in their sleep at the Dormitory!", "combat"); } catch { }
+            try { OnlineStateManager.Instance?.AddNews(Loc.Get("dormitory.news_murdered_sleep", currentPlayer.Name2, npcName), "combat"); } catch { }
 
             await Pacing.Wait(2000);
         }
@@ -757,8 +762,10 @@ public class DormitoryLocation : BaseLocation
             await backend.AppendSleepAttackLog(target.Username, logEntry);
 
             // Send message to victim
-            await backend.SendMessageToKey(currentPlayer.Name2, target.Username, "sleep_attack",
-                $"{currentPlayer.Name2} murdered you in your sleep! They stole {stolenGold:N0} gold{(stolenItemName != null ? $" and your {stolenItemName}" : "")}.");
+            // v1.2.5: in the victim's account language. The item name is the stored (English) item name.
+            string murderer = currentPlayer.Name2;
+            await backend.SendMessageToKeyLocalized(murderer, target.Username, "sleep_attack",
+                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName));
 
             terminal.SetColor("dark_red");
             terminal.WriteLine($"\n{Loc.Get("dormitory.leave_lifeless", target.Username)}");
