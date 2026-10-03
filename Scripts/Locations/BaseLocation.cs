@@ -2209,7 +2209,8 @@ public abstract class BaseLocation
         {
             var moodText = npc.GetMoodPrefix(currentPlayer);
             terminal.SetColor("gray");
-            terminal.WriteLine(moodText);
+            foreach (var row in NPCDialogueGenerator.NarrationRows(moodText))
+                terminal.WriteLine(row);
         }
         else
         {
@@ -5631,7 +5632,8 @@ public abstract class BaseLocation
                     terminal.SetColor("yellow");
                     terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
                     terminal.SetColor("white");
-                    terminal.WriteLine($"  \"{greeting}\"");
+                    foreach (var row in NPCDialogueGenerator.QuotedRows(greeting))
+                        terminal.WriteLine(row);
                     terminal.WriteLine("");
                     isFirstGreeting = false;
                 }
@@ -5798,7 +5800,8 @@ public abstract class BaseLocation
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
                         terminal.SetColor("white");
-                        terminal.WriteLine($"  \"{farewell}\"");
+                        foreach (var row in NPCDialogueGenerator.QuotedRows(farewell))
+                            terminal.WriteLine(row);
                         terminal.WriteLine("");
                         terminal.SetColor("gray");
                         terminal.WriteLine($"  {Loc.Get("base.nod_walk_away")}");
@@ -5898,7 +5901,8 @@ public abstract class BaseLocation
             terminal.SetColor("yellow");
             terminal.WriteLine($"  {Loc.Get("base.npc_says", npc.Name2)}");
             terminal.SetColor("white");
-            terminal.WriteLine($"  \"{smallTalk}\"");
+            foreach (var row in NPCDialogueGenerator.QuotedRows(smallTalk))
+                terminal.WriteLine(row);
             await Pacing.Wait(800);
 
             // Sometimes add a second line of dialogue for variety
@@ -5908,7 +5912,8 @@ public abstract class BaseLocation
                 string moreTalk = npc.GetSmallTalk(player);
                 if (moreTalk != smallTalk) // Avoid repetition
                 {
-                    terminal.WriteLine($"  \"{moreTalk}\"");
+                    foreach (var row in NPCDialogueGenerator.QuotedRows(moreTalk))
+                        terminal.WriteLine(row);
                     await Pacing.Wait(600);
                 }
             }

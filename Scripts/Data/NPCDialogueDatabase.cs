@@ -126,14 +126,14 @@ namespace UsurperRemake.Data
         public static string? GetBestLine(string category, NPC npc, Player player, string? eventType = null)
         {
             var chosen = PickLine(category, npc, player, eventType);
-            return chosen == null ? null : SubstitutePlaceholders(chosen.Text, npc, player);
+            return chosen == null ? null : RenderLine(chosen, npc, player);
         }
 
         /// <summary>
         /// v1.2.4: GetBestLine's pick, the line itself, so it can be rendered in more than one language.
         /// Marks the line used. Null when nothing fits.
         /// </summary>
-        public static DialogueLine? PickLine(string category, NPC npc, Player player, string? eventType = null)
+        public static DialogueLine? PickLine(string category, NPC npc, Player player, string? eventType = null, Random? rng = null)
         {
             Initialize();
             if (_allLines == null || _allLines.Count == 0) return null;
@@ -169,7 +169,7 @@ namespace UsurperRemake.Data
             int topScore = scored[0].score;
             var topCandidates = scored.Where(s => s.score >= topScore - 2).ToList();
 
-            var random = Random.Shared;
+            var random = rng ?? NPCDialogueGenerator.Rng;
             var chosen = topCandidates[random.Next(topCandidates.Count)].line;
 
             // Mark as recently used
@@ -185,10 +185,60 @@ namespace UsurperRemake.Data
         public static string RenderLine(DialogueLine line, NPC npc, Player player)
         {
             string key = "npc_dialogue." + line.Id;
-            if (UsurperRemake.Systems.Loc.GetIn("en", key) == line.Text.Replace("{player_name}", "{0}"))
-                return UsurperRemake.Systems.Loc.Get(key, player?.Name2 ?? player?.Name1 ?? "stranger");
+            if (UsurperRemake.Systems.Loc.GetIn("en", key) == ToTemplate(line.Text))
+            {
+                string tod = TimeOfDay();
+                return UsurperRemake.Systems.Loc.Get(key,
+                    player?.Name2 ?? player?.Name1 ?? "stranger",
+                    npc?.Name2 ?? npc?.Name1 ?? "someone",
+                    UsurperRemake.Systems.Loc.Get(player != null && player.King ? "npc_dialogue.ph.majesty" : "npc_dialogue.ph.adventurer"),
+                    UsurperRemake.Systems.Loc.Get("npc_dialogue.tod." + tod),
+                    player?.ClassName ?? UsurperRemake.Systems.Loc.Get("npc_dialogue.ph.adventurer"),
+                    UsurperRemake.Systems.Loc.Get("npc_dialogue.tod_salute." + tod),
+                    UsurperRemake.Systems.Loc.Get("npc_dialogue.tod_all." + tod));
+            }
             return SubstitutePlaceholders(line.Text, npc, player);
         }
+
+        /// <summary>
+        /// v1.2.5: the named placeholders of a line's English text and the argument each becomes in its
+        /// npc_dialogue key. A key may also use {5} (a "good morning" salutation) and {6} ("all morning"),
+        /// so a language can say the time of day without gluing a word to its own.
+        /// </summary>
+        private static readonly string[] Placeholders =
+            { "{player_name}", "{npc_name}", "{player_title}", "{time_of_day}", "{player_class}" };
+
+        /// <summary>v1.2.5: a line's English text with its named placeholders as key arguments.</summary>
+        internal static string ToTemplate(string text)
+        {
+            for (int i = 0; i < Placeholders.Length; i++)
+                text = text.Replace(Placeholders[i], "{" + i + "}");
+            return text;
+        }
+
+        /// <summary>
+        /// v1.2.5: a built-in line's English text, from its npc_dialogue key with the named placeholders put
+        /// back. The tables keep their text this way, so the modder export and editor see the same text.
+        /// </summary>
+        internal static string BuiltInText(string id)
+        {
+            string text = UsurperRemake.Systems.Loc.GetIn("en", "npc_dialogue." + id);
+            for (int i = 0; i < Placeholders.Length; i++)
+                text = text.Replace("{" + i + "}", Placeholders[i]);
+            return text;
+        }
+
+        /// <summary>v1.2.5: the hour of day the lines read; tests fix it.</summary>
+        internal static Func<int> Hour = () => DateTime.Now.Hour;
+
+        /// <summary>v1.2.5: night, morning, afternoon or evening, as an id.</summary>
+        internal static string TimeOfDay() => Hour() switch
+        {
+            < 6 => "night",
+            < 12 => "morning",
+            < 18 => "afternoon",
+            _ => "evening"
+        };
 
         /// <summary>
         /// Score a dialogue line based on how well it matches the current context.
@@ -294,15 +344,7 @@ namespace UsurperRemake.Data
                 result = result.Replace("{player_title}", "adventurer");
 
             // Time of day
-            var hour = DateTime.Now.Hour;
-            string timeOfDay = hour switch
-            {
-                < 6 => "night",
-                < 12 => "morning",
-                < 18 => "afternoon",
-                _ => "evening"
-            };
-            result = result.Replace("{time_of_day}", timeOfDay);
+            result = result.Replace("{time_of_day}", TimeOfDay());
 
             return result;
         }
