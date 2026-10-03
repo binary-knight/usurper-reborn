@@ -606,4 +606,40 @@ public class RestEngine125Tests : IDisposable
         }
         s.Text.Should().NotContain(L("hu", "news.new_day"), "the New Day marker is still skipped");
     }
+
+    // ---------- the save list row (leftover from the online systems piece) ----------
+
+    private static List<string> SaveRowText(string lang, int number, bool emergency, string saveType)
+    {
+        var pieces = InLang(lang, () => GameEngine.SaveListRow(number, LongName,
+            emergency ? Loc.Get("engine.save_tag_emergency") : $" ({GameConfig.GetLocalizedClassNameFromString("MysticShaman")})",
+            emergency ? "bright_red" : "cyan", Loc.Get("engine.save_slot_level", 100), GameEngine.SaveTypeLabel(saveType),
+            false, "2026-10-03 23:59:59"));
+        return string.Concat(pieces.Select(p => p.Text)).Split('\n').ToList();
+    }
+
+    [Fact]
+    public void SaveListRow_FitsWithALongName_InEnglishAndHungarian()
+    {
+        foreach (var lang in AllLanguages)
+            foreach (var emergency in new[] { false, true })
+                foreach (var type in new[] { "Manual Save", "Recovery", "Online Save" })
+                    foreach (var n in new[] { 1, 10 })
+                    {
+                        var rows = SaveRowText(lang, n, emergency, type == "Online Save" ? Loc.GetIn(lang, "save.type_online") : type);
+                        EveryRowFits(rows, $"save list ({lang})");
+                        string.Join(" ", rows).Should().Contain(LongName).And.Contain("2026-10-03 23:59:59");
+                    }
+        // The English row with the long name: the type and time continue under the name.
+        var en = SaveRowText("en", 1, false, "Manual Save");
+        en.Should().Equal($"[1] {LongName} (Mystic Shaman) - Level 100", "    Manual Save | 2026-10-03 23:59:59");
+        // A short name keeps the one row it always had.
+        var shortRow = InLang("en", () => GameEngine.SaveListRow(2, "Grim", " (Warrior)", "cyan", Loc.Get("engine.save_slot_level", 7),
+            GameEngine.SaveTypeLabel("Autosave"), true, "2026-10-03 23:59:59"));
+        string.Concat(shortRow.Select(p => p.Text)).Should().Be("[2] Grim (Warrior) - Level 7 | Autosave | 2026-10-03 23:59:59");
+        foreach (var lang in new[] { "en", "hu" })
+            InLang(lang, () => GameEngine.WrapRows(Loc.Get("engine.save_slot_sr_display", 10, LongName, "Mystic Shaman", 100,
+                Loc.Get("save.type_online"), "2026-10-03 23:59:59") + Loc.Get("engine.save_tag_emergency")))
+                .Should().OnlyContain(r => r.Length <= MaxWidth, $"[{lang}] the screen reader row wraps");
+    }
 }

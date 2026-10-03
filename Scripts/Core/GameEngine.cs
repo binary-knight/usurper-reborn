@@ -2322,40 +2322,23 @@ public partial class GameEngine
 
                     if (GameConfig.ScreenReaderMode)
                     {
-                        terminal.SetColor("white");
                         string saveTimeStr = mostRecentSave.SaveTime.Year >= 2020 ? mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss") : "";
-                        terminal.WriteLine(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, localizedClass, mostRecentSave.Level, SaveTypeLabel(mostRecentSave.SaveType), saveTimeStr) + statusTag);
+                        WriteRows(Loc.Get("engine.save_slot_sr_display", i + 1, mostRecentSave.PlayerName, localizedClass, mostRecentSave.Level, SaveTypeLabel(mostRecentSave.SaveType), saveTimeStr) + statusTag, "white");
                     }
                     else
                     {
-                        terminal.SetColor("darkgray");
-                        terminal.Write($"[");
-                        terminal.SetColor("bright_cyan");
-                        terminal.Write($"{i + 1}");
-                        terminal.SetColor("darkgray");
-                        terminal.Write("] ");
-                        terminal.SetColor("white");
-                        terminal.Write($"{mostRecentSave.PlayerName}");
-                        if (!string.IsNullOrEmpty(statusTag))
+                        foreach (var (text, color) in SaveListRow(i + 1, mostRecentSave.PlayerName,
+                            string.IsNullOrEmpty(statusTag) ? $" ({localizedClass})" : statusTag,
+                            string.IsNullOrEmpty(statusTag) ? "cyan" : statusColor,
+                            Loc.Get("engine.save_slot_level", mostRecentSave.Level),
+                            SaveTypeLabel(mostRecentSave.SaveType), mostRecentSave.IsAutosave,
+                            mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss")))
                         {
-                            terminal.SetColor(statusColor);
-                            terminal.Write(statusTag);
+                            if (text == "\n") { terminal.WriteLine(""); continue; }
+                            terminal.SetColor(color);
+                            terminal.Write(text);
                         }
-                        else
-                        {
-                            terminal.SetColor("cyan");
-                            terminal.Write($" ({localizedClass})");
-                        }
-                        terminal.SetColor("gray");
-                        terminal.Write(Loc.Get("engine.save_slot_level", mostRecentSave.Level));
-                        terminal.SetColor("darkgray");
-                        terminal.Write(" | ");
-                        terminal.SetColor(mostRecentSave.IsAutosave ? "yellow" : "green");
-                        terminal.Write(SaveTypeLabel(mostRecentSave.SaveType));
-                        terminal.SetColor("darkgray");
-                        terminal.Write(" | ");
-                        terminal.SetColor("gray");
-                        terminal.WriteLine(mostRecentSave.SaveTime.ToString("yyyy-MM-dd HH:mm:ss"));
+                        terminal.WriteLine("");
                     }
                 }
             }
@@ -8611,6 +8594,33 @@ public partial class GameEngine
         "Recovery" => Loc.Get("engine.save_type_recovery"),
         _ => saveType ?? ""
     };
+
+    /// <summary>
+    /// v1.2.5: one save of the save list as coloured pieces ("\n" ends a row): "[n] name (class) - Level x |
+    /// type | time" on one row when it fits in 79 columns, else the type and time on a second row under the
+    /// name. A 30 character name with a long class name made the one row about 98 columns wide.
+    /// </summary>
+    internal static List<(string Text, string Color)> SaveListRow(int number, string name, string tagOrClass, string tagColor,
+        string level, string saveType, bool autosave, string time)
+    {
+        var row = new List<(string, string)>
+        {
+            ("[", "darkgray"), (number.ToString(), "bright_cyan"), ("] ", "darkgray"), (name, "white"),
+            (tagOrClass, tagColor), (level, "gray")
+        };
+        int head = 1 + number.ToString().Length + 2 + name.Length + tagOrClass.Length + level.Length;
+        if (head + 3 + saveType.Length + 3 + time.Length <= UsurperRemake.UI.UIHelper.WrapWidth)
+            row.Add((" | ", "darkgray"));
+        else
+        {
+            row.Add(("\n", ""));
+            row.Add((new string(' ', 3 + number.ToString().Length), "gray"));
+        }
+        row.Add((saveType, autosave ? "yellow" : "green"));
+        row.Add((" | ", "darkgray"));
+        row.Add((time, "gray"));
+        return row;
+    }
 
     /// <summary>
     /// v1.2.5: a line word wrapped at 79 columns, later rows indented like the first, for text with a
