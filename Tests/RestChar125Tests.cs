@@ -337,7 +337,8 @@ public class RestChar125Tests : IDisposable
         foreach (var e in Effects)
         {
             var hu = EffectScreen("hu", e);
-            object arg = e.Str != null ? e.Str : Math.Abs(e.Int);
+            // v1.2.5: a dialogue reward shows its item name in the reader's language (DataDialogue125Tests)
+            object arg = e.Type == EffectType.GiveItem ? L("hu", "item.shadow_cloak") : e.Str != null ? e.Str : Math.Abs(e.Int);
             hu.Should().Contain(L("hu", e.Key, arg), $"{e.Key} is shown");
             NoEnglishLeft(hu, new[] { e.Key });
             foreach (var lang in AllLanguages)
@@ -858,7 +859,7 @@ public class RestChar125Tests : IDisposable
         data["Scripts/Systems/FactionSystem.cs"].Should().Be(30, "the 9 join refusals are keyed");
         data["Scripts/Systems/VisualNovelDialogueSystem.cs"].Should().Be(2, "the two pronouns are keyed");
         data["Scripts/Systems/CompanionSystem.cs"].Should().Be(94);
-        data["Scripts/Systems/DialogueSystem.cs"].Should().Be(461);
+        data.Should().NotContainKey("Scripts/Systems/DialogueSystem.cs", "v1.2.5: the dialogue trees are keyed (DataDialogue125Tests)");
         data["Scripts/Locations/DungeonLocation.cs"].Should().Be(77);
     }
 }
