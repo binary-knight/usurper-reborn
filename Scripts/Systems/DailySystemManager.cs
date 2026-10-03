@@ -21,6 +21,20 @@ public class DailySystemManager
     private DailyCycleMode currentMode = DailyCycleMode.Endless;
     private MaintenanceSystem? maintenanceSystem;
     private TerminalUI? terminal;
+
+    /// <summary>v1.2.5: text written word-wrapped at 79 columns (rows that can pass 79 with large amounts).</summary>
+    private static void WriteRows(TerminalUI terminal, string text)
+    {
+        foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(text))
+            terminal.WriteLine(row);
+    }
+
+    /// <summary>v1.2.5: a grief stage in the reader's language (the stage itself stays the enum).</summary>
+    internal static string GriefStageLabel(GriefStage stage) => Loc.Get($"daily.grief_stage_{stage.ToString().ToLowerInvariant()}");
+
+    /// <summary>v1.2.5: the blood moon broadcast in one reader's language.</summary>
+    internal static string BloodMoonBroadcast(string lang) =>
+        $"\r\n\x1b[1;31m  \u2605 {Loc.GetIn(lang, "daily.blood_moon_broadcast")} \u2605\x1b[0m\r\n";
     
     // Auto-save functionality
     private DateTime lastAutoSave;
@@ -508,7 +522,8 @@ public class DailySystemManager
                 if ((now - _lastBloodMoonBroadcast).TotalMinutes > 30)
                 {
                     _lastBloodMoonBroadcast = now;
-                    try { UsurperRemake.Server.MudServer.Instance?.BroadcastToAll($"\r\n\x1b[1;31m  ★ {Loc.Get("daily.blood_moon_broadcast")} ★\x1b[0m\r\n"); }
+                    // v1.2.5: each reader gets it in their own language
+                    try { UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(BloodMoonBroadcast); }
                     catch { }
                 }
             }
@@ -817,7 +832,8 @@ public class DailySystemManager
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("daily.grief_evolved", previousStage, grief.CurrentStage), "dark_magenta");
+                    terminal.SetColor("dark_magenta");
+                    WriteRows(terminal, Loc.Get("daily.grief_evolved", GriefStageLabel(previousStage), GriefStageLabel(grief.CurrentStage)));
                     var effects = grief.GetCurrentEffects();
                     if (!string.IsNullOrEmpty(effects.Description))
                         terminal.WriteLine($"  {effects.Description}", "gray");
@@ -860,7 +876,7 @@ public class DailySystemManager
                 if (terminal != null)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("daily.loan_interest", $"{interest:N0}", $"{player.LoanAmount:N0}", Math.Max(0, player.LoanDaysRemaining)));
+                    WriteRows(terminal, Loc.Get("daily.loan_interest", $"{interest:N0}", $"{player.LoanAmount:N0}", Math.Max(0, player.LoanDaysRemaining)));
                 }
 
                 if (player.LoanDaysRemaining <= 0 && terminal != null)
@@ -963,7 +979,8 @@ public class DailySystemManager
                 if (grief.CurrentStage != previousStage && terminal != null)
                 {
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("daily.grief_evolved", previousStage, grief.CurrentStage), "dark_magenta");
+                    terminal.SetColor("dark_magenta");
+                    WriteRows(terminal, Loc.Get("daily.grief_evolved", GriefStageLabel(previousStage), GriefStageLabel(grief.CurrentStage)));
 
                     // Show stage effect
                     var effects = grief.GetCurrentEffects();
@@ -1012,7 +1029,7 @@ public class DailySystemManager
                 if (terminal != null)
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("daily.loan_interest", $"{interest:N0}", $"{loanPlayer.LoanAmount:N0}", Math.Max(0, loanPlayer.LoanDaysRemaining)));
+                    WriteRows(terminal, Loc.Get("daily.loan_interest", $"{interest:N0}", $"{loanPlayer.LoanAmount:N0}", Math.Max(0, loanPlayer.LoanDaysRemaining)));
                 }
 
                 if (loanPlayer.LoanDaysRemaining <= 0)
@@ -1043,7 +1060,7 @@ public class DailySystemManager
                         if (terminal != null)
                         {
                             terminal.SetColor("yellow");
-                            terminal.WriteLine(Loc.Get("daily.royal_debt_early", $"{(long)(royalLoanPlayer.RoyalLoanAmount * 1.10):N0}", daysOverdue, GameConfig.RoyalLoanChivalryLossEarly));
+                            WriteRows(terminal, Loc.Get("daily.royal_debt_early", $"{(long)(royalLoanPlayer.RoyalLoanAmount * 1.10):N0}", daysOverdue, GameConfig.RoyalLoanChivalryLossEarly));
                         }
                     }
                     else if (daysOverdue <= 14)
@@ -1053,13 +1070,13 @@ public class DailySystemManager
                         if (!royalLoanPlayer.RoyalLoanBountyPosted)
                         {
                             royalLoanPlayer.RoyalLoanBountyPosted = true;
-                            QuestSystem.PostBountyOnPlayer(royalLoanPlayer.DisplayName, "Unpaid royal debt", (int)Math.Min(royalLoanPlayer.RoyalLoanAmount / 10, int.MaxValue));
-                            NewsSystem.Instance?.Newsy(true, $"{royalLoanPlayer.DisplayName} has defaulted on a royal loan! A bounty has been posted!");
+                            QuestSystem.PostBountyOnPlayer(royalLoanPlayer.DisplayName, Loc.Get("daily.bounty_crime_royal_debt"), (int)Math.Min(royalLoanPlayer.RoyalLoanAmount / 10, int.MaxValue));
+                            NewsSystem.Instance?.Newsy(true, Loc.Get("daily.news_loan_default", royalLoanPlayer.DisplayName));
                         }
                         if (terminal != null)
                         {
                             terminal.SetColor("red");
-                            terminal.WriteLine(Loc.Get("daily.royal_debt_bounty", daysOverdue, GameConfig.RoyalLoanChivalryLossMid));
+                            WriteRows(terminal, Loc.Get("daily.royal_debt_bounty", daysOverdue, GameConfig.RoyalLoanChivalryLossMid));
                         }
                     }
                     else
@@ -1069,7 +1086,7 @@ public class DailySystemManager
                         if (terminal != null)
                         {
                             terminal.SetColor("bright_red");
-                            terminal.WriteLine(Loc.Get("daily.royal_debt_late", daysOverdue, GameConfig.RoyalLoanChivalryLossLate));
+                            WriteRows(terminal, Loc.Get("daily.royal_debt_late", daysOverdue, GameConfig.RoyalLoanChivalryLossLate));
                         }
                     }
                 }
@@ -1112,7 +1129,7 @@ public class DailySystemManager
                     var netChange = incomeBefore - expensesBefore;
                     if (netChange < 0 && Math.Abs(netChange) > 100)
                     {
-                        NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+                        NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_treasury_bleeds", Math.Abs(netChange)));
                     }
                 }
             }
@@ -1319,7 +1336,7 @@ public class DailySystemManager
             god.GodLevel = newLevel;
             int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
             terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GodText.Title(newLevel)), "bright_cyan");
-            NewsSystem.Instance?.Newsy(true, $"{god.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("combat.news_god_ascended", god.DivineName, GodText.Title(newLevel)));
         }
 
         terminal?.WriteLine(Loc.Get("daily.deeds_restored", god.DeedsLeft), "yellow");

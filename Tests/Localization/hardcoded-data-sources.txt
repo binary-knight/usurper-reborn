@@ -42,8 +42,6 @@ nouns|Scripts/Core/GameConfig.cs|init.Name|crafting material names
 table|Scripts/Core/GameConfig.cs|init.[k]=|race descriptions passed into a Loc template
 
 # --- Scripts/AI ---------------------------------------------------------------------------------
-table|Scripts/AI/EnhancedNPCBehaviors.cs|init.Message|affair result, VisualNovelDialogueSystem
-table|Scripts/AI/EnhancedNPCBehaviors.cs|init.Reason|divorce refusal reason, VisualNovelDialogueSystem
 
 # --- Scripts/Data -------------------------------------------------------------------------------
 nouns|Scripts/Data/BeastData.cs|init.Name|kept English: saved as Pet.Name (WildernessLocation TryBeastEncounter), matched by name in CombatEngine and DungeonLocation
@@ -241,8 +239,6 @@ table|Scripts/UI/ANSIArt.cs|decl:Treasure|art with words, DungeonLocation
 # Not listed on purpose: Electron payload slots (MenuItemData labels and similar, counted in the
 # "electron" category), tuples passed to output helpers such as ShowBBSMenuRow (already counted as
 # output calls), NPC memory descriptions that only the web dashboard shows, and GMCP labels for MUD clients.
-nouns|Scripts/AI/GoalSystem.cs|decl:avengerName|fallback name in revenge news
-nouns|Scripts/AI/GoalSystem.cs|decl:targetName|fallback name in revenge news
 nouns|Scripts/Core/GameEngine.cs|decl:displayName|fallback name in the online who list
 names|Scripts/Core/GameEngine.cs|decl:locations|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 table|Scripts/Core/GameEngine.cs|decl:name|fallback NPC name
@@ -369,8 +365,6 @@ nouns|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestName|companion quest 
 table|Scripts/Systems/CompanionSystem.cs|init.Title|companion epithet
 table|Scripts/Systems/CompanionSystem.cs|=result.TriggerReason|companion death circumstance
 names|Scripts/Systems/CompanionSystem.cs|init.Name|companion names
-table|Scripts/Systems/CulturalMemeSystem.cs|new:CulturalMemeTemplate#1|meme names in news
-table|Scripts/Systems/CulturalMemeSystem.cs|new:CulturalMemeTemplate#2|meme descriptions in news
 table|Scripts/Systems/DivineBlessingSystem.cs|=blessing.Description|blessing description, TempleLocation
 nouns|Scripts/Systems/DivineBlessingSystem.cs|=blessing.Name|blessing name, TempleLocation
 table|Scripts/Systems/DivineBlessingSystem.cs|init.Description|blessing description
@@ -436,26 +430,12 @@ names|Scripts/Systems/StreetEncounterSystem.cs|decl:hunterNames|bounty hunter pe
 keyed|Scripts/Systems/StreetEncounterSystem.cs|init.Name|street_encounter.merchant.item.*
 table|Scripts/Systems/StreetEncounterSystem.cs|init.Role|court role "Advisor": saved in CourtMemberSaveData and compared by CastleLocation, so it stays English; CastleLocation prints it raw
 table|Scripts/Systems/VersionChecker.cs|=DownloadError|update download error
-table|Scripts/Systems/WorldEventSystem.cs|=CurrentKingDecree|king decree in news and the events screen
-table|Scripts/Systems/WorldEventSystem.cs|decl:DistantNewsTemplates/tuple#0|distant news type
-table|Scripts/Systems/WorldEventSystem.cs|decl:DistantNewsTemplates/tuple#1|distant news text
-table|Scripts/Systems/WorldEventSystem.cs|decl:PlayerReferencedTemplates|news templates
-table|Scripts/Systems/WorldEventSystem.cs|=evt.Description|event description in news and the events screen
-table|Scripts/Systems/WorldEventSystem.cs|=evt.Title|event title in news and the events screen
-table|Scripts/Systems/WorldEventSystem.cs|return/tuple#1|event refusal text
 names|Scripts/Systems/WorldEventSystem.cs|decl:DistantRegions|region names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:femaleFirstNames|NPC names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:lastNames|NPC surnames
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:maleFirstNames|NPC names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:OceanTeamNamesPrefixes|team names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:OceanTeamNamesSuffixes|team names
-table|Scripts/Systems/WorldSimulator.cs|decl:homeMessages|news, Newsy
-table|Scripts/Systems/WorldSimulator.cs|decl:killer|killer in worldsim.spouse_death_notice
-table|Scripts/Systems/WorldSimulator.cs|decl:newsMsg|news, Newsy
-table|Scripts/Systems/WorldSimulator.cs|decl:place|place in worldsim.spouse_death_notice
-table|Scripts/Systems/WorldSimulator.cs|decl:roles|court member role
-table|Scripts/Systems/WorldSimulator.cs|init.BackgroundStory|orphan backstory
-table|Scripts/Systems/WorldSimulator.cs|=questDesc|news, Newsy
 names|Scripts/Systems/WorldSimulator.cs|decl:firstNames|court member names
 names|Scripts/Systems/WorldSimulator.cs|decl:lastNames|court member surnames
 names|Scripts/Systems/WorldSimulator.cs|decl:TeamNamePrefixes|team names

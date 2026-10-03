@@ -133,6 +133,7 @@ namespace UsurperRemake.Tests
             // v1.2.5: NewsSystem.WriteBirthdayNews passes the English ordinal suffix (st, nd, rd, th
             // from GetOrdinalSuffix) as {3}; the other languages write the ordinal their own way.
             { "news.birthday", new HashSet<string> { "{3}" } },
+            { "worldsim.news_immigrant", new HashSet<string> { "{0}" } },   // v1.2.5: the English article ("A", "An")
         };
 
         [Fact]

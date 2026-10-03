@@ -1,39 +1,4 @@
 {
-  "Scripts/AI/EnhancedNPCBehaviorSystem.cs": {
-    "count": 6,
-    "sites": [
-      "0f342a13d8",
-      "8567a2ee22",
-      "98125e7cd7",
-      "b8d85881ff",
-      "d709c43e8f",
-      "f4eec7fca9"
-    ]
-  },
-  "Scripts/AI/EnhancedNPCBehaviors.cs": {
-    "count": 9,
-    "sites": [
-      "0f421e0c23",
-      "5b5ee1c300",
-      "71813564c7",
-      "775300d737",
-      "841ba65467",
-      "aa2856aa92",
-      "b8d85881ff",
-      "d90c237de3",
-      "e2099371e7"
-    ]
-  },
-  "Scripts/AI/GoalSystem.cs": {
-    "count": 5,
-    "sites": [
-      "0300563212",
-      "3abe9e4cf5",
-      "738373b515",
-      "9674d27811",
-      "bb6d7490eb"
-    ]
-  },
   "Scripts/Core/GameEngine.cs": {
     "count": 21,
     "sites": [
@@ -161,13 +126,6 @@
       "dcc82d1f23"
     ]
   },
-  "Scripts/Systems/BugReportSystem.cs": {
-    "count": 2,
-    "sites": [
-      "3f37ec1ef6",
-      "8f762aac57"
-    ]
-  },
   "Scripts/Systems/CharacterCreationSystem.cs": {
     "count": 3,
     "sites": [
@@ -204,23 +162,6 @@
       "d5bb3af59b",
       "e773fd5335",
       "ffddb01d06"
-    ]
-  },
-  "Scripts/Systems/CulturalMemeSystem.cs": {
-    "count": 3,
-    "sites": [
-      "7c2921576d",
-      "a723702b6a",
-      "e2d9d67555"
-    ]
-  },
-  "Scripts/Systems/DailySystemManager.cs": {
-    "count": 4,
-    "sites": [
-      "1674e9c8cc",
-      "226998229b",
-      "a8b97fbd62",
-      "ebf185f23e"
     ]
   },
   "Scripts/Systems/DialogueSystem.cs": {
@@ -287,12 +228,6 @@
       "dd2df31b8a"
     ]
   },
-  "Scripts/Systems/HintSystem.cs": {
-    "count": 1,
-    "sites": [
-      "ac046324b1"
-    ]
-  },
   "Scripts/Systems/IntimacySystem.cs": {
     "count": 1,
     "sites": [
@@ -303,57 +238,6 @@
     "count": 1,
     "sites": [
       "582f194579"
-    ]
-  },
-  "Scripts/Systems/MaintenanceSystem.cs": {
-    "count": 33,
-    "sites": [
-      "072e6cb8e6",
-      "12e9eee495",
-      "1fb06ab4ea",
-      "2b4f389701",
-      "2d585861d3",
-      "305c871b02",
-      "342f08ed73",
-      "3f7ee8e1bb",
-      "4883c30e75",
-      "4c46eb52e2",
-      "4f79769f12",
-      "52131434d3",
-      "5c620e9d05",
-      "5d7cc76f0e",
-      "5ee0cae588",
-      "60f989bc0c",
-      "6a360d7d9b",
-      "6bdb186950",
-      "86756b1aff",
-      "86af3c386d",
-      "953fb57469",
-      "9b59d4891c",
-      "9ba3e807ff",
-      "9fe0568919",
-      "a90b4e8c6b",
-      "ab6015e3b2",
-      "bec45a2e79",
-      "c2c031aeac",
-      "c4d1f15dfd",
-      "d00cb07f9f",
-      "ea73f2b37b",
-      "eec1d05350",
-      "ff75dc8ec4"
-    ]
-  },
-  "Scripts/Systems/MarketplaceSystem.cs": {
-    "count": 2,
-    "sites": [
-      "b98138a4c8",
-      "cd4152bafb"
-    ]
-  },
-  "Scripts/Systems/PermadeathHelper.cs": {
-    "count": 1,
-    "sites": [
-      "828f0d32e7"
     ]
   },
   "Scripts/Systems/QuestSystem.cs": {
@@ -379,19 +263,6 @@
     "count": 1,
     "sites": [
       "c9e689fa68"
-    ]
-  },
-  "Scripts/Systems/SocialInfluenceSystem.cs": {
-    "count": 8,
-    "sites": [
-      "263ffa0680",
-      "b1d135a31e",
-      "b96c453987",
-      "c9104db871",
-      "e75f34c15c",
-      "e837d4b00d",
-      "e95bb0ee8a",
-      "f0e5e50a0c"
     ]
   },
   "Scripts/Systems/SqlSaveBackend.cs": {
@@ -560,88 +431,6 @@
       "b586de08da",
       "bd6366cf02",
       "cb8cbe26a5"
-    ]
-  },
-  "Scripts/Systems/WorldEventSystem.cs": {
-    "count": 13,
-    "sites": [
-      "05c5deb88b",
-      "0975c0afcc",
-      "16f196d5de",
-      "2e7f81e40e",
-      "30f0fd457c",
-      "4a07b9688f",
-      "4df1d47247",
-      "578aee153d",
-      "72e5d912af",
-      "7b83a7d066",
-      "8ed7679694",
-      "aef726a9f1",
-      "af153f28a6"
-    ]
-  },
-  "Scripts/Systems/WorldInitializerSystem.cs": {
-    "count": 2,
-    "sites": [
-      "6117aca136",
-      "adbec631ba"
-    ]
-  },
-  "Scripts/Systems/WorldSimService.cs": {
-    "count": 2,
-    "sites": [
-      "1674e9c8cc",
-      "836c86c412"
-    ]
-  },
-  "Scripts/Systems/WorldSimulator.cs": {
-    "count": 45,
-    "sites": [
-      "0b1f0b90e5",
-      "0cbceb4a64",
-      "1ba6850636",
-      "1f22811933",
-      "292c7047c8",
-      "293f1c40ae",
-      "2cd705e0bc",
-      "2e27eaa7ce",
-      "3136c75081",
-      "3d11f9ed74",
-      "3ffc50c9c6",
-      "4578e7a2d1",
-      "471a68177e",
-      "49e17d1bfc",
-      "4da6d4b5d0",
-      "5196ffd52e",
-      "5c6817ac9d",
-      "637a811aef",
-      "63d4ef8bf1",
-      "74267f4730",
-      "7b79442804",
-      "800e92c7c0",
-      "84fecd292d",
-      "8c8ca978b9",
-      "90bc492d28",
-      "90fdd30133",
-      "929ff2e01a",
-      "932d5cfaf8",
-      "a2611a49e0",
-      "a6c1970068",
-      "ae482f3006",
-      "b98138a4c8",
-      "bb8b68fb1c",
-      "cd840b56b3",
-      "d12ddd4aee",
-      "d70962820f",
-      "d975683efb",
-      "db8db1b585",
-      "dfcbf2ba84",
-      "dfd4e3c82e",
-      "e03c3e9686",
-      "ec76122759",
-      "f25bf00dab",
-      "f6a0b12fe6",
-      "fd742728d6"
     ]
   },
   "Scripts/UI/SplashScreen.cs": {

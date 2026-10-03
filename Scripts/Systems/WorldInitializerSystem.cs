@@ -171,7 +171,7 @@ public class WorldInitializerSystem
             ActiveTeams.Add(team);
             teamsFormed++;
 
-            worldHistory.Add($"Day {team.DayFounded}: {leader.Name} founded '{teamName}' with {team.MemberNames.Count - 1} followers");
+            worldHistory.Add(Loc.Get("world_init.history_founded", team.DayFounded, leader.Name, teamName, team.MemberNames.Count - 1));
             // GD.Print($"[WorldInit] Team '{teamName}' founded by {leader.Name} with {team.MemberNames.Count} members");
         }
 
@@ -207,7 +207,7 @@ public class WorldInitializerSystem
         if (!string.IsNullOrEmpty(newKing.Team))
         {
             string oldTeam = newKing.Team;
-            worldHistory.Add($"Day 25: {newKing.Name} left '{oldTeam}' to pursue the throne");
+            worldHistory.Add(Loc.Get("world_init.history_left_for_throne", 25, newKing.Name, oldTeam));
 
             // Remove from team
             var team = ActiveTeams.FirstOrDefault(t => t.Name == oldTeam);
@@ -231,7 +231,7 @@ public class WorldInitializerSystem
         // Set the king in CastleLocation
         CastleLocation.SetKing(kingData);
 
-        worldHistory.Add($"Day 25: {kingData.GetTitle()} {newKing.Name} claimed the throne!");
+        worldHistory.Add(Loc.Get("world_init.history_claimed", 25, kingData.TitleLabel(), newKing.Name));
         // GD.Print($"[WorldInit] {kingData.GetTitle()} {newKing.Name} established as monarch");
 
         await Task.CompletedTask;
@@ -297,7 +297,7 @@ public class WorldInitializerSystem
                 }
             }
 
-            worldHistory.Add($"Day 40: '{strongestTeam.Name}' seized control of the city!");
+            worldHistory.Add(Loc.Get("world_init.history_city", 40, strongestTeam.Name));
             // GD.Print($"[WorldInit] Team '{strongestTeam.Name}' controls the city");
         }
 
@@ -336,7 +336,7 @@ public class WorldInitializerSystem
             if (king.AddGuard(guardName, CharacterAI.Computer, candidate.Sex, GameConfig.BaseGuardSalary))
             {
                 guardsHired++;
-                worldHistory.Add($"Day {50 + guardsHired}: {candidate.Name} joined the Royal Guard as {guardName}");
+                worldHistory.Add(Loc.Get("world_init.history_guard", 50 + guardsHired, candidate.Name, guardName));
             }
         }
 
@@ -354,7 +354,7 @@ public class WorldInitializerSystem
         {
             candidate.BankGuard = true;
             candidate.BankWage = 1000 + (candidate.Level * 50);
-            worldHistory.Add($"Day {55}: {candidate.Name} hired as bank guard");
+            worldHistory.Add(Loc.Get("world_init.history_bank_guard", 55, candidate.Name));
         }
 
         // GD.Print($"[WorldInit] {guardsHired} royal guards and {bankGuardCandidates.Count} bank guards hired");
@@ -440,7 +440,7 @@ public class WorldInitializerSystem
             // Small chance of notable victory
             if (random.NextDouble() < 0.05)
             {
-                worldHistory.Add($"Day {day}: {npc.Name} conquered dungeon level {dungeonLevel}");
+                worldHistory.Add(Loc.Get("world_init.history_conquered", day, npc.Name, dungeonLevel));
             }
         }
         else
@@ -454,7 +454,7 @@ public class WorldInitializerSystem
                 // NPC died
                 npc.HP = 0;
                 DeadNPCNames.Add(npc.Name);
-                worldHistory.Add($"Day {day}: {npc.Name} was slain in the dungeon");
+                worldHistory.Add(Loc.Get("world_init.history_slain", day, npc.Name));
 
                 // Remove from team
                 if (!string.IsNullOrEmpty(npc.Team))
@@ -500,7 +500,7 @@ public class WorldInitializerSystem
 
             if (npc.Level % 10 == 0)
             {
-                worldHistory.Add($"Day {day}: {npc.Name} achieved Level {npc.Level}");
+                worldHistory.Add(Loc.Get("world_init.history_level", day, npc.Name, npc.Level));
             }
         }
     }
@@ -553,7 +553,7 @@ public class WorldInitializerSystem
             if (newNPC != null)
             {
                 NPCSpawnSystem.Instance.AddRestoredNPC(newNPC); // reserves the name too
-                worldHistory.Add($"A new adventurer named {newNPC.Name} arrived in town");
+                worldHistory.Add(Loc.Get("world_init.history_arrived", newNPC.Name));
             }
         }
 
@@ -620,13 +620,13 @@ public class WorldInitializerSystem
         var king = CastleLocation.GetCurrentKing();
         if (king != null)
         {
-            NewsSystem.Instance.Newsy(false, $"{king.GetTitle()} {king.Name} has ruled for {king.TotalReign} days.");
+            NewsSystem.Instance.Newsy(false, Loc.Get("world_init.news_reign", king.TitleLabel(), king.Name, king.TotalReign));
         }
 
         var controllingTeam = ActiveTeams.FirstOrDefault(t => t.ControlsCity);
         if (controllingTeam != null)
         {
-            NewsSystem.Instance.Newsy(false, $"'{controllingTeam.Name}' controls the city.");
+            NewsSystem.Instance.Newsy(false, Loc.Get("world_init.news_controls", controllingTeam.Name));
         }
 
         // Add some recent historical events

@@ -1999,7 +1999,7 @@ namespace UsurperRemake.Systems
             // Log financial summary
             var netChange = king.CalculateDailyIncome() - king.CalculateDailyExpenses();
             if (netChange < 0 && Math.Abs(netChange) > 100)
-                NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_treasury_bleeds", Math.Abs(netChange)));
 
             DebugLogger.Instance.LogInfo("WORLDSIM",
                 $"World daily reset: King {king.Name}, Treasury {treasuryBefore:N0} -> {king.Treasury:N0}, Reign day {king.TotalReign}");
@@ -2033,7 +2033,7 @@ namespace UsurperRemake.Systems
                 // column).
                 _ = sqlBackend.PruneOldNPCDecisionLog(daysToKeep: 30);
 
-                NewsSystem.Instance?.Newsy(false, "A new day dawns in the realm...");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_new_day"));
             }
             catch (Exception ex)
             {
