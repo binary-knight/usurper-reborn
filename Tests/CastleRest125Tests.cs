@@ -423,7 +423,38 @@ public class CastleRest125Tests : IDisposable
                 if (info.Name != "Yoga") text.Should().NotContain(info.Name + " ", $"{info.Name} is shown in Hungarian");
             }
         }
-        if (lang == "en") text.Should().Contain("Pushups         +1-2 Strength").And.Contain("Shadow Boxing   +1 Attack, +1 Defence");
+        if (lang == "en") text.Should().Contain("Pushups         +1 Strength").And.Contain("Shadow Boxing   +10 Combat Stamina");
+    }
+
+    [Fact]
+    public async Task ActivityEffects_SayWhatTheActivityGives()
+    {
+        var effects = PrisonActivitySystem.ActivityInfo.ToDictionary(kv => kv.Key, kv => kv.Value.Effect);
+        effects.Values.Should().Equal("+1 Strength", "+1 Dexterity, +0-1 Agility", "+1 Intelligence, +5 Mana", "+1 Wisdom, Heal 10% HP",
+            "+10 Combat Stamina", "+1 Stamina, Heal 5% HP", "+1 Charisma", "+10-20 Chivalry or Darkness");
+        foreach (var activity in PrisonActivitySystem.Instance.GetAvailableActivities())
+            InLang("en", () => PrisonActivitySystem.ActivityEffect(activity)).Should().Be(effects[activity]);
+
+        foreach (var activity in PrisonActivitySystem.Instance.GetAvailableActivities())
+        {
+            var c = StatRewards1115Tests.Fresh("CastleRest" + activity);
+            c.HP = 1; c.Mana = 0; c.CurrentCombatStamina = 0;
+            long str = c.BaseStrength, dex = c.BaseDexterity, agi = c.BaseAgility, intel = c.BaseIntelligence, wis = c.BaseWisdom,
+                sta = c.BaseStamina, cha = c.BaseCharisma, hp = c.HP, mana = c.Mana, chiv = c.Chivalry, dark = c.Darkness;
+            long maxHp = c.MaxHP;
+            await new PrisonActivitySystem().PerformActivity(c, activity);
+            switch (activity)
+            {
+                case PrisonActivitySystem.PrisonActivity.Pushups: (c.BaseStrength - str).Should().Be(1); break;
+                case PrisonActivitySystem.PrisonActivity.Yoga: (c.BaseDexterity - dex).Should().Be(1); (c.BaseAgility - agi).Should().BeInRange(0, 1); break;
+                case PrisonActivitySystem.PrisonActivity.Reading: (c.BaseIntelligence - intel).Should().Be(1); (c.Mana - mana).Should().Be(Math.Min(5, c.MaxMana)); break;
+                case PrisonActivitySystem.PrisonActivity.Meditation: (c.BaseWisdom - wis).Should().Be(1); (c.HP - hp).Should().Be(maxHp / 10); break;
+                case PrisonActivitySystem.PrisonActivity.ShadowBoxing: c.CurrentCombatStamina.Should().Be(10); break;
+                case PrisonActivitySystem.PrisonActivity.Stretching: (c.BaseStamina - sta).Should().Be(1); (c.HP - hp).Should().Be(maxHp / 20); break;
+                case PrisonActivitySystem.PrisonActivity.Planning: (c.BaseCharisma - cha).Should().Be(1); break;
+                case PrisonActivitySystem.PrisonActivity.Praying: (c.Chivalry - chiv + c.Darkness - dark).Should().BeInRange(10, 20); break;
+            }
+        }
     }
 
     [Theory]
