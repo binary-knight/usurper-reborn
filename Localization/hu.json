@@ -7190,6 +7190,8 @@
   "ui.invalid_choice_retry": "Érvénytelen választás. Próbáld újra.",
   "ui.number_between": "Adj meg egy számot {0} és {1} között.",
   "ui.enter_valid_number": "Adj meg egy érvényes számot.",
+  "ui.yn_default_yes": "(I/n): ",
+  "ui.yn_default_no": "(i/N): ",
   "ui.idle_warning": "FIGYELEM: Tétlenség miatt 1 perc múlva bontjuk a kapcsolatot!",
   "ui.idle_timeout_title": "TÉTLENSÉGI IDŐKORLÁT",
   "ui.idle_no_input": "{0} perce nem érkezett bevitel.",

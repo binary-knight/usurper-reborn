@@ -7402,6 +7402,8 @@
   "ui.invalid_choice_retry": "Invalid choice. Please try again.",
   "ui.number_between": "Please enter a number between {0} and {1}.",
   "ui.enter_valid_number": "Please enter a valid number.",
+  "ui.yn_default_yes": "(Y/n): ",
+  "ui.yn_default_no": "(y/N): ",
   "ui.idle_warning": "WARNING: You will be disconnected in 1 minute due to inactivity!",
   "ui.idle_timeout_title": "IDLE TIMEOUT",
   "ui.idle_no_input": "No input received for {0} minutes.",

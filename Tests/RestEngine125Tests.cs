@@ -771,4 +771,35 @@ public class RestEngine125Tests : IDisposable
         Src("Core", "GameEngine.cs").Should().Contain("ConnectionLabel(lang, connType)").And.Contain("ConnectionLabel(lang, ngConnType)")
             .And.Contain("var connType = ctx?.ConnectionType ?? \"Unknown\";", "the type passed to SwitchIdentity is stored, so it stays English");
     }
+
+    // ---------- yes/no letters (review follow-up) ----------
+
+    [Fact]
+    public async Task ConfirmPrompt_ShowsOnlyLettersTheAnswerAccepts_InTheReadersLanguage()
+    {
+        foreach (var lang in AllLanguages)
+            foreach (var key in new[] { "ui.yn_default_yes", "ui.yn_default_no" })
+            {
+                var letters = Regex.Match(L(lang, key), @"\((\w)/(\w)\)");
+                letters.Success.Should().BeTrue($"[{lang}] {key} shows two letters");
+                GameConfig.IsAffirmative(letters.Groups[1].Value).Should().BeTrue($"[{lang}] {key} yes letter is accepted");
+                GameConfig.IsNegative(letters.Groups[2].Value).Should().BeTrue($"[{lang}] {key} no letter is accepted");
+                (key == "ui.yn_default_yes" ? letters.Groups[1].Value : letters.Groups[2].Value).Should()
+                    .Be((key == "ui.yn_default_yes" ? letters.Groups[1].Value : letters.Groups[2].Value).ToUpperInvariant(), "the default is the capital");
+            }
+
+        var hu = NewScreen("I");
+        (await InLanguage("hu", () => hu.Term.ConfirmAsync("Biztos?", false))).Should().BeTrue("I (Igen) is a yes");
+        hu.Text.Should().Contain("Biztos? (i/N): ").And.NotContain("(y/N)");
+        var huDefault = NewScreen("");
+        (await InLanguage("hu", () => huDefault.Term.ConfirmAsync("Biztos?", true))).Should().BeTrue();
+        huDefault.Text.Should().Contain("Biztos? (I/n): ");
+
+        var en = NewScreen("n");
+        (await InLanguage("en", () => en.Term.ConfirmAsync("Sure?", true))).Should().BeFalse();
+        en.Text.Should().Contain("Sure? (Y/n): ");
+        var enNo = NewScreen("y");
+        (await InLanguage("en", () => enNo.Term.ConfirmAsync("Sure?", false))).Should().BeTrue();
+        enNo.Text.Should().Contain("Sure? (y/N): ");
+    }
 }

@@ -1924,7 +1924,8 @@ public partial class TerminalEmulator
     // Overload for ConfirmAsync that takes a boolean parameter
     public async Task<bool> ConfirmAsync(string message, bool defaultValue)
     {
-        string prompt = defaultValue ? $"{message} (Y/n): " : $"{message} (y/N): ";
+        // v1.2.5: the letters the reader's language uses, each one GameConfig.IsAffirmative / IsNegative accepts
+        string prompt = $"{message} {UsurperRemake.Systems.Loc.Get(defaultValue ? "ui.yn_default_yes" : "ui.yn_default_no")}";
         WriteLine(prompt, "yellow");
         return await AskYesNoAsync("> ", defaultValue);
     }

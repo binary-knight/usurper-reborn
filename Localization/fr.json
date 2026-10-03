@@ -7182,6 +7182,8 @@
   "ui.invalid_choice_retry": "Choix invalide. Veuillez réessayer.",
   "ui.number_between": "Veuillez saisir un nombre entre {0} et {1}.",
   "ui.enter_valid_number": "Veuillez saisir un nombre valide.",
+  "ui.yn_default_yes": "(O/n) : ",
+  "ui.yn_default_no": "(o/N) : ",
   "ui.idle_warning": "ATTENTION : vous serez déconnecté dans 1 minute pour inactivité !",
   "ui.idle_timeout_title": "DÉLAI D'INACTIVITÉ DÉPASSÉ",
   "ui.idle_no_input": "Aucune saisie reçue depuis {0} minutes.",

@@ -7182,6 +7182,8 @@
   "ui.invalid_choice_retry": "Opción no válida. Inténtalo de nuevo.",
   "ui.number_between": "Introduce un número entre {0} y {1}.",
   "ui.enter_valid_number": "Introduce un número válido.",
+  "ui.yn_default_yes": "(S/n): ",
+  "ui.yn_default_no": "(s/N): ",
   "ui.idle_warning": "AVISO: ¡Se te desconectará en 1 minuto por inactividad!",
   "ui.idle_timeout_title": "TIEMPO DE INACTIVIDAD AGOTADO",
   "ui.idle_no_input": "No se recibió ninguna entrada en {0} minutos.",
