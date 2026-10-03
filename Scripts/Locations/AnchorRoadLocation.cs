@@ -2085,7 +2085,7 @@ public class AnchorRoadLocation : BaseLocation
         if (!ok)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("merc.turnin_failed", reason)}");
+            terminal.WriteLine($"  {Loc.Get("merc.turnin_failed", QuestSystem.MercTurnInReasonLabel(reason))}");
             await Pacing.Wait(1800);
             return;
         }

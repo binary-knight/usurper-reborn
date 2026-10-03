@@ -506,6 +506,77 @@ public class RestChar125Tests : IDisposable
         en.Should().Equal($"{LongName} committed a dark act: bank robbery");
     }
 
+    /// <summary>Every reason literal the callers of ChangeAlignment and ModifyAlignment pass, from the sources.</summary>
+    private static List<string> AlignmentReasons()
+    {
+        var reasons = new List<string>();
+        foreach (var file in Directory.GetFiles(Path.Combine(Source2Root(), "Scripts"), "*.cs", SearchOption.AllDirectories))
+        {
+            var text = File.ReadAllText(file);
+            foreach (Match m in Regex.Matches(text, @"(?:ChangeAlignment|ModifyAlignment)\((?:[^;]*?)(?:reason:\s*)?\$?""([^""]*)""\s*\)\s*;", RegexOptions.Singleline))
+                reasons.Add(m.Groups[1].Value);
+        }
+        return reasons.Distinct().ToList();
+    }
+
+    private static string Source2Root()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "usurper-reloaded.csproj"))) dir = dir.Parent;
+        return dir!.FullName;
+    }
+
+    [Fact]
+    public void AlignmentNews_NamesTheDeed_InTheWritersLanguage_AndNeverATag()
+    {
+        var reasons = AlignmentReasons();
+        reasons.Should().Contain("bank robbery").And.Contain("castle.knighthood").And.Contain("spared_npc_in_pvp")
+            .And.Contain("attacked sleeping {npcName}").And.Contain("Pilgrimage to {selected.LocName()}");
+        foreach (var reason in reasons)
+        {
+            string sample = Regex.Replace(reason, @"\{[^}]*\}", "Bo");
+            bool tag = !sample.Contains(' ') && (sample.Contains('.') || sample.Contains('_'));
+            var en = InLang("en", () => AlignmentSystem.DeedLabel(sample));
+            var hu = InLang("hu", () => AlignmentSystem.DeedLabel(sample));
+            if (tag)
+            {
+                en.Should().BeNull($"the tag \"{sample}\" is not a deed the news can name");
+                continue;
+            }
+            en.Should().Be(sample, $"the English news names \"{sample}\" as before");
+            hu.Should().NotBe(sample, $"\"{sample}\" has a Hungarian deed");
+        }
+        var who = new Character { Name1 = LongName, Name2 = LongName };
+        NewsWritten("en", () => new AlignmentSystem().ModifyAlignment(who, 30, 0, "castle.knighthood"))
+            .Should().Equal($"{LongName} performed a noble deed.");
+        NewsWritten("en", () => new AlignmentSystem().ModifyAlignment(who, 0, 30, "dungeon.merchant_rob_leader"))
+            .Should().Equal($"{LongName} committed a dark act.");
+        NewsWritten("hu", () => new AlignmentSystem().ModifyAlignment(who, 0, 30, "attacked sleeping Bo"))
+            .Should().Equal(L("hu", "alignment.news_dark_act", LongName, L("hu", "alignment.deed_attacked_sleeping", "Bo")));
+        NewsWritten("hu", () => new AlignmentSystem().ModifyAlignment(who, 30, 0, "defended an innocent"))
+            .Should().Equal(L("hu", "alignment.news_noble_deed", LongName, L("hu", "alignment.deed_defended_innocent")));
+        foreach (var key in new[] { "alignment.news_noble_deed_plain", "alignment.news_dark_act_plain" })
+        {
+            SameCatchUpBucket(key, LongName);
+            SameGossip(key, LongName);
+        }
+    }
+
+    [Fact]
+    public void MercTurnInRefusal_NamesTheReason_NotTheCode()
+    {
+        Source("Scripts/Locations/AnchorRoadLocation.cs").Should().Contain("Loc.Get(\"merc.turnin_failed\", QuestSystem.MercTurnInReasonLabel(reason))");
+        foreach (var code in new[] { "null", "not_merc", "not_yours", "incomplete" })
+            foreach (var lang in AllLanguages)
+            {
+                var label = InLang(lang, () => QuestSystem.MercTurnInReasonLabel(code));
+                label.Should().Be(L(lang, $"merc.turnin_reason_{code}")).And.NotBe(code);
+                ("  " + L(lang, "merc.turnin_failed", label)).Length.Should().BeLessOrEqualTo(MaxWidth);
+            }
+        InLang("en", () => QuestSystem.MercTurnInReasonLabel("incomplete")).Should().Be("the contract is not complete yet.");
+        NoEnglishLeft(InLang("hu", () => QuestSystem.MercTurnInReasonLabel("not_merc")), new[] { "merc.turnin_reason_not_merc" });
+    }
+
     [Fact]
     public void RomanceTracker_JealousyLines_AreKeyed()
     {
