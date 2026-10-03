@@ -27487,36 +27487,33 @@ public partial class CombatEngine
 
             if (result.Opponent != null)
             {
-                // v1.2.5: also gives the stored name of the piece priced, which the salvage list shows (the
-                // opponent's WeaponName/ArmorName is the legacy slot's name, "None" in the reader's language
-                // when that slot is empty, and was printed as the salvaged item's name)
-                long SalvageOf(Equipment? worn, string fallbackName, out string pieceName)
+                // v1.2.5: the piece is what the opponent actually wears, never a name. The gate used to compare
+                // the legacy slot's name (WeaponName/ArmorName) to "None", which that slot reads in the reader's
+                // language when empty, so English never salvaged and the other languages did. Every language
+                // now salvages from the real equipment; an empty slot gives nothing.
+                Equipment? PieceIn(EquipmentSlot slot, int legacyId)
                 {
-                    pieceName = fallbackName;
-                    var piece = worn;
-                    if (piece == null && !string.IsNullOrEmpty(fallbackName))
-                    {
-                        // an NPC with a named weapon and nothing equipped: shop templates only
-                        var byName = EquipmentDatabase.GetByName(fallbackName);
-                        if (byName != null && !EquipmentDatabase.IsDynamic(byName.Id)) piece = byName;
-                    }
-                    if (piece == null) return 0;
-                    pieceName = piece.Name;
-                    return (long)(Math.Clamp(piece.Value, 0, GameConfig.MaxItemValue) * 0.5);
+                    var worn = result.Opponent.GetEquipment(slot);
+                    if (worn != null) return worn;
+                    // an NPC with a legacy item id and nothing equipped: shop templates only
+                    if (legacyId > 0 && !EquipmentDatabase.IsDynamic(legacyId)) return EquipmentDatabase.GetById(legacyId);
+                    return null;
+                }
+                // half the clamped value; the stored name is what the salvage list shows through ItemNames
+                long SalvageOf(Equipment piece) => (long)(Math.Clamp(piece.Value, 0, GameConfig.MaxItemValue) * 0.5);
+
+                var weaponPiece = PieceIn(EquipmentSlot.MainHand, result.Opponent.RHand);
+                if (weaponPiece != null && random.Next(100) < 30)
+                {
+                    long weaponValue = SalvageOf(weaponPiece);
+                    if (weaponValue > 0) { equipmentLootValue += weaponValue; result.ItemsFound.Add(weaponPiece.Name); salvaged.Add((weaponPiece.Name, weaponValue)); }
                 }
 
-                string opponentWeaponName = result.Opponent.WeaponName;
-                if (!string.IsNullOrEmpty(opponentWeaponName) && opponentWeaponName != "Fist" && opponentWeaponName != "None" && random.Next(100) < 30)
+                var armorPiece = PieceIn(EquipmentSlot.Body, result.Opponent.Body);
+                if (armorPiece != null && random.Next(100) < 25)
                 {
-                    long weaponValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.MainHand), opponentWeaponName, out var weaponPiece);
-                    if (weaponValue > 0) { equipmentLootValue += weaponValue; result.ItemsFound.Add(weaponPiece); salvaged.Add((weaponPiece, weaponValue)); }
-                }
-
-                string opponentArmorName = result.Opponent.ArmorName;
-                if (!string.IsNullOrEmpty(opponentArmorName) && opponentArmorName != "None" && opponentArmorName != "Clothes" && random.Next(100) < 25)
-                {
-                    long armorValue = SalvageOf(result.Opponent.GetEquipment(EquipmentSlot.Body), opponentArmorName, out var armorPiece);
-                    if (armorValue > 0) { equipmentLootValue += armorValue; result.ItemsFound.Add(armorPiece); salvaged.Add((armorPiece, armorValue)); }
+                    long armorValue = SalvageOf(armorPiece);
+                    if (armorValue > 0) { equipmentLootValue += armorValue; result.ItemsFound.Add(armorPiece.Name); salvaged.Add((armorPiece.Name, armorValue)); }
                 }
 
                 long salvageCap = GameConfig.PvPGoldPerFightCap(result.Player?.Level ?? 1);
