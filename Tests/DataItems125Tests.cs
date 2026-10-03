@@ -226,7 +226,7 @@ public class DataItems125Tests
             shown.Length.Should().BeLessOrEqualTo(OlderLonger(lang, n) ? 30 : LongestEnglishName, $"{lang} {n} is \"{shown}\"");
             if (!(SameInLanguage.TryGetValue(n, out var same) && same.Contains(lang)))
                 shown.Should().NotBe(n, $"{lang} translates {n}");
-            shown.Should().NotContain("—").And.NotContain("–");
+            shown.Should().NotContain("\u2014").And.NotContain("\u2013");
         }
     }
 
