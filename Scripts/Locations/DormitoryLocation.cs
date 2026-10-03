@@ -777,6 +777,39 @@ public class DormitoryLocation : BaseLocation
         await terminal.WaitForKeyPress();
     }
 
+    /// <summary>The Equipment a sleeper's saved item becomes when it is stolen (field by field from the save).</summary>
+    internal static Equipment StolenEquipmentFrom(DynamicEquipmentData d, string fallbackName) => new Equipment
+        {
+            Id = d.Id,
+            Name = d.Name ?? fallbackName,
+            Slot = (EquipmentSlot)(d.Slot),
+            Handedness = (WeaponHandedness)(d.Handedness),
+            WeaponType = (WeaponType)(d.WeaponType),
+            WeaponPower = d.WeaponPower,
+            ArmorClass = d.ArmorClass,
+            ShieldBonus = d.ShieldBonus,
+            BlockChance = d.BlockChance,
+            DefenceBonus = d.DefenceBonus,
+            StrengthBonus = d.StrengthBonus,
+            DexterityBonus = d.DexterityBonus,
+            AgilityBonus = d.AgilityBonus,
+            ConstitutionBonus = d.ConstitutionBonus,
+            IntelligenceBonus = d.IntelligenceBonus,
+            WisdomBonus = d.WisdomBonus,
+            CharismaBonus = d.CharismaBonus,
+            MaxHPBonus = d.MaxHPBonus,
+            MaxManaBonus = d.MaxManaBonus,
+            Value = d.Value,
+            IsIdentified = true,
+            MinLevel = d.MinLevel,
+            Rarity = (EquipmentRarity)d.Rarity, // v1.1: was dropped; a stolen Legendary arrived Common
+            Family = d.Family ?? "",
+            // v1.2.5: the enchant count and kinds (in Description) and the pre-enchant record, so a stolen
+            // enchanted item keeps its enchant limit and can still have its enchants removed
+            Description = d.Description ?? "",
+            EnchantBase = d.EnchantBase ?? ""
+        };
+
     private async Task<(string? name, Equipment? equipment)> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
     {
         try
@@ -803,33 +836,7 @@ public class DormitoryLocation : BaseLocation
             var stolenEquip = playerData.DynamicEquipment![index];
 
             // Build an Equipment object from the save data before removing it
-            var equipment = new Equipment
-            {
-                Id = stolenEquip.Id,
-                Name = stolenEquip.Name ?? name,
-                Slot = (EquipmentSlot)(stolenEquip.Slot),
-                Handedness = (WeaponHandedness)(stolenEquip.Handedness),
-                WeaponType = (WeaponType)(stolenEquip.WeaponType),
-                WeaponPower = stolenEquip.WeaponPower,
-                ArmorClass = stolenEquip.ArmorClass,
-                ShieldBonus = stolenEquip.ShieldBonus,
-                BlockChance = stolenEquip.BlockChance,
-                DefenceBonus = stolenEquip.DefenceBonus,
-                StrengthBonus = stolenEquip.StrengthBonus,
-                DexterityBonus = stolenEquip.DexterityBonus,
-                AgilityBonus = stolenEquip.AgilityBonus,
-                ConstitutionBonus = stolenEquip.ConstitutionBonus,
-                IntelligenceBonus = stolenEquip.IntelligenceBonus,
-                WisdomBonus = stolenEquip.WisdomBonus,
-                CharismaBonus = stolenEquip.CharismaBonus,
-                MaxHPBonus = stolenEquip.MaxHPBonus,
-                MaxManaBonus = stolenEquip.MaxManaBonus,
-                Value = stolenEquip.Value,
-                IsIdentified = true,
-                MinLevel = stolenEquip.MinLevel,
-                Rarity = (EquipmentRarity)stolenEquip.Rarity, // v1.1: was dropped; a stolen Legendary arrived Common
-                Family = stolenEquip.Family ?? ""
-            };
+            var equipment = StolenEquipmentFrom(stolenEquip, name);
 
             // Also remove from equipped slots if this item is equipped
             if (playerData.EquippedItems != null)

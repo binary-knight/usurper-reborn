@@ -351,7 +351,7 @@ names|Scripts/Locations/LevelMasterLocation.cs|new()#0|master names
 table|Scripts/Locations/LevelMasterLocation.cs|new()#1|master description
 names|Scripts/Locations/MagicShopLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 nouns|Scripts/Locations/MagicShopLocation.cs|decl:StatNames|stat code an enchant appends to the stored item name, English in every language (GearSetFamilyResolver)
-table|Scripts/Locations/MagicShopLocation.cs|=suffix|enchanted item name suffix, stored, English in every language (GearSetFamilyResolver)
+table|Scripts/Locations/MagicShopLocation.cs|decl:NamedEnchantTags/tuple#1|enchant name tags, stored, English in every language (GearSetFamilyResolver)
 nouns|Scripts/Locations/MagicShopLocation.cs|=targetEquip.Name|item name prefix, stored, English in every language (GearSetFamilyResolver)
 nouns|Scripts/Locations/MagicShopLocation.cs|=targetItem.Name|item name prefix, stored, English in every language (GearSetFamilyResolver)
 names|Scripts/Locations/MainStreetLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels

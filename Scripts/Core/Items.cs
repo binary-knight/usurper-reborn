@@ -89,6 +89,9 @@ public class Item
     /// five-enchant limit and the one-of-each-kind rule reset on every conversion.
     /// </summary>
     public string EnchantMarkers { get; set; } = "";
+
+    /// <summary>v1.2.5: the pre-enchant form of the Equipment this Item was converted from (Equipment.EnchantBase).</summary>
+    public string EnchantBase { get; set; } = "";
     
     /// <summary>
     /// Constructor for creating items
@@ -793,6 +796,9 @@ public class Equipment
     public EquipmentRarity Rarity { get; set; } = EquipmentRarity.Common;
     /// <summary>v1.1: English template name this piece was generated from; see Item.Family.</summary>
     public string Family { get; set; } = "";
+    /// <summary>v1.2.5: the item as it was before its first Magic Shop enchant (EnchantBaseRecord as JSON),
+    /// "" when it carries no record. Enchant removal restores it; see RecordEnchantBase.</summary>
+    public string EnchantBase { get; set; } = "";
 
     // Economics
     public long Value { get; set; }         // Buy price
@@ -1279,6 +1285,7 @@ public class Equipment
             WeightClass = this.WeightClass,
             Rarity = this.Rarity,
             Family = this.Family, // v1.1: an enchanted or reforged copy stays in its set
+            EnchantBase = this.EnchantBase, // v1.2.5: an enchanted copy keeps its pre-enchant form
             // Economics
             Value = this.Value,
             // Combat stats
@@ -1448,6 +1455,99 @@ public class Equipment
         {
             Description = Description + " " + newMarker;
         }
+    }
+
+    /// <summary>v1.2.5: what a Magic Shop enchant can change on an item: the name, the value, the stats the enchant
+    /// tiers raise, and the fire and frost flags. Stored as JSON in Equipment.EnchantBase.</summary>
+    public sealed class EnchantBaseRecord
+    {
+        public string Name { get; set; } = "";
+        public long Value { get; set; }
+        public int WeaponPower { get; set; }
+        public int ArmorClass { get; set; }
+        public int StrengthBonus { get; set; }
+        public int DexterityBonus { get; set; }
+        public int ConstitutionBonus { get; set; }
+        public int IntelligenceBonus { get; set; }
+        public int WisdomBonus { get; set; }
+        public int CharismaBonus { get; set; }
+        public int DefenceBonus { get; set; }
+        public int StaminaBonus { get; set; }
+        public int AgilityBonus { get; set; }
+        public int CriticalChanceBonus { get; set; }
+        public int CriticalDamageBonus { get; set; }
+        public int MagicResistance { get; set; }
+        public int LifeSteal { get; set; }
+        public bool HasFireEnchant { get; set; }
+        public bool HasFrostEnchant { get; set; }
+    }
+
+    /// <summary>v1.2.5: this item's enchantable fields as a record.</summary>
+    public EnchantBaseRecord ToEnchantBaseRecord() => new()
+    {
+        Name = Name, Value = Value, WeaponPower = WeaponPower, ArmorClass = ArmorClass,
+        StrengthBonus = StrengthBonus, DexterityBonus = DexterityBonus, ConstitutionBonus = ConstitutionBonus,
+        IntelligenceBonus = IntelligenceBonus, WisdomBonus = WisdomBonus, CharismaBonus = CharismaBonus,
+        DefenceBonus = DefenceBonus, StaminaBonus = StaminaBonus, AgilityBonus = AgilityBonus,
+        CriticalChanceBonus = CriticalChanceBonus, CriticalDamageBonus = CriticalDamageBonus,
+        MagicResistance = MagicResistance, LifeSteal = LifeSteal, HasFireEnchant = HasFireEnchant, HasFrostEnchant = HasFrostEnchant,
+    };
+
+    /// <summary>v1.2.5: set this item's enchantable fields to the record's.</summary>
+    public void ApplyEnchantBaseRecord(EnchantBaseRecord r)
+    {
+        Name = r.Name; Value = r.Value; WeaponPower = r.WeaponPower; ArmorClass = r.ArmorClass;
+        StrengthBonus = r.StrengthBonus; DexterityBonus = r.DexterityBonus; ConstitutionBonus = r.ConstitutionBonus;
+        IntelligenceBonus = r.IntelligenceBonus; WisdomBonus = r.WisdomBonus; CharismaBonus = r.CharismaBonus;
+        DefenceBonus = r.DefenceBonus; StaminaBonus = r.StaminaBonus; AgilityBonus = r.AgilityBonus;
+        CriticalChanceBonus = r.CriticalChanceBonus; CriticalDamageBonus = r.CriticalDamageBonus;
+        MagicResistance = r.MagicResistance; LifeSteal = r.LifeSteal; HasFireEnchant = r.HasFireEnchant; HasFrostEnchant = r.HasFrostEnchant;
+    }
+
+    /// <summary>v1.2.5: before the first enchant (no enchant count yet, no record), keep the item as it is now,
+    /// so removal can return it to exactly this. An item enchanted before 1.2.5 has a count and no record and
+    /// gets none here: its later enchants would otherwise be counted as its base.</summary>
+    public void RecordEnchantBase()
+    {
+        if (!string.IsNullOrEmpty(EnchantBase) || GetEnchantmentCount() > 0) return;
+        EnchantBase = System.Text.Json.JsonSerializer.Serialize(ToEnchantBaseRecord());
+    }
+
+    /// <summary>v1.2.5: the recorded pre-enchant form, or null when there is none (or it does not parse).</summary>
+    public EnchantBaseRecord? GetEnchantBase()
+    {
+        if (string.IsNullOrEmpty(EnchantBase)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<EnchantBaseRecord>(EnchantBase); }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    /// <summary>v1.2.5: after a change to an enchanted item that is not an enchant (a reforge), move the recorded
+    /// base by the same change, so removal later keeps that change and takes off only the enchants. Each number
+    /// moves by (now - before), never above the item's new value and never below the smaller of its old base and
+    /// zero; a flag or the name that changed takes its new state. No record, nothing to do.</summary>
+    public void ShiftEnchantBase(Equipment before)
+    {
+        var record = GetEnchantBase();
+        if (record == null) return;
+        var was = before.ToEnchantBaseRecord();
+        var now = ToEnchantBaseRecord();
+        foreach (var prop in typeof(EnchantBaseRecord).GetProperties())
+        {
+            if (prop.PropertyType == typeof(int))
+            {
+                int b = (int)prop.GetValue(record)!, w = (int)prop.GetValue(was)!, n = (int)prop.GetValue(now)!;
+                long moved = (long)b + n - w;
+                prop.SetValue(record, (int)Math.Clamp(moved, Math.Min(b, 0), Math.Max(n, Math.Min(b, 0))));
+            }
+            else if (prop.PropertyType == typeof(long))
+            {
+                long b = (long)prop.GetValue(record)!, w = (long)prop.GetValue(was)!, n = (long)prop.GetValue(now)!;
+                prop.SetValue(record, Math.Clamp(b + n - w, Math.Min(b, 0), Math.Max(n, Math.Min(b, 0))));
+            }
+            else if (!Equals(prop.GetValue(was), prop.GetValue(now)))
+                prop.SetValue(record, prop.GetValue(now));
+        }
+        EnchantBase = System.Text.Json.JsonSerializer.Serialize(record);
     }
 
     #region Fluent Setters (for builder pattern)

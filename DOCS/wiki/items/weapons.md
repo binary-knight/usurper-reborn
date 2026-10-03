@@ -1,7 +1,7 @@
 ---
 title: Weapons and restrictions
 path: /wiki/en/items/weapons/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs
 ---
 Weapon power is only one input to damage. Weapon type, handedness, class compatibility and ability requirements can change whether a weapon fits your build.

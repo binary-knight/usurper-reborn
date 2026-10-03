@@ -1520,7 +1520,8 @@ public class Character
             Cursed = equipment.IsCursed,
             MinLevel = equipment.MinLevel,
             Rarity = equipment.Rarity, // issue #112: carry rarity so re-equip doesn't reset reforged quality
-            Family = equipment.Family ?? ""
+            Family = equipment.Family ?? "",
+            EnchantBase = equipment.EnchantBase ?? ""   // v1.2.5: the pre-enchant form, for full removal
         };
 
         // Preserve CON/INT as LootEffects for re-equip
@@ -1616,7 +1617,8 @@ public class Character
             IsIdentified = item.IsIdentified,
             MinLevel = item.MinLevel,
             Rarity = item.Rarity,
-            Family = item.Family ?? ""
+            Family = item.Family ?? "",
+            EnchantBase = item.EnchantBase ?? ""   // v1.2.5: the pre-enchant form, for full removal
         };
         ApplyItemLootEffectsToEquipment(item, equipment);
         equipment.RestoreEnchantMarkers(item.EnchantMarkers);   // v1.1.7
