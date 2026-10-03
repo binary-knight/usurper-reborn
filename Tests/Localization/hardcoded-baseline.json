@@ -432,48 +432,6 @@
       "cd4152bafb"
     ]
   },
-  "Scripts/Systems/NewsSystem.cs": {
-    "count": 13,
-    "sites": [
-      "114ec89b2b",
-      "38136ab1a8",
-      "4616fe03fa",
-      "7a5ca19a20",
-      "8d415dee37",
-      "9aa6eb307e",
-      "addeeb6491",
-      "b1906a6ec1",
-      "b1f39be824",
-      "be7e982d67",
-      "c6d2daff44",
-      "e08b4e0cdd",
-      "f84d1d3256"
-    ]
-  },
-  "Scripts/Systems/OnlineChatSystem.cs": {
-    "count": 19,
-    "sites": [
-      "00203bbbf8",
-      "1d16bcdce0",
-      "29a41fe7db",
-      "586b49c166",
-      "595d3500b4",
-      "5a23e896c4",
-      "69d1f1700b",
-      "6a49c74e47",
-      "755cf4da10",
-      "a19fc164c7",
-      "a94e56571c",
-      "a950c49d42",
-      "abb65f63eb",
-      "b1e8993628",
-      "b3e3d2ddce",
-      "b3e3d2ddce",
-      "dc1b772879",
-      "f082e70e75",
-      "fddbf13d15"
-    ]
-  },
   "Scripts/Systems/PermadeathHelper.cs": {
     "count": 1,
     "sites": [
@@ -519,81 +477,19 @@
     ]
   },
   "Scripts/Systems/SqlSaveBackend.cs": {
-    "count": 42,
+    "count": 11,
     "sites": [
-      "049c1a738f",
-      "099f0618f5",
-      "099f0618f5",
-      "0a87670258",
-      "1d8664d37d",
-      "2652c3d871",
-      "2652c3d871",
-      "27b70f4ef7",
       "32113ad09c",
-      "32113ad09c",
-      "32113ad09c",
-      "47bc803587",
-      "49944dde4b",
-      "4c4b9e9c70",
-      "4c4b9e9c70",
-      "67c3fcf20a",
-      "6c8b6f2039",
-      "74e997eb9a",
-      "7e2abfceb5",
-      "825cf2738f",
       "89c031d9aa",
-      "a705692c8e",
-      "ae1f1d9b52",
-      "ae1f1d9b52",
-      "b4272e3e82",
-      "c72599b62c",
-      "c867546568",
-      "cdd61d4792",
-      "cdd61d4792",
       "d5e7ca6d07",
-      "dc414039bb",
       "e2b03b36a4",
       "e7766cdec3",
-      "e7766cdec3",
-      "ed42515586",
       "f0612841d6",
       "f0612841d6",
       "f0612841d6",
       "f0612841d6",
       "f0612841d6",
-      "f0612841d6",
-      "f61674805a"
-    ]
-  },
-  "Scripts/Systems/TeamBalanceSystem.cs": {
-    "count": 2,
-    "sites": [
-      "2fad3feeae",
-      "44602442b3"
-    ]
-  },
-  "Scripts/Systems/TeamSystem.cs": {
-    "count": 19,
-    "sites": [
-      "00e7b216ed",
-      "0f34e27da8",
-      "138f5af20c",
-      "198ef8e47a",
-      "2815382023",
-      "3891d4f14d",
-      "5360d7a327",
-      "55edcc21c7",
-      "63065fc9f4",
-      "69c071f7ad",
-      "813bc2ab19",
-      "8f92a3028a",
-      "9c47e51012",
-      "bfec0fcfea",
-      "e046d26e76",
-      "e3a4067775",
-      "ea1591a6c2",
-      "ea7a62f288",
-      "fd4ff61b04"
+      "f0612841d6"
     ]
   },
   "Scripts/Systems/TrainingSystem.cs": {

@@ -3424,60 +3424,11 @@
       ]
     }
   },
-  "Scripts/Systems/GuildSystem.cs": {
-    "data": {
-      "count": 4,
-      "sites": [
-        "404b57118a",
-        "9f4db7aed8",
-        "f731df1bc8",
-        "fd0eab19dd"
-      ]
-    }
-  },
   "Scripts/Systems/InventorySystem.cs": {
     "data": {
       "count": 1,
       "sites": [
         "5763876627"
-      ]
-    }
-  },
-  "Scripts/Systems/MailSystem.cs": {
-    "data": {
-      "count": 31,
-      "sites": [
-        "04239f5945",
-        "0c4a320a5a",
-        "1964fce4dc",
-        "1b1c356382",
-        "229a35cfaa",
-        "271e7af107",
-        "2ab8983911",
-        "2bbe527641",
-        "5215f5029f",
-        "5e3f66be5f",
-        "737ab6adb1",
-        "796c74aeb2",
-        "7c2fd7c7e5",
-        "8e847df6ae",
-        "9a77396231",
-        "9ca3dcb390",
-        "9d8268bea2",
-        "a4215dd6d7",
-        "ad7681fbd3",
-        "bb3d57eee8",
-        "be7e9c401e",
-        "c2f66f04c7",
-        "ce9e253aec",
-        "cfa119f55b",
-        "d395bfbc06",
-        "d6df39c7d0",
-        "db488df444",
-        "ec4ccbbf84",
-        "f519cecbc8",
-        "f5486fef81",
-        "f9cc40b358"
       ]
     }
   },
@@ -4313,48 +4264,11 @@
       ]
     }
   },
-  "Scripts/Systems/SqlSaveBackend.cs": {
-    "data": {
-      "count": 10,
-      "sites": [
-        "567338fc22",
-        "567338fc22",
-        "a1972b1dff",
-        "a1972b1dff",
-        "bd9efd42e5",
-        "cd3bf6f825",
-        "cd3bf6f825",
-        "e2b55b39f0",
-        "f1df60a8af",
-        "f480a8ec09"
-      ]
-    }
-  },
   "Scripts/Systems/StreetEncounterSystem.cs": {
     "data": {
       "count": 1,
       "sites": [
         "79e325f9b0"
-      ]
-    }
-  },
-  "Scripts/Systems/TeamSystem.cs": {
-    "data": {
-      "count": 13,
-      "sites": [
-        "05377357f0",
-        "26d1cea11b",
-        "48fdda2bda",
-        "6dc613c0e2",
-        "7c13339088",
-        "81ae1444bd",
-        "954586fb66",
-        "a7449628bf",
-        "b12ac16875",
-        "bd96c18076",
-        "e29b8276cc",
-        "eb38c38d10",
-        "f27beddb9d"
       ]
     }
   },

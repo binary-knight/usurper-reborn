@@ -162,30 +162,30 @@ public partial class NewsSystem
     public void WriteDeathNews(string playerName, string killerName, string location)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "† ";
-        Newsy($"{prefix}{playerName} was slain by {killerName} at {location}!");
+        Newsy(prefix + Loc.Get("news.death", playerName, killerName, location));
     }
 
     public void WriteBirthNews(string motherName, string fatherName, string childName, bool isNPC = false)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "♥ ";
-        Newsy($"{prefix}{motherName} and {fatherName} are proud parents of {childName}!");
+        Newsy(prefix + Loc.Get("news.birth", motherName, fatherName, childName));
     }
 
     public void WriteNaturalDeathNews(string npcName, int age, string race)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "⚱ ";
-        Newsy($"{prefix}{npcName}, a {race} of {age} years, has passed away peacefully. The soul moves on...");
+        Newsy(prefix + Loc.Get("news.natural_death", npcName, race, age));
     }
 
     public void WriteComingOfAgeNews(string childName, string motherName, string fatherName)
     {
-        Newsy($"{childName}, child of {motherName} and {fatherName}, has come of age and joined the realm!");
+        Newsy(Loc.Get("news.coming_of_age", childName, motherName, fatherName));
     }
 
     public void WriteBirthdayNews(string npcName, int age, string race)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "🎂 ";
-        Newsy($"{prefix}{npcName} the {race} celebrates their {age}{GetOrdinalSuffix(age)} birthday!");
+        Newsy(prefix + Loc.Get("news.birthday", npcName, race, age, GetOrdinalSuffix(age)));
     }
 
     private static string GetOrdinalSuffix(int number)
@@ -204,31 +204,40 @@ public partial class NewsSystem
     public void WriteNPCLevelUpNews(string npcName, int level, string className, string race)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "⬆ ";
-        Newsy($"{prefix}{npcName} the {race} {className} has achieved Level {level}!");
+        Newsy(prefix + Loc.Get("news.npc_level_up", npcName, race, className, level));
     }
 
     public void WriteMarriageNews(string player1Name, string player2Name, string location = "Temple")
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "♥ ";
-        Newsy($"{prefix}{player1Name} and {player2Name} were married at the {location}!");
+        Newsy(prefix + Loc.Get("news.marriage", player1Name, player2Name, MarriagePlace(location)));
     }
+
+    /// <summary>v1.2.5: the wedding place the callers pass (Church, Castle, Temple) in the writer's language; another one as given.</summary>
+    internal static string MarriagePlace(string location) => location switch
+    {
+        "Church" => Loc.Get("news.place_church"),
+        "Castle" => Loc.Get("news.place_castle"),
+        "Temple" => Loc.Get("news.place_temple"),
+        _ => location
+    };
 
     public void WriteDivorceNews(string player1Name, string player2Name)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "✗ ";
-        Newsy($"{prefix}{player1Name} and {player2Name} have divorced!");
+        Newsy(prefix + Loc.Get("news.divorce", player1Name, player2Name));
     }
 
     public void WriteAffairNews(string npcName, string loverName)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "💋 ";
-        Newsy($"{prefix}Scandal! {npcName} and {loverName} are having a secret affair!");
+        Newsy(prefix + Loc.Get("news.affair", npcName, loverName));
     }
 
     public void WriteRoyalNews(string kingName, string proclamation)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "♔ ";
-        Newsy($"{prefix}King {kingName} proclaims: {proclamation}");
+        Newsy(prefix + Loc.Get("news.royal_proclaims", kingName, proclamation));
     }
 
     public void WriteHolyNews(string godName, string event_description)
@@ -239,15 +248,14 @@ public partial class NewsSystem
 
     public void WriteQuestNews(string playerName, string questDescription, bool completed = true)
     {
-        string status = completed ? "completed" : "failed";
         string prefix = GameConfig.ScreenReaderMode ? "" : "⚔ ";
-        Newsy($"{prefix}{playerName} {status} quest: {questDescription}");
+        Newsy(prefix + Loc.Get(completed ? "news.quest_completed" : "news.quest_failed", playerName, questDescription));
     }
 
     public void WriteTeamNews(string teamName, string event_description)
     {
         string prefix = GameConfig.ScreenReaderMode ? "" : "⚑ ";
-        Newsy($"{prefix}Team {teamName}: {event_description}");
+        Newsy(prefix + Loc.Get("news.team", teamName, event_description));
     }
 
     public void WritePrisonNews(string playerName, string event_description)
@@ -316,15 +324,29 @@ public partial class NewsSystem
     };
 
     /// <summary>
+    /// v1.2.5: the gossip keywords: the English ones, which match news written in English, and the
+    /// reader's language's ones (news.gossip_keywords, pieces of that language's news texts), which match
+    /// news written in that language. News is written in the writer's language, so offline it is the reader's.
+    /// </summary>
+    internal static List<string> GossipKeywordsForReader()
+    {
+        var words = new List<string>(GossipKeywords);
+        if (GameConfig.Language != "en")
+            words.AddRange(Loc.Get("news.gossip_keywords").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        return words;
+    }
+
+    /// <summary>
     /// Get recent gossip-worthy news items (marriages, deaths, affairs, births, level-ups, etc.)
     /// Returns items from the in-memory cache, filtered to interesting NPC events.
     /// </summary>
     public List<string> GetRecentGossip(int maxEntries = 4)
     {
         var allNews = GetTodaysNews();
+        var keywords = GossipKeywordsForReader();
 
         var gossip = allNews
-            .Where(line => GossipKeywords.Any(kw => line.Contains(kw, StringComparison.OrdinalIgnoreCase)))
+            .Where(line => keywords.Any(kw => line.Contains(kw, StringComparison.OrdinalIgnoreCase)))
             .ToList();
 
         // If not enough from today's cache, try the full file
@@ -332,7 +354,7 @@ public partial class NewsSystem
         {
             var fileNews = ReadNews();
             var fileGossip = fileNews
-                .Where(line => GossipKeywords.Any(kw => line.Contains(kw, StringComparison.OrdinalIgnoreCase)))
+                .Where(line => keywords.Any(kw => line.Contains(kw, StringComparison.OrdinalIgnoreCase)))
                 .Where(line => !gossip.Contains(line))
                 .ToList();
             gossip.AddRange(fileGossip);
@@ -366,7 +388,7 @@ public partial class NewsSystem
                 }
 
                 // Add a new day marker
-                Newsy("═══ New Day ═══");
+                Newsy($"═══ {Loc.Get("news.new_day")} ═══");
             }
             catch (Exception ex)
             {
@@ -420,7 +442,7 @@ public partial class NewsSystem
 
             if (!File.Exists(_newsFilePath))
             {
-                File.WriteAllText(_newsFilePath, "═══ Usurper Daily News ═══\n");
+                File.WriteAllText(_newsFilePath, $"═══ {Loc.Get("news.daily_news_title")} ═══\n");
             }
         }
         catch (Exception ex)

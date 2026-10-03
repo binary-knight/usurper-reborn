@@ -24,7 +24,7 @@ public static partial class MailSystem
         var mail = new MailRecord
         {
             Receiver = playerName,
-            Sender = "SYSTEM",
+            Sender = Loc.Get("mail.sender_system"),
             Subject = subject,
             Date = DateTime.Now,
             ReadFlag = false,
@@ -125,23 +125,23 @@ public static partial class MailSystem
         var mail = new MailRecord
         {
             Receiver = playerName,
-            Sender = "TOWN COUNCIL",
-            Subject = "Birthday Party!",
+            Sender = Loc.Get("mail.sender_town_council"),
+            Subject = Loc.Get("mail.birthday_subject"),
             Date = DateTime.Now,
             ReadFlag = false,
             Special = GameConfig.MailRequestBirthday,
             Lines = new List<string>
             {
-                $"You celebrated your {newAge} birthday!",
-                "The Town council has gracefully decided you worthy a present.",
+                Loc.Get("mail.birthday_line_celebrated", newAge),
+                Loc.Get("mail.birthday_line_present"),
                 "",
-                "Choose a gift:",
-                "(E)xperience - Gain knowledge and wisdom",
-                "(L)ove - Increase your charm and charisma", 
-                "(A)dopt a child - Expand your family",
-                "(S)kip - Decline all gifts",
+                Loc.Get("mail.birthday_line_choose"),
+                Loc.Get("mail.birthday_line_experience"),
+                Loc.Get("mail.birthday_line_love"),
+                Loc.Get("mail.birthday_line_adopt"),
+                Loc.Get("mail.birthday_line_skip"),
                 "",
-                "Visit the Town Council to claim your gift!"
+                Loc.Get("mail.birthday_line_visit")
             }
         };
         
@@ -160,24 +160,24 @@ public static partial class MailSystem
         {
             Receiver = playerName,
             Sender = kingName,
-            Subject = "Royal Guard Recruitment",
+            Subject = Loc.Get("mail.guard_subject"),
             Date = DateTime.Now,
             ReadFlag = false,
             Special = GameConfig.MailRequestRoyalGuard,
             Lines = new List<string>
             {
-                "Greetings, brave warrior!",
+                Loc.Get("mail.guard_line_greetings"),
                 "",
-                $"I, {kingName}, ruler of this realm, have been watching",
-                "your deeds with great interest.",
+                Loc.Get("mail.guard_line_watching", kingName),
+                Loc.Get("mail.guard_line_deeds"),
                 "",
-                "I hereby offer you a position as one of my Royal Guards.",
-                $"The position pays {wage} gold per day.",
+                Loc.Get("mail.guard_line_offer"),
+                Loc.Get("mail.guard_line_pay", wage),
                 "",
-                "Visit the castle to accept or decline this honor.",
+                Loc.Get("mail.guard_line_visit"),
                 "",
-                "Long live the realm!",
-                $"-- {kingName}"
+                Loc.Get("mail.guard_line_long_live"),
+                Loc.Get("mail.neglect_letter_line3", kingName)
             }
         };
         
@@ -196,10 +196,11 @@ public static partial class MailSystem
         {
             Receiver = receiverName,
             Sender = proposerName,
-            Subject = isProposal ? "Marriage Proposal" : "Marriage Update",
+            Subject = Loc.Get(isProposal ? "mail.marriage_subject_proposal" : "mail.marriage_subject_update"),
             Date = DateTime.Now,
             ReadFlag = false,
             Special = GameConfig.MailRequestMarriage,
+            IsProposal = isProposal,
             Lines = new List<string>()
         };
         
@@ -207,30 +208,30 @@ public static partial class MailSystem
         {
             mail.Lines.AddRange(new[]
             {
-                "My Dearest Love,",
+                Loc.Get("mail.marriage_line_dearest"),
                 "",
-                "After much consideration, I have decided to ask",
-                "for your hand in marriage.",
+                Loc.Get("mail.marriage_line_considered"),
+                Loc.Get("mail.marriage_line_hand"),
                 "",
-                "Will you marry me and share in life's adventures?",
+                Loc.Get("mail.marriage_line_will_you"),
                 "",
-                "Visit the temple to give your answer.",
+                Loc.Get("mail.marriage_line_visit_temple"),
                 "",
-                $"With all my love,",
-                $"-- {proposerName}"
+                Loc.Get("mail.marriage_line_love"),
+                Loc.Get("mail.neglect_letter_line3", proposerName)
             });
         }
         else
         {
             mail.Lines.AddRange(new[]
             {
-                "Marriage Status Update",
+                Loc.Get("mail.marriage_line_status_update"),
                 "",
-                "Your relationship status has changed.",
+                Loc.Get("mail.marriage_line_changed"),
                 "",
-                "Check your character status for details.",
+                Loc.Get("mail.marriage_line_check_status"),
                 "",
-                "-- The Temple"
+                Loc.Get("mail.marriage_line_temple_sign")
             });
         }
         
@@ -245,30 +246,27 @@ public static partial class MailSystem
     /// </summary>
     public static void SendChildBirthMail(string parentName, string childName, bool isBoy)
     {
-        var genderText = isBoy ? "son" : "daughter";
-        var pronounText = isBoy ? "He" : "She";
-        
         var mail = new MailRecord
         {
             Receiver = parentName,
-            Sender = "THE STORK",
-            Subject = "A New Arrival!",
+            Sender = Loc.Get("mail.sender_stork"),
+            Subject = Loc.Get("mail.child_subject"),
             Date = DateTime.Now,
             ReadFlag = false,
             Special = GameConfig.MailRequestChildBorn,
             Lines = new List<string>
             {
-                "Congratulations!",
+                Loc.Get("mail.child_line_congratulations"),
                 "",
-                $"A new {genderText} has been born to you!",
-                $"The child's name is {childName}.",
+                Loc.Get(isBoy ? "mail.child_line_born_son" : "mail.child_line_born_daughter"),
+                Loc.Get("mail.child_line_name", childName),
                 "",
-                $"{pronounText} appears to be healthy and strong.",
+                Loc.Get(isBoy ? "mail.child_line_healthy_he" : "mail.child_line_healthy_she"),
                 "",
-                "Visit the Royal Orphanage to see your child.",
+                Loc.Get("mail.child_line_visit"),
                 "",
-                "May your family grow in happiness!",
-                "-- The Stork"
+                Loc.Get("mail.child_line_family"),
+                Loc.Get("mail.child_line_sign")
             }
         };
         
@@ -291,8 +289,8 @@ public static partial class MailSystem
             var mail = new MailRecord
             {
                 Receiver = gameEngine.CurrentPlayer.Name2,
-                Sender = "TOWN CRIER",
-                Subject = "Daily News",
+                Sender = Loc.Get("mail.sender_town_crier"),
+                Subject = Loc.Get("mail.news_subject"),
                 Date = DateTime.Now,
                 ReadFlag = false,
                 Special = GameConfig.MailRequestNews,
@@ -509,7 +507,7 @@ public static partial class MailSystem
     /// </summary>
     private static async Task ProcessMarriageMail(MailRecord mail, TerminalUI terminal)
     {
-        if (mail.Subject.Contains("Proposal"))
+        if (mail.IsProposal)
         {
             terminal.WriteLine(Loc.Get("mail.marriage_accept_question"), "bright_yellow");
             terminal.WriteLine(Loc.Get("mail.marriage_yes"), "white");
@@ -621,5 +619,7 @@ public class MailRecord
     public DateTime Date { get; set; }
     public bool ReadFlag { get; set; } = false;
     public byte Special { get; set; } = 0;
+    /// <summary>v1.2.5: a marriage mail that asks for an answer (the subject is in the recipient's language, so it is not matched).</summary>
+    public bool IsProposal { get; set; } = false;
     public List<string> Lines { get; set; } = new List<string>();
 } 

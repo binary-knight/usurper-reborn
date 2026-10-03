@@ -102,7 +102,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("════════════════════════════════════════════════════════════");
             }
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(GameConfig.ScreenReaderMode ? "WHO'S ONLINE" : "                     WHO'S ONLINE");
+            string whoTitle = Loc.Get("main_street.whos_online").ToUpperInvariant();
+            terminal.WriteLine(GameConfig.ScreenReaderMode ? whoTitle : "                     " + whoTitle);
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("cyan");
@@ -113,12 +114,12 @@ namespace UsurperRemake.Systems
             if (players.Count == 0)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  No other players currently online.");
+                terminal.WriteLine("  " + Loc.Get("chat.who_no_others"));
             }
             else
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  {"Player",-18} {"Location",-16} {"Via",-5} {"Connected"}");
+                terminal.WriteLine(WhoColumnsRow());
                 if (!GameConfig.ScreenReaderMode)
                 {
                     terminal.SetColor("darkgray");
@@ -148,37 +149,80 @@ namespace UsurperRemake.Systems
                             displayName = $"{livePlayer.NobleTitle} {displayName}";
 
                         if (session.IsSpectating && session.SpectatingSession != null)
-                            specTag = $" [watching {session.SpectatingSession.Username}]";
+                            specTag = Loc.Get("chat.who_watching_tag", session.SpectatingSession.Username);
                         else if (session.Spectators.Count > 0)
-                            specTag = $" [{session.Spectators.Count} watching]";
+                            specTag = Loc.Get("chat.who_watchers_tag", session.Spectators.Count);
                     }
 
-                    terminal.SetColor("white");
-                    terminal.Write($"  {displayName,-18} ");
-                    terminal.SetColor("green");
-                    terminal.Write($"{FormatLocation(player.Location),-16} ");
-                    terminal.SetColor("darkgray");
-                    terminal.Write($"{viaTag,-5} ");
-                    terminal.SetColor("gray");
-                    terminal.Write(durationStr);
-                    if (!string.IsNullOrEmpty(specTag))
-                    {
-                        terminal.SetColor("bright_magenta");
-                        terminal.Write(specTag);
-                    }
-                    terminal.WriteLine("");
+                    WriteWhoRow(terminal, displayName, FormatLocation(player.Location), viaTag, durationStr, specTag);
                 }
             }
 
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {players.Count} player{(players.Count != 1 ? "s" : "")} online");
+            terminal.WriteLine("  " + Loc.Get(players.Count == 1 ? "chat.who_count_one" : "chat.who_count_many", players.Count));
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("cyan");
                 terminal.WriteLine("════════════════════════════════════════════════════════════");
             }
             await terminal.PressAnyKey();
+        }
+
+        /// <summary>v1.2.5: the column titles of the who list, in the reader's language.</summary>
+        internal static string WhoColumnsRow() =>
+            $"  {Loc.Get("chat.who_col_player").PadRight(18)} {Loc.Get("chat.who_col_location").PadRight(16)} " +
+            $"{Loc.Get("chat.who_col_via").PadRight(5)} {Loc.Get("chat.who_col_connected")}";
+
+        /// <summary>
+        /// v1.2.5: one who list entry as rows of (text, colour) pieces. The columns pad as before; a piece
+        /// that would pass column 79 starts a new row, indented under the location column.
+        /// </summary>
+        internal static List<List<(string Text, string Color)>> WhoRows(string displayName, string location, string via, string duration, string specTag)
+        {
+            const int Width = 79;
+            string indent = new string(' ', 21);
+            var pieces = new List<(string Text, string Color)>
+            {
+                ($"{location,-16} ", "green"),
+                ($"{via,-5} ", "darkgray"),
+                (duration, "gray"),
+            };
+            if (!string.IsNullOrEmpty(specTag)) pieces.Add((" " + specTag, "bright_magenta"));
+
+            var rows = new List<List<(string Text, string Color)>>();
+            var row = new List<(string Text, string Color)> { ($"  {displayName,-18} ", "white") };
+            int used = row[0].Text.Length;
+            foreach (var (text, color) in pieces)
+            {
+                if (used > indent.Length && used + text.Length > Width)
+                {
+                    rows.Add(row);
+                    row = new List<(string Text, string Color)> { (indent, "white") };
+                    used = indent.Length;
+                    string moved = text.TrimStart();
+                    row.Add((moved, color));
+                    used += moved.Length;
+                    continue;
+                }
+                row.Add((text, color));
+                used += text.Length;
+            }
+            rows.Add(row);
+            return rows;
+        }
+
+        private static void WriteWhoRow(TerminalEmulator terminal, string displayName, string location, string via, string duration, string specTag)
+        {
+            foreach (var row in WhoRows(displayName, location, via, duration, specTag))
+            {
+                foreach (var (text, color) in row)
+                {
+                    terminal.SetColor(color);
+                    terminal.Write(text);
+                }
+                terminal.WriteLine("");
+            }
         }
 
         /// <summary>
@@ -306,7 +350,7 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Display a single chat message.
         /// </summary>
-        private void DisplayMessage(TerminalEmulator terminal, ChatMessage msg)
+        internal static void DisplayMessage(TerminalEmulator terminal, ChatMessage msg)
         {
             switch (msg.Type)
             {
@@ -318,31 +362,19 @@ namespace UsurperRemake.Systems
                     break;
 
                 case "chat_private":
-                    terminal.SetColor("magenta");
-                    terminal.Write($"[PM from {msg.From}] ");
-                    terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(msg.Text);
+                    WriteTagged(terminal, Loc.Get("chat.pm_from_tag", msg.From), "magenta", msg.Text, "bright_magenta");
                     break;
 
                 case "system":
-                    terminal.SetColor("bright_yellow");
-                    terminal.Write("[SYSTEM] ");
-                    terminal.SetColor("yellow");
-                    terminal.WriteLine(msg.Text);
+                    WriteTagged(terminal, Loc.Get("chat.system_tag"), "bright_yellow", msg.Text, "yellow");
                     break;
 
                 case "duel":
-                    terminal.SetColor("red");
-                    terminal.Write($"[DUEL] ");
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"{msg.From} challenges you to a duel!");
+                    WriteTagged(terminal, Loc.Get("chat.duel_tag"), "red", Loc.Get("chat.duel_challenge", msg.From), "bright_red");
                     break;
 
                 case "trade":
-                    terminal.SetColor("green");
-                    terminal.Write($"[TRADE] ");
-                    terminal.SetColor("bright_green");
-                    terminal.WriteLine($"{msg.From} sent you a trade offer.");
+                    WriteTagged(terminal, Loc.Get("chat.trade_tag"), "green", Loc.Get("chat.trade_offer", msg.From), "bright_green");
                     break;
 
                 default:
@@ -350,6 +382,23 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine($"[{msg.From}] {msg.Text}");
                     break;
             }
+        }
+
+        /// <summary>
+        /// v1.2.5: a tag ("[DUEL]") and its text; a text wider than the row wraps, its later rows indented
+        /// under the text after the tag.
+        /// </summary>
+        internal static void WriteTagged(TerminalEmulator terminal, string tag, string tagColor, string text, string textColor)
+        {
+            string prefix = tag + " ";
+            var parts = UsurperRemake.UI.UIHelper.WrapAfterPrefix(prefix, text);
+            terminal.SetColor(tagColor);
+            terminal.Write(prefix);
+            terminal.SetColor(textColor);
+            terminal.WriteLine(parts[0]);
+            string indent = new string(' ', UsurperRemake.UI.UIHelper.VisibleLength(prefix));
+            for (int i = 1; i < parts.Count; i++)
+                terminal.WriteLine(indent + parts[i]);
         }
 
         /// <summary>
@@ -371,9 +420,9 @@ namespace UsurperRemake.Systems
                 {
                     await Say(message);
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"[You] {message}");
+                    terminal.WriteLine(Loc.Get("chat.you_line", message));
                     terminal.SetColor("green");
-                    terminal.WriteLine("  Message sent!");
+                    terminal.WriteLine("  " + Loc.Get("chat.message_sent"));
                     await Pacing.Wait(1500);
                 }
                 return true;
@@ -404,7 +453,7 @@ namespace UsurperRemake.Systems
                             if (resolvedTarget != null) targetPlayer = resolvedTarget;
                             await Tell(targetPlayer, message);
                             terminal.SetColor("magenta");
-                            terminal.WriteLine($"[To {targetPlayer}] {message}");
+                            terminal.WriteLine(Loc.Get("chat.to_line", targetPlayer, message));
 
                             // Check if target is online
                             var onlinePlayers = await stateManager.GetOnlinePlayers();
@@ -414,9 +463,9 @@ namespace UsurperRemake.Systems
 
                             terminal.SetColor("green");
                             if (isOnline)
-                                terminal.WriteLine("  Message sent!");
+                                terminal.WriteLine("  " + Loc.Get("chat.message_sent"));
                             else
-                                terminal.WriteLine($"  Message sent to {targetPlayer} (offline - they'll see it next login).");
+                                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("chat.message_sent_offline", targetPlayer), "  ");
                             await Pacing.Wait(1500);
                         }
                     }
@@ -459,7 +508,7 @@ namespace UsurperRemake.Systems
                 "MUD" => "MUD",
                 "BBS" => "BBS",
                 "Steam" => "Steam",
-                "Local" => "Local",
+                "Local" => Loc.Get("chat.via_local"),
                 "Electron" => "App",
                 _ => "?"
             };
@@ -474,7 +523,7 @@ namespace UsurperRemake.Systems
         internal static string FormatLocation(string location)
         {
             if (string.IsNullOrEmpty(location))
-                return "Unknown";
+                return Loc.Get("combat.unknown_name");
             if (location.Contains(' '))
                 return location;
 
