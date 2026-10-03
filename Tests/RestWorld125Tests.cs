@@ -542,6 +542,11 @@ public class RestWorld125Tests : IDisposable
         meme.Name.Should().Be("Tax Outrage");
         meme.Description.Should().Be("Anger over the king's taxes grows");
         InLang("hu", () => MemeFromTemplate("dungeon_danger")).Name.Should().Be("Dungeon Peril");
+        // A template made while a Hungarian writer runs stores English too (the templates are made once, in
+        // whatever language runs first)
+        var made = InLang("hu", () => new CulturalMemeTemplate("throne_doubt", MemeCategory.Unrest, new Dictionary<string, float>()));
+        made.Name.Should().Be("Throne Doubt");
+        made.Description.Should().Be("Doubts about the ruler spread");
 
         var sys = new CulturalMemeSystem();
         var active = (List<CulturalMeme>)typeof(CulturalMemeSystem).GetField("_activeMemes", F)!.GetValue(sys)!;
