@@ -498,5 +498,21 @@ public class RestWorld125Tests : IDisposable
         }
         finally { events.ClearAllEvents(); }
     }
+    [Fact]
+    public void WorldBossVictoryEvent_IsStoredInEnglish_AndShownInTheReadersLanguage()
+    {
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            events.ClearAllEvents();
+            InLang("hu", () => { events.ForceEvent(WorldEventSystem.EventType.WorldBossVictory, 10); return 0; });
+            var evt = events.GetActiveEvents().Single();
+            evt.Title.Should().Be(L("en", "world_boss.victory_event_title"));
+            evt.Description.Should().Be(L("en", "world_boss.victory_event_desc"));
+            string fr = EventScreen("fr");
+            fr.Should().Contain(L("fr", "world_boss.victory_event_title"));
+            Regex.Replace(fr, @"\s+", " ").Should().Contain(L("fr", "world_boss.victory_event_desc"), "the description is shown, wrapped at 79 columns");
+        }
+        finally { events.ClearAllEvents(); }
+    }
 }
-

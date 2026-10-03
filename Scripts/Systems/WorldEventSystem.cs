@@ -577,8 +577,9 @@ namespace UsurperRemake.Systems
                     break;
 
                 case EventType.WorldBossVictory:
-                    evt.Title = Loc.Get("world_boss.victory_event_title");
-                    evt.Description = Loc.Get("world_boss.victory_event_desc");
+                    // v1.2.5: stored in English like the other events (it was stored in the writer's language)
+                    evt.Title = StoredText(type, "title");
+                    evt.Description = StoredText(type, "desc");
                     evt.DaysRemaining = 1;
                     evt.Effects["xp"] = 1.1f;
                     break;
