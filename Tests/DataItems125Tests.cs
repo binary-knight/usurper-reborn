@@ -207,15 +207,23 @@ public class DataItems125Tests
         }
     }
 
+    // The longest English name in the tables ("Robes of the Grand Sorcerer"). No translation is longer, so a row
+    // that fits with the stored English name fits with the shown one. One older loot key is longer and is listed.
+    private const int LongestEnglishName = 27;
+    private static readonly (string Lang, string Name)[] OlderLongerKeys = { ("fr", "Dragon Scale Shield") };
+
+    private static bool OlderLonger(string lang, string name) => OlderLongerKeys.Contains((lang, name));
+
     [Theory]
     [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
-    public void EveryOwnedName_IsTranslated_AndAtMost30Columns(string lang)
+    public void EveryOwnedName_IsTranslated_AndNoLongerThanTheLongestEnglishName(string lang)
     {
+        OwnedNames().Max(n => n.Length).Should().Be(LongestEnglishName);
         foreach (var n in OwnedNames())
         {
             Loc.HasIn(lang, Key(n)).Should().BeTrue($"{lang} has {Key(n)}");
             string shown = Loc.GetIn(lang, Key(n));
-            shown.Length.Should().BeLessOrEqualTo(30, $"{lang} {n} is \"{shown}\"");
+            shown.Length.Should().BeLessOrEqualTo(OlderLonger(lang, n) ? 30 : LongestEnglishName, $"{lang} {n} is \"{shown}\"");
             if (!(SameInLanguage.TryGetValue(n, out var same) && same.Contains(lang)))
                 shown.Should().NotBe(n, $"{lang} translates {n}");
             shown.Should().NotContain("—").And.NotContain("–");
@@ -537,6 +545,96 @@ public class DataItems125Tests
         InLang(lang, () => item.GetDisplayName())
             .Should().Be($"{Loc.GetIn(lang, "item.cursed_ring")} ({Loc.GetIn(lang, "item.rarity.cursed")})");
         if (lang == "en") InLang(lang, () => item.GetDisplayName()).Should().Be("Cursed Ring (Cursed)", "English is as it was");
+    }
+
+    // ---------- 8. every message row that carries an item name ----------
+
+    // GameConfig.MaxNameLength (30) characters, the longest name a player can have.
+    private const string LongName = "Aranyszivu Hosszunevu Kalandor";
+
+    /// <summary>The message rows the converted sites print, as (indent, key, arguments): I the item, N a
+    /// 30-character player, NPC, owner or god name, S the longest slot name, G a large gold amount, # a small
+    /// number, P a percentage, D the longest auction duration label.</summary>
+    private static readonly (string Indent, string Key, string Args)[] ItemMessages =
+    {
+        ("", "armor_shop.autobuy_already_best", "SI"), ("", "armor_shop.autobuy_current", "I#"), ("", "armor_shop.autobuy_purchased", "I"),
+        ("", "armor_shop.autobuy_upgrade", "I"), ("", "armor_shop.buy_prompt_name", "I"), ("", "armor_shop.couldnt_equip", "I"),
+        ("", "base.auction_list_confirm", "IGDG"), ("", "base.auction_listed", "IGGD"), ("  ", "base.auction_push_listed", "NIGD"),
+        ("", "combat.currently_equipped", "I"), ("", "combat.inventory_full_dropped", "I"), ("", "combat.loot_added_inventory", "I"),
+        ("", "combat.loot_ally_picks_up", "NIP"), ("", "combat.loot_ally_upgrade_prompt", "NIP"), ("", "combat.loot_equipped_on_companion", "IN"),
+        ("", "combat.loot_teammate_equips", "NI"), ("", "combat.loot_teammate_passes", "NI"), ("", "combat.loot_teammate_takes", "NI"),
+        ("", "combat.other_equips", "NI"), ("  ", "combat.other_passes", "NI"), ("  ", "combat.other_takes", "NI"),
+        ("", "combat.other_takes_to_inventory", "NI"), ("", "combat.picked_up", "I"), ("", "combat.pickup_armor", "I"),
+        ("", "combat.pickup_weapon", "I"), ("", "dark_alley.bm_gear_purchased", "IG"), ("", "dungeon.cannot_equip_item", "I"),
+        ("", "dungeon.equipped_item_self", "I"), ("  ", "dungeon.equipped_item", "NI"), ("  ", "dungeon.follower_cannot_be_equipped", "I"),
+        ("  ", "dungeon.follower_unequipped", "I"), ("", "dungeon.took_item_from", "IN"), ("", "equip.equipped_in_slot", "IS"),
+        ("", "equip.moved_to_inventory", "I"), ("", "equip.moved_to_offhand", "I"), ("", "equip.cannot_offhand_with_2h", "II"),
+        ("", "healer.disintegrates", "I"), ("", "home.cursed_no_remove", "I"), ("", "home.equipped_item", "NI"), ("", "home.took_item", "IN"),
+        ("", "home.chest_stored", "I##"), ("", "home.chest_retrieved", "I"), ("", "home.equip_used", "I"), ("", "home.equip_equipped", "I"),
+        ("", "inn.cursed_cannot_remove", "I"), ("", "inn.equip_best_equipped", "SI"), ("", "inn.equip_best_upgraded", "SII"),
+        ("", "inn.equipped_item", "NI"), ("", "inn.took_from", "IN"), ("", "inventory.cannot_equip", "I"), ("", "inventory.cursed_cant_drop", "I"),
+        ("", "inventory.cursed_cant_unequip", "I"), ("", "inventory.dropped_item", "I"), ("", "inventory.equipped_item", "I"),
+        ("", "inventory.equipped", "I"), ("", "inventory.unequipped_item", "I"), ("", "inventory.unequipped", "I"),
+        ("", "magic_shop.curse_confirm", "IG"), ("", "magic_shop.curse_confirm_team", "NIG"), ("", "magic_shop.cursed_item_entry", "#IG"),
+        ("", "magic_shop.cursed_team_entry", "#INSG"), ("", "magic_shop.cursed_worn_entry", "#ISG"), ("", "magic_shop.curse_success", "I"),
+        ("", "magic_shop.curse_team_success", "NI"), ("", "magic_shop.curse_scene_1", "NI"), ("", "magic_shop.curse_team_scene_1", "NNI"),
+        ("", "magic_shop.enchant_anvil", "NI"), ("", "magic_shop.enchant_result", "II"), ("", "magic_shop.identify_result", "I"),
+        ("  ", "magic_shop.now_wearing", "I"), ("", "magic_shop.old_enchant_blessed", "I"), ("", "magic_shop.old_enchant_confirm", "IG"),
+        ("", "magic_shop.old_enchant_flows", "I"), ("", "magic_shop.old_enchant_ocean", "I"), ("", "magic_shop.old_enchant_protect", "I"),
+        ("", "magic_shop.remove_enchant_confirm", "I"), ("", "marketplace.news_npc_bought", "NIN"), ("", "marketplace.news_npc_listed", "NI"),
+        ("", "marketplace.news_purchased", "NIN"), ("", "music_shop.buy_confirm", "I"), ("", "party_inv.taken", "IN"),
+        ("", "shop.couldnt_equip", "I"), ("", "shop.cursed_item_healer", "I"), ("", "shop.cursed_warning", "I"),
+        ("  ", "shop.purchased_equipped", "I"), ("  ", "shop.purchased_inventory", "I"), ("", "shop.purchased_inventory_alt", "I"),
+        ("  ", "shop.sold_single", "IG"), ("", "street_encounter.bounty_hunter.victory_loot", "I"),
+        ("", "street_encounter.bounty_hunter.victory_loot_dropped", "I"), ("", "team.cursed_cannot_remove", "I"),
+        ("", "team.equip_item_gone", "I"), ("", "team.equipped_success", "NI"), ("", "team.took_item", "IN"),
+        ("", "temple.sacrifice_refused_item", "IN"), ("", "weapon_shop.autobuy_already_best", "I#"), ("", "weapon_shop.autobuy_current", "I#"),
+        ("", "weapon_shop.autobuy_purchased", "I"), ("", "weapon_shop.buy_prompt_name", "I"), ("", "weapon_shop.sell_main_hand", "I"),
+        ("", "weapon_shop.sell_off_hand", "I"),
+    };
+
+    private static string RenderMessage(string lang, (string Indent, string Key, string Args) m, string item)
+    {
+        string slot = Enum.GetValues<EquipmentSlot>().Where(s => s != EquipmentSlot.None)
+            .Select(s => InLang(lang, () => s.GetDisplayName())).OrderByDescending(s => s.Length).First();
+        string duration = new[] { 12, 24, 48, 72 }.Select(h => BaseLocation.AuctionDurationLabel(h, lang)).OrderByDescending(s => s.Length).First();
+        object[] args = m.Args.Select(c => (object)(c switch
+        {
+            'I' => item, 'N' => LongName, 'S' => slot, 'G' => "2,000,000,000", '#' => "999", 'P' => "999", 'D' => duration,
+            _ => throw new ArgumentException(m.Args),
+        })).ToArray();
+        return m.Indent + L(lang, m.Key, args);
+    }
+
+    [Fact]
+    public void EveryItemMessage_ThatFitsWithTheStoredName_FitsWithTheShownName_InEveryLanguage()
+    {
+        // Before this piece a row showed the stored English name; now it shows the translation. In each language a
+        // row that fit with the longest English name must still fit with the longest shown name. A row too long
+        // even with the English name is the template's own width, older than this piece, and is listed.
+        LongName.Length.Should().Be(GameConfig.MaxNameLength);
+        var names = OwnedNames();
+        string longestEnglish = names.OrderByDescending(n => n.Length).First();
+        var older = new List<string>();
+        var tooWide = new List<string>();
+        var sb = new StringBuilder();
+        foreach (var m in ItemMessages)
+        {
+            Loc.HasIn("en", m.Key).Should().BeTrue(m.Key);
+            foreach (var lang in AllLanguages)
+            {
+                string before = RenderMessage(lang, m, longestEnglish);
+                if (before.Length > MaxWidth) { older.Add($"{lang} {m.Key} {before.Length}"); continue; }
+                string longest = names.Where(n => !OlderLonger(lang, n)).Select(n => Loc.GetIn(lang, Key(n)))
+                    .OrderByDescending(n => n.Length).First();
+                string row = RenderMessage(lang, m, longest);
+                sb.AppendLine($"{lang} {row.Length,3} {row}");
+                if (row.Length > MaxWidth) tooWide.Add($"{m.Key} ({lang}, {row.Length}): \"{row}\"");
+            }
+        }
+        Capture("data-items-messages.txt", sb + "\nover 79 with the English name already (not asserted):\n" + string.Join("\n", older));
+        tooWide.Should().BeEmpty("the shown name never makes a fitting row too wide");
+        older.Should().NotBeEmpty("the older overflows are listed, not hidden");
     }
 
     // ---------- 7. the wiki export ----------
