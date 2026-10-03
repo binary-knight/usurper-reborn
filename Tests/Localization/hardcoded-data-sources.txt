@@ -50,9 +50,6 @@ keyed|Scripts/Data/BeastData.cs|init.EncounterFlavor|beast.{id}.encounter
 keyed|Scripts/Data/BeastData.cs|init.PassiveDescription|beast.{id}.passive
 keyed|Scripts/Data/BeastData.cs|init.TameSuccessFlavor|beast.{id}.tame
 names|Scripts/Data/ClassicNPCs.cs|init.Name|NPC names
-table|Scripts/Data/DialogueLines_Farewells.cs|init.Text|NPC farewell lines, NPCDialogueDatabase.GetBestLine
-table|Scripts/Data/DialogueLines_SmallTalk.cs|init.Text|NPC small talk lines, NPCDialogueDatabase.GetBestLine
-table|Scripts/Data/DialogueLines_StoryNPCs.cs|init.Text|story NPC lines, NPCDialogueDatabase.GetBestLine
 keyed|Scripts/Data/DruidShrineData.cs|init.AttunementDescription|shrine.{id}.attune
 keyed|Scripts/Data/DruidShrineData.cs|init.FlavorDescription|shrine.{id}.flavor
 keyed|Scripts/Data/DruidShrineData.cs|init.GodPatron|shrine.{id}.god
@@ -254,8 +251,6 @@ names|Scripts/Core/NPC.cs|decl:locations|place name, also a location.name.{id} k
 table|Scripts/Core/NPC.cs|decl:status|NPC status, DormitoryLocation
 names|Scripts/Core/Child.cs|decl:femaleNames|given names
 names|Scripts/Core/Child.cs|decl:maleNames|given names
-table|Scripts/Data/DialogueLines_Memory.cs|init.Text|NPC memory lines, NPCDialogueDatabase.GetBestLine
-table|Scripts/Data/DialogueLines_Reactions.cs|init.Text|NPC reaction lines, NPCDialogueDatabase.GetBestLine
 keyed|Scripts/Data/EquipmentData.cs|init.Name|stored English item names; ItemNames shows item.{TemplateLocKey} by EquipmentData id
 keyed|Scripts/Data/GauntletChampionData.cs|decl:CrowdAmbiance|gauntlet.crowd_ambiance.{i}
 keyed|Scripts/Data/GauntletChampionData.cs|decl:WarmupWaveFlavor|gauntlet.warmup.{i}
