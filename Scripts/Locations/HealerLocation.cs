@@ -1211,7 +1211,7 @@ public class HealerLocation : BaseLocation
 
         foreach (var item in cursedItems)
         {
-            terminal.WriteLine(Loc.Get("shop.cursed_item_healer", item.Name), "red");
+            terminal.WriteLine(Loc.Get("shop.cursed_item_healer", ItemNames.Display(item.Name)), "red");
             terminal.WriteLine(Loc.Get("healer.curse_cost", $"{cost:N0}"), "cyan");
             terminal.WriteLine(Loc.Get("healer.curse_warning"), "yellow");
             terminal.WriteLine("");
@@ -1241,7 +1241,7 @@ public class HealerLocation : BaseLocation
                 terminal.WriteLine("...", "gray");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("healer.suddenly"), "bright_yellow");
-                terminal.WriteLine(Loc.Get("healer.disintegrates", item.Name), "red");
+                terminal.WriteLine(Loc.Get("healer.disintegrates", ItemNames.Display(item.Name)), "red");
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("healer.smiles_pay1", Manager), "gray");
                 terminal.WriteLine(Loc.Get("healer.smiles_pay2"), "gray");

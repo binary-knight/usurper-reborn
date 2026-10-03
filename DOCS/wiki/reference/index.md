@@ -1,7 +1,7 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.2.1
+checked: 1.2.4
 sources: Scripts/Systems/WikiDataExporter.cs
 ---
 - [Balance rules](/wiki/en/reference/balance/)

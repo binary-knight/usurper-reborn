@@ -11434,7 +11434,7 @@ public class DungeonLocation : BaseLocation
             if (currentItem != null)
             {
                 terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-                terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("dungeon.unidentified"));
+                terminal.Write(currentItem.IsIdentified ? ItemNames.Display(currentItem) : Loc.Get("dungeon.unidentified"));
                 if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
                 terminal.WriteLine("");
             }
@@ -11491,7 +11491,7 @@ public class DungeonLocation : BaseLocation
             if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", ItemNames.Display(selectedItem)));
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -11520,7 +11520,7 @@ public class DungeonLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  {Loc.Get("dungeon.equipped_item", target.DisplayName, selectedItem.Name)}");
+                terminal.WriteLine($"  {Loc.Get("dungeon.equipped_item", target.DisplayName, ItemNames.Display(selectedItem))}");
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
@@ -11573,7 +11573,7 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"{slot.GetDisplayName(),-12}: ");
             terminal.SetColor(item.GetRarityColor());
-            terminal.Write(item.Name);
+            terminal.Write(ItemNames.Display(item));
             WriteEquipmentStatSummary(item);
             terminal.WriteLine("");
         }
@@ -11612,7 +11612,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("dungeon.took_item_from", selectedItem.Name, target.DisplayName));
+        terminal.WriteLine(Loc.Get("dungeon.took_item_from", ItemNames.Display(selectedItem), target.DisplayName));
         await Pacing.Wait(1500);
     }
 
@@ -19149,7 +19149,7 @@ public class DungeonLocation : BaseLocation
                     term.SetColor("gray");
                     term.Write($"    {name.PadRight(slotWidth)}");
                     term.SetColor("yellow");
-                    term.WriteLine($"{equip.Name}");
+                    term.WriteLine($"{ItemNames.Display(equip)}");
                 }
             }
 
@@ -19169,7 +19169,7 @@ public class DungeonLocation : BaseLocation
                     term.SetColor("gray");
                     term.Write($"    {i + 1}. ");
                     term.SetColor("cyan");
-                    term.WriteLine(player.Inventory[i].Name);
+                    term.WriteLine(ItemNames.Display(player.Inventory[i]));
                 }
             }
 
@@ -19211,7 +19211,7 @@ public class DungeonLocation : BaseLocation
                 if (!item.CanUse(player))
                 {
                     term.SetColor("red");
-                    term.WriteLine(Loc.Get("dungeon.cannot_equip_item", item.Name));
+                    term.WriteLine(Loc.Get("dungeon.cannot_equip_item", ItemNames.Display(item)));
                     await Pacing.Wait(1500);
                     continue;
                 }
@@ -19225,7 +19225,7 @@ public class DungeonLocation : BaseLocation
                     {
                         player.Inventory.RemoveAt(itemNum - 1);
                         term.SetColor("bright_green");
-                        term.WriteLine(Loc.Get("dungeon.equipped_item_self", knownEquip.Name));
+                        term.WriteLine(Loc.Get("dungeon.equipped_item_self", ItemNames.Display(knownEquip)));
                         if (!string.IsNullOrEmpty(equipMsg))
                         {
                             term.SetColor("gray");
@@ -19241,7 +19241,7 @@ public class DungeonLocation : BaseLocation
                 else
                 {
                     term.SetColor("red");
-                    term.WriteLine($"  {Loc.Get("dungeon.follower_cannot_be_equipped", item.Name)}");
+                    term.WriteLine($"  {Loc.Get("dungeon.follower_cannot_be_equipped", ItemNames.Display(item))}");
                 }
                 await Pacing.Wait(1500);
                 continue;
@@ -19259,7 +19259,7 @@ public class DungeonLocation : BaseLocation
                     term.SetColor("yellow");
                     term.Write($"{equippedList[i].name}: ");
                     term.SetColor("cyan");
-                    term.WriteLine(equippedList[i].equip.Name);
+                    term.WriteLine(ItemNames.Display(equippedList[i].equip));
                 }
                 term.SetColor("gray");
                 term.Write($"  {Loc.Get("dungeon.follower_unequip_prompt")}");
@@ -19276,7 +19276,7 @@ public class DungeonLocation : BaseLocation
                         player.RecalculateStats();
 
                         term.SetColor("bright_yellow");
-                        term.WriteLine($"  {Loc.Get("dungeon.follower_unequipped", unequipped.Name)}");
+                        term.WriteLine($"  {Loc.Get("dungeon.follower_unequipped", ItemNames.Display(unequipped))}");
                     }
                     else
                     {

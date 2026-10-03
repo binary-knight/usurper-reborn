@@ -404,7 +404,7 @@ public class MarketplaceLocation : BaseLocation
             if (listing.IsNPCSeller)
             {
                 NewsSystem.Instance?.Newsy(false,
-                    Loc.Get("marketplace.news_purchased", currentPlayer.DisplayName, listing.Item.Name, listing.Seller));
+                    Loc.Get("marketplace.news_purchased", currentPlayer.DisplayName, ItemNames.Display(listing.Item), listing.Seller));
             }
         }
         else

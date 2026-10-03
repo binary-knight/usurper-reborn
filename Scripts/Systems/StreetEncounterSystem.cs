@@ -1406,12 +1406,12 @@ public class StreetEncounterSystem
                     {
                         player.Inventory.Add(loot);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot", loot.Name));
+                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot", ItemNames.Display(loot)));
                     }
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot_dropped", loot.Name));
+                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot_dropped", ItemNames.Display(loot)));
                     }
                 }
             }

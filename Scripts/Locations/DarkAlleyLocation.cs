@@ -1500,7 +1500,7 @@ namespace UsurperRemake.Locations
 
             string rarityColor = item.Rarity == EquipmentRarity.Common ? "bright_magenta" : Equipment.ColorFor(item.Rarity);
             terminal.SetColor(rarityColor);
-            terminal.WriteLine($"  {item.Name}");
+            terminal.WriteLine($"  {ItemNames.Display(item)}");
             terminal.WriteLine("");
 
             terminal.SetColor("gray");
@@ -1750,7 +1750,7 @@ namespace UsurperRemake.Locations
             currentPlayer.Statistics?.RecordGoldSpent(price);
 
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("dark_alley.bm_gear_purchased", item.Name, price));
+            terminal.WriteLine(Loc.Get("dark_alley.bm_gear_purchased", ItemNames.Display(item), price));
             await Task.CompletedTask;
         }
 

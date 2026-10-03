@@ -3966,7 +3966,7 @@ public class InnLocation : BaseLocation
     /// </summary>
     private static string GetEquipmentDisplayName(Equipment item)
     {
-        if (item.IsIdentified) return item.Name;
+        if (item.IsIdentified) return ItemNames.Display(item);
         return item.Slot switch
         {
             EquipmentSlot.MainHand => Loc.Get("inn.unid_weapon"),
@@ -4001,7 +4001,7 @@ public class InnLocation : BaseLocation
             else
             {
                 terminal.SetColor(item.GetRarityColor());
-                terminal.Write(item.Name);
+                terminal.Write(ItemNames.Display(item));
 
                 // Build compact stat summary
                 var stats = new List<string>();
@@ -4095,7 +4095,7 @@ public class InnLocation : BaseLocation
                 else
                 {
                     terminal.SetColor(currentItem.GetRarityColor());
-                    terminal.Write(currentItem.Name);
+                    terminal.Write(ItemNames.Display(currentItem));
                     WriteEquipmentStatSummary(currentItem);
                     terminal.WriteLine("");
                 }
@@ -4154,7 +4154,7 @@ public class InnLocation : BaseLocation
             if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", ItemNames.Display(selectedItem)));
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -4184,7 +4184,7 @@ public class InnLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("inn.equipped_item", target.DisplayName, selectedItem.Name));
+                terminal.WriteLine(Loc.Get("inn.equipped_item", target.DisplayName, ItemNames.Display(selectedItem)));
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
@@ -4270,7 +4270,7 @@ public class InnLocation : BaseLocation
         if (selectedItem.IsCursed)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("inn.cursed_cannot_remove", selectedItem.Name));
+            terminal.WriteLine(Loc.Get("inn.cursed_cannot_remove", ItemNames.Display(selectedItem)));
             await Pacing.Wait(2000);
             return;
         }
@@ -4289,7 +4289,7 @@ public class InnLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("inn.took_from", unequipped.Name, target.DisplayName));
+            terminal.WriteLine(Loc.Get("inn.took_from", ItemNames.Display(unequipped), target.DisplayName));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("inn.added_inventory"));
         }

@@ -7214,6 +7214,95 @@ public partial class CombatEngine
         catch { /* telemetry is decoration */ }
     }
 
+    /// <summary>After a single-monster victory, offers the monster's weapon and armour. The picked-up item
+    /// carries the classic table's English name (ItemManager); the lines show it in the reader's language.</summary>
+    private async Task OfferMonsterGearPickup(CombatResult result)
+    {
+        // Offer weapon pickup
+        if (result.Monster.GrabWeap && !string.IsNullOrEmpty(result.Monster.Weapon))
+        {
+            terminal.WriteLine(Loc.Get("combat.pickup_weapon", ItemNames.Display(result.Monster.Weapon)), "yellow");
+            if (await terminal.AskYesNoAsync("> "))
+            {
+                Item lootItem;
+                var baseWeapon = ItemManager.GetClassicWeapon((int)result.Monster.WeapNr);
+                if (baseWeapon != null)
+                {
+                    lootItem = new Item
+                    {
+                        Name = baseWeapon.Name,
+                        Type = ObjType.Weapon,
+                        Value = baseWeapon.Value,
+                        Attack = (int)baseWeapon.Power
+                    };
+                }
+                else
+                {
+                    lootItem = new Item
+                    {
+                        Name = result.Monster.Weapon,
+                        Type = ObjType.Weapon,
+                        Value = 0,
+                        Attack = (int)result.Monster.WeapPow
+                    };
+                }
+
+                if (!result.Player.IsInventoryFull)
+                {
+                    result.Player.Inventory.Add(lootItem);
+                    terminal.WriteLine(Loc.Get("combat.picked_up", ItemNames.Display(lootItem)), "bright_green");
+                    result.ItemsFound.Add(lootItem.Name);
+                }
+                else
+                {
+                    terminal.WriteLine(Loc.Get("combat.inventory_full_dropped", ItemNames.Display(lootItem)), "red");
+                }
+            }
+        }
+
+        // Offer armor pickup
+        if (result.Monster.GrabArm && !string.IsNullOrEmpty(result.Monster.Armor))
+        {
+            terminal.WriteLine(Loc.Get("combat.pickup_armor", ItemNames.Display(result.Monster.Armor)), "yellow");
+            if (await terminal.AskYesNoAsync("> "))
+            {
+                Item lootItem;
+                var baseArmor = ItemManager.GetClassicArmor((int)result.Monster.ArmNr);
+                if (baseArmor != null)
+                {
+                    lootItem = new Item
+                    {
+                        Name = baseArmor.Name,
+                        Type = ObjType.Body,
+                        Value = baseArmor.Value,
+                        Armor = (int)baseArmor.Power
+                    };
+                }
+                else
+                {
+                    lootItem = new Item
+                    {
+                        Name = result.Monster.Armor,
+                        Type = ObjType.Body,
+                        Value = 0,
+                        Armor = (int)result.Monster.ArmPow
+                    };
+                }
+
+                if (!result.Player.IsInventoryFull)
+                {
+                    result.Player.Inventory.Add(lootItem);
+                    terminal.WriteLine(Loc.Get("combat.picked_up", ItemNames.Display(lootItem)), "bright_green");
+                    result.ItemsFound.Add(lootItem.Name);
+                }
+                else
+                {
+                    terminal.WriteLine(Loc.Get("combat.inventory_full_dropped", ItemNames.Display(lootItem)), "red");
+                }
+            }
+        }
+    }
+
     /// <summary>
     /// ═══ DEAD PATH — DO NOT PATCH ═══ (see DeadCombatPathGuard)
     /// Live equivalent: HandleVictoryMultiMonster (and DistributeGroupRewards
@@ -7589,89 +7678,8 @@ public partial class CombatEngine
             await ShowBossKillSummary(result, playerXP, goldReward);
         }
 
-        // Offer weapon pickup
-        if (result.Monster.GrabWeap && !string.IsNullOrEmpty(result.Monster.Weapon))
-        {
-            terminal.WriteLine(Loc.Get("combat.pickup_weapon", result.Monster.Weapon), "yellow");
-            if (await terminal.AskYesNoAsync("> "))
-            {
-                Item lootItem;
-                var baseWeapon = ItemManager.GetClassicWeapon((int)result.Monster.WeapNr);
-                if (baseWeapon != null)
-                {
-                    lootItem = new Item
-                    {
-                        Name = baseWeapon.Name,
-                        Type = ObjType.Weapon,
-                        Value = baseWeapon.Value,
-                        Attack = (int)baseWeapon.Power
-                    };
-                }
-                else
-                {
-                    lootItem = new Item
-                    {
-                        Name = result.Monster.Weapon,
-                        Type = ObjType.Weapon,
-                        Value = 0,
-                        Attack = (int)result.Monster.WeapPow
-                    };
-                }
-
-                if (!result.Player.IsInventoryFull)
-                {
-                    result.Player.Inventory.Add(lootItem);
-                    terminal.WriteLine(Loc.Get("combat.picked_up", lootItem.Name), "bright_green");
-                    result.ItemsFound.Add(lootItem.Name);
-                }
-                else
-                {
-                    terminal.WriteLine(Loc.Get("combat.inventory_full_dropped", lootItem.Name), "red");
-                }
-            }
-        }
-
-        // Offer armor pickup
-        if (result.Monster.GrabArm && !string.IsNullOrEmpty(result.Monster.Armor))
-        {
-            terminal.WriteLine(Loc.Get("combat.pickup_armor", result.Monster.Armor), "yellow");
-            if (await terminal.AskYesNoAsync("> "))
-            {
-                Item lootItem;
-                var baseArmor = ItemManager.GetClassicArmor((int)result.Monster.ArmNr);
-                if (baseArmor != null)
-                {
-                    lootItem = new Item
-                    {
-                        Name = baseArmor.Name,
-                        Type = ObjType.Body,
-                        Value = baseArmor.Value,
-                        Armor = (int)baseArmor.Power
-                    };
-                }
-                else
-                {
-                    lootItem = new Item
-                    {
-                        Name = result.Monster.Armor,
-                        Type = ObjType.Body,
-                        Value = 0,
-                        Armor = (int)result.Monster.ArmPow
-                    };
-                }
-
-                if (!result.Player.IsInventoryFull)
-                {
-                    result.Player.Inventory.Add(lootItem);
-                    terminal.WriteLine(Loc.Get("combat.picked_up", lootItem.Name), "bright_green");
-                    result.ItemsFound.Add(lootItem.Name);
-                }
-                else
-                {
-                    terminal.WriteLine(Loc.Get("combat.inventory_full_dropped", lootItem.Name), "red");
-                }
-            }
-        }
+        // Offer the monster's weapon and armour (v1.2.5: moved into OfferMonsterGearPickup, unchanged)
+        await OfferMonsterGearPickup(result);
 
         result.CombatLog.Add($"Victory! Gained {expReward} exp and {goldReward} gold");
 
@@ -9962,7 +9970,7 @@ public partial class CombatEngine
                         // Player cancelled - add to ACTUAL player inventory (not companion's)
                         actualPlayer.Inventory.Add(lootItem);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.loot_added_inventory", lootItem.Name));
+                        terminal.WriteLine(Loc.Get("combat.loot_added_inventory", ItemNames.Display(lootItem)));
                         break;
                     }
                 }
@@ -9981,7 +9989,7 @@ public partial class CombatEngine
                             // Player chose inventory - route to ACTUAL player (not companion)
                             actualPlayer.Inventory.Add(lootItem);
                             terminal.SetColor("cyan");
-                            terminal.WriteLine(Loc.Get("combat.loot_added_inventory", lootItem.Name));
+                            terminal.WriteLine(Loc.Get("combat.loot_added_inventory", ItemNames.Display(lootItem)));
                             break;
                         }
                     }
@@ -10036,7 +10044,7 @@ public partial class CombatEngine
                         // dropped if full). Suppress equipMsg on companion equips so the player
                         // sees only the accurate per-item line plus a clean "equipped on X" line.
                         if (isCompanionEquip)
-                            terminal.WriteLine(Loc.Get("combat.loot_equipped_on_companion", lootItem.Name, player.DisplayName));
+                            terminal.WriteLine(Loc.Get("combat.loot_equipped_on_companion", ItemNames.Display(lootItem), player.DisplayName));
                         else
                             terminal.WriteLine(equipMsg);
                     }
@@ -10070,7 +10078,7 @@ public partial class CombatEngine
                     if (!actualPlayer.IsInventoryFull)
                     {
                         actualPlayer.Inventory.Add(lootItem);
-                        terminal.WriteLine(Loc.Get("combat.loot_added_inventory", lootItem.Name));
+                        terminal.WriteLine(Loc.Get("combat.loot_added_inventory", ItemNames.Display(lootItem)));
                     }
                     else
                     {
@@ -10091,7 +10099,7 @@ public partial class CombatEngine
                 {
                     player.Inventory.Add(lootItem);
                     terminal.SetColor("cyan");
-                    string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                    string invName = lootItem.IsIdentified ? ItemNames.Display(lootItem) : LootGenerator.GetUnidentifiedName(lootItem);
                     bool transferredToCompanion = player != (currentPlayer ?? player);
                     // v0.57.2 — when Take targets a companion (via </> selector), the confirmation
                     // message names them explicitly. The ambiguous "added to inventory" wording was
@@ -10197,7 +10205,7 @@ public partial class CombatEngine
                                     terminal.SetColor("gray");
                                     terminal.WriteLine(Loc.Get("combat.loot_ally_approved", teammateName));
                                     terminal.SetColor("bright_green");
-                                    terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, lootItem.Name, upgradePercent));
+                                    terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, ItemNames.Display(lootItem), upgradePercent));
                                     itemTaken = true;
 
                                     // v0.57.1 — await the save so companion loot pickup isn't lost if the
@@ -10256,7 +10264,7 @@ public partial class CombatEngine
             if (lootItem.Charisma != 0) bonusStats["CHA"] = lootItem.Charisma;
             if (lootItem.Agility != 0) bonusStats["AGI"] = lootItem.Agility;
             ElectronBridge.EmitLootItem(
-                lootItem.Name,
+                ItemNames.Display(lootItem),
                 lootItem.Type.ToString(),
                 lootItem.Attack,
                 lootItem.Armor,
@@ -10320,10 +10328,10 @@ public partial class CombatEngine
         {
             // Identified - show full details
             terminal.SetColor(rarityColor);
-            terminal.WriteLine($"  {lootItem.Name}");
+            terminal.WriteLine($"  {ItemNames.Display(lootItem)}");
             terminal.SetColor("white");
 
-            lootBroadcastSb.Add(lang => $"\u001b[37m  {lootItem.Name}\u001b[0m");
+            lootBroadcastSb.Add(lang => $"\u001b[37m  {ItemNames.DisplayIn(lang, lootItem.Name)}\u001b[0m");
 
             if (lootItem.Type == global::ObjType.Weapon)
             {
@@ -10499,7 +10507,7 @@ public partial class CombatEngine
             if (lootItem.IsIdentified)
             {
                 followerTerm.SetColor(rarityColor);
-                followerTerm.WriteLine($"  {lootItem.Name}");
+                followerTerm.WriteLine($"  {ItemNames.DisplayIn(followerLang, lootItem.Name)}");
                 followerTerm.SetColor("white");
                 if (lootItem.Type == global::ObjType.Weapon)
                     followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_attack_power", lootItem.Attack));
@@ -10637,7 +10645,7 @@ public partial class CombatEngine
                         followerTerm.SetColor("green");
                         followerTerm.WriteLine(equipMsg);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.loot_teammate_equips", recipientName, lootItem.Name));
+                        terminal.WriteLine(Loc.Get("combat.loot_teammate_equips", recipientName, ItemNames.Display(lootItem)));
                     }
                     else
                     {
@@ -10645,7 +10653,7 @@ public partial class CombatEngine
                         followerTerm.SetColor("yellow");
                         followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_equip_failed_inventory", equipMsg));
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, lootItem.Name));
+                        terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, ItemNames.Display(lootItem)));
                     }
                 }
                 await Pacing.Wait(GetCombatDelay(1500));
@@ -10655,10 +10663,10 @@ public partial class CombatEngine
             {
                 player.Inventory?.Add(lootItem);
                 followerTerm.SetColor("cyan");
-                string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(followerLang, lootItem.Name) : LootGenerator.GetUnidentifiedName(lootItem);
                 followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_added_inventory", invName));
                 terminal.SetColor("cyan");
-                terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, lootItem.Name));
+                terminal.WriteLine(Loc.Get("combat.loot_teammate_takes", recipientName, ItemNames.Display(lootItem)));
                 await Pacing.Wait(GetCombatDelay(1500));
                 return;
             }
@@ -10668,7 +10676,7 @@ public partial class CombatEngine
                 followerTerm.SetColor("gray");
                 followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_you_pass"));
                 terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("combat.loot_teammate_passes", recipientName, lootItem.Name));
+                terminal.WriteLine(Loc.Get("combat.loot_teammate_passes", recipientName, ItemNames.Display(lootItem)));
 
                 bool itemTaken = false;
 
@@ -10731,7 +10739,7 @@ public partial class CombatEngine
                                     terminal.SetColor("gray");
                                     terminal.WriteLine(Loc.Get("combat.loot_ally_approved", teammateName));
                                     terminal.SetColor("bright_green");
-                                    terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, lootItem.Name, upgradePercent));
+                                    terminal.WriteLine(Loc.Get("combat.loot_ally_picks_up", teammateName, ItemNames.Display(lootItem), upgradePercent));
                                     itemTaken = true;
 
                                     // v0.57.1 — await the save (same fix as the other companion-pickup branch)
@@ -10948,7 +10956,7 @@ public partial class CombatEngine
                     if (!winner.IsInventoryFull)
                     {
                         winner.Inventory.Add(lootItem);
-                        winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", lootItem.Name));
+                        winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", ItemNames.DisplayIn(winnerLang, lootItem.Name)));
                     }
                     else
                     {
@@ -10968,7 +10976,7 @@ public partial class CombatEngine
                 {
                     winner.Inventory.Add(lootItem);
                     winnerTerm.SetColor("cyan");
-                    string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                    string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(winnerLang, lootItem.Name) : LootGenerator.GetUnidentifiedName(lootItem);
                     winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_added_inventory", invName));
                 }
                 break;
@@ -10980,7 +10988,7 @@ public partial class CombatEngine
         }
 
         // Announce to the group what the winner chose
-        string itemName = lootItem.IsIdentified ? lootItem.Name : Loc.Get("combat.loot_unidentified_item");
+        string itemName = lootItem.IsIdentified ? ItemNames.Display(lootItem) : Loc.Get("combat.loot_unidentified_item");
         if (choice.ToUpper() == "E" || choice.ToUpper() == "T")
         {
             terminal.SetColor("cyan");
@@ -11374,14 +11382,14 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("combat.loot_ally_upgrade_prompt", tname, lootItem.Name, upgradePercent));
+        terminal.WriteLine(Loc.Get("combat.loot_ally_upgrade_prompt", tname, ItemNames.Display(lootItem), upgradePercent));
 
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("combat.loot_ally_current_label")}: ");
         if (currentEquip != null)
         {
             terminal.SetColor("white");
-            terminal.Write(currentEquip.Name);
+            terminal.Write(ItemNames.Display(currentEquip));
             string cs = BuildEquipmentStatSummary(currentEquip);
             if (!string.IsNullOrEmpty(cs))
             {
@@ -11399,7 +11407,7 @@ public partial class CombatEngine
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("combat.loot_ally_new_label")}: ");
         terminal.SetColor("white");
-        terminal.Write(lootItem.Name);
+        terminal.Write(ItemNames.Display(lootItem));
         if (candidateEquip != null)
         {
             string ns = BuildEquipmentStatSummary(candidateEquip);
@@ -11461,7 +11469,7 @@ public partial class CombatEngine
             if (lootItem.IsIdentified)
             {
                 otherTerm.SetColor(rarityColor);
-                otherTerm.WriteLine($"  {lootItem.Name}");
+                otherTerm.WriteLine($"  {ItemNames.DisplayIn(otherLang, lootItem.Name)}");
                 otherTerm.SetColor("white");
                 if (lootItem.Type == global::ObjType.Weapon)
                     otherTerm.WriteLine(Loc.GetIn(otherLang, "combat.loot_attack_power", lootItem.Attack));
@@ -11548,7 +11556,7 @@ public partial class CombatEngine
                         otherTerm.SetColor("green");
                         otherTerm.WriteLine(equipMsg);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.other_equips", otherName, lootItem.Name));
+                        terminal.WriteLine(Loc.Get("combat.other_equips", otherName, ItemNames.Display(lootItem)));
                         return true;
                     }
                     else
@@ -11557,7 +11565,7 @@ public partial class CombatEngine
                         otherTerm.SetColor("yellow");
                         otherTerm.WriteLine(Loc.GetIn(otherLang, "combat.loot_equip_failed_inventory", equipMsg));
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.other_takes_to_inventory", otherName, lootItem.Name));
+                        terminal.WriteLine(Loc.Get("combat.other_takes_to_inventory", otherName, ItemNames.Display(lootItem)));
                         return true;
                     }
                 }
@@ -11566,10 +11574,10 @@ public partial class CombatEngine
             {
                 otherPlayer.Inventory?.Add(lootItem);
                 otherTerm.SetColor("cyan");
-                string invName = lootItem.IsIdentified ? lootItem.Name : LootGenerator.GetUnidentifiedName(lootItem);
+                string invName = lootItem.IsIdentified ? ItemNames.DisplayIn(otherLang, lootItem.Name) : LootGenerator.GetUnidentifiedName(lootItem);
                 otherTerm.WriteLine(Loc.GetIn(otherLang, "combat.added_to_inventory", invName));
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  {Loc.Get("combat.other_takes", otherName, lootItem.Name)}");
+                terminal.WriteLine($"  {Loc.Get("combat.other_takes", otherName, ItemNames.Display(lootItem))}");
                 return true;
             }
             else
@@ -11577,7 +11585,7 @@ public partial class CombatEngine
                 otherTerm.SetColor("gray");
                 otherTerm.WriteLine(Loc.GetIn(otherLang, "combat.pass_on_item"));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  {Loc.Get("combat.other_passes", otherName, lootItem.Name)}");
+                terminal.WriteLine($"  {Loc.Get("combat.other_passes", otherName, ItemNames.Display(lootItem))}");
             }
         }
 
@@ -11914,7 +11922,7 @@ public partial class CombatEngine
         else
         {
             terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("combat.currently_equipped", currentEquip.Name));
+            terminal.WriteLine(Loc.Get("combat.currently_equipped", ItemNames.Display(currentEquip)));
 
             // v0.65.1: show the equipped item's class too, so the player sees the
             // handedness tradeoff (e.g. a dropped 2H sword vs your current 1H + shield).
@@ -12135,7 +12143,7 @@ public partial class CombatEngine
         if (mainHandItem != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(mainHandItem.Name);
+            terminal.WriteLine(ItemNames.Display(mainHandItem));
         }
         else
         {
@@ -12148,7 +12156,7 @@ public partial class CombatEngine
         if (offHandItem != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(offHandItem.Name);
+            terminal.WriteLine(ItemNames.Display(offHandItem));
         }
         else
         {

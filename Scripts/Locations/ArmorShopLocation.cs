@@ -166,7 +166,7 @@ public class ArmorShopLocation : BaseLocation
             if (IsScreenReader)
             {
                 string slotLabel = currentItem != null
-                    ? $"{slot.GetDisplayName()} - {currentItem.Name} {Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass)}"
+                    ? $"{slot.GetDisplayName()} - {ItemNames.Display(currentItem)} {Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass)}"
                     : $"{slot.GetDisplayName()} - {Loc.Get("shop.empty")}";
                 WriteSRMenuOption($"{num}", slotLabel);
             }
@@ -186,7 +186,7 @@ public class ArmorShopLocation : BaseLocation
                     terminal.SetColor("gray");
                     terminal.Write(" - ");
                     terminal.SetColor("bright_cyan");
-                    terminal.Write($"{currentItem.Name}");
+                    terminal.Write($"{ItemNames.Display(currentItem)}");
                     terminal.SetColor("gray");
                     terminal.Write(" " + Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass));
                 }
@@ -242,7 +242,7 @@ public class ArmorShopLocation : BaseLocation
         {
             var currentItem = currentPlayer.GetEquipment(slot);
             string slotLabel = currentItem != null
-                ? $"{slot.GetDisplayName()} - {currentItem.Name} {Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass)}"
+                ? $"{slot.GetDisplayName()} - {ItemNames.Display(currentItem)} {Loc.Get("armor_shop.ac_tag", currentItem.ArmorClass)}"
                 : $"{slot.GetDisplayName()} - {Loc.Get("shop.empty")}";
             WriteSRMenuOption($"{num}", slotLabel);
             num++;
@@ -349,7 +349,7 @@ public class ArmorShopLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("armor_shop.currently_equipped"));
             terminal.SetColor("bright_white");
-            terminal.Write($"{currentItem.Name}");
+            terminal.Write($"{ItemNames.Display(currentItem)}");
             terminal.SetColor("gray");
             terminal.WriteLine($" ({Loc.Get("ui.stat_ac")}: {currentItem.ArmorClass}, {Loc.Get("armor_shop.value_label")}: {FormatNumber(currentItem.Value)})");
             terminal.WriteLine("");
@@ -383,7 +383,7 @@ public class ArmorShopLocation : BaseLocation
             terminal.Write($"{num,3}. ");
 
             terminal.SetColor(canBuy ? "white" : "darkgray");
-            terminal.Write($"{item.Name,-26}");
+            terminal.Write(ItemNames.Column(item, 26));
 
             // Level requirement
             if (item.MinLevel > 1)
@@ -716,11 +716,11 @@ public class ArmorShopLocation : BaseLocation
         }
 
         // Show tax breakdown
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, adjustedPrice);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, ItemNames.Display(item), adjustedPrice);
 
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("armor_shop.buy_prompt_name", item.Name));
+        terminal.Write(Loc.Get("armor_shop.buy_prompt_name", ItemNames.Display(item)));
         terminal.SetColor("yellow");
         terminal.Write(FormatNumber(armorTotalWithTax));
         terminal.SetColor("white");
@@ -802,7 +802,7 @@ public class ArmorShopLocation : BaseLocation
                 var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                 currentPlayer.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("shop.purchased_inventory", item.Name));
+                terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
             }
             else
             {
@@ -811,7 +811,7 @@ public class ArmorShopLocation : BaseLocation
                 {
                     terminal.SetColor("bright_green");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.purchased_equipped", item.Name));
+                    terminal.WriteLine(Loc.Get("shop.purchased_equipped", ItemNames.Display(item)));
                     terminal.SetColor("gray");
                     terminal.WriteLine(message);
 
@@ -826,7 +826,7 @@ public class ArmorShopLocation : BaseLocation
                     currentPlayer.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("armor_shop.couldnt_equip", item.Name));
+                    terminal.WriteLine(Loc.Get("armor_shop.couldnt_equip", ItemNames.Display(item)));
                 }
             }
         }
@@ -837,7 +837,7 @@ public class ArmorShopLocation : BaseLocation
             currentPlayer.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("shop.purchased_inventory", item.Name));
+            terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
         }
 
         QuestSystem.OnEquipmentPurchased(currentPlayer, item);
@@ -878,13 +878,13 @@ public class ArmorShopLocation : BaseLocation
             var item = currentPlayer.GetEquipment(slot);
             if (item != null)
             {
-                sellableItems.Add((true, slot, null, item.Name, item.Value, item.IsCursed));
+                sellableItems.Add((true, slot, null, ItemNames.Display(item), item.Value, item.IsCursed));
                 long sellPrice = (long)((item.Value / 2) * fenceModifier);
 
                 terminal.SetColor("bright_cyan");
                 terminal.Write($"{num}. ");
                 terminal.SetColor("white");
-                terminal.Write($"{slot.GetDisplayName()}: {item.Name}");
+                terminal.Write($"{slot.GetDisplayName()}: {ItemNames.Display(item)}");
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("armor_shop.sell_for_gold", FormatNumber(sellPrice)));
                 num++;
@@ -911,12 +911,12 @@ public class ArmorShopLocation : BaseLocation
             foreach (var (item, invIndex) in inventoryArmor)
             {
                 if (!item.IsIdentified || item.IsCursed) continue; // v1.1.1: [A] sells only these; the list used to show more than it sold
-                sellableItems.Add((false, null, invIndex, item.Name, item.Value, item.IsCursed));
+                sellableItems.Add((false, null, invIndex, ItemNames.Display(item), item.Value, item.IsCursed));
                 long displayPrice = (long)((item.Value / 2) * fenceModifier);
                 terminal.SetColor("bright_cyan");
                 terminal.Write($"{num}. ");
                 terminal.SetColor("white");
-                terminal.Write($"{item.Name}");
+                terminal.Write($"{ItemNames.Display(item)}");
                 terminal.Write(" " + Loc.Get("armor_shop.ac_tag", item.Armor));
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("armor_shop.sell_for_gold", FormatNumber(displayPrice)));
@@ -1071,7 +1071,7 @@ public class ArmorShopLocation : BaseLocation
                 if (currentItem != null)
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("armor_shop.autobuy_already_best", slot.GetDisplayName(), currentItem.Name));
+                    terminal.WriteLine(Loc.Get("armor_shop.autobuy_already_best", slot.GetDisplayName(), ItemNames.Display(currentItem)));
                 }
                 else
                 {
@@ -1111,7 +1111,7 @@ public class ArmorShopLocation : BaseLocation
                 if (currentItem != null)
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("armor_shop.autobuy_current", currentItem.Name, currentItem.ArmorClass));
+                    terminal.WriteLine(Loc.Get("armor_shop.autobuy_current", ItemNames.Display(currentItem), currentItem.ArmorClass));
                 }
                 else
                 {
@@ -1121,14 +1121,14 @@ public class ArmorShopLocation : BaseLocation
 
                 // Show the armor offer
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("armor_shop.autobuy_upgrade", armor.Name));
+                terminal.WriteLine(Loc.Get("armor_shop.autobuy_upgrade", ItemNames.Display(armor)));
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("armor_shop.autobuy_ac", armor.ArmorClass, armor.ArmorClass - currentAC));
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("armor_shop.autobuy_price", FormatNumber(itemPrice)));
 
                 // Show tax breakdown
-                CityControlSystem.Instance.DisplayTaxBreakdown(terminal, armor.Name, itemPrice);
+                CityControlSystem.Instance.DisplayTaxBreakdown(terminal, ItemNames.Display(armor), itemPrice);
 
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("armor_shop.autobuy_your_gold", FormatNumber(currentPlayer.Gold)));
@@ -1159,7 +1159,7 @@ public class ArmorShopLocation : BaseLocation
                             purchased++;
                             CityControlSystem.Instance.ProcessSaleTax(itemPrice); // v1.1.1: after the equip check; a failed equip refunded the price but kept the tax
                             terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("armor_shop.autobuy_purchased", armor.Name));
+                            terminal.WriteLine(Loc.Get("armor_shop.autobuy_purchased", ItemNames.Display(armor)));
 
                             // Check for equipment quest completion
                             QuestSystem.OnEquipmentPurchased(currentPlayer, armor);

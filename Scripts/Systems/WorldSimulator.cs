@@ -5710,7 +5710,7 @@ public class WorldSimulator
                 try
                 {
                     await backend.CreateAuctionListing(npc.Name, item.Name, itemJson, price, hoursToExpire: 48);
-                    NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_listed", npc.Name, item.Name));
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_listed", npc.Name, ItemNames.Display(item)));
                 }
                 catch (Exception ex)
                 {
@@ -5764,7 +5764,7 @@ public class WorldSimulator
                     // Equip or store the purchased item
                     MarketplaceSystem.Instance.EquipOrStoreItem(npc, item);
 
-                    NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_bought", npc.Name, item.Name, chosen.Seller));
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_bought", npc.Name, ItemNames.Display(item), chosen.Seller));
 
                     // Notify seller: 1.2.5, in the seller's language, one mail per world-sim day
                     await backend.MailAuctionSale(chosen.Seller, item.Name, npc.Name, chosen.Price);
