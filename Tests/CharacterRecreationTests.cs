@@ -405,10 +405,10 @@ public class CharacterRecreationTests : IDisposable
         // Review: the Castle's crime report posts a paid bounty on an NPC through PostBountyOnPlayer; marking it
         // as a player bounty made it uncollectable.
         var src = CodeOnly(Source("Locations", "CastleLocation.cs"));
-        src.Should().Contain("\"Criminal activity\", (int)Math.Min(bountyCost, int.MaxValue), onPlayer: false)");
+        src.Should().Contain("Loc.Get(\"castle.bounty_crime_activity\"), (int)Math.Min(bountyCost, int.MaxValue), onPlayer: false)");
         src.Should().Contain("bool onPlayer = SaveSystem.Instance.IsDisplayNameTaken(name, \"\")");
         src.Should().Contain("&& NPCSpawnSystem.Instance.IsRosterTrustworthy && !QuestSystem.IsNPCName(name);", "a roster being rebuilt cannot rule out an NPC");
-        src.Should().Contain("\"Royal decree\", amount, onPlayer: onPlayer)");
+        src.Should().Contain("Loc.Get(\"castle.bounty_crime_decree\"), amount, onPlayer: onPlayer)");
         var quest = CodeOnly(Source("Systems", "QuestSystem.cs"));
         quest.Should().Contain("IsPlayerBounty = onPlayer");
     }

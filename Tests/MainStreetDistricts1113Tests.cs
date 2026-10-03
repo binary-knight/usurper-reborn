@@ -430,6 +430,8 @@ public class MainStreetDistricts1113Tests
         "main_street.achieve_", "main_street.attack_cancel", "castle.court_menu",
         // 1.2.5: the citizen and Hall of Fame pager keys ([P]rev, [N]ext), not Main Street map keys
         "main_street.nav_",
+        // 1.2.5: the bail mail names the prison's own [B] Pay Bail command, not a Main Street key
+        "castle.mail_bail_set",
     };
 
     [Fact]
