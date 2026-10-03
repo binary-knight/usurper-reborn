@@ -432,7 +432,7 @@ public class OnlineSystems125Tests : IDisposable
                 {
                     "news.birth", "news.natural_death", "news.coming_of_age", "news.birthday", "news.npc_level_up",
                     "news.marriage", "news.divorce", "news.affair",
-                    "npc_behavior.news_poly_union",   // v1.2.5: the gossip keyword for the polyamorous union news
+                    "npc_behavior.news_poly_union", "worldsim.news_expecting",   // v1.2.5: gossip keywords of the world simulation's news
                 }.Select(k => L(lang, k)));
                 foreach (var kw in L(lang, "news.gossip_keywords").Split('|'))
                     texts.Should().ContainEquivalentOf(kw, $"[{lang}] the keyword {kw} matches a news text");

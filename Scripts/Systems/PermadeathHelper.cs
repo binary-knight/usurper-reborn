@@ -230,8 +230,9 @@ namespace UsurperRemake.Systems
                     {
                         if (OnlineStateManager.IsActive)
                         {
+                            // v1.2.5: in the writer's language, as CombatEngine writes the same news
                             _ = OnlineStateManager.Instance!.AddNews(
-                                $"{displayName} the Lv.{finalLevel} {className} fell forever to {killerName}. Their soul has left the world.",
+                                Loc.Get("combat.news_permadeath", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), killerName),
                                 "permadeath");
                         }
                     }
@@ -332,7 +333,7 @@ namespace UsurperRemake.Systems
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_magenta");
-                string heirName = heir.DisplayName ?? heir.Name2 ?? heir.Name1 ?? "your child";
+                string heirName = heir.DisplayName ?? heir.Name2 ?? heir.Name1 ?? UsurperRemake.Systems.Loc.Get("permadeath.your_child");
                 terminal.WriteLine(
                     $"  {UsurperRemake.Systems.Loc.Get("permadeath.inheritance_estate", heirName, passed)}");
                 await Pacing.Wait(2500);
@@ -347,7 +348,7 @@ namespace UsurperRemake.Systems
                 {
                     global::NewsSystem.Instance?.Newsy(
                         UsurperRemake.Systems.Loc.Get("permadeath.inheritance_news",
-                            player.Name2 ?? player.Name1 ?? "An adventurer", heirName, passed));
+                            player.Name2 ?? player.Name1 ?? UsurperRemake.Systems.Loc.Get("permadeath.an_adventurer"), heirName, passed));
                 }
                 catch (Exception nx)
                 {

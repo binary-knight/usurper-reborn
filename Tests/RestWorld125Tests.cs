@@ -719,4 +719,173 @@ public class RestWorld125Tests : IDisposable
             SameCatchUpBucket(key, LongName, "Bo");
         L("en", "goal.news_avenged", LongName, L("en", "goal.target_enemy")).Should().Be($"{LongName} has avenged the blood of their kin. their enemy is dead.");
     }
+    // ================= WorldSimulator, DailySystemManager, WorldInitializerSystem, WorldSimService =================
+
+    private static readonly (string Key, object[] Args)[] WorldNews =
+    {
+        ("worldsim.news_permadeath", new object[] { LongName, "Bo" }),
+        ("worldsim.news_respawned", new object[] { LongName }),
+        ("worldsim.news_natural_death", new object[] { LongName, 77 }),
+        ("worldsim.news_immigrant", new object[] { "An", "Elf", LongName }),
+        ("worldsim.news_orphan_taken", new object[] { LongName, "Bo", "Al" }),
+        ("worldsim.news_orphan_guard", new object[] { LongName }),
+        ("worldsim.news_orphan_realm", new object[] { LongName }),
+        ("worldsim.news_expecting", new object[] { LongName, "Bo" }),
+        ("team.news_joined", new object[] { LongName, "Ocean Wardens" }),
+        ("worldsim.news_team_formed", new object[] { LongName, "Ocean Wardens", "Bo" }),
+        ("worldsim.news_team_recruited", new object[] { LongName, "Bo", "Ocean Wardens" }),
+        ("worldsim.news_team_conquered", new object[] { "Ocean Wardens", 12, 30 }),
+        ("worldsim.news_boss_defeated", new object[] { LongName, "Goblin Chieftain" }),
+        ("worldsim.news_monster_slain", new object[] { LongName, "Goblin", 7, 120 }),
+        ("worldsim.news_purchased", new object[] { LongName, "Long Sword" }),
+        ("worldsim.news_training", new object[] { LongName }),
+        ("worldsim.news_hunt_victory", new object[] { LongName, "Bo" }),
+        ("worldsim.home_1", new object[] { LongName }), ("worldsim.home_2", new object[] { LongName }),
+        ("worldsim.home_3", new object[] { LongName }), ("worldsim.home_4", new object[] { LongName }),
+        ("worldsim.home_5", new object[] { LongName }), ("worldsim.home_6", new object[] { LongName }),
+        ("worldsim.news_love_disease", new object[] { LongName }),
+        ("worldsim.news_love_seen", new object[] { LongName }),
+        ("worldsim.news_blessing", new object[] { LongName }),
+        ("worldsim.news_offering", new object[] { LongName }),
+        ("worldsim.news_divine_wrath", new object[] { LongName }),
+        ("worldsim.news_desecrated", new object[] { LongName }),
+        ("worldsim.news_bank_deposit", new object[] { LongName }),
+        ("worldsim.news_bank_guard", new object[] { LongName }),
+        ("marketplace.news_npc_listed", new object[] { LongName, "Long Sword" }),
+        ("marketplace.news_npc_bought", new object[] { LongName, "Long Sword", "Bo" }),
+        ("worldsim.court.guard_joined", new object[] { LongName }),
+        ("worldsim.news_pickpocket", new object[] { LongName, 50, "Bo" }),
+        ("worldsim.news_inn_brawl", new object[] { LongName, "Bo" }),
+        ("worldsim.news_inn_drinks", new object[] { LongName, "Bo" }),
+        ("worldsim.news_team_disbanded_solo", new object[] { "Ocean Wardens", LongName }),
+        ("worldsim.news_member_abandoned", new object[] { LongName, "Ocean Wardens" }),
+        ("worldsim.news_team_disbanded", new object[] { "Ocean Wardens" }),
+        ("worldsim.news_team_war", new object[] { "Ocean Wardens", "Tide Breakers", "Main Street" }),
+        ("worldsim.news_team_victorious", new object[] { "Ocean Wardens", "Tide Breakers" }),
+        ("worldsim.news_town_control", new object[] { "Ocean Wardens" }),
+        ("worldsim.news_tension", new object[] { LongName, "Bo", "Main Street" }),
+        ("worldsim.news_caught_pickpocket", new object[] { LongName, "Bo", "Main Street", 40 }),
+        ("worldsim.news_public_challenge", new object[] { LongName, "Bo", "Main Street", "Bo" }),
+        ("worldsim.news_treasury_bleeds", new object[] { 500 }),
+        ("worldsim.news_new_day", new object[0]),
+        ("daily.news_loan_default", new object[] { LongName }),
+        ("world_init.news_controls", new object[] { "Ocean Wardens" }),
+        ("world_init.history_founded", new object[] { 3, LongName, "Ocean Wardens", 4 }),
+        ("world_init.history_left_for_throne", new object[] { 25, LongName, "Ocean Wardens" }),
+        ("world_init.history_city", new object[] { 40, "Ocean Wardens" }),
+        ("world_init.history_guard", new object[] { 51, LongName, "Sir " + LongName }),
+        ("world_init.history_bank_guard", new object[] { 55, LongName }),
+        ("world_init.history_conquered", new object[] { 30, LongName, 8 }),
+        ("world_init.history_slain", new object[] { 30, LongName }),
+        ("world_init.history_level", new object[] { 30, LongName, 20 }),
+        ("world_init.history_arrived", new object[] { LongName }),
+    };
+
+    [Fact]
+    public void WorldNews_InEveryLanguage_SortsAsTheEnglish_AndHasNoEnglishInHungarian()
+    {
+        foreach (var (key, args) in WorldNews)
+        {
+            // the place argument is shown by its place name in the writer's language
+            foreach (var lang in new[] { "en" }.Concat(OtherLanguages))
+            {
+                var shown = args.Select(a => a is string s && s == "Main Street" ? (object)WorldSimulator.PlaceIn(lang, s) : a).ToArray();
+                string written = L(lang, key, shown);
+                GameEngine.CatchUpBucket(written).Should().Be(GameEngine.CatchUpBucket(L("en", key, args)),
+                    $"{key} written in {lang} (\"{written}\") sorts as the English \"{L("en", key, args)}\"");
+            }
+            NoEnglishLeft(L("hu", key, args), new[] { key });
+        }
+        foreach (var key in new[] { "worldsim.news_natural_death", "worldsim.news_orphan_guard", "worldsim.news_orphan_realm", "worldsim.news_expecting" })
+            SameGossip(key, LongName, 77);
+
+        // The throne's news sorts under Royal for a king in every language
+        foreach (var lang in new[] { "en" }.Concat(OtherLanguages))
+        {
+            GameEngine.CatchUpBucket(L(lang, "world_init.news_reign", L(lang, "castle.king"), LongName, 30)).Should().Be(2, $"the reign news ({lang})");
+            GameEngine.CatchUpBucket(L(lang, "world_init.history_claimed", 25, L(lang, "castle.king"), LongName)).Should().Be(2, $"the throne news ({lang})");
+            GameEngine.CatchUpBucket(L(lang, "combat.news_god_ascended", LongName, L(lang, "god.title.5"))).Should()
+                .Be(GameEngine.CatchUpBucket(L("en", "combat.news_god_ascended", LongName, L("en", "god.title.5"))), $"the god news ({lang})");
+        }
+
+        // English as before
+        L("en", "worldsim.news_natural_death", "Bo", 77).Should().Be("Bo has passed away peacefully at the age of 77. The soul moves on...");
+        L("en", "worldsim.news_immigrant", "An", "Elf", "Bo").Should().Be("An Elf traveler named Bo has arrived in town.");
+        L("en", "worldsim.news_monster_slain", "Bo", "Goblin", 7, 120).Should().Be("Bo slew a Goblin (Lv7) and earned 120 gold.");
+        L("en", "world_init.history_founded", 3, "Bo", "Ocean Wardens", 4).Should().Be("Day 3: Bo founded 'Ocean Wardens' with 4 followers");
+        L("en", "worldsim.news_tension", "Bo", "Al", "Main Street").Should().Be("Tensions are rising between Bo and Al at the Main Street.");
+        GodText.Title(5).Should().Be(GameConfig.GodTitles[4], "the god title in the news is the same English as before");
+    }
+
+    [Fact]
+    public void WorldSimulatorMail_IsInTheRecipientsLanguage_NotTheWriters()
+    {
+        const string when = "2026-10-03 12:00 UTC";
+        string hu = InLang("fr", () => WorldSimulator.SpouseDeathNotice("hu", LongName, null, null, "Main Street", null, when));
+        hu.Should().Be(L("hu", "worldsim.spouse_death_notice", LongName, L("hu", "combat.killer_unknown_forces"), L("hu", "location.name.MainStreet"), when));
+        string oldAge = InLang("fr", () => WorldSimulator.SpouseDeathNotice("hu", null, null, "worldsim.cause_old_age", null, "worldsim.place_home", when));
+        oldAge.Should().Be(L("hu", "worldsim.spouse_death_notice", L("hu", "worldsim.your_spouse"), L("hu", "worldsim.cause_old_age"), L("hu", "worldsim.place_home"), when));
+        NoEnglishLeft(oldAge, new[] { "worldsim.spouse_death_notice", "worldsim.your_spouse", "worldsim.cause_old_age", "worldsim.place_home" });
+        WorldSimulator.SpouseDeathNotice("en", "Bo", "a Goblin", null, "Main Street", null, when)
+            .Should().Be($"Grave news: your spouse Bo has died. Cause: a Goblin. Location: Main Street. Time: {when}. The Town Crier extends the realm's condolences.");
+        WorldSimulator.SpouseDeathNotice("en", "Bo", null, "worldsim.cause_old_age", null, "worldsim.place_home", when)
+            .Should().Contain("Cause: old age. Location: their home.");
+        WorldSimulator.SpouseDeathNotice("en", "Bo", "", null, " ", null, when).Should().Contain("Cause: unknown forces. Location: parts unknown.");
+        InLang("fr", () => WorldSimulator.SpouseDeathNotice("hu", "Bo", "Goblin", null, "the dungeon", null, when)).Should().Contain(L("hu", "worldsim.place_dungeon"));
+        WorldSimulator.SpouseDeathNotice("en", "Bo", "Goblin", null, "the dungeon", null, when).Should().Contain("Location: the dungeon.");
+
+        InLang("fr", () => WorldSimulator.SleepMurderMail("hu", LongName, 1234, "Long Sword"))
+            .Should().Be(L("hu", "worldsim.mail_sleep_murder_item", LongName, $"{1234:N0}", "Long Sword"));
+        WorldSimulator.SleepMurderMail("en", "Bo", 1234, null).Should().Be($"Bo murdered you in your sleep! Lost {1234:N0} gold.");
+        WorldSimulator.SleepMurderMail("en", "Bo", 1234, "Long Sword").Should().Be($"Bo murdered you in your sleep! Lost {1234:N0} gold and Long Sword.");
+        L("en", "worldsim.mail_widowed", "Bo").Should().Be("Your beloved Bo has passed away. You are now widowed.");
+        NoEnglishLeft(L("hu", "worldsim.mail_widowed", LongName), new[] { "worldsim.mail_widowed" });
+
+        // The world simulation sends them through the backend's per-recipient language helpers
+        string src = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "WorldSimulator.cs"));
+        src.Should().Contain("SendMessageToKeyLocalized(\"The Town Crier\", username, \"death\"")
+            .And.Contain("backend.SendMessageLocalized(\"System\", deceased.SpouseName, \"system\"")
+            .And.Contain("SendMessageToKeyLocalized(attackerNPC.Name2, sleeper.Username, \"sleep_attack\"");
+    }
+
+    [Fact]
+    public void OrphanBackstory_AndCourtRoles_AreStoredInEnglish_AndShownInTheReadersLanguage()
+    {
+        string stored = L("en", "worldsim.orphan_backstory", "Mira", "Tor");
+        stored.Should().Be("Both parents lost. Mother: Mira, Father: Tor.");
+        InLang("hu", () => CastleLocation.OrphanBackstoryText(stored)).Should().Be(L("hu", "worldsim.orphan_backstory", "Mira", "Tor"));
+        InLang("hu", () => CastleLocation.OrphanBackstoryText("A story of its own.")).Should().Be("A story of its own.");
+        string src = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Scripts", "Systems", "WorldSimulator.cs"));
+        Regex.Matches(src, Regex.Escape("BackgroundStory = Loc.GetIn(\"en\", \"worldsim.orphan_backstory\", child.Mother, child.Father)")).Count.Should().Be(2);
+
+        var sim = (WorldSimulator)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(WorldSimulator));
+        var king = King.CreateNewKing("Bo", CharacterAI.Computer, CharacterSex.Male);
+        king.CourtMembers.Clear();
+        InLang("hu", () => { typeof(WorldSimulator).GetMethod("InitializeCourtMembers", F)!.Invoke(sim, new object[] { king }); return 0; });
+        king.CourtMembers.Select(m => m.Role).Should().Equal("Royal Advisor", "Court Steward", "Marshal", "Spymaster", "Treasurer");
+        InLang("hu", () => king.CourtMembers.Select(m => CastleLocation.CourtRoleLabel(m.Role)).ToList())
+            .Should().Equal(L("hu", "castle.d3_role_advisor"), L("hu", "castle.court_role_steward"), L("hu", "castle.court_role_marshal"),
+                L("hu", "castle.court_role_spymaster"), L("hu", "castle.court_role_treasurer"));
+    }
+
+    // ================= BugReportSystem and HintSystem =================
+
+    [Fact]
+    public void BugReportTitle_AndTipBox_AreInTheReadersLanguage_AsWideAsBefore()
+    {
+        BugReportSystem.TitleRow(L("en", "bug_report.title")).Should().Be("                         BUG REPORT");
+        BugReportSystem.TitleRow(L("hu", "bug_report.title")).Length.Should().BeLessOrEqualTo(MaxWidth);
+        L("hu", "bug_report.title").Should().NotBe("BUG REPORT");
+
+        HintSystem.BoxTop("TIP").Should().Be("┌─── TIP ────────────────────────────────────────────────────────────────────┐");
+        foreach (var lang in new[] { "es", "fr", "hu", "it" })
+            HintSystem.BoxTop(L(lang, "hint.tip_label")).Length.Should().Be(78, $"the {lang} tip box top is as wide as the box");
+
+        var s = NewScreen();
+        InLang("hu", () => HintSystem.Instance.TryShowHint(HintSystem.HINT_INVENTORY, s.Term, new HashSet<string>()));
+        Capture("tip-box-hu.txt", s.Text);
+        Rows(s.Text).Should().Contain(HintSystem.BoxTop(L("hu", "hint.tip_label")));
+        s.Text.Should().NotContain(" TIP ");
+        EveryRowFits(s.Text, "tip box (hu)");
+    }
 }

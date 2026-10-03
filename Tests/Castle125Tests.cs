@@ -384,7 +384,10 @@ public class Castle125Tests : IDisposable
             L("en", $"castle.orphan_backstory_{i}").Should().Be(table[i]);
             InLang("hu", () => CastleLocation.OrphanBackstoryText(table[i])).Should().Be(L("hu", $"castle.orphan_backstory_{i}"));
         }
-        InLang("hu", () => CastleLocation.OrphanBackstoryText("Both parents lost. Mother: A, Father: B.")).Should().Be("Both parents lost. Mother: A, Father: B.");
+        // v1.2.5: the world simulation's own backstory (worldsim.orphan_backstory, stored in English) is shown keyed too;
+        // any other stored text is shown as stored
+        InLang("hu", () => CastleLocation.OrphanBackstoryText("Both parents lost. Mother: A, Father: B.")).Should().Be(L("hu", "worldsim.orphan_backstory", "A", "B"));
+        InLang("hu", () => CastleLocation.OrphanBackstoryText("A backstory of its own.")).Should().Be("A backstory of its own.");
         Src().Should().Contain("BackgroundStory = OrphanBackstories[random.Next(OrphanBackstories.Length)]");
     }
 

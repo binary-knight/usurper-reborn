@@ -145,7 +145,7 @@ namespace UsurperRemake.Systems
             if (!GameConfig.ScreenReaderMode)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("┌─── TIP ────────────────────────────────────────────────────────────────────┐");
+                terminal.WriteLine(BoxTop(tipLabel));
             }
             terminal.SetColor(hint.Color);
             if (GameConfig.ScreenReaderMode)
@@ -170,6 +170,13 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("└────────────────────────────────────────────────────────────────────────────┘");
             }
             terminal.WriteLine("");
+        }
+
+        /// <summary>v1.2.5: the tip box's top border with the tip label in the reader's language, 78 columns as before.</summary>
+        internal static string BoxTop(string label)
+        {
+            string head = $"\u250c\u2500\u2500\u2500 {label} ";
+            return head + new string('\u2500', Math.Max(0, 77 - head.Length)) + "\u2510";
         }
 
         /// <summary>

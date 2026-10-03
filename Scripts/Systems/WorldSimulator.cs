@@ -283,6 +283,24 @@ public class WorldSimulator
     /// <summary>Empties the gossip pool (tests).</summary>
     internal static void ClearGossipPool() => _gossipPool.Clear();
 
+    /// <summary>v1.2.5: the mail a sleeper killed by an NPC finds, in the sleeper's language.</summary>
+    internal static string SleepMurderMail(string lang, string attacker, long gold, string? itemName) => itemName != null
+        ? Loc.GetIn(lang, "worldsim.mail_sleep_murder_item", attacker, $"{gold:N0}", itemName)
+        : Loc.GetIn(lang, "worldsim.mail_sleep_murder", attacker, $"{gold:N0}");
+
+    /// <summary>
+    /// v1.2.5: an orphan backstory the world simulation stored (in English, worldsim.orphan_backstory) in the
+    /// reader's language; null when the stored text is not one.
+    /// </summary>
+    internal static string? OrphanBackstoryLabel(string? stored)
+    {
+        if (string.IsNullOrEmpty(stored)) return null;
+        string pattern = "^" + System.Text.RegularExpressions.Regex.Escape(Loc.GetIn("en", "worldsim.orphan_backstory"))
+            .Replace(@"\{0}", "(.*)").Replace(@"\{1}", "(.*)") + "$";
+        var m = System.Text.RegularExpressions.Regex.Match(stored, pattern);
+        return m.Success ? Loc.Get("worldsim.orphan_backstory", m.Groups[1].Value, m.Groups[2].Value) : null;
+    }
+
     // Team name generators for NPC-formed teams - Ocean/Manwe themed for lore
     private static readonly string[] TeamNamePrefixes = new[]
     {
@@ -748,8 +766,7 @@ public class WorldSimulator
             // was disabled ("NPCs respawn, so 'will not return' would be misleading"); now that a rolled
             // permadeath genuinely sticks (IsPermaDead set above, no respawn), the "will not return"
             // line is accurate and the death should be visible in the feed and the log.
-            NewsSystem.Instance?.Newsy(
-                $"\u2620 {npc.Name} has been slain by {killerName} and will not return. The realm mourns.");
+            NewsSystem.Instance?.Newsy("\u2620 " + Loc.Get("worldsim.news_permadeath", npc.Name, killerName));
 
             // Witnesses record the permanent death
             SocialInfluenceSystem.RecordWitnesses(npcs, location,
@@ -817,7 +834,7 @@ public class WorldSimulator
     /// HandleSpouseBereavement path; this is only for NPC-married-to-player.
     /// Best-effort -- failure never breaks the death cascade.
     /// </summary>
-    private void NotifyPlayerSpouseOfDeath(NPC npc, string killerName, string location)
+    private void NotifyPlayerSpouseOfDeath(NPC npc, string? killerName, string? location, string? killerKey = null, string? placeKey = null)
     {
         try
         {
@@ -842,11 +859,8 @@ public class WorldSimulator
             {
                 return;
             }
-            string npcName = npc.Name2 ?? npc.Name1 ?? npc.Name ?? "Your spouse";
-            string killer = string.IsNullOrWhiteSpace(killerName) ? "unknown forces" : killerName;
-            string place = string.IsNullOrWhiteSpace(location) ? "parts unknown" : location;
+            string? npcName = npc.Name2 ?? npc.Name1 ?? npc.Name;
             string when = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm 'UTC'");
-            string body = Loc.Get("worldsim.spouse_death_notice", npcName, killer, place, when);
 
             // Online: if the spouse name resolves to a real player, send mail.
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SqlBackend != null)
@@ -854,7 +868,9 @@ public class WorldSimulator
                 var username = SqlBackend.ResolvePlayerUsernameForMail(spouseName); // SpouseName is a bare Name2; a family surname widens the display name
                 if (!string.IsNullOrEmpty(username))
                 {
-                    _ = SqlBackend.SendMessageToKey("The Town Crier", username, "death", body);
+                    // v1.2.5: in the spouse's account language (the world sim writes it with no reader present)
+                    _ = SqlBackend.SendMessageToKeyLocalized("The Town Crier", username, "death",
+                        lang => SpouseDeathNotice(lang, npcName, killerName, killerKey, location, placeKey, when));
                     DebugLogger.Instance.LogInfo("WORLDSIM",
                         $"Spouse-death mail sent to player '{username}' for {npcName}");
                 }
@@ -869,7 +885,7 @@ public class WorldSimulator
                  || string.Equals(current.Name1, spouseName, StringComparison.OrdinalIgnoreCase)
                  || string.Equals(current.DisplayName, spouseName, StringComparison.OrdinalIgnoreCase)))
             {
-                GameEngine.PendingNotifications.Enqueue(body);
+                GameEngine.PendingNotifications.Enqueue(SpouseDeathNotice(GameConfig.Language, npcName, killerName, killerKey, location, placeKey, when));
                 DebugLogger.Instance.LogInfo("WORLDSIM",
                     $"Spouse-death notification queued for single-player spouse of {npcName}");
             }
@@ -879,6 +895,30 @@ public class WorldSimulator
             DebugLogger.Instance.LogError("WORLDSIM",
                 $"Spouse-death notification failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// v1.2.5: the spouse death notice in the reader's language. The killer is a name (shown as it is) or, with
+    /// killerKey, a cause in the reader's language; the place is a location id shown by its place name, or with
+    /// none the placeKey text (parts unknown when there is no placeKey).
+    /// </summary>
+    internal static string SpouseDeathNotice(string lang, string? npcName, string? killerName, string? killerKey, string? location, string? placeKey, string when)
+    {
+        string name = string.IsNullOrWhiteSpace(npcName) ? Loc.GetIn(lang, "worldsim.your_spouse") : npcName;
+        string killer = killerKey != null ? Loc.GetIn(lang, killerKey)
+            : string.IsNullOrWhiteSpace(killerName) ? Loc.GetIn(lang, "combat.killer_unknown_forces") : killerName;
+        string place = string.IsNullOrWhiteSpace(location) ? Loc.GetIn(lang, placeKey ?? "worldsim.place_unknown") : PlaceIn(lang, location);
+        return Loc.GetIn(lang, "worldsim.spouse_death_notice", name, killer, place, when);
+    }
+
+    /// <summary>v1.2.5: a location id as a place name in a language (location.name.*), else as stored.</summary>
+    internal static string PlaceIn(string lang, string location)
+    {
+        if (lang == "en") return location;
+        // the dungeon deaths pass "the dungeon" (also an id the witnesses compare), not a location key
+        if (location.Equals("the dungeon", StringComparison.OrdinalIgnoreCase)) return Loc.GetIn(lang, "worldsim.place_dungeon");
+        string key = "location.name." + location.Replace(" ", "");
+        return Loc.HasIn(lang, key) ? Loc.GetIn(lang, key) : location;
     }
 
     /// <summary>
@@ -1027,7 +1067,7 @@ public class WorldSimulator
                 // Lose some gold and XP as death penalty
                 npc.Gold = Math.Max(0, npc.Gold / 2);
 
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} has returned from the realm of the dead!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_respawned", npc.Name));
                 UsurperRemake.Systems.DebugLogger.Instance.LogInfo("NPC", $"RESPAWNED: {npc.Name} (HP restored to {npc.HP}, MaxHP={npc.MaxHP}, IsDead={npc.IsDead})");
             }
             else
@@ -1229,7 +1269,7 @@ public class WorldSimulator
                         // bereavement clears the marriage flags (the notify
                         // gate reads them). Aging path doesn't route through
                         // MarkNPCDead, so it needs its own hook.
-                        NotifyPlayerSpouseOfDeath(npc, "old age", npc.CurrentLocation ?? "their home");
+                        NotifyPlayerSpouseOfDeath(npc, null, npc.CurrentLocation, "worldsim.cause_old_age", "worldsim.place_home");
                         HandleSpouseBereavement(npc);
                     }
 
@@ -1239,8 +1279,7 @@ public class WorldSimulator
                     // pending_inheritance table and deliver on next login.
                     BequeathItemsToTeamLeader(npc);
 
-                    NewsSystem.Instance?.Newsy(
-                        $"⚱ {npc.Name2} has passed away peacefully at the age of {currentAge}. The soul moves on...");
+                    NewsSystem.Instance?.Newsy("\u26b1 " + Loc.Get("worldsim.news_natural_death", npc.Name2, currentAge));
 
                     UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
                         $"{npc.Name2} died of old age at {currentAge} (max {maxAge} for {npc.Race})");
@@ -1337,8 +1376,9 @@ public class WorldSimulator
 
             // v0.62.1 (article fix): race may be vowel-initial (Elf, Orc) so emit
             // "An Elf traveler" / "A Dwarf traveler" via GetIndefiniteArticle.
-            NewsSystem.Instance?.Newsy(
-                $"{GameConfig.GetIndefiniteArticle(race.ToString())} {race} traveler named {immigrant.Name2} has arrived in town.");
+            // v1.2.5: the article ({0}) is English only; other languages leave it out
+            string raceName = GameConfig.GetLocalizedRaceName(race);
+            NewsSystem.Instance?.Newsy(Loc.Get("worldsim.news_immigrant", GameConfig.GetIndefiniteArticle(raceName), raceName, immigrant.Name2));
 
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("IMMIGRATION",
                 $"Generated immigrant: {immigrant.Name2} ({race} {immigrant.Class} L{immigrant.Level} {sex})");
@@ -1469,8 +1509,10 @@ public class WorldSimulator
                 var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
                 if (backend != null)
                 {
-                    backend.SendMessage("System", deceased.SpouseName, "system",
-                        $"Your beloved {deceased.Name2} has passed away. You are now widowed.").GetAwaiter().GetResult();
+                    // v1.2.5: in the spouse's account language
+                    string deceasedName = deceased.Name2;
+                    backend.SendMessageLocalized("System", deceased.SpouseName, "system",
+                        lang => Loc.GetIn(lang, "worldsim.mail_widowed", deceasedName)).GetAwaiter().GetResult();
 
                     DebugLogger.Instance.LogInfo("LIFECYCLE",
                         $"Player {deceased.SpouseName} will be widowed on login after NPC spouse {deceased.Name2}'s permadeath");
@@ -1641,7 +1683,7 @@ public class WorldSimulator
                     Sex = child.Sex,
                     ArrivalDate = DateTime.Now,
                     BirthDate = child.BirthDate,
-                    BackgroundStory = $"Both parents lost. Mother: {child.Mother}, Father: {child.Father}.",
+                    BackgroundStory = Loc.GetIn("en", "worldsim.orphan_backstory", child.Mother, child.Father),
                     Happiness = 30, // Low — just lost family
                     MotherName = child.Mother,
                     FatherName = child.Father,
@@ -1663,8 +1705,7 @@ public class WorldSimulator
                 }).GetAwaiter().GetResult();
 
                 if (admitted)
-                    NewsSystem.Instance?.Newsy(
-                        $"🏠 Young {child.Name}, child of the late {child.Mother} and {child.Father}, has been taken into the Royal Orphanage.");
+                    NewsSystem.Instance?.Newsy("\U0001F3E0 " + Loc.Get("worldsim.news_orphan_taken", child.Name, child.Mother, child.Father));
             }
             else if (king == null)
             {
@@ -1855,9 +1896,8 @@ public class WorldSimulator
         // Also create the NPC entity so the guard has real combat stats
         OrphanBecomesNPC(orphan);
 
-        string guardPrefix = GameConfig.ScreenReaderMode ? "" : "⚔ ";
-        NewsSystem.Instance?.Newsy(
-            $"{guardPrefix}{orphan.Name}, raised in the Royal Orphanage, has come of age and joined the Royal Guard!");
+        string guardPrefix = GameConfig.ScreenReaderMode ? "" : "\u2694 ";
+        NewsSystem.Instance?.Newsy(guardPrefix + Loc.Get("worldsim.news_orphan_guard", orphan.Name));
 
         DebugLogger.Instance.LogInfo("ORPHANAGE",
             $"{orphan.Name} came of age and became a Royal Guard");
@@ -1982,8 +2022,7 @@ public class WorldSimulator
 
         NPCSpawnSystem.Instance?.AddRestoredNPC(npc);
 
-        NewsSystem.Instance?.Newsy(
-            $"🎓 {displayName}, raised in the Royal Orphanage, has come of age and joined the realm!");
+        NewsSystem.Instance?.Newsy("\U0001F393 " + Loc.Get("worldsim.news_orphan_realm", displayName));
 
         DebugLogger.Instance.LogInfo("ORPHANAGE",
             $"{displayName} came of age and became a citizen NPC ({npc.Class})");
@@ -2206,7 +2245,7 @@ public class WorldSimulator
                 Sex = child.Sex,
                 ArrivalDate = DateTime.Now,
                 BirthDate = child.BirthDate,
-                BackgroundStory = $"Both parents lost. Mother: {child.Mother}, Father: {child.Father}.",
+                BackgroundStory = Loc.GetIn("en", "worldsim.orphan_backstory", child.Mother, child.Father),
                 Happiness = 30,
                 MotherName = child.Mother,
                 FatherName = child.Father,
@@ -2362,9 +2401,8 @@ public class WorldSimulator
             }
             else
             {
-                string childPrefix = GameConfig.ScreenReaderMode ? "" : "♥ ";
-                NewsSystem.Instance?.Newsy(
-                    $"{childPrefix}{npc.Name2} and {father.Name2} are expecting a child!");
+                string childPrefix = GameConfig.ScreenReaderMode ? "" : "\u2665 ";
+                NewsSystem.Instance?.Newsy(childPrefix + Loc.Get("worldsim.news_expecting", npc.Name2, father.Name2));
             }
 
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("LIFECYCLE",
@@ -3688,7 +3726,7 @@ public class WorldSimulator
                         npc.CTurf = teamLeader.CTurf;
                     }))
                 {
-                    NewsSystem.Instance.Newsy(true, $"{npc.Name} joined the team '{npc.Team}'!");
+                    NewsSystem.Instance.Newsy(true, Loc.Get("team.news_joined", npc.Name, npc.Team));
                     if (UsurperRemake.BBS.DoorMode.IsOnlineMode) _npcTeamActionCooldown[npc.Id] = _currentTick;
                     return;
                 }
@@ -3744,7 +3782,7 @@ public class WorldSimulator
                 bestRecruit.TeamPW = teamPassword;
                 bestRecruit.CTurf = false;
 
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} formed a new team called '{teamName}' with {bestRecruit.Name}!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_formed", npc.Name, teamName, bestRecruit.Name));
                 if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {
                     _npcTeamActionCooldown[npc.Id] = _currentTick;
@@ -3808,7 +3846,7 @@ public class WorldSimulator
 
             if (random.NextDouble() < 0.3) // 30% chance to announce
             {
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} recruited {candidate.Name} into '{npc.Team}'!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_recruited", npc.Name, candidate.Name, npc.Team));
             }
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
             {
@@ -4012,7 +4050,7 @@ public class WorldSimulator
             // responsible for the permadeath cascade.
             foreach (var member in teamMembers.Where(m => m.HP <= 0).ToList())
             {
-                MarkNPCDead(member, 0.05f, monsters.FirstOrDefault()?.Name ?? "a monster", "the dungeon");
+                MarkNPCDead(member, 0.05f, monsters.FirstOrDefault()?.Name ?? Loc.Get("combat.a_monster"), "the dungeon");
             }
         }
         else
@@ -4041,7 +4079,7 @@ public class WorldSimulator
                 // Generate news for notable victories
                 if (random.NextDouble() < 0.15 || monsters.Any(m => m.IsBoss))
                 {
-                    NewsSystem.Instance.Newsy(true, $"Team '{npc.Team}' conquered dungeon level {dungeonLevel}, defeating {monsterCount} monsters!");
+                    NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_conquered", npc.Team, dungeonLevel, monsterCount));
                 }
 
                 // GD.Print($"[WorldSim] Team '{npc.Team}' won! {survivors.Count} survivors shared {totalExp} XP and {totalGold} gold");
@@ -4060,7 +4098,7 @@ public class WorldSimulator
             var dead = teamMembers.Where(m => !m.IsAlive).ToList();
             if (dead.Any())
             {
-                var killerName = monsters.FirstOrDefault()?.Name ?? "dungeon monsters";
+                var killerName = monsters.FirstOrDefault()?.Name ?? Loc.Get("worldsim.killer_dungeon_monsters");
                 foreach (var deadMember in dead)
                 {
                     // v0.65.6: survival lesson before the death roll (Brain survives respawn).
@@ -4653,8 +4691,8 @@ public class WorldSimulator
             if (monster.IsBoss || monster.Level >= npc.Level + 5 || random.NextDouble() < 0.1)
             {
                 string newsMsg = monster.IsBoss
-                    ? $"{npc.Name} defeated the mighty {monster.Name} in the dungeon depths!"
-                    : $"{npc.Name} slew a {monster.Name} (Lv{monster.Level}) and earned {goldGain} gold.";
+                    ? Loc.Get("worldsim.news_boss_defeated", npc.Name, monster.Name)
+                    : Loc.Get("worldsim.news_monster_slain", npc.Name, monster.Name, monster.Level, goldGain);
                 NewsSystem.Instance.Newsy(true, newsMsg);
             }
 
@@ -4832,7 +4870,7 @@ public class WorldSimulator
 
         if (boughtSomething && random.NextDouble() < 0.15)
         {
-            NewsSystem.Instance.Newsy(true, $"{npc.Name} purchased {itemBought} from the shop.");
+            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_purchased", npc.Name, itemBought));
         }
 
         // v0.65.6: a fruitless visit (checked both shops, bought nothing) marks
@@ -4892,7 +4930,7 @@ public class WorldSimulator
             // Occasionally newsworthy
             if (random.NextDouble() < 0.05)
             {
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} has been training hard at the Gym!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_training", npc.Name));
             }
         }
     }
@@ -5121,11 +5159,11 @@ public class WorldSimulator
         try
         {
             questDesc = pick.GetTargetDescription();
-            if (string.IsNullOrWhiteSpace(questDesc)) questDesc = "a bounty";
+            if (string.IsNullOrWhiteSpace(questDesc)) questDesc = Loc.Get("worldsim.quest_a_bounty");
         }
         catch
         {
-            questDesc = "a bounty";
+            questDesc = Loc.Get("worldsim.quest_a_bounty");
         }
 
         if (succeeded)
@@ -5161,8 +5199,7 @@ public class WorldSimulator
 
             try
             {
-                NewsSystem.Instance?.Newsy(true,
-                    $"{npc.Name2 ?? npc.Name} returned victorious from a hunt for {questDesc}!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("worldsim.news_hunt_victory", npc.Name2 ?? npc.Name, questDesc));
             }
             catch (Exception ex)
             {
@@ -5351,19 +5388,9 @@ public class WorldSimulator
             var romance = RomanceTracker.Instance;
             bool isSpouse = romance?.Spouses?.Any(s => s.NPCId == npc.ID) == true;
 
-            string[] homeMessages = isSpouse ? new[]
-            {
-                $"{npc.Name} is spending quality time at home.",
-                $"{npc.Name} prepared a warm meal at home.",
-                $"{npc.Name} is waiting faithfully at home."
-            } : new[]
-            {
-                $"{npc.Name} stopped by home for a visit.",
-                $"{npc.Name} is relaxing at home.",
-                $"{npc.Name} came home looking for company."
-            };
-
-            NewsSystem.Instance?.Newsy(false, homeMessages[random.Next(homeMessages.Length)]);
+            // v1.2.5: worldsim.home_1..3 for a spouse, 4..6 otherwise
+            int homeMessage = (isSpouse ? 1 : 4) + random.Next(3);
+            NewsSystem.Instance?.Newsy(false, Loc.Get($"worldsim.home_{homeMessage}", npc.Name));
         }
     }
 
@@ -5406,8 +5433,7 @@ public class WorldSimulator
             {
                 // NPC contracted a disease
                 npc.HP = Math.Max(1, npc.HP / 2);
-                NewsSystem.Instance.Newsy(true,
-                    $"{npc.Name} caught a nasty disease at Love Street!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_love_disease", npc.Name));
                 // GD.Print($"[WorldSim] {npc.Name} contracted a disease at Love Street!");
             }
             else
@@ -5418,8 +5444,7 @@ public class WorldSimulator
             // Generate news occasionally
             if (random.NextDouble() < 0.3f)
             {
-                NewsSystem.Instance.Newsy(true,
-                    $"{npc.Name} was seen at Love Street last night.");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_love_seen", npc.Name));
             }
         }
         else
@@ -5480,7 +5505,7 @@ public class WorldSimulator
                         npc.HP = Math.Min(npc.HP + npc.MaxHP / 4, npc.MaxHP);
                         break;
                 }
-                NewsSystem.Instance.Newsy(false, $"{npc.Name} received a divine blessing at the Temple.");
+                NewsSystem.Instance.Newsy(false, Loc.Get("worldsim.news_blessing", npc.Name));
                 // GD.Print($"[WorldSim] {npc.Name} received a divine blessing!");
             }
         }
@@ -5498,7 +5523,7 @@ public class WorldSimulator
             // Occasional news for large sacrifices
             if (sacrifice >= 2000 && random.NextDouble() < 0.3)
             {
-                NewsSystem.Instance.Newsy(false, $"{npc.Name} made a generous offering at the Temple.");
+                NewsSystem.Instance.Newsy(false, Loc.Get("worldsim.news_offering", npc.Name));
             }
         }
         else if (roll < 0.75f && personality != null && personality.Aggression > 0.6f && npc.Darkness > npc.Chivalry)
@@ -5514,12 +5539,12 @@ public class WorldSimulator
             {
                 int damage = random.Next(20, 50 + npc.Level);
                 npc.HP = Math.Max(1, npc.HP - damage);
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} was struck by divine wrath for desecrating an altar!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_divine_wrath", npc.Name));
                 // GD.Print($"[WorldSim] {npc.Name} was struck by divine wrath!");
             }
             else
             {
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} desecrated an altar at the Temple!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_desecrated", npc.Name));
             }
         }
         else
@@ -5571,7 +5596,7 @@ public class WorldSimulator
             // Occasional news for large deposits
             if (depositAmount >= 10000 && random.NextDouble() < 0.2)
             {
-                NewsSystem.Instance.Newsy(false, $"{npc.Name} made a substantial deposit at the Ironvault Bank.");
+                NewsSystem.Instance.Newsy(false, Loc.Get("worldsim.news_bank_deposit", npc.Name));
             }
         }
         else if (npc.BankGold > 0 && npc.Gold < 100 && roll < 0.7f)
@@ -5591,7 +5616,7 @@ public class WorldSimulator
                 npc.BankGuard = true;
                 npc.BankWage = 1000 + (npc.Level * 50);
 
-                NewsSystem.Instance.Newsy(true, $"{npc.Name} has been hired as a guard at the Ironvault Bank!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_bank_guard", npc.Name));
                 // GD.Print($"[WorldSim] {npc.Name} became a bank guard (wage: {npc.BankWage}/day)");
             }
         }
@@ -5685,7 +5710,7 @@ public class WorldSimulator
                 try
                 {
                     await backend.CreateAuctionListing(npc.Name, item.Name, itemJson, price, hoursToExpire: 48);
-                    NewsSystem.Instance?.Newsy(false, $"{npc.Name} put {item.Name} up for sale at the Auction House.");
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_listed", npc.Name, item.Name));
                 }
                 catch (Exception ex)
                 {
@@ -5739,8 +5764,7 @@ public class WorldSimulator
                     // Equip or store the purchased item
                     MarketplaceSystem.Instance.EquipOrStoreItem(npc, item);
 
-                    NewsSystem.Instance?.Newsy(false,
-                        $"{npc.Name} bought {item.Name} from {chosen.Seller} at the Auction House.");
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_bought", npc.Name, item.Name, chosen.Seller));
 
                     // Notify seller: 1.2.5, in the seller's language, one mail per world-sim day
                     await backend.MailAuctionSale(chosen.Seller, item.Name, npc.Name, chosen.Price);
@@ -5830,7 +5854,7 @@ public class WorldSimulator
                     return;
 
                 // News announcement
-                NewsSystem.Instance?.Newsy(true, $"{npc.Name} has joined the Royal Guard!");
+                NewsSystem.Instance?.Newsy(true, Loc.Get("worldsim.court.guard_joined", npc.Name));
 
                 // Chivalry boost for service
                 npc.Chivalry += 5;
@@ -5889,7 +5913,7 @@ public class WorldSimulator
                     victim.SpendGold(stolen);
                     npc.Gold += stolen;
                     npc.Darkness += 2;
-                    NewsSystem.Instance?.Newsy(false, $"{npc.Name} pickpocketed {stolen} gold from {victim.Name} in the Dark Alley!");
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_pickpocket", npc.Name, stolen, victim.Name));
                     RelationshipSystem.UpdateRelationship(victim, npc, -5, 0, false);
                 }
             }
@@ -6033,12 +6057,12 @@ public class WorldSimulator
                 npc.HP = Math.Max(1, npc.HP - Math.Clamp(npcLoss, 5, (int)(npc.MaxHP * 0.18)));
                 other.HP = Math.Max(1, other.HP - Math.Clamp(otherLoss, 5, (int)(other.MaxHP * 0.18)));
                 RelationshipSystem.UpdateRelationship(npc, other, -3, 0, false);
-                NewsSystem.Instance?.Newsy(false, $"{npc.Name} and {other.Name} traded blows at the Inn before the keeper threw them out.");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_inn_brawl", npc.Name, other.Name));
             }
             // Gossip at the inn (small chance)
             else if (random.NextDouble() < 0.10)
             {
-                NewsSystem.Instance?.Newsy(false, $"{npc.Name} and {other.Name} shared drinks and gossip at the Inn.");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_inn_drinks", npc.Name, other.Name));
             }
         }
     }
@@ -6607,7 +6631,9 @@ public class WorldSimulator
     private void InitializeCourtMembers(King working)
     {
         // Create default court positions
-        var roles = new[] { "Royal Advisor", "Court Steward", "Marshal", "Spymaster", "Treasurer" };
+        // v1.2.5: the roles are stored in English (CastleLocation.CourtRoleLabel shows them in the reader's language)
+        var roles = new[] { "castle.d3_role_advisor", "castle.court_role_steward", "castle.court_role_marshal",
+            "castle.court_role_spymaster", "castle.court_role_treasurer" }.Select(k => Loc.GetIn("en", k)).ToArray();
         var factions = Enum.GetValues<CourtFaction>().Where(f => f != CourtFaction.None).ToArray();
 
         foreach (var role in roles)
@@ -6811,7 +6837,7 @@ public class WorldSimulator
             solo.TeamPW = "";
             solo.CTurf = false;
             solo.TeamRec = 0;
-            NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has disbanded as {solo.DisplayName} went solo!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_disbanded_solo", oldTeam, solo.DisplayName));
         }
 
         // Re-fetch after cleanup
@@ -6840,14 +6866,14 @@ public class WorldSimulator
                 member.CTurf = false;
                 member.TeamRec = 0;
 
-                NewsSystem.Instance.Newsy(true, $"{member.Name} abandoned '{oldTeam}'!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_member_abandoned", member.Name, oldTeam));
                 // GD.Print($"[WorldSim] {member.Name} left team '{oldTeam}'");
 
                 // Check if team is now empty or solo (NPC-only teams)
                 var remainingMembers = npcs.Count(n => n.Team == oldTeam && n.IsAlive);
                 if (remainingMembers == 0 && !IsPlayerTeam(oldTeam))
                 {
-                    NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has been disbanded!");
+                    NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_disbanded", oldTeam));
                 }
                 else if (remainingMembers == 1 && !IsPlayerTeam(oldTeam))
                 {
@@ -6860,7 +6886,7 @@ public class WorldSimulator
                         soloMember.TeamPW = "";
                         soloMember.CTurf = false;
                         soloMember.TeamRec = 0;
-                        NewsSystem.Instance.Newsy(true, $"The team '{oldTeam}' has disbanded as {soloMember.DisplayName} went solo!");
+                        NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_disbanded_solo", oldTeam, soloMember.DisplayName));
                     }
                 }
             }
@@ -6905,7 +6931,7 @@ public class WorldSimulator
         string team1Name = team1Group.Key;
         string team2Name = team2Group.Key;
 
-        NewsSystem.Instance.Newsy(true, $"Team War! '{team1Name}' clashes with '{team2Name}' at {team1Location}!");
+        NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_war", team1Name, team2Name, GameEngine.NpcPlaceLabel(team1Location)));
         // GD.Print($"[WorldSim] Team war between '{team1Name}' and '{team2Name}'");
 
         // Simulate team battle
@@ -6913,11 +6939,11 @@ public class WorldSimulator
 
         if (team1Won)
         {
-            NewsSystem.Instance.Newsy(true, $"'{team1Name}' emerged victorious against '{team2Name}'!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_victorious", team1Name, team2Name));
         }
         else
         {
-            NewsSystem.Instance.Newsy(true, $"'{team2Name}' emerged victorious against '{team1Name}'!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_team_victorious", team2Name, team1Name));
         }
     }
 
@@ -7021,7 +7047,7 @@ public class WorldSimulator
                 member.TeamRec = 0;
             }
 
-            NewsSystem.Instance.Newsy(true, $"'{strongestTeam.TeamName}' has taken control of the town!");
+            NewsSystem.Instance.Newsy(true, Loc.Get("worldsim.news_town_control", strongestTeam.TeamName));
             // GD.Print($"[WorldSim] Team '{strongestTeam.TeamName}' took control of turf");
         }
     }
@@ -7173,7 +7199,7 @@ public class WorldSimulator
 
                 if (!cooldownActive && (!isOnline || _tensionMessagesThisTick < MAX_TENSION_MESSAGES_PER_TICK))
                 {
-                    NewsSystem.Instance?.Newsy(false, $"Tensions are rising between {npcName} and {rivalName} at the {npc.CurrentLocation}.");
+                    NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_tension", npcName, rivalName, GameEngine.NpcPlaceLabel(npc.CurrentLocation)));
                     if (isOnline)
                     {
                         _tensionMessageCooldown[pairKey] = _currentTick;
@@ -7352,7 +7378,7 @@ public class WorldSimulator
         string victimName = victim.Name2 ?? victim.Name;
         // Witnesses observe the theft
         SocialInfluenceSystem.RecordWitnesses(npcs, thief.CurrentLocation, thiefName, victimName, WitnessEventType.SawTheft);
-        NewsSystem.Instance?.Newsy($"{thiefName} was caught pickpocketing {victimName} at the {thief.CurrentLocation}! {stolenAmount} gold went missing.");
+        NewsSystem.Instance?.Newsy(Loc.Get("worldsim.news_caught_pickpocket", thiefName, victimName, GameEngine.NpcPlaceLabel(thief.CurrentLocation), stolenAmount));
         AddGossip("worldsim.gossip_stole", thiefName, victimName);
 
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"{thiefName} stole {stolenAmount}g from {victimName}");
@@ -7412,7 +7438,7 @@ public class WorldSimulator
         SocialInfluenceSystem.RecordWitnesses(npcs, challenger.CurrentLocation, challengerName, targetName, WitnessEventType.SawChallenge, suppressNews: true);
 
         // Generate news
-        NewsSystem.Instance?.Newsy($"{challengerName} publicly challenged {targetName} at the {challenger.CurrentLocation}! {winnerName} emerged victorious.");
+        NewsSystem.Instance?.Newsy(Loc.Get("worldsim.news_public_challenge", challengerName, targetName, GameEngine.NpcPlaceLabel(challenger.CurrentLocation), winnerName));
         AddGossip("worldsim.gossip_bested", winnerName, loserName);
 
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("WORLD", $"Challenge: {challengerName} vs {targetName} - {winnerName} won");
@@ -7741,8 +7767,9 @@ public class WorldSimulator
                         details = attackLog
                     });
                     SqlBackend.AppendSleepAttackLog(sleeper.Username, logEntry).GetAwaiter().GetResult();
-                    SqlBackend.SendMessageToKey(attackerNPC.Name2, sleeper.Username, "sleep_attack",
-                        $"{attackerNPC.Name2} murdered you in your sleep! Lost {stolenGold:N0} gold{(stolenItemName != null ? $" and {stolenItemName}" : "")}.").GetAwaiter().GetResult();
+                    // v1.2.5: in the sleeper's account language
+                    SqlBackend.SendMessageToKeyLocalized(attackerNPC.Name2, sleeper.Username, "sleep_attack",
+                        lang => SleepMurderMail(lang, attackerNPC.Name2, stolenGold, stolenItemName)).GetAwaiter().GetResult();
 
                     DebugLogger.Instance.LogInfo("SLEEP", $"NPC {attackerNPC.Name2} killed sleeping {sleeper.Username}, stole {stolenGold}g + {stolenItemName ?? "nothing"}");
                 }

@@ -1053,8 +1053,8 @@ public class DailySystemManager
                         if (!royalLoanPlayer.RoyalLoanBountyPosted)
                         {
                             royalLoanPlayer.RoyalLoanBountyPosted = true;
-                            QuestSystem.PostBountyOnPlayer(royalLoanPlayer.DisplayName, "Unpaid royal debt", (int)Math.Min(royalLoanPlayer.RoyalLoanAmount / 10, int.MaxValue));
-                            NewsSystem.Instance?.Newsy(true, $"{royalLoanPlayer.DisplayName} has defaulted on a royal loan! A bounty has been posted!");
+                            QuestSystem.PostBountyOnPlayer(royalLoanPlayer.DisplayName, Loc.Get("daily.bounty_crime_royal_debt"), (int)Math.Min(royalLoanPlayer.RoyalLoanAmount / 10, int.MaxValue));
+                            NewsSystem.Instance?.Newsy(true, Loc.Get("daily.news_loan_default", royalLoanPlayer.DisplayName));
                         }
                         if (terminal != null)
                         {
@@ -1112,7 +1112,7 @@ public class DailySystemManager
                     var netChange = incomeBefore - expensesBefore;
                     if (netChange < 0 && Math.Abs(netChange) > 100)
                     {
-                        NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+                        NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_treasury_bleeds", Math.Abs(netChange)));
                     }
                 }
             }
@@ -1319,7 +1319,7 @@ public class DailySystemManager
             god.GodLevel = newLevel;
             int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
             terminal?.WriteLine(Loc.Get("daily.divine_power_grows", GodText.Title(newLevel)), "bright_cyan");
-            NewsSystem.Instance?.Newsy(true, $"{god.DivineName} has ascended to the rank of {GameConfig.GodTitles[titleIdx]}!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("combat.news_god_ascended", god.DivineName, GodText.Title(newLevel)));
         }
 
         terminal?.WriteLine(Loc.Get("daily.deeds_restored", god.DeedsLeft), "yellow");

@@ -4192,32 +4192,6 @@
       ]
     }
   },
-  "Scripts/Systems/WorldSimulator.cs": {
-    "data": {
-      "count": 19,
-      "sites": [
-        "047c4f4d7f",
-        "2278fd1ddd",
-        "2278fd1ddd",
-        "25d6f91e2f",
-        "3d00156d88",
-        "455d03177e",
-        "53ec066148",
-        "5d05f88471",
-        "5ec10bb446",
-        "752ca3f1e3",
-        "7a4f00a843",
-        "8aa1489306",
-        "8e14c2eae7",
-        "9b93326389",
-        "b14f685fc3",
-        "b6d2e01943",
-        "b7d01c2405",
-        "d488e01143",
-        "d488e01143"
-      ]
-    }
-  },
   "Scripts/UI/ANSIArt.cs": {
     "data": {
       "count": 6,

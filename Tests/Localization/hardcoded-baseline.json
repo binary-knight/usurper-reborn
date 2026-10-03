@@ -126,13 +126,6 @@
       "dcc82d1f23"
     ]
   },
-  "Scripts/Systems/BugReportSystem.cs": {
-    "count": 2,
-    "sites": [
-      "3f37ec1ef6",
-      "8f762aac57"
-    ]
-  },
   "Scripts/Systems/CharacterCreationSystem.cs": {
     "count": 3,
     "sites": [
@@ -169,15 +162,6 @@
       "d5bb3af59b",
       "e773fd5335",
       "ffddb01d06"
-    ]
-  },
-  "Scripts/Systems/DailySystemManager.cs": {
-    "count": 4,
-    "sites": [
-      "1674e9c8cc",
-      "226998229b",
-      "a8b97fbd62",
-      "ebf185f23e"
     ]
   },
   "Scripts/Systems/DialogueSystem.cs": {
@@ -244,12 +228,6 @@
       "dd2df31b8a"
     ]
   },
-  "Scripts/Systems/HintSystem.cs": {
-    "count": 1,
-    "sites": [
-      "ac046324b1"
-    ]
-  },
   "Scripts/Systems/IntimacySystem.cs": {
     "count": 1,
     "sites": [
@@ -260,19 +238,6 @@
     "count": 1,
     "sites": [
       "582f194579"
-    ]
-  },
-  "Scripts/Systems/MarketplaceSystem.cs": {
-    "count": 2,
-    "sites": [
-      "b98138a4c8",
-      "cd4152bafb"
-    ]
-  },
-  "Scripts/Systems/PermadeathHelper.cs": {
-    "count": 1,
-    "sites": [
-      "828f0d32e7"
     ]
   },
   "Scripts/Systems/QuestSystem.cs": {
@@ -466,69 +431,6 @@
       "b586de08da",
       "bd6366cf02",
       "cb8cbe26a5"
-    ]
-  },
-  "Scripts/Systems/WorldInitializerSystem.cs": {
-    "count": 2,
-    "sites": [
-      "6117aca136",
-      "adbec631ba"
-    ]
-  },
-  "Scripts/Systems/WorldSimService.cs": {
-    "count": 2,
-    "sites": [
-      "1674e9c8cc",
-      "836c86c412"
-    ]
-  },
-  "Scripts/Systems/WorldSimulator.cs": {
-    "count": 44,
-    "sites": [
-      "0b1f0b90e5",
-      "0cbceb4a64",
-      "1ba6850636",
-      "1f22811933",
-      "292c7047c8",
-      "293f1c40ae",
-      "2cd705e0bc",
-      "2e27eaa7ce",
-      "3136c75081",
-      "3d11f9ed74",
-      "3ffc50c9c6",
-      "4578e7a2d1",
-      "471a68177e",
-      "49e17d1bfc",
-      "4da6d4b5d0",
-      "5196ffd52e",
-      "5c6817ac9d",
-      "637a811aef",
-      "63d4ef8bf1",
-      "7b79442804",
-      "800e92c7c0",
-      "84fecd292d",
-      "8c8ca978b9",
-      "90bc492d28",
-      "90fdd30133",
-      "929ff2e01a",
-      "932d5cfaf8",
-      "a2611a49e0",
-      "a6c1970068",
-      "ae482f3006",
-      "b98138a4c8",
-      "bb8b68fb1c",
-      "cd840b56b3",
-      "d12ddd4aee",
-      "d70962820f",
-      "d975683efb",
-      "db8db1b585",
-      "dfcbf2ba84",
-      "dfd4e3c82e",
-      "e03c3e9686",
-      "ec76122759",
-      "f25bf00dab",
-      "f6a0b12fe6",
-      "fd742728d6"
     ]
   },
   "Scripts/UI/SplashScreen.cs": {

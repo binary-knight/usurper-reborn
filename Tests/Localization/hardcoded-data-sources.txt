@@ -436,13 +436,6 @@ names|Scripts/Systems/WorldInitializerSystem.cs|decl:lastNames|NPC surnames
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:maleFirstNames|NPC names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:OceanTeamNamesPrefixes|team names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:OceanTeamNamesSuffixes|team names
-table|Scripts/Systems/WorldSimulator.cs|decl:homeMessages|news, Newsy
-table|Scripts/Systems/WorldSimulator.cs|decl:killer|killer in worldsim.spouse_death_notice
-table|Scripts/Systems/WorldSimulator.cs|decl:newsMsg|news, Newsy
-table|Scripts/Systems/WorldSimulator.cs|decl:place|place in worldsim.spouse_death_notice
-table|Scripts/Systems/WorldSimulator.cs|decl:roles|court member role
-table|Scripts/Systems/WorldSimulator.cs|init.BackgroundStory|orphan backstory
-table|Scripts/Systems/WorldSimulator.cs|=questDesc|news, Newsy
 names|Scripts/Systems/WorldSimulator.cs|decl:firstNames|court member names
 names|Scripts/Systems/WorldSimulator.cs|decl:lastNames|court member surnames
 names|Scripts/Systems/WorldSimulator.cs|decl:TeamNamePrefixes|team names

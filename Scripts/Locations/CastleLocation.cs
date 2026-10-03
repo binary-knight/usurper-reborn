@@ -1108,7 +1108,7 @@ public class CastleLocation : BaseLocation
     internal static string OrphanBackstoryText(string? stored)
     {
         int i = Array.IndexOf(OrphanBackstories, stored ?? "");
-        return i >= 0 ? Loc.Get($"castle.orphan_backstory_{i}") : stored ?? "";
+        return i >= 0 ? Loc.Get($"castle.orphan_backstory_{i}") : WorldSimulator.OrphanBackstoryLabel(stored) ?? stored ?? "";
     }
 
     /// <summary>v1.2.5: a stored mercenary role (Tank, DPS, Support) in the player's language.</summary>
