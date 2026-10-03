@@ -911,9 +911,12 @@ public partial class MagicShopLocation : BaseLocation
             // Value partially restored (curse halved it, purification recovers most but not all)
             targetItem.Value = (long)(targetItem.Value * 1.6); // 80% of original value (was halved, now x1.6)
 
-            // Clean up curse-related name prefix, add "Purified" tag
+            // Clean up curse-related name prefix, add "Purified" tag. v1.2.5: a name stored in another
+            // language (a drop rolled before 1.2.5) gets that language's words (ItemNames.PurifiedName)
             if (targetItem.Name.StartsWith("Cursed "))
                 targetItem.Name = "Purified " + targetItem.Name.Substring(7);
+            else
+                targetItem.Name = ItemNames.PurifiedName(targetItem.Name);
 
             // Fix curse description
             if (targetItem.Description != null && targetItem.Description.Count > 1 &&
@@ -999,9 +1002,11 @@ public partial class MagicShopLocation : BaseLocation
             // Value partially restored
             targetEquip.Value = (long)(targetEquip.Value * 1.6);
 
-            // Clean up name
+            // Clean up name. v1.2.5: a name stored in another language gets that language's words
             if (targetEquip.Name.StartsWith("Cursed "))
                 targetEquip.Name = "Purified " + targetEquip.Name.Substring(7);
+            else
+                targetEquip.Name = ItemNames.PurifiedName(targetEquip.Name);
 
             // Fix any negative magic resistance
             if (targetEquip.MagicResistance < 0)

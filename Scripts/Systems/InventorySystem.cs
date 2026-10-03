@@ -214,13 +214,14 @@ namespace UsurperRemake.Systems
                                         var options = new List<object>();
                                         if (item.Type == ObjType.Fingers || (int)item.MagicType == 5)
                                         {
-                                            options.Add(new { slot = "LFinger", label = "Left Finger", current = player.GetEquipment(EquipmentSlot.LFinger)?.Name ?? "(empty)" });
-                                            options.Add(new { slot = "RFinger", label = "Right Finger", current = player.GetEquipment(EquipmentSlot.RFinger)?.Name ?? "(empty)" });
+                                            // v1.2.5: labels and the worn item in the reader's language; slot stays the id the client sends back
+                                            options.Add(new { slot = "LFinger", label = Loc.Get("inventory.slot_pick_left_finger"), current = SlotPickCurrent(player, EquipmentSlot.LFinger) });
+                                            options.Add(new { slot = "RFinger", label = Loc.Get("inventory.slot_pick_right_finger"), current = SlotPickCurrent(player, EquipmentSlot.RFinger) });
                                         }
                                         else
                                         {
-                                            options.Add(new { slot = "MainHand", label = "Main Hand", current = player.GetEquipment(EquipmentSlot.MainHand)?.Name ?? "(empty)" });
-                                            options.Add(new { slot = "OffHand", label = "Off Hand", current = player.GetEquipment(EquipmentSlot.OffHand)?.Name ?? "(empty)" });
+                                            options.Add(new { slot = "MainHand", label = Loc.Get("equip.slot.MainHand"), current = SlotPickCurrent(player, EquipmentSlot.MainHand) });
+                                            options.Add(new { slot = "OffHand", label = Loc.Get("equip.slot.OffHand"), current = SlotPickCurrent(player, EquipmentSlot.OffHand) });
                                         }
                                         ElectronBridge.Emit("inventory_slot_pick", new
                                         {
@@ -1308,6 +1309,13 @@ namespace UsurperRemake.Systems
 
             player.RecalculateStats();
             await Pacing.Wait(1500);
+        }
+
+        /// <summary>v1.2.5: what the Electron slot picker shows as worn in a slot, in the reader's language.</summary>
+        internal static string SlotPickCurrent(Character player, EquipmentSlot slot)
+        {
+            var worn = player.GetEquipment(slot);
+            return worn != null ? ItemNames.Display(worn) : Loc.Get("home.slot_empty");
         }
 
         private static void GetHandedness(Item item, out WeaponHandedness handedness, out WeaponType weaponType)

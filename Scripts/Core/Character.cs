@@ -2948,12 +2948,15 @@ public class Character
         set => TeamRec = value; 
     }
     
+    /// <summary>The stored name of the item worn in a slot. v1.2.5: kept as stored, not shown through ItemNames:
+    /// CombatEngine's PvP salvage compares it and looks it up by name (EquipmentDatabase.GetByName), and shows
+    /// it through ItemNames itself.</summary>
     private string GetEquippedItemName(int itemId)
     {
         if (itemId == 0) return Loc.Get("ui.none");
         // Look up equipment from game data
         var equipment = EquipmentDatabase.GetById(itemId);
-        return equipment?.Name ?? $"Unknown Item #{itemId}";
+        return equipment?.Name ?? Loc.Get("item.unknown_id", itemId);
     }
     
     // Pascal-compatible string access for names

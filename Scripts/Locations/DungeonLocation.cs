@@ -9878,14 +9878,15 @@ public class DungeonLocation : BaseLocation
                 terminal.SetColor("darkgray");
                 terminal.Write("] ");
                 terminal.SetColor(item.Sold ? "darkgray" : "bright_yellow");
-                if (item.Sold)
-                {
-                    terminal.WriteLine($"{item.Name} - {Loc.Get("dungeon.sold")}");
-                }
-                else
-                {
-                    terminal.WriteLine($"{item.Name} ({item.Price:N0}g) - {item.Description}");
-                }
+                // v1.2.5: the ware's name in the reader's language; a row too long wraps under the name (one that fits is unchanged)
+                string ware = item.Sold
+                    ? $"{MerchantItemName(item)} - {Loc.Get("dungeon.sold")}"
+                    : $"{MerchantItemName(item)} ({item.Price:N0}g) - {item.Description}";
+                var wareRows = UsurperRemake.UI.UIHelper.VisibleLength(ware) + 6 <= UsurperRemake.UI.UIHelper.WrapWidth
+                    ? new List<string> { ware }
+                    : UsurperRemake.UI.UIHelper.WordWrap(ware, UsurperRemake.UI.UIHelper.WrapWidth, firstLineOffset: 6);
+                terminal.WriteLine(wareRows[0]);
+                foreach (var more in wareRows.Skip(1)) terminal.WriteLine("      " + more);
             }
 
             terminal.WriteLine("");
@@ -10044,6 +10045,11 @@ public class DungeonLocation : BaseLocation
             }
         }
     }
+
+    /// <summary>v1.2.5: a merchant ware's name in the reader's language; Name stays the stored English name
+    /// (compared for duplicates when the wares are drawn).</summary>
+    private static string MerchantItemName(MerchantRareItem item) =>
+        item.LootItem != null ? ItemNames.Display(item.LootItem) : ItemNames.Display(item.Name);
 
     private class MerchantRareItem
     {
@@ -10213,7 +10219,7 @@ public class DungeonLocation : BaseLocation
         if (player.Gold < item.Price)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("dungeon.merchant_need_gold", item.Price, item.Name));
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.merchant_need_gold", item.Price, MerchantItemName(item)));   // v1.2.5: a long name wraps
             terminal.WriteLine(Loc.Get("dungeon.merchant_come_back"));
             await Pacing.Wait(2000);
             return;
@@ -10224,7 +10230,7 @@ public class DungeonLocation : BaseLocation
         {
             terminal.SetColor("white");
             terminal.WriteLine("");
-            terminal.WriteLine($"  {item.Name}");
+            terminal.WriteLine($"  {MerchantItemName(item)}");
             terminal.SetColor("cyan");
             // 1.2.4: a long stat list wraps at 79 (a row that fits is unchanged).
             foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(item.Description, UsurperRemake.UI.UIHelper.WrapWidth - 2))
@@ -10238,7 +10244,7 @@ public class DungeonLocation : BaseLocation
 
         terminal.SetColor("cyan");
         // v1.2.4: a long item name and price wrap at 79 (a row that fits is unchanged)
-        foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(Loc.Get("dungeon.merchant_purchase_confirm", item.Name, item.Price)))
+        foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(Loc.Get("dungeon.merchant_purchase_confirm", MerchantItemName(item), item.Price)))
             terminal.WriteLine(line);
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (await terminal.AskYesNoAsync(""))
@@ -10259,7 +10265,7 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine("");
             WriteThickDivider(39);
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  {Loc.Get("dungeon.merchant_acquired", item.Name.ToUpper())}");
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("dungeon.merchant_acquired", MerchantItemName(item).ToUpper()), "  ");   // v1.2.5: a long name wraps
             WriteThickDivider(39);
             terminal.SetColor("green");
             foreach (var line in UsurperRemake.UI.UIHelper.WordWrap(item.Description, UsurperRemake.UI.UIHelper.WrapWidth))

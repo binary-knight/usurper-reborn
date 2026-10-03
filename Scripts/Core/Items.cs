@@ -545,7 +545,7 @@ public static class ItemManager
     {
         InitializeClassicWeapons();
         InitializeClassicArmor();
-        InitializeSpecialItems();
+        // v1.2.5: the four supreme being items (IDs 1001 to 1004) were removed: nothing read them
     }
     
     /// <summary>
@@ -573,53 +573,6 @@ public static class ItemManager
         {
             classicArmor[i + 1] = new ClassicArmor(ClassicArmorTable[i].name, ClassicArmorTable[i].value, ClassicArmorTable[i].power);
         }
-    }
-    
-    /// <summary>
-    /// Initialize special items and artifacts
-    /// </summary>
-    private static void InitializeSpecialItems()
-    {
-        // Supreme Being items (from Pascal global_s_* constants)
-        CreateSupremeItem(1001, "Lantern of Eternal Light", ObjType.Weapon, 
-            "A mystical lantern that never dims", true);
-            
-        CreateSupremeItem(1002, "Sword of Supreme Justice", ObjType.Weapon,
-            "The ultimate weapon of righteousness", true);
-            
-        CreateSupremeItem(1003, "Staff of Black Magic", ObjType.Weapon,
-            "A staff that channels dark powers", true);
-            
-        CreateSupremeItem(1004, "Staff of White Magic", ObjType.Weapon,
-            "A staff blessed with holy power", true);
-    }
-    
-    /// <summary>
-    /// Create a supreme being item
-    /// </summary>
-    private static void CreateSupremeItem(int id, string name, ObjType type, string description, bool artifact)
-    {
-        var item = new Item
-        {
-            ItemID = id,
-            Name = name,
-            Type = type,
-            Rarity = artifact ? EquipmentRarity.Artifact : EquipmentRarity.Legendary, // v1.1: was Common with IsArtifact set
-            Value = 999999,
-            Attack = type == ObjType.Weapon ? 50 : 0,
-            Armor = type != ObjType.Weapon ? 50 : 0,
-            OnlyOne = true,
-            IsArtifact = artifact,
-            MinLevel = 100,
-            RequiresGood = name.Contains("White") || name.Contains("Justice"),
-            RequiresEvil = name.Contains("Black"),
-            StrengthNeeded = 25
-        };
-        
-        item.Description[0] = description;
-        item.Description[1] = "This legendary item pulses with incredible power.";
-        
-        gameItems[id] = item;
     }
     
     /// <summary>
