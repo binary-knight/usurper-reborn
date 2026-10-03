@@ -59,21 +59,7 @@ namespace UsurperRemake.Systems
                 BetrayalType = BetrayalType.Manipulation,
                 TriggerCondition = BetrayalTrigger.StoryProgression,
                 CanBeForgiven = true,
-                Motivations = new List<string>
-                {
-                    "Noctura seeks to manipulate you into freeing the Old Gods",
-                    "She believes the ends justify the means",
-                    "She has watched mortals for millennia and sees them as tools"
-                },
-                BetrayalDialogue = new[]
-                {
-                    "Did you truly believe I was your friend?",
-                    "I am Noctura, the Shadow Weaver.",
-                    "Every word I spoke was calculated. Every kindness, a manipulation.",
-                    "But you... you surprised me. You are not like the others.",
-                    "Perhaps that is why I hesitate now..."
-                },
-                RedemptionPath = "Prove that mortals can choose mercy even when betrayed"
+                Keyed = true
             };
 
             // Team member betrayal - if player treats them poorly
@@ -85,21 +71,7 @@ namespace UsurperRemake.Systems
                 BetrayalType = BetrayalType.Resentment,
                 TriggerCondition = BetrayalTrigger.AccumulatedGrievances,
                 CanBeForgiven = true,
-                Motivations = new List<string>
-                {
-                    "Years of being overlooked for glory",
-                    "Watching you grow darker while they remained silent",
-                    "The final straw was when you sacrificed innocents"
-                },
-                BetrayalDialogue = new[]
-                {
-                    "I've followed you through darkness and light.",
-                    "I made excuses for your cruelty. Called it necessity.",
-                    "But I cannot follow you any further.",
-                    "The person I believed in... died somewhere in those dungeons.",
-                    "This ends now."
-                },
-                RedemptionPath = "Demonstrate genuine change and sacrifice for others"
+                Keyed = true
             };
 
             // Romantic betrayal - if player is unfaithful
@@ -110,22 +82,8 @@ namespace UsurperRemake.Systems
                 BetrayalPoints = 0,
                 BetrayalType = BetrayalType.HeartBroken,
                 TriggerCondition = BetrayalTrigger.Infidelity,
-                CanBeForgiven = false, // Some wounds don't heal
-                Motivations = new List<string>
-                {
-                    "They gave you everything - their heart, their trust",
-                    "You chose another. Or many others.",
-                    "Love turned to ash, and ash to cold fury"
-                },
-                BetrayalDialogue = new[]
-                {
-                    "I would have died for you. Did you know that?",
-                    "I gave you my heart. My future. My everything.",
-                    "And you... you couldn't even give me honesty.",
-                    "I don't hate you. That would require caring.",
-                    "You're simply... nothing to me now."
-                },
-                RedemptionPath = null // Cannot be forgiven
+                CanBeForgiven = false, // Some wounds don't heal; no redemption path
+                Keyed = true
             };
 
             // King's Advisor - political betrayal
@@ -137,21 +95,7 @@ namespace UsurperRemake.Systems
                 BetrayalType = BetrayalType.Political,
                 TriggerCondition = BetrayalTrigger.PowerStruggle,
                 CanBeForgiven = true,
-                Motivations = new List<string>
-                {
-                    "He served the crown loyally for decades",
-                    "Your rise threatens his position and legacy",
-                    "He believes he knows what's best for the realm"
-                },
-                BetrayalDialogue = new[]
-                {
-                    "You think yourself a hero, don't you?",
-                    "Storming through our politics like a bull in crystal.",
-                    "The realm needs stability, not another would-be savior.",
-                    "I do this not from malice, but from duty.",
-                    "History will vindicate me."
-                },
-                RedemptionPath = "Prove your commitment to the realm's wellbeing over personal glory"
+                Keyed = true
             };
 
             // Companion betrayal - Lyris (tragic romance option)
@@ -164,25 +108,33 @@ namespace UsurperRemake.Systems
                 TriggerCondition = BetrayalTrigger.ProtectingPlayer,
                 CanBeForgiven = true,
                 IsSacrifice = true, // Not malicious - sacrifices herself
-                Motivations = new List<string>
-                {
-                    "She has a secret connection to Veloura",
-                    "Her soul can power the Soulweaver's Loom",
-                    "She knew this from the beginning but fell in love anyway"
-                },
-                BetrayalDialogue = new[]
-                {
-                    "I should have told you sooner.",
-                    "Veloura is... she's part of me. A shard of her divine essence.",
-                    "I was sent to guide you to this moment.",
-                    "But I didn't expect... I didn't expect to love you.",
-                    "Let me do this. Please. Let my death mean something."
-                },
-                RedemptionPath = "There is no redemption needed - only grief"
+                Keyed = true
             };
 
             // GD.Print($"[Betrayal] Initialized {betrayalProfiles.Count} potential betrayers");
         }
+
+        /// <summary>
+        /// v1.2.5: the key of a story betrayer's shown text (name, dialogue, motivations, redemption), from its id.
+        /// </summary>
+        internal static string TextKey(string npcId, string part) => $"betrayal.{npcId}.{part}";
+
+        /// <summary>v1.2.5: the betrayer's name as shown; NPCName stays the stored English (Lyris is a name).</summary>
+        internal static string DisplayName(BetrayalProfile profile) =>
+            profile.Keyed && Loc.Has(TextKey(profile.NPCId, "name")) ? Loc.Get(TextKey(profile.NPCId, "name")) : profile.NPCName;
+
+        /// <summary>v1.2.5: the betrayer's spoken lines in the reader's language, or the profile's own (none for a generic one).</summary>
+        internal static string[]? DialogueRows(BetrayalProfile profile) =>
+            profile.Keyed ? Loc.Get(TextKey(profile.NPCId, "dialogue")).Split('\n') : profile.BetrayalDialogue;
+
+        /// <summary>v1.2.5: the betrayer's motivations in the reader's language, or the profile's own.</summary>
+        internal static List<string> MotivationRows(BetrayalProfile profile) =>
+            profile.Keyed ? Loc.Get(TextKey(profile.NPCId, "motivations")).Split('\n').ToList() : profile.Motivations;
+
+        /// <summary>v1.2.5: the path to redemption in the reader's language, or null when there is none.</summary>
+        internal static string? RedemptionText(BetrayalProfile profile) =>
+            profile.Keyed ? (Loc.Has(TextKey(profile.NPCId, "redemption")) ? Loc.Get(TextKey(profile.NPCId, "redemption")) : null)
+                          : profile.RedemptionPath;
 
         /// <summary>
         /// Add betrayal points to an NPC (hidden from player)
@@ -349,7 +301,7 @@ namespace UsurperRemake.Systems
                 Type = profile.BetrayalType,
                 IsSacrifice = profile.IsSacrifice,
                 CanBeForgiven = profile.CanBeForgiven,
-                Motivations = profile.Motivations
+                Motivations = MotivationRows(profile)
             };
         }
 
@@ -373,15 +325,16 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(1500);
 
-            terminal.WriteLine($"  {Loc.Get("betrayal.turns_to_face", profile.NPCName)}", "white");
+            terminal.WriteLine($"  {Loc.Get("betrayal.turns_to_face", DisplayName(profile))}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.eyes_changed")}", "gray");
             terminal.WriteLine("");
 
             await Pacing.Wait(1000);
 
-            if (profile.BetrayalDialogue != null)
+            var dialogue = DialogueRows(profile);
+            if (dialogue != null)
             {
-                foreach (var line in profile.BetrayalDialogue)
+                foreach (var line in dialogue)
                 {
                     terminal.WriteLine($"  \"{line}\"", "yellow");
                     await Pacing.Wait(800);
@@ -390,7 +343,8 @@ namespace UsurperRemake.Systems
 
             terminal.WriteLine("");
 
-            if (profile.Motivations.Count > 0)
+            var motivations = MotivationRows(profile);
+            if (motivations.Count > 0)
             {
                 if (!GameConfig.ScreenReaderMode)
                     terminal.WriteLine("  ─────────────────────────────────────────────", "dark_gray");
@@ -398,7 +352,7 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("betrayal.understand_reasons")}", "dark_cyan");
                 terminal.WriteLine("");
 
-                foreach (var motivation in profile.Motivations)
+                foreach (var motivation in motivations)
                 {
                     terminal.WriteLine($"  - {motivation}", "gray");
                     await Pacing.Wait(500);
@@ -485,7 +439,7 @@ namespace UsurperRemake.Systems
             if (!canForgive)
             {
                 terminal.WriteLine(Loc.Get("betrayal.conditions_not_met"), "yellow");
-                terminal.WriteLine(Loc.Get("betrayal.path_to_redemption", profile.RedemptionPath ?? Loc.Get("ui.none")), "gray");
+                terminal.WriteLine(Loc.Get("betrayal.path_to_redemption", RedemptionText(profile) ?? Loc.Get("ui.none")), "gray");
                 return false;
             }
 
@@ -557,7 +511,7 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("betrayal.approach_npc", profile.NPCName)}", "white");
+            terminal.WriteLine($"  {Loc.Get("betrayal.approach_npc", DisplayName(profile))}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.flinch_expecting")}", "gray");
             terminal.WriteLine("");
 
@@ -570,7 +524,7 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("betrayal.eyes_widen", profile.NPCName)}", "white");
+            terminal.WriteLine($"  {Loc.Get("betrayal.eyes_widen", DisplayName(profile))}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.neither_speak")}", "gray");
             terminal.WriteLine("");
 
@@ -617,7 +571,7 @@ namespace UsurperRemake.Systems
 
             if (betrayalProfiles.TryGetValue(npcId, out var profile))
             {
-                terminal.WriteLine($"  {Loc.Get("betrayal.falls_before_you", profile.NPCName)}", "gray");
+                terminal.WriteLine($"  {Loc.Get("betrayal.falls_before_you", DisplayName(profile))}", "gray");
                 terminal.WriteLine($"  {Loc.Get("betrayal.no_plea_mercy")}", "dark_gray");
                 terminal.WriteLine($"  {Loc.Get("betrayal.knew_coming")}", "dark_gray");
             }
@@ -766,6 +720,8 @@ namespace UsurperRemake.Systems
         public List<string> Motivations { get; set; } = new();
         public string[]? BetrayalDialogue { get; set; }
         public string? RedemptionPath { get; set; }
+        /// <summary>v1.2.5: a story betrayer whose dialogue, motivations and redemption are shown from keys built from NPCId.</summary>
+        public bool Keyed { get; set; }
         public List<Grievance> Grievances { get; set; } = new();
         public List<string> ActsOfKindness { get; set; } = new();
     }

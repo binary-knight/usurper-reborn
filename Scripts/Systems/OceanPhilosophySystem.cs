@@ -87,127 +87,28 @@ namespace UsurperRemake.Systems
         public HashSet<AwakeningMoment> ExperiencedMoments { get; private set; } = new();
 
         /// <summary>
-        /// The ambient wisdom phrases that NPCs might say based on awakening level
+        /// The ambient wisdom phrases that NPCs might say based on awakening level.
+        /// v1.2.5: three per level (0 to 7), under ocean.wisdom.{level}.{n} in the reader's language.
         /// </summary>
-        private static readonly Dictionary<int, string[]> AmbientWisdom = new()
-        {
-            [0] = new[] {
-                "The world seems solid and separate.",
-                "Each being stands alone against the void.",
-                "Power is the only truth."
-            },
-            [1] = new[] {
-                "Sometimes, in quiet moments, the boundaries feel thin...",
-                "An old saying: 'The river does not push the river.'",
-                "All streams flow to the sea, yet the sea is never full."
-            },
-            [2] = new[] {
-                "What is a wave but the ocean in motion?",
-                "The flame that burns twice as bright burns half as long.",
-                "They say the First Ones knew no separation."
-            },
-            [3] = new[] {
-                "When water meets water, which loses its identity?",
-                "The dying often speak of light... and of returning.",
-                "Manwe wept when he first felt alone."
-            },
-            [4] = new[] {
-                "You feel... familiar. Have we met in another life?",
-                "Some souls are older than the bodies they wear.",
-                "The creator dreams of being created."
-            },
-            [5] = new[] {
-                "Child of the deep waters, you are beginning to remember.",
-                "The wave rises, crashes, and returns. This is not death.",
-                "Your eyes hold the sadness of one who has forgotten home."
-            },
-            [6] = new[] {
-                "The boundaries blur. Self and other merge at the edges.",
-                "You carry the weight of worlds. Few mortals could.",
-                "The Ocean calls to its fragments. Can you not feel it?"
-            },
-            [7] = new[] {
-                "Welcome back, Dreamer. The dream is ending.",
-                "You always knew. You chose to forget.",
-                "The wave remembers it is water."
-            }
-        };
+        internal const int WisdomPhrasesPerLevel = 3;
+
+        internal static string WisdomKey(int level, int n) => $"ocean.wisdom.{level}.{n}";
 
         /// <summary>
         /// Wave Fragment lore texts - these reveal the philosophy piece by piece
         /// </summary>
         public static readonly Dictionary<WaveFragment, WaveFragmentData> FragmentData = new()
         {
-            [WaveFragment.Origin] = new WaveFragmentData(
-                "The Origin",
-                "In the beginning, there was only the Ocean - vast, eternal, undivided. " +
-                "It knew itself completely, for there was nothing else to know. " +
-                "But complete knowledge became complete loneliness.",
-                1
-            ),
-            [WaveFragment.FirstSeparation] = new WaveFragmentData(
-                "The First Separation",
-                "And so the Ocean dreamed of waves. Each wave rose, believing itself " +
-                "separate and special. Each wave fell, returning to what it always was. " +
-                "The Ocean learned to love through loss.",
-                2
-            ),
-            [WaveFragment.TheForgetting] = new WaveFragmentData(
-                "The Forgetting",
-                "For the dream to feel real, the waves had to forget. " +
-                "True separation requires true belief in separation. " +
-                "And so the Ocean hid itself from itself.",
-                3
-            ),
-            [WaveFragment.ManwesChoice] = new WaveFragmentData(
-                "Manwe's Choice",
-                "The first and greatest wave chose the deepest forgetting. " +
-                "He became Manwe, Creator of the Seven, Lord of Gods. " +
-                "He forgot he was still water. He believed himself stone.",
-                4
-            ),
-            [WaveFragment.TheSevenDrops] = new WaveFragmentData(
-                "The Seven Drops",
-                "From Manwe's forgetting sprang seven more waves - the Old Gods. " +
-                "Veloura for love, Thorgrim for law, Noctura for mystery... " +
-                "Each a facet of the Ocean's yearning to understand itself.",
-                4
-            ),
-            [WaveFragment.TheCorruption] = new WaveFragmentData(
-                "The Corruption",
-                "But belief in separation became pain. The waves fought each other, " +
-                "having forgotten they shared the same source. " +
-                "War is water fighting water. Cruelty is the ocean hurting itself.",
-                5
-            ),
-            [WaveFragment.TheCycle] = new WaveFragmentData(
-                "The Eternal Cycle",
-                "Manwe grew weary of watching waves destroy waves. " +
-                "In desperation, he sent a fragment of himself to learn what he had forgotten. " +
-                "That fragment wakes in a dormitory, remembering nothing...",
-                6
-            ),
-            [WaveFragment.TheReturn] = new WaveFragmentData(
-                "The Return",
-                "Death is not an ending. It is a wave becoming water again. " +
-                "The individual dissolves, but the essence returns to the source. " +
-                "We do not lose what we love - we become it.",
-                6
-            ),
-            [WaveFragment.TheTruth] = new WaveFragmentData(
-                "The Final Truth",
-                "You are not a wave fighting the ocean. You ARE the ocean, " +
-                "dreaming of being a wave. When you wake, you will not disappear - " +
-                "you will become everything you ever loved.",
-                7
-            ),
-            [WaveFragment.TheChoice] = new WaveFragmentData(
-                "The Choice",
-                "The dreamer can choose: continue the dream, or wake. " +
-                "Waking is not death - it is the end of loneliness. " +
-                "But the dream has its own beauty, its own purpose...",
-                7
-            )
+            [WaveFragment.Origin] = new WaveFragmentData(WaveFragment.Origin, 1),
+            [WaveFragment.FirstSeparation] = new WaveFragmentData(WaveFragment.FirstSeparation, 2),
+            [WaveFragment.TheForgetting] = new WaveFragmentData(WaveFragment.TheForgetting, 3),
+            [WaveFragment.ManwesChoice] = new WaveFragmentData(WaveFragment.ManwesChoice, 4),
+            [WaveFragment.TheSevenDrops] = new WaveFragmentData(WaveFragment.TheSevenDrops, 4),
+            [WaveFragment.TheCorruption] = new WaveFragmentData(WaveFragment.TheCorruption, 5),
+            [WaveFragment.TheCycle] = new WaveFragmentData(WaveFragment.TheCycle, 6),
+            [WaveFragment.TheReturn] = new WaveFragmentData(WaveFragment.TheReturn, 6),
+            [WaveFragment.TheTruth] = new WaveFragmentData(WaveFragment.TheTruth, 7),
+            [WaveFragment.TheChoice] = new WaveFragmentData(WaveFragment.TheChoice, 7)
         };
 
         public OceanPhilosophySystem()
@@ -477,9 +378,9 @@ namespace UsurperRemake.Systems
         /// </summary>
         public string GetAmbientWisdom()
         {
-            if (AmbientWisdom.TryGetValue(AwakeningLevel, out var phrases))
+            if (AwakeningLevel >= 0 && AwakeningLevel <= MaxStage)
             {
-                return phrases[Random.Shared.Next(phrases.Length)];
+                return Loc.Get(WisdomKey(AwakeningLevel, Random.Shared.Next(WisdomPhrasesPerLevel)));
             }
             return "";
         }
@@ -498,9 +399,9 @@ namespace UsurperRemake.Systems
                 effectiveLevel = Math.Max(effectiveLevel, 5);
             }
 
-            if (AmbientWisdom.TryGetValue(effectiveLevel, out var phrases))
+            if (effectiveLevel >= 0 && effectiveLevel <= MaxStage)
             {
-                return phrases[Random.Shared.Next(phrases.Length)];
+                return Loc.Get(WisdomKey(effectiveLevel, Random.Shared.Next(WisdomPhrasesPerLevel)));
             }
             return "";
         }
@@ -605,14 +506,15 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class WaveFragmentData
     {
-        public string Title { get; }
-        public string Text { get; }
+        /// <summary>v1.2.5: the stored id; the title and text are looked up by it in the reader's language.</summary>
+        public WaveFragment Fragment { get; }
+        public string Title => AwakeningScreens.FragmentTitle(Fragment);
+        public string Text => AwakeningScreens.FragmentText(Fragment);
         public int RequiredAwakening { get; }
 
-        public WaveFragmentData(string title, string text, int requiredAwakening)
+        public WaveFragmentData(WaveFragment fragment, int requiredAwakening)
         {
-            Title = title;
-            Text = text;
+            Fragment = fragment;
             RequiredAwakening = requiredAwakening;
         }
     }
