@@ -633,6 +633,16 @@ namespace UsurperRemake.Systems
             return madeChoices.TryGetValue(paradoxId, out var choice) ? choice : null;
         }
 
+        /// <summary>1.2.5: a new character starts with no paradox answered.</summary>
+        public void Reset()
+        {
+            madeChoices.Clear();
+            UtilitarianChoices = 0;
+            DeontologicalChoices = 0;
+            VirtueChoices = 0;
+            NihilistChoices = 0;
+        }
+
         /// <summary>1.2.5: the ids of the paradoxes already answered, as the save writes them.</summary>
         public IEnumerable<string> CompletedParadoxIds => madeChoices.Keys;
 

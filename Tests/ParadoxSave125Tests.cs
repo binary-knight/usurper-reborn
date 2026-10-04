@@ -18,7 +18,8 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// 1.2.5: an answered moral paradox is kept in the save. After a save and reload the floor 95 paradox
 /// (destroy_darkness) is not offered again and its effects are not applied a second time, through the
-/// file save and the SQL save. An old save without the field loads with no paradox answered.
+/// file save and the SQL save. An old save without the field loads with no paradox answered. A new character
+/// made in the same process, or a load of another save, does not keep the record of the one before.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class ParadoxSave125Tests : IDisposable
@@ -176,7 +177,77 @@ public class ParadoxSave125Tests : IDisposable
         MoralParadoxSystem.Instance.IsParadoxAvailable(Paradox, hero).Should().BeTrue();
     }
 
+    private static readonly Type[] NarrativeSystems =
+        { typeof(StrangerEncounterSystem), typeof(TownNPCStorySystem), typeof(DreamSystem), typeof(GriefSystem) };
+
     // ---------- tests ----------
+
+    [Fact]
+    public void NewCharacter_InTheSameProcess_IsOfferedTheParadoxAgain()
+    {
+        // the new-game reset touches these singletons as well; give it fresh ones and put the old ones back
+        var fields = NarrativeSystems.Select(t => t.GetField("_fallbackInstance", SNP)!).ToList();
+        var old = fields.Select(f => f.GetValue(null)).ToList();
+        try
+        {
+            foreach (var (f, t) in fields.Zip(NarrativeSystems)) f.SetValue(null, Activator.CreateInstance(t));
+
+            FreshWorld();
+            var first = Hero();
+            AnswerAndSave(first);
+            MoralParadoxSystem.Instance.IsParadoxAvailable(Paradox, first).Should().BeFalse("character A answered it");
+
+            GameEngine.ResetNarrativeSystemsForNewGame();
+
+            var second = Hero();
+            MoralParadoxSystem.Instance.CompletedParadoxIds.Should().BeEmpty("character B starts with no paradox answered");
+            MoralParadoxSystem.Instance.IsParadoxAvailable(Paradox, second).Should().BeTrue("the paradox is on offer to character B");
+        }
+        finally
+        {
+            for (int i = 0; i < fields.Count; i++) fields[i].SetValue(null, old[i]);
+        }
+    }
+
+    [Fact]
+    public void NewGame_RunsTheNarrativeReset()
+    {
+        var src = File.ReadAllText(Path.Combine(UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot(), "Scripts", "Core", "GameEngine.cs"));
+        int start = src.IndexOf("async Task CreateNewGame(", StringComparison.Ordinal);
+        start.Should().BePositive();
+        int next = src.IndexOf("\n    private ", start + 1, StringComparison.Ordinal);
+        var body = next > start ? src.Substring(start, next - start) : src.Substring(start);
+        body.Should().Contain("ResetNarrativeSystemsForNewGame();");
+    }
+
+    [Fact]
+    public async Task LoadingAnotherSave_Replaces_TheRecord_NotMerges()
+    {
+        var backend = FileBackend();
+
+        FreshWorld();
+        var a = Hero();
+        var answered = AnswerAndSave(a);
+        (await backend.WriteGameData("ParadoxSaveA", answered)).Should().BeTrue();
+
+        FreshWorld();
+        var unanswered = new SaveGameData
+        {
+            Version = GameConfig.SaveVersion,
+            SaveTime = DateTime.Now,
+            Player = new PlayerData { Name1 = "ParadoxSaveB", Name2 = "ParadoxSaveB", Level = 100 },
+            StorySystems = SaveSystem.Instance.SerializeStorySystemsPublic(),
+        };
+        unanswered.StorySystems.CompletedParadoxIds.Should().BeEmpty();
+        (await backend.WriteGameData("ParadoxSaveB", unanswered)).Should().BeTrue();
+
+        // load A, then B in the same process: B has no paradox answered
+        SaveSystem.Instance.RestoreStorySystems((await backend.ReadGameData("ParadoxSaveA"))!.StorySystems);
+        MoralParadoxSystem.Instance.CompletedParadoxIds.Should().Equal(Paradox);
+        SaveSystem.Instance.RestoreStorySystems((await backend.ReadGameData("ParadoxSaveB"))!.StorySystems);
+        MoralParadoxSystem.Instance.CompletedParadoxIds.Should().BeEmpty("a load replaces the record, it does not add to it");
+        MoralParadoxSystem.Instance.IsParadoxAvailable(Paradox, Hero()).Should().BeTrue();
+    }
 
     [Fact]
     public async Task FileSave_AnsweredParadox_DoesNotReturn_OrReapply_AfterReload()
