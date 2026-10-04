@@ -430,7 +430,7 @@ namespace UsurperRemake.Data
             await DisplayIntro(boss, terminal);
 
             // Pre-fight dialogue
-            await DisplayDialogue(boss.LocPreDialogue(), boss.Name, terminal);
+            await DisplayDialogue(boss.LocPreDialogue(), MonsterNames.Display(boss.Name), terminal);
 
             // Handle choice if required. v1.1.15: a wrong choice makes this one fight harder (the
             // attackMultiplier of CreateBossMonster); the shared boss data is not changed, so a retry or
@@ -548,8 +548,8 @@ namespace UsurperRemake.Data
             }
 
             terminal.WriteLine("");
-            terminal.WriteLine($"  {boss.Name}", "bright_red");
-            terminal.WriteLine($"  \"{boss.Title}\"", "red");
+            terminal.WriteLine($"  {MonsterNames.Display(boss.Name)}", "bright_red");   // v1.2.5: monster.name.{id}
+            terminal.WriteLine($"  \"{boss.LocTitle()}\"", "red");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey();
@@ -679,6 +679,9 @@ namespace UsurperRemake.Data
         }
         public string[] LocIntro() => LocArr("intro", IntroText);
         public string LocBattleCry() => LocScalar("battlecry", BattleCry);
+        /// <summary>v1.2.5: the title in the reader's language (secretboss.{LocKey}.title); the Name, stored English
+        /// as the fight's Monster name, shows through MonsterNames (monster.name.{id}).</summary>
+        public string LocTitle() => LocScalar("title", Title);
         public string[] LocPreDialogue() => LocArr("predialogue", DialogueBeforeFight);
         public string[] LocVictory() => LocArr("victory", VictoryText);
         public string[] LocChoiceOptions() => LocArr("choice", ChoiceOptions);

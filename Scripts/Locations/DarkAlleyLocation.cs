@@ -2435,13 +2435,13 @@ namespace UsurperRemake.Locations
 
             // Generate monster at player level
             var monster = MonsterGenerator.GenerateMonster(currentPlayer.Level);
-            monster.Name = Loc.Get("dark_alley.pit_monster_name", monster.Name);
+            monster.Name = MonsterNames.FromKey("dark_alley.pit_monster_name", monster.Name);   // v1.2.5: stored English, shown by MonsterNames
             monster.Gold *= 2; // 2x gold reward
 
             terminal.SetColor("bright_red");
             terminal.WriteLine("");
             // v0.62.1 article fix.
-            terminal.WriteLine(Loc.Get("dark_alley.pit_released", GameConfig.ArticulateForLanguage(monster.Name)));
+            terminal.WriteLine(Loc.Get("dark_alley.pit_released", GameConfig.ArticulateForLanguage(MonsterNames.Display(monster))));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("dark_alley.pit_monster_stats", monster.Level, monster.HP));
             terminal.WriteLine("");
@@ -3201,7 +3201,7 @@ namespace UsurperRemake.Locations
 
                     // Create a mugger monster at player's level
                     var mugger = MonsterGenerator.GenerateMonster(player.Level);
-                    mugger.Name = Loc.Get("dark_alley.mugger_name");
+                    mugger.Name = MonsterNames.FromKey("dark_alley.mugger_name");   // v1.2.5: stored English, shown by MonsterNames
 
                     var combatEngine = new CombatEngine(term);
                     await combatEngine.PlayerVsMonster(player, mugger, null, false);

@@ -823,7 +823,8 @@ public class Castle125Tests : IDisposable
             name.Should().Contain("Bob");
             foreach (var word in CombatNameChecks) name.Should().NotContain(word, $"{lang}: CombatEngine reads {word} in a monster name");
         }
-        Src().Should().Contain("Name = Loc.Get(\"castle.royal_guard_monster\", guard.Name),");
+        // v1.2.5 (D11): stored English through MonsterNames.FromKey, shown in the reader's language
+        Src().Should().Contain("Name = MonsterNames.FromKey(\"castle.royal_guard_monster\", guard.Name),");
     }
 
     private void Player(string key, string display, string lang) =>

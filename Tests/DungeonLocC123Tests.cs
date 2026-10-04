@@ -279,7 +279,8 @@ public class DungeonLocC123Tests
     public void ArenaChampionName_IsKeyed_AndKeepsTheEnglishMonsterName()
     {
         Src("Systems", "RareEncounters.cs").Should()
-            .Contain("champion.Name = Loc.Get(\"dungeon.arena_champion_name\", champion.Name);").And.NotContain("$\"Arena {champion.Name}\"");
+            // v1.2.5 (D11, bug 13): stored English through MonsterNames.FromKey, shown in the reader's language
+            .Contain("champion.Name = MonsterNames.FromKey(\"dungeon.arena_champion_name\", champion.Name);").And.NotContain("$\"Arena {champion.Name}\"");
         L("en", "dungeon.arena_champion_name", "Zombie").Should().Be("Arena Zombie");
         L("hu", "dungeon.arena_champion_name", "Zombie").Should().Be("Aréna Zombie");
         // CombatEngine's undead check and the kill quests read the English monster name inside it.

@@ -369,7 +369,7 @@ namespace UsurperRemake.Systems
                 return await fileBackend.ReadGameDataByFileNameWithError(fileName);
             }
             var data = await backend.ReadGameDataByFileName(fileName);
-            return (data, data == null ? $"Could not read save: {fileName}" : null, false);
+            return (data, data == null ? Loc.Get("save.load_error_unreadable", fileName) : null, false);   // v1.2.5
         }
 
         /// <summary>

@@ -10380,111 +10380,6 @@ public class DungeonLocation : BaseLocation
     }
     
     /// <summary>
-    /// Create dungeon monster based on level and terrain
-    /// </summary>
-    private Monster CreateDungeonMonster(bool isLeader = false)
-    {
-        var monsterNames = GetMonsterNamesForTerrain(currentTerrain);
-        var weaponArmor = GetWeaponArmorForTerrain(currentTerrain);
-        
-        var name = monsterNames[dungeonRandom.Next(monsterNames.Length)];
-        var weapon = weaponArmor.weapons[dungeonRandom.Next(weaponArmor.weapons.Length)];
-        var armor = weaponArmor.armor[dungeonRandom.Next(weaponArmor.armor.Length)];
-        
-        if (isLeader)
-        {
-            name = GetLeaderName(name);
-        }
-        
-        // Smooth scaling factors – tuned for balanced difficulty curve
-        float scaleFactor = 1f + (currentDungeonLevel / 20f); // every 20 levels → +100 %
-
-        // Regular monsters are weaker, bosses are tougher (like the original game)
-        float monsterMultiplier = isLeader ? 1.8f : 0.6f; // Regular monsters are 60% strength, bosses are 180%
-
-        long hp = (long)(currentDungeonLevel * 4 * scaleFactor * monsterMultiplier); // survivability
-
-        int strength = (int)(currentDungeonLevel * 1.5f * scaleFactor * monsterMultiplier); // base damage
-        int punch    = (int)(currentDungeonLevel * 1.2f * scaleFactor * monsterMultiplier); // natural attacks
-        int weapPow  = (int)(currentDungeonLevel * 0.9f * scaleFactor * monsterMultiplier); // weapon bonus
-        int armPow   = (int)(currentDungeonLevel * 0.9f * scaleFactor * monsterMultiplier); // defense bonus
-
-        var monster = Monster.CreateMonster(
-            nr: currentDungeonLevel,
-            name: name,
-            hps: hp,
-            strength: strength,
-            defence: 0,
-            phrase: GetMonsterPhrase(currentTerrain),
-            grabweap: dungeonRandom.NextDouble() < 0.3,
-            grabarm: false,
-            weapon: weapon,
-            armor: armor,
-            poisoned: false,
-            disease: false,
-            punch: punch,
-            armpow: armPow,
-            weappow: weapPow
-        );
-        
-        if (isLeader)
-        {
-            monster.IsMiniBoss = true;  // Terrain encounter leaders are elites, not floor bosses
-        }
-        
-        // Store level for other systems (initiative scaling etc.)
-        monster.Level = currentDungeonLevel;
-        
-        return monster;
-    }
-    
-    // Helper methods for monster creation
-    private string[] GetMonsterNamesForTerrain(DungeonTerrain terrain)
-    {
-        return terrain switch
-        {
-            DungeonTerrain.Underground => new[] { "Orc", "Half-Orc", "Goblin", "Troll", "Skeleton" },
-            DungeonTerrain.Mountains => new[] { "Mountain Bandit", "Hill Giant", "Stone Golem", "Dwarf Warrior" },
-            DungeonTerrain.Desert => new[] { "Robber Knight", "Robber Squire", "Desert Nomad", "Sand Troll" },
-            DungeonTerrain.Forest => new[] { "Tree Hunter", "Green Threat", "Forest Bandit", "Wild Beast" },
-            DungeonTerrain.Caves => new[] { "Cave Troll", "Underground Drake", "Deep Dweller", "Rock Monster" },
-            _ => new[] { "Monster", "Creature", "Beast", "Fiend" }
-        };
-    }
-    
-    private (string[] weapons, string[] armor) GetWeaponArmorForTerrain(DungeonTerrain terrain)
-    {
-        return terrain switch
-        {
-            DungeonTerrain.Underground => (
-                new[] { "Sword", "Spear", "Axe", "Club" },
-                new[] { "Leather", "Chain-mail", "Cloth" }
-            ),
-            DungeonTerrain.Mountains => (
-                new[] { "War Hammer", "Battle Axe", "Mace" },
-                new[] { "Chain-mail", "Scale Mail", "Plate" }
-            ),
-            DungeonTerrain.Desert => (
-                new[] { "Lance", "Scimitar", "Javelin" },
-                new[] { "Chain-Mail", "Leather", "Robes" }
-            ),
-            DungeonTerrain.Forest => (
-                new[] { "Silver Dagger", "Sling", "Sharp Stick", "Bow" },
-                new[] { "Cloth", "Leather", "Bark Armor" }
-            ),
-            _ => (
-                new[] { "Rusty Sword", "Broken Spear", "Old Club" },
-                new[] { "Torn Clothes", "Rags", "Nothing" }
-            )
-        };
-    }
-    
-    private string GetLeaderName(string baseName)
-    {
-        return baseName + " Leader";
-    }
-
-    /// <summary>
     /// Get the plural form of a monster name for display purposes.
     /// Handles common English pluralization rules.
     /// </summary>
@@ -10518,20 +10413,6 @@ public class DungeonLocation : BaseLocation
 
         // Default: just add s
         return name + "s";
-    }
-    
-    private string GetMonsterPhrase(DungeonTerrain terrain)
-    {
-        var phrases = terrain switch
-        {
-            DungeonTerrain.Underground => new[] { Loc.Get("dungeon.phrase_underground_1"), Loc.Get("dungeon.phrase_underground_2"), Loc.Get("dungeon.phrase_underground_3"), Loc.Get("dungeon.phrase_underground_4") },
-            DungeonTerrain.Mountains => new[] { Loc.Get("dungeon.phrase_mountains_1"), Loc.Get("dungeon.phrase_mountains_2"), Loc.Get("dungeon.phrase_mountains_3") },
-            DungeonTerrain.Desert => new[] { Loc.Get("dungeon.phrase_desert_1"), Loc.Get("dungeon.phrase_desert_2"), Loc.Get("dungeon.phrase_desert_3") },
-            DungeonTerrain.Forest => new[] { Loc.Get("dungeon.phrase_forest_1"), Loc.Get("dungeon.phrase_forest_2"), Loc.Get("dungeon.phrase_forest_3") },
-            _ => new[] { Loc.Get("dungeon.phrase_default_1"), Loc.Get("dungeon.phrase_default_2"), Loc.Get("dungeon.phrase_default_3"), Loc.Get("dungeon.phrase_default_4") }
-        };
-        
-        return phrases[dungeonRandom.Next(phrases.Length)];
     }
     
     // Additional helper methods
@@ -16324,7 +16205,7 @@ public class DungeonLocation : BaseLocation
         if (mate.AutoLevelUp)
             LevelMasterLocation.CheckAutoLevelUp(mate);
 
-        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", boss.Name, xp, boss.RewardGold)}\u001b[0m");
+        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", MonsterNames.Display(boss.Name), xp, boss.RewardGold)}\u001b[0m");
     }
 
     /// <summary>

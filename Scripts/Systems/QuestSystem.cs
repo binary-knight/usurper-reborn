@@ -375,14 +375,16 @@ public partial class QuestSystem
                 var (family, tier) = MonsterFamilies.GetMonsterForLevel(
                     Math.Min(playerLevel + quest.Difficulty * 3, maxAccessibleFloor), random);
                 // Use base tier name as targetId so it matches OnMonsterKilled tierId
-                var bossName = Loc.Get("quest.title.champion", tier.Name);
+                // v1.2.5: stored English (quest.title.champion around the English tier); shown in the reader's
+                // language by ShowMonsterArgs, which rebuilds it from the tier in TargetId
+                var bossName = Loc.GetIn("en", "quest.title.champion", tier.Name);
                 var bossId = tier.Name.ToLower().Replace(" ", "_");
                 quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.KillBoss,
                     "quest.objective.defeat_boss",
                     new object[] { bossName },
                     1, bossId, bossName));
-                quest.Title = Loc.Get("quest.title.defeat_boss", bossName);
+                quest.Title = Loc.GetIn("en", "quest.title.defeat_boss", bossName);
                 quest.TitleKey = "quest.title.defeat_boss";
                 quest.TitleArgs = new List<string> { bossName };
                 break;
@@ -467,13 +469,19 @@ public partial class QuestSystem
             throw new ArgumentException("Invalid dungeon quest target type");
         }
 
+        // v1.2.5: the comment is stored as a key and its arguments, shown in each reader's language
+        // (GetDisplayComment); Comment keeps the English text. The default dungeon name is a loc: argument.
+        bool defaultDungeon = dungeonName == null || dungeonName == Loc.Get("quest.dungeon_name");
+        string dungeonArg = defaultDungeon ? "loc:quest.dungeon_name" : dungeonName!;
         var quest = new Quest
         {
             Initiator = BountyBoardInitiator,  // English only: shared quest data
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
-            Comment = Loc.Get("quest.dungeon_quest_comment", dungeonName ?? Loc.Get("quest.dungeon_name")),
+            Comment = Loc.GetIn("en", "quest.dungeon_quest_comment", defaultDungeon ? Loc.GetIn("en", "quest.dungeon_name") : dungeonName!),
+            CommentKey = "quest.dungeon_quest_comment",
+            CommentArgs = new List<string> { dungeonArg },
             Date = DateTime.Now,
             MinLevel = Math.Max(1, playerLevel - 5),
             MaxLevel = playerLevel + 15,
@@ -530,7 +538,7 @@ public partial class QuestSystem
             var questTypes = new[] { QuestTarget.ClearBoss, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.SurviveDungeon };
             var questType = questTypes[random.Next(questTypes.Length)];
 
-            CreateDungeonQuest(questType, difficulty, Loc.Get("quest.dungeon_name"), playerLevel, deepestFloor);
+            CreateDungeonQuest(questType, difficulty, null, playerLevel, deepestFloor);
             existingCount++;
         }
 

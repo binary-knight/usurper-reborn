@@ -1963,12 +1963,12 @@ namespace UsurperRemake.Systems
                 if (monsters.Count > 0)
                 {
                     var champion = monsters[0];
-                    champion.Name = Loc.Get("dungeon.arena_champion_name", champion.Name);
+                    champion.Name = MonsterNames.FromKey("dungeon.arena_champion_name", champion.Name);   // v1.2.5: stored English, shown by MonsterNames
                     champion.IsMiniBoss = true;
                     // Mini-boss bonuses applied by Monster class
 
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine(Loc.Get("encounter.arena.opponent", champion.Name));
+                    terminal.WriteLine(Loc.Get("encounter.arena.opponent", MonsterNames.Display(champion)));
                     terminal.WriteLine("");
                     await Pacing.Wait(500);
 

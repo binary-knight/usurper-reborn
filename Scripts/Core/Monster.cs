@@ -459,102 +459,6 @@ public class Monster
     }
     
     /// <summary>
-    /// Cast spell if monster has mana and spells
-    /// </summary>
-    public MonsterSpellResult CastSpell(Character target)
-    {
-        if (Mana <= 0 || MagicLevel == 0)
-        {
-            return new MonsterSpellResult { Success = false, Message = "No mana or magic ability" };
-        }
-        
-        // Find available spells
-        var availableSpells = new List<int>();
-        for (int i = 0; i < Spell.Count; i++)
-        {
-            if (Spell[i])
-            {
-                availableSpells.Add(i);
-            }
-        }
-        
-        if (availableSpells.Count == 0)
-        {
-            return new MonsterSpellResult { Success = false, Message = "No spells known" };
-        }
-        
-        // Cast random spell
-        var spellIndex = availableSpells[Random.Shared.Next(0, availableSpells.Count)];
-        var spellCost = 5 + (spellIndex * 2);
-        
-        if (Mana < spellCost)
-        {
-            return new MonsterSpellResult { Success = false, Message = "Insufficient mana" };
-        }
-        
-        Mana -= spellCost;
-        return CastSpellByIndex(spellIndex, target);
-    }
-    
-    /// <summary>
-    /// Cast specific spell by index
-    /// </summary>
-    private MonsterSpellResult CastSpellByIndex(int spellIndex, Character target)
-    {
-        var result = new MonsterSpellResult { Success = true };
-        
-        switch (spellIndex)
-        {
-            case 0: // Heal
-                var healAmount = MagicLevel * 10 + Random.Shared.Next(5, 16);
-                HP = Math.Min((int)HP + (int)healAmount, (int)GetMaxHP());
-                result.Message = $"{Name} heals for {healAmount} points!";
-                break;
-                
-            case 1: // Magic missile
-                var damage = MagicLevel * 8 + Random.Shared.Next(3, 13);
-                result.Damage = damage;
-                result.Message = $"{Name} casts magic missile for {damage} damage!";
-                break;
-                
-            case 2: // Poison
-                result.SpecialEffect = "poison";
-                result.Message = $"{Name} casts a poison spell!";
-                break;
-                
-            case 3: // Weakness
-                result.SpecialEffect = "weakness";
-                result.Message = $"{Name} casts a weakness spell!";
-                break;
-                
-            case 4: // Fear
-                result.SpecialEffect = "fear";
-                result.Message = $"{Name} casts a fear spell!";
-                break;
-                
-            case 5: // Death spell
-                if (MagicLevel >= 5 && (float)Random.Shared.NextDouble() < 0.1f) // 10% chance, high level only
-                {
-                    result.Damage = target.HP; // Instant death
-                    result.Message = $"{Name} casts DEATH! You feel your life force drain away!";
-                }
-                else
-                {
-                    result.Damage = MagicLevel * 15;
-                    result.Message = $"{Name} casts a death spell for {result.Damage} damage!";
-                }
-                break;
-                
-            default:
-                result.Success = false;
-                result.Message = "Unknown spell";
-                break;
-        }
-        
-        return result;
-    }
-    
-    /// <summary>
     /// Get maximum HP for this monster type
     /// </summary>
     private long GetMaxHP()
@@ -721,17 +625,6 @@ public class Monster
         Mana = MaxMana;
         LastAction = DateTime.Now;
     }
-}
-
-/// <summary>
-/// Result of a monster spell cast
-/// </summary>
-public class MonsterSpellResult
-{
-    public bool Success { get; set; }
-    public string Message { get; set; } = "";
-    public long Damage { get; set; }
-    public string SpecialEffect { get; set; } = "";
 }
 
 /// <summary>

@@ -172,9 +172,46 @@ public static class LootGenerator
         /// <summary>v1.2.5: the key of an effect's name word, "prefix" or "suffix" (item.effect.fire_damage.prefix).</summary>
         internal static string EffectWordKey(SpecialEffect effect, string part) => $"item.effect.{GetEffectKey(effect)}.{part}";
 
-        private static string GetLocalizedEffectName(SpecialEffect effect)
+        private static string GetEffectNameIn(string lang, SpecialEffect effect)
         {
-            return Loc.Get($"item.effect.{GetEffectKey(effect)}.name");
+            return Loc.GetIn(lang, $"item.effect.{GetEffectKey(effect)}.name");
+        }
+
+        /// <summary>v1.2.5: the English curse line a cursed drop stores in Description[1].</summary>
+        internal static string CurseLine => Loc.GetIn("en", "item.desc_cursed");
+
+        /// <summary>v1.2.5: the English line curse removal stores in Description[1].</summary>
+        internal static string PurifiedLine => Loc.GetIn("en", "item.desc_purified");
+
+        /// <summary>
+        /// v1.2.5: a stored item description line in the reader's language. A drop stores its lines in English
+        /// (the effect list "Fire Damage +5, Life Steal +3", the curse line, the purified line); they are shown
+        /// through their keys. Any other line (a drop rolled before 1.2.5 in its finder's language, an item's own
+        /// text) shows as stored. Nothing is written back.
+        /// </summary>
+        public static string DescriptionLine(string? stored) => DescriptionLineIn(GameConfig.Language, stored);
+
+        public static string DescriptionLineIn(string lang, string? stored)
+        {
+            if (string.IsNullOrEmpty(stored)) return stored ?? "";
+            if (stored == CurseLine) return Loc.GetIn(lang, "item.desc_cursed");
+            if (stored == PurifiedLine) return Loc.GetIn(lang, "item.desc_purified");
+            var parts = stored.Split(", ");
+            var shown = new List<string>(parts.Length);
+            foreach (var part in parts)
+            {
+                var m = Regex.Match(part, @"^(.+) \+(-?\d+)$");
+                if (!m.Success) return stored;
+                SpecialEffect? effect = null;
+                foreach (SpecialEffect e in Enum.GetValues(typeof(SpecialEffect)))
+                {
+                    string key = $"item.effect.{GetEffectKey(e)}.name";
+                    if (e != SpecialEffect.None && Loc.HasIn("en", key) && Loc.GetIn("en", key) == m.Groups[1].Value) { effect = e; break; }
+                }
+                if (effect == null) return stored;
+                shown.Add($"{GetEffectNameIn(lang, effect.Value)} +{m.Groups[2].Value}");
+            }
+            return string.Join(", ", shown);
         }
 
         #endregion
@@ -2194,7 +2231,8 @@ public static class LootGenerator
             // Store effects description
             if (effects.Count > 0)
             {
-                var effectDescs = effects.Select(e => $"{GetLocalizedEffectName(e.effect)} +{e.value}");
+                // v1.2.5: stored in English (saved, auctioned, banked by guilds); shown by DescriptionLine
+                var effectDescs = effects.Select(e => $"{GetEffectNameIn("en", e.effect)} +{e.value}");
                 if (item.Description.Count > 0)
                     item.Description[0] = string.Join(", ", effectDescs);
             }
@@ -2212,7 +2250,7 @@ public static class LootGenerator
 
             // Add curse description
             if (item.Description.Count > 1)
-                item.Description[1] = "This item is CURSED! Visit the Magic Shop to remove the curse.";
+                item.Description[1] = CurseLine;   // v1.2.5: stored English, shown by DescriptionLine
         }
 
         #endregion

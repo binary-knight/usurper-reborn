@@ -2012,7 +2012,7 @@ public class StreetEncounterSystem
 
     private string GetMuggerName(int index)
     {
-        return Loc.Get(MuggerNameKeys[index % MuggerNameKeys.Length]);
+        return MonsterNames.FromKey(MuggerNameKeys[index % MuggerNameKeys.Length]);   // v1.2.5: a Monster's name, stored English
     }
 
     // 1.2.5: the street foes' names and lines are Loc keys, shown in the player's language. These foes are

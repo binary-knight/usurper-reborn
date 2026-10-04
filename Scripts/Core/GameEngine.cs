@@ -4099,17 +4099,18 @@ public partial class GameEngine
                 foreach (var entry in attackLog)
                 {
                     string attacker = SleepAttackerName(entry);
-                    string result = entry["result"]?.GetValue<string>() ?? "unknown";
+                    string result = SleepResult(entry);
                     long goldStolen = 0;
-                    try { goldStolen = entry["gold_stolen"]?.GetValue<long>() ?? 0; } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ProcessSleepReport] Failed to parse gold_stolen: {ex.Message}"); }
-                    string? itemStolen = entry["item_stolen"]?.GetValue<string>();
+                    try { goldStolen = (entry["gold_stolen"] ?? entry["goldStolen"])?.GetValue<long>() ?? 0; } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ProcessSleepReport] Failed to parse gold_stolen: {ex.Message}"); }
+                    string? itemStolen = (entry["item_stolen"] ?? entry["itemStolen"])?.GetValue<string>();
+                    if (itemStolen == "nothing" && entry["itemStolen"] != null) itemStolen = null;   // the world simulation's "no item"
                     long xpLost = 0;
-                    try { xpLost = entry["xp_lost"]?.GetValue<long>() ?? 0; } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ProcessSleepReport] Failed to parse xp_lost: {ex.Message}"); }
+                    try { xpLost = (entry["xp_lost"] ?? entry["xpLost"])?.GetValue<long>() ?? 0; } catch (Exception ex) { DebugLogger.Instance.LogError("ENGINE", $"[ProcessSleepReport] Failed to parse xp_lost: {ex.Message}"); }
 
                     terminal.WriteLine("");
 
                     // Show guard fights if present
-                    var guardFights = entry["guard_fights"];
+                    var guardFights = entry["guard_fights"] ?? SleepGuardFights(entry, attacker);
                     if (guardFights is JsonArray guardArr)
                     {
                         foreach (var gf in guardArr)
@@ -4144,7 +4145,7 @@ public partial class GameEngine
                         if (!string.IsNullOrEmpty(itemStolen))
                         {
                             terminal.SetColor("red");
-                            terminal.WriteLine(Loc.Get("engine.item_stolen", itemStolen));
+                            terminal.WriteLine(Loc.Get("engine.item_stolen", ItemNames.Display(itemStolen)));   // v1.2.5
                         }
                         if (xpLost > 0)
                         {
@@ -8708,6 +8709,40 @@ public partial class GameEngine
     };
 
     /// <summary>v1.2.5: the attacker of a sleep attack log entry; a missing name is shown in the reader's language.</summary>
+    /// <summary>
+    /// v1.2.5: a sleep attack's result as the report reads it. The world simulation writes "killed" and
+    /// "repelled" (by the guards when it logged a guard win, else by the sleeper); the Inn and the Dormitory
+    /// write the report's own words.
+    /// </summary>
+    internal static string SleepResult(JsonNode entry)
+    {
+        string result = entry["result"]?.GetValue<string>() ?? "unknown";
+        if (result == "killed") return "attacker_won";
+        if (result == "repelled")
+            return SleepGuardFights(entry, SleepAttackerName(entry)) is JsonArray fights
+                && fights.Any(f => f?["result"]?.GetValue<string>() == "guard_won") ? "guards_repelled" : "defender_won";
+        return result;
+    }
+
+    /// <summary>
+    /// v1.2.5: the guard fights of a world simulation entry, read from its stored English sentences
+    /// ("Your {guard} fought off {attacker}!", "Your {guard} was defeated by {attacker}."), so the report shows
+    /// them in the reader's language. Null when there are none.
+    /// </summary>
+    internal static JsonArray? SleepGuardFights(JsonNode entry, string attacker)
+    {
+        if (entry["details"] is not JsonArray details) return null;
+        var fights = new JsonArray();
+        foreach (var d in details)
+        {
+            string line = d?.GetValue<string>() ?? "";
+            foreach (var (tail, outcome) in new[] { ($" fought off {attacker}!", "guard_won"), ($" was defeated by {attacker}.", "guard_lost") })
+                if (line.StartsWith("Your ", StringComparison.Ordinal) && line.EndsWith(tail, StringComparison.Ordinal) && line.Length > 5 + tail.Length)
+                    fights.Add(new JsonObject { ["guard"] = line.Substring(5, line.Length - 5 - tail.Length), ["result"] = outcome });
+        }
+        return fights.Count > 0 ? fights : null;
+    }
+
     internal static string SleepAttackerName(JsonNode entry) =>
         entry["attacker"]?.GetValue<string>() ?? Loc.Get("combat.unknown_name");
 

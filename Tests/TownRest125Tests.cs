@@ -491,7 +491,7 @@ public class TownRest125Tests : IDisposable
         mails.Take(3).Should().OnlyContain(m => m.From == "Murderer" && m.Type == "sleep_attack");
         mails[0].Message.Should().Contain("Steel Sword", "the stolen item keeps its stored name");
         Src("Locations", "DormitoryLocation.cs").Should().Contain("SendMessageToKeyLocalized(murderer, target.Username, \"sleep_attack\",")
-            .And.Contain("lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName)");
+            .And.Contain("lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenEquipment?.Family)");   // v1.2.5 D11: the item through ItemNames
     }
 
     // ================= the Temple =================

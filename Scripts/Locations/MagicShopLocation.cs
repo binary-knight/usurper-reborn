@@ -918,10 +918,11 @@ public partial class MagicShopLocation : BaseLocation
             else
                 targetItem.Name = ItemNames.PurifiedName(targetItem.Name);
 
-            // Fix curse description
+            // Fix curse description. v1.2.5: the item was cursed (its flag), so its curse line, in whatever
+            // language it was stored, becomes the English purified line (shown by LootGenerator.DescriptionLine)
             if (targetItem.Description != null && targetItem.Description.Count > 1 &&
-                targetItem.Description[1] != null && targetItem.Description[1].Contains("CURSED"))
-                targetItem.Description[1] = "Purified -- some power was lost in the cleansing.";
+                !string.IsNullOrEmpty(targetItem.Description[1]))
+                targetItem.Description[1] = LootGenerator.PurifiedLine;
 
             // Fix any negative magic resistance
             if (targetItem.MagicProperties.MagicResistance < 0)
@@ -1075,7 +1076,7 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage($"     {Loc.Get("magic_shop.curse_effect", string.Join(", ", negatives))}", "darkred");
 
         if (HasLoreDescription(item))
-            DisplayMessage($"     \"{item.Description[0]}\"", "gray");
+            DisplayMessage($"     \"{LootGenerator.DescriptionLine(item.Description[0])}\"", "gray");   // v1.2.5: in the reader's language
     }
 
     /// <summary>
