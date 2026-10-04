@@ -2591,6 +2591,10 @@ public class Character
         ActiveStatuses[status] = duration;
     }
 
+    /// <summary>1.2.6: the damage the last ProcessStatusEffects call dealt by its ticks (poison, bleed,
+    /// burn, frost, curse, disease); regeneration is not counted. Not saved.</summary>
+    internal long StatusTickDamage { get; private set; }
+
     /// <summary>
     /// Tick status durations and apply per-round effects (poison damage, etc.).
     /// Should be called once per combat round.
@@ -2599,6 +2603,7 @@ public class Character
     public List<(string message, string color)> ProcessStatusEffects()
     {
         var messages = new List<(string message, string color)>();
+        StatusTickDamage = 0;   // 1.2.6: read by the combat event stream after each call
         if (ActiveStatuses.Count == 0) return messages;
 
         var toRemove = new List<StatusEffect>();
@@ -2612,37 +2617,37 @@ public class Character
                 case StatusEffect.Poisoned:
                     // Poison scales with level: 2-5 base + 1 per 10 levels
                     dmg = rnd.Next(2, 6) + (int)(Level / 10);
-                    HP = Math.Max(0, HP - dmg);
+                    HP = Math.Max(0, HP - dmg); StatusTickDamage += dmg;
                     messages.Add((Loc.Get("status.tick_poison", DisplayName, dmg), "green"));
                     break;
 
                 case StatusEffect.Bleeding:
                     dmg = rnd.Next(1, 7) + (int)(Level / 5); // 1d6 + level scaling
-                    HP = Math.Max(0, HP - dmg);
+                    HP = Math.Max(0, HP - dmg); StatusTickDamage += dmg;
                     messages.Add((Loc.Get("status.tick_bleed", DisplayName, dmg), "red"));
                     break;
 
                 case StatusEffect.Burning:
                     dmg = rnd.Next(2, 9) + (int)(Level / 4); // 2d4 + level scaling
-                    HP = Math.Max(0, HP - dmg);
+                    HP = Math.Max(0, HP - dmg); StatusTickDamage += dmg;
                     messages.Add((Loc.Get("status.tick_burn", DisplayName, dmg), "bright_red"));
                     break;
 
                 case StatusEffect.Frozen:
                     dmg = rnd.Next(1, 4) + (int)(Level / 8); // 1d3 + level scaling
-                    HP = Math.Max(0, HP - dmg);
+                    HP = Math.Max(0, HP - dmg); StatusTickDamage += dmg;
                     messages.Add((Loc.Get("status.tick_frost", DisplayName, dmg), "bright_cyan"));
                     break;
 
                 case StatusEffect.Cursed:
                     dmg = rnd.Next(1, 3) + (int)(Level / 10); // 1d2 + level scaling
-                    HP = Math.Max(0, HP - dmg);
+                    HP = Math.Max(0, HP - dmg); StatusTickDamage += dmg;
                     messages.Add((Loc.Get("status.tick_curse", DisplayName, dmg), "magenta"));
                     break;
 
                 case StatusEffect.Diseased:
                     dmg = 1 + (int)(Level / 15); // scales slightly with level
-                    HP = Math.Max(0, HP - dmg);
+                    HP = Math.Max(0, HP - dmg); StatusTickDamage += dmg;
                     messages.Add((Loc.Get("status.tick_disease", DisplayName, dmg), "yellow"));
                     break;
 
