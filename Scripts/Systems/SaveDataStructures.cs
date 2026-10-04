@@ -38,6 +38,12 @@ namespace UsurperRemake.Systems
         // 1.2.5: moral paradoxes already answered, by paradox id (an old save has none)
         public List<string> CompletedParadoxIds { get; set; } = new();
 
+        // 1.2.5: how often each kind of moral answer was chosen (an old save has all four at zero)
+        public int MoralUtilitarianChoices { get; set; }
+        public int MoralDeontologicalChoices { get; set; }
+        public int MoralVirtueChoices { get; set; }
+        public int MoralNihilistChoices { get; set; }
+
         // Seven Seals
         public List<int> CollectedSeals { get; set; } = new();
 
