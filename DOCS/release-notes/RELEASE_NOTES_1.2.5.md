@@ -12,8 +12,7 @@
 - **Mailbox cleanup:** the world boss notice is no longer mailed every
   night, existing world boss mail is deleted once, and system mail older
   than 30 days is deleted. Mail between players is never deleted.
-- **Fixes:** PvP salvage for English players, the Manwe fight bonus, moral
-  paradoxes saved with the character, full Magic Shop enchant removal, Inn
+- **Fixes:** PvP salvage for English players, moral paradoxes saved with the character, full Magic Shop enchant removal, Inn
   guards in NPC attacks, and the same loot bonuses in every language.
 - **A new wiki guide** to accounts and character slots.
 
@@ -128,9 +127,9 @@ names and guild ranks.
 - **PvP salvage.** After a PvP win, players in every language salvage gold
   from the loser's worn weapon (30% chance) and armour (25% chance) at half
   their value. English players never did before.
-- **The Manwe fight** gives the bonus its dialogue promises: +50 damage
-  after the defiant answer, or +30 defence after the willing answer. The
-  effects of a dialogue step you pass through are now applied.
+- **Dialogue effects.** In the Old Gods' and story conversations, a step
+  you pass through now applies its effects, not only the step a
+  conversation ends on.
 - **Moral paradoxes** you answer are saved with the character, so one no
   longer appears again or applies its effects a second time after a reload
   (for example the floor 95 paradox). A new character starts with none
@@ -300,6 +299,9 @@ its scenes reachable in play and its state saved.
 - The ascension broadcast in the endings is also shown to the player who
   ascends, and an achievement broadcast can be shown to its earner when
   their character name differs from the account name.
+- The Manwe fight bonuses for answering the Stranger (+50 damage when
+  defiant, +30 defence when willing) are set only by the Stranger's opening
+  conversation, which is not reached in play.
 - The spouse's leaving scene after 28 days is not part of this release.
 - When the old session of a reconnect takes longer than 15 seconds to
   finish, the five effects listed in the 1.2.4 notes can still act on the
