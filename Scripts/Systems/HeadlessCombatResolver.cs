@@ -153,6 +153,7 @@ public static class HeadlessCombatResolver
         return new Character
         {
             Name2 = guardName,
+            IsSleepGuard = true,   // v1.2.5: English inside, shown per reader
             Level = Math.Max(1, playerLevel / 2),
             HP = guardHp,
             MaxHP = guardHp,

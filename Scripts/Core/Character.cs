@@ -398,6 +398,9 @@ public class Character
     // combat. Skipped by social / relationship / NPC flows. Cannot permadie -- HP
     // is restored to MaxHP at combat end.
     public bool IsPet { get; set; } = false;
+    // v1.2.5: a hired sleep guard's combat stand-in (HeadlessCombatResolver.CreateGuardCharacter). Name2 is the
+    // guard's English name; DisplayName shows it in the reader's language (InnLocation.GuardName).
+    public bool IsSleepGuard { get; set; } = false;
     // v0.61.2: species id (e.g. "storm_eagle", "dire_wolf") on combat-pet wrappers
     // so species-specific behavior (Storm Eagle lightning + stun proc) can fire
     // regardless of what the player named the pet. AddActivePetToParty sets this
@@ -2896,7 +2899,9 @@ public class Character
     // v0.65.1: append the optional family surname (set only on the player, via the
     // marriage ceremony). Name2 stays the stable identity key; this is the display layer.
     // v1.2.5: a tamed pet's combat wrapper (IsPet) is named by Pet.Name, stored English; shown through MonsterNames.
-    public string DisplayName => IsPet ? MonsterNames.Display(!string.IsNullOrEmpty(Name2) ? Name2 : Name1) : string.IsNullOrEmpty(FamilySurname)
+    public string DisplayName => IsPet ? MonsterNames.Display(!string.IsNullOrEmpty(Name2) ? Name2 : Name1)
+        : IsSleepGuard ? InnLocation.GuardName(null, Name2)
+        : string.IsNullOrEmpty(FamilySurname)
         ? (!string.IsNullOrEmpty(Name2) ? Name2 : Name1)
         : $"{(!string.IsNullOrEmpty(Name2) ? Name2 : Name1)} {FamilySurname}";
 
