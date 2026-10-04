@@ -662,6 +662,18 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.2.5: load step. Replaces the moral-type counters with the saved values; an old save
+        /// has none, so all four start at zero. A negative value from an edited file reads as zero.
+        /// </summary>
+        public void RestoreMoralCounters(int utilitarian, int deontological, int virtue, int nihilist)
+        {
+            UtilitarianChoices = Math.Max(0, utilitarian);
+            DeontologicalChoices = Math.Max(0, deontological);
+            VirtueChoices = Math.Max(0, virtue);
+            NihilistChoices = Math.Max(0, nihilist);
+        }
+
+        /// <summary>
         /// Save state for serialization
         /// </summary>
         public Dictionary<string, object> SaveState()

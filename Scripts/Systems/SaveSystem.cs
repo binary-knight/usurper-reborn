@@ -1934,10 +1934,15 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
-            // 1.2.5: answered moral paradoxes, so none repeats after a reload
+            // 1.2.5: answered moral paradoxes, so none repeats after a reload, and the moral-type counters
             try
             {
                 data.CompletedParadoxIds = MoralParadoxSystem.Instance.CompletedParadoxIds.ToList();
+                var moral = MoralParadoxSystem.Instance;
+                data.MoralUtilitarianChoices = moral.UtilitarianChoices;
+                data.MoralDeontologicalChoices = moral.DeontologicalChoices;
+                data.MoralVirtueChoices = moral.VirtueChoices;
+                data.MoralNihilistChoices = moral.NihilistChoices;
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
@@ -2474,10 +2479,12 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 
-            // 1.2.5: answered moral paradoxes; an old save has none recorded
+            // 1.2.5: answered moral paradoxes and the moral-type counters; an old save has none recorded
             try
             {
                 MoralParadoxSystem.Instance.RestoreFromSave(data.CompletedParadoxIds);
+                MoralParadoxSystem.Instance.RestoreMoralCounters(data.MoralUtilitarianChoices, data.MoralDeontologicalChoices,
+                    data.MoralVirtueChoices, data.MoralNihilistChoices);
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 
