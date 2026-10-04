@@ -190,7 +190,7 @@ public class DataAchieve125Tests : IDisposable
                 {
                     Loc.HasIn(lang, key).Should().BeTrue($"{key} has a {lang} text");
                     L(lang, key).Should().NotBeNullOrWhiteSpace();
-                    L(lang, key).Should().NotContain("—").And.NotContain("–");
+                    L(lang, key).Should().NotContain("\u2014").And.NotContain("\u2013");
                 }
                 if (!SameInHungarian.Contains(stored))
                     L("hu", key).Should().NotBe(stored, $"{key} is translated into Hungarian");

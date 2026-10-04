@@ -610,8 +610,9 @@ public class TownRest125Tests : IDisposable
         }
         string text = all.ToString();
         Capture($"achievements-{lang}.txt", text);
-        // The long English descriptions continue under the text, indented 7
-        text.Should().Contain("Survived all 10 fights of the Anchor Road Gauntlet");
+        // The long descriptions continue under the text, indented 7 (v1.2.5, data D6: in the player's language)
+        text.Should().Contain(lang == "en" ? "Survived all 10 fights of the Anchor Road Gauntlet"
+            : string.Join(" ", L(lang, "achievement.arena_hopeful.desc").Split(' ').Take(4)));
         string header = L(lang, "main_street.achieve_header", L(lang, "main_street.achieve_cat_combat")).ToUpper();
         text.Should().Contain(header);
         Rows(text).Where(r => r.Contains(header)).Should().OnlyContain(r => r.Length <= MaxWidth + 1);
