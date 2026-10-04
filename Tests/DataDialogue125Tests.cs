@@ -325,7 +325,7 @@ public class DataDialogue125Tests
         var text = seen.ToString();
         text.Should().Contain("[Rejtélyes Idegen]", "the Stranger's title is translated");
         text.Should().Contain("[Noctura]", "a god's name stays as it is");
-        text.Should().Contain(Loc.GetIn("hu", "dialogue.effect_item", "Ősi Vaskulcs"));
+        text.Should().Contain(Loc.GetIn("hu", "dialogue.effect_story_key", "Ősi Vaskulcs"));
         text.Should().Contain(Loc.GetIn("hu", "dialogue.effect_item", "Árnyék Köpeny"));
         text.Should().Contain("Á... " + Name30 + ". Már vártalak.");
         text.Should().NotContain("Mysterious Stranger").And.NotContain("Ancient Iron Key").And.NotContain("Shadow Cloak");
@@ -480,7 +480,7 @@ public class DataDialogue125Tests
         nodes.Select(n => n.Speaker).Distinct().Should().BeEquivalentTo(
             "Mysterious Stranger", "Maelketh", "Veloura", "Thorgrim", "Noctura", "Aurelion", "Terravok", "Manwe");
         var gifts = nodes.SelectMany(n => n.Effects.Concat(n.Choices.SelectMany(c => c.Effects)))
-            .Where(e => e.Type == EffectType.GiveItem).Select(e => e.StringValue).Distinct().ToList();
+            .Where(e => e.Type == EffectType.GiveItem || e.Type == EffectType.GiveStoryKey).Select(e => e.StringValue).Distinct().ToList();
         gifts.Should().BeEquivalentTo("Ancient Iron Key", "Shadow Cloak");
         foreach (var lang in AllLanguages)
         {

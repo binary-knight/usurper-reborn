@@ -12914,6 +12914,7 @@
   "dialogue.effect_healed": "(Healed {0} HP)",
   "dialogue.effect_damage": "(Took {0} damage)",
   "dialogue.effect_item": "(Received: {0})",
+  "dialogue.effect_story_key": "({0}: a key to your story, not an item for your pack.)",
   "dialogue.effect_loyalty_up": "({0}'s loyalty increased)",
   "dialogue.effect_loyalty_down": "({0}'s loyalty decreased)",
   "dialogue.effect_trust_up": "({0}'s trust increased)",

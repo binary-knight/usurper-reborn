@@ -368,6 +368,10 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void AdvanceChapter(StoryChapter chapter)
         {
+            // v1.2.5: advance only; a story beat met late (the Stranger's opening scene at a high level)
+            // never moves a character back to an earlier chapter
+            if (chapter <= CurrentChapter) return;
+
             var previousChapter = CurrentChapter;
             CurrentChapter = chapter;
             UpdateCurrentAct();

@@ -12708,6 +12708,7 @@
   "dialogue.effect_healed": "(Gyógyultál {0} ÉP-t)",
   "dialogue.effect_damage": "({0} sebzést szenvedtél)",
   "dialogue.effect_item": "(Kaptál: {0})",
+  "dialogue.effect_story_key": "({0}: a történeted kulcsa, nem tárgy a csomagodba.)",
   "dialogue.effect_loyalty_up": "({0} hűsége nőtt)",
   "dialogue.effect_loyalty_down": "({0} hűsége csökkent)",
   "dialogue.effect_trust_up": "({0} bizalma nőtt)",

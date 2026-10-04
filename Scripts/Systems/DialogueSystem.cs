@@ -14,13 +14,28 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class DialogueSystem
     {
-        private static DialogueSystem? instance;
-        public static DialogueSystem Instance => instance ??= new DialogueSystem();
+        // v1.2.5: one instance per session (as the story systems are). Before, one process-wide instance
+        // held the run state, so two players in dialogue at once overwrote each other's terminal, player
+        // and node. The trees are built once and shared; they are never changed after they are built.
+        private static DialogueSystem? _fallbackInstance;
+        public static DialogueSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.Dialogue ??= new DialogueSystem();
+                return _fallbackInstance ??= new DialogueSystem();
+            }
+        }
 
+        private static readonly object SharedTreesLock = new();
+        private static Dictionary<string, DialogueTree>? _sharedTrees;
+
+        // Per run, per session
         private TerminalEmulator? terminal;
         private Character? currentPlayer;
         private DialogueNode? currentNode;
-        private Dictionary<string, DialogueTree> dialogueTrees = new();
+        private readonly Dictionary<string, DialogueTree> dialogueTrees;
 
         // Track dialogue history for this session
         private List<string> dialogueHistory = new();
@@ -30,7 +45,19 @@ namespace UsurperRemake.Systems
 
         public DialogueSystem()
         {
+            dialogueTrees = SharedTrees();
+        }
+
+        private DialogueSystem(Dictionary<string, DialogueTree> building)
+        {
+            dialogueTrees = building;
             RegisterAllDialogueTrees();
+        }
+
+        private static Dictionary<string, DialogueTree> SharedTrees()
+        {
+            lock (SharedTreesLock)
+                return _sharedTrees ??= new DialogueSystem(new Dictionary<string, DialogueTree>()).dialogueTrees;
         }
 
         /// <summary>
@@ -509,6 +536,15 @@ namespace UsurperRemake.Systems
             if (currentPlayer == null) return;
             var story = StoryProgressionSystem.Instance;
 
+            // v1.2.5: an effect with a once flag pays out a single time: a run cut off (a disconnect) and
+            // played again does not pay it twice. The flag is set first, so a crash between the two
+            // loses the reward rather than doubling it.
+            if (!string.IsNullOrEmpty(effect.OnceFlag))
+            {
+                if (story.HasStoryFlag(effect.OnceFlag)) return;
+                story.SetStoryFlag(effect.OnceFlag, true);
+            }
+
             switch (effect.Type)
             {
                 case EffectType.SetStoryFlag:
@@ -560,6 +596,11 @@ namespace UsurperRemake.Systems
                 case EffectType.GiveItem:
                     // Item inventory add not implemented for dialogue rewards
                     terminal?.WriteLine(Loc.Get("dialogue.effect_item", RewardName(effect.StringValue ?? "")), "bright_yellow");
+                    break;
+
+                case EffectType.GiveStoryKey:
+                    // v1.2.5: a key to the story (a saved flag), never an inventory item; the line says so
+                    terminal?.WriteLine(Loc.Get("dialogue.effect_story_key", RewardName(effect.StringValue ?? "")), "bright_yellow");
                     break;
 
                 case EffectType.RecordChoice:
@@ -872,9 +913,11 @@ namespace UsurperRemake.Systems
                         Id = "choice_3",
                         NextNodeId = "stranger_defiant",
                         Tone = DialogueTone.Defiant,
+                        // v1.2.5: a run cut off and played again offers only the branch first taken
+                        Condition = new DialogueCondition { Type = ConditionType.NotHasStoryFlag, StringValue = "stranger_reward_chivalry" },
                         Effects = new List<DialogueEffect>
                         {
-                            new() { Type = EffectType.AddDarkness, IntValue = 5 }
+                            new() { Type = EffectType.AddDarkness, IntValue = 5, OnceFlag = "stranger_reward_darkness" }
                         }
                     },
                     new()
@@ -882,9 +925,10 @@ namespace UsurperRemake.Systems
                         Id = "choice_4",
                         NextNodeId = "stranger_willing",
                         Tone = DialogueTone.Friendly,
+                        Condition = new DialogueCondition { Type = ConditionType.NotHasStoryFlag, StringValue = "stranger_reward_darkness" },
                         Effects = new List<DialogueEffect>
                         {
-                            new() { Type = EffectType.AddChivalry, IntValue = 5 }
+                            new() { Type = EffectType.AddChivalry, IntValue = 5, OnceFlag = "stranger_reward_chivalry" }
                         }
                     }
                 }
@@ -1004,8 +1048,8 @@ namespace UsurperRemake.Systems
                 {
                     new() { Type = EffectType.SetStoryFlag, StringValue = "met_mysterious_stranger" },
                     new() { Type = EffectType.SetStoryFlag, StringValue = "has_ancient_key" },
-                    new() { Type = EffectType.GiveItem, StringValue = "Ancient Iron Key" },
-                    new() { Type = EffectType.AddExperience, IntValue = 100 },
+                    new() { Type = EffectType.GiveStoryKey, StringValue = "Ancient Iron Key" },
+                    new() { Type = EffectType.AddExperience, IntValue = 100, OnceFlag = "stranger_reward_xp" },
                     new() { Type = EffectType.RecordChoice, StringValue = "stranger_intro", StringValue2 = "completed" }
                 }
             };
@@ -2164,6 +2208,8 @@ namespace UsurperRemake.Systems
         public int IntValue { get; set; }
         public string? StringValue { get; set; }
         public string? StringValue2 { get; set; }
+        /// <summary>v1.2.5: when set, the effect applies only while this story flag is unset, and sets it.</summary>
+        public string? OnceFlag { get; set; }
     }
 
     public class DialogueResult
@@ -2274,7 +2320,10 @@ namespace UsurperRemake.Systems
 
         // Amnesia effects
         RevealMemory,              // StringValue = memory key
-        TriggerDream               // StringValue = dream sequence
+        TriggerDream,              // StringValue = dream sequence
+
+        // v1.2.5: a story key (StringValue = stored English name), shown, never put in the inventory
+        GiveStoryKey
     }
 
     #endregion

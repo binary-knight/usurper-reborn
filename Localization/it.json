@@ -12700,6 +12700,7 @@
   "dialogue.effect_healed": "(Recuperi {0} PV)",
   "dialogue.effect_damage": "(Subisci {0} danni)",
   "dialogue.effect_item": "(Ricevuto: {0})",
+  "dialogue.effect_story_key": "({0}: una chiave della tua storia, non un oggetto.)",
   "dialogue.effect_loyalty_up": "(La lealtà di {0} è aumentata)",
   "dialogue.effect_loyalty_down": "(La lealtà di {0} è diminuita)",
   "dialogue.effect_trust_up": "(La fiducia di {0} è aumentata)",
