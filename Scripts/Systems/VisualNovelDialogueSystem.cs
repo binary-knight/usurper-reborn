@@ -2274,7 +2274,7 @@ namespace UsurperRemake.Systems
                 if (choice?.Trim().ToUpper() == "M" || choice?.Trim().ToUpper() == "L")
                 {
                     bool marry = choice.Trim().ToUpper() == "M";
-                    string exSpouseName = npc.SpouseName ?? "their spouse";
+                    string exSpouseName = npc.SpouseName ?? Loc.Get("dialogue.vn.their_spouse");
                     EnhancedNPCBehaviors.ProcessAffairDivorce(npc, player!, marry);
 
                     if (marry)
@@ -2835,7 +2835,7 @@ namespace UsurperRemake.Systems
                 spoken = UsurperRemake.Systems.DialogueEnhancer.Enhance(spoken, npc, player);
 
             // FWB keeps the *winks* action prefix.
-            string prefix = romanceType == RomanceRelationType.FWB ? "*winks* " : "";
+            string prefix = romanceType == RomanceRelationType.FWB ? Loc.Get("dialogue.vn.winks_prefix") : "";
             terminal.WriteLine($"  {npc.Name2}: {prefix}\"{spoken}\"");
             terminal.WriteLine("");
 

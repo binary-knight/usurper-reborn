@@ -65,10 +65,11 @@ public class PantheonLocation : BaseLocation
     internal static string ProclamationBroadcast(string lang, string godName, string godTitle, string message) =>
         $"\u001b[1;33m  {DivineNews(Loc.GetIn(lang, "pantheon.news_proclaims", godName, godTitle, message))}\u001b[0m";
 
-    /// <summary>Description column for a boon row: at most cap wide, cut with "..." so the whole row stays within 79 columns.</summary>
+    /// <summary>Description column for a boon row: at most cap wide, cut with "..." so the whole row stays within 79 columns.
+    /// v1.2.5: the column may shrink to 4 (was 10), so a long translated alignment tag and lock word still fit.</summary>
     internal static string FitBoonText(string text, int fixedWidth, int cap)
     {
-        int width = Math.Min(cap, Math.Max(10, BoonRowWidth - fixedWidth));
+        int width = Math.Min(cap, Math.Max(4, BoonRowWidth - fixedWidth));
         if (text.Length > width) text = text.Substring(0, width - 3) + "...";
         return text.PadRight(width);
     }
@@ -443,9 +444,9 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("white");
                     terminal.Write($"  {idx,2}. ");
                     terminal.SetColor("bright_green");
-                    terminal.Write($"{boon.Name} {tierStr,-5}");
+                    terminal.Write($"{boon.LocName} {tierStr,-5}");
                     terminal.SetColor("gray");
-                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + costTail.Length, 29)}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.LocName.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + costTail.Length, 29)}");
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($" {alignTag,-12}{costTail}");
                     idx++;
@@ -475,13 +476,13 @@ public class PantheonLocation : BaseLocation
                 string alignTag = BoonAlignTag(boon);
                 string addedTail = " " + Loc.Get("pantheon.boon_added_cost", addedCost);
                 string action = currentTier > 0 ? "upgrade to" : "add";
-                string label = currentTier > 0 ? $"{boon.Name} → {tierStr}" : $"{boon.Name} {tierStr}";
+                string label = currentTier > 0 ? $"{boon.LocName} → {tierStr}" : $"{boon.LocName} {tierStr}";
 
                 if (!alignmentMatch)
                 {
                     terminal.SetColor("darkgray");
                     string lockedTail = Loc.Get("pantheon.boon_locked");
-                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {FitBoonText(boon.Description, BoonRowFixedWidth(label, alignTag, 1 + lockedTail.Length), 27)} {alignTag,-12} {lockedTail}");
+                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {FitBoonText(boon.LocDescription, BoonRowFixedWidth(label, alignTag, 1 + lockedTail.Length), 27)} {alignTag,-12} {lockedTail}");
                 }
                 else if (!canAfford)
                 {
@@ -554,7 +555,7 @@ public class PantheonLocation : BaseLocation
 
                 var boon = DivineBoonRegistry.GetBoon(boonId);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("pantheon.boon_configured", boon?.Name ?? boonId));
+                terminal.WriteLine(Loc.Get("pantheon.boon_configured", boon?.LocName ?? boonId));
                 await Pacing.Wait(500);
             }
         }

@@ -125,21 +125,21 @@ namespace UsurperRemake.Systems
 
             if (alignment > 0.3f) // Good god
             {
-                blessing.Name = $"{godName}'s Protection";
+                blessing.Name = Loc.Get("blessing.protection_name", godName);   // v1.2.5: shown at once in this session, never saved or compared
                 blessing.DefenseBonus = (int)(5 + sacrificePower * godPower * 10);
-                blessing.Description = $"Divine protection reduces damage taken by {blessing.DefenseBonus}%";
+                blessing.Description = Loc.Get("blessing.protection_desc", blessing.DefenseBonus);
             }
             else if (alignment < -0.3f) // Dark god
             {
-                blessing.Name = $"{godName}'s Fury";
+                blessing.Name = Loc.Get("blessing.fury_name", godName);
                 blessing.DamageBonus = (int)(5 + sacrificePower * godPower * 10);
-                blessing.Description = $"Dark power increases damage dealt by {blessing.DamageBonus}%";
+                blessing.Description = Loc.Get("blessing.fury_desc", blessing.DamageBonus);
             }
             else // Balanced
             {
-                blessing.Name = $"{godName}'s Favor";
+                blessing.Name = Loc.Get("blessing.favor_name", godName);
                 blessing.XPBonus = (int)(10 + sacrificePower * godPower * 15);
-                blessing.Description = $"Divine favor grants {blessing.XPBonus}% bonus XP";
+                blessing.Description = Loc.Get("blessing.favor_desc", blessing.XPBonus);
             }
 
             temporaryBlessings[character.Name2] = blessing;
@@ -210,11 +210,11 @@ namespace UsurperRemake.Systems
                 GodName = godName,
                 GrantedAt = DateTime.Now,
                 ExpiresAt = DateTime.Now.AddMinutes(prayerMinutes),
-                Name = $"{godName}'s Daily Blessing",
+                Name = Loc.Get("blessing.daily_name", godName),   // v1.2.5: shown at once in this session, never saved or compared
                 DamageBonus = (int)(3 + godPower * 5),
                 DefenseBonus = (int)(3 + godPower * 5),
                 XPBonus = (int)(5 + godPower * 10),
-                Description = "Your morning prayers grant you divine favor"
+                Description = Loc.Get("blessing.daily_desc")
             };
 
             temporaryBlessings[character.Name2] = blessing;

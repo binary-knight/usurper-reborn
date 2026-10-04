@@ -632,7 +632,7 @@ public class LevelMasterLocation : BaseLocation
         {
             var cur = UsurperRemake.Data.SpecializationData.GetSpec(player.Specialization);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("spec.current", cur?.Name ?? player.Specialization.ToString())}");
+            terminal.WriteLine($"  {Loc.Get("spec.current", cur?.LocName ?? player.Specialization.ToString())}");
         }
         else
         {
@@ -645,7 +645,7 @@ public class LevelMasterLocation : BaseLocation
         {
             var s = specs[i];
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  [{i + 1}] {s.Name}  ({Loc.Get("spec.role_" + s.Role.ToString().ToLowerInvariant())})");
+            terminal.WriteLine($"  [{i + 1}] {s.LocName}  ({Loc.Get("spec.role_" + s.Role.ToString().ToLowerInvariant())})");
             terminal.SetColor("gray");
             terminal.WriteLine($"      {Loc.Get(s.DescriptionKey)}");
             string growth = BuildSpecGrowthSummary(s);
@@ -679,7 +679,7 @@ public class LevelMasterLocation : BaseLocation
                 await terminal.PressAnyKey();
                 return;
             }
-            if (!await terminal.AskYesNoAsync(Loc.Get("spec.confirm_respec", chosen.Name, $"{respecCost:N0}"))) return;
+            if (!await terminal.AskYesNoAsync(Loc.Get("spec.confirm_respec", chosen.LocName, $"{respecCost:N0}"))) return;
             player.Gold -= respecCost;
         }
 
@@ -687,7 +687,7 @@ public class LevelMasterLocation : BaseLocation
         await GameEngine.Instance.SaveCurrentGame();
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {Loc.Get("spec.chosen", chosen.Name)}");
+        terminal.WriteLine($"  {Loc.Get("spec.chosen", chosen.LocName)}");
         terminal.SetColor("white");
         await terminal.PressAnyKey();
     }

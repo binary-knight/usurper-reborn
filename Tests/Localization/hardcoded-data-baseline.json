@@ -174,38 +174,6 @@
       ]
     }
   },
-  "Scripts/Data/SpecializationData.cs": {
-    "data": {
-      "count": 25,
-      "sites": [
-        "0433db2ad3",
-        "15d9c547ed",
-        "1c3190eaab",
-        "2ca4ba1307",
-        "3a1ee8c233",
-        "50cac25b6f",
-        "63165997eb",
-        "6912341c4d",
-        "70e3e67802",
-        "72ab3df00c",
-        "7bf256e9a2",
-        "7c41e056fe",
-        "8814f82cf1",
-        "8cbd39d9be",
-        "8d9e7cba10",
-        "96401a36aa",
-        "97ebce2607",
-        "99f9320436",
-        "a2432328f5",
-        "ccc037b112",
-        "db3b352ffc",
-        "de5a53521e",
-        "e1ff0f63eb",
-        "e5ec718927",
-        "e814f5c895"
-      ]
-    }
-  },
   "Scripts/Locations/CastleLocation.cs": {
     "data": {
       "count": 11,
@@ -273,194 +241,9 @@
   },
   "Scripts/Systems/CharacterCreationSystem.cs": {
     "data": {
-      "count": 26,
+      "count": 1,
       "sites": [
-        "02ac8ab14e",
-        "148dbb6a7e",
-        "1b14b124fb",
-        "1b14b124fb",
-        "1b14b124fb",
-        "26a28258e5",
-        "33ee8f4939",
-        "3ce5681632",
-        "4ac07f1c55",
-        "576ceb8684",
-        "58685ae805",
-        "5aa81d8ff4",
-        "5d5cd9157c",
-        "642450ba53",
-        "6fa09368ac",
-        "91c7f90102",
-        "9294fb662c",
-        "92daa82f66",
-        "98024ae508",
-        "cdef9effdb",
-        "df2a6e81ce",
-        "df2a6e81ce",
-        "df2a6e81ce",
-        "e3cf68769b",
-        "e3cf68769b",
-        "e3cf68769b"
-      ]
-    }
-  },
-  "Scripts/Systems/CompanionSystem.cs": {
-    "data": {
-      "count": 94,
-      "sites": [
-        "04b11d3f8d",
-        "0679e8b9f9",
-        "06ba34f7c1",
-        "07458833d2",
-        "105bf16607",
-        "1704bc63e7",
-        "17794c9f2e",
-        "1adc351a59",
-        "1cb61718d3",
-        "1d2095321d",
-        "1d399e866a",
-        "1d7cc6f8df",
-        "1e1e27655b",
-        "1f6e5fbb83",
-        "25e99cfc55",
-        "271117b8ff",
-        "28505f13b0",
-        "298102a073",
-        "2a6e24b295",
-        "2ac1d5f1f2",
-        "2b13c6ebb6",
-        "2f53b012b2",
-        "2f61d5e116",
-        "2f701115cc",
-        "31cc663a63",
-        "34cfb01268",
-        "34d5043f52",
-        "351efc3bbd",
-        "35839ccfa0",
-        "3981e66ac4",
-        "3a6553b62e",
-        "3a912a9f9a",
-        "3f64b5b237",
-        "45590b4506",
-        "482783f0b0",
-        "49d084dd1d",
-        "49e7c5f727",
-        "4a36dabbb0",
-        "4bbffcf7dc",
-        "4dca83392c",
-        "54e90f00eb",
-        "58bb6e1fbd",
-        "5a237fa082",
-        "5a5585243d",
-        "5e06fdc3c7",
-        "5f295ff805",
-        "5f29dd6c0b",
-        "6798615627",
-        "68f0d604d3",
-        "69261131a8",
-        "6c2749b495",
-        "6c5e897071",
-        "6e4d8337a7",
-        "797272800f",
-        "7faa4a2604",
-        "88562bc7ec",
-        "8871daa8c9",
-        "88a35243a9",
-        "8bfdd8a708",
-        "8f7a8bf576",
-        "9362b9a71d",
-        "9a0124c37c",
-        "a43042c08c",
-        "a74d70b8c4",
-        "a8261866ff",
-        "a8edf8a993",
-        "ab4854b178",
-        "b0a346dcc8",
-        "b61106e33e",
-        "b9a1309d15",
-        "c336c598d2",
-        "c4daf99e39",
-        "c9a4350114",
-        "ca415d3851",
-        "ca58a29729",
-        "d17375b080",
-        "d2454e5524",
-        "dbbb5fe2c8",
-        "dffffb33e5",
-        "e389180c8d",
-        "e39649f601",
-        "e3c0655d39",
-        "e78df19479",
-        "e99ea6c3b4",
-        "eb2d1c064e",
-        "ebe728fe93",
-        "edf47f020b",
-        "eec3f4090d",
-        "f04062e983",
-        "f0cc0c3860",
-        "f1b8fdf834",
-        "f8044a558e",
-        "f94ee5cdab",
-        "fc7cd63e78"
-      ]
-    }
-  },
-  "Scripts/Systems/DivineBlessingSystem.cs": {
-    "data": {
-      "count": 8,
-      "sites": [
-        "184c7a6a0b",
-        "2539fa3ed4",
-        "3e15ce4455",
-        "3e1b306667",
-        "7704e213d2",
-        "ac5ef18178",
-        "e22c04811f",
-        "fe17906785"
-      ]
-    }
-  },
-  "Scripts/Systems/DivineBoonRegistry.cs": {
-    "data": {
-      "count": 37,
-      "sites": [
-        "03bc981d89",
-        "0767cd8455",
-        "0b10d66b12",
-        "1059c7eb66",
-        "15a1538815",
-        "17f3b2dfc4",
-        "1c37a004da",
-        "1d2a5b32b4",
-        "2fff290157",
-        "324d5300e3",
-        "540864bd15",
-        "5c0ce603ca",
-        "683dcd1fcb",
-        "6b2c46d52e",
-        "72f1415d85",
-        "7343b0c3e9",
-        "9032a6eb2d",
-        "934c775883",
-        "a5170b430c",
-        "b59f75eb99",
-        "b972039bd1",
-        "c7cc78d016",
-        "c7cc78d016",
-        "c7cc78d016",
-        "d2ec0ce6d3",
-        "d7126d65ab",
-        "da68bfe54b",
-        "da68bfe54b",
-        "da68bfe54b",
-        "da68bfe54b",
-        "e31ffa6eeb",
-        "e31ffa6eeb",
-        "e31ffa6eeb",
-        "e31ffa6eeb",
-        "f3893457ed",
-        "f93e7658ae",
-        "fcbf6a5bc8"
+        "6fa09368ac"
       ]
     }
   },
@@ -496,34 +279,6 @@
       ]
     }
   },
-  "Scripts/Systems/RelationshipSystem.cs": {
-    "data": {
-      "count": 21,
-      "sites": [
-        "0484107384",
-        "12c7b27c48",
-        "1ce3d3aa21",
-        "1d8c1f4382",
-        "21c3d9f6f1",
-        "460cd4f7ba",
-        "4be9bcb33f",
-        "5008bc8407",
-        "60152455ce",
-        "604d10b796",
-        "6dcc29eeda",
-        "6f6dcca7c3",
-        "86bd25fee3",
-        "8c5ab3bb93",
-        "923c2b4d2f",
-        "92fa21311e",
-        "a4de2771e9",
-        "d7b6e51e1e",
-        "dd4a682555",
-        "f0dfe7e4c0",
-        "fbde306aea"
-      ]
-    }
-  },
   "Scripts/Systems/SaveFileRepair.cs": {
     "data": {
       "count": 2,
@@ -553,10 +308,9 @@
   },
   "Scripts/Systems/VisualNovelDialogueSystem.cs": {
     "data": {
-      "count": 2,
+      "count": 1,
       "sites": [
-        "6b08d91fff",
-        "b905f71c06"
+        "6b08d91fff"
       ]
     }
   },

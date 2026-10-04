@@ -791,7 +791,7 @@ public class TeamCornerLocation : BaseLocation
     }
 
     private static string SpecTag(NPC npc) => npc.Specialization == ClassSpecialization.None ? ""
-        : $" [{UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.Name ?? npc.Specialization.ToString()}]";
+        : $" [{UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.LocName ?? npc.Specialization.ToString()}]";
 
     private static string MemberPickRow(TeamMemberEntry e)
     {
@@ -2220,7 +2220,7 @@ public class TeamCornerLocation : BaseLocation
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(member.Specialization);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.Name ?? member.Specialization.ToString()} ({(specDef != null ? SpecRoleName(specDef.Role) : "")})");
+            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.LocName ?? member.Specialization.ToString()} ({(specDef != null ? SpecRoleName(specDef.Role) : "")})");
             terminal.SetColor("white");
         }
         terminal.WriteLine($"  {Loc.Get("status.race")}: {GameConfig.GetLocalizedRaceName(member.Race)}");   // v1.1.12: localized
@@ -4299,7 +4299,7 @@ public class TeamCornerLocation : BaseLocation
 
         // Show current spec
         string currentSpecName = npc.Specialization != ClassSpecialization.None
-            ? (UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.Name ?? npc.Specialization.ToString())
+            ? (UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.LocName ?? npc.Specialization.ToString())
             : Loc.Get("spec.unspecialized");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("spec.current_spec", currentSpecName));
@@ -4321,7 +4321,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor(isCurrentSpec ? "bright_green" : "bright_yellow");
             terminal.Write($"  {i + 1}. ");
             terminal.SetColor(isCurrentSpec ? "bright_green" : "white");
-            terminal.Write($"{spec.Name} ");
+            terminal.Write($"{spec.LocName} ");
             terminal.SetColor("cyan");
             terminal.Write($"({SpecRoleName(spec.Role)}) ");
             if (isCurrentSpec)
@@ -4417,7 +4417,7 @@ public class TeamCornerLocation : BaseLocation
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(newSpec);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("spec.set", npc.DisplayName, specDef?.Name ?? newSpec.ToString(), specDef != null ? SpecRoleName(specDef.Role) : ""));
+            terminal.WriteLine(Loc.Get("spec.set", npc.DisplayName, specDef?.LocName ?? newSpec.ToString(), specDef != null ? SpecRoleName(specDef.Role) : ""));
         }
 
         terminal.SetColor("gray");

@@ -181,7 +181,7 @@ public static class WikiDataExporter
                 .Select(spec => new
                 {
                     id = spec.Spec.ToString(),
-                    name = Names(null, spec.Name),
+                    name = Names(spec.NameKey, spec.Name),   // v1.2.5: es fr hu it through spec.{class}.{spec}.name; en is the table name
                     description = Names(spec.DescriptionKey, "").GetValueOrDefault("en", ""),
                     role = spec.Role,
                     bonusesPerLevel = new
