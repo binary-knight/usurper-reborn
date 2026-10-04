@@ -21093,6 +21093,8 @@
   "item.effect.fire_damage.prefix": "Blazing",
   "item.effect.fire_damage.suffix": "of Flames",
   "item.effect.fire_damage.name": "Fire Damage",
+  "item.desc_cursed": "This item is CURSED! Visit the Magic Shop to remove the curse.",
+  "item.desc_purified": "Purified -- some power was lost in the cleansing.",
   "item.effect.ice_damage.prefix": "Frozen",
   "item.effect.ice_damage.suffix": "of Frost",
   "item.effect.ice_damage.name": "Ice Damage",

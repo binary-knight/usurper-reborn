@@ -298,7 +298,7 @@ public class Item
     /// </summary>
     public string GetFullDescription()
     {
-        var desc = string.Join("\n", Description.Where(d => !string.IsNullOrEmpty(d)));
+        var desc = string.Join("\n", Description.Where(d => !string.IsNullOrEmpty(d)).Select(d => LootGenerator.DescriptionLine(d)));   // v1.2.5
         
         if (!string.IsNullOrEmpty(desc))
         {

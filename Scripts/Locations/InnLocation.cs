@@ -1382,7 +1382,7 @@ public class InnLocation : BaseLocation
             npc.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.Defeated,
-                Description = Loc.Get("inn.memory_defeated_duel", currentPlayer.Name2),
+                Description = Loc.GetIn("en", "inn.memory_defeated_duel", currentPlayer.Name2),   // v1.2.5: stored English like every other memory
                 InvolvedCharacter = currentPlayer.Name2,
                 Importance = 0.8f,
                 EmotionalImpact = -0.7f,
@@ -5845,7 +5845,7 @@ public class InnLocation : BaseLocation
             npc.Memory?.RecordEvent(new MemoryEvent
             {
                 Type = MemoryType.Murdered,
-                Description = Loc.Get("inn.memory_murdered_sleep", currentPlayer.Name2),
+                Description = Loc.GetIn("en", "inn.memory_murdered_sleep", currentPlayer.Name2),   // v1.2.5: stored English like every other memory
                 InvolvedCharacter = currentPlayer.Name2,
                 Importance = 1.0f,
                 EmotionalImpact = -1.0f,
@@ -5868,7 +5868,7 @@ public class InnLocation : BaseLocation
                 witness.Memory?.RecordEvent(new MemoryEvent
                 {
                     Type = MemoryType.SawDeath,
-                    Description = Loc.Get("inn.memory_witnessed_murder", currentPlayer.Name2, npcName),
+                    Description = Loc.GetIn("en", "inn.memory_witnessed_murder", currentPlayer.Name2, npcName),   // v1.2.5: stored English like every other memory
                     InvolvedCharacter = currentPlayer.Name2,
                     Importance = 0.8f,
                     EmotionalImpact = -0.6f,

@@ -838,7 +838,7 @@ namespace UsurperRemake.Locations
             // multiply that bit the Gauntlet at v0.61.6 (Quent the Lv.55 Barbarian getting one-shot
             // by the WEAKEST champion). See AnchorRoadLocation.cs:1340-1365 for the source rationale.
             var monster = MonsterGenerator.GenerateMonster(effLevel, isBoss: false, isMiniBoss: false, rng);
-            monster.Name = champion.LocName();
+            monster.Name = champion.StoredName();   // v1.2.5: stored English, shown by MonsterNames (champion.LocName() was the session's language)
             monster.MonsterColor = "bright_yellow";
             monster.HP = (long)(monster.HP * champion.HpMultiplier);
             monster.MaxHP = (long)(monster.MaxHP * champion.HpMultiplier);

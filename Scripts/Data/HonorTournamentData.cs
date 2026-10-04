@@ -86,6 +86,13 @@ public static class HonorTournamentData
         public string LocCrowd() => LocOr($"tournament.champ.{Id}.crowd", CrowdReaction);
         public string LocDropFlavor() => LocOr($"tournament.champ.{Id}.drop_flavor", Drop.FlavorDescription);
         public string LocName() => LocOr($"tournament.champ.{Id}.name", Name);
+        /// <summary>v1.2.5: the name a champion's Monster stores: English, remembered with its key so MonsterNames
+        /// shows it in each reader's language (news, the permadeath eulogy, combat).</summary>
+        public string StoredName()
+        {
+            string key = $"tournament.champ.{Id}.name";
+            return UsurperRemake.Systems.Loc.HasIn("en", key) && UsurperRemake.Systems.Loc.GetIn("en", key) == Name ? UsurperRemake.Systems.MonsterNames.FromKey(key) : Name;
+        }
     }
 
     public class ChampionDrop

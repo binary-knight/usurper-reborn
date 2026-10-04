@@ -470,7 +470,9 @@ public class DataAchieve125Tests : IDisposable
         q.Initiator.Should().Be("Bounty Board");
         InLang("hu", () => q.GetDisplayInitiator()).Should().Be(L("hu", "quest.initiator.bounty_board")).And.NotBe("Bounty Board");
         InLang("en", () => q.GetDisplayInitiator()).Should().Be("Bounty Board");
-        q.Comment.Should().Be(L("hu", "quest.dungeon_quest_comment", L("hu", "quest.dungeon_name")));
+        // v1.2.5 (D11, bug 10): the comment is stored English with its key and shown in the reader's language
+        q.Comment.Should().Be(L("en", "quest.dungeon_quest_comment", L("en", "quest.dungeon_name")));
+        InLang("hu", q.GetDisplayComment).Should().Be(L("hu", "quest.dungeon_quest_comment", L("hu", "quest.dungeon_name")));
         QuestSystem.GetBountyBoardQuests(new Character { Name2 = LongName, Level = 10 }).Should().Contain(q);
         // A royal floor target is stored English and shown as dungeon.floor.
         InLang("hu", () => CastleLocation.QuestTargetLabel("Floor 12")).Should().Be(L("hu", "dungeon.floor", 12));

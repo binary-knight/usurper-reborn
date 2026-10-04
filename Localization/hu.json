@@ -20890,6 +20890,8 @@
   "item.effect.fire_damage.prefix": "Lángoló",
   "item.effect.fire_damage.suffix": "Lángok",
   "item.effect.fire_damage.name": "Tűzsebzés",
+  "item.desc_cursed": "Ez a tárgy ELÁTKOZOTT! Látogasd meg a Varázsboltot az átok eltávolításához.",
+  "item.desc_purified": "Megtisztítva: erejének egy része elveszett a tisztítás során.",
   "item.effect.ice_damage.prefix": "Fagyos",
   "item.effect.ice_damage.suffix": "Fagy",
   "item.effect.ice_damage.name": "Jégsebzés",

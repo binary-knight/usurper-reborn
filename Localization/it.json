@@ -20867,6 +20867,8 @@
   "item.effect.fire_damage.prefix": "Ardente",
   "item.effect.fire_damage.suffix": "delle Fiamme",
   "item.effect.fire_damage.name": "Danno da Fuoco",
+  "item.desc_cursed": "Questo oggetto è MALEDETTO! Visita il Negozio di Magia per rimuovere la maledizione.",
+  "item.desc_purified": "Purificato: parte del suo potere è andata perduta nella purificazione.",
   "item.effect.ice_damage.prefix": "Gelido",
   "item.effect.ice_damage.suffix": "del Gelo",
   "item.effect.ice_damage.name": "Danno da Ghiaccio",

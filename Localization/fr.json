@@ -20867,6 +20867,8 @@
   "item.effect.fire_damage.prefix": "Flamboyant",
   "item.effect.fire_damage.suffix": "des Flammes",
   "item.effect.fire_damage.name": "Dégâts de Feu",
+  "item.desc_cursed": "Cet objet est MAUDIT ! Visitez la Boutique de Magie pour retirer la malédiction.",
+  "item.desc_purified": "Purifié : une partie de son pouvoir s’est perdue dans la purification.",
   "item.effect.ice_damage.prefix": "Gelé",
   "item.effect.ice_damage.suffix": "du Givre",
   "item.effect.ice_damage.name": "Dégâts de Glace",

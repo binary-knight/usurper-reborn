@@ -20878,6 +20878,8 @@
   "item.effect.fire_damage.prefix": "Llameante",
   "item.effect.fire_damage.suffix": "de las Llamas",
   "item.effect.fire_damage.name": "Daño de Fuego",
+  "item.desc_cursed": "¡Este objeto está MALDITO! Visita la Tienda Mágica para eliminar la maldición.",
+  "item.desc_purified": "Purificado: parte de su poder se perdió en la purificación.",
   "item.effect.ice_damage.prefix": "Gélido",
   "item.effect.ice_damage.suffix": "de la Escarcha",
   "item.effect.ice_damage.name": "Daño de Hielo",
