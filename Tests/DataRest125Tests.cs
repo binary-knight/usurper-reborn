@@ -370,6 +370,24 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
         bad.Should().BeEmpty($"every {lang} race and class preview row fits");
     }
 
+    [Fact]
+    public async Task TheClassConfirmPrompt_HasNoEnglishArticle_OutsideEnglish()
+    {
+        foreach (var (art, sr) in new[] { (false, false), (false, true) })
+        {
+            string en = await CreationScreen("en", "ShowClassPreview", CharacterClass.Assassin, art, sr);
+            en.Should().Contain("Be an Assassin?", "English keeps its article");
+            foreach (var lang in OtherLanguages)
+            {
+                string text = await CreationScreen(lang, "ShowClassPreview", CharacterClass.Assassin, art, sr);
+                string name = L(lang, "class.assassin");
+                text.Should().Contain(L(lang, sr ? "creation.preview.be_class_yn" : "creation.preview.be_class", name).Trim().Split(' ')[0] + " " + name);
+                text.Should().NotContain(" an " + name).And.NotContain(" a " + name);
+            }
+        }
+        L("hu", "creation.preview.be_class_yn", "x").Should().NotContain("Yes");
+    }
+
     [Theory]
     [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
     public async Task TheClassSelection_FitsIn79Columns_ForEveryRace(string lang)

@@ -1758,8 +1758,9 @@ public class CharacterCreationSystem
         terminal.WriteLine("╣", "gray");
 
         // ── Row 22: Confirm prompt ──
-        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
-        string prompt = $" {Loc.Get("creation.preview.be_class", article, className)}";
+        // v1.2.5: the English article only in English (it showed as "a"/"an" in every language)
+        var article = GameConfig.ArticulateForLanguage(className, capitalize: false);
+        string prompt = $" {Loc.Get("creation.preview.be_class", article)}";
         terminal.Write("║", "gray");
         terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
         terminal.WriteLine("║", "gray");
@@ -2004,9 +2005,10 @@ public class CharacterCreationSystem
 
         // ── Confirm prompt ──
         terminal.WriteLine("");
-        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
+        // v1.2.5: the English article only in English (it showed as "a"/"an" in every language)
+        var article = GameConfig.ArticulateForLanguage(className, capitalize: false);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article, className)}");
+        return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_class_yn", article)}");
     }
 
     /// <summary>Screen reader race preview: plain text, no boxes or stat bars.</summary>
@@ -2105,9 +2107,10 @@ public class CharacterCreationSystem
         UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.strengths")} {strengths}");
 
         terminal.WriteLine("");
-        var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
+        // v1.2.5: the English article only in English (it showed as "a"/"an" in every language)
+        var article = GameConfig.ArticulateForLanguage(className, capitalize: false);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_class_yn", article, className));
+        return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_class_yn", article));
     }
 
     private static string GetClassDescription(CharacterClass cls) => cls switch
