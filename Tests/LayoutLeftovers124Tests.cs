@@ -297,7 +297,8 @@ public class LayoutLeftovers124Tests
         var secret = SecretBossManager.Instance.CreateBossMonster(SecretBossType.TheFirstWave, 30);
         secret.CanSpeak = true;
         string intro = Strip(CombatEngine.GroupCombatIntro(lang, new List<Monster> { secret }, null));
-        intro.Should().NotContain("The The").And.Contain(Loc.GetIn(lang, "combat.monster_says", "The First Wave", "").Split('"')[0]);
+        // v1.2.5 (D11): the boss is named through monster.name.the_first_wave in the reader's language
+        intro.Should().NotContain("The The").And.Contain(Loc.GetIn(lang, "combat.monster_says", MonsterNames.DisplayIn(lang, "The First Wave"), "").Split('"')[0]);
     }
 
     // ---------- 8. the intro rows fit for the longest boss name and phrase ----------

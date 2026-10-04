@@ -17,8 +17,8 @@ namespace UsurperRemake.Locations;
 public class DormitoryLocation : BaseLocation
 {
     /// <summary>v1.2.5: the mail a sleeper murdered in the Dormitory gets, in the given language; the item name is the stored name.</summary>
-    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName) => itemName != null
-        ? Loc.GetIn(lang, "dormitory.mail_sleep_murder_item", murderer, $"{gold:N0}", itemName)
+    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName, string? itemFamily = null) => itemName != null
+        ? Loc.GetIn(lang, "dormitory.mail_sleep_murder_item", murderer, $"{gold:N0}", ItemNames.DisplayIn(lang, itemName, itemFamily))   // v1.2.5
         : Loc.GetIn(lang, "dormitory.mail_sleep_murder", murderer, $"{gold:N0}");
 
     private List<NPC> sleepers = new();
@@ -738,7 +738,7 @@ public class DormitoryLocation : BaseLocation
                 EquipmentDatabase.RegisterDynamic(stolenEquipment);
                 var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(stolenEquipment);
                 currentPlayer.Inventory.Add(legacyItem);
-                terminal.WriteLine(Loc.Get("dormitory.also_take_item", stolenItemName), "yellow");
+                terminal.WriteLine(Loc.Get("dormitory.also_take_item", ItemNames.Display(stolenEquipment)), "yellow");
             }
 
             // Apply XP loss to victim
@@ -765,7 +765,7 @@ public class DormitoryLocation : BaseLocation
             // v1.2.5: in the victim's account language. The item name is the stored (English) item name.
             string murderer = currentPlayer.Name2;
             await backend.SendMessageToKeyLocalized(murderer, target.Username, "sleep_attack",
-                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName));
+                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenEquipment?.Family));
 
             terminal.SetColor("dark_red");
             terminal.WriteLine($"\n{Loc.Get("dormitory.leave_lifeless", target.Username)}");

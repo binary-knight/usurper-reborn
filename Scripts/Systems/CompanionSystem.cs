@@ -1057,7 +1057,26 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>v1.2.5: a death circumstance in the player's language (see StoredTextKeys).</summary>
-        public static string CircumstanceLabel(string stored) => StoredText(stored ?? "");
+        public static string CircumstanceLabel(string stored)
+        {
+            stored ??= "";
+            // v1.2.5: the combat deaths, stored English with a name (the player saved, the killer)
+            if (Between(stored, "companion.death_sacrifice") is string saved) return Loc.Get("companion.death_sacrifice", saved);
+            if (Between(stored, "companion.death_slain") is string killer) return Loc.Get("companion.death_slain", MonsterNames.Display(killer));
+            return StoredText(stored);
+        }
+
+        /// <summary>The {0} of a one-argument key's English text when the stored text is that text, else null.</summary>
+        private static string? Between(string stored, string key)
+        {
+            string template = Loc.GetIn("en", key);
+            int at = template.IndexOf("{0}", StringComparison.Ordinal);
+            if (at < 0) return null;
+            string head = template.Substring(0, at), tail = template.Substring(at + 3);
+            if (stored.Length <= head.Length + tail.Length || !stored.StartsWith(head, StringComparison.Ordinal) || !stored.EndsWith(tail, StringComparison.Ordinal))
+                return null;
+            return stored.Substring(head.Length, stored.Length - head.Length - tail.Length);
+        }
 
         private static string StoredText(string stored)
         {

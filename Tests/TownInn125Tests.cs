@@ -447,7 +447,7 @@ public class TownInn125Tests : IDisposable
         mails[2].Message.Should().Be(L("hu", "inn.mail_sleep_murder", "Murderer", "50"));
         mails.Should().OnlyContain(m => m.From == "Murderer" && m.Type == "sleep_attack");
         Src("Locations", "InnLocation.cs").Should().Contain("SendMessageToKeyLocalized(murderer, target.Username, \"sleep_attack\",")
-            .And.Contain("lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName)");
+            .And.Contain("lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenItemFamily)");   // v1.2.5 D11: the item through ItemNames
     }
 
     // ================= the Bank =================
@@ -481,7 +481,7 @@ public class TownInn125Tests : IDisposable
         string src = Src("Locations", "BankLocation.cs");
         foreach (var key in new[] { "bank.guard_captain_name", "bank.guard_name", "bank.war_hound_name" })
         {
-            src.Should().Contain($"Name = Loc.Get(\"{key}\")");
+            src.Should().Contain($"Name = MonsterNames.FromKey(\"{key}\")");   // v1.2.5 D11: stored English, shown by MonsterNames
             foreach (var lang in AllLanguages)
                 foreach (var word in CombatNameChecks)
                     L(lang, key).Should().NotContain(word, $"{lang} {key} must not turn the guard into a boss, undead or evil foe");
@@ -799,7 +799,8 @@ public class TownInn125Tests : IDisposable
             var foe = Call<NPC>(street, "CreateRandomHostileNPC", 10);
             foe.Name2.Should().Be(Loc.Get(StreetEncounterSystem.HostileFoeNameKeys[0]));
             for (int i = 0; i < 4; i++)
-                Call<string>(street, "GetMuggerName", i).Should().Be(Loc.Get(StreetEncounterSystem.MuggerNameKeys[i]));
+                // v1.2.5 D11: a mugger is a Monster: its name is stored English and shown through MonsterNames
+                MonsterNames.Display(Call<string>(street, "GetMuggerName", i)).Should().Be(Loc.Get(StreetEncounterSystem.MuggerNameKeys[i]));
             Call<string>(street, "GetRandomBrawlerName").Should().Be(Loc.Get(StreetEncounterSystem.BrawlerNameKeys[0]));
             var keys = StreetEncounterSystem.HostileFoeNameKeys.Concat(StreetEncounterSystem.BrawlerNameKeys).Concat(StreetEncounterSystem.MuggerNameKeys)
                 .Concat(new[] { "street_encounter.foe.pickpocket", "street_encounter.foe.angry_drunk", "street_encounter.foe.guard_captain",

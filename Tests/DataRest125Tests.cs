@@ -134,6 +134,7 @@ public class DataRest125Tests : IDisposable
     {
         var keys = EnglishKeys(NewKeyPrefixes);
         keys.Remove("version.download_at");   // an older key under the same prefix
+        keys.Remove("save.load_error_unreadable");   // v1.2.5 D11, tested in Leftovers125Tests
         keys.Should().HaveCount(131, "the keys this piece added");
         foreach (var key in keys)
             foreach (var lang in OtherLanguages)
@@ -585,11 +586,12 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
     {
         var npc = new NPC(LongName, "commoner", CharacterClass.Warrior, 100) { IsHostile = true };
         string line = InLang(lang, () => npc.GetDisplayInfo());
-        line.Should().Be(L(lang, "npc.display_info_hostile", npc.IsNPC ? GameConfig.NpcMark : "", npc.DisplayName, "commoner", 100));
+        // v1.2.5 (D11): the archetype id is shown through npc.archetype.{id}
+        line.Should().Be(L(lang, "npc.display_info_hostile", npc.IsNPC ? GameConfig.NpcMark : "", npc.DisplayName, L(lang, "npc.archetype.commoner"), 100));
         line.Length.Should().BeLessOrEqualTo(MaxWidth);
         if (lang != "en") line.Should().NotContain("Level");
         npc.IsHostile = false;
-        InLang(lang, () => npc.GetDisplayInfo()).Should().Be(L(lang, "npc.display_info", npc.IsNPC ? GameConfig.NpcMark : "", npc.DisplayName, "commoner", 100));
+        InLang(lang, () => npc.GetDisplayInfo()).Should().Be(L(lang, "npc.display_info", npc.IsNPC ? GameConfig.NpcMark : "", npc.DisplayName, L(lang, "npc.archetype.commoner"), 100));
     }
 
     [Fact]

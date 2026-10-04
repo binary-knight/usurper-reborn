@@ -5768,7 +5768,7 @@ public class WorldSimulator
                     NewsSystem.Instance?.Newsy(false, Loc.Get("marketplace.news_npc_bought", npc.Name, ItemNames.Display(item), chosen.Seller));
 
                     // Notify seller: 1.2.5, in the seller's language, one mail per world-sim day
-                    await backend.MailAuctionSale(chosen.Seller, item.Name, npc.Name, chosen.Price);
+                    await backend.MailAuctionSale(chosen.Seller, item.Name, npc.Name, chosen.Price, itemFamily: item.Family);
                 }
                 catch (Exception ex)
                 {

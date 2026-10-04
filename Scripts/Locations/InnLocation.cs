@@ -5422,8 +5422,8 @@ public class InnLocation : BaseLocation
     }
 
     /// <summary>1.2.5: the mail a murdered sleeper gets, in the given language; the item name is the stored name.</summary>
-    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName) => itemName != null
-        ? Loc.GetIn(lang, "inn.mail_sleep_murder_item", murderer, $"{gold:N0}", itemName)
+    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName, string? itemFamily = null) => itemName != null
+        ? Loc.GetIn(lang, "inn.mail_sleep_murder_item", murderer, $"{gold:N0}", ItemNames.DisplayIn(lang, itemName, itemFamily))   // v1.2.5
         : Loc.GetIn(lang, "inn.mail_sleep_murder", murderer, $"{gold:N0}");
 
     /// <summary>1.2.5: a companion's combat role in the player's language (inn.role_tank and so on).</summary>
@@ -6016,7 +6016,7 @@ public class InnLocation : BaseLocation
             // Item steal FIRST: StealRandomItem writes the victim's entire pre-combat
             // save blob back, which used to overwrite (and revert) the atomic gold
             // deduction below. Blob write first, json_set deductions after.
-            string stolenItemName = await StealRandomItem(backend, target.Username, victimSave);
+            var (stolenItemName, stolenItemFamily) = await StealRandomItem(backend, target.Username, victimSave);
 
             long stolenGold = (long)(victimGold * GameConfig.SleeperGoldTheftPercent);
             if (stolenGold > 0)
@@ -6027,7 +6027,7 @@ public class InnLocation : BaseLocation
             }
 
             if (stolenItemName != null)
-                terminal.WriteLine(Loc.Get("inn.atk_steal_item", stolenItemName), "yellow");
+                terminal.WriteLine(Loc.Get("inn.atk_steal_item", ItemNames.DisplayIn(GameConfig.Language, stolenItemName, stolenItemFamily)), "yellow");
 
             long xpLoss = (long)(victimSave.Player.Experience * GameConfig.SleeperXPLossPercent / 100.0);
             if (xpLoss > 0)
@@ -6049,7 +6049,7 @@ public class InnLocation : BaseLocation
             // 1.2.5: in the victim's account language. The item name is the stored (English) item name.
             string murderer = currentPlayer.Name2;
             await backend.SendMessageToKeyLocalized(murderer, target.Username, "sleep_attack",
-                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName));
+                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenItemFamily));
 
             terminal.SetColor("dark_red");
             terminal.WriteLine(Loc.Get("inn.atk_leave_body", target.Username));
@@ -6066,13 +6066,13 @@ public class InnLocation : BaseLocation
         await terminal.WaitForKeyPress();
     }
 
-    private async Task<string?> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
+    private async Task<(string? name, string? family)> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
     {
         var rng = Random.Shared;
         try
         {
             var playerData = saveData.Player;
-            if (playerData == null) return null;
+            if (playerData == null) return (null, null);
 
             var stealable = new List<(int index, string name)>();
             if (playerData.DynamicEquipment != null)
@@ -6085,7 +6085,7 @@ public class InnLocation : BaseLocation
                 }
             }
 
-            if (stealable.Count == 0) return null;
+            if (stealable.Count == 0) return (null, null);
 
             var (index, name) = stealable[rng.Next(stealable.Count)];
             var stolenEquip = playerData.DynamicEquipment![index];
@@ -6102,9 +6102,9 @@ public class InnLocation : BaseLocation
 
             playerData.DynamicEquipment.RemoveAt(index);
             await backend.WriteGameData(username, saveData);
-            return name;
+            return (name, stolenEquip.Family);
         }
-        catch { return null; }
+        catch { return (null, null); }
     }
 
     private async Task DeductXPFromPlayer(SqlSaveBackend backend, string username, long xpLoss)

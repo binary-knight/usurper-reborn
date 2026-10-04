@@ -2895,7 +2895,8 @@ public class Character
     public bool IsNPC => AI == CharacterAI.Computer;
     // v0.65.1: append the optional family surname (set only on the player, via the
     // marriage ceremony). Name2 stays the stable identity key; this is the display layer.
-    public string DisplayName => string.IsNullOrEmpty(FamilySurname)
+    // v1.2.5: a tamed pet's combat wrapper (IsPet) is named by Pet.Name, stored English; shown through MonsterNames.
+    public string DisplayName => IsPet ? MonsterNames.Display(!string.IsNullOrEmpty(Name2) ? Name2 : Name1) : string.IsNullOrEmpty(FamilySurname)
         ? (!string.IsNullOrEmpty(Name2) ? Name2 : Name1)
         : $"{(!string.IsNullOrEmpty(Name2) ? Name2 : Name1)} {FamilySurname}";
 

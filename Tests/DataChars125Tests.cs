@@ -494,7 +494,8 @@ public class DataChars125Tests
             });
             InLang(lang, () => CompanionSystem.CircumstanceLabel(death.Circumstance)).Should().Be(L(lang, "companion.death_reason_moral_choice"));
             // text another system wrote shows as stored
-            InLang(lang, () => CompanionSystem.CircumstanceLabel("Slain by a Wolf in combat")).Should().Be("Slain by a Wolf in combat");
+            // v1.2.5 (D11): the combat death is shown through companion.death_slain; "a Wolf" is no stored monster name
+            InLang(lang, () => CompanionSystem.CircumstanceLabel("Slain by a Wolf in combat")).Should().Be(L(lang, "companion.death_slain", "a Wolf"));
             return 0;
         });
     }

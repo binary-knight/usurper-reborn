@@ -8,6 +8,8 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Microsoft.Data.Sqlite;
+using System.Text.Json.Nodes;
 using UsurperRemake;
 using UsurperRemake.Locations;
 using UsurperRemake.Systems;
@@ -539,4 +541,237 @@ public class Leftovers125Tests
             L(lang, "item.desc_purified").Should().NotBeEmpty();
         }
     }
+
+    // ====================================================================================================
+    // B. display only: stored English shown in the reader's language
+    // ====================================================================================================
+
+    private static readonly string[] ArchetypeIds =
+    {
+        "commoner", "citizen", "merchant", "drunk_fighter", "assassin", "bard", "craftsman", "fighter", "guard", "healer",
+        "knight", "mystic", "noble", "priest", "sailor", "scholar", "scout", "thug", "worker",
+    };
+
+    [Fact]
+    public void NpcInfoLine_ShowsTheArchetypeInTheReadersLanguage_AndKeepsTheStoredId()
+    {
+        foreach (var id in ArchetypeIds)
+        {
+            L("en", "npc.archetype." + id).Should().Be(id, "English shows the id as before");
+            var npc = new NPC { Name1 = LongName, Name2 = LongName, Archetype = id, Level = 100 };
+            foreach (var lang in AllLanguages)
+            {
+                string line = InLang(lang, npc.GetDisplayInfo);
+                line.Should().Contain(L(lang, "npc.archetype." + id), $"{id} {lang}");
+                line.Length.Should().BeLessOrEqualTo(MaxWidth, $"{id} {lang}");
+            }
+            npc.Archetype.Should().Be(id, "the stored id is not changed");
+            if (id != "noble") InLang("hu", npc.GetDisplayInfo).Should().NotContain(id, id);
+        }
+        InLang("hu", () => NPC.ArchetypeLabel("Balanced")).Should().Be("Balanced", "an id without a key shows as stored");
+    }
+
+    [Fact]
+    public async Task TheOnlineSaveFallbackError_IsInThePlayersLanguage()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"usurper-d11-{Guid.NewGuid():N}.db");
+        try
+        {
+            var system = new SaveSystem(new SqlSaveBackend(path));
+            var (data, error, tooLarge) = await InLanguage("hu", () => system.LoadSaveByFileNameWithError("missing_save"));
+            data.Should().BeNull();
+            tooLarge.Should().BeFalse();
+            error.Should().Be(L("hu", "save.load_error_unreadable", "missing_save")).And.NotContain("Could not read");
+            (await InLanguage("en", () => system.LoadSaveByFileNameWithError("missing_save"))).Error.Should().Be("Could not read save: missing_save");
+        }
+        finally { SqliteConnection.ClearAllPools(); try { File.Delete(path); } catch { } }
+    }
+
+    [Fact]
+    public void CompanionCombatDeaths_AreStoredAsBefore_AndShownInTheReadersLanguage()
+    {
+        // the stored English is the text written before 1.2.5
+        L("en", "companion.death_sacrifice", LongName).Should().Be($"Sacrificed themselves to save {LongName} from a killing blow");
+        L("en", "companion.death_slain", "Wolf").Should().Be("Slain by Wolf in combat");
+        foreach (var lang in AllLanguages)
+        {
+            InLang(lang, () => CompanionSystem.CircumstanceLabel($"Sacrificed themselves to save {LongName} from a killing blow"))
+                .Should().Be(L(lang, "companion.death_sacrifice", LongName), lang);
+            InLang(lang, () => CompanionSystem.CircumstanceLabel("Slain by Wolf in combat"))
+                .Should().Be(L(lang, "companion.death_slain", lang == "en" ? "Wolf" : L(lang, "monster.name.wolf")), lang);
+        }
+        // anything else shows as stored
+        InLang("hu", () => CompanionSystem.CircumstanceLabel("Slain by")).Should().Be("Slain by");
+        Src("Systems", "CombatEngine.cs").Should().Contain("Loc.GetIn(\"en\", \"companion.death_sacrifice\", player.DisplayName)")
+            .And.Contain("Loc.GetIn(\"en\", \"companion.death_slain\", killerName)");
+    }
+
+    [Fact]
+    public void TheHealerCursedWeapon_IsShownThroughItemNames()
+    {
+        // HealerLocation's cursed list keeps the stored name and shows each entry through ItemNames.Display
+        string healer = Src("Locations", "HealerLocation.cs");
+        healer.Should().Contain("cursedItems.Add((player.WeaponName ?? Loc.Get(\"base.item_type_weapon\"), \"weapon\",")
+            .And.Contain("Loc.Get(\"shop.cursed_item_healer\", ItemNames.Display(item.Name))");
+        InLang("hu", () => ItemNames.Display("Long Sword")).Should().Be(L("hu", "item.long_sword"));
+    }
+
+    [Fact]
+    public void SleepMurderMails_NameTheItemInTheVictimsLanguage()
+    {
+        InnLocation.SleepMurderMail("hu", LongName, 1234, "Long Sword").Should().Be(L("hu", "inn.mail_sleep_murder_item", LongName, $"{1234:N0}", L("hu", "item.long_sword")));
+        DormitoryLocation.SleepMurderMail("hu", LongName, 1234, "Long Sword").Should().Be(L("hu", "dormitory.mail_sleep_murder_item", LongName, $"{1234:N0}", L("hu", "item.long_sword")));
+        InnLocation.SleepMurderMail("en", "Bo", 5, "Long Sword").Should().Be(L("en", "inn.mail_sleep_murder_item", "Bo", "5", "Long Sword"));
+        // an unknown stored name shows as stored
+        InnLocation.SleepMurderMail("hu", "Bo", 5, "Zzyzx Blade").Should().Contain("Zzyzx Blade");
+        Src("Locations", "InnLocation.cs").Should().Contain("SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenItemFamily)");
+        Src("Locations", "DormitoryLocation.cs").Should().Contain("SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenEquipment?.Family)");
+    }
+
+    /// <summary>An entry as WorldSimulator.ProcessNPCAttacksOnSleepers writes it.</summary>
+    private static JsonNode WorldSimEntry(string result, params string[] details) => JsonNode.Parse(JsonSerializer.Serialize(new
+    {
+        attacker = "Grimbold", type = "npc", result, goldStolen = 120L, itemStolen = "Long Sword", xpLost = 33L, details,
+    }))!;
+
+    [Fact]
+    public void TheSleepReport_ReadsTheWorldSimulationsEntries_InTheReadersLanguage()
+    {
+        var killed = WorldSimEntry("killed", "Your Hound was defeated by Grimbold.", "Grimbold attacked you in your sleep and killed you!");
+        GameEngine.SleepResult(killed).Should().Be("attacker_won");
+        var fights = GameEngine.SleepGuardFights(killed, "Grimbold")!;
+        fights.Should().ContainSingle();
+        fights[0]!["guard"]!.GetValue<string>().Should().Be("Hound");
+        fights[0]!["result"]!.GetValue<string>().Should().Be("guard_lost");
+
+        var byGuards = WorldSimEntry("repelled", "Your Old Tom fought off Grimbold!");
+        GameEngine.SleepResult(byGuards).Should().Be("guards_repelled");
+        GameEngine.SleepGuardFights(byGuards, "Grimbold")![0]!["result"]!.GetValue<string>().Should().Be("guard_won");
+        GameEngine.SleepResult(WorldSimEntry("repelled", "You fought off Grimbold in your sleep!")).Should().Be("defender_won");
+
+        // the Inn and the Dormitory entries read as before
+        GameEngine.SleepResult(JsonNode.Parse("{\"attacker\":\"X\",\"result\":\"attacker_won\"}")!).Should().Be("attacker_won");
+        GameEngine.SleepGuardFights(JsonNode.Parse("{\"attacker\":\"X\",\"result\":\"guards_repelled\"}")!, "X").Should().BeNull();
+
+        string engine = Src("Core", "GameEngine.cs");
+        engine.Should().Contain("string result = SleepResult(entry);")
+            .And.Contain("entry[\"guard_fights\"] ?? SleepGuardFights(entry, attacker)")
+            .And.Contain("(entry[\"gold_stolen\"] ?? entry[\"goldStolen\"])")
+            .And.Contain("Loc.Get(\"engine.item_stolen\", ItemNames.Display(itemStolen))");
+    }
+
+    [Fact]
+    public void ResurrectionChoices_AreInThePlayersLanguage_AndFit()
+    {
+        L("en", "death.temple_desc", $"{1234567:N0}", 2).Should().Be($"Pay the temple 50% of your gold ({1234567:N0}g) for resurrection (2 remaining)");
+        L("en", "death.accept_desc").Should().Be("WARNING: Lose 5 levels, 75% of your gold, and a random equipped item");
+        foreach (var lang in AllLanguages)
+            foreach (var text in new[] { L(lang, "death.temple_desc", $"{9_999_999_999L:N0}", 3), L(lang, "death.accept_desc"), L(lang, "death.divine_desc", "99") })
+                foreach (var row in UsurperRemake.UI.UIHelper.WrapAfterPrefix("    ", text, 79))
+                    ("    " + row).Length.Should().BeLessOrEqualTo(MaxWidth, $"{lang}: {row}");
+        NoEnglishLeft(L("hu", "death.temple_desc", "1", 1) + L("hu", "death.accept_desc"), new[] { "death.temple_desc", "death.accept_desc" });
+        string combat = Src("Systems", "CombatEngine.cs");
+        combat.Should().Contain("Description = Loc.Get(\"death.temple_desc\", templeCost.ToString(\"N0\"), remaining),")
+            .And.Contain("Description = Loc.Get(\"death.accept_desc\"),")
+            .And.Contain("UsurperRemake.UI.UIHelper.WrapAfterPrefix(\"    \", choice.Description, 79)");
+    }
+
+    [Fact]
+    public async Task TheAuctionSaleMail_NamesTheItemInTheSellersLanguage()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"usurper-d11-{Guid.NewGuid():N}.db");
+        try
+        {
+            var db = new SqlSaveBackend(path);
+            using (var c = new SqliteConnection($"Data Source={path}"))
+            {
+                c.Open();
+                using var cmd = c.CreateCommand();
+                cmd.CommandText = "INSERT INTO players (username, display_name, player_data, language, last_login) VALUES ('seller_hu', 'Seller', '{\"player\":{\"name2\":\"Seller\"}}', 'hu', datetime('now'));";
+                cmd.ExecuteNonQuery();
+            }
+            long id = await db.MailAuctionSale("Seller", "Long Sword", "Brenna", 100, DateTime.UtcNow, "Long Sword");
+            id.Should().BeGreaterThan(0);
+            using var r = new SqliteConnection($"Data Source={path}");
+            r.Open();
+            using var q = r.CreateCommand();
+            q.CommandText = $"SELECT message FROM messages WHERE id = {id};";
+            ((string)q.ExecuteScalar()!).Should().Be(L("hu", "mail.auction_sold", L("hu", "item.long_sword"), "Brenna", $"{100:N0}"));
+        }
+        finally { SqliteConnection.ClearAllPools(); try { File.Delete(path); } catch { } }
+        Src("Systems", "WorldSimulator.cs").Should().Contain("MailAuctionSale(chosen.Seller, item.Name, npc.Name, chosen.Price, itemFamily: item.Family)");
+    }
+
+    [Fact]
+    public void ATamedPet_IsNamedInTheReadersLanguage_AndKeepsItsStoredName()
+    {
+        var def = UsurperRemake.Data.BeastData.Beasts.First(b => MonsterNames.KeyOf(b.Name) != null);
+        var pet = UsurperRemake.Data.BeastData.BuildCombatWrapper(def, 5, def.Name);
+        pet.Name2.Should().Be(def.Name);
+        foreach (var lang in AllLanguages)
+            InLang(lang, () => pet.DisplayName).Should().Be(MonsterNames.DisplayIn(lang, def.Name), lang);
+        // a renamed pet and any other character show as before
+        InLang("hu", () => UsurperRemake.Data.BeastData.BuildCombatWrapper(def, 5, "Fluffy").DisplayName).Should().Be("Fluffy");
+        InLang("hu", () => new Character { Name2 = "Wolf" }.DisplayName).Should().Be("Wolf");
+    }
+
+    [Fact]
+    public void TheMonsterNamedFoes_AreStoredInEnglish_AndShownInTheReadersLanguage()
+    {
+        // street muggers, bank guards, the Main Street royal guards, the castle's royal guards
+        foreach (var key in StreetEncounterSystem.MuggerNameKeys.Concat(new[] { "bank.guard_captain_name", "bank.guard_name", "bank.war_hound_name", "base.royal_guard" }))
+        {
+            var m = new Monster { Name = InLang("hu", () => MonsterNames.FromKey(key)) };
+            m.Name.Should().Be(L("en", key), key);
+            // a name the monster tables also hold ("War Hound") shows through that table's key
+            string shownKey = MonsterNames.KeyOf(m.Name) ?? key;
+            foreach (var lang in AllLanguages) MonsterNames.DisplayIn(lang, m).Should().Be(L(lang, shownKey), $"{key} {lang}");
+            MonsterNames.DisplayIn("hu", m).Should().NotBe(m.Name, key);
+        }
+        var guard = new Monster { Name = InLang("hu", () => MonsterNames.FromKey("castle.royal_guard_monster", LongName)) };
+        guard.Name.Should().Be(L("en", "castle.royal_guard_monster", LongName));
+        MonsterNames.DisplayIn("hu", guard).Should().Be(L("hu", "castle.royal_guard_monster", LongName));
+
+        Src("Systems", "StreetEncounterSystem.cs").Should().Contain("return MonsterNames.FromKey(MuggerNameKeys[index % MuggerNameKeys.Length]);");
+        string bank = Src("Locations", "BankLocation.cs");
+        foreach (var key in new[] { "bank.guard_captain_name", "bank.guard_name", "bank.war_hound_name" })
+            bank.Should().Contain($"Name = MonsterNames.FromKey(\"{key}\"),");
+        Src("Locations", "BaseLocation.cs").Should().Contain("Name = MonsterNames.FromKey(\"base.royal_guard\"),");
+        Src("Locations", "CastleLocation.cs").Should().Contain("Name = MonsterNames.FromKey(\"castle.royal_guard_monster\", guard.Name),");
+
+        // no English name check sees a word in these names
+        foreach (var name in StreetEncounterSystem.MuggerNameKeys.Select(k => L("en", k)).Concat(new[] { "Captain of the Guard", "Bank Guard", "War Hound", "Royal Guard" }))
+            foreach (var word in new[] { "Boss", "Chief", "Lord", "King", "Undead", "Skeleton", "Zombie", "Ghost", "Demon", "Imp", "Angel", "God" })
+                name.Should().NotContain(word, name);
+    }
+
+    [Fact]
+    public void SecretBosses_AreNamedAndTitledInTheReadersLanguage_AndStoredInEnglish()
+    {
+        foreach (var type in Enum.GetValues<SecretBossType>())
+        {
+            var boss = UsurperRemake.Data.SecretBossManager.Instance.GetBoss(type);
+            if (boss == null) continue;
+            MonsterNames.KeyOf(boss.Name).Should().NotBeNull(boss.Name);
+            foreach (var lang in AllLanguages)
+            {
+                MonsterNames.DisplayIn(lang, boss.Name).Should().Be(L(lang, MonsterNames.KeyOf(boss.Name)!), lang);
+                InLang(lang, boss.LocTitle).Should().Be(L(lang, $"secretboss.{boss.LocKey}.title"), lang);
+            }
+            L("en", $"secretboss.{boss.LocKey}.title").Should().Be(boss.Title);
+            InLang("hu", boss.LocTitle).Should().NotBe(boss.Title);
+            var monster = (Monster)typeof(UsurperRemake.Data.SecretBossManager).GetMethod("CreateBossMonster", F | BindingFlags.Public)!
+                .Invoke(UsurperRemake.Data.SecretBossManager.Instance, BossArgs(typeof(UsurperRemake.Data.SecretBossManager).GetMethod("CreateBossMonster", F | BindingFlags.Public)!, type))!;
+            monster.Name.Should().Be(boss.Name, "the fight's monster keeps the English name");
+        }
+        string src = Src("Data", "SecretBosses.cs");
+        src.Should().Contain("terminal.WriteLine($\"  {MonsterNames.Display(boss.Name)}\", \"bright_red\");")
+            .And.Contain("terminal.WriteLine($\"  \\\"{boss.LocTitle()}\\\"\", \"red\");")
+            .And.Contain("await DisplayDialogue(boss.LocPreDialogue(), MonsterNames.Display(boss.Name), terminal);");
+    }
+
+    private static object?[] BossArgs(MethodInfo m, SecretBossType type) =>
+        m.GetParameters().Select(p => p.ParameterType == typeof(SecretBossType) ? type
+            : p.ParameterType == typeof(int) ? 50 : p.ParameterType == typeof(float) ? 1f : p.ParameterType == typeof(double) ? 1.0
+            : p.HasDefaultValue ? p.DefaultValue : null).ToArray();
 }

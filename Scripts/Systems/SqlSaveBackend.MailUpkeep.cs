@@ -152,13 +152,14 @@ namespace UsurperRemake.Systems
         /// one immediate transaction, so two purchases at once cannot both start the day's mail. Returns the
         /// mail row's id, or 0 when it failed.
         /// </summary>
-        public async Task<long> MailAuctionSale(string seller, string itemName, string buyer, long price, DateTime? utcNow = null)
+        public async Task<long> MailAuctionSale(string seller, string itemName, string buyer, long price, DateTime? utcNow = null, string? itemFamily = null)
         {
             try
             {
                 string to = MailAddressForName(seller);
                 string lang = MailLanguageForName(seller);
                 string day = AuctionMailDay(utcNow ?? DateTime.UtcNow);
+                string shownItem = ItemNames.DisplayIn(lang, itemName, itemFamily);   // v1.2.5: the stored name in the seller's language
                 using var connection = OpenConnection();
                 using var tx = connection.BeginTransaction(deferred: false);
 
@@ -181,7 +182,7 @@ namespace UsurperRemake.Systems
                     using var up = connection.CreateCommand();
                     up.Transaction = tx;
                     up.CommandText = "UPDATE messages SET message = @msg, is_read = 0 WHERE id = @id;";
-                    up.Parameters.AddWithValue("@msg", Loc.GetIn(lang, "mail.auction_sold_today", sales, $"{gold:N0}", itemName, buyer, $"{price:N0}"));
+                    up.Parameters.AddWithValue("@msg", Loc.GetIn(lang, "mail.auction_sold_today", sales, $"{gold:N0}", shownItem, buyer, $"{price:N0}"));
                     up.Parameters.AddWithValue("@id", messageId);
                     up.ExecuteNonQuery();
                 }
@@ -191,7 +192,7 @@ namespace UsurperRemake.Systems
                     ins.Transaction = tx;
                     ins.CommandText = "INSERT INTO messages (from_player, to_player, message_type, message) VALUES ('Auction House', @to, 'auction', @msg); SELECT last_insert_rowid();";
                     ins.Parameters.AddWithValue("@to", to);
-                    ins.Parameters.AddWithValue("@msg", Loc.GetIn(lang, "mail.auction_sold", itemName, buyer, $"{price:N0}"));
+                    ins.Parameters.AddWithValue("@msg", Loc.GetIn(lang, "mail.auction_sold", shownItem, buyer, $"{price:N0}"));
                     messageId = Convert.ToInt64(await ins.ExecuteScalarAsync());
                 }
 

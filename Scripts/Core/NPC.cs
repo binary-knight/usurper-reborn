@@ -867,8 +867,17 @@ public partial class NPC : Character
     public string GetDisplayInfo()
     {
         var marker = IsNPC ? GameConfig.NpcMark : "";
-        // v1.2.5: the line in the reader's language; Archetype is the stored id, shown as stored
-        return Loc.Get(IsHostile ? "npc.display_info_hostile" : "npc.display_info", marker, DisplayName, Archetype, Level);
+        // v1.2.5: the line in the reader's language; Archetype is the stored id, shown through ArchetypeLabel
+        return Loc.Get(IsHostile ? "npc.display_info_hostile" : "npc.display_info", marker, DisplayName, ArchetypeLabel(Archetype), Level);
+    }
+
+    /// <summary>v1.2.5: an NPC's stored archetype id (commoner, merchant, ...) in the reader's language
+    /// (npc.archetype.{id}); an id without a key shows as stored.</summary>
+    internal static string ArchetypeLabel(string? id)
+    {
+        if (string.IsNullOrEmpty(id)) return id ?? "";
+        string key = "npc.archetype." + id.ToLowerInvariant();
+        return Loc.Has(key) ? Loc.Get(key) : id;
     }
     
     // Helper methods for world state

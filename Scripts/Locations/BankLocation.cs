@@ -1354,7 +1354,7 @@ public class BankLocation : BaseLocation
         long captainHP = (long)(150 * level + Math.Pow(level, 1.3) * 40);
         var captain = new Monster
         {
-            Name = Loc.Get("bank.guard_captain_name"),
+            Name = MonsterNames.FromKey("bank.guard_captain_name"),   // v1.2.5: stored English, shown by MonsterNames
             Level = level + 5, // Loot quality scales with monster level
             HP = captainHP,
             MaxHP = captainHP,
@@ -1373,7 +1373,7 @@ public class BankLocation : BaseLocation
             long guardHP = (long)(100 * level + Math.Pow(level, 1.2) * 25);
             var guard = new Monster
             {
-                Name = Loc.Get("bank.guard_name"),
+                Name = MonsterNames.FromKey("bank.guard_name"),   // v1.2.5: stored English, shown by MonsterNames
                 Level = level,
                 HP = guardHP,
                 MaxHP = guardHP,
@@ -1395,7 +1395,7 @@ public class BankLocation : BaseLocation
             long dogHP = (long)(60 * level + Math.Pow(level, 1.2) * 15);
             var dog = new Monster
             {
-                Name = Loc.Get("bank.war_hound_name"),
+                Name = MonsterNames.FromKey("bank.war_hound_name"),   // v1.2.5: stored English, shown by MonsterNames
                 Level = level - 5,
                 HP = dogHP,
                 MaxHP = dogHP,

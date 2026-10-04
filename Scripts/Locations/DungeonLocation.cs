@@ -16324,7 +16324,7 @@ public class DungeonLocation : BaseLocation
         if (mate.AutoLevelUp)
             LevelMasterLocation.CheckAutoLevelUp(mate);
 
-        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", boss.Name, xp, boss.RewardGold)}\u001b[0m");
+        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", MonsterNames.Display(boss.Name), xp, boss.RewardGold)}\u001b[0m");
     }
 
     /// <summary>

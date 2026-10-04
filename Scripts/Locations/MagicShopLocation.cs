@@ -1076,11 +1076,7 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage($"     {Loc.Get("magic_shop.curse_effect", string.Join(", ", negatives))}", "darkred");
 
         if (HasLoreDescription(item))
-        {
-            // v1.2.5: in the reader's language, wrapped at 79 columns (four effects passed it in every language)
-            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap($"\"{LootGenerator.DescriptionLine(item.Description[0])}\"", 79 - 5))
-                DisplayMessage($"     {row}", "gray");
-        }
+            DisplayMessage($"     \"{LootGenerator.DescriptionLine(item.Description[0])}\"", "gray");   // v1.2.5: in the reader's language
     }
 
     /// <summary>

@@ -20281,7 +20281,7 @@ public partial class CombatEngine
         await companionSystem.KillCompanion(
             sacrificingCompanion.Id,
             UsurperRemake.Systems.DeathType.Sacrifice,
-            $"Sacrificed themselves to save {player.DisplayName} from a killing blow",
+            Loc.GetIn("en", "companion.death_sacrifice", player.DisplayName),   // v1.2.5: stored English, shown by CircumstanceLabel
             terminal);
 
         // Player survives with 1 HP
@@ -21127,7 +21127,7 @@ public partial class CombatEngine
         await companionSystem.KillCompanion(
             companion.CompanionId.Value,
             UsurperRemake.Systems.DeathType.Combat,
-            $"Slain by {killerName} in combat",
+            Loc.GetIn("en", "companion.death_slain", killerName),   // v1.2.5: stored English, shown by CircumstanceLabel
             terminal);
 
         // Generate death news for the realm
@@ -23010,7 +23010,7 @@ public partial class CombatEngine
             choices.Add(new ResurrectionChoice
             {
                 Name = Loc.Get("death.temple_resurrection"),
-                Description = $"Pay the temple 50% of your gold ({templeCost:N0}g) for resurrection ({remaining} remaining)",
+                Description = Loc.Get("death.temple_desc", templeCost.ToString("N0"), remaining),   // v1.2.5
                 Cost = templeCost,
                 HPRestored = (int)(player.MaxHP * 0.75), // 75% HP
                 Method = "Temple Resurrection",
@@ -23044,7 +23044,7 @@ public partial class CombatEngine
         choices.Add(new ResurrectionChoice
         {
             Name = Loc.Get("death.accept_fate"),
-            Description = "WARNING: Lose 5 levels, 75% of your gold, and a random equipped item",
+            Description = Loc.Get("death.accept_desc"),   // v1.2.5
             Cost = 0,
             HPRestored = 0,
             Method = "Death Accepted",
@@ -23070,7 +23070,8 @@ public partial class CombatEngine
             terminal.SetColor("cyan");
             terminal.WriteLine($"[{i + 1}] {choice.Name}");
             terminal.SetColor("white");
-            terminal.WriteLine($"    {choice.Description}");
+            foreach (var row in UsurperRemake.UI.UIHelper.WrapAfterPrefix("    ", choice.Description, 79))   // v1.2.5: fits 79
+                terminal.WriteLine($"    {row}");
             terminal.WriteLine("");
         }
 

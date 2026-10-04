@@ -6459,7 +6459,7 @@ public class CastleLocation : BaseLocation
 
                     var m = new Monster
                     {
-                        Name = Loc.Get("castle.royal_guard_monster", guard.Name),
+                        Name = MonsterNames.FromKey("castle.royal_guard_monster", guard.Name),   // v1.2.5: stored English, shown by MonsterNames
                         Level = guardLevel,
                         HP = (int)Math.Min(guardHP, int.MaxValue),
                         MaxHP = (int)Math.Min(guardHP, int.MaxValue),
