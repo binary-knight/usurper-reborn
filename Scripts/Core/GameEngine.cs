@@ -4116,19 +4116,14 @@ public partial class GameEngine
                         foreach (var gf in guardArr)
                         {
                             if (gf == null) continue;
-                            string guardName = gf["guard"]?.GetValue<string>() ?? Loc.Get("inn.guard_default");
+                            string guardName = InnLocation.GuardName(null, gf["guard"]?.GetValue<string>());   // v1.2.5: shown per reader
                             string guardResult = gf["result"]?.GetValue<string>() ?? "unknown";
 
+                            // v1.2.5: wrapped at 79 columns (a long guard name and a 30-character attacker)
                             if (guardResult == "guard_won")
-                            {
-                                terminal.SetColor("bright_green");
-                                terminal.WriteLine(Loc.Get("engine.guard_fought_off", guardName, attacker));
-                            }
+                                WriteRows(Loc.Get("engine.guard_fought_off", guardName, attacker), "bright_green");
                             else
-                            {
-                                terminal.SetColor("red");
-                                terminal.WriteLine(Loc.Get("engine.guard_defeated", guardName, attacker));
-                            }
+                                WriteRows(Loc.Get("engine.guard_defeated", guardName, attacker), "red");
                         }
                     }
 

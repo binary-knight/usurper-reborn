@@ -3362,7 +3362,7 @@ namespace UsurperRemake.Locations
 
             // Generate enforcer at playerLevel + 5
             var enforcer = MonsterGenerator.GenerateMonster(player.Level + 5);
-            enforcer.Name = Loc.Get("dark_alley.enforcer_name");
+            enforcer.Name = MonsterNames.FromKey("dark_alley.enforcer_name");   // v1.2.5: stored English, shown by MonsterNames
             enforcer.Gold = 0; // No gold reward — this is punishment
 
             var combatEngine = new CombatEngine(term);
