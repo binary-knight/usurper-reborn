@@ -124,7 +124,7 @@ public class CombatLocA122Tests
             src.Should().Contain($"\"combat.{key}\"");
         Regex.Matches(src, "BroadcastGroupDeathLine\\(result, \"combat\\.group_(slain|fallen)\"").Count.Should().Be(2);
         src.Should().Contain("BroadcastGroupLocalized(result, GroupRetreatLine)");
-        src.Should().Contain("GroupLine(lang, \"\\u001b[36m\", \"combat.boss_confused\", MonsterNames.DisplayIn(lang, monster))");
+        src.Should().Contain("GroupLineWrapped(lang, \"\\u001b[36m\", \"combat.boss_confused\", MonsterNames.DisplayIn(lang, monster))");
     }
 
     // ---------- 2. the compact BBS menus ----------

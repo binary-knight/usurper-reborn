@@ -385,7 +385,8 @@ public class TownRest125Tests : IDisposable
                 s.Term.StreamWriterInternal?.Flush();
                 return Encoding.UTF8.GetString(s.Output.ToArray());
             });
-            int at = raw.IndexOf(divine, StringComparison.Ordinal);
+            // v1.2.5: the news row wraps at 79; its first row starts with the marker
+            int at = raw.IndexOf(UsurperRemake.UI.UIHelper.MessageRows("  " + divine)[0].TrimStart(), StringComparison.Ordinal);
             at.Should().BeGreaterThan(0);
             string before2 = raw.Substring(0, at);
             before2.Substring(before2.LastIndexOf('\u001b')).Should().StartWith("\u001b[93m", "the divine line is bright yellow (the marker is found)");

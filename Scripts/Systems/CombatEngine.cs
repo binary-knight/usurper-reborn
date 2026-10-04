@@ -21948,7 +21948,7 @@ public partial class CombatEngine
         string shareLine = teammateCount > 0
             ? Loc.Get("combat.share_boss_allies", playerName, className, player.Level, MonsterNames.Display(monster), rounds, teammateCount, result.TotalDamageDealt.ToString("N0"))
             : Loc.Get("combat.share_boss", playerName, className, player.Level, MonsterNames.Display(monster), rounds, result.TotalDamageDealt.ToString("N0"));
-        UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.share_label", shareLine)}");
+        terminal.WriteLine($"  {Loc.Get("combat.share_label", shareLine)}");
         terminal.WriteLine("");
 
         // v0.65.2 (co-op feedback): followers never saw the boss-kill summary (it rendered
@@ -22028,7 +22028,7 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("gray");
         string shareLine = Loc.Get("combat.share_death", playerName, className, player.Level, killerName, totalKills.ToString("N0"), deepestFloor);
-        UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.share_label", shareLine)}");
+        terminal.WriteLine($"  {Loc.Get("combat.share_label", shareLine)}");
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();

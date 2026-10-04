@@ -104,6 +104,9 @@ public class Width125Tests
         "wilderness.monster_emerges",
     };
 
+    /// <summary>The share line is written whole so it copies as one line (the terminal soft-wraps it).</summary>
+    private static readonly string[] CopiedWhole = { "combat.share_boss", "combat.share_boss_allies" };
+
     private static string Root => UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot();
     private static string Src(string rel) => File.ReadAllText(Path.Combine(Root, "Scripts", rel));
 
@@ -165,6 +168,8 @@ public class Width125Tests
         string combat = Src("Systems/CombatEngine.cs");
         Regex.IsMatch(combat, @"terminal\.WriteLine\((abilityResult|spellResult)\.Message\)").Should().BeFalse("ability and spell messages are wrapped");
         Regex.IsMatch(combat, @"terminal\.WriteLine\(attackMessage").Should().BeFalse("attack messages are wrapped");
+        Regex.Matches(combat, Regex.Escape("terminal.WriteLine($\"  {Loc.Get(\"combat.share_label\", shareLine)}\");")).Count
+            .Should().Be(2, "the share line is written whole, to be copied as one line");
         Src("Server/RoomRegistry.cs").Should().Contain("UIHelper.AnsiRows(\"\u001b[90m\", $\"  {buildMessage(lang)}\")", "room actions are wrapped");
         Src("Locations/LoveStreetLocation.cs").Should().Contain("UIHelper.WrapAfterPrefix(\" - \", news)").And.NotContain("terminal.WriteLine($\" - {news}\")");
         Src("Locations/PantheonLocation.cs").Should().Contain("UIHelper.WriteRow(terminal, $\"  {item}\")").And.NotContain("terminal.WriteLine($\"  {item}\")");
@@ -189,7 +194,7 @@ public class Width125Tests
     {
         LongName.Length.Should().Be(GameConfig.MaxNameLength);
         var tooWide = new List<string>();
-        foreach (var key in MessageKeys)
+        foreach (var key in MessageKeys.Except(CopiedWhole))
             foreach (var lang in AllLanguages)
             {
                 string template = Loc.GetIn(lang, key);
