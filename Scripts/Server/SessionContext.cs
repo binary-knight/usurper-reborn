@@ -139,6 +139,10 @@ public class SessionContext : IDisposable
     public TownNPCStorySystem TownNPCStories { get; set; } = null!;
     public CycleDialogueSystem CycleDialogue { get; set; } = null!;
     public CycleSystem Cycle { get; set; } = null!;
+    // v1.2.5: the dialogue run (terminal, player, node, history) and the opening scene's entry state
+    // belong to one session; the dialogue trees themselves are shared.
+    public DialogueSystem Dialogue { get; set; } = null!;
+    public OpeningSequenceSystem OpeningSequence { get; set; } = null!;
 
     // --- Per-Session Mechanics Systems ---
     public AlignmentSystem Alignment { get; set; } = null!;
@@ -205,6 +209,8 @@ public class SessionContext : IDisposable
         TownNPCStories = new TownNPCStorySystem();
         CycleDialogue = new CycleDialogueSystem();
         Cycle = new CycleSystem();
+        Dialogue = new DialogueSystem();
+        OpeningSequence = new OpeningSequenceSystem();
         Alignment = new AlignmentSystem();
         Factions = new FactionSystem();
         Archetype = new ArchetypeTracker();

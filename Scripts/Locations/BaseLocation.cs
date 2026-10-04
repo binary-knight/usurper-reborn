@@ -706,6 +706,7 @@ public abstract class BaseLocation
         }
 
         // Check for encounters when first entering location
+        bool entryEncounterShown = false;
         if (ShouldCheckForEncounters())
         {
             // Priority: consequence encounters (grudges, jealous spouses, throne challengers)
@@ -714,6 +715,7 @@ public abstract class BaseLocation
 
             if (consequenceResult.EncounterOccurred)
             {
+                entryEncounterShown = true;
                 if (!currentPlayer.IsAlive)
                     return;
             }
@@ -725,18 +727,27 @@ public abstract class BaseLocation
 
                 if (encounterResult.EncounterOccurred)
                 {
+                    entryEncounterShown = true;
                     if (!currentPlayer.IsAlive)
                         return;
                 }
             }
         }
 
-        // Check for narrative encounters (Stranger, Town NPCs)
-        await CheckNarrativeEncounters();
+        // v1.2.5: the Mysterious Stranger's opening scene, once per character, at an entry with no other
+        // scene before it; when it is shown, no other narrative scene or petition follows on this entry
+        bool openingShown = await OpeningSequenceSystem.Instance.CheckOpeningSequenceTriggers(
+            currentPlayer, LocationId, terminal, otherSceneShown: entryEncounterShown);
 
-        // Check for NPC petitions (world-state-driven encounters)
-        if (currentPlayer.IsAlive && NPCPetitionSystem.Instance != null)
-            await NPCPetitionSystem.Instance.CheckForPetition(currentPlayer, LocationId, terminal);
+        if (!openingShown)
+        {
+            // Check for narrative encounters (Stranger, Town NPCs)
+            await CheckNarrativeEncounters();
+
+            // Check for NPC petitions (world-state-driven encounters)
+            if (currentPlayer.IsAlive && NPCPetitionSystem.Instance != null)
+                await NPCPetitionSystem.Instance.CheckForPetition(currentPlayer, LocationId, terminal);
+        }
 
         // Reset on every location entry so the banner always shows once on arrival
         _locationEntryDisplayed = false;
