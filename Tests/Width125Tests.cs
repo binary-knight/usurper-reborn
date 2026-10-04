@@ -274,7 +274,7 @@ public class Width125Tests
         {
             GameConfig.Language = lang;
             string summary = (string)method.Invoke(null, new object[] { item })!;
-            summary.Should().Be($"{agility}, {wisdom}");
+            summary.Should().Be($"{agility} {wisdom}");   // v1.2.5: stats one space apart (compaction)
         }
         finally { GameConfig.Language = prev; }
     }

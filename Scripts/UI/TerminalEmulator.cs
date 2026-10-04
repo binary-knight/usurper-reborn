@@ -358,6 +358,8 @@ public partial class TerminalEmulator
     
     public void WriteLine(string text, string color = "white")
     {
+        Column = 0;
+        RowsSinceClear += 1 + (text?.Count(c => c == '\n') ?? 0);
         // Capture output for group combat broadcasting
         if (_captureBuffer != null)
         {
@@ -567,8 +569,31 @@ public partial class TerminalEmulator
         WriteLine(text, currentColor);
     }
     
+    /// <summary>
+    /// v1.2.5: the visible column the next Write lands on: the width written since the last line end
+    /// (ANSI sequences and [colour] markup not counted). The stat tails use it to wrap at 79 columns.
+    /// </summary>
+    public int Column { get; private set; }
+
+    /// <summary>v1.2.5: rows written since the last ClearScreen; the BBS shop lists size a page by it.</summary>
+    public int RowsSinceClear { get; private set; }
+
+    private static readonly System.Text.RegularExpressions.Regex ColumnMarkup =
+        new(@"\x1b\[[0-9;?]*[A-Za-z]|\[/?[a-z_]+\]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+    private void AdvanceColumn(string? text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        int nl = text.LastIndexOf('\n');
+        if (nl >= 0) RowsSinceClear += text.Count(c => c == '\n');
+        string tail = nl >= 0 ? text.Substring(nl + 1) : text;
+        int width = ColumnMarkup.Replace(tail, "").Length;
+        Column = nl >= 0 ? width : Column + width;
+    }
+
     public void Write(string text, string? color = null)
     {
+        AdvanceColumn(text);
         // Use current color if no color specified
         string effectiveColor = color ?? currentColor;
 
@@ -850,6 +875,8 @@ public partial class TerminalEmulator
 
     public void ClearScreen()
     {
+        Column = 0;
+        RowsSinceClear = 0;
         // Screen reader mode: don't clear the screen — screen readers lose their
         // reading position when the buffer is wiped. Instead, output a separator
         // so the screen reader buffer grows naturally and the user hears each new

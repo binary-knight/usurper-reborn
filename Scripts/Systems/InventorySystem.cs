@@ -567,6 +567,7 @@ namespace UsurperRemake.Systems
                         ObjType.Fingers or ObjType.Neck => "bright_magenta",
                         _ => "white"
                     };
+                    int nameColumn = terminal.Column;
                     terminal.SetColor(itemColor);
                     terminal.Write(ItemNames.Display(item));
                     if (item.IsCursed)
@@ -576,8 +577,8 @@ namespace UsurperRemake.Systems
                         terminal.Write(Loc.Get("shop.cursed_tag"));
                     }
 
-                    terminal.SetColor("gray");
-                    terminal.Write($" - {item.Value:N0}g");
+                    // v1.2.5: the value, stats and class tag are the row's tail; one that does not fit 79 wraps under the name
+                    var tail = new List<(string? Color, string Text)> { ("gray", $" - {item.Value:N0}g") };
 
                     var stats = new List<string>();
                     if (item.Attack > 0) stats.Add($"{Loc.Get("ui.stat_wp")}:{item.Attack}");
@@ -594,10 +595,7 @@ namespace UsurperRemake.Systems
                     if (intFromLoot != 0) stats.Add($"{Loc.Get("ui.stat_int")}:{intFromLoot:+#;-#;0}");
 
                     if (stats.Count > 0)
-                    {
-                        terminal.SetColor("darkgray");
-                        terminal.Write($" ({string.Join(", ", stats.Take(4))})");
-                    }
+                        tail.Add(("darkgray", $" ({string.Join(" ", stats.Take(4))})"));
 
                     // v0.65.1: weapon-class tag (1H/2H/Shield) for weapons & shields in the
                     // backpack. InferWeaponType only runs for actual weapons (defaults to Sword).
@@ -606,12 +604,11 @@ namespace UsurperRemake.Systems
                         item.Type == ObjType.Weapon ? ShopItemGenerator.InferWeaponType(item.Name) : WeaponType.None,
                         WeaponHandedness.None,
                         item.ShieldBonus,
-                        item.BlockChance);
+                        item.BlockChance,
+                        shortForm: true);
                     if (!string.IsNullOrEmpty(bpWeaponClassTag))
-                    {
-                        terminal.SetColor("darkgray");
-                        terminal.Write($" [{bpWeaponClassTag}]");
-                    }
+                        tail.Add(("darkgray", $" [{bpWeaponClassTag}]"));
+                    UIHelper.WriteTail(terminal, nameColumn, tail.ToArray());
                 }
                 else
                 {
@@ -651,36 +648,24 @@ namespace UsurperRemake.Systems
             if (item != null)
             {
                 // Color based on rarity
+                int nameColumn = terminal.Column;
                 terminal.SetColor(GetRarityColor(item.Rarity));
                 terminal.Write(ItemNames.Display(item));
 
-                // Show key stats
-                terminal.SetColor("gray");
+                // key stats, the armor weight class tag and (v0.65.1) the weapon-class tag (1H/2H/Shield) for the
+                // weapon slots; v1.2.5: a tail that does not fit 79 wraps under the item name
+                var tail = new List<(string? Color, string Text)>();
                 var stats = GetItemStatSummary(item);
-                if (!string.IsNullOrEmpty(stats))
-                {
-                    terminal.Write($" ({stats})");
-                }
-
-                // Show armor weight class tag
+                if (!string.IsNullOrEmpty(stats)) tail.Add(("gray", $" ({stats})"));
                 if (item.WeightClass != ArmorWeightClass.None && slot.IsArmorSlot())
-                {
-                    terminal.SetColor(item.WeightClass.GetWeightColor());
-                    terminal.Write($" [{item.WeightClass}]");
-                }
-
-                // v0.65.1: weapon-class tag (1H/2H/Shield) for the weapon slots, parallel
-                // to the armor weight-class tag above -- so the player can see handedness
-                // and shields at a glance without equipping.
+                    tail.Add((item.WeightClass.GetWeightColor(), $" [{item.WeightClass.ShortTag()}]"));
                 if (slot == EquipmentSlot.MainHand || slot == EquipmentSlot.OffHand)
                 {
-                    string weaponClassTag = GameConfig.GetWeaponClassTag(item.Name, item.WeaponType, item.Handedness, item.ShieldBonus, item.BlockChance);
-                    if (!string.IsNullOrEmpty(weaponClassTag))
-                    {
-                        terminal.SetColor("darkgray");
-                        terminal.Write($" [{weaponClassTag}]");
-                    }
+                    // matched from the stored English name and the item's own type, never the shown name
+                    string weaponClassTag = GameConfig.GetWeaponClassTag(item.Name, item.WeaponType, item.Handedness, item.ShieldBonus, item.BlockChance, shortForm: true);
+                    if (!string.IsNullOrEmpty(weaponClassTag)) tail.Add(("darkgray", $" [{weaponClassTag}]"));
                 }
+                UIHelper.WriteTail(terminal, nameColumn, tail.ToArray());
                 terminal.WriteLine("");
             }
             else
@@ -725,7 +710,7 @@ namespace UsurperRemake.Systems
             if (item.CriticalChanceBonus != 0) stats.Add($"{Loc.Get("ui.stat_crit")}:{item.CriticalChanceBonus}%");
             if (item.LifeSteal != 0) stats.Add($"{Loc.Get("ui.stat_ls")}:{item.LifeSteal}%");
 
-            return string.Join(", ", stats.Take(4)); // Limit to 4 stats for display
+            return string.Join(" ", stats.Take(4)); // Limit to 4 stats for display
         }
 
         private void DisplayStatsSummary()

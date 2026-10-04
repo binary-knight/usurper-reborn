@@ -2756,7 +2756,7 @@ public static partial class GameConfig
     /// resolves weaponType via InferWeaponType ONLY when Type == Weapon (that
     /// inferer defaults to Sword on unknown names, so it must not run on armor).
     /// </summary>
-    public static string GetWeaponClassTag(string name, WeaponType weaponType, WeaponHandedness handedness, int shieldBonus, int blockChance)
+    public static string GetWeaponClassTag(string name, WeaponType weaponType, WeaponHandedness handedness, int shieldBonus, int blockChance, bool shortForm = false)
     {
         name ??= "";
 
@@ -2783,8 +2783,9 @@ public static partial class GameConfig
         }
         return eff switch
         {
-            WeaponHandedness.TwoHanded => Loc.Get("equip.class_two_handed"),
-            WeaponHandedness.OneHanded => Loc.Get("equip.class_one_handed"),
+            // v1.2.5: the equipment and backpack rows use the short form ("1H", "2H"); screen reader mode the words
+            WeaponHandedness.TwoHanded => Loc.Get(shortForm && !ScreenReaderMode ? "equip.class_short.two_handed" : "equip.class_two_handed"),
+            WeaponHandedness.OneHanded => Loc.Get(shortForm && !ScreenReaderMode ? "equip.class_short.one_handed" : "equip.class_one_handed"),
             WeaponHandedness.OffHandOnly => Loc.Get("equip.class_off_hand"),
             _ => "",
         };

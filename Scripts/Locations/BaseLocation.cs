@@ -103,6 +103,51 @@ public abstract class BaseLocation
     /// True when this session should use compact BBS menus (80x24 terminal).
     /// Covers both single-player BBS door mode and MUD server BBS connections.
     /// </summary>
+    /// <summary>
+    /// v1.2.5: the first item of each page of a shop list. Off BBS a page is perPage items, as before; on a BBS
+    /// screen a page also stops before its rows (a wrapped row counts its lines) pass lineBudget, so the page
+    /// fits 24 lines. A page always holds at least one item.
+    /// </summary>
+    internal static List<int> PageStarts(IReadOnlyList<int> rowLines, int perPage, int? lineBudget)
+    {
+        var starts = new List<int>();
+        int i = 0;
+        while (i < rowLines.Count)
+        {
+            starts.Add(i);
+            int used = 0, start = i;
+            while (i < rowLines.Count && i - start < perPage
+                   && (i == start || lineBudget == null || used + rowLines[i] <= lineBudget.Value))
+            {
+                used += rowLines[i];
+                i++;
+            }
+        }
+        if (starts.Count == 0) starts.Add(0);
+        return starts;
+    }
+
+    /// <summary>v1.2.5: the rows a BBS shop list may use: 23 lines less what is above the list (rows already
+    /// written, the page line, a blank, the header and divider) and below it (a blank, the menu, a blank, the prompt).</summary>
+    internal static int? ShopLineBudget(TerminalEmulator term) =>
+        IsBBSSession ? Math.Max(5, 23 - (term.RowsSinceClear + 4) - 4) : null;
+
+    /// <summary>
+    /// v1.2.5: an item's class restriction as short class names ("War/Pal"), in the reader's language. Display
+    /// only: what a class may use is read from Equipment.ClassRestrictions (the enum), never from this text.
+    /// </summary>
+    internal static string ClassRestrictionTag(Equipment item)
+    {
+        if (item.ClassRestrictions == null || item.ClassRestrictions.Count == 0)
+            return "";
+        return string.Join("/", item.ClassRestrictions.Select(c => Loc.Get($"class_short.{c.ToString().ToLowerInvariant()}")));
+    }
+
+    /// <summary>v1.2.5: a weapon type for the shop's type column, in the reader's language (display only;
+    /// the stored and matched value is Equipment.WeaponType).</summary>
+    internal static string WeaponTypeLabel(WeaponType type) =>
+        type == WeaponType.None ? "" : Loc.Get($"weapon_type.{type.ToString().ToLowerInvariant()}");
+
     protected static bool IsBBSSession
     {
         get
@@ -8332,7 +8377,7 @@ public abstract class BaseLocation
         if (statLine.Count > 0)
         {
             terminal.SetColor("green");
-            terminal.WriteLine($"    {string.Join(", ", statLine)}");
+            UIHelper.WriteRow(terminal, $"    {string.Join(", ", statLine)}");   // v1.2.5: wrapped at 79
         }
 
         terminal.WriteLine("");
@@ -8348,16 +8393,14 @@ public abstract class BaseLocation
         if (item != null)
         {
             // Color based on rarity
+            int nameColumn = terminal.Column;
             terminal.SetColor(GetEquipmentRarityColor(item.Rarity));
             terminal.Write(ItemNames.Display(item));
 
-            // Show key stats
+            // Show key stats (v1.2.5: wrapped under the name when the row is over 79)
             var stats = GetEquipmentStatSummary(item);
             if (!string.IsNullOrEmpty(stats))
-            {
-                terminal.SetColor("gray");
-                terminal.Write($" ({stats})");
-            }
+                UIHelper.WriteTail(terminal, nameColumn, ("gray", $" ({stats})"));
             terminal.WriteLine("");
         }
         else
@@ -8406,7 +8449,7 @@ public abstract class BaseLocation
         if (item.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}:{item.StaminaBonus:+#;-#;0}");
 
         // Limit to 4 stats for concise display
-        return string.Join(", ", stats.Take(4));
+        return string.Join(" ", stats.Take(4));
     }
 
     /// <summary>
@@ -8460,19 +8503,24 @@ public abstract class BaseLocation
             terminal.Write("  " + Loc.Get("base.bonuses") + " ");
             // v1.2.5: labels keyed; the row wraps before a bonus that would pass 79 columns.
             int used = 2 + Loc.Get("base.bonuses").Length + 1;
+            bool rowStart = true;
             void Bonus(string color, string label, int value)
             {
                 if (value == 0) return;
-                string piece = $"{label} {value:+#;-#;0}  ";
-                if (used + piece.TrimEnd().Length > 79)
+                // v1.2.5: the two spaces go between bonuses, not after the last, so a full row ends by 79
+                string piece = $"{label} {value:+#;-#;0}";
+                string gap = rowStart ? "" : "  ";
+                if (used + gap.Length + piece.Length > 79)
                 {
                     terminal.WriteLine("");
                     terminal.Write("    ");
                     used = 4;
+                    gap = "";
                 }
                 terminal.SetColor(color);
-                terminal.Write(piece);
-                used += piece.Length;
+                terminal.Write(gap + piece);
+                used += gap.Length + piece.Length;
+                rowStart = false;
             }
             Bonus("green", Loc.Get("ui.stat_str"), totalStr);
             Bonus("green", Loc.Get("ui.stat_dex"), totalDex);
@@ -10809,8 +10857,9 @@ public abstract class BaseLocation
 
         if (stats.Count > 0)
         {
-            terminal.SetColor("darkgray");
-            terminal.Write($" [{string.Join(" ", stats)}]");
+            // v1.2.5: the stats follow the item name; a row over 79 wraps them under the name
+            int nameColumn = Math.Max(0, terminal.Column - UIHelper.VisibleLength(ItemNames.Display(item)));
+            UIHelper.WriteTail(terminal, nameColumn, ("darkgray", $" [{string.Join(" ", stats)}]"));
         }
     }
 
@@ -11479,19 +11528,16 @@ public abstract class BaseLocation
                 WriteEquipmentStatSummary(item);
             }
 
+            // v1.2.5: the slot and refusal notes continue the tail, wrapped under the item name
+            int nameColumn = 5 + (i + 1).ToString().Length - 1;
+
             // Show if currently equipped by player
             if (isEquipped)
-            {
-                terminal.SetColor("cyan");
-                terminal.Write($" {Loc.Get("base.your_slot", fromSlot?.GetDisplayName() ?? "")}");
-            }
+                UIHelper.WriteTail(terminal, nameColumn, ("cyan", $" {Loc.Get("base.your_slot", fromSlot?.GetDisplayName() ?? "")}"));
 
             // Check if target can use it
             if (item.IsIdentified && !item.CanEquip(target, out string reason))
-            {
-                terminal.SetColor("red");
-                terminal.Write($" [{reason}]");
-            }
+                UIHelper.WriteTail(terminal, nameColumn, ("red", $" [{reason}]"));
 
             terminal.WriteLine("");
         }

@@ -17,6 +17,7 @@ public class ArmorShopLocation : BaseLocation
     private EquipmentSlot? currentSlotCategory = null;
     private int currentPage = 0;
     private const int ItemsPerPage = 15;
+    private List<int> pageStarts = new() { 0 };   // v1.2.5: the first item of each page of the list last shown
 
     // Armor slots sold in this shop (accessories are in the Magic Shop)
     private static readonly EquipmentSlot[] ArmorSlots = new[]
@@ -356,16 +357,23 @@ public class ArmorShopLocation : BaseLocation
         }
 
         // Paginate items
-        int startIndex = currentPage * ItemsPerPage;
-        var pageItems = items.Skip(startIndex).Take(ItemsPerPage).ToList();
-        int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
+        // v1.2.5: compact columns, one space apart, each as wide as its widest value or header word; a row
+        // whose tail does not fit 79 wraps it under the bonus column, and a BBS page holds what fits 24 lines
+        int valueWidth = Math.Max(7, items.Select(i => FormatNumber(i.Value).Length).DefaultIfEmpty(0).Max());
+        var cols = UsurperRemake.UI.ShopColumns.From(Loc.Get("armor_shop.item_header"), 3, 4, valueWidth);
+        pageStarts = PageStarts(items.Select(i => UsurperRemake.UI.UIHelper.TailRows(cols.BonusColumn, cols.BonusColumn,
+            RowTail(i, currentItem, true, true)).Count).ToList(), ItemsPerPage, ShopLineBudget(terminal));
+        currentPage = Math.Clamp(currentPage, 0, pageStarts.Count - 1);
+        int startIndex = pageStarts[currentPage];
+        var pageItems = items.Skip(startIndex).Take(PageEnd(currentPage, items.Count) - startIndex).ToList();
+        int totalPages = pageStarts.Count;
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("armor_shop.page_info", currentPage + 1, totalPages, items.Count));
         terminal.WriteLine("");
 
         terminal.SetColor("bright_blue");
-        terminal.WriteLine(Loc.Get("armor_shop.item_header"));
+        terminal.WriteLine(cols.Header);
         WriteDivider(63);
 
         int num = 1;
@@ -377,7 +385,6 @@ public class ArmorShopLocation : BaseLocation
             bool meetsClass = isPrestige || item.ClassRestrictions == null || item.ClassRestrictions.Count == 0
                 || item.ClassRestrictions.Contains(currentPlayer.Class);
             bool canBuy = canAfford && meetsLevel && meetsClass;
-            bool isUpgrade = currentItem == null || item.ArmorClass > currentItem.ArmorClass;
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
             terminal.Write($"{num,3}. ");
@@ -389,55 +396,22 @@ public class ArmorShopLocation : BaseLocation
             if (item.MinLevel > 1)
             {
                 terminal.SetColor(!meetsLevel ? "red" : (canBuy ? "bright_cyan" : "darkgray"));
-                terminal.Write($"{item.MinLevel,3}  ");
+                terminal.Write(cols.Cell(0, $"{item.MinLevel}"));
             }
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"--",3}  ");
+                terminal.Write(cols.Cell(0, "--"));
             }
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-            terminal.Write($"{item.ArmorClass,4}  ");
+            terminal.Write(cols.Cell(1, $"{item.ArmorClass}"));
 
             terminal.SetColor(canBuy ? "yellow" : "darkgray");
-            terminal.Write($"{FormatNumber(item.Value),10}  ");
+            terminal.Write(cols.Cell(2, FormatNumber(item.Value)));
 
-            // Show bonus stats
-            var bonuses = GetBonusDescription(item);
-            if (!string.IsNullOrEmpty(bonuses))
-            {
-                terminal.SetColor(canBuy ? "green" : "darkgray");
-                terminal.Write(bonuses);
-            }
-
-            // Show class restriction tag
-            var classTag = GetClassTag(item);
-            if (!string.IsNullOrEmpty(classTag))
-            {
-                terminal.SetColor(!meetsClass ? "red" : "gray");
-                terminal.Write($" [{classTag}]");
-            }
-
-            // Show armor weight class tag
-            if (item.WeightClass != ArmorWeightClass.None)
-            {
-                terminal.SetColor(canBuy ? item.WeightClass.GetWeightColor() : "darkgray");
-                terminal.Write($" [{item.WeightClass}]");
-            }
-
-            // Show upgrade indicator
-            if (isUpgrade && canBuy)
-            {
-                terminal.SetColor("bright_green");
-                terminal.Write(" ↑");
-            }
-            else if (!isUpgrade && currentItem != null)
-            {
-                terminal.SetColor("red");
-                terminal.Write(" ↓");
-            }
-
+            // bonus stats, class restriction, weight class and the upgrade mark, wrapped under the bonus column
+            UsurperRemake.UI.UIHelper.WriteTail(terminal, cols.BonusColumn, RowTail(item, currentItem, canBuy, meetsClass));
             terminal.WriteLine("");
             num++;
         }
@@ -485,6 +459,25 @@ public class ArmorShopLocation : BaseLocation
         terminal.WriteLine("");
     }
 
+    /// <summary>v1.2.5: the first item after page p (pageStarts from the last list shown).</summary>
+    private int PageEnd(int p, int count) => p + 1 < pageStarts.Count ? pageStarts[p + 1] : count;
+
+    /// <summary>v1.2.5: a list row's tail: bonuses, class tag, weight tag and the upgrade mark, each in its colour.</summary>
+    private (string? Color, string Text)[] RowTail(Equipment item, Equipment? currentItem, bool canBuy, bool meetsClass)
+    {
+        bool isUpgrade = currentItem == null || item.ArmorClass > currentItem.ArmorClass;
+        var tail = new List<(string? Color, string Text)>();
+        var bonuses = GetBonusDescription(item);
+        if (!string.IsNullOrEmpty(bonuses)) tail.Add((canBuy ? "green" : "darkgray", bonuses));
+        var classTag = GetClassTag(item);
+        if (!string.IsNullOrEmpty(classTag)) tail.Add((!meetsClass ? "red" : "gray", $" [{classTag}]"));
+        if (item.WeightClass != ArmorWeightClass.None)
+            tail.Add((canBuy ? item.WeightClass.GetWeightColor() : "darkgray", $" [{item.WeightClass.ShortTag()}]"));
+        if (isUpgrade && canBuy) tail.Add(("bright_green", " ↑"));
+        else if (!isUpgrade && currentItem != null) tail.Add(("red", " ↓"));
+        return tail.ToArray();
+    }
+
     private string GetBonusDescription(Equipment item)
     {
         var bonuses = new List<string>();
@@ -509,28 +502,8 @@ public class ArmorShopLocation : BaseLocation
         return string.Join(" ", bonuses);
     }
 
-    private static string GetClassTag(Equipment item)
-    {
-        if (item.ClassRestrictions == null || item.ClassRestrictions.Count == 0)
-            return "";
-        var abbrevs = item.ClassRestrictions.Select(c => c switch
-        {
-            CharacterClass.Warrior => "War",
-            CharacterClass.Paladin => "Pal",
-            CharacterClass.Barbarian => "Bar",
-            CharacterClass.Ranger => "Rng",
-            CharacterClass.Assassin => "Asn",
-            CharacterClass.Magician => "Mag",
-            CharacterClass.Sage => "Sag",
-            CharacterClass.Cleric => "Clr",
-            CharacterClass.Bard => "Brd",
-            CharacterClass.Alchemist => "Alc",
-            CharacterClass.Jester => "Jst",
-            CharacterClass.MysticShaman => "Sha",
-            _ => c.ToString().Substring(0, 3),
-        });
-        return string.Join("/", abbrevs);
-    }
+    // v1.2.5: the class tag is shown through keys (ClassRestrictionTag); the restriction itself stays the enum list
+    private static string GetClassTag(Equipment item) => ClassRestrictionTag(item);
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
@@ -613,9 +586,7 @@ public class ArmorShopLocation : BaseLocation
             case "N":
                 if (currentSlotCategory.HasValue)
                 {
-                    var items = GetShopArmorForSlot(currentSlotCategory.Value);
-                    int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
-                    if (currentPage < totalPages - 1) currentPage++;
+                    if (currentPage < pageStarts.Count - 1) currentPage++;
                 }
                 RequestRedisplay();
                 return false;
@@ -635,7 +606,8 @@ public class ArmorShopLocation : BaseLocation
     {
         var items = GetShopArmorForSlot(slot);
 
-        int actualIndex = currentPage * ItemsPerPage + itemIndex - 1;
+        int pageStart = currentPage < pageStarts.Count ? pageStarts[currentPage] : currentPage * ItemsPerPage;
+        int actualIndex = pageStart + itemIndex - 1;
         if (actualIndex < 0 || actualIndex >= items.Count)
         {
             terminal.WriteLine(Loc.Get("ui.invalid_selection"), "red");

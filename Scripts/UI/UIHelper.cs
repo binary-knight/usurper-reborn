@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -411,6 +412,69 @@ namespace UsurperRemake.UI
             return rows[rows.Count - 1] + prompt.Substring(body.Length);
         }
 
+        /// <summary>
+        /// v1.2.5: a row's coloured tail (stats, tags) laid out from startCol. When the whole tail fits width it is
+        /// one row with the segments unchanged; otherwise it is word-wrapped and each later row starts at indent.
+        /// Each row is a list of (colour, text) pieces; a null colour keeps the current one.
+        /// </summary>
+        public static List<List<(string? Color, string Text)>> TailRows(int startCol, int indent,
+            IEnumerable<(string? Color, string Text)> segments, int width = WrapWidth)
+        {
+            var segs = segments.Where(s => !string.IsNullOrEmpty(s.Text)).ToList();
+            var rows = new List<List<(string? Color, string Text)>> { new() };
+            if (startCol + segs.Sum(s => VisibleLength(s.Text)) <= width)
+            {
+                rows[0].AddRange(segs);
+                return rows;
+            }
+            int col = startCol, rowStart = startCol;
+            foreach (var (color, text) in segs)
+            {
+                var words = text.Split(' ');
+                bool lead = text.StartsWith(' ');
+                bool first = true;
+                foreach (var word in words)
+                {
+                    if (word.Length == 0) continue;
+                    bool space = first ? lead : true;
+                    first = false;
+                    int w = VisibleLength(word);
+                    if ((rows.Count == 1 || col > rowStart) && col + (space ? 1 : 0) + w > width)
+                    {
+                        // a later row starts under indent, or further left when one word is wider than what is left
+                        rowStart = Math.Max(0, Math.Min(indent, width - w));
+                        rows.Add(new() { (null, new string(' ', rowStart)) });
+                        col = rowStart;
+                    }
+                    if (col == rowStart && rows.Count > 1) space = false;
+                    string piece = (space ? " " : "") + word;
+                    rows[rows.Count - 1].Add((color, piece));
+                    col += VisibleLength(piece);
+                }
+            }
+            return rows;
+        }
+
+        /// <summary>
+        /// v1.2.5: write a row's tail from the terminal's current column, wrapped at 79 under indent (TailRows).
+        /// Screen reader mode writes it on one line, as before. The caller ends the row.
+        /// </summary>
+        public static void WriteTail(TerminalEmulator terminal, int indent, params (string? Color, string Text)[] segments)
+        {
+            var rows = GameConfig.ScreenReaderMode
+                ? new List<List<(string? Color, string Text)>> { segments.Where(s => !string.IsNullOrEmpty(s.Text)).ToList() }
+                : TailRows(terminal.Column, indent, segments);
+            for (int i = 0; i < rows.Count; i++)
+            {
+                if (i > 0) terminal.WriteLine("");
+                foreach (var (color, text) in rows[i])
+                {
+                    if (color != null) terminal.SetColor(color);
+                    terminal.Write(text);
+                }
+            }
+        }
+
         /// <summary>v1.2.5: a message row written in the current colour, wrapped at 79 columns (MessageRows).</summary>
         public static void WriteRow(TerminalEmulator? terminal, string? row)
         {
@@ -486,5 +550,40 @@ namespace UsurperRemake.UI
                 terminal.ClearScreen();
             await Task.Delay(durationMs);
         }
+    }
+
+    /// <summary>
+    /// v1.2.5: the columns of a shop list. The header's words (#, name, one word per column, bonus) are laid out
+    /// over the row's columns: each column is as wide as its widest value or its header word, whichever is
+    /// wider, one space apart, so rows and header line up in every language. A negative width is left aligned.
+    /// </summary>
+    public sealed class ShopColumns
+    {
+        public const int NameWidth = 26;
+        public string Header { get; }
+        public int[] Widths { get; }
+        public int BonusColumn => 5 + NameWidth + Widths.Sum(w => Math.Abs(w) + 1);
+
+        private ShopColumns(string header, int[] widths) { Header = header; Widths = widths; }
+
+        public static ShopColumns From(string header, params int[] widths)
+        {
+            var words = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var w = (int[])widths.Clone();
+            if (words.Length != widths.Length + 3) return new ShopColumns(header, w);
+            var sb = new StringBuilder("  " + words[0].PadRight(3) + words[1].PadRight(NameWidth));
+            for (int i = 0; i < w.Length; i++)
+            {
+                int width = Math.Max(Math.Abs(w[i]), words[2 + i].Length);
+                w[i] = w[i] < 0 ? -width : width;
+                sb.Append(w[i] < 0 ? words[2 + i].PadRight(width) : words[2 + i].PadLeft(width)).Append(' ');
+            }
+            sb.Append(words[words.Length - 1]);
+            return new ShopColumns(sb.ToString(), w);
+        }
+
+        /// <summary>The cell of column i and the space after it.</summary>
+        public string Cell(int i, string text) =>
+            (Widths[i] < 0 ? text.PadRight(-Widths[i]) : text.PadLeft(Widths[i])) + " ";
     }
 }
