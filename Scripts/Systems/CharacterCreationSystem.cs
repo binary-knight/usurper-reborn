@@ -422,7 +422,7 @@ public class CharacterCreationSystem
         // Compact summary: what they got + where to change the defaults.
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {Loc.Get("creation.qs_summary", character.Name2, GameConfig.RaceNames[(int)character.Race], character.ClassName)}");
+        terminal.WriteLine($"  {Loc.Get("creation.qs_summary", character.Name2, GameConfig.GetLocalizedRaceName(character.Race), character.ClassName)}");
         terminal.SetColor("gray");
         terminal.WriteLine($"  {Loc.Get("creation.qs_defaults_hint")}");
         terminal.WriteLine("");
@@ -1058,7 +1058,7 @@ public class CharacterCreationSystem
         foreach (var (pc, unlockReqKey) in prestige)
         {
             bool isUnlocked = unlockedPrestige.Contains(pc);
-            var desc = GameConfig.PrestigeClassDescriptions.TryGetValue(pc, out var d) ? d : "";
+            var desc = GameConfig.GetLocalizedPrestigeDescription(pc);
             result.Add(new
             {
                 key = isUnlocked ? prestigeIdx.ToString() : "",
@@ -1123,7 +1123,7 @@ public class CharacterCreationSystem
         const int CONTENT_ROWS = 18; // rows of portrait + stats content (18 fits 24-row BBS)
 
         var raceAttrib = GameConfig.RaceAttributes[race];
-        string raceName = GameConfig.RaceNames[(int)race];
+        string raceName = GameConfig.GetLocalizedRaceName(race);
 
         // ── Row 1: Top border with race name ──
         string title = $" {raceName.ToUpper()} ";
@@ -1181,7 +1181,7 @@ public class CharacterCreationSystem
         terminal.WriteLine("╣", "gray");
 
         // ── Row 22: Confirm prompt ──
-        var raceDesc = GameConfig.RaceDescriptions[race];
+        var raceDesc = GameConfig.GetLocalizedRaceDescription(race);
         string prompt = $" {Loc.Get("creation.preview.be_race", raceDesc)}";
         terminal.Write("║", "gray");
         terminal.Write(prompt.PadRight(TOTAL_W - 2), "white");
@@ -1301,7 +1301,7 @@ public class CharacterCreationSystem
             var classList = new StringBuilder();
             foreach (var cls in available)
             {
-                string name = cls.ToString();
+                string name = GameConfig.GetLocalizedClassName(cls);
                 if (classList.Length + name.Length + 2 > panelWidth - 2)
                 {
                     AddText(classList.ToString(), "white");
@@ -1316,7 +1316,7 @@ public class CharacterCreationSystem
         // ── Restricted note (word-wrapped) ──
         if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
         {
-            string reason = GameConfig.RaceRestrictionReasons[race];
+            string reason = GameConfig.GetLocalizedRaceRestriction(race);
             var reasonWords = reason.Split(' ');
             var reasonLine = new StringBuilder();
             foreach (var word in reasonWords)
@@ -1376,7 +1376,7 @@ public class CharacterCreationSystem
         string pad = new string(' ', (80 - W) / 2); // left padding to center
 
         var raceAttrib = GameConfig.RaceAttributes[race];
-        string raceName = GameConfig.RaceNames[(int)race];
+        string raceName = GameConfig.GetLocalizedRaceName(race);
 
         // ── Top border with race name ──
         CardTopBorder(pad, W, raceName);
@@ -1419,7 +1419,7 @@ public class CharacterCreationSystem
         }
         else
         {
-            string GetClassDisplayName(CharacterClass c) => (int)c < GameConfig.ClassNames.Length ? GameConfig.ClassNames[(int)c] : c.ToString();
+            string GetClassDisplayName(CharacterClass c) => GameConfig.GetLocalizedClassName(c);
             var classNamesList = available.Select(GetClassDisplayName);
             string classList = string.Join(", ", classNamesList);
             if (($"  {Loc.Get("creation.preview.classes")}  " + classList).Length <= W - 4)
@@ -1439,7 +1439,7 @@ public class CharacterCreationSystem
         // ── Restricted classes (if any) ──
         if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
         {
-            CardLine(pad, W, $"  [red]{GameConfig.RaceRestrictionReasons[race]}");
+            CardLine(pad, W, $"  [red]{GameConfig.GetLocalizedRaceRestriction(race)}");
         }
 
         CardBlank(pad, W);
@@ -1466,7 +1466,7 @@ public class CharacterCreationSystem
 
         // ── Confirm prompt ──
         terminal.WriteLine("");
-        var raceDesc = GameConfig.RaceDescriptions[race];
+        var raceDesc = GameConfig.GetLocalizedRaceDescription(race);
         // v1.1.15: yesno-convert-a, strict (Y/N)
         return await terminal.AskYesNoAsync($"{pad} {Loc.Get("creation.preview.be_race_yn", raceDesc)}");
     }
@@ -1660,9 +1660,7 @@ public class CharacterCreationSystem
         const int RIGHT_W = 38;
         const int CONTENT_ROWS = 18;
 
-        string className = (int)characterClass < GameConfig.ClassNames.Length
-            ? GameConfig.ClassNames[(int)characterClass]
-            : characterClass.ToString();
+        string className = GameConfig.GetLocalizedClassName(characterClass);
 
         // ── Row 1: Top border with class name ──
         string title = $" {className.ToUpper()} ";
@@ -1906,9 +1904,7 @@ public class CharacterCreationSystem
         string pad = new string(' ', (80 - W) / 2);
 
         var attrs = GameConfig.ClassStartingAttributes[characterClass];
-        string className = (int)characterClass < GameConfig.ClassNames.Length
-            ? GameConfig.ClassNames[(int)characterClass]
-            : characterClass.ToString();
+        string className = GameConfig.GetLocalizedClassName(characterClass);
 
         // Determine class category
         string category = characterClass switch
@@ -1974,7 +1970,7 @@ public class CharacterCreationSystem
         terminal.Clear();
 
         var raceAttrib = GameConfig.RaceAttributes[race];
-        string raceName = GameConfig.RaceNames[(int)race];
+        string raceName = GameConfig.GetLocalizedRaceName(race);
         string desc = GetRaceDescription(race);
 
         terminal.WriteLine("");
@@ -2002,12 +1998,12 @@ public class CharacterCreationSystem
         }
         else
         {
-            terminal.WriteLine($"{Loc.Get("creation.preview.classes")} {string.Join(", ", available.Select(c => (int)c < GameConfig.ClassNames.Length ? GameConfig.ClassNames[(int)c] : c.ToString()))}");
+            terminal.WriteLine($"{Loc.Get("creation.preview.classes")} {string.Join(", ", available.Select(c => GameConfig.GetLocalizedClassName(c)))}");
         }
 
         if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
         {
-            terminal.WriteLine($"{Loc.Get("creation.preview.restricted")} {GameConfig.RaceRestrictionReasons[race]}");
+            terminal.WriteLine($"{Loc.Get("creation.preview.restricted")} {GameConfig.GetLocalizedRaceRestriction(race)}");
         }
 
         terminal.WriteLine("");
@@ -2022,7 +2018,7 @@ public class CharacterCreationSystem
         terminal.WriteLine($"{Loc.Get("creation.preview.special")} {special}");
 
         terminal.WriteLine("");
-        var raceDesc = GameConfig.RaceDescriptions[race];
+        var raceDesc = GameConfig.GetLocalizedRaceDescription(race);
         // v1.1.15: yesno-convert-a, strict (Y/N)
         return await terminal.AskYesNoAsync(Loc.Get("creation.preview.be_race_yn", raceDesc));
     }
@@ -2033,9 +2029,7 @@ public class CharacterCreationSystem
         terminal.Clear();
 
         var attrs = GameConfig.ClassStartingAttributes[characterClass];
-        string className = (int)characterClass < GameConfig.ClassNames.Length
-            ? GameConfig.ClassNames[(int)characterClass]
-            : characterClass.ToString();
+        string className = GameConfig.GetLocalizedClassName(characterClass);
 
         string category = characterClass switch
         {
@@ -2172,8 +2166,8 @@ public class CharacterCreationSystem
                 // Phase 3: emit class picker as a structured list for JS.
                 ElectronBridge.EmitCharacterCreationStep(
                     step: "class",
-                    title: Loc.Get("creation.choose_class", GameConfig.RaceNames[(int)race]),
-                    description: GameConfig.RaceRestrictionReasons.TryGetValue(race, out var reason) ? reason : "",
+                    title: Loc.Get("creation.choose_class", GameConfig.GetLocalizedRaceName(race)),
+                    description: GameConfig.GetLocalizedRaceRestriction(race),
                     data: new
                     {
                         race = race.ToString(),
@@ -2182,7 +2176,7 @@ public class CharacterCreationSystem
 
                 terminal.Clear();
                 terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("creation.choose_class", GameConfig.RaceNames[(int)race]), "cyan");
+                terminal.WriteLine(Loc.Get("creation.choose_class", GameConfig.GetLocalizedRaceName(race)), "cyan");
                 terminal.WriteLine("");
 
                 // Show class menu with restrictions marked
@@ -2220,15 +2214,15 @@ public class CharacterCreationSystem
                     if (isUnlocked)
                     {
                         terminal.Write($"({prestigeIdx}) ", "bright_magenta");
-                        terminal.Write($"{pc,-14}", "bright_white");
-                        var desc = GameConfig.PrestigeClassDescriptions.TryGetValue(pc, out var d) ? d : "";
+                        terminal.Write($"{GameConfig.GetLocalizedClassName(pc),-14}", "bright_white");
+                        var desc = GameConfig.GetLocalizedPrestigeDescription(pc);
                         terminal.WriteLine($" {desc}", "magenta");
                         prestigeIdx++;
                     }
                     else
                     {
                         terminal.Write($"     ", "dark_gray");
-                        terminal.Write($"{pc,-14}", "dark_gray");
+                        terminal.Write($"{GameConfig.GetLocalizedClassName(pc),-14}", "dark_gray");
                         terminal.WriteLine($" {Loc.Get("creation.prestige_locked", unlockReq)}", "dark_gray");
                     }
                 }
@@ -2240,7 +2234,7 @@ public class CharacterCreationSystem
                 // Show restriction reason if this race has restrictions
                 if (restrictedClasses.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
                 {
-                    terminal.WriteLine($"{Loc.Get("character_creation.note")}: {GameConfig.RaceRestrictionReasons[race]}", "yellow");
+                    terminal.WriteLine($"{Loc.Get("character_creation.note")}: {GameConfig.GetLocalizedRaceRestriction(race)}", "yellow");
                     terminal.WriteLine("");
                 }
             }
@@ -2275,11 +2269,11 @@ public class CharacterCreationSystem
                 if (restrictedClasses.Contains(characterClass))
                 {
                     terminal.WriteLine("");
-                    var article1 = "aeiouAEIOU".Contains(characterClass.ToString()[0]) ? "an" : "a";
-                    terminal.WriteLine(Loc.Get("creation.race_restricted", GameConfig.RaceNames[(int)race], article1, characterClass.ToString()), "red");
+                    terminal.WriteLine(Loc.Get("creation.race_restricted", GameConfig.GetLocalizedRaceName(race),
+                        GameConfig.ArticulateForLanguage(GameConfig.GetLocalizedClassName(characterClass), capitalize: false)), "red");
                     if (GameConfig.RaceRestrictionReasons.ContainsKey(race))
                     {
-                        terminal.WriteLine(GameConfig.RaceRestrictionReasons[race], "yellow");
+                        terminal.WriteLine(GameConfig.GetLocalizedRaceRestriction(race), "yellow");
                     }
                     await Pacing.Wait(2000);
                     choice = "?";
@@ -2439,7 +2433,7 @@ public class CharacterCreationSystem
                     data: new
                     {
                         className = character.ClassName,
-                        raceName = GameConfig.RaceNames[(int)character.Race],
+                        raceName = GameConfig.GetLocalizedRaceName(character.Race),
                         rerollsRemaining,
                         totalStats = emitTotalStats,
                         stats = new
@@ -2470,7 +2464,7 @@ public class CharacterCreationSystem
                 terminal.WriteLine(Loc.Get("character_creation.stat_roll"), "bright_cyan");
             terminal.WriteLine("");
             terminal.WriteLine($"{Loc.Get("status.class")}: {character.ClassName}", "yellow");
-            terminal.WriteLine($"{Loc.Get("status.race")}: {GameConfig.RaceNames[(int)character.Race]}", "yellow");
+            terminal.WriteLine($"{Loc.Get("status.race")}: {GameConfig.GetLocalizedRaceName(character.Race)}", "yellow");
             terminal.WriteLine("");
 
             // Calculate total stat points for comparison
@@ -2878,7 +2872,7 @@ public class CharacterCreationSystem
             data: new
             {
                 name = character.Name2,
-                race = GameConfig.RaceNames[(int)character.Race],
+                race = GameConfig.GetLocalizedRaceName(character.Race),
                 className = character.ClassName,
                 sex = character.Sex.ToString(),
                 age = character.Age,
@@ -2897,9 +2891,9 @@ public class CharacterCreationSystem
                 maxMana = character.MaxMana,
                 height = character.Height,
                 weight = character.Weight,
-                eyes = GameConfig.EyeColors[character.Eyes],
-                hair = GameConfig.HairColors[character.Hair],
-                skin = GameConfig.SkinColors[character.Skin],
+                eyes = GameConfig.GetLocalizedEyeColor(character.Eyes),
+                hair = GameConfig.GetLocalizedHairColor(character.Hair),
+                skin = GameConfig.GetLocalizedSkinColor(character.Skin),
                 gold = character.Gold,
                 experience = character.Experience,
                 level = character.Level,
@@ -2912,7 +2906,7 @@ public class CharacterCreationSystem
         terminal.WriteLine("");
 
         terminal.WriteLine($"{Loc.Get("ui.name_label")}: {character.Name2}", "cyan");
-        terminal.WriteLine($"{Loc.Get("status.race")}: {GameConfig.RaceNames[(int)character.Race]}", "yellow");
+        terminal.WriteLine($"{Loc.Get("status.race")}: {GameConfig.GetLocalizedRaceName(character.Race)}", "yellow");
         terminal.WriteLine($"{Loc.Get("status.class")}: {character.ClassName}", "yellow");
         terminal.WriteLine($"{Loc.Get("character_creation.sex")}: {(character.Sex == CharacterSex.Male ? Loc.Get("character_creation.male") : Loc.Get("character_creation.female"))}", "white");
         terminal.WriteLine($"{Loc.Get("character_creation.age")}: {character.Age}", "white");
@@ -2938,9 +2932,9 @@ public class CharacterCreationSystem
         terminal.WriteLine($"=== {Loc.Get("character_creation.appearance")} ===", "green");
         terminal.WriteLine($"{Loc.Get("character_creation.height")}: {Loc.Get("character_creation.height_cm", character.Height)}", "white");
         terminal.WriteLine($"{Loc.Get("character_creation.weight")}: {Loc.Get("character_creation.weight_kg", character.Weight)}", "white");
-        terminal.WriteLine($"{Loc.Get("character_creation.eyes")}: {GameConfig.EyeColors[character.Eyes]}", "white");
-        terminal.WriteLine($"{Loc.Get("character_creation.hair")}: {GameConfig.HairColors[character.Hair]}", "white");
-        terminal.WriteLine($"{Loc.Get("character_creation.skin")}: {GameConfig.SkinColors[character.Skin]}", "white");
+        terminal.WriteLine($"{Loc.Get("character_creation.eyes")}: {GameConfig.GetLocalizedEyeColor(character.Eyes)}", "white");
+        terminal.WriteLine($"{Loc.Get("character_creation.hair")}: {GameConfig.GetLocalizedHairColor(character.Hair)}", "white");
+        terminal.WriteLine($"{Loc.Get("character_creation.skin")}: {GameConfig.GetLocalizedSkinColor(character.Skin)}", "white");
         terminal.WriteLine("");
 
         terminal.WriteLine($"=== {Loc.Get("character_creation.starting_resources")} ===", "green");
@@ -2962,7 +2956,7 @@ public class CharacterCreationSystem
         terminal.WriteLine("");
         terminal.WriteLine($"--- {Loc.Get("character_creation.race_info_header")} ---", "bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine(GameConfig.RaceHelpText, "white");
+        foreach (var row in RaceHelpRows()) terminal.WriteLine(row, "white");
         await terminal.PressAnyKey();
     }
     
@@ -2975,10 +2969,56 @@ public class CharacterCreationSystem
         terminal.WriteLine("");
         terminal.WriteLine($"--- {Loc.Get("character_creation.class_info_header")} ---", "bright_green");
         terminal.WriteLine("");
-        terminal.WriteLine(GameConfig.ClassHelpText, "white");
+        foreach (var row in ClassHelpRows()) terminal.WriteLine(row, "white");
         await terminal.PressAnyKey();
     }
     
+    /// <summary>
+    /// v1.2.5: the race help screen in the reader's language (creation.help.*): an intro, then one entry per
+    /// race, "Name      - text".
+    /// </summary>
+    internal static List<string> RaceHelpRows()
+    {
+        var rows = new List<string> { "", Loc.Get("creation.help.race_intro"), "" };
+        var races = (CharacterRace[])Enum.GetValues(typeof(CharacterRace));
+        rows.AddRange(HelpGroupRows(races.Select(r => (GameConfig.GetLocalizedRaceName(r), Loc.Get("creation.help.race." + GameConfig.RaceKeyPart(r))))));
+        rows.Add("");
+        return rows;
+    }
+
+    private static readonly (string Group, CharacterClass[] Classes)[] ClassHelpGroups =
+    {
+        ("melee", new[] { CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin }),
+        ("hybrid", new[] { CharacterClass.Ranger, CharacterClass.Assassin, CharacterClass.Bard, CharacterClass.Jester }),
+        ("magic", new[] { CharacterClass.Magician, CharacterClass.Sage, CharacterClass.Cleric, CharacterClass.Alchemist }),
+        ("prestige", new[] { CharacterClass.Tidesworn, CharacterClass.Wavecaller, CharacterClass.Cyclebreaker, CharacterClass.Abysswarden, CharacterClass.Voidreaver }),
+        ("race_locked", new[] { CharacterClass.MysticShaman }),
+    };
+
+    /// <summary>v1.2.5: the class help screen in the reader's language, grouped as before.</summary>
+    internal static List<string> ClassHelpRows()
+    {
+        var rows = new List<string> { "", Loc.Get("creation.help.class_intro"), "" };
+        foreach (var (group, classes) in ClassHelpGroups)
+        {
+            rows.Add($"=== {Loc.Get("creation.help.class_group." + group)} ===");
+            rows.AddRange(HelpGroupRows(classes.Select(c => (GameConfig.GetLocalizedClassName(c), Loc.Get("creation.help.class." + GameConfig.ClassKeyPart(c))))));
+            rows.Add("");
+        }
+        return rows;
+    }
+
+    /// <summary>One help group: names padded to one column (at least 10 wide, as the old text), then "- " and the text.</summary>
+    private static IEnumerable<string> HelpGroupRows(IEnumerable<(string Name, string Text)> entries)
+    {
+        var list = entries.ToList();
+        int nameWidth = Math.Max(9, list.Max(e => e.Name.Length)) + 1;
+        foreach (var (name, text) in list)
+        {
+            yield return name.PadRight(nameWidth) + "- " + text;
+        }
+    }
+
     /// <summary>
     /// Pascal confirm function implementation
     /// </summary>

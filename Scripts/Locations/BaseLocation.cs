@@ -3690,11 +3690,11 @@ public abstract class BaseLocation
             {
                 hasAny = true;
                 terminal.SetColor(matDef.Color);
-                terminal.Write($"  {matDef.Name}");
+                terminal.Write($"  {matDef.LocName}");
                 terminal.SetColor("white");
                 terminal.Write($" x{count}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  -- {matDef.Description}");
+                terminal.WriteLine($"  -- {matDef.LocDescription}");
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"    {Loc.Get("base.mat_found_floors", matDef.FloorMin, matDef.FloorMax)}");
                 terminal.WriteLine("");

@@ -153,7 +153,20 @@ public static partial class GameConfig
     /// <summary>
     /// Message of the Day - displayed to players on login
     /// </summary>
-    public static string MessageOfTheDay { get; set; } = "Thanks for playing Usurper Reborn! Report bugs with the in-game ! command.";
+    public static string MessageOfTheDay { get; set; } = DefaultMessageOfTheDay;
+
+    /// <summary>
+    /// v1.2.5: the default message of the day in English. It is what the sysop config and the server
+    /// settings store, so it stays English; MessageOfTheDayText shows it through motd.default.
+    /// </summary>
+    public const string DefaultMessageOfTheDay = "Thanks for playing Usurper Reborn! Report bugs with the in-game ! command.";
+
+    /// <summary>
+    /// v1.2.5: the message of the day as shown: the reader's language when it is still the default,
+    /// else the text the sysop set, as set. The stored value is never changed.
+    /// </summary>
+    public static string MessageOfTheDayText() =>
+        MessageOfTheDay == DefaultMessageOfTheDay ? Loc.Get("motd.default") : MessageOfTheDay ?? "";
 
     /// <summary>
     /// When true, the [O]nline Multiplayer option is hidden from BBS door players.
@@ -2142,6 +2155,25 @@ public static partial class GameConfig
         public int FloorMin { get; set; }
         public int FloorMax { get; set; }
         public string? ThematicGod { get; set; }  // OldGodType name as string (e.g. "Maelketh")
+
+        /// <summary>v1.2.5: the name in the reader's language (material.{id}.name); Name stays the English source.</summary>
+        public string LocName => Loc.Get("material." + Id + ".name");
+
+        /// <summary>v1.2.5: the description in the reader's language (material.{id}.desc).</summary>
+        public string LocDescription => Loc.Get("material." + Id + ".desc");
+
+        /// <summary>
+        /// v1.2.5: the description in quotes as rows of at most 79 columns: the first row starts with indent,
+        /// later rows sit under the text (indent plus one, past the opening quote).
+        /// </summary>
+        public List<string> QuotedDescriptionRows(string indent)
+        {
+            var wrapped = UsurperRemake.UI.UIHelper.WordWrap("\"" + LocDescription + "\"", UsurperRemake.UI.UIHelper.WrapWidth - indent.Length - 1);
+            var rows = new List<string>();
+            for (int i = 0; i < wrapped.Count; i++)
+                rows.Add((i == 0 ? indent : indent + " ") + wrapped[i]);
+            return rows;
+        }
     }
 
     public static readonly CraftingMaterialDef[] CraftingMaterials = new[]
@@ -2613,6 +2645,10 @@ public static partial class GameConfig
         return Loc.Get(ClassLocKeys[classId]);
     }
 
+    /// <summary>v1.2.5: the Loc key part of a class (class.{part}, creation.help.class.{part}): mystic_shaman for MysticShaman.</summary>
+    public static string ClassKeyPart(CharacterClass cls) =>
+        (int)cls >= 0 && (int)cls < ClassLocKeys.Length ? ClassLocKeys[(int)cls].Substring("class.".Length) : cls.ToString().ToLowerInvariant();
+
     /// <summary>Overload taking the enum directly.</summary>
     public static string GetLocalizedClassName(CharacterClass cls) => GetLocalizedClassName((int)cls);
 
@@ -2631,6 +2667,28 @@ public static partial class GameConfig
         CharacterRace.Mutant => Loc.Get("race.mutant"),
         _ => race.ToString(),
     };
+
+    /// <summary>v1.2.5: the Loc key part of a race: race.{part} and creation.race_desc.{part} (HalfElf is half_elf).</summary>
+    public static string RaceKeyPart(CharacterRace race) => race == CharacterRace.HalfElf ? "half_elf" : race.ToString().ToLowerInvariant();
+
+    /// <summary>v1.2.5: "a humble Human" in the reader's language (creation.race_desc.*); RaceDescriptions stays the English source.</summary>
+    public static string GetLocalizedRaceDescription(CharacterRace race) => Loc.Get("creation.race_desc." + RaceKeyPart(race));
+
+    /// <summary>v1.2.5: why a race cannot take some classes, in the reader's language (creation.race_restriction.*).</summary>
+    public static string GetLocalizedRaceRestriction(CharacterRace race) =>
+        RaceRestrictionReasons.ContainsKey(race) ? Loc.Get("creation.race_restriction." + RaceKeyPart(race)) : "";
+
+    /// <summary>v1.2.5: a prestige class description in the reader's language (creation.prestige_desc.*).</summary>
+    public static string GetLocalizedPrestigeDescription(CharacterClass cls) =>
+        PrestigeClassDescriptions.ContainsKey(cls) ? Loc.Get("creation.prestige_desc." + cls.ToString().ToLowerInvariant()) : "";
+
+    /// <summary>v1.2.5: an eye, hair or skin colour in the reader's language (appearance.{eye|hair|skin}.{n}). The
+    /// character stores the number; EyeColors, HairColors and SkinColors stay the English source.</summary>
+    public static string GetLocalizedEyeColor(int n) => AppearanceText("eye", n, EyeColors);
+    public static string GetLocalizedHairColor(int n) => AppearanceText("hair", n, HairColors);
+    public static string GetLocalizedSkinColor(int n) => AppearanceText("skin", n, SkinColors);
+    private static string AppearanceText(string part, int n, string[] english) =>
+        n > 0 && n < english.Length ? Loc.Get($"appearance.{part}.{n}") : "";
 
     /// <summary>v1.1.12: Male or Female in the session language.</summary>
     public static string GetLocalizedSexName(CharacterSex sex) => sex == CharacterSex.Male ? Loc.Get("base.male") : Loc.Get("base.female");
@@ -2930,52 +2988,8 @@ public static partial class GameConfig
         "SYSOP", "COMPUTER", "COMPUTER1", "COMPUTER2", "COMPUTER3", "COMPUTER4", "COMPUTER5"
     };
 
-    // Character Creation Help Text
-    public const string RaceHelpText = @"
-Race determines your basic physical and mental characteristics:
-
-Human     - Balanced in all areas. Can be any class.
-Hobbit    - Small but agile. Good rangers, rogues, bards. Too small for heavy combat.
-Elf       - Graceful and magical. Excellent mages and clerics. Dislike brute force.
-Half-Elf  - Versatile like humans. Can be any class.
-Dwarf     - Strong and tough. Great warriors. Distrust arcane magic.
-Troll     - Massive brutes with natural regeneration. Warriors, barbarians, rangers only.
-Orc       - Aggressive fighters. Warriors, assassins, rangers. Limited magic.
-Gnome     - Small and clever. Great mages, alchemists. Poor heavy fighters.
-Gnoll     - Pack hunters. Warriors, rangers, assassins. Limited intellect.
-Mutant    - Chaotic and unpredictable. Can be any class.
-";
-
-    public const string ClassHelpText = @"
-Class determines your profession and abilities:
-
-=== MELEE FIGHTERS ===
-Warrior   - Strong fighters, masters of weapons. Balanced and reliable.
-Barbarian - Savage fighters with incredible strength. Requires brute force races.
-Paladin   - Holy warriors of virtue. Restricted to honorable races.
-
-=== HYBRID CLASSES ===
-Ranger    - Woodsmen and trackers. Balanced fighters with survival skills.
-Assassin  - Deadly killers, masters of stealth. Requires cunning and dexterity.
-Bard      - Musicians and storytellers. Social skills and light combat.
-Jester    - Entertainers and tricksters. Very agile and unpredictable.
-
-=== MAGIC USERS ===
-Magician  - Powerful spellcasters with low health. Requires high intellect.
-Sage      - Scholars and wise magic users. Requires wisdom and study.
-Cleric    - Healers and holy magic users. Requires devotion and wisdom.
-Alchemist - Potion makers and researchers. Requires intellect and patience.
-
-=== PRESTIGE CLASSES (NG+) ===
-Tidesworn    - Ocean's divine shield. Tank/healer hybrid. Requires Holy alignment ending.
-Wavecaller   - Ocean's harmonics. Support/buffer specialist. Requires Savior ending.
-Cyclebreaker - Reality manipulator. Balanced versatility. Requires Defiant ending.
-Abysswarden  - Old God prison warden. Drain/debuff striker. Requires Usurper ending.
-Voidreaver   - Void consumer. Extreme glass cannon. Requires Usurper ending.
-
-=== RACE-LOCKED CLASSES ===
-Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc/Gnoll only.
-";
+    // v1.2.5: the race and class help screens are Loc keys (creation.help.*), drawn by
+    // CharacterCreationSystem.RaceHelpRows and ClassHelpRows.
 
     // Invalid Race/Class Combinations (Pascal validation + expanded restrictions)
     // Based on racial attributes and common-sense fantasy archetypes

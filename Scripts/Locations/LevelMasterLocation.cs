@@ -178,7 +178,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        terminal.WriteLine(currentMaster.Description);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, currentMaster.LocDescription);
         terminal.WriteLine("");
 
         // Show alignment-specific greeting
@@ -1658,8 +1658,9 @@ public class LevelMasterLocation : BaseLocation
 
             terminal.SetColor("cyan");
             string navOptions = "";
-            if (currentPage > 0) navOptions += "[P]rev  ";
-            if (currentPage < totalPages - 1) navOptions += "[N]ext  ";
+            // v1.2.5: the labels in the reader's language; the keys stay P and N in every language
+            if (currentPage > 0) navOptions += Loc.Get("level_master.crystal_nav_prev") + "  ";
+            if (currentPage < totalPages - 1) navOptions += Loc.Get("level_master.crystal_nav_next") + "  ";
             terminal.WriteLine(Loc.Get("level_master.crystal_nav", navOptions));
             terminal.WriteLine("");
             terminal.Write(Loc.Get("ui.choice"));
@@ -2266,7 +2267,11 @@ public class LevelMasterLocation : BaseLocation
 /// <summary>
 /// Represents a level master's information
 /// </summary>
-public record MasterInfo(string Name, string Description, string Color, PlayerAlignment Alignment);
+public record MasterInfo(string Name, string Description, string Color, PlayerAlignment Alignment)
+{
+    /// <summary>v1.2.5: the description in the reader's language (level_master.desc_{good|neutral|evil}); Description stays the English source.</summary>
+    public string LocDescription => Loc.Get("level_master.desc_" + Alignment.ToString().ToLowerInvariant());
+}
 
 /// <summary>
 /// Player alignment for determining which master to use

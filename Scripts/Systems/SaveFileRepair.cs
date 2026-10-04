@@ -107,7 +107,7 @@ namespace UsurperRemake.Systems
             {
                 if (!File.Exists(filePath))
                 {
-                    result.ErrorMessage = $"Save file not found: {filePath}";
+                    result.ErrorMessage = Loc.Get("save_repair.not_found", filePath);
                     return result;
                 }
 
@@ -127,7 +127,7 @@ namespace UsurperRemake.Systems
                 }
                 catch (OutOfMemoryException)
                 {
-                    result.ErrorMessage = $"File too large to read into memory ({result.OriginalSizeBytes / (1024 * 1024)} MB).";
+                    result.ErrorMessage = Loc.Get("save_repair.too_large", result.OriginalSizeBytes / (1024 * 1024));
                     return result;
                 }
 

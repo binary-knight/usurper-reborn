@@ -362,14 +362,14 @@ namespace UsurperRemake.Systems
         /// instead of "corrupted". Only supported on file backends; online (SQL)
         /// backend falls back to the nullable return with a generic error.
         /// </summary>
-        public async Task<(SaveGameData? Data, string? Error)> LoadSaveByFileNameWithError(string fileName)
+        public async Task<(SaveGameData? Data, string? Error, bool TooLarge)> LoadSaveByFileNameWithError(string fileName)
         {
             if (backend is FileSaveBackend fileBackend)
             {
                 return await fileBackend.ReadGameDataByFileNameWithError(fileName);
             }
             var data = await backend.ReadGameDataByFileName(fileName);
-            return (data, data == null ? $"Could not read save: {fileName}" : null);
+            return (data, data == null ? $"Could not read save: {fileName}" : null, false);
         }
 
         /// <summary>

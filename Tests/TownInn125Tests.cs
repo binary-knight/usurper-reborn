@@ -357,7 +357,7 @@ public class TownInn125Tests : IDisposable
             $"  {Loc.Get("inn.skills_role_line", InnLocation.RoleName(CombatRole.Hybrid), GameConfig.GetLocalizedClassName(CharacterClass.Paladin), 100)}"
                 .Length.Should().BeLessOrEqualTo(MaxWidth);
             $"  {Loc.Get("inn.skills_options_sr")}".Length.Should().BeLessOrEqualTo(MaxWidth);
-            string material = GameConfig.CraftingMaterials.Select(m => m.Name).OrderByDescending(n => n.Length).First();
+            string material = GameConfig.CraftingMaterials.Select(m => m.LocName).OrderByDescending(n => n.Length).First();
             UIHelperRowsFit("  ", Loc.Get("inn.material_dissolves", material));
             return 0;
         });

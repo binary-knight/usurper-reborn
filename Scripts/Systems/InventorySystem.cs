@@ -327,7 +327,7 @@ namespace UsurperRemake.Systems
                 }
                 catch (Exception ex)
                 {
-                    resultMessage = "Error: " + ex.Message;
+                    resultMessage = Loc.Get("auth.err_prefix", ex.Message);
                     resultType = "error";
                     DebugLogger.Instance?.Log(DebugLogger.LogLevel.Error, "INVENTORY", $"Electron inventory error: {ex}");
                 }
