@@ -1487,6 +1487,51 @@ public class CharacterCreationSystem
     /// </summary>
     private void CardLine(string pad, int cardWidth, string content)
     {
+        // v1.2.5: a line wider than the card is wrapped into more card lines: the text after its last colour tag
+        // ("  [red]text", "  [cyan]Label  [white]text") wraps and is kept under itself; a wider line had pushed
+        // the right border past 79.
+        foreach (var line in CardLineRows(content, cardWidth - 2))
+            CardLineRow(pad, cardWidth, line);
+    }
+
+    /// <summary>v1.2.5: the card rows for one content line; see CardLine.</summary>
+    internal static List<string> CardLineRows(string content, int inner)
+    {
+        if (CardVisibleLength(content) <= inner) return new List<string> { content };
+        // the text after the last colour tag wraps; the part before it (indent, label) stays on the first row
+        var last = System.Text.RegularExpressions.Regex.Match(content, @"^(.*\])((?:[^\[\]])*)$");
+        string prefix = last.Success ? last.Groups[1].Value : new string(' ', content.Length - content.TrimStart().Length);
+        string body = last.Success ? last.Groups[2].Value : content.TrimStart();
+        var lastTag = System.Text.RegularExpressions.Regex.Match(prefix, @"(\[[a-z_]+\])+$");
+        string tags = lastTag.Success ? lastTag.Value : "";
+        int used = CardVisibleLength(prefix);
+        if (used > inner / 2) return new List<string> { content };
+        string under = new string(' ', used) + (body.StartsWith("\"") ? " " : "");
+        var wrapped = UIHelper.WordWrap(body, inner - under.Length - 1);
+        var rows = new List<string> { prefix + wrapped[0] };
+        rows.AddRange(wrapped.Skip(1).Select(w => under + tags + w));
+        return rows;
+    }
+
+    private static int CardVisibleLength(string content)
+    {
+        int visibleLen = 0;
+        int idx = 0;
+        while (idx < content.Length)
+        {
+            if (content[idx] == '[')
+            {
+                int end = content.IndexOf(']', idx);
+                if (end > idx) { idx = end + 1; continue; }
+            }
+            visibleLen++;
+            idx++;
+        }
+        return visibleLen;
+    }
+
+    private void CardLineRow(string pad, int cardWidth, string content)
+    {
         // Count visible characters in content (strip [color] tags)
         int visibleLen = 0;
         int idx = 0;
@@ -1974,10 +2019,10 @@ public class CharacterCreationSystem
         string desc = GetRaceDescription(race);
 
         terminal.WriteLine("");
-        terminal.WriteLine($"{Loc.Get("status.race")}: {raceName}");
-        terminal.WriteLine($"\"{desc}\"");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("status.race")}: {raceName}");
+        UIHelper.WriteWrapped(terminal, $"\"{desc}\"");
         terminal.WriteLine("");
-        terminal.WriteLine($"{Loc.Get("creation.preview.stats")} {Loc.Get("status.hp")} +{raceAttrib.HPBonus}, {Loc.Get("status.str")} +{raceAttrib.StrengthBonus}, {Loc.Get("status.def")} +{raceAttrib.DefenceBonus}, {Loc.Get("status.sta")} +{raceAttrib.StaminaBonus}");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.stats")} {Loc.Get("status.hp")} +{raceAttrib.HPBonus}, {Loc.Get("status.str")} +{raceAttrib.StrengthBonus}, {Loc.Get("status.def")} +{raceAttrib.DefenceBonus}, {Loc.Get("status.sta")} +{raceAttrib.StaminaBonus}");
         terminal.WriteLine("");
 
         // Available classes
@@ -1994,16 +2039,16 @@ public class CharacterCreationSystem
 
         if (available.Count == allClasses.Length)
         {
-            terminal.WriteLine($"{Loc.Get("creation.preview.classes")} {Loc.Get("creation.preview.classes_all")}");
+            UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.classes")} {Loc.Get("creation.preview.classes_all")}");
         }
         else
         {
-            terminal.WriteLine($"{Loc.Get("creation.preview.classes")} {string.Join(", ", available.Select(c => GameConfig.GetLocalizedClassName(c)))}");
+            UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.classes")} {string.Join(", ", available.Select(c => GameConfig.GetLocalizedClassName(c)))}");
         }
 
         if (restricted.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
         {
-            terminal.WriteLine($"{Loc.Get("creation.preview.restricted")} {GameConfig.GetLocalizedRaceRestriction(race)}");
+            UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.restricted")} {GameConfig.GetLocalizedRaceRestriction(race)}");
         }
 
         terminal.WriteLine("");
@@ -2015,7 +2060,7 @@ public class CharacterCreationSystem
             CharacterRace.Gnoll => $"{Loc.Get("creation.preview.poison_bite")} - {Loc.Get("creation.preview.poison_desc")}",
             _ => Loc.Get("creation.preview.none")
         };
-        terminal.WriteLine($"{Loc.Get("creation.preview.special")} {special}");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.special")} {special}");
 
         terminal.WriteLine("");
         var raceDesc = GameConfig.GetLocalizedRaceDescription(race);
@@ -2042,10 +2087,10 @@ public class CharacterCreationSystem
         string desc = GetClassDescription(characterClass);
 
         terminal.WriteLine("");
-        terminal.WriteLine($"{Loc.Get("status.class")}: {className} ({category})");
-        terminal.WriteLine($"\"{desc}\"");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("status.class")}: {className} ({category})");
+        UIHelper.WriteWrapped(terminal, $"\"{desc}\"");
         terminal.WriteLine("");
-        terminal.WriteLine($"{Loc.Get("creation.preview.stats")} {Loc.Get("status.hp")} +{attrs.HP}, {Loc.Get("status.str")} +{attrs.Strength}, {Loc.Get("status.def")} +{attrs.Defence}, {Loc.Get("status.sta")} +{attrs.Stamina}, {Loc.Get("status.agi")} +{attrs.Agility}, {Loc.Get("status.cha")} +{attrs.Charisma}, {Loc.Get("status.dex")} +{attrs.Dexterity}, {Loc.Get("status.wis")} +{attrs.Wisdom}, {Loc.Get("status.int")} +{attrs.Intelligence}, {Loc.Get("status.con")} +{attrs.Constitution}");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.stats")} {Loc.Get("status.hp")} +{attrs.HP}, {Loc.Get("status.str")} +{attrs.Strength}, {Loc.Get("status.def")} +{attrs.Defence}, {Loc.Get("status.sta")} +{attrs.Stamina}, {Loc.Get("status.agi")} +{attrs.Agility}, {Loc.Get("status.cha")} +{attrs.Charisma}, {Loc.Get("status.dex")} +{attrs.Dexterity}, {Loc.Get("status.wis")} +{attrs.Wisdom}, {Loc.Get("status.int")} +{attrs.Intelligence}, {Loc.Get("status.con")} +{attrs.Constitution}");
         terminal.WriteLine("");
 
         string manaText;
@@ -2055,9 +2100,9 @@ public class CharacterCreationSystem
             manaText = Loc.Get("creation.preview.mana_grows", GetClassManaPerLevel(characterClass).ToString());
         else
             manaText = Loc.Get("creation.preview.mana_none_physical");
-        terminal.WriteLine($"{Loc.Get("creation.preview.mana")} {manaText}");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.mana")} {manaText}");
         string strengths = GetClassStrengths(characterClass);
-        terminal.WriteLine($"{Loc.Get("creation.preview.strengths")} {strengths}");
+        UIHelper.WriteWrapped(terminal, $"{Loc.Get("creation.preview.strengths")} {strengths}");
 
         terminal.WriteLine("");
         var article = "aeiouAEIOU".Contains(className[0]) ? "an" : "a";
@@ -2208,21 +2253,29 @@ public class CharacterCreationSystem
                     (CharacterClass.Voidreaver, Loc.Get("charcreate.prestige_req_usurper"))
                 };
                 int prestigeIdx = prestigeStartIndex;
+                // v1.2.5: the name column is as wide as the longest prestige name in the reader's language (14 in English)
+                int prestigeNameWidth = Math.Max(14, allPrestige.Max(p => GameConfig.GetLocalizedClassName(p.Item1).Length));
                 foreach (var (pc, unlockReq) in allPrestige)
                 {
                     bool isUnlocked = unlockedPrestige.Contains(pc);
                     if (isUnlocked)
                     {
-                        terminal.Write($"({prestigeIdx}) ", "bright_magenta");
-                        terminal.Write($"{GameConfig.GetLocalizedClassName(pc),-14}", "bright_white");
-                        var desc = GameConfig.GetLocalizedPrestigeDescription(pc);
-                        terminal.WriteLine($" {desc}", "magenta");
+                        string head = $"({prestigeIdx}) ";
+                        string namePad = GameConfig.GetLocalizedClassName(pc).PadRight(prestigeNameWidth);
+                        terminal.Write(head, "bright_magenta");
+                        terminal.Write(namePad, "bright_white");
+                        // v1.2.5: the description wraps under itself so the row fits 79 columns
+                        int used = head.Length + namePad.Length + 1;
+                        var descRows = UIHelper.WordWrap(GameConfig.GetLocalizedPrestigeDescription(pc), UIHelper.WrapWidth - used);
+                        terminal.WriteLine($" {descRows[0]}", "magenta");
+                        foreach (var more in descRows.Skip(1))
+                            terminal.WriteLine(new string(' ', used) + more, "magenta");
                         prestigeIdx++;
                     }
                     else
                     {
                         terminal.Write($"     ", "dark_gray");
-                        terminal.Write($"{GameConfig.GetLocalizedClassName(pc),-14}", "dark_gray");
+                        terminal.Write(GameConfig.GetLocalizedClassName(pc).PadRight(prestigeNameWidth), "dark_gray");
                         terminal.WriteLine($" {Loc.Get("creation.prestige_locked", unlockReq)}", "dark_gray");
                     }
                 }
@@ -2234,7 +2287,8 @@ public class CharacterCreationSystem
                 // Show restriction reason if this race has restrictions
                 if (restrictedClasses.Length > 0 && GameConfig.RaceRestrictionReasons.ContainsKey(race))
                 {
-                    terminal.WriteLine($"{Loc.Get("character_creation.note")}: {GameConfig.GetLocalizedRaceRestriction(race)}", "yellow");
+                    terminal.SetColor("yellow");
+                    UIHelper.WriteWrapped(terminal, $"{Loc.Get("character_creation.note")}: {GameConfig.GetLocalizedRaceRestriction(race)}");
                     terminal.WriteLine("");
                 }
             }
@@ -2273,7 +2327,8 @@ public class CharacterCreationSystem
                         GameConfig.ArticulateForLanguage(GameConfig.GetLocalizedClassName(characterClass), capitalize: false)), "red");
                     if (GameConfig.RaceRestrictionReasons.ContainsKey(race))
                     {
-                        terminal.WriteLine(GameConfig.GetLocalizedRaceRestriction(race), "yellow");
+                        terminal.SetColor("yellow");
+                        UIHelper.WriteWrapped(terminal, GameConfig.GetLocalizedRaceRestriction(race));
                     }
                     await Pacing.Wait(2000);
                     choice = "?";
@@ -2975,7 +3030,7 @@ public class CharacterCreationSystem
     
     /// <summary>
     /// v1.2.5: the race help screen in the reader's language (creation.help.*): an intro, then one entry per
-    /// race, "Name      - text".
+    /// race, "Name      - text", the text wrapped under itself so every row fits 79 columns.
     /// </summary>
     internal static List<string> RaceHelpRows()
     {
@@ -2995,7 +3050,7 @@ public class CharacterCreationSystem
         ("race_locked", new[] { CharacterClass.MysticShaman }),
     };
 
-    /// <summary>v1.2.5: the class help screen in the reader's language, grouped as before.</summary>
+    /// <summary>v1.2.5: the class help screen in the reader's language, grouped as before, every row within 79 columns.</summary>
     internal static List<string> ClassHelpRows()
     {
         var rows = new List<string> { "", Loc.Get("creation.help.class_intro"), "" };
@@ -3015,7 +3070,11 @@ public class CharacterCreationSystem
         int nameWidth = Math.Max(9, list.Max(e => e.Name.Length)) + 1;
         foreach (var (name, text) in list)
         {
-            yield return name.PadRight(nameWidth) + "- " + text;
+            string head = name.PadRight(nameWidth) + "- ";
+            var wrapped = UIHelper.WordWrap(text, UIHelper.WrapWidth - head.Length);
+            yield return head + wrapped[0];
+            foreach (var more in wrapped.Skip(1))
+                yield return new string(' ', head.Length) + more;
         }
     }
 

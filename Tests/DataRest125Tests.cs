@@ -327,6 +327,143 @@ Mystic Shaman - Tribal caster who summons totems and enchants weapons. Troll/Orc
         }
     }
 
+    /// <summary>A creation screen rendered in a language: a race or class preview (card, portrait or screen reader).</summary>
+    private static async Task<string> CreationScreen(string lang, string method, object arg, bool art, bool screenReader)
+    {
+        var s = NewScreen("N", "N", "N");
+        var creation = new CharacterCreationSystem(s.Term);
+        bool artWas = GameConfig.DisableCharacterMonsterArt;
+        await InLanguage(lang, async () =>
+        {
+            GameConfig.ScreenReaderMode = screenReader;
+            GameConfig.DisableCharacterMonsterArt = !art;
+            try
+            {
+                var m = typeof(CharacterCreationSystem).GetMethod(method, F)!;
+                object?[] args = m.GetParameters().Length == 1 ? new[] { arg } : new object?[] { arg, "Zz", CharacterSex.Male };
+                if (m.GetParameters().Length == 2) args = new[] { arg, (object)CharacterRace.Human };
+                await (Task<bool>)m.Invoke(creation, args)!;
+            }
+            finally { GameConfig.DisableCharacterMonsterArt = artWas; }
+            return 0;
+        });
+        return s.Text;
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public async Task EveryRaceAndClassPreview_FitsIn79Columns(string lang)
+    {
+        var bad = new List<string>();
+        foreach (CharacterRace race in Enum.GetValues(typeof(CharacterRace)))
+            foreach (var (art, sr) in new[] { (true, false), (false, false), (false, true) })
+            {
+                string text = await CreationScreen(lang, "ShowRacePreview", race, art, sr);
+                bad.AddRange(Rows(text).Where(r => r.Length > MaxWidth).Select(r => $"{race} art={art} sr={sr}: {r.Length} {r}"));
+            }
+        foreach (CharacterClass cls in Enum.GetValues(typeof(CharacterClass)))
+            foreach (var (art, sr) in new[] { (true, false), (false, false), (false, true) })
+            {
+                string text = await CreationScreen(lang, "ShowClassPreview", cls, art, sr);
+                bad.AddRange(Rows(text).Where(r => r.Length > MaxWidth).Select(r => $"{cls} art={art} sr={sr}: {r.Length} {r}"));
+            }
+        bad.Should().BeEmpty($"every {lang} race and class preview row fits");
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public async Task TheClassSelection_FitsIn79Columns_ForEveryRace(string lang)
+    {
+        foreach (CharacterRace race in Enum.GetValues(typeof(CharacterRace)))
+        {
+            var restricted = GameConfig.InvalidCombinations.TryGetValue(race, out var r) ? r : Array.Empty<CharacterClass>();
+            // pick a class the race cannot be (by its menu number) so the refusal and the reason are shown too
+            var menu = new[] { CharacterClass.Warrior, CharacterClass.Paladin, CharacterClass.Ranger, CharacterClass.Assassin, CharacterClass.Bard,
+                CharacterClass.Jester, CharacterClass.Alchemist, CharacterClass.Magician, CharacterClass.Cleric, CharacterClass.Sage,
+                CharacterClass.Barbarian, CharacterClass.MysticShaman };
+            int pick = Array.FindIndex(menu, c => restricted.Contains(c));
+            string text = await ClassSelection(lang, race, pick >= 0 ? pick.ToString() : "?", "A", "Y");
+            EveryRowFits(Rows(text), $"class selection for {race} ({lang})");
+        }
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public async Task TheUnlockedPrestigeRows_ShowTheirDescriptions_AndFit(string lang)
+    {
+        var story = StoryProgressionSystem.Instance;
+        int cycleWas = story.CurrentCycle;
+        bool had = story.CompletedEndings.Contains(EndingType.TrueEnding);
+        try
+        {
+            story.CompletedEndings.Add(EndingType.TrueEnding);
+            typeof(StoryProgressionSystem).GetProperty("CurrentCycle")!.SetValue(story, 2);
+            string text = await ClassSelection(lang, CharacterRace.Human, "A", "Y");
+            Capture($"prestige-{lang}.txt", text);
+            foreach (var cls in GameConfig.PrestigeClassDescriptions.Keys)
+            {
+                text.Should().Contain(L(lang, "class." + GameConfig.ClassKeyPart(cls)));
+                string first = L(lang, "creation.prestige_desc." + cls.ToString().ToLowerInvariant()).Split(' ')[0];
+                text.Should().Contain(first);
+            }
+            if (lang != "en") text.Should().NotContain("The Ocean's divine shield");
+            EveryRowFits(Rows(text), $"prestige rows ({lang})");
+        }
+        finally
+        {
+            if (!had) story.CompletedEndings.Remove(EndingType.TrueEnding);
+            typeof(StoryProgressionSystem).GetProperty("CurrentCycle")!.SetValue(story, cycleWas);
+        }
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public void TheHelpScreens_FitIn79Columns(string lang)
+    {
+        EveryRowFits(InLang(lang, CharacterCreationSystem.RaceHelpRows), $"race help ({lang})");
+        EveryRowFits(InLang(lang, CharacterCreationSystem.ClassHelpRows), $"class help ({lang})");
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public async Task TheMaterialsScreen_FitsIn79Columns(string lang)
+    {
+        var s = NewScreen();
+        var hero = new Character { Name1 = "zzmats", Name2 = "ZzMats", Level = 50, HP = 300, MaxHP = 300, AI = CharacterAI.Human };
+        foreach (var m in GameConfig.CraftingMaterials) hero.AddMaterial(m.Id, 999);
+        var street = new MainStreetLocation();
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(street, s.Term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(street, hero);
+        await InLanguage(lang, async () => { await (Task)typeof(BaseLocation).GetMethod("ShowMaterials", F)!.Invoke(street, null)!; return 0; });
+        string text = s.Text;
+        Capture($"materials-{lang}.txt", text);
+        foreach (var m in GameConfig.CraftingMaterials)
+            text.Should().Contain(L(lang, $"material.{m.Id}.name"));
+        EveryRowFits(Rows(text), $"materials screen ({lang})");
+    }
+
+    [Theory]
+    [InlineData("en")] [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public async Task TheInnTrainingScreen_WithMaterials_FitsIn79Columns(string lang)
+    {
+        var s = NewScreen("");
+        var hero = new Character { Name1 = "zztrain", Name2 = "ZzTrain", Level = 100, HP = 900, MaxHP = 900, AI = CharacterAI.Human,
+            Strength = 99999, Dexterity = 99999, Gold = 1_000_000_000 };
+        hero.StatTrainingCounts["STR"] = 3;
+        hero.StatTrainingCounts["DEX"] = 4;
+        var inn = new InnLocation();
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(inn, s.Term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(inn, hero);
+        await InLanguage(lang, async () => { await (Task)typeof(InnLocation).GetMethod("HandleStatTraining", F)!.Invoke(inn, null)!; return 0; });
+        string text = s.Text;
+        Capture($"inn-training-{lang}.txt", text);
+        text.Should().Contain(L(lang, "material.eye_of_manwe.name")).And.Contain(L(lang, "material.heart_of_the_ocean.name"));
+        // the stat rows and the material rows (the trainer's own lines are another piece's keys)
+        var tableRows = Rows(text).Where(r => Regex.IsMatch(r, @"^\d ") || r.Contains(L(lang, "material.heart_of_the_ocean.name"))).ToList();
+        tableRows.Should().HaveCountGreaterOrEqualTo(8);
+        EveryRowFits(tableRows, $"inn training ({lang})");
+    }
+
     [Fact]
     public void AppearanceRaceAndMaterials_AreSavedAsNumbersAndIds_InEveryLanguage()
     {

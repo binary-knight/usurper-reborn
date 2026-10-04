@@ -3694,7 +3694,12 @@ public abstract class BaseLocation
                 terminal.SetColor("white");
                 terminal.Write($" x{count}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  -- {matDef.LocDescription}");
+                // v1.2.5: the description wraps under itself so the row fits 79 columns (it was up to 100)
+                string matPrefix = $"  {matDef.LocName} x{count}  -- ";
+                var matRows = UIHelper.WrapAfterPrefix(matPrefix, matDef.LocDescription);
+                terminal.WriteLine($"  -- {matRows[0]}");
+                foreach (var more in matRows.Skip(1))
+                    terminal.WriteLine(new string(' ', matPrefix.Length) + more);
                 terminal.SetColor("darkgray");
                 terminal.WriteLine($"    {Loc.Get("base.mat_found_floors", matDef.FloorMin, matDef.FloorMax)}");
                 terminal.WriteLine("");
