@@ -12,6 +12,8 @@
 - **Mailbox cleanup:** the world boss notice is no longer mailed every
   night, existing world boss mail is deleted once, and system mail older
   than 30 days is deleted. Mail between players is never deleted.
+- **The Mysterious Stranger** now appears in play, with two follow-up
+  scenes, and the answer you give carries into the Manwe fight.
 - **Fixes:** PvP salvage for English players, moral paradoxes saved with the character, full Magic Shop enchant removal, Inn
   guards in NPC attacks, and the same loot bonuses in every language.
 - **A new wiki guide** to accounts and character slots.
@@ -130,6 +132,8 @@ names and guild ranks.
 - **Dialogue effects.** In the Old Gods' and story conversations, a step
   you pass through now applies its effects, not only the step a
   conversation ends on.
+- **Conversations online.** Dialogue state is kept per player, so two
+  players in a conversation at the same time no longer affect each other.
 - **Moral paradoxes** you answer are saved with the character, so one no
   longer appears again or applies its effects a second time after a reload
   (for example the floor 95 paradox). A new character starts with none
@@ -158,6 +162,24 @@ names and guild ranks.
 - Birthday, guard and marriage mail accept the answer letters each
   language shows.
 - A damaged save is offered the same repair in every language.
+
+## The Mysterious Stranger
+
+- From level 3, a character who has not yet met Noctura may meet the
+  Stranger on entering Main Street, the Inn, the Dark Alley or the Auction
+  House. The scene comes once per character; a scene cut off by a
+  disconnect can return, and its rewards are never given twice.
+- The defiant answer gives +5 Darkness and +50 damage against Manwe. The
+  willing answer gives +5 Chivalry and +30 defence against Manwe. Every
+  answer gives +100 XP. Answering nothing ends the scene without rewards.
+- The Ancient Iron Key from the scene is a story key, not an item. The
+  line reads "a key to your story, not an item for your pack".
+- Follow-up at the Temple: from level 10, while the Seal of Creation is
+  unfound, a priest speaks to you. His line now points to the Temple: "The
+  first Seal lies here, in this very Temple, among the ancient stones." It
+  said "The first Seal lies deep in the dungeon, on the 15th level."
+- Follow-up at the Inn: from level 25 until you meet Maelketh, a warning
+  about Maelketh.
 
 ## Stored data
 
@@ -299,9 +321,8 @@ its scenes reachable in play and its state saved.
 - The ascension broadcast in the endings is also shown to the player who
   ascends, and an achievement broadcast can be shown to its earner when
   their character name differs from the account name.
-- The Manwe fight bonuses for answering the Stranger (+50 damage when
-  defiant, +30 defence when willing) are set only by the Stranger's opening
-  conversation, which is not reached in play.
+- In Noctura's conversation, the Shadow Cloak reward line says it was
+  received, but no item is added.
 - The spouse's leaving scene after 28 days is not part of this release.
 - When the old session of a reconnect takes longer than 15 seconds to
   finish, the five effects listed in the 1.2.4 notes can still act on the

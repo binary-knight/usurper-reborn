@@ -5,6 +5,8 @@
 [*]Every message, shop, equipment and status row fits 79 columns in all five languages. Shop, equipment and backpack rows are tighter, show [1H] and [2H], and wrap long stats onto a second row.
 [*]Mailbox cleanup: the world boss notice is no longer mailed every night, old world boss mail is deleted once, and system mail older than 30 days is deleted. Mail between players is never deleted.
 [*]Fixes: English players now salvage gold after a PvP win, answered moral paradoxes are saved, Magic Shop enchant removal really returns an item to its base form, NPC attackers fight surviving Inn guards, and loot bonuses are the same in every language.
+[*]The Mysterious Stranger now appears from level 3 on entering Main Street, the Inn, the Dark Alley or the Auction House. A defiant answer gives +50 damage against Manwe, a willing one +30 defence. Two follow-up scenes come at the Temple and the Inn.
+[*]Online, each player's conversation state is kept separately.
 [*]The wiki has a new guide to accounts and character slots.
 [*]Still in English on purpose: slash commands, BBS listings, admin lines, words drawn into ASCII art, god rank titles in news, and online locations on /who.
 [*]Coming in 1.2.6: a difficulty pass with smarter monsters, mixed encounters, elites and potions that scale, plus the betrayal feature.
