@@ -1892,21 +1892,20 @@
     </div>
 </footer>
 
+<script src="/escape.js"></script>
 <script>
     // --- Live Stats Dashboard ---
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+    // escapeHtml and safeHttpsUrl come from /escape.js.
 
     function formatNumber(n) {
+        n = Number(n) || 0;
         if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
         if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
         return String(n);
     }
 
     function formatGold(n) {
+        n = Number(n) || 0;
         if (n >= 1000000000) return (n / 1000000000).toFixed(1) + 'B';
         if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
         if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
@@ -1979,7 +1978,7 @@
         html += '<span class="online-count' + countClass + '">';
         if (onlineCount === 0) html += 'No adventurers online';
         else if (onlineCount === 1) html += '1 Adventurer Online';
-        else html += onlineCount + ' Adventurers Online';
+        else html += escapeHtml(onlineCount) + ' Adventurers Online';
         html += '</span></div>';
 
         if (data.online && data.online.length > 0) {
@@ -1990,7 +1989,7 @@
                 html += '<tr>';
                 html += '<td class="player-name">' + escapeHtml(p.name) + '</td>';
                 html += '<td class="player-class">' + escapeHtml(p.className) + '</td>';
-                html += '<td>' + p.level + '</td>';
+                html += '<td>' + escapeHtml(p.level) + '</td>';
                 html += '<td>' + escapeHtml(p.location) + '</td>';
                 html += '<td class="player-via">' + escapeHtml(p.connectionType || 'Unknown') + '</td>';
                 html += '</tr>';
@@ -2022,7 +2021,7 @@
             html += '<div class="highlight-card">';
             html += '<div class="highlight-label">Top Adventurer</div>';
             html += '<div class="highlight-value">' + escapeHtml(h.topPlayer.name) + '</div>';
-            html += '<div class="highlight-detail">Level ' + h.topPlayer.level + ' ' + escapeHtml(h.topPlayer.className) + '</div>';
+            html += '<div class="highlight-detail">Level ' + escapeHtml(h.topPlayer.level) + ' ' + escapeHtml(h.topPlayer.className) + '</div>';
             html += '</div>';
         }
         if (h.king) {
@@ -2043,7 +2042,7 @@
             html += '<div class="highlight-card" style="border-color: #8b0000;">';
             html += '<div class="highlight-label" style="color: #ff4444;">Most Wanted</div>';
             html += '<div class="highlight-value">' + escapeHtml(h.mostWanted.name) + '</div>';
-            html += '<div class="highlight-detail">Blood Price: ' + h.mostWanted.murderWeight + ' | Level ' + h.mostWanted.level + ' ' + escapeHtml(h.mostWanted.className) + '</div>';
+            html += '<div class="highlight-detail">Blood Price: ' + escapeHtml(h.mostWanted.murderWeight) + ' | Level ' + escapeHtml(h.mostWanted.level) + ' ' + escapeHtml(h.mostWanted.className) + '</div>';
             html += '</div>';
         }
         html += '</div>';
@@ -2055,14 +2054,14 @@
             html += '<th class="rank-col">Rank</th><th>Player</th><th>Class</th><th class="lb-level">Lv</th><th class="lb-xp">Experience</th>';
             html += '</tr></thead><tbody>';
             for (const p of data.leaderboard.slice(0, 25)) {
-                const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
+                const rankClass = p.rank <= 3 ? ' rank-' + escapeHtml(p.rank) : '';
                 const onlineClass = p.isOnline ? ' is-online' : '';
                 const onlineDot = p.isOnline ? '<span class="online-indicator">&#9679;</span>' : '';
                 html += '<tr>';
-                html += '<td class="rank-col' + rankClass + '">#' + p.rank + '</td>';
+                html += '<td class="rank-col' + rankClass + '">#' + escapeHtml(p.rank) + '</td>';
                 html += '<td class="lb-name' + onlineClass + '">' + onlineDot + escapeHtml(p.name) + '</td>';
                 html += '<td class="lb-class">' + escapeHtml(p.className) + '</td>';
-                html += '<td class="lb-level">' + p.level + '</td>';
+                html += '<td class="lb-level">' + escapeHtml(p.level) + '</td>';
                 html += '<td class="lb-xp">' + formatNumber(p.experience) + '</td>';
                 html += '</tr>';
             }
@@ -2076,14 +2075,14 @@
             html += '<th class="rank-col">Rank</th><th>Player</th><th>Class</th><th class="lb-level">Lv</th><th class="lb-wins">W</th><th class="lb-losses">L</th><th class="lb-gold">Gold Stolen</th>';
             html += '</tr></thead><tbody>';
             for (const p of data.pvpLeaderboard) {
-                const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
+                const rankClass = p.rank <= 3 ? ' rank-' + escapeHtml(p.rank) : '';
                 html += '<tr>';
-                html += '<td class="rank-col' + rankClass + '">#' + p.rank + '</td>';
+                html += '<td class="rank-col' + rankClass + '">#' + escapeHtml(p.rank) + '</td>';
                 html += '<td class="lb-name">' + escapeHtml(p.name) + '</td>';
                 html += '<td class="lb-class">' + escapeHtml(p.className) + '</td>';
-                html += '<td class="lb-level">' + p.level + '</td>';
-                html += '<td class="lb-wins">' + p.wins + '</td>';
-                html += '<td class="lb-losses">' + p.losses + '</td>';
+                html += '<td class="lb-level">' + escapeHtml(p.level) + '</td>';
+                html += '<td class="lb-wins">' + escapeHtml(p.wins) + '</td>';
+                html += '<td class="lb-losses">' + escapeHtml(p.losses) + '</td>';
                 html += '<td class="lb-gold">' + formatGold(p.goldStolen) + '</td>';
                 html += '</tr>';
             }
@@ -2160,7 +2159,7 @@
     }
 
     function renderStatCard(value, label) {
-        return '<div class="stat-card"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div>';
+        return '<div class="stat-card"><div class="stat-value">' + escapeHtml(value) + '</div><div class="stat-label">' + label + '</div></div>';
     }
 
     // --- SSE Live Feed ---
@@ -2252,13 +2251,19 @@
                     grid.innerHTML = '<div class="sponsors-empty">Be the first to sponsor this project!</div>';
                     return;
                 }
-                grid.innerHTML = data.sponsors.map(s => `
-                    <a class="sponsor-card" href="${s.url}" target="_blank" rel="noopener" title="${s.name || s.login}">
-                        <img class="sponsor-avatar" src="${s.avatarUrl}" alt="${s.login}" loading="lazy">
-                        <span class="sponsor-name">${s.name || s.login}</span>
-                        ${s.tier ? `<span class="sponsor-tier">${s.tier}</span>` : ''}
-                    </a>
-                `).join('');
+                // Sponsor data comes from GitHub: every field is escaped, and url and
+                // avatarUrl are used only when they are https URLs (no link or image otherwise).
+                grid.innerHTML = data.sponsors.map(s => {
+                    const label = s.name || s.login;
+                    const href = safeHttpsUrl(s.url);
+                    const avatar = safeHttpsUrl(s.avatarUrl);
+                    const inner = (avatar ? `<img class="sponsor-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(s.login)}" loading="lazy">` : '')
+                        + `<span class="sponsor-name">${escapeHtml(label)}</span>`
+                        + (s.tier ? `<span class="sponsor-tier">${escapeHtml(s.tier)}</span>` : '');
+                    return href
+                        ? `<a class="sponsor-card" href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${escapeHtml(label)}">${inner}</a>`
+                        : `<span class="sponsor-card" title="${escapeHtml(label)}">${inner}</span>`;
+                }).join('');
             })
             .catch(() => {
                 document.getElementById('sponsors-grid').innerHTML =

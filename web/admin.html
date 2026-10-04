@@ -638,6 +638,7 @@
   <div class="snoop-terminal" id="snoop-terminal"></div>
 </div>
 
+<script src="/escape.js"></script>
 <script>
 const API = '/api/admin';
 let token = localStorage.getItem('admin_token') || localStorage.getItem('balance_token') || '';
@@ -880,7 +881,7 @@ function connTag(type) {
   if (t === 'ssh') return '<span class="tag tag-ssh">SSH</span>';
   if (t === 'mud') return '<span class="tag tag-mud">MUD</span>';
   if (t === 'bbs') return '<span class="tag tag-bbs">BBS</span>';
-  return `<span class="tag">${type}</span>`;
+  return `<span class="tag">${escapeHtml(type)}</span>`;
 }
 
 // --- Overview Cards ---
@@ -917,8 +918,8 @@ function renderOverviewCards(data) {
   el.innerHTML = cards.map(c => `
     <div class="card">
       <div class="label">${c.label}</div>
-      <div class="value ${c.cls || ''}">${c.value}</div>
-      ${c.sub ? `<div class="sub">${c.sub}</div>` : ''}
+      <div class="value ${c.cls || ''}">${escapeHtml(c.value)}</div>
+      ${c.sub ? `<div class="sub">${escapeHtml(c.sub)}</div>` : ''}
     </div>
   `).join('');
 
@@ -936,11 +937,11 @@ function renderServices(data) {
     ${data.services.map(s => {
       const statusCls = s.status === 'active' ? 'active' : s.status === 'inactive' ? 'inactive' : 'unknown';
       return `<tr>
-        <td><span class="status-dot ${statusCls}"></span>${s.name}</td>
-        <td>${s.status}</td>
-        <td>${s.pid || '-'}</td>
-        <td>${s.memory}</td>
-        <td>${s.uptime}</td>
+        <td><span class="status-dot ${statusCls}"></span>${escapeHtml(s.name)}</td>
+        <td>${escapeHtml(s.status)}</td>
+        <td>${escapeHtml(s.pid || '-')}</td>
+        <td>${escapeHtml(s.memory)}</td>
+        <td>${escapeHtml(s.uptime)}</td>
       </tr>`;
     }).join('')}
   </table>`;
@@ -957,12 +958,12 @@ function renderOnlinePlayers(data) {
   el.innerHTML = `<table>
     <tr><th>Name</th><th>Level</th><th>Class</th><th>Location</th><th>Type</th><th>IP</th><th>Connected</th></tr>
     ${players.map(p => `<tr>
-      <td>${p.name}</td>
-      <td>${p.level}</td>
-      <td>${p.className}</td>
-      <td>${p.location}</td>
+      <td>${escapeHtml(p.name)}</td>
+      <td>${escapeHtml(p.level)}</td>
+      <td>${escapeHtml(p.className)}</td>
+      <td>${escapeHtml(p.location)}</td>
       <td>${connTag(p.connectionType)}</td>
-      <td style="color:var(--dim);font-size:11px">${p.ip || '—'}</td>
+      <td style="color:var(--dim);font-size:11px">${escapeHtml(p.ip || '-')}</td>
       <td>${fmtTimeAgo(p.connectedAt)}</td>
     </tr>`).join('')}
   </table>`;
@@ -986,7 +987,7 @@ async function refreshBotStats() {
 
     if (!sessions.length) {
       const thresholdLine = t
-        ? `<div style="color:var(--dim);font-size:11px;margin-top:8px;">Flag conditions: rolling mean &lt; ${t.suspectMeanMs}ms AND stddev &lt; ${t.suspectStdDevMs}ms AND ${t.suspectConsecutiveCount}+ consecutive sub-${t.fastThresholdMs}ms inputs (window of ${t.windowSize})</div>`
+        ? `<div style="color:var(--dim);font-size:11px;margin-top:8px;">Flag conditions: rolling mean &lt; ${escapeHtml(t.suspectMeanMs)}ms AND stddev &lt; ${escapeHtml(t.suspectStdDevMs)}ms AND ${escapeHtml(t.suspectConsecutiveCount)}+ consecutive sub-${escapeHtml(t.fastThresholdMs)}ms inputs (window of ${escapeHtml(t.windowSize)})</div>`
         : '';
       body.innerHTML = `<div style="color:var(--dim)">No active combat sessions tracked.</div>${thresholdLine}`;
       return;
@@ -1005,13 +1006,13 @@ async function refreshBotStats() {
       const stdCol = s.stddevMs < t.suspectStdDevMs ? 'color:#ff6b6b;font-weight:bold' : '';
       const consCol = s.consecFast >= t.suspectConsecutiveCount ? 'color:#ff6b6b;font-weight:bold' : '';
       const flagCol = s.totalFlags > 0 ? 'color:#ffaa00;font-weight:bold' : 'color:var(--dim)';
-      const tag = s.suspect ? ' <span style="color:#ff6b6b">[SUSPECT]</span>' : (s.totalFlags > 0 ? ' <span style="color:#ffaa00">[flagged ' + s.totalFlags + 'x]</span>' : '');
+      const tag = s.suspect ? ' <span style="color:#ff6b6b">[SUSPECT]</span>' : (s.totalFlags > 0 ? ' <span style="color:#ffaa00">[flagged ' + escapeHtml(s.totalFlags) + 'x]</span>' : '');
       return `<tr class="${cls}">
-        <td>${s.username}${tag}</td>
+        <td>${escapeHtml(s.username)}${tag}</td>
         <td style="${meanCol}">${s.meanMs.toFixed(1)} ms</td>
         <td style="${stdCol}">${s.stddevMs.toFixed(1)} ms</td>
-        <td style="${consCol}">${s.consecFast}</td>
-        <td style="${flagCol}">${s.totalFlags}</td>
+        <td style="${consCol}">${escapeHtml(s.consecFast)}</td>
+        <td style="${flagCol}">${escapeHtml(s.totalFlags)}</td>
       </tr>`;
     }).join('');
 
@@ -1023,12 +1024,12 @@ async function refreshBotStats() {
         <tbody>${rows}</tbody>
       </table>
       <div style="color:var(--dim);font-size:11px;margin-top:8px;">
-        Flag conditions: mean &lt; ${t.suspectMeanMs}ms AND stddev &lt; ${t.suspectStdDevMs}ms AND ${t.suspectConsecutiveCount}+ consecutive sub-${t.fastThresholdMs}ms inputs (window of ${t.windowSize}).
+        Flag conditions: mean &lt; ${escapeHtml(t.suspectMeanMs)}ms AND stddev &lt; ${escapeHtml(t.suspectStdDevMs)}ms AND ${escapeHtml(t.suspectConsecutiveCount)}+ consecutive sub-${escapeHtml(t.fastThresholdMs)}ms inputs (window of ${escapeHtml(t.windowSize)}).
         Red values = currently meeting that condition. [SUSPECT] = all three met right now.
       </div>`;
   } catch (e) {
     if (e.message !== 'Session expired') {
-      body.innerHTML = `<div class="danger">Failed to load bot stats: ${e.message}</div>`;
+      body.innerHTML = `<div class="danger">Failed to load bot stats: ${escapeHtml(e.message)}</div>`;
     }
   }
 }
@@ -1051,7 +1052,7 @@ async function refreshBannedIps() {
         <td>${e.associated_username ? escapeHtml(e.associated_username) : '<span style="color:var(--dim)">(direct IP ban)</span>'}</td>
         <td style="color:var(--dim);font-size:11px">${escapeHtml(e.banned_at || '')}</td>
         <td style="color:var(--dim);font-size:11px">${escapeHtml(e.banned_by || '')}</td>
-        <td><button class="action-btn action-btn-good" onclick="liftIpBan('${escapeHtml(e.ip_address).replace(/'/g, "\\'")}')">Lift</button></td>
+        <td><button class="action-btn action-btn-good" data-action="lift-ip" data-ip="${escapeHtml(e.ip_address)}">Lift</button></td>
       </tr>`).join('');
     body.innerHTML = `
       <table>
@@ -1060,7 +1061,7 @@ async function refreshBannedIps() {
       </table>`;
   } catch (e) {
     if (e.message !== 'Session expired') {
-      body.innerHTML = `<div class="danger">Failed to load banned IPs: ${e.message}</div>`;
+      body.innerHTML = `<div class="danger">Failed to load banned IPs: ${escapeHtml(e.message)}</div>`;
     }
   }
 }
@@ -1127,7 +1128,7 @@ async function refreshServerSettings() {
 
     let html = '';
     for (const [cat, items] of Object.entries(byCategory)) {
-      html += `<h3 style="color:var(--cyan);margin:18px 0 8px 0;font-size:13px;letter-spacing:1px">${escapeHtml(cat).toUpperCase()}</h3>`;
+      html += `<h3 style="color:var(--cyan);margin:18px 0 8px 0;font-size:13px;letter-spacing:1px">${escapeHtml(String(cat).toUpperCase())}</h3>`;
       html += `<table style="width:100%">`;
       html += `<tr><th style="width:30%">Setting</th><th style="width:25%">Value</th><th>Notes</th></tr>`;
       for (const s of items) {
@@ -1161,16 +1162,16 @@ function renderSettingRow(s) {
     </select>`;
   } else if (s.type === 'Int' || s.type === 'Float') {
     const step = s.type === 'Float' ? '0.1' : '1';
-    const min = s.minValue != null ? `min="${s.minValue}"` : '';
-    const max = s.maxValue != null ? `max="${s.maxValue}"` : '';
+    const min = s.minValue != null ? `min="${escapeHtml(s.minValue)}"` : '';
+    const max = s.maxValue != null ? `max="${escapeHtml(s.maxValue)}"` : '';
     inputHtml = `<input type="number" id="${inputId}" value="${val}" step="${step}" ${min} ${max} style="width:120px">`;
   } else { // String
-    const maxLen = s.maxLength != null ? `maxlength="${s.maxLength}"` : '';
+    const maxLen = s.maxLength != null ? `maxlength="${escapeHtml(s.maxLength)}"` : '';
     inputHtml = `<input type="text" id="${inputId}" value="${val}" ${maxLen} style="width:100%">`;
   }
 
   const rangeHint = (s.minValue != null || s.maxValue != null)
-    ? `<span style="color:var(--dim);font-size:11px;margin-left:6px">(${s.minValue ?? '-'} to ${s.maxValue ?? '-'})</span>`
+    ? `<span style="color:var(--dim);font-size:11px;margin-left:6px">(${escapeHtml(s.minValue ?? '-')} to ${escapeHtml(s.maxValue ?? '-')})</span>`
     : '';
 
   return `<tr>
@@ -1182,7 +1183,7 @@ function renderSettingRow(s) {
       ${inputHtml}${rangeHint}
       <div style="margin-top:4px">
         <button class="action-btn" style="font-size:11px;padding:2px 8px"
-          onclick="saveServerSetting('${escapeHtml(s.key)}', '${s.type}', '${inputId}')">Save</button>
+          data-action="save-setting" data-key="${escapeHtml(s.key)}" data-type="${escapeHtml(s.type)}" data-input="${escapeHtml(inputId)}">Save</button>
         <span id="${inputId}-status" style="font-size:11px;margin-left:6px"></span>
       </div>
       <div style="margin-top:2px">${sub}</div>
@@ -1229,7 +1230,7 @@ function renderDatabase(data) {
   const el = document.getElementById('db-body');
   const tables = data.tables || {};
   const tableRows = Object.entries(tables).map(([name, count]) =>
-    `<tr><td>${name}</td><td>${count >= 0 ? count.toLocaleString() : 'error'}</td></tr>`
+    `<tr><td>${escapeHtml(name)}</td><td>${count >= 0 ? escapeHtml(count.toLocaleString()) : 'error'}</td></tr>`
   ).join('');
 
   const intCls = data.integrityCheck === 'ok' ? 'good' : 'danger';
@@ -1238,15 +1239,15 @@ function renderDatabase(data) {
     <div class="mini-cards" style="margin-bottom: 1rem;">
       <div class="mini-card">
         <div class="label">DB Size</div>
-        <div class="value">${data.sizeMB} MB</div>
+        <div class="value">${escapeHtml(data.sizeMB)} MB</div>
       </div>
       <div class="mini-card">
         <div class="label">WAL Size</div>
-        <div class="value">${data.walSizeMB} MB</div>
+        <div class="value">${escapeHtml(data.walSizeMB)} MB</div>
       </div>
       <div class="mini-card">
         <div class="label">Integrity</div>
-        <div class="value ${intCls}">${data.integrityCheck}</div>
+        <div class="value ${intCls}">${escapeHtml(data.integrityCheck)}</div>
       </div>
     </div>
     <table>
@@ -1266,7 +1267,7 @@ function renderSslVersion(sslData, versionData) {
       <div class="mini-cards" style="margin-bottom: 1rem;">
         <div class="mini-card">
           <div class="label">Days Left</div>
-          <div class="value ${daysCls}">${sslData.daysRemaining}</div>
+          <div class="value ${daysCls}">${escapeHtml(sslData.daysRemaining)}</div>
         </div>
         <div class="mini-card">
           <div class="label">Expires</div>
@@ -1274,7 +1275,7 @@ function renderSslVersion(sslData, versionData) {
         </div>
         <div class="mini-card">
           <div class="label">Issuer</div>
-          <div class="value" style="font-size: 0.8rem;">${sslData.issuer || 'Unknown'}</div>
+          <div class="value" style="font-size: 0.8rem;">${escapeHtml(sslData.issuer || 'Unknown')}</div>
         </div>
       </div>
     `;
@@ -1287,11 +1288,11 @@ function renderSslVersion(sslData, versionData) {
     <div class="mini-cards">
       <div class="mini-card">
         <div class="label">Version</div>
-        <div class="value" style="font-size: 0.9rem;">${versionData.version || 'Unknown'}</div>
+        <div class="value" style="font-size: 0.9rem;">${escapeHtml(versionData.version || 'Unknown')}</div>
       </div>
       <div class="mini-card">
         <div class="label">Binary Size</div>
-        <div class="value" style="font-size: 0.9rem;">${versionData.sizeMB ? versionData.sizeMB + ' MB' : 'N/A'}</div>
+        <div class="value" style="font-size: 0.9rem;">${versionData.sizeMB ? escapeHtml(versionData.sizeMB) + ' MB' : 'N/A'}</div>
       </div>
       <div class="mini-card">
         <div class="label">Last Deploy</div>
@@ -1314,9 +1315,9 @@ function renderLogins(data) {
   el.innerHTML = `<table>
     <tr><th>Player</th><th>Level</th><th>Class</th><th>Last Login</th></tr>
     ${logins.map(l => `<tr>
-      <td>${l.name}</td>
-      <td>${l.level}</td>
-      <td>${l.className}</td>
+      <td>${escapeHtml(l.name)}</td>
+      <td>${escapeHtml(l.level)}</td>
+      <td>${escapeHtml(l.className)}</td>
       <td>${fmtTime(l.time)}</td>
     </tr>`).join('')}
   </table>`;
@@ -1333,16 +1334,39 @@ function renderNews(data) {
     <tr><th>Event</th><th>Category</th><th>Time</th></tr>
     ${news.map(n => `<tr>
       <td>${escapeHtml(n.message)}</td>
-      <td>${n.category || ''}</td>
+      <td>${escapeHtml(n.category || '')}</td>
       <td>${fmtTimeAgo(n.time)}</td>
     </tr>`).join('')}
   </table>`;
 }
 
-function escapeHtml(s) {
-  if (!s) return '';
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
+// escapeHtml comes from /escape.js. Buttons, rows and fields built from server data
+// carry their arguments in data-* attributes and run through this one listener; no
+// inline handler carries data. The closest element with data-action wins, so a
+// button inside a player row does not also open the row.
+document.addEventListener('click', e => {
+  const el = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+  if (!el) return;
+  const d = el.dataset;
+  switch (d.action) {
+    case 'open-player': openPlayerPanel(d.user); break;
+    case 'unban': quickUnban(d.user); break;
+    case 'ban': showBanModal(d.user); break;
+    case 'kick': showKickModal(d.user); break;
+    case 'slay': showSlayModal(d.user); break;
+    case 'snoop': startSnoop(d.user); break;
+    case 'message': showMessageModal(d.user); break;
+    case 'queue': queueCommand(d.cmd, d.user); break;
+    case 'reset-pw': showResetPwModal(d.user); break;
+    case 'delete': showDeleteModal(d.user); break;
+    case 'lift-ip': liftIpBan(d.ip); break;
+    case 'save-setting': saveServerSetting(d.key, d.type, d.input); break;
+    case 'edit-field': makeEditable(el, d.path, d.type); break;
+    case 'reset-dailies': resetDailies(); break;
+    case 'save-raw': saveRawJson(); break;
+    case 'player-page': playerPage = Number(d.page); loadPlayers(); break;
+  }
+});
 
 // --- Tabs ---
 document.addEventListener('click', e => {
@@ -1441,7 +1465,7 @@ async function loadPlayers() {
     const data = await apiFetch(`/players?search=${encodeURIComponent(search)}&filter=${playerFilter}&page=${playerPage}&limit=25`);
     renderPlayerTable(data);
   } catch (e) {
-    document.getElementById('player-table').innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
+    document.getElementById('player-table').innerHTML = `<span style="color:var(--red)">${escapeHtml(e.message)}</span>`;
   }
 }
 
@@ -1461,20 +1485,21 @@ function renderPlayerTable(data) {
       if (p.isBanned) badges += '<span class="badge badge-banned">BANNED</span>';
       if (p.isFrozen) badges += '<span class="badge badge-frozen">FROZEN</span>';
       if (p.isMuted) badges += '<span class="badge badge-muted">MUTED</span>';
-      return `<tr class="player-row" onclick="openPlayerPanel('${escapeHtml(p.username)}')">
+      const u = escapeHtml(p.username);
+      return `<tr class="player-row" data-action="open-player" data-user="${u}">
         <td>${escapeHtml(p.displayName || p.username)}</td>
-        <td>${p.level}</td>
-        <td>${p.className}</td>
-        <td>${p.raceName}</td>
-        <td>${(p.gold || 0).toLocaleString()}</td>
+        <td>${escapeHtml(p.level)}</td>
+        <td>${escapeHtml(p.className)}</td>
+        <td>${escapeHtml(p.raceName)}</td>
+        <td>${escapeHtml((p.gold || 0).toLocaleString())}</td>
         <td>${badges || '<span style="color:var(--dim)">-</span>'}</td>
         <td>${fmtTimeAgo(p.lastLogin)}</td>
         <td>
-          <button class="action-btn" onclick="event.stopPropagation(); openPlayerPanel('${escapeHtml(p.username)}')">Edit</button>
+          <button class="action-btn" data-action="open-player" data-user="${u}">Edit</button>
           ${p.isBanned
-            ? `<button class="action-btn action-btn-good" onclick="event.stopPropagation(); quickUnban('${escapeHtml(p.username)}')">Unban</button>`
-            : `<button class="action-btn action-btn-danger" onclick="event.stopPropagation(); showBanModal('${escapeHtml(p.username)}')">Ban</button>`}
-          ${p.isOnline ? `<button class="action-btn action-btn-warn" onclick="event.stopPropagation(); showKickModal('${escapeHtml(p.username)}')">Kick</button>` : ''}
+            ? `<button class="action-btn action-btn-good" data-action="unban" data-user="${u}">Unban</button>`
+            : `<button class="action-btn action-btn-danger" data-action="ban" data-user="${u}">Ban</button>`}
+          ${p.isOnline ? `<button class="action-btn action-btn-warn" data-action="kick" data-user="${u}">Kick</button>` : ''}
         </td>
       </tr>`;
     }).join('')}
@@ -1483,9 +1508,9 @@ function renderPlayerTable(data) {
   // Pagination
   const pag = document.getElementById('player-pagination');
   pag.innerHTML = `
-    <button ${data.page <= 1 ? 'disabled' : ''} onclick="playerPage=${data.page - 1}; loadPlayers()">Prev</button>
-    <span>Page ${data.page} of ${data.totalPages} (${data.total} players)</span>
-    <button ${data.page >= data.totalPages ? 'disabled' : ''} onclick="playerPage=${data.page + 1}; loadPlayers()">Next</button>
+    <button ${data.page <= 1 ? 'disabled' : ''} data-action="player-page" data-page="${escapeHtml(Number(data.page) - 1)}">Prev</button>
+    <span>Page ${escapeHtml(data.page)} of ${escapeHtml(data.totalPages)} (${escapeHtml(data.total)} players)</span>
+    <button ${data.page >= data.totalPages ? 'disabled' : ''} data-action="player-page" data-page="${escapeHtml(Number(data.page) + 1)}">Next</button>
   `;
 }
 
@@ -1547,46 +1572,44 @@ function closePlayerPanel() {
 }
 
 function renderPanelActions(data) {
-  const u = data.username;
+  const u = escapeHtml(data.username);
   let html = '';
   if (data.isOnline) {
-    html += `<button class="action-btn action-btn-warn" onclick="showKickModal('${esc(u)}')">Kick</button>`;
-    html += `<button class="action-btn action-btn-danger" onclick="showSlayModal('${esc(u)}')">Slay</button>`;
-    html += `<button class="action-btn" onclick="startSnoop('${esc(u)}')">Snoop</button>`;
-    html += `<button class="action-btn action-btn-warn" onclick="showMessageModal('${esc(u)}')">Message</button>`;
+    html += `<button class="action-btn action-btn-warn" data-action="kick" data-user="${u}">Kick</button>`;
+    html += `<button class="action-btn action-btn-danger" data-action="slay" data-user="${u}">Slay</button>`;
+    html += `<button class="action-btn" data-action="snoop" data-user="${u}">Snoop</button>`;
+    html += `<button class="action-btn action-btn-warn" data-action="message" data-user="${u}">Message</button>`;
   }
   if (data.settings.isFrozen)
-    html += `<button class="action-btn action-btn-good" onclick="queueCommand('thaw','${esc(u)}')">Thaw</button>`;
+    html += `<button class="action-btn action-btn-good" data-action="queue" data-cmd="thaw" data-user="${u}">Thaw</button>`;
   else
-    html += `<button class="action-btn action-btn-warn" onclick="queueCommand('freeze','${esc(u)}')">Freeze</button>`;
+    html += `<button class="action-btn action-btn-warn" data-action="queue" data-cmd="freeze" data-user="${u}">Freeze</button>`;
   if (data.settings.isMuted)
-    html += `<button class="action-btn action-btn-good" onclick="queueCommand('unmute','${esc(u)}')">Unmute</button>`;
+    html += `<button class="action-btn action-btn-good" data-action="queue" data-cmd="unmute" data-user="${u}">Unmute</button>`;
   else
-    html += `<button class="action-btn action-btn-warn" onclick="queueCommand('mute','${esc(u)}')">Mute</button>`;
+    html += `<button class="action-btn action-btn-warn" data-action="queue" data-cmd="mute" data-user="${u}">Mute</button>`;
   if (data.isBanned)
-    html += `<button class="action-btn action-btn-good" onclick="quickUnban('${esc(u)}')">Unban</button>`;
+    html += `<button class="action-btn action-btn-good" data-action="unban" data-user="${u}">Unban</button>`;
   else
-    html += `<button class="action-btn action-btn-danger" onclick="showBanModal('${esc(u)}')">Ban</button>`;
-  html += `<button class="action-btn" onclick="showResetPwModal('${esc(u)}')">Reset Password</button>`;
-  html += `<button class="action-btn action-btn-danger" onclick="showDeleteModal('${esc(u)}')">Delete</button>`;
+    html += `<button class="action-btn action-btn-danger" data-action="ban" data-user="${u}">Ban</button>`;
+  html += `<button class="action-btn" data-action="reset-pw" data-user="${u}">Reset Password</button>`;
+  html += `<button class="action-btn action-btn-danger" data-action="delete" data-user="${u}">Delete</button>`;
   document.getElementById('panel-actions').innerHTML = html;
 }
-
-function esc(s) { return escapeHtml(s).replace(/'/g, "\\'"); }
 
 // --- Field rendering helpers ---
 function editableField(label, value, path, type = 'number') {
   const displayVal = type === 'boolean' ? (value ? 'true' : 'false') : (value ?? '');
   return `<div class="field-row">
     <span class="field-label">${label}</span>
-    <span class="field-value" onclick="makeEditable(this, '${path}', '${type}')">${displayVal}</span>
+    <span class="field-value" data-action="edit-field" data-path="${escapeHtml(path)}" data-type="${escapeHtml(type)}">${escapeHtml(displayVal)}</span>
   </div>`;
 }
 
 function readonlyField(label, value) {
   return `<div class="field-row">
     <span class="field-label">${label}</span>
-    <span class="field-value" style="cursor:default">${value ?? ''}</span>
+    <span class="field-value" style="cursor:default">${escapeHtml(value)}</span>
   </div>`;
 }
 
@@ -1766,7 +1789,7 @@ function renderDailyTab(data) {
       ${editableField('Game Time (min)', d.gameTimeMinutes, 'player.gameTimeMinutes')}
     </div>
     <div style="margin-top:0.75rem;">
-      <button class="action-btn" onclick="resetDailies()">Reset All Dailies</button>
+      <button class="action-btn" data-action="reset-dailies">Reset All Dailies</button>
     </div>
   `;
 }
@@ -1826,7 +1849,7 @@ function renderEquipmentTab(data) {
       html += `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">`;
       html += `<td style="padding:2px 6px; color:var(--dim);">${escapeHtml(slotName)}</td>`;
       html += `<td style="padding:2px 6px;">${escapeHtml(name)}</td>`;
-      html += `<td style="padding:2px 6px; color:var(--cyan); font-size:10px;">${stats.join(' ') || '-'}</td>`;
+      html += `<td style="padding:2px 6px; color:var(--cyan); font-size:10px;">${escapeHtml(stats.join(' ') || '-')}</td>`;
       html += `</tr>`;
     }
     html += '</table>';
@@ -1838,7 +1861,7 @@ function renderEquipmentTab(data) {
   } else {
     html += `<table style="font-size:11px;">
       <tr><th>Item</th><th>Type</th></tr>
-      ${inv.slice(0, 50).map(i => `<tr><td>${escapeHtml(i.name || i.Name || 'Unknown')}</td><td>${i.type || i.Type || ''}</td></tr>`).join('')}
+      ${inv.slice(0, 50).map(i => `<tr><td>${escapeHtml(i.name || i.Name || 'Unknown')}</td><td>${escapeHtml(i.type || i.Type || '')}</td></tr>`).join('')}
       ${inv.length > 50 ? `<tr><td colspan="2" style="color:var(--dim)">...and ${inv.length - 50} more</td></tr>` : ''}
     </table>`;
   }
@@ -1857,12 +1880,12 @@ async function renderRawTab(data) {
     document.getElementById('panel-raw').innerHTML = `
       <textarea class="json-editor" id="raw-json-editor">${escapeHtml(formatted)}</textarea>
       <div style="margin-top:0.5rem; display:flex; gap:0.5rem;">
-        <button class="action-btn action-btn-warn" onclick="saveRawJson()">Save Raw JSON</button>
+        <button class="action-btn action-btn-warn" data-action="save-raw">Save Raw JSON</button>
         <span style="color:var(--dim); font-size:11px; align-self:center;">Warning: replaces entire player data blob</span>
       </div>
     `;
   } catch (e) {
-    document.getElementById('panel-raw').innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
+    document.getElementById('panel-raw').innerHTML = `<span style="color:var(--red)">${escapeHtml(e.message)}</span>`;
   }
 }
 
@@ -2090,7 +2113,7 @@ async function loadWizardLog() {
       </tr>`).join('')}
     </table>`;
   } catch (e) {
-    document.getElementById('wizard-log-body').innerHTML = `<span style="color:var(--red)">${e.message}</span>`;
+    document.getElementById('wizard-log-body').innerHTML = `<span style="color:var(--red)">${escapeHtml(e.message)}</span>`;
   }
 }
 
