@@ -86,6 +86,9 @@ namespace UsurperRemake.Systems
             names.AddRange(LootGenerator.GetShieldTemplates().Select(t => t.Name));
             names.AddRange(LootGenerator.GetRingTemplates().Select(t => t.Name));
             names.AddRange(LootGenerator.GetNecklaceTemplates().Select(t => t.Name));
+            // v1.2.5: the arena and tournament champions' themed drops (stored under these English names)
+            names.AddRange(UsurperRemake.Data.GauntletChampionData.Champions.Select(c => c.Drop.ItemName));
+            names.AddRange(UsurperRemake.Data.HonorTournamentData.Champions.Select(c => c.Drop.ItemName));
 
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var name in names)

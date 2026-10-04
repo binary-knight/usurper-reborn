@@ -44,7 +44,7 @@ table|Scripts/Core/GameConfig.cs|init.[k]=|race descriptions passed into a Loc t
 # --- Scripts/AI ---------------------------------------------------------------------------------
 
 # --- Scripts/Data -------------------------------------------------------------------------------
-nouns|Scripts/Data/BeastData.cs|init.Name|kept English: saved as Pet.Name (WildernessLocation TryBeastEncounter), matched by name in CombatEngine and DungeonLocation
+keyed|Scripts/Data/BeastData.cs|init.Name|monster.name.{id} (MonsterNames.Display, by the English name); stored English: saved as Pet.Name (WildernessLocation TryBeastEncounter), matched by name in CombatEngine
 keyed|Scripts/Data/BeastData.cs|init.Species|dungeon.beast.{id}.species
 keyed|Scripts/Data/BeastData.cs|init.EncounterFlavor|beast.{id}.encounter
 keyed|Scripts/Data/BeastData.cs|init.PassiveDescription|beast.{id}.passive
@@ -87,11 +87,11 @@ keyed|Scripts/Data/OldGodsData.cs|init.LossDialogue|oldgod.{key}.loss.N
 keyed|Scripts/Data/OldGodsData.cs|init.Phase2Dialogue|oldgod.{key}.phase2.N
 keyed|Scripts/Data/OldGodsData.cs|init.Phase3Dialogue|oldgod.{key}.phase3.N
 keyed|Scripts/Data/OldGodsData.cs|init.SaveDialogue|oldgod.{key}.save.N
-table|Scripts/Data/OldGodsData.cs|init.Phase1Abilities|boss ability names in combat.monster_uses_ability
-table|Scripts/Data/OldGodsData.cs|init.Phase2Abilities|boss ability names in combat.monster_uses_ability
-table|Scripts/Data/OldGodsData.cs|init.Phase3Abilities|boss ability names in combat.monster_uses_ability
-names|Scripts/Data/OldGodsData.cs|init.Name|Old God names
-names|Scripts/Data/OldGodsData.cs|init.Title|Old God titles, kept English by design
+keyed|Scripts/Data/OldGodsData.cs|init.Phase1Abilities|oldgod.ability.{id} (OldGodsData.AbilityLabel, CombatEngine.BossAbilityLabel); stored English: CombatEngine picks each ability's effect by its name
+keyed|Scripts/Data/OldGodsData.cs|init.Phase2Abilities|oldgod.ability.{id} (OldGodsData.AbilityLabel, CombatEngine.BossAbilityLabel); stored English: CombatEngine picks each ability's effect by its name
+keyed|Scripts/Data/OldGodsData.cs|init.Phase3Abilities|oldgod.ability.{id} (OldGodsData.AbilityLabel, CombatEngine.BossAbilityLabel); stored English: CombatEngine picks each ability's effect by its name
+keyed|Scripts/Data/OldGodsData.cs|init.Name|oldgod.{key}.name (LocName, MonsterNames); the proper name is the same in every language; stored English as the boss monster's Name
+keyed|Scripts/Data/OldGodsData.cs|init.Title|oldgod.{key}.title (LocTitle)
 keyed|Scripts/Data/RiddleDatabase.cs|init.AlternateAnswers|riddle.{id}.alt.N
 keyed|Scripts/Data/RiddleDatabase.cs|init.Answer|riddle.{id}.answer
 keyed|Scripts/Data/RiddleDatabase.cs|init.Hint|riddle.{id}.hint
@@ -110,7 +110,7 @@ keyed|Scripts/Data/WorldBossData.cs|init.Name|worldboss.{id}.ability.pN.i.name; 
 keyed|Scripts/Data/WorldBossData.cs|init.Phase2Dialogue|worldboss.{id}.phase2.N
 keyed|Scripts/Data/WorldBossData.cs|init.Phase3Dialogue|worldboss.{id}.phase3.N
 keyed|Scripts/Data/WorldBossData.cs|init.SpawnDialogue|worldboss.{id}.spawn.N
-table|Scripts/Data/WorldBossData.cs|init.Element|element printed raw, WorldBossSystem
+keyed|Scripts/Data/WorldBossData.cs|init.Element|worldboss.element.{element} (WorldBossDatabase.ElementLabel); stored English: the boss monster's family and the loot element word
 names|Scripts/Data/WorldBossData.cs|init.Title|boss titles, kept English by design
 
 # --- Scripts/Locations --------------------------------------------------------------------------
@@ -125,21 +125,18 @@ keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#1|dark_alley.deed_{
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#2|dark_alley.deed_{id}_desc
 keyed|Scripts/Locations/DarkAlleyLocation.cs|new:EvilDeedDef#17|dark_alley.deed_{id}_news
 names|Scripts/Locations/DungeonLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#2/tuple#1|event choice label
-table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#3/tuple#1|event choice label
-table|Scripts/Locations/DungeonLocation.cs|call:EmitChoices#4/tuple#1|event choice label
 names|Scripts/Locations/DungeonLocation.cs|decl:duelistTemplates/tuple#0|duelist names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#0|NPC names
 names|Scripts/Locations/DungeonLocation.cs|decl:npcInfo/tuple#1|NPC names with titles
 names|Scripts/Locations/DungeonLocation.cs|=currentPlayer.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player!.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/DungeonLocation.cs|=player.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-nouns|Scripts/Locations/DungeonLocation.cs|decl:name|monster name
-nouns|Scripts/Locations/DungeonLocation.cs|decl:names|undead monster names
-table|Scripts/Locations/DungeonLocation.cs|dictpair#1|boss name pool, monster names
+keyed|Scripts/Locations/DungeonLocation.cs|decl:name|monster.name.{id} (MonsterNames.Display, by the English name); stored English as Monster.Name
+keyed|Scripts/Locations/DungeonLocation.cs|decl:names|monster.name.{id} (MonsterNames.Display, by the English name); stored English as Monster.Name
+keyed|Scripts/Locations/DungeonLocation.cs|dictpair#1|monster.name.{id} (MonsterNames.Display, by the English name); floor boss names stored English as Monster.Name
 names|Scripts/Locations/DungeonLocation.cs|init.Name|unique NPC name
-table|Scripts/Locations/DungeonLocation.cs|=memberTypes|monster names
-nouns|Scripts/Locations/DungeonLocation.cs|=name|monster name
+keyed|Scripts/Locations/DungeonLocation.cs|=memberTypes|monster.name.{id} (MonsterNames.Display, by the English name); stored English as Monster.Name
+keyed|Scripts/Locations/DungeonLocation.cs|=name|monster.leader around the member's monster.name.{id} (MonsterNames); stored English as Monster.Name
 names|Scripts/Locations/HealerLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/HealerLocation.cs|decl:HealerName|shop name
 names|Scripts/Locations/HealerLocation.cs|decl:Manager|NPC name
@@ -151,11 +148,11 @@ names|Scripts/Locations/PrisonLocation.cs|decl:vexName|NPC name
 names|Scripts/Locations/TempleLocation.cs|=LocationName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 
 # --- Scripts/Systems ----------------------------------------------------------------------------
-table|Scripts/Systems/ArtifactSystem.cs|dictpair#0|artifact stat bonus label
-table|Scripts/Systems/ArtifactSystem.cs|init.Description|artifact description
-table|Scripts/Systems/ArtifactSystem.cs|init.LoreText|artifact lore
-table|Scripts/Systems/ArtifactSystem.cs|init.SpecialAbility|artifact ability
-names|Scripts/Systems/ArtifactSystem.cs|init.Name|unique artifact names
+keyed|Scripts/Systems/ArtifactSystem.cs|dictpair#0|artifact.stat.{key} (ArtifactData.StatLabel); the keys stay English: ApplyArtifactBonuses and ArtifactStatGrants read them
+keyed|Scripts/Systems/ArtifactSystem.cs|init.Description|artifact.{id}.desc (ArtifactData.LocDescription)
+keyed|Scripts/Systems/ArtifactSystem.cs|init.LoreText|artifact.{id}.lore.{n} (ArtifactData.LocLore)
+keyed|Scripts/Systems/ArtifactSystem.cs|init.SpecialAbility|artifact.{id}.ability (ArtifactData.LocAbility)
+keyed|Scripts/Systems/ArtifactSystem.cs|init.Name|artifact.{id}.name (ArtifactData.LocName); artifacts are stored by type
 names|Scripts/Systems/BetrayalSystem.cs|init.NPCName|NPC names
 table|Scripts/Systems/CharacterCreationSystem.cs|dictpair#1|class abbreviations in the race list
 table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|starter weapon description
@@ -179,13 +176,13 @@ keyed|Scripts/Systems/NPCItemGenerator.cs|init.Name|stored English fallback name
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#0|prison.activity_{id}_name
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#1|prison.activity_{id}_desc
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#2|prison.activity_{id}_effect
-table|Scripts/Systems/QuestSystem.cs|call:CreateStarterQuest#7/tuple#0|kept English: starter quest monster names, saved as QuestMonster names and objective targets (SaveSystem, OnlineStateManager) and matched against killed monsters; monster names have no keys yet
-nouns|Scripts/Systems/QuestSystem.cs|decl:bossName|kept English: boss fallback in quest.objective.defeat_boss on a path no starter quest takes (no ClearBoss starter)
-table|Scripts/Systems/QuestSystem.cs|decl:highLevel|kept English: royal quest target monster, saved as QuestMonster and objective TargetName and matched against killed monsters; monster names have no keys yet
-table|Scripts/Systems/QuestSystem.cs|decl:lowLevel|kept English: royal quest target monster, saved as QuestMonster and objective TargetName and matched against killed monsters; monster names have no keys yet
-table|Scripts/Systems/QuestSystem.cs|decl:midLevel|kept English: royal quest target monster, saved as QuestMonster and objective TargetName and matched against killed monsters; monster names have no keys yet
+keyed|Scripts/Systems/QuestSystem.cs|call:CreateStarterQuest#7/tuple#0|monster.name.{id} (MonsterNames.Display, by the English name) (QuestSystem.ShowMonsterArgs, QuestHallLocation); stored English: QuestMonster names and objective targets (SaveSystem, OnlineStateManager), matched against killed monsters
+keyed|Scripts/Systems/QuestSystem.cs|decl:bossName|monster.name.{id} (MonsterNames.Display, by the English name) (QuestSystem.ShowMonsterArgs); stored English as the objective target
+keyed|Scripts/Systems/QuestSystem.cs|decl:highLevel|monster.name.{id} (MonsterNames.Display, by the English name) (CastleLocation.QuestTargetLabel); stored English: QuestMonster and objective TargetName, matched against killed monsters
+keyed|Scripts/Systems/QuestSystem.cs|decl:lowLevel|monster.name.{id} (MonsterNames.Display, by the English name) (CastleLocation.QuestTargetLabel); stored English: QuestMonster and objective TargetName, matched against killed monsters
+keyed|Scripts/Systems/QuestSystem.cs|decl:midLevel|monster.name.{id} (MonsterNames.Display, by the English name) (CastleLocation.QuestTargetLabel); stored English: QuestMonster and objective TargetName, matched against killed monsters
 keyed|Scripts/Systems/QuestSystem.cs|decl:BountyBoardInitiator|quest.initiator.bounty_board (Quest.GetDisplayInitiator); stored and compared in English (QuestSystem GetBountyBoardQuests, RefreshBountyBoard)
-table|Scripts/Systems/QuestSystem.cs|init.TargetId|kept English: merc contract target id, a monster name or a GameLocation enum name matched in UpdateObjectiveProgress and OnLocationVisited
+keyed|Scripts/Systems/QuestSystem.cs|init.TargetId|ids, not shown: the contract text is merc.contract.{id}.objective; a monster name matched in UpdateObjectiveProgress (shown through monster.name.{id} where an objective names it) or a GameLocation enum name matched in OnLocationVisited
 keyed|Scripts/Systems/QuestSystem.cs|=targetName|dungeon.floor (CastleLocation.QuestTargetLabel at Castle and GameEngine); saved as objective TargetName in English
 keyed|Scripts/Systems/QuestSystem.cs|init.Comment|merc.contract.{id}.comment
 keyed|Scripts/Systems/QuestSystem.cs|init.Title|merc.contract.{id}.title
@@ -223,11 +220,10 @@ nouns|Scripts/Core/GameEngine.cs|decl:ngDisplayName|fallback name in the online 
 names|Scripts/Core/GameEngine.cs|decl:fonts|font names
 keyed|Scripts/Core/Items.cs|decl:ClassicArmorTable/tuple#0|stored English on picked-up armour; ItemNames shows item.{TemplateLocKey}
 keyed|Scripts/Core/Items.cs|decl:ClassicWeaponTable/tuple#0|stored English on picked-up weapons; ItemNames shows item.{TemplateLocKey}
-table|Scripts/Core/King.cs|decl:AvailableMonsters/tuple#0|castle guard monster names: stored on the court (MonsterGuard.Name) and matched by name (ChallengeSystem DefenceLosses, CastleLocation dismiss), so they stay English
+keyed|Scripts/Core/King.cs|decl:AvailableMonsters/tuple#0|monster.name.{id} (MonsterNames.Display, by the English name) (CastleLocation guard lists, siege, news); stored English on the court (MonsterGuard.Name) and matched by name (ChallengeSystem DefenceLosses, CastleLocation dismiss)
 table|Scripts/Core/King.cs|decl:Role|court member role "Advisor": saved in CourtMemberSaveData, shown through CastleLocation.CourtRoleLabel
 table|Scripts/Core/King.cs|=name|fallback king name: becomes the stored King.Name, matched by name everywhere
 names|Scripts/Core/King.cs|=npc.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Core/Monster.cs|=status|monster status in combat.facing
 names|Scripts/Core/NPC.cs|=CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Core/NPC.cs|decl:CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 table|Scripts/Core/NPC.cs|decl:greetings|NPC greeting
@@ -243,7 +239,7 @@ keyed|Scripts/Data/GauntletChampionData.cs|init.EntranceAnnouncement|gauntlet.ch
 keyed|Scripts/Data/GauntletChampionData.cs|init.FlavorDescription|gauntlet.champ.{id}.drop_flavor
 keyed|Scripts/Data/GauntletChampionData.cs|init.LoreLine|gauntlet.champ.{id}.lore
 names|Scripts/Data/GauntletChampionData.cs|init.GodPatron|god names
-nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|kept English: becomes the saved Equipment.Name (AnchorRoadLocation, SanctumLocation); item names have no display-time translation
+keyed|Scripts/Data/GauntletChampionData.cs|init.ItemName|item.{name} (ItemNames templates); stored English as Equipment.Name (AnchorRoadLocation)
 names|Scripts/Data/GauntletChampionData.cs|init.Name|champion names
 names|Scripts/Data/GauntletChampionData.cs|init.Title|champion titles
 keyed|Scripts/Data/HonorTournamentData.cs|init.CrowdReaction|tournament.champ.{id}.crowd
@@ -251,9 +247,9 @@ keyed|Scripts/Data/HonorTournamentData.cs|init.EntranceAnnouncement|tournament.c
 keyed|Scripts/Data/HonorTournamentData.cs|init.FlavorDescription|tournament.champ.{id}.drop_flavor
 keyed|Scripts/Data/HonorTournamentData.cs|init.LoreLine|tournament.champ.{id}.lore
 keyed|Scripts/Data/HonorTournamentData.cs|init.Name|tournament.champ.{id}.name
-nouns|Scripts/Data/HonorTournamentData.cs|init.ItemName|champion drop item names printed raw
-nouns|Scripts/Data/MonsterFamilies.cs|init.FamilyName|family label in dungeon.encounter_group_family
-nouns|Scripts/Data/MonsterFamilies.cs|init.Name|monster tier names become monster names
+keyed|Scripts/Data/HonorTournamentData.cs|init.ItemName|item.{name} (ItemNames templates); stored English as the drop's Name (SanctumLocation)
+keyed|Scripts/Data/MonsterFamilies.cs|init.FamilyName|monster.family.{id} (MonsterNames.Family); stored English as Monster.FamilyName, matched by classification and abilities
+keyed|Scripts/Data/MonsterFamilies.cs|init.Name|monster.name.{id} (MonsterNames.Display, by the English name), champions through monster.champion.{family}; stored English as Monster.Name and TierName (quest kills, CombatEngine name checks)
 keyed|Scripts/Data/WildernessData.cs|init.ForagingResults/tuple#0|wilderness.forage.{id}.{i}
 keyed|Scripts/Data/WildernessData.cs|init.ForagingResults/tuple#1|wilderness.forage.{id}.{i}
 keyed|Scripts/Data/WildernessData.cs|init.TravelerEncounters/tuple#0|wilderness.traveler.{id}.{i}
@@ -262,7 +258,7 @@ keyed|Scripts/Data/WildernessData.cs|init.Description|wilderness.region and disc
 keyed|Scripts/Data/WildernessData.cs|init.Direction|wilderness.direction.{key}
 keyed|Scripts/Data/WildernessData.cs|init.Name|wilderness.region and discovery name keys
 keyed|Scripts/Data/WildernessData.cs|init.RuinsEncounters|wilderness.ruins.{id}.{i}
-nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|kept English: monster.Name and TierName for quest kills, GetMonsterProfile lookup, CombatEngine undead name checks
+keyed|Scripts/Data/WildernessData.cs|init.MonsterNames|monster.name.{id} (MonsterNames.Display, by the English name); stored English: monster.Name and TierName for quest kills, GetMonsterProfile lookup, CombatEngine undead name checks
 names|Scripts/Locations/AnchorRoadLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Locations/BankLocation.cs|decl:BankerName|NPC name
@@ -312,7 +308,6 @@ keyed|Scripts/Systems/AchievementSystem.cs|init.Name|achievement.{id}.name (Achi
 keyed|Scripts/Systems/AchievementSystem.cs|init.SecretHint|achievement.{id}.hint (Achievement.LocSecretHint); the wiki export keeps the English field
 keyed|Scripts/Systems/AchievementSystem.cs|init.UnlockMessage|achievement.{id}.unlock (Achievement.LocUnlockMessage)
 names|Scripts/Systems/CombatEngine.cs|init.Name|unique boss name
-table|Scripts/Systems/CombatMessages.cs|init.[k]=|attack verbs
 table|Scripts/Systems/CompanionSystem.cs|decl:drop|companion drop line
 table|Scripts/Systems/CompanionSystem.cs|decl:notification|inn notifications
 table|Scripts/Systems/CompanionSystem.cs|init.Abilities|companion abilities

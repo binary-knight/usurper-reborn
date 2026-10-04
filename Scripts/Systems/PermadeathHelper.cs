@@ -22,7 +22,7 @@ namespace UsurperRemake.Systems
         {
             string className;
             using (Loc.RenderLanguage(lang)) className = GameConfig.GetLocalizedClassName(cls);
-            var rows = UIHelper.WordWrap("*** " + Loc.GetIn(lang, "permadeath.eulogy", displayName, level, className, killerName) + " ***", UIHelper.WrapWidth - 2);
+            var rows = UIHelper.WordWrap("*** " + Loc.GetIn(lang, "permadeath.eulogy", displayName, level, className, MonsterNames.DisplayIn(lang, killerName)) + " ***", UIHelper.WrapWidth - 2);
             return "\u001b[1;31m\r\n" + string.Join("\r\n", rows.Select(r => "  " + r)) + "\r\n\u001b[0m";
         }
 
@@ -243,7 +243,7 @@ namespace UsurperRemake.Systems
                         {
                             // v1.2.5: in the writer's language, as CombatEngine writes the same news
                             _ = OnlineStateManager.Instance!.AddNews(
-                                Loc.Get("combat.news_permadeath", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), killerName),
+                                Loc.Get("combat.news_permadeath", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), MonsterNames.Display(killerName)),
                                 "permadeath");
                         }
                     }

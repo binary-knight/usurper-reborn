@@ -531,7 +531,7 @@ public partial class CombatEngine
     internal bool ConsumeDiscordiaFail(Monster monster)
     {
         if (monster == null || !_discordStruck.Remove(monster)) return false;
-        terminal?.WriteLine(Loc.Get("combat.discordia_first_action_fails", monster.Name), "magenta");
+        terminal?.WriteLine(Loc.Get("combat.discordia_first_action_fails", MonsterNames.Display(monster)), "magenta");
         return true;
     }
 
@@ -1444,7 +1444,7 @@ public partial class CombatEngine
                 if (rampedBoss != null)
                 {
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine($"  {Loc.Get("combat.boss_unleashed", rampedBoss.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.boss_unleashed", MonsterNames.Display(rampedBoss))}");
                     terminal.WriteLine("");
                     if (hasGroupEarly)
                         BroadcastGroupLocalized(result, lang => GroupLineWrapped(lang, "\u001b[1;31m", "combat.boss_unleashed", rampedBoss.Name));
@@ -1476,7 +1476,7 @@ public partial class CombatEngine
                             if (hasGroupEarly)
                             {
                                 int hpPctBoss = (int)(bossMonster.HP * 100 / Math.Max(1, bossMonster.MaxHP));
-                                BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;35m", "combat.group_boss_phase", bossMonster.Name, phase, hpPctBoss));
+                                BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;35m", "combat.group_boss_phase", MonsterNames.DisplayIn(lang, bossMonster), phase, hpPctBoss));
                             }
 
                             // Maelketh spawns minions on phase 2
@@ -1845,12 +1845,12 @@ public partial class CombatEngine
                     {
                         terminal.WriteLine("");
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.boss_confused", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.boss_confused", MonsterNames.Display(monster)));
                         // v1.1.10: a confused skip bypasses ProcessMonsterAction, so the surge ticks here
                         if (TickPowerSurgeOncePerRound(monster))
-                            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
+                            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", MonsterNames.Display(monster)), "gray");
                         if (hasGroup)
-                            BroadcastGroupLocalized(result, lang => GroupLine(lang, "\u001b[36m", "combat.boss_confused", monster.Name));
+                            BroadcastGroupLocalized(result, lang => GroupLine(lang, "\u001b[36m", "combat.boss_confused", MonsterNames.DisplayIn(lang, monster)));
                         await Pacing.Wait(GetCombatDelay(500));
                         continue;
                     }
@@ -2326,7 +2326,7 @@ public partial class CombatEngine
         // The CombatLog entry runs unconditionally too — save/replay needs it.
         ElectronBridge.Emit("combat_start", new
         {
-            monsterName = monster.Name,
+            monsterName = MonsterNames.Display(monster),   // v1.2.5: a label; the sprite is chosen by family
             monsterLevel = monster.Level,
             monsterHp = monster.HP,
             monsterMaxHp = monster.MaxHP,
@@ -2557,7 +2557,7 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.your_hp", player.HP, player.MaxHP));
         if (monster != null)
         {
-            terminal.WriteLine(Loc.Get("combat.enemy_hp", monster.Name, monster.HP));
+            terminal.WriteLine(Loc.Get("combat.enemy_hp", MonsterNames.Display(monster), monster.HP));
         }
         else if (pvpOpponent != null)
         {
@@ -2858,7 +2858,7 @@ public partial class CombatEngine
         string hpStatus = Loc.Get("combat.pvp_your_hp", player.HP, player.MaxHP);
         if (monster != null)
         {
-            hpStatus += $"  │  {monster.Name}: {monster.HP}";
+            hpStatus += $"  │  {MonsterNames.Display(monster)}: {monster.HP}";
         }
         else if (pvpOpponent != null)
         {
@@ -3590,7 +3590,7 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.off_hand_strike"));
             }
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.evasion_miss", target.Name));
+            terminal.WriteLine(Loc.Get("combat.evasion_miss", MonsterNames.Display(target)));
             result.CombatLog.Add($"Player attack passes through evasive {target.Name}");
             return;
         }
@@ -3646,7 +3646,7 @@ public partial class CombatEngine
                 else
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("combat.you_miss", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.you_miss", MonsterNames.Display(target)));
                 }
                 result.CombatLog.Add($"Player misses {target.Name} (roll: {attackRoll.NaturalRoll})");
 
@@ -3979,7 +3979,7 @@ public partial class CombatEngine
             {
                 long poisonBonus = (long)(attackPower * GameConfig.AssassinLethalPrecisionPoisonBonus);
                 attackPower += poisonBonus;
-                terminal.WriteLine(Loc.Get("combat.lethal_precision_poison", target.Name, poisonBonus), "dark_green");
+                terminal.WriteLine(Loc.Get("combat.lethal_precision_poison", MonsterNames.Display(target), poisonBonus), "dark_green");
             }
         }
 
@@ -4018,7 +4018,7 @@ public partial class CombatEngine
         attacker.Punch = attackPower;
 
         terminal.SetColor(ColorRole.Success);
-        terminal.WriteLine(Loc.Get("combat.you_hit", target.Name, attackPower));
+        terminal.WriteLine(Loc.Get("combat.you_hit", MonsterNames.Display(target), attackPower));
 
         // Calculate defense absorption
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
@@ -4063,7 +4063,7 @@ public partial class CombatEngine
         {
             actualDamage = ApplyPhaseImmunityDamage(immuneTarget, actualDamage, isMagicalDamage: false);
             terminal.SetColor("dark_magenta");
-            terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", immuneTarget.Name));
+            terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", MonsterNames.Display(immuneTarget)));
         }
 
         // Divine armor reduction for Old God bosses (reduces player damage dealt)
@@ -4077,9 +4077,9 @@ public partial class CombatEngine
         {
             terminal.SetColor("cyan");
             if (armorPiercePct > 0)
-                terminal.WriteLine(Loc.Get("combat.armor_absorbed_pierced", target.Name, defense, armorPiercePct));
+                terminal.WriteLine(Loc.Get("combat.armor_absorbed_pierced", MonsterNames.Display(target), defense, armorPiercePct));
             else
-                terminal.WriteLine(Loc.Get("combat.armor_absorbed", target.Name, defense));
+                terminal.WriteLine(Loc.Get("combat.armor_absorbed", MonsterNames.Display(target), defense));
         }
 
         // Apply damage
@@ -4093,7 +4093,7 @@ public partial class CombatEngine
         result.TotalDamageDealt += actualDamage;
 
         terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("combat.target_damage", target.Name, actualDamage));
+        terminal.WriteLine(Loc.Get("combat.target_damage", MonsterNames.Display(target), actualDamage));
 
         result.CombatLog.Add($"Player attacks {target.Name} for {actualDamage} damage (roll: {attackRoll.NaturalRoll})");
 
@@ -4333,12 +4333,12 @@ public partial class CombatEngine
                 if (MiracleSystem.BanishKillsOutright(target))
                 {
                     target.HP = 0;
-                    terminal.WriteLine(Loc.Get("miracle.banish", target.Name), "bright_white");
+                    terminal.WriteLine(Loc.Get("miracle.banish", MonsterNames.Display(target)), "bright_white");
                     if (!result.DefeatedMonsters.Contains(target)) result.DefeatedMonsters.Add(target);
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("miracle.banish_resist", target.Name), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("miracle.banish_resist", MonsterNames.Display(target)), "bright_yellow");
                     await ApplySingleMonsterDamage(target, MiracleSystem.BanishBossDamage(target), result, "banish", actor, isSpellDamage: true);
                 }
                 break;
@@ -4360,9 +4360,9 @@ public partial class CombatEngine
                 target ??= monsters.Where(m => m.IsAlive).OrderByDescending(m => m.HP).FirstOrDefault();
                 if (target == null) break;
                 if (TryHoldMonster(target, HoldKind.Bind, GameConfig.MiracleBindRounds))
-                    terminal.WriteLine(Loc.Get("miracle.bind", target.Name, target.StunDuration), "bright_cyan");
+                    terminal.WriteLine(Loc.Get("miracle.bind", MonsterNames.Display(target), target.StunDuration), "bright_cyan");
                 else
-                    terminal.WriteLine(Loc.Get("miracle.bind_resist", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("miracle.bind_resist", MonsterNames.Display(target)), "yellow");
                 break;
 
             case GodDomain.Shadow:
@@ -4560,7 +4560,7 @@ public partial class CombatEngine
                 if (TryStunMonster(target, 2))
                 {
                     terminal.SetColor("dark_magenta");
-                    terminal.WriteLine(Loc.Get("combat.nightshade_sleep", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.nightshade_sleep", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -4570,7 +4570,7 @@ public partial class CombatEngine
                     target.Distracted = true;
                     target.Strength = Math.Max(1, target.Strength - target.Strength / 4); // -25% strength
                     terminal.SetColor("dark_green");
-                    terminal.WriteLine(Loc.Get("combat.hemlock_weakened", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.hemlock_weakened", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -4589,7 +4589,7 @@ public partial class CombatEngine
                 if (TryStunMonster(target, 2))
                 {
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("combat.widows_kiss_paralyze", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.widows_kiss_paralyze", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -4599,7 +4599,7 @@ public partial class CombatEngine
                 target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
                 target.Strength = Math.Max(1, target.Strength - target.Strength / 4); // -25% strength
                 terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get("combat.deathbane_ravages", target.Name));
+                terminal.WriteLine(Loc.Get("combat.deathbane_ravages", MonsterNames.Display(target)));
                 break;
         }
     }
@@ -4872,7 +4872,7 @@ public partial class CombatEngine
         // paused while the boss was held would let the player's own control stretch its strongest
         // rounds, and a stun-lock on a surging god would cost nothing.
         if (TickPowerSurgeOncePerRound(monster))
-            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", monster.Name), "gray");
+            terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", MonsterNames.Display(monster)), "gray");
 
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
@@ -4889,10 +4889,10 @@ public partial class CombatEngine
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
             monster.HP = Math.Max(0, monster.HP - dmg); // hq-armory: out (burn tick, no caster recorded)
             monster.BurnRounds--;
-            terminal.WriteLine(Loc.Get("combat.fire_burn", monster.Name, dmg), "red");
+            terminal.WriteLine(Loc.Get("combat.fire_burn", MonsterNames.Display(monster), dmg), "red");
             if (!monster.IsAlive)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_burn_death", monster.Name), "red");
+                terminal.WriteLine(Loc.Get("combat.monster_burn_death", MonsterNames.Display(monster)), "red");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 return;
@@ -4907,10 +4907,10 @@ public partial class CombatEngine
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
             monster.HP = Math.Max(0, monster.HP - dmg); // hq-armory: out (poison tick, no caster recorded)
             monster.PoisonRounds--;
-            terminal.WriteLine(Loc.Get("combat.poison_burn", monster.Name, dmg), "dark_green");
+            terminal.WriteLine(Loc.Get("combat.poison_burn", MonsterNames.Display(monster), dmg), "dark_green");
             if (!monster.IsAlive)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_poison_death", monster.Name), "dark_green");
+                terminal.WriteLine(Loc.Get("combat.monster_poison_death", MonsterNames.Display(monster)), "dark_green");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 return;
@@ -4931,11 +4931,11 @@ public partial class CombatEngine
             player.HP = Math.Min(player.MaxHP, player.HP + heal);
             long actualHeal = player.HP - oldHP;
             monster.CorruptingDotRounds--;
-            terminal.WriteLine(Loc.Get("combat.corrupting_tick", monster.Name, corruptDmg, actualHeal), "dark_red");
+            terminal.WriteLine(Loc.Get("combat.corrupting_tick", MonsterNames.Display(monster), corruptDmg, actualHeal), "dark_red");
             if (monster.CorruptingDotRounds == 0) monster.CorruptingDotTickDamage = 0;
             if (!monster.IsAlive)
             {
-                terminal.WriteLine(Loc.Get("combat.corrupting_kill", monster.Name), "dark_red");
+                terminal.WriteLine(Loc.Get("combat.corrupting_kill", MonsterNames.Display(monster)), "dark_red");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
                 return;
@@ -4946,7 +4946,7 @@ public partial class CombatEngine
         {
             monster.StunRounds--;
             if (monster.StunRounds <= 0) monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
-            terminal.WriteLine(Loc.Get("combat.stunned", monster.Name), "cyan");
+            terminal.WriteLine(Loc.Get("combat.stunned", MonsterNames.Display(monster)), "cyan");
             await Pacing.Wait(GetCombatDelay(600));
             return; // Skip action
         }
@@ -4956,7 +4956,7 @@ public partial class CombatEngine
         {
             monster.Stunned = false; // One-round stun
             monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
-            terminal.WriteLine(Loc.Get("combat.stunned", monster.Name), "cyan");
+            terminal.WriteLine(Loc.Get("combat.stunned", MonsterNames.Display(monster)), "cyan");
             await Pacing.Wait(GetCombatDelay(600));
             return;
         }
@@ -4986,7 +4986,7 @@ public partial class CombatEngine
 
             if (skipped)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_charmed", monster.Name), ColorRole.Success);
+                terminal.WriteLine(Loc.Get("combat.monster_charmed", MonsterNames.Display(monster)), ColorRole.Success);
                 await Pacing.Wait(GetCombatDelay(600));
                 return;
             }
@@ -5000,13 +5000,13 @@ public partial class CombatEngine
             monster.SleepDuration = 0;
             monster.SlumberHpMark = -1;
             monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
-            terminal.WriteLine(Loc.Get("combat.sage_slumber_broken", monster.Name), "yellow");
+            terminal.WriteLine(Loc.Get("combat.sage_slumber_broken", MonsterNames.Display(monster)), "yellow");
         }
 
         // Check if monster is sleeping (from Sleep spell or ability)
         if (monster.IsSleeping)
         {
-            terminal.WriteLine(Loc.Get("combat.asleep", monster.Name), "cyan");
+            terminal.WriteLine(Loc.Get("combat.asleep", MonsterNames.Display(monster)), "cyan");
             monster.SleepDuration--;
             if (monster.SleepDuration <= 0)
             {
@@ -5014,7 +5014,7 @@ public partial class CombatEngine
                 monster.SlumberHpMark = -1;
                 // v1.1.15: sleep is a hold; the same post-hold immunity as a stun follows it
                 monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
-                terminal.WriteLine(Loc.Get("combat.monster_wakes", monster.Name), "yellow");
+                terminal.WriteLine(Loc.Get("combat.monster_wakes", MonsterNames.Display(monster)), "yellow");
             }
             await Pacing.Wait(GetCombatDelay(600));
             return;
@@ -5047,19 +5047,19 @@ public partial class CombatEngine
             if (monster.CorrodedDuration <= 0)
             {
                 monster.IsCorroded = false;
-                terminal.WriteLine(Loc.Get("combat.corrode_fades", monster.Name), "gray");
+                terminal.WriteLine(Loc.Get("combat.corrode_fades", MonsterNames.Display(monster)), "gray");
             }
         }
 
         // Check if monster is feared (from Fear spell or Intimidating Roar)
         if (monster.IsFeared)
         {
-            terminal.WriteLine(Loc.Get("combat.feared", monster.Name), "yellow");
+            terminal.WriteLine(Loc.Get("combat.feared", MonsterNames.Display(monster)), "yellow");
             monster.FearDuration--;
             if (monster.FearDuration <= 0)
             {
                 monster.IsFeared = false;
-                terminal.WriteLine(Loc.Get("combat.monster_shakes_fear", monster.Name), "yellow");
+                terminal.WriteLine(Loc.Get("combat.monster_shakes_fear", MonsterNames.Display(monster)), "yellow");
             }
             await Pacing.Wait(GetCombatDelay(600));
             return;
@@ -5075,7 +5075,7 @@ public partial class CombatEngine
         // Check if monster is stunned (modern stun from spells, distinct from legacy Stunned)
         if (monster.IsStunned)
         {
-            terminal.WriteLine(Loc.Get("combat.stunned", monster.Name), "bright_yellow");
+            terminal.WriteLine(Loc.Get("combat.stunned", MonsterNames.Display(monster)), "bright_yellow");
             monster.StunDuration--;
             if (monster.StunDuration <= 0)
             {
@@ -5108,14 +5108,14 @@ public partial class CombatEngine
         // Check if monster is frozen (from Frost Bomb)
         if (monster.IsFrozen)
         {
-            terminal.WriteLine(Loc.Get("combat.frozen", monster.Name), "bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.frozen", MonsterNames.Display(monster)), "bright_cyan");
             monster.FrozenDuration--;
             if (monster.FrozenDuration <= 0)
             {
                 monster.IsFrozen = false;
                 // v1.1.15: freeze is a hold; the same post-hold immunity as a stun follows it
                 monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
-                terminal.WriteLine(Loc.Get("combat.ice_shatters", monster.Name), "cyan");
+                terminal.WriteLine(Loc.Get("combat.ice_shatters", MonsterNames.Display(monster)), "cyan");
             }
             await Pacing.Wait(GetCombatDelay(600));
             return;
@@ -5129,7 +5129,7 @@ public partial class CombatEngine
                 monster.ConfusedDuration--;
             if (random.Next(100) < 50)
             {
-                terminal.WriteLine(Loc.Get("combat.confusion_stumble", monster.Name), "magenta");
+                terminal.WriteLine(Loc.Get("combat.confusion_stumble", MonsterNames.Display(monster)), "magenta");
                 if (monster.ConfusedDuration <= 0) monster.IsConfused = false;
                 await Pacing.Wait(GetCombatDelay(600));
                 return;
@@ -5139,11 +5139,11 @@ public partial class CombatEngine
                 long selfDmg = Math.Max(1, monster.Strength / 3);
                 monster.HP = Math.Max(0, monster.HP - selfDmg); // hq-armory: out (confusion self-hit, not player damage)
                 terminal.SetColor("magenta");
-                terminal.WriteLine(Loc.Get("combat.confusion_self_damage", monster.Name, selfDmg));
+                terminal.WriteLine(Loc.Get("combat.confusion_self_damage", MonsterNames.Display(monster), selfDmg));
                 if (monster.HP <= 0)
                 {
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("combat.confusion_defeat", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.confusion_defeat", MonsterNames.Display(monster)));
                     if (!result.DefeatedMonsters.Contains(monster))
                         result.DefeatedMonsters.Add(monster);
                 }
@@ -5161,7 +5161,7 @@ public partial class CombatEngine
             monster.SlowDuration--;
             if (random.Next(100) < 50)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_sluggish", monster.Name), "gray");
+                terminal.WriteLine(Loc.Get("combat.monster_sluggish", MonsterNames.Display(monster)), "gray");
                 if (monster.SlowDuration <= 0) monster.IsSlowed = false;
                 await Pacing.Wait(GetCombatDelay(600));
                 return;
@@ -5177,7 +5177,7 @@ public partial class CombatEngine
             {
                 monster.IsMarked = false;
                 monster.MarkedBonusPercent = 0;
-                terminal.WriteLine(Loc.Get("combat.mark_fades", monster.Name), "gray");
+                terminal.WriteLine(Loc.Get("combat.mark_fades", MonsterNames.Display(monster)), "gray");
             }
         }
 
@@ -5185,7 +5185,7 @@ public partial class CombatEngine
         if (player.DodgeNextAttack)
         {
             player.DodgeNextAttack = false;
-            terminal.WriteLine(Loc.Get("combat.you_dodge", monster.Name), "bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.you_dodge", MonsterNames.Display(monster)), "bright_cyan");
             await Pacing.Wait(GetCombatDelay(600));
             return;
         }
@@ -5197,7 +5197,7 @@ public partial class CombatEngine
         if (player.Class == CharacterClass.Cyclebreaker
             && random.Next(100) < GameConfig.CyclebreakerPassiveEvadePercent)
         {
-            terminal.WriteLine(Loc.Get("combat.cyclebreaker_evade", monster.Name), "bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.cyclebreaker_evade", MonsterNames.Display(monster)), "bright_cyan");
             await Pacing.Wait(GetCombatDelay(500));
             return;
         }
@@ -5269,7 +5269,7 @@ public partial class CombatEngine
 
         // Monster is targeting the player — show "attacks you!" message
         terminal.SetColor("red");
-        terminal.WriteLine(Loc.Get("combat.monster_attacks", monster.Name));
+        terminal.WriteLine(Loc.Get("combat.monster_attacks", MonsterNames.Display(monster)));
 
         // === MONSTER SPECIAL ABILITIES ===
         // Chance for monster to use a special ability instead of normal attack
@@ -5297,7 +5297,7 @@ public partial class CombatEngine
             monsterRoll.Modifier -= penalty;
             monsterRoll.Success = monsterRoll.Total >= monsterRoll.TargetDC;
             terminal.SetColor(ColorRole.Derived);
-            terminal.WriteLine(Loc.Get("combat.monster_roll_distracted", monster.Name, monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC, penalty));
+            terminal.WriteLine(Loc.Get("combat.monster_roll_distracted", MonsterNames.Display(monster), monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC, penalty));
             monster.Distracted = false;
             monster.DistractedPenalty = 0;
         }
@@ -5305,7 +5305,7 @@ public partial class CombatEngine
         {
             // Show the roll result
             terminal.SetColor(ColorRole.Derived);
-            terminal.WriteLine(Loc.Get("combat.monster_roll", monster.Name, monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC));
+            terminal.WriteLine(Loc.Get("combat.monster_roll", MonsterNames.Display(monster), monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC));
         }
 
         // Blur / duplicate miss chance (20%) - additional miss chance on top of D20
@@ -5313,8 +5313,8 @@ public partial class CombatEngine
         {
             if (random.Next(100) < 20)
             {
-                var missMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, 0, player.MaxHP, random);   // v1.1.14: the engine RNG
-                terminal.WriteLine(missMessage);
+                var missMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, 0, player.MaxHP, random);   // v1.1.14: the engine RNG
+                foreach (var row in CombatMessages.Rows(missMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
                 terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
                 result.CombatLog.Add($"{monster.Name} misses due to blur");
                 await Pacing.Wait(GetCombatDelay(800));
@@ -5326,7 +5326,7 @@ public partial class CombatEngine
         if (monsterRoll.Success && StatEffectsSystem.RollDodge(player, random))
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.you_dodge_chance", monster.Name, StatEffectsSystem.GetDodgeChance(player.Agility)));
+            terminal.WriteLine(Loc.Get("combat.you_dodge_chance", MonsterNames.Display(monster), StatEffectsSystem.GetDodgeChance(player.Agility)));
             result.CombatLog.Add($"Player dodges {monster.Name}'s attack");
             await Pacing.Wait(GetCombatDelay(800));
             return;
@@ -5339,7 +5339,7 @@ public partial class CombatEngine
             if (random.Next(100) < shadowDodge)
             {
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.shadow_dodge", monster.Name));
+                terminal.WriteLine(Loc.Get("combat.shadow_dodge", MonsterNames.Display(monster)));
                 result.CombatLog.Add($"Player shadow-dodges {monster.Name}'s attack (Shadow Crown)");
                 await Pacing.Wait(GetCombatDelay(800));
                 return;
@@ -5352,11 +5352,11 @@ public partial class CombatEngine
             if (monsterRoll.IsCriticalFailure)
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("combat.monster_misses", monster.TheNameOrName));
+                terminal.WriteLine(Loc.Get("combat.monster_misses", MonsterNames.TheName(monster)));
             }
             else
             {
-                terminal.WriteLine(Loc.Get("combat.monster_misses", monster.TheNameOrName));
+                terminal.WriteLine(Loc.Get("combat.monster_misses", MonsterNames.TheName(monster)));
             }
             result.CombatLog.Add($"{monster.Name} misses player (roll: {monsterRoll.NaturalRoll})");
             await Pacing.Wait(GetCombatDelay(1500));
@@ -5402,19 +5402,19 @@ public partial class CombatEngine
         // Show critical hit message
         if (monsterRoll.IsCriticalSuccess)
         {
-            terminal.WriteLine(Loc.Get("combat.monster_critical", monster.Name, ""), "bright_red");
+            terminal.WriteLine(Loc.Get("combat.monster_critical", MonsterNames.Display(monster), ""), "bright_red");
         }
 
         // Use colored combat message
-        var attackMessage = CombatMessages.GetMonsterAttackMessage(monster.Name, monster.MonsterColor, monsterAttack, player.MaxHP, random);   // v1.1.14: the engine RNG
-        terminal.WriteLine(attackMessage);
+        var attackMessage = CombatMessages.GetMonsterAttackMessage(MonsterNames.Display(monster), monster.MonsterColor, monsterAttack, player.MaxHP, random);   // v1.1.14: the engine RNG
+        foreach (var row in CombatMessages.Rows(attackMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
         // Check for shield block (20% chance to block, halves incoming damage)
         var (blocked, blockBonus) = TryShieldBlock(player);
         if (blocked)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.you_block", monster.Name));
+            terminal.WriteLine(Loc.Get("combat.you_block", MonsterNames.Display(monster)));
         }
 
         // Player defense: Defence stat + ArmPow (75-100% variance) + MagicACBonus
@@ -5698,7 +5698,7 @@ public partial class CombatEngine
             if (reflect > 0)
             {
                 monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect, derived from damage taken)
-                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", MonsterNames.Display(monster), reflect), "bright_magenta");
                 // If reflect kills the monster, credit the kill so XP/gold/quests register
                 if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
@@ -5733,7 +5733,7 @@ public partial class CombatEngine
         }
         else
         {
-            terminal.WriteLine(Loc.Get("combat.monster_hits", monster.TheNameOrName, actualDamage));
+            terminal.WriteLine(Loc.Get("combat.monster_hits", MonsterNames.TheName(monster), actualDamage));
         }
 
         result.CombatLog.Add($"{monster.Name} attacks player for {actualDamage} damage (roll: {monsterRoll.NaturalRoll})");
@@ -5744,10 +5744,10 @@ public partial class CombatEngine
             float reflectPct = IsManweBattle && ArtifactSystem.Instance.HasVoidKey() ? 0.30f : 0.15f;
             long reflectedDamage = Math.Max(1, (long)(actualDamage * reflectPct));
             monster.HP = Math.Max(0, monster.HP - reflectedDamage); // hq-armory: out (Scales of Law reflect)
-            terminal.WriteLine(Loc.Get("combat.scales_reflect", reflectedDamage, monster.Name), "gray");
+            terminal.WriteLine(Loc.Get("combat.scales_reflect", reflectedDamage, MonsterNames.Display(monster)), "gray");
             if (monster.HP <= 0)
             {
-                terminal.WriteLine(Loc.Get("combat.scales_destroy", monster.Name), "bright_white");
+                terminal.WriteLine(Loc.Get("combat.scales_destroy", MonsterNames.Display(monster)), "bright_white");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
             }
@@ -5760,10 +5760,10 @@ public partial class CombatEngine
             long thornsDamage = Math.Max(1, actualDamage * thornsPct / 100);
             monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("combat.thorns_reflect", thornsDamage, monster.Name));
+            terminal.WriteLine(Loc.Get("combat.thorns_reflect", thornsDamage, MonsterNames.Display(monster)));
             if (monster.HP <= 0)
             {
-                terminal.WriteLine(Loc.Get("combat.thorns_kill", monster.Name), "bright_yellow");
+                terminal.WriteLine(Loc.Get("combat.thorns_kill", MonsterNames.Display(monster)), "bright_yellow");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
             }
@@ -5780,16 +5780,16 @@ public partial class CombatEngine
             if (player.Class == CharacterClass.Voidreaver)
             {
                 terminal.SetColor("dark_red");
-                terminal.WriteLine(Loc.Get("combat.void_shroud_reflect", reflectDamage, monster.Name));
+                terminal.WriteLine(Loc.Get("combat.void_shroud_reflect", reflectDamage, MonsterNames.Display(monster)));
             }
             else
             {
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine(Loc.Get("combat.harmonic_reflect", reflectDamage, monster.Name));
+                terminal.WriteLine(Loc.Get("combat.harmonic_reflect", reflectDamage, MonsterNames.Display(monster)));
             }
             if (monster.HP <= 0)
             {
-                terminal.WriteLine(Loc.Get("combat.reflection_destroy", monster.Name), "bright_white");
+                terminal.WriteLine(Loc.Get("combat.reflection_destroy", MonsterNames.Display(monster)), "bright_white");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
             }
@@ -5829,7 +5829,7 @@ public partial class CombatEngine
             long sHp = 40 + monster.Level * 3;
             summons.Add(WithDialogueDamage(new Monster
             {
-                Name = Loc.Get("combat.summoned_minion_name", monster.Name),
+                Name = MonsterNames.FromKey("combat.summoned_minion_name", monster.Name),   // v1.2.5: stored English, shown by MonsterNames
                 Level = Math.Max(1, monster.Level - 8),
                 HP = sHp, MaxHP = sHp,
                 Strength = 8 + (long)(monster.Level * 1.5),
@@ -5984,7 +5984,7 @@ public partial class CombatEngine
                     if (reflect > 0)
                     {
                         monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
-                        terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+                        terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", MonsterNames.Display(monster), reflect), "bright_magenta");
                         if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
                     }
@@ -6103,7 +6103,7 @@ public partial class CombatEngine
                 player.HP -= damage;
                 long healAmount = damage * abilityResult.LifeStealPercent / 100;
                 monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmount);
-                terminal.WriteLine(Loc.Get("combat.you_take_damage_heals", damage, monster.Name, healAmount), "magenta");
+                terminal.WriteLine(Loc.Get("combat.you_take_damage_heals", damage, MonsterNames.Display(monster), healAmount), "magenta");
                 result.CombatLog.Add($"{monster.Name} life drains for {damage} damage, heals {healAmount}");
             }
         }
@@ -6173,7 +6173,7 @@ public partial class CombatEngine
                     if (reflect > 0)
                     {
                         monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
-                        terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+                        terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", MonsterNames.Display(monster), reflect), "bright_magenta");
                         if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
                     }
@@ -6236,7 +6236,7 @@ public partial class CombatEngine
     {
         if (player.HasStatus(StatusEffect.Invulnerable))
         {
-            terminal.WriteLine(Loc.Get("combat.divine_shield_absorbs", monster.Name, abilityName), "bright_white");
+            terminal.WriteLine(Loc.Get("combat.divine_shield_absorbs", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_white");
             result.CombatLog.Add($"{monster.Name}'s {abilityName} blocked by Invulnerable");
             return 0;
         }
@@ -6287,7 +6287,7 @@ public partial class CombatEngine
             if (reflect > 0)
             {
                 monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
-                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", MonsterNames.Display(monster), reflect), "bright_magenta");
                 if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
             }
@@ -6341,7 +6341,7 @@ public partial class CombatEngine
                     or "Final Verdict" or "Tyranny Unleashed" or "Final Secret"
                     or "Final Darkness" or "Desperate Betrayer" or "Shadow Incarnate" ? 3.0 : 2.0;
                 long damage = Math.Max(1, (long)(baseDamage * mult) - player.Defence);
-                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_red");
                 ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 return true;
             }
@@ -6359,7 +6359,7 @@ public partial class CombatEngine
             case "Truth Revealed":
             {
                 long damage = Math.Max(1, (long)(baseDamage * 1.5) - player.Defence);
-                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "yellow");
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "yellow");
                 ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 return true;
             }
@@ -6375,8 +6375,8 @@ public partial class CombatEngine
                 double healPct = abilityName is "Blood Sacrifice" or "Love's Sacrifice" or "Sacrifice" ? 0.10 : 0.05;
                 long healAmt = (long)(monster.MaxHP * healPct);
                 monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
-                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_magenta");
-                terminal.WriteLine(Loc.Get("combat.monster_heals", monster.Name, $"{healAmt:N0}"), "green");
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.monster_heals", MonsterNames.Display(monster), $"{healAmt:N0}"), "green");
                 result.CombatLog.Add($"{monster.Name} heals {healAmt} HP via {abilityName}");
                 return true;
             }
@@ -6391,11 +6391,11 @@ public partial class CombatEngine
                 // v1.1.10: for a few rounds, as the comment says, and a second cast renews it rather
                 // than stacking. It used to be permanent and compound with every cast, so a long god
                 // fight turned into a wall the longer it ran.
-                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_red");
                 if (monster.PowerSurgeRounds > 0)
                 {
                     monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
-                    terminal.WriteLine(Loc.Get("combat.monster_power_surge_renewed", monster.Name), "red");
+                    terminal.WriteLine(Loc.Get("combat.monster_power_surge_renewed", MonsterNames.Display(monster)), "red");
                     result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff renewed)");
                     return true;
                 }
@@ -6404,7 +6404,7 @@ public partial class CombatEngine
                 monster.Strength += buff;
                 monster.PowerSurgeStrength = buff;
                 monster.PowerSurgeRounds = GameConfig.BossPowerSurgeRounds;
-                terminal.WriteLine(Loc.Get("combat.monster_power_surges", monster.Name, buff), "red");
+                terminal.WriteLine(Loc.Get("combat.monster_power_surges", MonsterNames.Display(monster), buff), "red");
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} (attack buff +{buff})");
                 return true;
             }
@@ -6422,13 +6422,13 @@ public partial class CombatEngine
                 {
                     if (player.CalmWatersRounds > 0 && random.Next(100) < (int)(GameConfig.CalmWatersResistChance * 100))
                     {
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_magenta");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "dark_magenta");
                         terminal.WriteLine(Loc.Get("combat.calm_waters_deflects_curse"), "bright_cyan");
                     }
                     else
                     {
                         player.ApplyStatus(StatusEffect.Cursed, 3);
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_magenta");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "dark_magenta");
                         terminal.WriteLine(Loc.Get("combat.strength_falters"), "yellow");
                     }
                 }
@@ -6436,7 +6436,7 @@ public partial class CombatEngine
                 {
                     // Fallback to damage if already cursed
                     long damage = Math.Max(1, (long)(baseDamage * 1.5) - player.Defence);
-                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_magenta");
+                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "dark_magenta");
                     ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 }
                 result.CombatLog.Add($"{monster.Name} uses {abilityName}");
@@ -6455,12 +6455,12 @@ public partial class CombatEngine
                 {
                     if (player.CalmWatersRounds > 0 && random.Next(100) < (int)(GameConfig.CalmWatersResistChance * 100))
                     {
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_yellow");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_yellow");
                         terminal.WriteLine(Loc.Get("combat.calm_waters_deflects_stun"), "bright_cyan");
                     }
                     else
                     {
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_yellow");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_yellow");
                         // v1.1.13: the duel control rules (no re-hold, immunity after); +1 for the off-by-one
                         if (TryApplyPvPControl(player, StatusEffect.Stunned, 2))
                             terminal.WriteLine(Loc.Get("combat.you_are_stunned"), "yellow");
@@ -6468,7 +6468,7 @@ public partial class CombatEngine
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("combat.monster_ability_resisted", monster.Name, abilityName), "gray");
+                    terminal.WriteLine(Loc.Get("combat.monster_ability_resisted", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "gray");
                 }
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} (stun)");
                 return true;
@@ -6484,14 +6484,14 @@ public partial class CombatEngine
             case "Soul Siphon":
             {
                 long damage = Math.Max(1, (long)(baseDamage * 1.8) - player.Defence);
-                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "magenta");
+                terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "magenta");
                 long dealt = ApplyBossAbilityDamageToPlayer(monster, player, damage, abilityName, result);
                 if (dealt > 0)
                 {
                     // Heal from damage actually dealt (post-mitigation), not the raw roll
                     long healAmt = dealt * 30 / 100;
                     monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
-                    terminal.WriteLine(Loc.Get("combat.monster_heals", monster.Name, $"{healAmt:N0}"), "green");
+                    terminal.WriteLine(Loc.Get("combat.monster_heals", MonsterNames.Display(monster), $"{healAmt:N0}"), "green");
                 }
                 result.CombatLog.Add($"{monster.Name} life drains {dealt} via {abilityName}");
                 return true;
@@ -6514,7 +6514,7 @@ public partial class CombatEngine
                     // add ~6 monsters per round, compounding.
                     if (monsterList.Count(m => m.IsAlive) >= 6)
                     {
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_red");
                         return true; // turn spent; the call goes unanswered
                     }
                     int count = 1 + random.Next(2);
@@ -6547,7 +6547,7 @@ public partial class CombatEngine
                     }
                     monsterList.AddRange(minions);
                     result.Monsters.AddRange(minions);
-                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "bright_red");
+                    terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "bright_red");
                     terminal.WriteLine(Loc.Get("combat.minions_materialize", count, minionName), "red");
                     result.CombatLog.Add($"{monster.Name} summons {count} {minionName}s");
                 }
@@ -6565,19 +6565,19 @@ public partial class CombatEngine
                 {
                     if (player.CalmWatersRounds > 0 && random.Next(100) < (int)(GameConfig.CalmWatersResistChance * 100))
                     {
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_red");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "dark_red");
                         terminal.WriteLine(Loc.Get("combat.calm_waters_deflects_fear"), "bright_cyan");
                     }
                     else
                     {
                         player.ApplyStatus(StatusEffect.Feared, 2);
-                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", monster.Name, abilityName), "dark_red");
+                        terminal.WriteLine(Loc.Get("combat.monster_uses_ability", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "dark_red");
                         terminal.WriteLine(Loc.Get("combat.terror_grips_heart"), "yellow");
                     }
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("combat.monster_ability_stand_firm", monster.Name, abilityName), "gray");
+                    terminal.WriteLine(Loc.Get("combat.monster_ability_stand_firm", MonsterNames.Display(monster), BossAbilityLabel(abilityName)), "gray");
                 }
                 result.CombatLog.Add($"{monster.Name} uses {abilityName} (fear)");
                 return true;
@@ -6587,7 +6587,7 @@ public partial class CombatEngine
             case "The Offer":
             {
                 terminal.WriteLine("");
-                terminal.WriteLine($"  {Loc.Get("combat.manwe_offer_pause", monster.Name)}", "bright_yellow");
+                terminal.WriteLine($"  {Loc.Get("combat.manwe_offer_pause", MonsterNames.Display(monster))}", "bright_yellow");
                 terminal.WriteLine($"  {Loc.Get("combat.manwe_offer_peace")}", "yellow");
                 terminal.WriteLine("");
                 // Narrative moment, but doesn't stop combat for non-Manwe gods
@@ -7110,9 +7110,9 @@ public partial class CombatEngine
             monster.HP = Math.Max(0, monster.HP - damage);
 
             if (isOffHandAttack)
-                terminal.WriteLine(Loc.Get("combat.tm_offhand_strike", teammate.DisplayName, monster.Name, damage), "cyan");
+                terminal.WriteLine(Loc.Get("combat.tm_offhand_strike", teammate.DisplayName, MonsterNames.Display(monster), damage), "cyan");
             else
-                terminal.WriteLine(Loc.Get("combat.companion_hits", teammate.DisplayName, monster.Name, damage), "cyan");
+                terminal.WriteLine(Loc.Get("combat.companion_hits", teammate.DisplayName, MonsterNames.Display(monster), damage), "cyan");
             result.CombatLog.Add($"{teammate.DisplayName} attacks {monster.Name} for {damage} damage");
 
             // Apply post-hit enchantment effects
@@ -7337,7 +7337,7 @@ public partial class CombatEngine
         }
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("combat.you_slain", result.Monster.Name));
+        terminal.WriteLine(Loc.Get("combat.you_slain", MonsterNames.Display(result.Monster)));
         terminal.WriteLine("");
 
         // Abysswarden Corruption Harvest: heal 15% max HP on killing a poisoned enemy
@@ -7368,7 +7368,7 @@ public partial class CombatEngine
         // Rendered per-recipient so each player in the room reads it in their own language.
         if (isBoss)
             UsurperRemake.Server.RoomRegistry.BroadcastActionLocalized(lang =>
-                Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, result.Monster.Name));
+                Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, MonsterNames.Display(result.Monster)));
 
         QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss, result.Monster.TierName);
 
@@ -7567,7 +7567,7 @@ public partial class CombatEngine
         CompanionSystem.Instance?.SyncCompanionLevelToWrappers(result.Teammates);
 
         // Grant god XP share from believer kill (based on player's actual XP)
-        GrantGodKillXP(result.Player, playerXP, lang => result.Monster?.Name ?? Loc.GetIn(lang, "combat.a_monster"));
+        GrantGodKillXP(result.Player, playerXP, lang => result.Monster != null ? MonsterNames.DisplayIn(lang, result.Monster) : Loc.GetIn(lang, "combat.a_monster"));
 
         // Track statistics (player's actual share)
         result.Player.Statistics.RecordMonsterKill(playerXP, goldReward, isBoss, result.Monster.IsUnique);
@@ -7587,7 +7587,7 @@ public partial class CombatEngine
             {
                 var bossKillerName = result.Player.Name2 ?? result.Player.Name1;
                 _ = OnlineStateManager.Instance!.AddNews(
-                    Loc.Get("combat.news_boss_defeated", bossKillerName, result.Monster.Name), "combat");
+                    Loc.Get("combat.news_boss_defeated", bossKillerName, MonsterNames.Display(result.Monster)), "combat");
             }
         }
 
@@ -8422,12 +8422,12 @@ public partial class CombatEngine
         {
             long lightningBonus = Math.Max(1, damage / 10);
             target.HP = Math.Max(0, target.HP - lightningBonus); // hq-armory: out (Storm Eagle pet chip)
-            terminal.WriteLine(Loc.Get("combat.storm_eagle_lightning", attackerName, target.Name, lightningBonus), "bright_cyan");
+            terminal.WriteLine(Loc.Get("combat.storm_eagle_lightning", attackerName, MonsterNames.Display(target), lightningBonus), "bright_cyan");
 
             if (target.IsAlive && random.Next(100) < 15)
             {
                 if (TryStunMonster(target, 1))
-                    terminal.WriteLine(Loc.Get("combat.storm_eagle_stun", target.Name), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.storm_eagle_stun", MonsterNames.Display(target)), "bright_yellow");
             }
         }
         // Post-hit enchant sourcing -- two different rules apply:
@@ -8559,7 +8559,7 @@ public partial class CombatEngine
             {
                 target.IsFeared = true;
                 target.FearDuration = 2;
-                terminal.WriteLine(Loc.Get("combat.terror_incarnate", target.Name), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.terror_incarnate", MonsterNames.Display(target)), "bright_magenta");
             }
 
             // Holy Smite (Good/Holy): bonus damage vs undead/demonic foes. Applied as extra
@@ -8575,7 +8575,7 @@ public partial class CombatEngine
             {
                 long smite = Math.Max(1, (long)(damage * smiteBonus));
                 target.HP = Math.Max(0, target.HP - smite); // hq-armory: out (post-hit rider)
-                terminal.WriteLine(Loc.Get("combat.holy_smite_passive", target.Name, smite), "bright_yellow");
+                terminal.WriteLine(Loc.Get("combat.holy_smite_passive", MonsterNames.Display(target), smite), "bright_yellow");
             }
         }
 
@@ -8612,7 +8612,7 @@ public partial class CombatEngine
         {
             target.Poisoned = true;
             target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
-            terminal.WriteLine(Loc.Get("combat.gnoll_bite_poison", target.Name), "dark_green");
+            terminal.WriteLine(Loc.Get("combat.gnoll_bite_poison", MonsterNames.Display(target)), "dark_green");
         }
     }
 
@@ -9001,10 +9001,10 @@ public partial class CombatEngine
             case "dulling_mist":
             {
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
-                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
                 target.IsSlowed = true;
                 target.SlowDuration = Math.Max(target.SlowDuration, rounds);
-                terminal.WriteLine(Loc.Get("combat.spell_slowed", target.Name), "gray");
+                terminal.WriteLine(Loc.Get("combat.spell_slowed", MonsterNames.Display(target)), "gray");
                 return true;
             }
 
@@ -9012,7 +9012,7 @@ public partial class CombatEngine
             case "unveil_pattern":
             {
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : (effect == "scholars_mark" ? 3 : 2));
-                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
                 // the percent is fixed at cast; a mark already up keeps the higher of the two
                 int percent = SageMarkBonusPercent(caster);
                 if (target.IsMarked) percent = Math.Max(percent, target.MarkedBonusPercent > 0 ? target.MarkedBonusPercent : GameConfig.MarkedBonusPercent);
@@ -9020,26 +9020,26 @@ public partial class CombatEngine
                 target.MarkedDuration = Math.Max(target.MarkedDuration, rounds);
                 target.MarkedBonusPercent = percent;
                 if (percent > GameConfig.MarkedBonusPercent)
-                    terminal.WriteLine(Loc.Get("combat.sage_marked_library", target.Name, rounds, percent), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.sage_marked_library", MonsterNames.Display(target), rounds, percent), "bright_yellow");
                 else
-                    terminal.WriteLine(Loc.Get("combat.sage_marked", target.Name, rounds), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.sage_marked", MonsterNames.Display(target), rounds), "bright_yellow");
                 return true;
             }
 
             case "slumber_mist":
                 if (target.IsBoss || target.IsMiniBoss)
                 {
-                    terminal.WriteLine(Loc.Get("combat.sage_slumber_boss_immune", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.sage_slumber_boss_immune", MonsterNames.Display(target)), "yellow");
                     return true;
                 }
                 if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 2))
                 {
                     target.SlumberHpMark = target.HP;
-                    terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep", MonsterNames.Display(target)), "cyan");
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", MonsterNames.Display(target)), "yellow");
                 }
                 return true;
 
@@ -9050,16 +9050,16 @@ public partial class CombatEngine
                 {
                     target.IsConfused = true;
                     target.ConfusedDuration = Math.Max(target.ConfusedDuration, 1);
-                    terminal.WriteLine(Loc.Get("combat.spell_psychic", target.Name), "magenta");
+                    terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
                 }
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
-                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
                 int penalty = 5 + (caster?.Level ?? 0) / 5 + (int)((caster?.Wisdom ?? 0) / 10);
                 target.Distracted = true;
                 target.DistractedPenalty = Math.Max(target.DistractedPenalty, penalty);
                 target.DistractedRounds = Math.Max(target.DistractedRounds, rounds);
                 target.DistractedRoundsPenalty = Math.Max(target.DistractedRoundsPenalty, penalty);
-                terminal.WriteLine(Loc.Get("combat.distracted", target.Name, penalty), "yellow");
+                terminal.WriteLine(Loc.Get("combat.distracted", MonsterNames.Display(target), penalty), "yellow");
                 return true;
             }
 
@@ -9067,11 +9067,11 @@ public partial class CombatEngine
             {
                 if (target.FamilyName == "OldGod")
                 {
-                    terminal.WriteLine(Loc.Get("combat.sage_compel_old_god", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.sage_compel_old_god", MonsterNames.Display(target)), "yellow");
                     return true;
                 }
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
-                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
                 var tank = FindCompelTarget(caster, result);
                 if (tank != null)
                 {
@@ -9080,7 +9080,7 @@ public partial class CombatEngine
                     target.TauntStickChance = GameConfig.SoftTauntStickChance;
                 }
                 target.WeakenRounds = Math.Max(target.WeakenRounds, rounds);
-                terminal.WriteLine(Loc.Get("combat.sage_compel", target.Name, tank?.DisplayName ?? caster?.DisplayName ?? ""), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.sage_compel", MonsterNames.Display(target), tank?.DisplayName ?? caster?.DisplayName ?? ""), "bright_magenta");
                 return true;
             }
 
@@ -9088,12 +9088,12 @@ public partial class CombatEngine
             case "mass_confusion":
             {
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : 3);
-                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", target.Name), "yellow"); return true; }
+                if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
                 if (effect == "mass_confusion" && (target.IsBoss || target.IsMiniBoss))
                     rounds = Math.Min(rounds, GameConfig.MassConfusionBossMaxRounds);
                 target.IsConfused = true;
                 target.ConfusedDuration = rounds;
-                terminal.WriteLine(Loc.Get(effect == "confusion" ? "combat.confusion_stumble" : "combat.spell_mass_confusion", target.Name), "magenta");
+                terminal.WriteLine(Loc.Get(effect == "confusion" ? "combat.confusion_stumble" : "combat.spell_mass_confusion", MonsterNames.Display(target)), "magenta");
                 return true;
             }
         }
@@ -9184,8 +9184,8 @@ public partial class CombatEngine
             // assumed her own staff's enchant had leaked across characters. Mirror the
             // fire/lightning pattern that already differentiates player vs teammate.
             terminal.WriteLine(isPlayer
-                ? Loc.Get("combat.enchant_frost", target.Name)
-                : Loc.Get("combat.enchant_frost_tm", name, target.Name));
+                ? Loc.Get("combat.enchant_frost", MonsterNames.Display(target))
+                : Loc.Get("combat.enchant_frost_tm", name, MonsterNames.Display(target)));
         }
 
         if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
@@ -9200,14 +9200,14 @@ public partial class CombatEngine
             if (stunned)
             {
                 terminal.WriteLine(isPlayer
-                    ? Loc.Get("combat.enchant_lightning_stun", lightningDamage, target.Name)
-                    : Loc.Get("combat.enchant_lightning_stun_tm", name, lightningDamage, target.Name));
+                    ? Loc.Get("combat.enchant_lightning_stun", lightningDamage, MonsterNames.Display(target))
+                    : Loc.Get("combat.enchant_lightning_stun_tm", name, lightningDamage, MonsterNames.Display(target)));
             }
             else
             {
                 terminal.WriteLine(isPlayer
-                    ? Loc.Get("combat.enchant_lightning_resist", lightningDamage, target.Name)
-                    : Loc.Get("combat.enchant_lightning_resist_tm", name, lightningDamage, target.Name));
+                    ? Loc.Get("combat.enchant_lightning_resist", lightningDamage, MonsterNames.Display(target))
+                    : Loc.Get("combat.enchant_lightning_resist_tm", name, lightningDamage, MonsterNames.Display(target)));
             }
             result.TotalDamageDealt += lightningDamage;
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
@@ -9236,7 +9236,7 @@ public partial class CombatEngine
             if (IsAngelMonster(target))
             {
                 terminal.SetColor("bright_white");
-                terminal.WriteLine(Loc.Get("combat.enchant_holy_immune_angel", target.Name));
+                terminal.WriteLine(Loc.Get("combat.enchant_holy_immune_angel", MonsterNames.Display(target)));
             }
             else
             {
@@ -9272,7 +9272,7 @@ public partial class CombatEngine
             if (IsDemonMonster(target))
             {
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.enchant_shadow_immune_demon", target.Name));
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow_immune_demon", MonsterNames.Display(target)));
             }
             else
             {
@@ -9343,7 +9343,7 @@ public partial class CombatEngine
             long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
             target.HP -= fireDamage;
             terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("combat.enchant_fire_multi", fireDamage, target.Name));
+            terminal.WriteLine(Loc.Get("combat.enchant_fire_multi", fireDamage, MonsterNames.Display(target)));
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
 
@@ -9353,7 +9353,7 @@ public partial class CombatEngine
             target.IsSlowed = true;
             target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.enchant_frost_multi", target.Name));
+            terminal.WriteLine(Loc.Get("combat.enchant_frost_multi", MonsterNames.Display(target)));
         }
 
         if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
@@ -9364,8 +9364,8 @@ public partial class CombatEngine
             bool stunned = TryStunMonster(target, 1);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(stunned
-                ? Loc.Get("combat.enchant_lightning_stun_multi", lightningDamage, target.Name)
-                : Loc.Get("combat.enchant_lightning_resist_multi", lightningDamage, target.Name));
+                ? Loc.Get("combat.enchant_lightning_stun_multi", lightningDamage, MonsterNames.Display(target))
+                : Loc.Get("combat.enchant_lightning_resist_multi", lightningDamage, MonsterNames.Display(target)));
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
         }
 
@@ -9375,7 +9375,7 @@ public partial class CombatEngine
             long poisonDamage = Math.Max(1, poisonValue);
             target.HP -= poisonDamage;
             terminal.SetColor("green");
-            terminal.WriteLine(Loc.Get("combat.enchant_venom_multi", poisonDamage, target.Name));
+            terminal.WriteLine(Loc.Get("combat.enchant_venom_multi", poisonDamage, MonsterNames.Display(target)));
             attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
         }
 
@@ -9385,7 +9385,7 @@ public partial class CombatEngine
             if (IsAngelMonster(target))
             {
                 terminal.SetColor("bright_white");
-                terminal.WriteLine(Loc.Get("combat.enchant_holy_immune_angel", target.Name));
+                terminal.WriteLine(Loc.Get("combat.enchant_holy_immune_angel", MonsterNames.Display(target)));
             }
             else
             {
@@ -9401,8 +9401,8 @@ public partial class CombatEngine
                 target.HP -= holyDamage;
                 terminal.SetColor("bright_white");
                 terminal.WriteLine(isUndead
-                    ? Loc.Get("combat.enchant_holy_undead_multi", holyDamage, target.Name)
-                    : Loc.Get("combat.enchant_holy_multi", holyDamage, target.Name));
+                    ? Loc.Get("combat.enchant_holy_undead_multi", holyDamage, MonsterNames.Display(target))
+                    : Loc.Get("combat.enchant_holy_multi", holyDamage, MonsterNames.Display(target)));
                 attacker.Statistics?.RecordDamageDealt(holyDamage, false);
             }
         }
@@ -9413,14 +9413,14 @@ public partial class CombatEngine
             if (IsDemonMonster(target))
             {
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.enchant_shadow_immune_demon", target.Name));
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow_immune_demon", MonsterNames.Display(target)));
             }
             else
             {
                 long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
                 target.HP -= shadowDamage;
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.enchant_shadow_multi", shadowDamage, target.Name));
+                terminal.WriteLine(Loc.Get("combat.enchant_shadow_multi", shadowDamage, MonsterNames.Display(target)));
                 attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
             }
         }
@@ -9738,7 +9738,7 @@ public partial class CombatEngine
         while (true)
         {
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("combat.loot_found_on_corpse", monster.Name));
+            terminal.WriteLine(Loc.Get("combat.loot_found_on_corpse", MonsterNames.Display(monster)));
             terminal.WriteLine("");
 
             if (!canPlayerUseItem && cantUseReason != null)
@@ -10275,9 +10275,9 @@ public partial class CombatEngine
                 lootItem.IsIdentified,
                 new List<ElectronBridge.ChoiceOption>
                 {
-                    new() { Key = "E", Label = "Equip", Style = "treasure" },
-                    new() { Key = "T", Label = "Take", Style = "info" },
-                    new() { Key = "P", Label = "Pass", Style = "info" },
+                    new() { Key = "E", Label = Loc.Get("combat.loot_choice_equip"), Style = "treasure" },
+                    new() { Key = "T", Label = Loc.Get("combat.loot_choice_take"), Style = "info" },
+                    new() { Key = "P", Label = Loc.Get("combat.loot_choice_pass"), Style = "info" },
                 });
         }
 
@@ -10502,7 +10502,7 @@ public partial class CombatEngine
             string followerLang = LanguageOf(player);   // v1.2.2: the lines on followerTerm are in their language
             followerTerm.SetColor("bright_yellow");
             followerTerm.WriteLine("");
-            followerTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.GetIn(followerLang, "combat.loot_drop_from_sr", monster.Name) : Loc.GetIn(followerLang, "combat.loot_drop_from", monster.Name));
+            followerTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.GetIn(followerLang, "combat.loot_drop_from_sr", MonsterNames.Display(monster)) : Loc.GetIn(followerLang, "combat.loot_drop_from", MonsterNames.Display(monster)));
             // Reassure the follower this drop is theirs to earn (co-op feedback).
             followerTerm.SetColor("bright_green");
             followerTerm.WriteLine(Loc.GetIn(followerLang, "combat.loot_yours_to_claim"));
@@ -10800,7 +10800,7 @@ public partial class CombatEngine
         winnerTerm.FlushPendingInput();
 
         winnerTerm.SetColor("white");
-        winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_won_roll", monster.Name));
+        winnerTerm.WriteLine(Loc.GetIn(winnerLang, "combat.loot_won_roll", MonsterNames.Display(monster)));
         winnerTerm.WriteLine("");
         if (lootItem.IsIdentified)
         {
@@ -11467,7 +11467,7 @@ public partial class CombatEngine
 
             otherTerm.SetColor("bright_yellow");
             otherTerm.WriteLine("");
-            otherTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.GetIn(otherLang, "combat.loot_passed_from_sr", monster.Name) : Loc.GetIn(otherLang, "combat.loot_passed_from", monster.Name));
+            otherTerm.WriteLine(GameConfig.ScreenReaderMode ? Loc.GetIn(otherLang, "combat.loot_passed_from_sr", MonsterNames.Display(monster)) : Loc.GetIn(otherLang, "combat.loot_passed_from", MonsterNames.Display(monster)));
             if (lootItem.IsIdentified)
             {
                 otherTerm.SetColor(rarityColor);
@@ -12278,7 +12278,7 @@ public partial class CombatEngine
         {
             var monsterData = monsters.Where(m => m.IsAlive).Select(m => new
             {
-                name = m.Name,
+                name = MonsterNames.Display(m),
                 hp = m.HP,
                 maxHp = m.MaxHP,
                 level = m.Level,
@@ -12357,7 +12357,7 @@ public partial class CombatEngine
             terminal.Write($"║ [{i + 1}] ");
             terminal.SetColor(monster.IsBoss ? "bright_red" : "white");
             // Truncate long names to fit the status box (18 chars)
-            string displayName = monster.Name;
+            string displayName = MonsterNames.Display(monster);
             if (displayName.Length > 18)
             {
                 // For bosses with titles like "Maelketh, The Broken Blade", use just the first name
@@ -12779,7 +12779,7 @@ public partial class CombatEngine
             string hpStatus = hpPercent > 75 ? Loc.Get("combat.status_healthy") : hpPercent > 50 ? Loc.Get("combat.status_wounded") : hpPercent > 25 ? Loc.Get("combat.status_badly_hurt") : Loc.Get("combat.status_near_death");
 
             terminal.SetColor(monster.IsBoss ? "bright_red" : "white");
-            terminal.Write($"  {i + 1}. {monster.Name}");
+            terminal.Write($"  {i + 1}. {MonsterNames.Display(monster)}");
             terminal.SetColor("gray");
             terminal.Write(Loc.Get("combat.sr_monster_hp", monster.HP, monster.MaxHP, (int)hpPercent, hpStatus));
 
@@ -13141,7 +13141,7 @@ public partial class CombatEngine
                 && random.Next(100) < monster.EvasionMissChance)
             {
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("combat.evasion_miss", monster.Name));
+                terminal.WriteLine(Loc.Get("combat.evasion_miss", MonsterNames.Display(monster)));
                 continue;
             }
 
@@ -13171,13 +13171,13 @@ public partial class CombatEngine
             {
                 damagePerMonster = ApplyPhaseImmunityDamage(monster, damagePerMonster, isMagicalDamage: true);
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", monster.Name));
+                terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", MonsterNames.Display(monster)));
             }
             else if (!isSpellDamage && monster.IsPhysicalImmune)
             {
                 damagePerMonster = ApplyPhaseImmunityDamage(monster, damagePerMonster, isMagicalDamage: false);
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", monster.Name));
+                terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", MonsterNames.Display(monster)));
             }
             if (BossContext != null && BossContext.DivineArmorReduction > 0 && damagePerMonster > 0)
             {
@@ -13212,7 +13212,7 @@ public partial class CombatEngine
             result.TotalDamageDealt += actualDamage;
 
             terminal.SetColor("yellow");
-            terminal.Write($"{monster.Name}: ");
+            terminal.Write($"{MonsterNames.Display(monster)}: ");
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("combat.hp_loss", actualDamage));
 
@@ -13225,7 +13225,7 @@ public partial class CombatEngine
             {
                 monster.HP = 0;
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  {Loc.Get("combat.you_kill", monster.Name)}");
+                terminal.WriteLine($"  {Loc.Get("combat.you_kill", MonsterNames.Display(monster))}");
                 result.DefeatedMonsters.Add(monster);
 
                 // Bloodlust heal-on-kill
@@ -13295,7 +13295,7 @@ public partial class CombatEngine
             && random.Next(100) < target.EvasionMissChance)
         {
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.evasion_miss", target.Name));
+            terminal.WriteLine(Loc.Get("combat.evasion_miss", MonsterNames.Display(target)));
             return false; // evaded -- caller must skip post-hit enchantments (lifesteal etc.)
         }
 
@@ -13307,13 +13307,13 @@ public partial class CombatEngine
         {
             damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: true);
             terminal.SetColor("dark_magenta");
-            terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", target.Name));
+            terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", MonsterNames.Display(target)));
         }
         else if (!isSpellDamage && target.IsPhysicalImmune)
         {
             damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: false);
             terminal.SetColor("dark_magenta");
-            terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", target.Name));
+            terminal.WriteLine(Loc.Get("combat.physical_immunity_absorbs", MonsterNames.Display(target)));
         }
 
         // Divine armor reduction for Old God bosses (reduces player damage dealt)
@@ -13384,7 +13384,7 @@ public partial class CombatEngine
             long sleepBonus = actualDamage / 2;
             actualDamage += sleepBonus;
             terminal.SetColor("cyan");
-            terminal.WriteLine(Loc.Get("combat.sleep_bonus_damage", target.Name, sleepBonus));
+            terminal.WriteLine(Loc.Get("combat.sleep_bonus_damage", MonsterNames.Display(target), sleepBonus));
         }
 
         // v1.1.11: Team HQ Armory, after every other modifier of the hit (0 for NPCs and companions).
@@ -13419,37 +13419,37 @@ public partial class CombatEngine
         if (suppressMeleeFlavor)
         {
             // Spell/ability — show damage without melee flavor verbs
-            attackMessage = Loc.Get("combat.target_takes_damage_markup", target.Name, actualDamage);
+            attackMessage = Loc.Get("combat.target_takes_damage_markup", MonsterNames.Display(target), actualDamage);
         }
         else if (attacker != null && attacker != currentPlayer && attacker.IsCompanion)
         {
             // Companion/ally attack
-            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
+            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, MonsterNames.Display(target), actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
         }
         else if (attacker != null && attacker != currentPlayer)
         {
             // Teammate attack (NPC, echo, or other non-player ally)
-            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, target.Name, actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
+            attackMessage = CombatMessages.GetAllyAttackMessage(attacker.DisplayName, MonsterNames.Display(target), actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
         }
         else
         {
             // Player attack
-            attackMessage = CombatMessages.GetPlayerAttackMessage(target.Name, actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
+            attackMessage = CombatMessages.GetPlayerAttackMessage(MonsterNames.Display(target), actualDamage, target.MaxHP, random);   // v1.1.14: the engine RNG
         }
-        terminal.WriteLine(attackMessage);
+        foreach (var row in CombatMessages.Rows(attackMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
         if (target.HP <= 0)
         {
             target.HP = 0;
 
             // Use new colored death message
-            var deathMessage = CombatMessages.GetDeathMessage(target.Name, target.MonsterColor, random);   // v1.1.14: the engine RNG
+            var deathMessage = CombatMessages.GetDeathMessage(MonsterNames.Display(target), target.MonsterColor, random);   // v1.1.14: the engine RNG
             terminal.WriteLine(deathMessage);
 
             // Broadcast monster death to group
             string? killerName = attacker?.DisplayName;
             BroadcastGroupLocalized(result, lang => GroupLine(lang, "\u001b[1;32m", "combat.group_slays",
-                killerName ?? Loc.GetIn(lang, "combat.group_someone"), target.Name));
+                killerName ?? Loc.GetIn(lang, "combat.group_someone"), MonsterNames.DisplayIn(lang, target)));
 
             result.DefeatedMonsters.Add(target);
 
@@ -13819,7 +13819,7 @@ public partial class CombatEngine
                             {
                                 long poisonBonusMM = (long)(attackPower * GameConfig.AssassinLethalPrecisionPoisonBonus);
                                 attackPower += poisonBonusMM;
-                                terminal.WriteLine(Loc.Get("combat.lethal_precision_poison", target.Name, poisonBonusMM), "dark_green");
+                                terminal.WriteLine(Loc.Get("combat.lethal_precision_poison", MonsterNames.Display(target), poisonBonusMM), "dark_green");
                             }
                         }
 
@@ -14260,11 +14260,11 @@ public partial class CombatEngine
                         terminal.SetColor("bright_green");
                         if (isOffHandAttack)
                         {
-                            terminal.WriteLine(Loc.Get("combat.offhand_strike_at", target.Name));
+                            terminal.WriteLine(Loc.Get("combat.offhand_strike_at", MonsterNames.Display(target)));
                         }
                         else
                         {
-                            terminal.WriteLine(Loc.Get("combat.you_attack_target", target.Name));
+                            terminal.WriteLine(Loc.Get("combat.you_attack_target", MonsterNames.Display(target)));
                         }
                         await Pacing.Wait(GetCombatDelay(500));
 
@@ -14464,7 +14464,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("combat.backstab_shadows", target.Name));
+        terminal.WriteLine(Loc.Get("combat.backstab_shadows", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Backstab: 3x damage, dexterity-based success
@@ -14512,7 +14512,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_red");
-        terminal.WriteLine(Loc.Get("combat.power_attack_windup", target.Name));
+        terminal.WriteLine(Loc.Get("combat.power_attack_windup", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Mirror the basic-attack damage stack so Power Strike doesn't lose to it just
@@ -14604,7 +14604,7 @@ public partial class CombatEngine
         powerDamage = Math.Max(1, powerDamage - defense);
 
         terminal.SetColor("bright_red");
-        terminal.WriteLine(Loc.Get("combat.power_attack_hit", target.Name, powerDamage));
+        terminal.WriteLine(Loc.Get("combat.power_attack_hit", MonsterNames.Display(target), powerDamage));
 
         // Power Attack runs the same on-hit enchant pipeline as a basic swing (lifesteal, elemental
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
@@ -14620,7 +14620,7 @@ public partial class CombatEngine
             {
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", offHandTarget.Name));
+                terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", MonsterNames.Display(offHandTarget)));
                 await Pacing.Wait(GetCombatDelay(500));
 
                 // Off-hand follow-up does a FULL off-hand swing using the same formula as a normal
@@ -14645,7 +14645,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("combat.precise_strike_aim", target.Name));
+        terminal.WriteLine(Loc.Get("combat.precise_strike_aim", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Precise Strike: normal damage, +25% accuracy via reducing defense by 25%
@@ -14665,7 +14665,7 @@ public partial class CombatEngine
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
 
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("combat.precise_strike_hit", target.Name, damage));
+        terminal.WriteLine(Loc.Get("combat.precise_strike_hit", MonsterNames.Display(target), damage));
 
         await ApplySingleMonsterDamage(target, damage, result, "precise strike", player);
         await Pacing.Wait(GetCombatDelay(800));
@@ -14714,7 +14714,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("combat.soul_strike_channel", target.Name));
+        terminal.WriteLine(Loc.Get("combat.soul_strike_channel", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Soul Strike: Chivalry-based holy damage
@@ -14722,7 +14722,7 @@ public partial class CombatEngine
         holyDamage = DifficultySystem.ApplyPlayerDamageMultiplier(holyDamage);
 
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("combat.soul_strike_damage", holyDamage, target.Name)); // v1.1.1: missing target arg showed raw {1}
+        terminal.WriteLine(Loc.Get("combat.soul_strike_damage", holyDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
 
         await ApplySingleMonsterDamage(target, holyDamage, result, "soul strike", player, isSpellDamage: true);
     }
@@ -14734,7 +14734,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_white");
-        terminal.WriteLine(Loc.Get("combat.smite_channel", target.Name));
+        terminal.WriteLine(Loc.Get("combat.smite_channel", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Smite: 150% damage + level bonus (with weapon soft cap)
@@ -14743,7 +14743,7 @@ public partial class CombatEngine
         smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
 
         terminal.SetColor("bright_white");
-        terminal.WriteLine(Loc.Get("combat.smite_damage", smiteDamage, target.Name)); // v1.1.1: missing target arg showed raw {1}
+        terminal.WriteLine(Loc.Get("combat.smite_damage", smiteDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
 
         await ApplySingleMonsterDamage(target, smiteDamage, result, "smite", player);
     }
@@ -14764,7 +14764,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("green");
-        terminal.WriteLine(Loc.Get("combat.ranged_fire", target.Name));
+        terminal.WriteLine(Loc.Get("combat.ranged_fire", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Ranged damage: DEX-based + weapon power + level bonus (mirrors melee formula)
@@ -14781,7 +14781,7 @@ public partial class CombatEngine
         rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
 
         terminal.SetColor("green");
-        terminal.WriteLine(Loc.Get("combat.ranged_hit", target.Name, rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
+        terminal.WriteLine(Loc.Get("combat.ranged_hit", MonsterNames.Display(target), rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
 
         await ApplySingleMonsterDamage(target, rangedDamage, result, "ranged attack", player);
     }
@@ -14793,7 +14793,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("combat.disarm_attempt", target.Name));
+        terminal.WriteLine(Loc.Get("combat.disarm_attempt", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Disarm: Dexterity vs monster strength
@@ -14801,7 +14801,7 @@ public partial class CombatEngine
         if (random.Next(100) < disarmChance)
         {
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("combat.disarm_success", target.Name));
+            terminal.WriteLine(Loc.Get("combat.disarm_success", MonsterNames.Display(target)));
             target.WeapPow = Math.Max(0, target.WeapPow - 5);
         }
         else
@@ -14820,12 +14820,12 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("combat.taunt_target", target.Name));
+        terminal.WriteLine(Loc.Get("combat.taunt_target", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Taunt: Lower enemy defense + force targeting for 2 rounds
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("combat.taunt_enraged", target.Name));
+        terminal.WriteLine(Loc.Get("combat.taunt_enraged", MonsterNames.Display(target)));
         target.Defence = Math.Max(0, target.Defence - 3);
         target.ArmPow = Math.Max(0, target.ArmPow - 2);
         target.TauntedBy = player.DisplayName;
@@ -15036,7 +15036,7 @@ public partial class CombatEngine
             {
                 actualDamage = (long)(actualDamage * 1.40);
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("combat.tidesworn_weaken_bonus", target.Name));
+                terminal.WriteLine(Loc.Get("combat.tidesworn_weaken_bonus", MonsterNames.Display(target)));
             }
 
             // Handle special damage effects
@@ -15067,7 +15067,7 @@ public partial class CombatEngine
                 // actually see the bonus fire against low-HP enemies. Now applied inline like Execute.
                 actualDamage = (long)(actualDamage * 1.5);
                 terminal.SetColor("dark_red");
-                terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", target.Name));
+                terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", MonsterNames.Display(target)));
             }
             else if (abilityResult.SpecialEffect == "double_vs_debuffed" && target != null)
             {
@@ -15084,12 +15084,12 @@ public partial class CombatEngine
                 {
                     actualDamage *= 2;
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("combat.wave_echo_resonates", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_resonates", MonsterNames.Display(target)));
                 }
                 else
                 {
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("combat.wave_echo_strikes", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_strikes", MonsterNames.Display(target)));
                 }
             }
             else if (abilityResult.SpecialEffect == "aoe" || abilityResult.SpecialEffect == "aoe_confusion")
@@ -15176,7 +15176,7 @@ public partial class CombatEngine
                 result.Player?.Statistics.RecordDamageDealt(actualDamage, abilityCrit);
 
                 terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_you_deal_damage" : "combat.ability_npc_deals_damage", actorName, actualDamage, target.Name));
+                terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_you_deal_damage" : "combat.ability_npc_deals_damage", actorName, actualDamage, MonsterNames.Display(target)));
 
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
@@ -15220,16 +15220,16 @@ public partial class CombatEngine
                     long actualHeal = player.HP - oldHP;
                     terminal.SetColor("red");
                     if (actualHeal > 0)
-                        terminal.WriteLine(Loc.Get("combat.ability_lifesteal_drain", target.Name, actualDamage, actualHeal));
+                        terminal.WriteLine(Loc.Get("combat.ability_lifesteal_drain", MonsterNames.Display(target), actualDamage, actualHeal));
                     else
-                        terminal.WriteLine(Loc.Get("combat.ability_lifesteal_capped", target.Name, actualDamage));
+                        terminal.WriteLine(Loc.Get("combat.ability_lifesteal_capped", MonsterNames.Display(target), actualDamage));
                 }
 
                 if (target.HP <= 0)
                 {
                     target.HP = 0;
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine(Loc.Get("combat.ability_target_slain", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_target_slain", MonsterNames.Display(target)));
                     result.DefeatedMonsters.Add(target);
                 }
             }
@@ -15257,9 +15257,9 @@ public partial class CombatEngine
                 // a {0}=actor / {1}=target shape and was already correct. Branch cleanly so
                 // each key gets the args its template expects.
                 if (isPlayer)
-                    terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", offHandTarget.Name));
+                    terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", MonsterNames.Display(offHandTarget)));
                 else
-                    terminal.WriteLine(Loc.Get("combat.off_hand_strike_npc", actorName, offHandTarget.Name));
+                    terminal.WriteLine(Loc.Get("combat.off_hand_strike_npc", actorName, MonsterNames.Display(offHandTarget)));
                 await Pacing.Wait(GetCombatDelay(500));
 
                 // Off-hand follow-up does a FULL off-hand swing. For the PLAYER, use the same
@@ -15431,12 +15431,12 @@ public partial class CombatEngine
                     if (TryStunMonster(target, 1))
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_stunned", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_stunned", MonsterNames.Display(target)));
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_stun_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_stun_resist", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -15447,7 +15447,7 @@ public partial class CombatEngine
                     target.Poisoned = true;
                     target.PoisonRounds = Math.Max(target.PoisonRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("green");
-                    terminal.WriteLine(Loc.Get("combat.ability_poisoned", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_poisoned", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -15461,9 +15461,9 @@ public partial class CombatEngine
                     target.IsCorroded = true;
                     target.CorrodedDuration = Math.Max(target.CorrodedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("dark_green");
-                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_apply", target.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_apply", MonsterNames.Display(target))}");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_effect", target.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_effect", MonsterNames.Display(target))}");
                 }
                 break;
 
@@ -15479,7 +15479,7 @@ public partial class CombatEngine
                         result.TotalDamageDealt += executeBonusMM;
                         result.Player?.Statistics.RecordDamageDealt(executeBonusMM, false);
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_execute_critical", target.Name, executeBonusMM));
+                        terminal.WriteLine(Loc.Get("combat.ability_execute_critical", MonsterNames.Display(target), executeBonusMM));
                     }
                     else if (hpPercentMM < 0.50)
                     {
@@ -15489,12 +15489,12 @@ public partial class CombatEngine
                         result.TotalDamageDealt += executeBonusMM;
                         result.Player?.Statistics.RecordDamageDealt(executeBonusMM, false);
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("combat.ability_execute_finishing", target.Name, executeBonusMM));
+                        terminal.WriteLine(Loc.Get("combat.ability_execute_finishing", MonsterNames.Display(target), executeBonusMM));
                     }
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("combat.ability_execute_too_healthy", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_execute_too_healthy", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -15506,7 +15506,7 @@ public partial class CombatEngine
                     int distractPenalty = 5 + player.Level / 5 + (int)(player.Charisma / 10);
                     target.DistractedPenalty = distractPenalty;
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.distracted", target.Name, distractPenalty));
+                    terminal.WriteLine(Loc.Get("combat.distracted", MonsterNames.Display(target), distractPenalty));
                 }
                 break;
 
@@ -15519,7 +15519,7 @@ public partial class CombatEngine
                     int weakenDefReduction = Math.Max(1, (int)(target.Defence * 0.20));
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, weakenAtkReduction, weakenDefReduction));
+                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", MonsterNames.Display(target), weakenAtkReduction, weakenDefReduction));
                 }
                 break;
 
@@ -15530,12 +15530,12 @@ public partial class CombatEngine
                     if (random.Next(100) < GameConfig.CharmApplyChance && TryCharmMonster(target, charmRounds))
                     {
                         terminal.SetColor(ColorRole.Success);
-                        terminal.WriteLine(Loc.Get("combat.ability_charmed", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_charmed", MonsterNames.Display(target)));
                     }
                     else
                     {
                         terminal.SetColor(ColorRole.Notice);
-                        terminal.WriteLine(Loc.Get("combat.resists_charm", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.resists_charm", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -15649,7 +15649,7 @@ public partial class CombatEngine
                     {
                         target.HP = 0;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.ability_target_slain", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_target_slain", MonsterNames.Display(target)));
                         if (!result.DefeatedMonsters.Contains(target))
                             result.DefeatedMonsters.Add(target);
                     }
@@ -15677,7 +15677,7 @@ public partial class CombatEngine
                         {
                             target.HP = 0;
                             terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("combat.ability_target_slain", target.Name));
+                            terminal.WriteLine(Loc.Get("combat.ability_target_slain", MonsterNames.Display(target)));
                             if (!result.DefeatedMonsters.Contains(target))
                                 result.DefeatedMonsters.Add(target);
                         }
@@ -15713,7 +15713,7 @@ public partial class CombatEngine
                     {
                         target.HP = 0;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.ability_purified", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_purified", MonsterNames.Display(target)));
                         if (!result.DefeatedMonsters.Contains(target))
                             result.DefeatedMonsters.Add(target);
                     }
@@ -15802,14 +15802,14 @@ public partial class CombatEngine
                         result.TotalDamageDealt += actualHolyDmg;
                         bool isUndead = m.MonsterClass == MonsterClass.Undead || m.Undead > 0;
                         terminal.SetColor("yellow");
-                        terminal.Write($"  {m.Name}: ");
+                        terminal.Write($"  {MonsterNames.Display(m)}: ");
                         terminal.SetColor("bright_yellow");
                         terminal.WriteLine(Loc.Get(isUndead ? "combat.hp_loss_holy" : "combat.hp_loss", actualHolyDmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
                             terminal.SetColor("bright_green");
-                            terminal.WriteLine($"  {Loc.Get("combat.ability_purified", m.Name)}");
+                            terminal.WriteLine($"  {Loc.Get("combat.ability_purified", MonsterNames.Display(m))}");
                             if (!result.DefeatedMonsters.Contains(m))
                                 result.DefeatedMonsters.Add(m);
                         }
@@ -15828,12 +15828,12 @@ public partial class CombatEngine
                         target.IsFeared = true;
                         target.FearDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_fear_success" : "combat.ability_fear_success_npc", target.Name, actorName));
+                        terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_fear_success" : "combat.ability_fear_success_npc", MonsterNames.Display(target), actorName));
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_fear_resist" : "combat.ability_fear_resist_npc", target.Name, actorName));
+                        terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_fear_resist" : "combat.ability_fear_resist_npc", MonsterNames.Display(target), actorName));
                     }
                 }
                 break;
@@ -15847,12 +15847,12 @@ public partial class CombatEngine
                         target.IsConfused = true;
                         target.ConfusedDuration = 2;
                         terminal.SetColor("magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_confusion_success", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_confusion_success", MonsterNames.Display(target)));
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_confusion_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_confusion_resist", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -15866,12 +15866,12 @@ public partial class CombatEngine
                         && TryHoldMonster(target, HoldKind.Freeze, abilityResult.Duration > 0 ? abilityResult.Duration : 2))
                     {
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_frozen", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_frozen", MonsterNames.Display(target)));
                     }
                     else
                     {
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_freeze_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_freeze_resist", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -15888,7 +15888,7 @@ public partial class CombatEngine
                         result.TotalDamageDealt += killDmg;
                         result.Player?.Statistics.RecordDamageDealt(killDmg, false);
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_assassinated", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_assassinated", MonsterNames.Display(target)));
                         if (!result.DefeatedMonsters.Contains(target))
                             result.DefeatedMonsters.Add(target);
                     }
@@ -15920,7 +15920,7 @@ public partial class CombatEngine
                         {
                             target.HP = 0;
                             terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("combat.ability_torn_apart", target.Name));
+                            terminal.WriteLine(Loc.Get("combat.ability_torn_apart", MonsterNames.Display(target)));
                             if (!result.DefeatedMonsters.Contains(target))
                                 result.DefeatedMonsters.Add(target);
                         }
@@ -15945,7 +15945,7 @@ public partial class CombatEngine
                         result.TotalDamageDealt += blossomDmg;
                         result.Player?.Statistics.RecordDamageDealt(blossomDmg, false);
                         terminal.SetColor(isExecute ? "bright_red" : "red");
-                        terminal.WriteLine(Loc.Get(isExecute ? "combat.death_blossom_execute" : "combat.death_blossom_hit", m.Name, blossomDmg));
+                        terminal.WriteLine(Loc.Get(isExecute ? "combat.death_blossom_execute" : "combat.death_blossom_hit", MonsterNames.Display(m), blossomDmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -15982,7 +15982,7 @@ public partial class CombatEngine
                     target.IsMarked = true;
                     target.MarkedDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_marked", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_marked", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -16150,9 +16150,9 @@ public partial class CombatEngine
                     corrodeTarget.IsCorroded = true;
                     corrodeTarget.CorrodedDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  {Loc.Get("combat.corrosive_cloud_hits", corrodeTarget.Name, corrodeDmg)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.corrosive_cloud_hits", MonsterNames.Display(corrodeTarget), corrodeDmg)}");
                     terminal.SetColor("dark_green");
-                    terminal.WriteLine($"  {Loc.Get("combat.corroded_armor", corrodeTarget.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.corroded_armor", MonsterNames.Display(corrodeTarget))}");
                     if (corrodeTarget.HP <= 0)
                     {
                         corrodeTarget.HP = 0;
@@ -16188,12 +16188,12 @@ public partial class CombatEngine
                     if (TryStunMonster(target, 1))
                     {
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_legendary_stagger", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_legendary_stagger", MonsterNames.Display(target)));
                     }
                     else
                     {
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_legendary_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_legendary_resist", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -16234,7 +16234,7 @@ public partial class CombatEngine
                     target.TauntRoundsLeft = Math.Max(target.TauntRoundsLeft, abilityResult.Duration);
                     target.TauntStickChance = GameConfig.SoftTauntStickChance;
                     terminal.SetColor("cyan");
-                    terminal.WriteLine(Loc.Get("combat.ability_undertow", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_undertow", MonsterNames.Display(target)));
                 }
                 // In multi-monster: taunt ALL living monsters
                 if (monsters != null)
@@ -16271,7 +16271,7 @@ public partial class CombatEngine
                 {
                     target.WeakenRounds = Math.Max(target.WeakenRounds, 2);
                     terminal.SetColor("cyan");
-                    terminal.WriteLine(Loc.Get("combat.ability_riptide", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_riptide", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -16330,7 +16330,7 @@ public partial class CombatEngine
                         m.HP -= dmg;
                         totalHeal += (int)(dmg * 0.20);
                         terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
-                        terminal.WriteLine(Loc.Get(isHoly ? "combat.ability_sanctified_torrent_holy" : "combat.ability_sanctified_torrent", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get(isHoly ? "combat.ability_sanctified_torrent_holy" : "combat.ability_sanctified_torrent", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -16419,13 +16419,13 @@ public partial class CombatEngine
                     {
                         target.HP = 0;
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep_kill", target.Name.ToUpper()));
+                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep_kill", MonsterNames.Display(target).ToUpper()));
                     }
                     else
                     {
                         dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep", target.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep", MonsterNames.Display(target), dmg));
                     }
                     int heal = (int)(dmg * 0.50);
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
@@ -16487,7 +16487,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -16533,7 +16533,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_grand_finale", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_grand_finale", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -16589,7 +16589,7 @@ public partial class CombatEngine
                         // v1.1.15: through the hold rules, like the single-target twin
                         bool waveStun = random.Next(100) < 25 && TryStunMonster(m, 1);
                         terminal.SetColor("magenta");
-                        terminal.WriteLine(Loc.Get(waveStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", m.Name));
+                        terminal.WriteLine(Loc.Get(waveStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", MonsterNames.Display(m)));
                     }
                 }
                 break;
@@ -16607,7 +16607,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_resonance_cascade", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_resonance_cascade", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -16672,7 +16672,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_grand_finale", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_grand_finale", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -16733,7 +16733,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_echo_25", target.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_echo_25", MonsterNames.Display(target), dmg));
                     if (random.Next(100) < 25)
                     {
                         target.HP -= dmg; // hq-armory: out (echo reuses the boosted helper hit)
@@ -16773,7 +16773,7 @@ public partial class CombatEngine
                         m.IsMarked = true;
                         m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                         terminal.SetColor("magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_entropy_aoe", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_entropy_aoe", MonsterNames.Display(m), dmg));
                     }
                 }
                 break;
@@ -16797,7 +16797,7 @@ public partial class CombatEngine
                     target.ConfusedDuration = Math.Max(target.ConfusedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_causality_loop", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_causality_loop", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -16834,7 +16834,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get(m.Stunned ? "combat.ability_singularity_stun" : "combat.ability_singularity", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get(m.Stunned ? "combat.ability_singularity_stun" : "combat.ability_singularity", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -16854,12 +16854,12 @@ public partial class CombatEngine
                     if (TryStunMonster(target, requestedDur))
                     {
                         terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", target.Name, target.StunDuration));
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", MonsterNames.Display(target), target.StunDuration));
                     }
                     else
                     {
                         terminal.SetColor("bright_magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", MonsterNames.Display(target)));
                     }
                 }
                 break;
@@ -16875,7 +16875,7 @@ public partial class CombatEngine
                     dmg += (int)(target.Defence * 0.25);
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_cycles_end", target.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_cycles_end", MonsterNames.Display(target), dmg));
                     if (cycleBonus > 0)
                     {
                         terminal.SetColor("magenta");
@@ -16911,7 +16911,7 @@ public partial class CombatEngine
                     target.CorruptingDotRounds = Math.Max(target.CorruptingDotRounds, dotRounds);
                     target.CorruptingDotTickDamage = Math.Max(target.CorruptingDotTickDamage, tickDmg);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_corrupting_dot", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_corrupting_dot", MonsterNames.Display(target)));
                 }
                 break;
 
@@ -16944,7 +16944,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe", target.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe", MonsterNames.Display(target), dmg));
                     if (target.HP <= 0 && monsters != null)
                     {
                         int overflow = (int)Math.Abs(target.HP); // overkill, computed before clamp
@@ -16959,7 +16959,7 @@ public partial class CombatEngine
                             int spreadDmg = (int)(spreadDmgBase * GetAoEDiminishingMultiplier(oi));
                             m.HP -= spreadDmg; // hq-armory: out (spread is derived from the boosted helper hit)
                             terminal.SetColor("bright_red");
-                            terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe_spread", m.Name, spreadDmg));
+                            terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe_spread", MonsterNames.Display(m), spreadDmg));
                             if (m.HP <= 0)
                             {
                                 m.HP = 0;
@@ -16990,7 +16990,7 @@ public partial class CombatEngine
                     int heal = (int)(dmg * leechRate);
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get(isPoisoned ? "combat.ability_soul_leech_corrupt" : "combat.ability_soul_leech", target.Name, dmg, heal));
+                    terminal.WriteLine(Loc.Get(isPoisoned ? "combat.ability_soul_leech_corrupt" : "combat.ability_soul_leech", MonsterNames.Display(target), dmg, heal));
                     if (target.HP <= 0)
                     {
                         target.HP = 0;
@@ -17014,7 +17014,7 @@ public partial class CombatEngine
                         m.Poisoned = true;
                         m.PoisonRounds = Math.Max(m.PoisonRounds, 3);
                         terminal.SetColor("dark_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_abyssal_eruption", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_abyssal_eruption", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -17052,7 +17052,7 @@ public partial class CombatEngine
                     target.IsMarked = true;
                     target.MarkedDuration = Math.Max(target.MarkedDuration, abilityResult.Duration);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_prison_wardens_command", target.Name, atkReduction, defReduction));
+                    terminal.WriteLine(Loc.Get("combat.ability_prison_wardens_command", MonsterNames.Display(target), atkReduction, defReduction));
                 }
                 break;
 
@@ -17064,7 +17064,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_consume_soul", target.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_consume_soul", MonsterNames.Display(target), dmg));
                     if (target.HP <= 0)
                     {
                         target.HP = 0;
@@ -17090,7 +17090,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_abyss_unchained", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_abyss_unchained", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -17160,7 +17160,7 @@ public partial class CombatEngine
                     if (canReap) dmg *= 3;
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get(canReap ? "combat.ability_execute_reap_triple" : "combat.ability_execute_reap", target.Name, dmg));
+                    terminal.WriteLine(Loc.Get(canReap ? "combat.ability_execute_reap_triple" : "combat.ability_execute_reap", MonsterNames.Display(target), dmg));
                     if (target.HP <= 0)
                     {
                         target.HP = 0;
@@ -17213,7 +17213,7 @@ public partial class CombatEngine
                     int heal = (int)(dmg * 0.30);
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("combat.ability_devour", target.Name, dmg, heal));
+                    terminal.WriteLine(Loc.Get("combat.ability_devour", MonsterNames.Display(target), dmg, heal));
                     if (target.HP <= 0)
                     {
                         target.HP = 0;
@@ -17234,7 +17234,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage + (int)(target.Defence * 0.5);
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_entropic_blade", target.Name, dmg, hpCost));
+                    terminal.WriteLine(Loc.Get("combat.ability_entropic_blade", MonsterNames.Display(target), dmg, hpCost));
                     if (target.HP <= 0)
                     {
                         target.HP = 0;
@@ -17273,7 +17273,7 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_void_rupture", m.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_void_rupture", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
                         {
                             m.HP = 0;
@@ -17291,7 +17291,7 @@ public partial class CombatEngine
                             explosionDmg = (int)TeamHQBonus.ApplyAttack(player, explosionDmg); // v1.1.11: Team HQ Armory, last.
                             m.HP -= explosionDmg;
                             terminal.SetColor("bright_red");
-                            terminal.WriteLine(Loc.Get("combat.ability_void_rupture_explode", kills, m.Name, explosionDmg));
+                            terminal.WriteLine(Loc.Get("combat.ability_void_rupture_explode", kills, MonsterNames.Display(m), explosionDmg));
                             if (m.HP <= 0)
                             {
                                 m.HP = 0;
@@ -17327,7 +17327,7 @@ public partial class CombatEngine
                     {
                         target.HP = 0;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_annihilation_kill", target.Name.ToUpper(), hpCost));
+                        terminal.WriteLine(Loc.Get("combat.ability_annihilation_kill", MonsterNames.Display(target).ToUpper(), hpCost));
                         if (!result.DefeatedMonsters.Contains(target))
                             result.DefeatedMonsters.Add(target);
                     }
@@ -17336,7 +17336,7 @@ public partial class CombatEngine
                         int dmg = abilityResult.Damage;
                         dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_annihilation", target.Name, dmg, hpCost));
+                        terminal.WriteLine(Loc.Get("combat.ability_annihilation", MonsterNames.Display(target), dmg, hpCost));
                         if (target.HP <= 0)
                         {
                             target.HP = 0;
@@ -17431,7 +17431,7 @@ public partial class CombatEngine
                 {
                     boltDamage = ApplyHandlerAbilityDamage(player, target, boltDamage, result, abilityResult);
                     // TotalDamageDealt recorded inside ApplyHandlerAbilityDamage
-                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, boltDamage), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", MonsterNames.Display(target), boltDamage), "bright_yellow");
                 }
                 break;
             }
@@ -17445,7 +17445,7 @@ public partial class CombatEngine
                     long primaryHit = TeamHQBonus.ApplyAttack(player, chainDamage); // v1.1.11: Team HQ Armory, last.
                     target.HP -= (int)primaryHit;
                     result.TotalDamageDealt += primaryHit;
-                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", target.Name, primaryHit), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", MonsterNames.Display(target), primaryHit), "bright_yellow");
                 }
                 // Chain to other living monsters at reduced damage
                 if (monsters != null)
@@ -17459,7 +17459,7 @@ public partial class CombatEngine
                         chainHit = TeamHQBonus.ApplyAttack(player, chainHit); // v1.1.11: Team HQ Armory, last.
                         m.HP -= (int)chainHit;
                         result.TotalDamageDealt += chainHit;
-                        terminal.WriteLine(Loc.Get("combat.shaman_chain_lightning", m.Name, chainHit), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.shaman_chain_lightning", MonsterNames.Display(m), chainHit), "yellow");
                     }
                 }
                 break;
@@ -17925,7 +17925,7 @@ public partial class CombatEngine
                     target.Undead == 0;
                 if (turnUndeadOnLiving)
                 {
-                    terminal.WriteLine(Loc.Get("combat.spell_turn_undead_unaffected", target.Name), "gray");
+                    terminal.WriteLine(Loc.Get("combat.spell_turn_undead_unaffected", MonsterNames.Display(target)), "gray");
                     damage = 0;
                 }
 
@@ -17980,61 +17980,61 @@ public partial class CombatEngine
         {
             case "sleep":
                 if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 3))
-                    terminal.WriteLine(Loc.Get("combat.spell_sleep", target.Name), "cyan");
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep", MonsterNames.Display(target)), "cyan");
                 else
-                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", MonsterNames.Display(target)), "yellow");
                 break;
 
             case "fear":
                 target.IsFeared = true;
                 target.FearDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_fear", target.Name), "yellow");
+                terminal.WriteLine(Loc.Get("combat.spell_fear", MonsterNames.Display(target)), "yellow");
                 break;
 
             case "stun":
             case "lightning":
                 if (TryStunMonster(target, duration > 0 ? duration : 1))
-                    terminal.WriteLine(Loc.Get("combat.spell_stunned", target.Name), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.spell_stunned", MonsterNames.Display(target)), "bright_yellow");
                 else
-                    terminal.WriteLine(Loc.Get("combat.spell_resist_stun", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.spell_resist_stun", MonsterNames.Display(target)), "yellow");
                 break;
 
             case "slow":
                 target.IsSlowed = true;
                 target.SlowDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_slowed", target.Name), "gray");
+                terminal.WriteLine(Loc.Get("combat.spell_slowed", MonsterNames.Display(target)), "gray");
                 break;
 
             case "poison":
                 target.Poisoned = true;
                 target.PoisonRounds = duration > 0 ? duration : 5;
-                terminal.WriteLine(Loc.Get("combat.spell_poisoned", target.Name), "dark_green");
+                terminal.WriteLine(Loc.Get("combat.spell_poisoned", MonsterNames.Display(target)), "dark_green");
                 break;
 
             case "freeze":
                 if (TryHoldMonster(target, HoldKind.Freeze, duration > 0 ? duration : 2))
-                    terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.spell_frozen", MonsterNames.Display(target)), "bright_cyan");
                 else
-                    terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", target.Name), "cyan");
+                    terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", MonsterNames.Display(target)), "cyan");
                 break;
 
             case "frost":
                 target.IsSlowed = true;
                 target.SlowDuration = duration > 0 ? duration : 2;
-                terminal.WriteLine(Loc.Get("combat.spell_chilled", target.Name), "cyan");
+                terminal.WriteLine(Loc.Get("combat.spell_chilled", MonsterNames.Display(target)), "cyan");
                 break;
 
             case "web":
                 if (TryStunMonster(target, duration > 0 ? duration : 2))
-                    terminal.WriteLine(Loc.Get("combat.spell_web", target.Name), "white");
+                    terminal.WriteLine(Loc.Get("combat.spell_web", MonsterNames.Display(target)), "white");
                 else
-                    terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
+                    terminal.WriteLine(Loc.Get("combat.spell_web_resist", MonsterNames.Display(target)), "white");
                 break;
 
             case "dominate":
                 target.Charmed = true;
                 target.IsFriendly = true;
-                terminal.WriteLine(Loc.Get("combat.spell_dominate", target.Name), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.spell_dominate", MonsterNames.Display(target)), "bright_magenta");
                 break;
 
             case "holy":
@@ -18044,7 +18044,7 @@ public partial class CombatEngine
                     long holyBonus = (long)(spellDamage * 0.5);
                     holyBonus = TeamHQBonus.ApplyAttack(player, holyBonus); // v1.1.11: Team HQ Armory, last.
                     target.HP -= holyBonus;
-                    terminal.WriteLine(Loc.Get("combat.spell_holy_bonus", target.Name, holyBonus), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.spell_holy_bonus", MonsterNames.Display(target), holyBonus), "bright_yellow");
                     result.CombatLog.Add($"Holy bonus: {holyBonus} vs {target.MonsterClass}");
                     // Kill check (audit): the spell path has no post-effect death sweep,
                     // so a monster finished by the holy bonus vanished silently and never
@@ -18065,7 +18065,7 @@ public partial class CombatEngine
                 // tick independently on the same target.
                 target.IsBurning = true;
                 target.BurnRounds = duration > 0 ? duration : 2;
-                terminal.WriteLine(Loc.Get("combat.spell_fire", target.Name), "red");
+                terminal.WriteLine(Loc.Get("combat.spell_fire", MonsterNames.Display(target)), "red");
                 break;
 
             case "drain":
@@ -18078,7 +18078,7 @@ public partial class CombatEngine
                     long actualHeal = player.HP - oldHP;
                     if (actualHeal > 0)
                     {
-                        terminal.WriteLine(Loc.Get("combat.spell_drain", actualHeal, target.Name), "bright_green");
+                        terminal.WriteLine(Loc.Get("combat.spell_drain", actualHeal, MonsterNames.Display(target)), "bright_green");
                     }
                 }
                 break;
@@ -18089,13 +18089,13 @@ public partial class CombatEngine
                 {
                     if (random.Next(100) < 30)
                     {
-                        terminal.WriteLine(Loc.Get("combat.spell_death_kill", target.Name), "dark_red");
+                        terminal.WriteLine(Loc.Get("combat.spell_death_kill", MonsterNames.Display(target)), "dark_red");
                         target.HP = 0;
                         result.CombatLog.Add($"Death spell instant kill on {target.Name}");
                     }
                     else
                     {
-                        terminal.WriteLine(Loc.Get("combat.spell_death_resist", target.Name), "gray");
+                        terminal.WriteLine(Loc.Get("combat.spell_death_resist", MonsterNames.Display(target)), "gray");
                     }
                 }
                 break;
@@ -18104,7 +18104,7 @@ public partial class CombatEngine
                 // Reduce target defense by 25% for rest of combat
                 int defReduction = (int)(target.ArmPow * 0.25);
                 target.ArmPow = Math.Max(0, target.ArmPow - defReduction);
-                terminal.WriteLine(Loc.Get("combat.spell_disintegrate", target.Name, defReduction), "bright_red");
+                terminal.WriteLine(Loc.Get("combat.spell_disintegrate", MonsterNames.Display(target), defReduction), "bright_red");
                 break;
 
             case "ignore_defense":
@@ -18159,7 +18159,7 @@ public partial class CombatEngine
                 target.ConfusedDuration = Math.Max(target.ConfusedDuration, 3);
                 target.IsSlowed = true;
                 target.SlowDuration = Math.Max(target.SlowDuration, 3);
-                terminal.WriteLine(Loc.Get("combat.probability_shift", target.Name), "cyan");
+                terminal.WriteLine(Loc.Get("combat.probability_shift", MonsterNames.Display(target)), "cyan");
                 break;
 
             case "ignore_half_defense":
@@ -18170,7 +18170,7 @@ public partial class CombatEngine
                     halfDefBonus = TeamHQBonus.ApplyAttack(player, halfDefBonus); // v1.1.11: Team HQ Armory, last.
                     target.HP -= halfDefBonus;
                     terminal.SetColor("cyan");
-                    terminal.WriteLine(Loc.Get("combat.future_echo", target.Name, halfDefBonus));
+                    terminal.WriteLine(Loc.Get("combat.future_echo", MonsterNames.Display(target), halfDefBonus));
                     if (target.HP <= 0)
                     {
                         target.HP = 0;
@@ -18198,7 +18198,7 @@ public partial class CombatEngine
                     int creationDefReduce = (int)(target.ArmPow * 0.30);
                     target.ArmPow = Math.Max(0, target.ArmPow - creationDefReduce);
                     if (creationDefReduce > 0)
-                        terminal.WriteLine(Loc.Get("combat.creation_reshape", target.Name, creationDefReduce), "bright_yellow");
+                        terminal.WriteLine(Loc.Get("combat.creation_reshape", MonsterNames.Display(target), creationDefReduce), "bright_yellow");
                     if (spellDamage > 0)
                     {
                         long creationHeal = spellDamage / 5;
@@ -18229,7 +18229,7 @@ public partial class CombatEngine
                 }
                 target.IsBurning = true;
                 target.BurnRounds = duration > 0 ? duration : 2;
-                terminal.WriteLine(Loc.Get("combat.engulfed_in_flames", target.Name), "red");
+                terminal.WriteLine(Loc.Get("combat.engulfed_in_flames", MonsterNames.Display(target)), "red");
                 break;
 
             case "dodge_next":
@@ -18244,7 +18244,7 @@ public partial class CombatEngine
                 {
                     target.IsConfused = true;
                     target.ConfusedDuration = 1;
-                    terminal.WriteLine(Loc.Get("combat.spell_psychic", target.Name), "magenta");
+                    terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
                 }
                 break;
 
@@ -18256,17 +18256,17 @@ public partial class CombatEngine
                     target.IsFeared = true;
                     target.FearDuration = duration > 0 ? duration : 2;
                     if (soulDefReduce > 0)
-                        terminal.WriteLine(Loc.Get("combat.soul_shattered", target.Name, soulDefReduce), "dark_red");
-                    terminal.WriteLine(Loc.Get("combat.existential_terror", target.Name), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.soul_shattered", MonsterNames.Display(target), soulDefReduce), "dark_red");
+                    terminal.WriteLine(Loc.Get("combat.existential_terror", MonsterNames.Display(target)), "yellow");
                 }
                 break;
 
             case "temporal":
                 // Temporal Paradox: trap in time loop — stun for 2 rounds
                 if (TryStunMonster(target, duration > 0 ? duration : 2))
-                    terminal.WriteLine(Loc.Get("combat.trapped_time_loop", target.Name), "bright_cyan");
+                    terminal.WriteLine(Loc.Get("combat.trapped_time_loop", MonsterNames.Display(target)), "bright_cyan");
                 else
-                    terminal.WriteLine(Loc.Get("combat.resists_time_loop", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.resists_time_loop", MonsterNames.Display(target)), "yellow");
                 break;
 
             case "paradox_collapse":
@@ -18296,7 +18296,7 @@ public partial class CombatEngine
                     int atkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int defReduction2 = Math.Max(1, (int)(target.Defence * 0.20));
                     target.WeakenRounds = Math.Max(target.WeakenRounds, duration > 0 ? duration : 4);
-                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, atkReduction, defReduction2), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", MonsterNames.Display(target), atkReduction, defReduction2), "yellow");
                 }
                 break;
 
@@ -18325,17 +18325,17 @@ public partial class CombatEngine
                     // Reduce defense by 20% as "banish dark enchantments"
                     int dispelDefReduction = Math.Max(1, (int)(target.Defence * 0.20));
                     target.Defence = Math.Max(0, target.Defence - dispelDefReduction);
-                    terminal.WriteLine(Loc.Get("combat.spell_dispel", target.Name), "bright_white");
+                    terminal.WriteLine(Loc.Get("combat.spell_dispel", MonsterNames.Display(target)), "bright_white");
                     if (dispelled)
-                        terminal.WriteLine(Loc.Get("combat.protections_stripped", target.Name), "bright_white");
-                    terminal.WriteLine(Loc.Get("combat.loses_defense", target.Name, dispelDefReduction), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.protections_stripped", MonsterNames.Display(target)), "bright_white");
+                    terminal.WriteLine(Loc.Get("combat.loses_defense", MonsterNames.Display(target), dispelDefReduction), "yellow");
                 }
                 break;
 
             case "convert":
             {
                 // Conversion: flee/pacify/join based on CHA vs level
-                terminal.WriteLine(Loc.Get("combat.spell_convert_touch", target.Name), "white");
+                terminal.WriteLine(Loc.Get("combat.spell_convert_touch", MonsterNames.Display(target)), "white");
                 int conversionChance = 30 + (int)(player.Charisma / 5) - (target.Level * 2);
                 conversionChance = Math.Clamp(conversionChance, 5, 85);
 
@@ -18350,7 +18350,7 @@ public partial class CombatEngine
                     int effectRoll = random.Next(100);
                     if (effectRoll < 40)
                     {
-                        terminal.WriteLine(Loc.Get("combat.spell_convert_flee", target.Name), "bright_cyan");
+                        terminal.WriteLine(Loc.Get("combat.spell_convert_flee", MonsterNames.Display(target)), "bright_cyan");
                         target.HP = 0;
                         target.Fled = true;
                     }
@@ -18358,24 +18358,24 @@ public partial class CombatEngine
                     {
                         if (TryStunMonster(target, 3 + random.Next(1, 4)))
                         {
-                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify", target.Name), "bright_green");
+                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify", MonsterNames.Display(target)), "bright_green");
                             target.IsFriendly = true;
                         }
                         else
                         {
-                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify_resist", target.Name), "bright_green");
+                            terminal.WriteLine(Loc.Get("combat.spell_convert_pacify_resist", MonsterNames.Display(target)), "bright_green");
                         }
                     }
                     else
                     {
-                        terminal.WriteLine(Loc.Get("combat.spell_convert_success", target.Name), "bright_yellow");
+                        terminal.WriteLine(Loc.Get("combat.spell_convert_success", MonsterNames.Display(target)), "bright_yellow");
                         target.IsFriendly = true;
                         target.IsConverted = true;
                     }
                 }
                 else
                 {
-                    terminal.WriteLine(Loc.Get("combat.spell_convert_fail", target.Name), "gray");
+                    terminal.WriteLine(Loc.Get("combat.spell_convert_fail", MonsterNames.Display(target)), "gray");
                 }
                 break;
             }
@@ -19098,9 +19098,9 @@ public partial class CombatEngine
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
                 if (isOffHandAttack)
-                    terminal.WriteLine(Loc.Get("combat.teammate_offhand_strike", teammate.DisplayName, target.Name));
+                    terminal.WriteLine(Loc.Get("combat.teammate_offhand_strike", teammate.DisplayName, MonsterNames.Display(target)));
                 else
-                    terminal.WriteLine(Loc.Get("combat.teammate_attacks", teammate.DisplayName, target.Name));
+                    terminal.WriteLine(Loc.Get("combat.teammate_attacks", teammate.DisplayName, MonsterNames.Display(target)));
                 await Pacing.Wait(GetCombatDelay(500));
 
                 // Calculate teammate attack damage (with weapon soft cap)
@@ -19622,13 +19622,13 @@ public partial class CombatEngine
                 monster.HP -= actualDamage;
 
                 terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get("combat.target_takes_damage", monster.Name, actualDamage));
+                terminal.WriteLine(Loc.Get("combat.target_takes_damage", MonsterNames.Display(monster), actualDamage));
 
                 if (monster.HP <= 0)
                 {
                     monster.HP = 0;
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.target_destroyed", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.target_destroyed", MonsterNames.Display(monster)));
                     result.DefeatedMonsters.Add(monster);
                 }
             }
@@ -19661,13 +19661,13 @@ public partial class CombatEngine
                 target.HP -= actualDamage;
 
                 terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, actualDamage));
+                terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", MonsterNames.Display(target), actualDamage));
 
                 if (target.HP <= 0)
                 {
                     target.HP = 0;
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.target_destroyed_flat", target.Name));
+                    terminal.WriteLine(Loc.Get("combat.target_destroyed_flat", MonsterNames.Display(target)));
                     result.DefeatedMonsters.Add(target);
                 }
 
@@ -19808,7 +19808,7 @@ public partial class CombatEngine
         if (isWard)
             terminal.WriteLine(Loc.Get("combat.teammate_casts_party", teammate.DisplayName, spell.DisplayName));
         else if (target != null)
-            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, spell.DisplayName, target.Name));
+            terminal.WriteLine(Loc.Get("combat.teammate_casts_on", teammate.DisplayName, spell.DisplayName, MonsterNames.Display(target)));
         else
             terminal.WriteLine(Loc.Get("combat.teammate_casts_spell", teammate.DisplayName, spell.DisplayName));
 
@@ -20603,7 +20603,7 @@ public partial class CombatEngine
         {
             companion.DodgeNextAttack = false;
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("combat.companion_dodges", companion.DisplayName, monster.TheNameOrName));
+            terminal.WriteLine(Loc.Get("combat.companion_dodges", companion.DisplayName, MonsterNames.TheName(monster)));
             await Pacing.Wait(GetCombatDelay(600));
             return;
         }
@@ -20624,7 +20624,7 @@ public partial class CombatEngine
                     if (!abilityResult.IsSelfOnly)
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("combat.monster_attacks_companion", monster.TheNameOrName, companion.DisplayName));
+                        terminal.WriteLine(Loc.Get("combat.monster_attacks_companion", MonsterNames.TheName(monster), companion.DisplayName));
                         shownAttackMessage = true;
                     }
                     if (!string.IsNullOrEmpty(abilityResult.Message))
@@ -20675,7 +20675,7 @@ public partial class CombatEngine
                         {
                             long healAmt = dmg * abilityResult.LifeStealPercent / 100;
                             monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
-                            terminal.WriteLine(Loc.Get("combat.companion_takes_damage_monster_heals", companion.DisplayName, dmg, monster.Name, healAmt), "magenta");
+                            terminal.WriteLine(Loc.Get("combat.companion_takes_damage_monster_heals", companion.DisplayName, dmg, MonsterNames.Display(monster), healAmt), "magenta");
                             result.CombatLog.Add($"{monster.Name} life drains {companion.DisplayName} for {dmg}, heals {healAmt}");
                         }
                         else
@@ -20783,7 +20783,7 @@ public partial class CombatEngine
         if (!shownAttackMessage)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("combat.monster_attacks_companion", monster.TheNameOrName, companion.DisplayName));
+            terminal.WriteLine(Loc.Get("combat.monster_attacks_companion", MonsterNames.TheName(monster), companion.DisplayName));
             await Pacing.Wait(GetCombatDelay(500));
         }
 
@@ -20797,7 +20797,7 @@ public partial class CombatEngine
             if (random.Next(100) < missChance)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("combat.distracted_miss", monster.TheNameOrName, companion.DisplayName));
+                terminal.WriteLine(Loc.Get("combat.distracted_miss", MonsterNames.TheName(monster), companion.DisplayName));
                 await Pacing.Wait(GetCombatDelay(500));
                 return;
             }
@@ -20918,7 +20918,7 @@ public partial class CombatEngine
                 monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
                 if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
-                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", monster.Name, reflect), "bright_magenta");
+                terminal.WriteLine(Loc.Get("combat.divine_mandate_reflect", MonsterNames.Display(monster), reflect), "bright_magenta");
             }
         }
 
@@ -20929,11 +20929,11 @@ public partial class CombatEngine
             long reflectDamage = Math.Max(1, (long)(actualDamage * reflectPercent));
             monster.HP = Math.Max(0, monster.HP - reflectDamage); // hq-armory: out (Reflecting status)
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine($"  {Loc.Get("combat.tidal_barrier_reflects", companion.DisplayName, reflectDamage, monster.Name)}");
+            terminal.WriteLine($"  {Loc.Get("combat.tidal_barrier_reflects", companion.DisplayName, reflectDamage, MonsterNames.Display(monster))}");
             if (monster.HP <= 0)
             {
                 terminal.SetColor("bright_white");
-                terminal.WriteLine($"  {Loc.Get("combat.destroyed_by_reflect", monster.Name)}");
+                terminal.WriteLine($"  {Loc.Get("combat.destroyed_by_reflect", MonsterNames.Display(monster))}");
                 if (!result.DefeatedMonsters.Contains(monster))
                     result.DefeatedMonsters.Add(monster);
             }
@@ -20947,8 +20947,8 @@ public partial class CombatEngine
             {
                 GroupSystem.Instance!.BroadcastToGroupSessionsLocalized(group,
                     companion.GroupPlayerUsername,
-                    lang => GroupLine(lang, "\u001b[31m", "combat.group_hits_you", monster.Name, actualDamage, companion.HP, companion.MaxHP),
-                    lang => GroupLine(lang, "\u001b[31m", "combat.group_hits_ally", monster.Name, companion.DisplayName, actualDamage),
+                    lang => GroupLine(lang, "\u001b[31m", "combat.group_hits_you", MonsterNames.DisplayIn(lang, monster), actualDamage, companion.HP, companion.MaxHP),
+                    lang => GroupLine(lang, "\u001b[31m", "combat.group_hits_ally", MonsterNames.DisplayIn(lang, monster), companion.DisplayName, actualDamage),
                     inDungeonOnly: true);
             }
         }
@@ -20970,8 +20970,8 @@ public partial class CombatEngine
                     // Tell the dying player they died
                     GroupSystem.Instance!.BroadcastToGroupSessionsLocalized(deathGroup,
                         companion.GroupPlayerUsername,
-                        lang => GroupYouHaveFallenLine(lang, monster.Name),
-                        lang => GroupDeathLine(lang, "combat.group_slain_by", companion.DisplayName, monster.Name),
+                        lang => GroupYouHaveFallenLine(lang, MonsterNames.DisplayIn(lang, monster)),
+                        lang => GroupDeathLine(lang, "combat.group_slain_by", companion.DisplayName, MonsterNames.DisplayIn(lang, monster)),
                         inDungeonOnly: true);
                 }
             }
@@ -21141,7 +21141,7 @@ public partial class CombatEngine
 
         // Generate death news for the realm
         string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
-        NewsSystem.Instance?.WriteDeathNews(companion.DisplayName, killerName, location);
+        NewsSystem.Instance?.WriteDeathNews(companion.DisplayName, MonsterNames.Display(killerName), location);
     }
 
     /// <summary>
@@ -21289,7 +21289,7 @@ public partial class CombatEngine
 
         // Generate death news for the realm
         string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
-        NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, killerName, location);
+        NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, MonsterNames.Display(killerName), location);
 
         // Ocean Philosophy awakening moment
         if (!OceanPhilosophySystem.Instance.ExperiencedMoments.Contains(AwakeningMoment.FirstCompanionDeath))
@@ -21342,9 +21342,10 @@ public partial class CombatEngine
             bool anyBoss = result.DefeatedMonsters.Any(m => m.IsBoss);
             if (anyBoss)
             {
-                var monsterNames = string.Join(", ", result.DefeatedMonsters.Select(m => m.Name).Distinct());
+                var defeatedBosses = result.DefeatedMonsters.GroupBy(m => m.Name).Select(g => g.First()).ToList();
                 UsurperRemake.Server.RoomRegistry.BroadcastActionLocalized(lang =>
-                    Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, monsterNames));
+                    Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName,
+                        string.Join(", ", defeatedBosses.Select(m => MonsterNames.DisplayIn(lang, m)))));   // v1.2.5: each reader their own names
             }
 
             // v0.60.3: GMCP Char.Combat.Killed -- one frame per defeated monster so
@@ -21418,7 +21419,7 @@ public partial class CombatEngine
             {
                 long corruptHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
                 result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + corruptHeal);
-                terminal.WriteLine(Loc.Get("combat.corruption_harvest", corruptHeal, monster.Name), "dark_red");
+                terminal.WriteLine(Loc.Get("combat.corruption_harvest", corruptHeal, MonsterNames.Display(monster)), "dark_red");
             }
 
             // Voidreaver Void Hunger: heal 10% max HP on every kill
@@ -21426,14 +21427,14 @@ public partial class CombatEngine
             {
                 long voidHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
                 result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + voidHeal);
-                terminal.WriteLine(Loc.Get("combat.void_hunger", voidHeal, monster.Name), "dark_red");
+                terminal.WriteLine(Loc.Get("combat.void_hunger", voidHeal, MonsterNames.Display(monster)), "dark_red");
 
                 // Soul Eater: restore 15% max mana on killing blow
                 if (result.Player.IsManaClass)
                 {
                     int manaRestore = Math.Max(1, (int)(result.Player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
                     result.Player.Mana = Math.Min(result.Player.MaxMana, result.Player.Mana + manaRestore);
-                    terminal.WriteLine(Loc.Get("combat.soul_eater", manaRestore, monster.Name), "dark_magenta");
+                    terminal.WriteLine(Loc.Get("combat.soul_eater", manaRestore, MonsterNames.Display(monster)), "dark_magenta");
                 }
             }
 
@@ -21927,7 +21928,7 @@ public partial class CombatEngine
         }
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {Loc.Get("combat.boss_summary_line", playerName, player.Level, className, monster.Name)}");
+        terminal.WriteLine($"  {Loc.Get("combat.boss_summary_line", playerName, player.Level, className, MonsterNames.Display(monster))}");
         terminal.SetColor("cyan");
         terminal.WriteLine($"  {Loc.Get(rounds == 1 ? "combat.boss_summary_rounds_one" : "combat.boss_summary_rounds_many", rounds, result.TotalDamageDealt.ToString("N0"))}");
 
@@ -21954,8 +21955,8 @@ public partial class CombatEngine
         terminal.WriteLine("");
         terminal.SetColor("gray");
         string shareLine = teammateCount > 0
-            ? Loc.Get("combat.share_boss_allies", playerName, className, player.Level, monster.Name, rounds, teammateCount, result.TotalDamageDealt.ToString("N0"))
-            : Loc.Get("combat.share_boss", playerName, className, player.Level, monster.Name, rounds, result.TotalDamageDealt.ToString("N0"));
+            ? Loc.Get("combat.share_boss_allies", playerName, className, player.Level, MonsterNames.Display(monster), rounds, teammateCount, result.TotalDamageDealt.ToString("N0"))
+            : Loc.Get("combat.share_boss", playerName, className, player.Level, MonsterNames.Display(monster), rounds, result.TotalDamageDealt.ToString("N0"));
         terminal.WriteLine($"  {Loc.Get("combat.share_label", shareLine)}");
         terminal.WriteLine("");
 
@@ -21965,7 +21966,7 @@ public partial class CombatEngine
         if (result.Teammates?.Any(t => t != null && t.IsGroupedPlayer) == true)
         {
             BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;33m",
-                rounds == 1 ? "combat.group_boss_defeated_one" : "combat.group_boss_defeated_many", playerName, monster.Name, rounds));
+                rounds == 1 ? "combat.group_boss_defeated_one" : "combat.group_boss_defeated_many", playerName, MonsterNames.DisplayIn(lang, monster), rounds));
         }
 
         await terminal.PressAnyKey();
@@ -21980,7 +21981,7 @@ public partial class CombatEngine
         var player = result.Player;
         string playerName = player.DisplayName ?? player.Name2 ?? player.Name1 ?? Loc.Get("combat.hero_fallback");
         string className = GameConfig.GetLocalizedClassName(player.Class);
-        string killerName = result.Monster?.Name ?? Loc.Get("combat.killer_the_unknown");
+        string killerName = result.Monster != null ? MonsterNames.Display(result.Monster) : Loc.Get("combat.killer_the_unknown");   // v1.2.5: shown only
         int deepestFloor = player.Statistics?.DeepestDungeonLevel ?? 1;
         long totalKills = player.MKills;
 
@@ -22325,6 +22326,8 @@ public partial class CombatEngine
             string username = (!string.IsNullOrEmpty(ctx?.CharacterKey) ? ctx!.CharacterKey : ctx?.Username) ?? player.Name1 ?? player.Name2 ?? "";
             string displayName = player.Name2 ?? player.Name1 ?? username;
             string killerName = result.Monster?.Name ?? Loc.Get("combat.killer_unknown_end");
+            var killerMonster = result.Monster;
+            string KillerIn(string lang) => killerMonster != null ? MonsterNames.DisplayIn(lang, killerMonster) : killerName;   // v1.2.5: shown only
             int finalLevel = player.Level;
             string className = player.Class.ToString();
 
@@ -22346,7 +22349,7 @@ public partial class CombatEngine
                 try
                 {
                     UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(
-                        lang => "\u001b[1;31m\r\n  *** " + Loc.GetIn(lang, "permadeath.eulogy", displayName, finalLevel, className, killerName) + " ***\r\n\u001b[0m",
+                        lang => "\u001b[1;31m\r\n  *** " + Loc.GetIn(lang, "permadeath.eulogy", displayName, finalLevel, className, KillerIn(lang)) + " ***\r\n\u001b[0m",
                         excludeUsername: username);
                 }
                 catch (Exception ex) { DebugLogger.Instance.LogError("DEATH_CAP", $"Broadcast failed: {ex.Message}"); }
@@ -22356,7 +22359,7 @@ public partial class CombatEngine
                     if (UsurperRemake.Systems.OnlineStateManager.IsActive)
                     {
                         _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                            Loc.Get("combat.news_permadeath", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), killerName),
+                            Loc.Get("combat.news_permadeath", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), KillerIn(GameConfig.Language)),
                             "permadeath");
                     }
                 }
@@ -23352,7 +23355,7 @@ public partial class CombatEngine
         player.Mana = 0; // No mana
 
         // Generate death news for the realm
-        string killerName = result.Monster?.Name ?? Loc.Get("combat.killer_unknown_forces");
+        string killerName = result.Monster != null ? MonsterNames.Display(result.Monster) : Loc.Get("combat.killer_unknown_forces");   // v1.2.5: news in the writer's language
         string location = string.IsNullOrEmpty(player.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : player.CurrentLocation;
         NewsSystem.Instance?.WriteDeathNews(player.DisplayName, killerName, location);
     }
@@ -23471,12 +23474,12 @@ public partial class CombatEngine
                 {
                     damage *= 3;
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine(Loc.Get("combat.berserker_critical_fury", monster.Name, damage));
+                    terminal.WriteLine(Loc.Get("combat.berserker_critical_fury", MonsterNames.Display(monster), damage));
                 }
                 else
                 {
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.berserker_savage_attack", monster.Name, damage));
+                    terminal.WriteLine(Loc.Get("combat.berserker_savage_attack", MonsterNames.Display(monster), damage));
                 }
 
                 monster.HP -= damage;
@@ -23487,7 +23490,7 @@ public partial class CombatEngine
                 {
                     terminal.SetColor("bright_green");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("combat.berserker_tear_apart", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.berserker_tear_apart", MonsterNames.Display(monster)));
                     terminal.WriteLine(Loc.Get("combat.berserker_subsides"));
                     result.Victory = true;
                     result.MonsterKilled = true;
@@ -23509,14 +23512,14 @@ public partial class CombatEngine
             // Monster gets bonus damage vs berserker (50% more)
             monsterDamage = (long)(monsterDamage * 1.5);
 
-            terminal.WriteLine(Loc.Get("combat.berserker_monster_strikes", monster.Name, monsterDamage));
+            terminal.WriteLine(Loc.Get("combat.berserker_monster_strikes", MonsterNames.Display(monster), monsterDamage));
             player.HP -= monsterDamage;
             result.TotalDamageTaken += monsterDamage;
             player.Statistics.RecordDamageTaken(monsterDamage);
 
             // Show HP status
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("combat.berserker_hp_status", player.HP, player.MaxHP, monster.Name, monster.HP, monster.MaxHP));
+            terminal.WriteLine(Loc.Get("combat.berserker_hp_status", player.HP, player.MaxHP, MonsterNames.Display(monster), monster.HP, monster.MaxHP));
 
             if (player.HP <= 0)
             {
@@ -23882,7 +23885,7 @@ public partial class CombatEngine
                 && abilityResult.SpecialEffect == "riptide")
             {
                 actualDamage = (long)(actualDamage * 1.40);
-                terminal.WriteLine(Loc.Get("combat.tidesworn_weaken_bonus", monster.Name), "bright_cyan");
+                terminal.WriteLine(Loc.Get("combat.tidesworn_weaken_bonus", MonsterNames.Display(monster)), "bright_cyan");
             }
 
             // Handle special damage effects
@@ -23915,7 +23918,7 @@ public partial class CombatEngine
                 // and silently skipped when the first hit killed the monster.
                 actualDamage = (long)(actualDamage * 1.5);
                 terminal.SetColor("dark_red");
-                terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", monster.Name));
+                terminal.WriteLine(Loc.Get("combat.shadow_harvest_feast", MonsterNames.Display(monster)));
             }
             else if (abilityResult.SpecialEffect == "double_vs_debuffed" && monster != null)
             {
@@ -23927,12 +23930,12 @@ public partial class CombatEngine
                 {
                     actualDamage *= 2;
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("combat.wave_echo_resonates", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_resonates", MonsterNames.Display(monster)));
                 }
                 else
                 {
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("combat.wave_echo_strikes", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.wave_echo_strikes", MonsterNames.Display(monster)));
                 }
             }
 
@@ -23990,7 +23993,7 @@ public partial class CombatEngine
             player.Statistics.RecordDamageDealt(actualDamage, abilityCrit);
 
             terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("combat.deal_damage", actualDamage, monster.Name));
+            terminal.WriteLine(Loc.Get("combat.deal_damage", actualDamage, MonsterNames.Display(monster)));
 
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
@@ -24024,14 +24027,14 @@ public partial class CombatEngine
                 long actualHeal = player.HP - oldHP;
                 terminal.SetColor("red");
                 if (actualHeal > 0)
-                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_drain", monster.Name, actualDamage, actualHeal));
+                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_drain", MonsterNames.Display(monster), actualDamage, actualHeal));
                 else
-                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_capped", monster.Name, actualDamage));
+                    terminal.WriteLine(Loc.Get("combat.ability_lifesteal_capped", MonsterNames.Display(monster), actualDamage));
             }
 
             if (monster.HP <= 0)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_slain", monster.Name), "bright_green");
+                terminal.WriteLine(Loc.Get("combat.monster_slain", MonsterNames.Display(monster)), "bright_green");
             }
         }
 
@@ -24046,7 +24049,7 @@ public partial class CombatEngine
         {
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("combat.offhand_strike_at", monster.Name));
+            terminal.WriteLine(Loc.Get("combat.offhand_strike_at", MonsterNames.Display(monster)));
             await Pacing.Wait(GetCombatDelay(500));
 
             long ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
@@ -24064,7 +24067,7 @@ public partial class CombatEngine
 
             if (monster.HP <= 0)
             {
-                terminal.WriteLine(Loc.Get("combat.monster_slain", monster.Name), "bright_green");
+                terminal.WriteLine(Loc.Get("combat.monster_slain", MonsterNames.Display(monster)), "bright_green");
             }
         }
 
@@ -24145,9 +24148,9 @@ public partial class CombatEngine
                 if (monster != null && random.Next(100) < 60)
                 {
                     if (TryStunMonster(monster, 1))
-                        terminal.WriteLine(Loc.Get("combat.is_stunned", monster.Name), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.is_stunned", MonsterNames.Display(monster)), "yellow");
                     else
-                        terminal.WriteLine(Loc.Get("combat.resists_stun", monster.Name), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.resists_stun", MonsterNames.Display(monster)), "yellow");
                 }
                 break;
 
@@ -24157,7 +24160,7 @@ public partial class CombatEngine
                     monster.Poisoned = true;
                     monster.PoisonRounds = Math.Max(monster.PoisonRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("green");
-                    terminal.WriteLine(Loc.Get("combat.ability_poisoned", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_poisoned", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -24171,9 +24174,9 @@ public partial class CombatEngine
                     monster.IsCorroded = true;
                     monster.CorrodedDuration = Math.Max(monster.CorrodedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("dark_green");
-                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_apply", monster.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_apply", MonsterNames.Display(monster))}");
                     terminal.SetColor("green");
-                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_effect", monster.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.biaxin_effect", MonsterNames.Display(monster))}");
                 }
                 break;
 
@@ -24189,7 +24192,7 @@ public partial class CombatEngine
                         result.TotalDamageDealt += executeBonusSM;
                         result.Player?.Statistics.RecordDamageDealt(executeBonusSM, false);
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_execute_critical", monster.Name, executeBonusSM));
+                        terminal.WriteLine(Loc.Get("combat.ability_execute_critical", MonsterNames.Display(monster), executeBonusSM));
                     }
                     else if (hpPercent < 0.50)
                     {
@@ -24199,12 +24202,12 @@ public partial class CombatEngine
                         result.TotalDamageDealt += executeBonusSM;
                         result.Player?.Statistics.RecordDamageDealt(executeBonusSM, false);
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("combat.ability_execute_finishing", monster.Name, executeBonusSM));
+                        terminal.WriteLine(Loc.Get("combat.ability_execute_finishing", MonsterNames.Display(monster), executeBonusSM));
                     }
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("combat.ability_execute_too_healthy", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_execute_too_healthy", MonsterNames.Display(monster)));
                     }
                 }
                 break;
@@ -24216,7 +24219,7 @@ public partial class CombatEngine
                     int distractPen = 5 + player.Level / 5 + (int)(player.Charisma / 10);
                     monster.DistractedPenalty = distractPen;
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.distracted", monster.Name, distractPen));
+                    terminal.WriteLine(Loc.Get("combat.distracted", MonsterNames.Display(monster), distractPen));
                 }
                 break;
 
@@ -24230,7 +24233,7 @@ public partial class CombatEngine
                     int weakenDefReduction2 = Math.Max(1, (int)(monster.Defence * 0.20));
                     monster.WeakenRounds = Math.Max(monster.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", monster.Name, weakenAtkReduction2, weakenDefReduction2));
+                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", MonsterNames.Display(monster), weakenAtkReduction2, weakenDefReduction2));
                 }
                 break;
 
@@ -24241,12 +24244,12 @@ public partial class CombatEngine
                     if (random.Next(100) < GameConfig.CharmApplyChance && TryCharmMonster(monster, charmRounds2))
                     {
                         terminal.SetColor(ColorRole.Success);
-                        terminal.WriteLine(Loc.Get("combat.ability_charmed", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_charmed", MonsterNames.Display(monster)));
                     }
                     else
                     {
                         terminal.SetColor(ColorRole.Notice);
-                        terminal.WriteLine(Loc.Get("combat.resists_charm", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.resists_charm", MonsterNames.Display(monster)));
                     }
                 }
                 break;
@@ -24308,7 +24311,7 @@ public partial class CombatEngine
                     {
                         monster.HP = 0;
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("combat.ability_target_slain", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_target_slain", MonsterNames.Display(monster)));
                         if (!result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
                     }
@@ -24335,7 +24338,7 @@ public partial class CombatEngine
                         {
                             monster.HP = 0;
                             terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("combat.ability_target_slain", monster.Name));
+                            terminal.WriteLine(Loc.Get("combat.ability_target_slain", MonsterNames.Display(monster)));
                             if (!result.DefeatedMonsters.Contains(monster))
                                 result.DefeatedMonsters.Add(monster);
                         }
@@ -24446,12 +24449,12 @@ public partial class CombatEngine
                         monster.IsFeared = true;
                         monster.FearDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.terrified_by_roar", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.terrified_by_roar", MonsterNames.Display(monster)));
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.resists_intimidation", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.resists_intimidation", MonsterNames.Display(monster)));
                     }
                 }
                 break;
@@ -24476,12 +24479,12 @@ public partial class CombatEngine
                         monster.IsConfused = true;
                         monster.ConfusedDuration = 2;
                         terminal.SetColor("magenta");
-                        terminal.WriteLine(Loc.Get("combat.ability_confusion_success", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_confusion_success", MonsterNames.Display(monster)));
                     }
                     else
                     {
                         terminal.SetColor("yellow");
-                        terminal.WriteLine(Loc.Get("combat.ability_confusion_resist", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_confusion_resist", MonsterNames.Display(monster)));
                     }
                 }
                 break;
@@ -24495,12 +24498,12 @@ public partial class CombatEngine
                         && TryHoldMonster(monster, HoldKind.Freeze, abilityResult.Duration > 0 ? abilityResult.Duration : 2))
                     {
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.frozen_solid", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.frozen_solid", MonsterNames.Display(monster)));
                     }
                     else
                     {
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("combat.frost_bites_no_freeze", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.frost_bites_no_freeze", MonsterNames.Display(monster)));
                     }
                 }
                 break;
@@ -24515,7 +24518,7 @@ public partial class CombatEngine
                         result.TotalDamageDealt += killDmg;
                         player.Statistics.RecordDamageDealt(killDmg, false);
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_assassinated", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_assassinated", MonsterNames.Display(monster)));
                     }
                     else
                     {
@@ -24544,7 +24547,7 @@ public partial class CombatEngine
                         {
                             monster.HP = 0;
                             terminal.SetColor("bright_green");
-                            terminal.WriteLine(Loc.Get("combat.ability_torn_apart", monster.Name));
+                            terminal.WriteLine(Loc.Get("combat.ability_torn_apart", MonsterNames.Display(monster)));
                             if (!result.DefeatedMonsters.Contains(monster))
                                 result.DefeatedMonsters.Add(monster);
                         }
@@ -24563,7 +24566,7 @@ public partial class CombatEngine
                     result.TotalDamageDealt += blossomDmgSM;
                     player.Statistics.RecordDamageDealt(blossomDmgSM, false);
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get(isExecSM ? "combat.death_blossom_execute" : "combat.death_blossom_hit", monster.Name, blossomDmgSM));
+                    terminal.WriteLine(Loc.Get(isExecSM ? "combat.death_blossom_execute" : "combat.death_blossom_hit", MonsterNames.Display(monster), blossomDmgSM));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -24597,7 +24600,7 @@ public partial class CombatEngine
                     monster.IsMarked = true;
                     monster.MarkedDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_marked", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_marked", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -24750,7 +24753,7 @@ public partial class CombatEngine
                     monster.IsCorroded = true;
                     monster.CorrodedDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                     terminal.SetColor("dark_green");
-                    terminal.WriteLine(Loc.Get("combat.corroded_armor_dissolves", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.corroded_armor_dissolves", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -24778,9 +24781,9 @@ public partial class CombatEngine
                 {
                     terminal.SetColor("bright_yellow");
                     if (TryStunMonster(monster, 1))
-                        terminal.WriteLine(Loc.Get("combat.legendary_shot_staggers", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.legendary_shot_staggers", MonsterNames.Display(monster)));
                     else
-                        terminal.WriteLine(Loc.Get("combat.legendary_shot_withstands", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.legendary_shot_withstands", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -24861,7 +24864,7 @@ public partial class CombatEngine
                     monster.TauntRoundsLeft = Math.Max(monster.TauntRoundsLeft, abilityResult.Duration);
                     monster.TauntStickChance = GameConfig.SoftTauntStickChance;
                     terminal.SetColor("cyan");
-                    terminal.WriteLine(Loc.Get("combat.ability_undertow", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_undertow", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -24881,7 +24884,7 @@ public partial class CombatEngine
                 {
                     monster.WeakenRounds = Math.Max(monster.WeakenRounds, 2);
                     terminal.SetColor("cyan");
-                    terminal.WriteLine(Loc.Get("combat.ability_riptide", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_riptide", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -24927,7 +24930,7 @@ public partial class CombatEngine
                     if (isHoly) dmg *= 2;
                     monster.HP -= dmg;
                     terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
-                    terminal.WriteLine(Loc.Get(isHoly ? "combat.ability_sanctified_torrent_holy" : "combat.ability_sanctified_torrent", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get(isHoly ? "combat.ability_sanctified_torrent_holy" : "combat.ability_sanctified_torrent", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25013,13 +25016,13 @@ public partial class CombatEngine
                     {
                         monster.HP = 0;
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep_kill", monster.Name.ToUpper()));
+                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep_kill", MonsterNames.Display(monster).ToUpper()));
                     }
                     else
                     {
                         monster.HP -= dmg;
                         terminal.SetColor("bright_cyan");
-                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep", monster.Name, dmg));
+                        terminal.WriteLine(Loc.Get("combat.ability_wrath_deep", MonsterNames.Display(monster), dmg));
                     }
                     int wdHeal = (int)(dmg * 0.50);
                     player.HP = Math.Min(player.MaxHP, player.HP + wdHeal);
@@ -25076,7 +25079,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage + caBonusDmg;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25138,7 +25141,7 @@ public partial class CombatEngine
                     monster.MarkedDuration = Math.Max(monster.MarkedDuration, abilityResult.Duration);
                     bool dissonantStun = random.Next(100) < 25 && TryStunMonster(monster, 1);
                     terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get(dissonantStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", monster.Name));
+                    terminal.WriteLine(Loc.Get(dissonantStun ? "combat.ability_dissonant_wave_stun" : "combat.ability_dissonant_wave", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -25150,7 +25153,7 @@ public partial class CombatEngine
                     int dmg = (int)abilityResult.Damage;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_grand_finale", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_grand_finale", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25182,7 +25185,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine(Loc.Get("combat.ability_resonance_cascade", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_resonance_cascade", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25238,7 +25241,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage + gfBonusDmg;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine(Loc.Get("combat.ability_grand_finale", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_grand_finale", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25299,7 +25302,7 @@ public partial class CombatEngine
                     int echoDmg = abilityResult.Damage;
                     monster.HP -= echoDmg;
                     terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_echo_25", monster.Name, echoDmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_echo_25", MonsterNames.Display(monster), echoDmg));
                     if (random.Next(100) < 25)
                     {
                         monster.HP -= echoDmg;
@@ -25334,7 +25337,7 @@ public partial class CombatEngine
                     monster.IsMarked = true;
                     monster.MarkedDuration = Math.Max(monster.MarkedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                     terminal.SetColor("magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_entropy_aoe", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_entropy_aoe", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25361,7 +25364,7 @@ public partial class CombatEngine
                     monster.ConfusedDuration = Math.Max(monster.ConfusedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     monster.WeakenRounds = Math.Max(monster.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_causality_loop", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_causality_loop", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -25395,7 +25398,7 @@ public partial class CombatEngine
                     if (monster.Stunned || monster.IsStunned) dmg *= 2;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get(monster.Stunned ? "combat.ability_singularity_stun" : "combat.ability_singularity", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get(monster.Stunned ? "combat.ability_singularity_stun" : "combat.ability_singularity", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25413,9 +25416,9 @@ public partial class CombatEngine
                     int tpReqDur = monster.IsBoss ? 1 : (abilityResult.Duration > 0 ? abilityResult.Duration : 2);
                     terminal.SetColor("bright_magenta");
                     if (TryStunMonster(monster, tpReqDur))
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", monster.Name, monster.StunDuration));
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison", MonsterNames.Display(monster), monster.StunDuration));
                     else
-                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", monster.Name));
+                        terminal.WriteLine(Loc.Get("combat.ability_temporal_prison_resist", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -25429,7 +25432,7 @@ public partial class CombatEngine
                     dmg += (int)(monster.Defence * 0.25);
                     monster.HP -= dmg;
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("combat.ability_cycles_end", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_cycles_end", MonsterNames.Display(monster), dmg));
                     if (ceCycleBonus > 0)
                     {
                         terminal.SetColor("magenta");
@@ -25459,7 +25462,7 @@ public partial class CombatEngine
                     monster.CorruptingDotRounds = Math.Max(monster.CorruptingDotRounds, dotRounds);
                     monster.CorruptingDotTickDamage = Math.Max(monster.CorruptingDotTickDamage, tickDmg);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_corrupting_dot", monster.Name));
+                    terminal.WriteLine(Loc.Get("combat.ability_corrupting_dot", MonsterNames.Display(monster)));
                 }
                 break;
 
@@ -25492,7 +25495,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     monster.HP -= dmg;
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_overflow_aoe", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25515,7 +25518,7 @@ public partial class CombatEngine
                     int slHeal = (int)(dmg * leechRate);
                     player.HP = Math.Min(player.MaxHP, player.HP + slHeal);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get(slPoisoned ? "combat.ability_soul_leech_corrupt" : "combat.ability_soul_leech", monster.Name, dmg, slHeal));
+                    terminal.WriteLine(Loc.Get(slPoisoned ? "combat.ability_soul_leech_corrupt" : "combat.ability_soul_leech", MonsterNames.Display(monster), dmg, slHeal));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25536,7 +25539,7 @@ public partial class CombatEngine
                     monster.Poisoned = true;
                     monster.PoisonRounds = Math.Max(monster.PoisonRounds, 3);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_abyssal_eruption", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_abyssal_eruption", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25573,7 +25576,7 @@ public partial class CombatEngine
                     monster.IsMarked = true;
                     monster.MarkedDuration = Math.Max(monster.MarkedDuration, abilityResult.Duration);
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_prison_wardens_command", monster.Name, pwAtkReduction, pwDefReduction));
+                    terminal.WriteLine(Loc.Get("combat.ability_prison_wardens_command", MonsterNames.Display(monster), pwAtkReduction, pwDefReduction));
                 }
                 break;
 
@@ -25585,7 +25588,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     monster.HP -= dmg;
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_consume_soul", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_consume_soul", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25608,7 +25611,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_abyss_unchained", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_abyss_unchained", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25674,7 +25677,7 @@ public partial class CombatEngine
                     if (canReap) dmg *= 3;
                     monster.HP -= dmg;
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get(canReap ? "combat.ability_execute_reap_triple" : "combat.ability_execute_reap", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get(canReap ? "combat.ability_execute_reap_triple" : "combat.ability_execute_reap", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25727,7 +25730,7 @@ public partial class CombatEngine
                     int dvHeal = (int)(dmg * 0.50);
                     player.HP = Math.Min(player.MaxHP, player.HP + dvHeal);
                     terminal.SetColor("red");
-                    terminal.WriteLine(Loc.Get("combat.ability_devour", monster.Name, dmg, dvHeal));
+                    terminal.WriteLine(Loc.Get("combat.ability_devour", MonsterNames.Display(monster), dmg, dvHeal));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25748,7 +25751,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage + (int)(monster.Defence * 0.5);
                     monster.HP -= dmg;
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_entropic_blade", monster.Name, dmg, ebHpCost));
+                    terminal.WriteLine(Loc.Get("combat.ability_entropic_blade", MonsterNames.Display(monster), dmg, ebHpCost));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25779,7 +25782,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     monster.HP -= dmg;
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_void_rupture", monster.Name, dmg));
+                    terminal.WriteLine(Loc.Get("combat.ability_void_rupture", MonsterNames.Display(monster), dmg));
                     if (monster.HP <= 0)
                     {
                         monster.HP = 0;
@@ -25813,7 +25816,7 @@ public partial class CombatEngine
                     {
                         monster.HP = 0;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_annihilation_kill", monster.Name.ToUpper(), anHpCost));
+                        terminal.WriteLine(Loc.Get("combat.ability_annihilation_kill", MonsterNames.Display(monster).ToUpper(), anHpCost));
                         if (!result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
                     }
@@ -25822,7 +25825,7 @@ public partial class CombatEngine
                         int dmg = abilityResult.Damage;
                         monster.HP -= dmg;
                         terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.ability_annihilation", monster.Name, dmg, anHpCost));
+                        terminal.WriteLine(Loc.Get("combat.ability_annihilation", MonsterNames.Display(monster), dmg, anHpCost));
                         if (monster.HP <= 0)
                         {
                             monster.HP = 0;
@@ -25917,7 +25920,7 @@ public partial class CombatEngine
                 {
                     monster.HP -= (int)boltDamage;
                     result.TotalDamageDealt += boltDamage;
-                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", monster.Name, boltDamage), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", MonsterNames.Display(monster), boltDamage), "bright_yellow");
                 }
                 break;
             }
@@ -25929,7 +25932,7 @@ public partial class CombatEngine
                 {
                     monster.HP -= (int)chainDamage;
                     result.TotalDamageDealt += chainDamage;
-                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", monster.Name, chainDamage), "bright_yellow");
+                    terminal.WriteLine(Loc.Get("combat.shaman_lightning_bolt", MonsterNames.Display(monster), chainDamage), "bright_yellow");
                 }
                 break;
             }
@@ -27467,7 +27470,7 @@ public partial class CombatEngine
             result.Player.Statistics?.RecordGoldChange(result.Player.Gold);
 
             // Electron graphical client — emit victory
-            ElectronBridge.EmitCombatEnd("Victory", xpReward, goldReward);
+            ElectronBridge.EmitCombatEnd(Loc.Get("combat.victory_label"), xpReward, goldReward);   // v1.2.5: a title the client shows
 
             // Display rewards. Phase 2: in Electron mode the graphical victory
             // overlay shows xp/gold in its own panel; skip the text duplicates
@@ -27673,7 +27676,7 @@ public partial class CombatEngine
                 target.Undead == 0;
             if (turnUndeadOnLiving)
             {
-                terminal.WriteLine(Loc.Get("combat.spell_turn_undead_unaffected", target.Name), "gray");
+                terminal.WriteLine(Loc.Get("combat.spell_turn_undead_unaffected", MonsterNames.Display(target)), "gray");
             }
             else
             {
@@ -27682,7 +27685,7 @@ public partial class CombatEngine
                 // bosses at full damage regardless of their immunity phase.
                 long spellDamage = ApplyBossSpellProtections(target, spellResult.Damage, announce: true);
                 target.HP = Math.Max(0, target.HP - spellDamage);
-                terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", target.Name, spellDamage), "red");
+                terminal.WriteLine(Loc.Get("combat.target_takes_damage_flat", MonsterNames.Display(target), spellDamage), "red");
 
                 // Track spell damage dealt for boss kill summary / telemetry
                 if (result != null)
@@ -27693,7 +27696,7 @@ public partial class CombatEngine
 
                 if (target.HP <= 0)
                 {
-                    terminal.WriteLine(Loc.Get("combat.slain_by_magic", target.Name), "dark_red");
+                    terminal.WriteLine(Loc.Get("combat.slain_by_magic", MonsterNames.Display(target)), "dark_red");
                 }
             }
         }
@@ -27743,7 +27746,7 @@ public partial class CombatEngine
                 {
                     target.Poisoned = true;
                     target.PoisonRounds = duration > 0 ? duration : 5;
-                    terminal.WriteLine(Loc.Get("combat.spell_poisoned", target.Name), "dark_green");
+                    terminal.WriteLine(Loc.Get("combat.spell_poisoned", MonsterNames.Display(target)), "dark_green");
                 }
                 break;
 
@@ -27751,9 +27754,9 @@ public partial class CombatEngine
                 if (target != null)
                 {
                     if (TryHoldMonster(target, HoldKind.Sleep, duration > 0 ? duration : 3))
-                        terminal.WriteLine(Loc.Get("combat.magical_slumber", target.Name), "cyan");
+                        terminal.WriteLine(Loc.Get("combat.magical_slumber", MonsterNames.Display(target)), "cyan");
                     else
-                        terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", target.Name), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.spell_sleep_resist", MonsterNames.Display(target)), "yellow");
                 }
                 break;
 
@@ -27761,9 +27764,9 @@ public partial class CombatEngine
                 if (target != null)
                 {
                     if (TryHoldMonster(target, HoldKind.Freeze, duration > 0 ? duration : 2))
-                        terminal.WriteLine(Loc.Get("combat.spell_frozen", target.Name), "bright_cyan");
+                        terminal.WriteLine(Loc.Get("combat.spell_frozen", MonsterNames.Display(target)), "bright_cyan");
                     else
-                        terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", target.Name), "cyan");
+                        terminal.WriteLine(Loc.Get("combat.spell_freeze_resist", MonsterNames.Display(target)), "cyan");
                 }
                 break;
 
@@ -27772,7 +27775,7 @@ public partial class CombatEngine
                 {
                     target.IsFeared = true;
                     target.FearDuration = duration > 0 ? duration : 3;
-                    terminal.WriteLine(Loc.Get("combat.spell_fear", target.Name), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.spell_fear", MonsterNames.Display(target)), "yellow");
                 }
                 break;
 
@@ -27780,9 +27783,9 @@ public partial class CombatEngine
                 if (target != null)
                 {
                     if (TryStunMonster(target, duration > 0 ? duration : 2))
-                        terminal.WriteLine(Loc.Get("combat.spell_web", target.Name), "white");
+                        terminal.WriteLine(Loc.Get("combat.spell_web", MonsterNames.Display(target)), "white");
                     else
-                        terminal.WriteLine(Loc.Get("combat.spell_web_resist", target.Name), "white");
+                        terminal.WriteLine(Loc.Get("combat.spell_web_resist", MonsterNames.Display(target)), "white");
                 }
                 break;
 
@@ -27813,7 +27816,7 @@ public partial class CombatEngine
                     {
                         target.Gold -= goldStolen;
                         caster.Gold += goldStolen;
-                        terminal.WriteLine(Loc.Get("combat.steals_gold", caster.DisplayName, goldStolen, target.Name), "yellow");
+                        terminal.WriteLine(Loc.Get("combat.steals_gold", caster.DisplayName, goldStolen, MonsterNames.Display(target)), "yellow");
                     }
                     else
                     {
@@ -27825,7 +27828,7 @@ public partial class CombatEngine
             case "convert":
                 if (target != null)
                 {
-                    terminal.WriteLine(Loc.Get("combat.spell_convert_touch", target.Name), "white");
+                    terminal.WriteLine(Loc.Get("combat.spell_convert_touch", MonsterNames.Display(target)), "white");
 
                     // Calculate conversion chance based on caster's Charisma and monster's level
                     int conversionChance = 30 + (int)(caster.Charisma / 5) - (target.Level * 2);
@@ -27847,7 +27850,7 @@ public partial class CombatEngine
                         {
                             // Monster flees in fear/awe
                             terminal.SetColor("bright_cyan");
-                            terminal.WriteLine(Loc.Get("combat.convert_flees", target.Name));
+                            terminal.WriteLine(Loc.Get("combat.convert_flees", MonsterNames.Display(target)));
                             target.HP = 0; // Effectively removed from combat
                             target.Fled = true;
                         }
@@ -27857,21 +27860,21 @@ public partial class CombatEngine
                             if (TryStunMonster(target, 3 + random.Next(1, 4)))
                             {
                                 terminal.SetColor("bright_green");
-                                terminal.WriteLine(Loc.Get("combat.pacified_holy_light", target.Name));
+                                terminal.WriteLine(Loc.Get("combat.pacified_holy_light", MonsterNames.Display(target)));
                                 terminal.WriteLine(Loc.Get("combat.tame_respect"));
                                 target.IsFriendly = true; // Mark as temporarily friendly
                             }
                             else
                             {
                                 terminal.SetColor("bright_green");
-                                terminal.WriteLine(Loc.Get("combat.resists_holy_light", target.Name));
+                                terminal.WriteLine(Loc.Get("combat.resists_holy_light", MonsterNames.Display(target)));
                             }
                         }
                         else
                         {
                             // Monster joins your side temporarily
                             terminal.SetColor("bright_yellow");
-                            terminal.WriteLine(Loc.Get("combat.converted_to_cause", target.Name));
+                            terminal.WriteLine(Loc.Get("combat.converted_to_cause", MonsterNames.Display(target)));
                             terminal.WriteLine(Loc.Get("combat.tame_fight_alongside"));
                             target.IsFriendly = true;
                             target.IsConverted = true;
@@ -27882,7 +27885,7 @@ public partial class CombatEngine
                     {
                         // Conversion failed
                         terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("combat.resists_conversion", target.Name));
+                        terminal.WriteLine(Loc.Get("combat.resists_conversion", MonsterNames.Display(target)));
                         terminal.WriteLine(Loc.Get("combat.tame_too_strong"));
                     }
                 }
@@ -27897,7 +27900,7 @@ public partial class CombatEngine
                 {
                     target.IsSlowed = true;
                     target.SlowDuration = 3;
-                    terminal.WriteLine(Loc.Get("combat.spell_slowed", target.Name), "gray");
+                    terminal.WriteLine(Loc.Get("combat.spell_slowed", MonsterNames.Display(target)), "gray");
                 }
                 break;
 
@@ -28026,7 +28029,7 @@ public partial class CombatEngine
                     int atkReduction = Math.Max(1, (int)(target.Strength * 0.30));
                     int defReduction = Math.Max(1, (int)(target.Defence * 0.20));
                     target.WeakenRounds = Math.Max(target.WeakenRounds, duration > 0 ? duration : 4);
-                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", target.Name, atkReduction, defReduction), "yellow");
+                    terminal.WriteLine(Loc.Get("combat.resolve_crumbles", MonsterNames.Display(target), atkReduction, defReduction), "yellow");
                 }
                 break;
 
@@ -28382,7 +28385,7 @@ public partial class CombatEngine
         long damage = Math.Max(1, attackPower - defense);
 
         terminal.SetColor("magenta");
-        terminal.WriteLine(Loc.Get("combat.power_attack_smash", target.Name, damage));
+        terminal.WriteLine(Loc.Get("combat.power_attack_smash", MonsterNames.Display(target), damage));
 
         target.HP = Math.Max(0, target.HP - damage);
         result.CombatLog.Add($"Player power-attacks {target.Name} for {damage} dmg (PowerStance)");
@@ -28531,7 +28534,7 @@ public partial class CombatEngine
         actual = DifficultySystem.ApplyPlayerDamageMultiplier(actual);
 
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("combat.smite_evil", target.Name, actual));
+        terminal.WriteLine(Loc.Get("combat.smite_evil", MonsterNames.Display(target), actual));
 
         target.HP = Math.Max(0, target.HP - actual);
         result.CombatLog.Add($"Player smites {target.Name} for {actual} dmg");
@@ -28555,7 +28558,7 @@ public partial class CombatEngine
             monster.WeapPow = 0;
             monster.Weapon = "";
             monster.WUser = false;
-            terminal.WriteLine(Loc.Get("combat.knock_weapon_away", monster.Name), "yellow");
+            terminal.WriteLine(Loc.Get("combat.knock_weapon_away", MonsterNames.Display(monster)), "yellow");
             result.CombatLog.Add($"{player.DisplayName} disarmed {monster.Name}");
         }
         else
@@ -28572,7 +28575,7 @@ public partial class CombatEngine
             await Pacing.Wait(GetCombatDelay(500));
             return;
         }
-        terminal.WriteLine(Loc.Get("combat.taunt_draw_ire", monster.Name), "yellow");
+        terminal.WriteLine(Loc.Get("combat.taunt_draw_ire", MonsterNames.Display(monster)), "yellow");
         // Lower defence + force targeting for 2 rounds
         monster.Defence = Math.Max(0, monster.Defence - 2);
         monster.TauntedBy = player.DisplayName;
@@ -29618,7 +29621,7 @@ public partial class CombatEngine
         var quickbar = GetQuickbarActions(player);
         var targets = new List<object>();
         if (monster != null)
-            targets.Add(new { index = 1, name = monster.Name, hp = monster.HP, maxHp = monster.MaxHP, family = monster.FamilyName ?? "" });
+            targets.Add(new { index = 1, name = MonsterNames.Display(monster), hp = monster.HP, maxHp = monster.MaxHP, family = monster.FamilyName ?? "" });
 
         var teammates = currentTeammates?.Where(t => t.IsAlive).Select(t => new
         {
@@ -29633,14 +29636,14 @@ public partial class CombatEngine
         {
             actions = new[]
             {
-                new { key = "A", label = "Attack", available = true, style = "danger" },
-                new { key = "D", label = "Defend", available = true, style = "info" },
-                new { key = "P", label = "Power Attack", available = true, style = "danger" },
-                new { key = "E", label = "Precise Strike", available = true, style = "danger" },
-                new { key = "I", label = $"Potions ({player.Healing}/{player.MaxPotions})", available = player.Healing > 0, style = "feature" },
-                new { key = "R", label = isPvP ? "Flee" : "Retreat", available = true, style = "info" },
-                new { key = "T", label = "Taunt", available = true, style = "info" },
-                new { key = "L", label = "Hide", available = true, style = "info" },
+                new { key = "A", label = Loc.Get("combat.attack"), available = true, style = "danger" },
+                new { key = "D", label = Loc.Get("combat.defend"), available = true, style = "info" },
+                new { key = "P", label = Loc.Get("combat.power_attack"), available = true, style = "danger" },
+                new { key = "E", label = Loc.Get("combat.precise_strike"), available = true, style = "danger" },
+                new { key = "I", label = Loc.Get("combat.electron_potions", player.Healing, player.MaxPotions), available = player.Healing > 0, style = "feature" },
+                new { key = "R", label = isPvP ? Loc.Get("combat.flee") : Loc.Get("combat.bbs_retreat"), available = true, style = "info" },
+                new { key = "T", label = Loc.Get("combat.taunt"), available = true, style = "info" },
+                new { key = "L", label = Loc.Get("combat.hide"), available = true, style = "info" },
             },
             quickbar = quickbar.Select(q => new { key = q.key, label = q.displayName, available = q.available }).ToArray(),
             targets,
@@ -29661,7 +29664,7 @@ public partial class CombatEngine
         var targets = monsters.Where(m => m.IsAlive).Select((m, i) => new
         {
             index = i + 1,
-            name = m.Name,
+            name = MonsterNames.Display(m),
             hp = m.HP,
             maxHp = m.MaxHP,
             family = m.FamilyName ?? "",
@@ -29681,16 +29684,16 @@ public partial class CombatEngine
         {
             actions = new[]
             {
-                new { key = "A", label = "Attack", available = true, style = "danger" },
-                new { key = "D", label = "Defend", available = true, style = "info" },
-                new { key = "P", label = "Power Attack", available = true, style = "danger" },
-                new { key = "E", label = "Precise Strike", available = true, style = "danger" },
-                new { key = "I", label = $"Potions ({player.Healing}/{player.MaxPotions})", available = player.Healing > 0, style = "feature" },
-                new { key = "H", label = "Aid Ally", available = teammates.Count > 0, style = "feature" },
-                new { key = "R", label = "Retreat", available = true, style = "info" },
-                new { key = "T", label = "Taunt", available = true, style = "info" },
-                new { key = "L", label = "Hide", available = true, style = "info" },
-                new { key = "J", label = "Herbs", available = (player is Player pp2 && pp2.TotalHerbCount > 0), style = "info" },
+                new { key = "A", label = Loc.Get("combat.attack"), available = true, style = "danger" },
+                new { key = "D", label = Loc.Get("combat.defend"), available = true, style = "info" },
+                new { key = "P", label = Loc.Get("combat.power_attack"), available = true, style = "danger" },
+                new { key = "E", label = Loc.Get("combat.precise_strike"), available = true, style = "danger" },
+                new { key = "I", label = Loc.Get("combat.electron_potions", player.Healing, player.MaxPotions), available = player.Healing > 0, style = "feature" },
+                new { key = "H", label = Loc.Get("combat.aid_ally"), available = teammates.Count > 0, style = "feature" },
+                new { key = "R", label = Loc.Get("combat.bbs_retreat"), available = true, style = "info" },
+                new { key = "T", label = Loc.Get("combat.taunt"), available = true, style = "info" },
+                new { key = "L", label = Loc.Get("combat.hide"), available = true, style = "info" },
+                new { key = "J", label = Loc.Get("combat.electron_herbs"), available = (player is Player pp2 && pp2.TotalHerbCount > 0), style = "info" },
             },
             quickbar = quickbar.Select(q => new { key = q.key, label = q.displayName, available = q.available }).ToArray(),
             targets,
@@ -29956,7 +29959,7 @@ public partial class CombatEngine
             result.TotalDamageDealt += actualDamage;
             player.Statistics.RecordDamageDealt(actualDamage, false);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("combat.dealt_damage_to", actualDamage, monster.Name));
+            terminal.WriteLine(Loc.Get("combat.dealt_damage_to", actualDamage, MonsterNames.Display(monster)));
         }
 
         if (abilityResult.Healing > 0)
@@ -30021,8 +30024,8 @@ public partial class CombatEngine
             3 => ctx.BossData?.LocPhase3() ?? Array.Empty<string>(),
             _ => Array.Empty<string>()
         };
-        string flavor = newPhase == 2 ? Loc.Get("combat.boss_phase2_flavor", boss.Name)
-            : newPhase == 3 ? Loc.Get("combat.boss_phase3_flavor", boss.Name)
+        string flavor = newPhase == 2 ? Loc.Get("combat.boss_phase2_flavor", MonsterNames.Display(boss))
+            : newPhase == 3 ? Loc.Get("combat.boss_phase3_flavor", MonsterNames.Display(boss))
             : "";
 
         // Phase 7: emit graphical phase-transition banner. Non-blocking — the
@@ -30030,7 +30033,7 @@ public partial class CombatEngine
         if (GameConfig.ElectronMode)
         {
             ElectronBridge.EmitBossPhaseTransition(
-                bossName: boss.Name,
+                bossName: MonsterNames.Display(boss),
                 newPhase: newPhase,
                 bossHp: boss.HP,
                 bossMaxHp: boss.MaxHP,
@@ -30141,12 +30144,12 @@ public partial class CombatEngine
         if (roundNumber == warningRound50)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  {Loc.Get("combat.boss_enrage_countdown", bossMonster.Name, ctx.EnrageRound - roundNumber)}");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_enrage_countdown", MonsterNames.Display(bossMonster), ctx.EnrageRound - roundNumber)}");
         }
         else if (roundNumber == warningRound75)
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  {Loc.Get("combat.boss_power_builds", bossMonster.Name)}");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_power_builds", MonsterNames.Display(bossMonster))}");
             terminal.WriteLine($"  *** {Loc.Get("combat.boss_enrage_in", ctx.EnrageRound - roundNumber)} ***");
         }
 
@@ -30162,12 +30165,12 @@ public partial class CombatEngine
             terminal.SetColor("bright_red");
             if (GameConfig.ScreenReaderMode)
             {
-                terminal.WriteLine($"  {Loc.Get("combat.boss_enraged", bossMonster.Name)} {Loc.Get("combat.boss_enraged_detail")}");
+                terminal.WriteLine($"  {Loc.Get("combat.boss_enraged", MonsterNames.Display(bossMonster))} {Loc.Get("combat.boss_enraged_detail")}");
             }
             else
             {
                 terminal.WriteLine("  ╔═══════════════════════════════════════════════╗");
-                terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged", bossMonster.Name)}".PadRight(49) + "║");
+                terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged", MonsterNames.Display(bossMonster))}".PadRight(49) + "║");
                 terminal.WriteLine($"  ║   {Loc.Get("combat.boss_enraged_detail")}".PadRight(49) + "║");
                 terminal.WriteLine("  ╚═══════════════════════════════════════════════╝");
             }
@@ -30258,7 +30261,7 @@ public partial class CombatEngine
         boss.ChannelingAbilityName = ctx.ChannelAbilityName;
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_ability", boss.Name, BossAbilityLabel(ctx.ChannelAbilityName))}");
+        terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_ability", MonsterNames.Display(boss), BossAbilityLabel(ctx.ChannelAbilityName))}");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("combat.channel_interrupt_warning")}");
         terminal.WriteLine($"  {Loc.Get("combat.channel_interrupt_hint")}");
@@ -30279,7 +30282,7 @@ public partial class CombatEngine
             int damage = BossContext?.ChannelDamage ?? (int)(boss.Strength * 3);
 
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, BossAbilityLabel(boss.ChannelingAbilityName))} ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", MonsterNames.Display(boss), BossAbilityLabel(boss.ChannelingAbilityName))} ***");
 
             // Hit player
             if (player.IsAlive)
@@ -30309,7 +30312,7 @@ public partial class CombatEngine
         else
         {
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_continues", boss.Name, BossAbilityLabel(boss.ChannelingAbilityName), boss.ChannelingRoundsLeft)}");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_channeling_continues", MonsterNames.Display(boss), BossAbilityLabel(boss.ChannelingAbilityName), boss.ChannelingRoundsLeft)}");
         }
     }
 
@@ -30336,7 +30339,7 @@ public partial class CombatEngine
             boss.IsChanneling = false;
             boss.ChannelingRoundsLeft = 0;
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  *** {Loc.Get("combat.boss_channel_interrupted", interrupter.DisplayName, boss.Name, BossAbilityLabel(boss.ChannelingAbilityName))} ***");
+            terminal.WriteLine($"  *** {Loc.Get("combat.boss_channel_interrupted", interrupter.DisplayName, MonsterNames.Display(boss), BossAbilityLabel(boss.ChannelingAbilityName))} ***");
             return true;
         }
         return false;
@@ -30348,10 +30351,12 @@ public partial class CombatEngine
     /// </summary>
     /// <summary>
     /// v1.2.2: a boss ability name held as a Loc key (the Old God AoE and channel names) in the reader's
-    /// language, resolved as it is written so a group capture re-renders it; any other name is shown as is.
+    /// language, resolved as it is written so a group capture re-renders it; v1.2.5: an Old God ability's
+    /// English name (matched by the ability handlers) shows through oldgod.ability.{id}; any other as is.
     /// </summary>
     internal static string BossAbilityLabel(string nameOrKey) =>
-        !string.IsNullOrEmpty(nameOrKey) && Loc.Has(nameOrKey) ? Loc.Get(nameOrKey) : nameOrKey;
+        !string.IsNullOrEmpty(nameOrKey) && Loc.Has(nameOrKey) ? Loc.Get(nameOrKey)
+            : UsurperRemake.Data.OldGodsData.AbilityLabel(nameOrKey);   // v1.2.5: an Old God ability's English name through its key
 
     private async Task ProcessBossAoE(Monster boss, Character player, CombatResult result)
     {
@@ -30361,7 +30366,7 @@ public partial class CombatEngine
         string abilityName = !string.IsNullOrEmpty(BossContext.AoEAbilityName) ? BossAbilityLabel(BossContext.AoEAbilityName) : Loc.Get("combat.boss_aoe_default");
 
         terminal.SetColor("bright_red");
-        terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", boss.Name, abilityName)} ***");
+        terminal.WriteLine($"  *** {Loc.Get("combat.boss_unleashes", MonsterNames.Display(boss), abilityName)} ***");
 
         // Check if anyone is taunting (tank absorbing)
         Character? tank = null;
@@ -30603,7 +30608,7 @@ public partial class CombatEngine
         boss.PhaseImmunityRounds = rounds;
 
         terminal.SetColor("bright_magenta");
-        terminal.WriteLine($"  {Loc.Get(physical ? "combat.boss_immune_physical" : "combat.boss_immune_magical", boss.Name, rounds)}");
+        terminal.WriteLine($"  {Loc.Get(physical ? "combat.boss_immune_physical" : "combat.boss_immune_magical", MonsterNames.Display(boss), rounds)}");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get(physical ? "combat.use_magical_spells" : "combat.use_physical_attacks")}");
     }
@@ -30640,7 +30645,7 @@ public partial class CombatEngine
             if (announce)
             {
                 terminal.SetColor("dark_magenta");
-                terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", target.Name));
+                terminal.WriteLine(Loc.Get("combat.magical_immunity_absorbs", MonsterNames.Display(target)));
             }
         }
         if (BossContext != null && BossContext.DivineArmorReduction > 0 && damage > 0)
@@ -30721,7 +30726,8 @@ public partial class CombatEngine
             {
                 if (TryMortisMiracleForFollower(tm, result)) continue;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
                 string killerName = bossMonster.Name;
-                BroadcastGroupLocalized(result, lang => $"\u001b[1;31m  ═══ {Loc.GetIn(lang, "combat.group_fallen_dark_powers", tm.DisplayName, killerName)} ═══\u001b[0m");
+                var killer = bossMonster;
+                BroadcastGroupLocalized(result, lang => $"\u001b[1;31m  ═══ {Loc.GetIn(lang, "combat.group_fallen_dark_powers", tm.DisplayName, MonsterNames.DisplayIn(lang, killer))} ═══\u001b[0m");
 
                 if (tm.IsEcho)
                 {
@@ -30740,7 +30746,7 @@ public partial class CombatEngine
                 else if (tm.IsGroupedPlayer)
                 {
                     terminal.SetColor("dark_red");
-                    terminal.WriteLine($"  {Loc.Get("combat.slain_by_corruption", tm.DisplayName, killerName)}");
+                    terminal.WriteLine($"  {Loc.Get("combat.slain_by_corruption", tm.DisplayName, MonsterNames.Display(killer))}");
                     result.Teammates.Remove(tm);
                     result.CombatLog.Add($"{tm.DisplayName} was slain by {killerName}");
                     if (tm.CombatInputChannel != null)
@@ -30775,7 +30781,7 @@ public partial class CombatEngine
                 bossMonster.IsPhysicalImmune = false;
                 bossMonster.IsMagicalImmune = false;
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"  {Loc.Get("combat.boss_immunity_fades", bossMonster.Name)}");
+                terminal.WriteLine($"  {Loc.Get("combat.boss_immunity_fades", MonsterNames.Display(bossMonster))}");
             }
         }
 
@@ -30839,7 +30845,7 @@ public partial class CombatEngine
         if (!boss.CanBeSaved)
         {
             terminal.SetColor("red");
-            terminal.WriteLine($"  {Loc.Get("combat.boss_cannot_save", boss.Name)}");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_cannot_save", boss.LocName())}");
             return false;
         }
 
@@ -30855,7 +30861,7 @@ public partial class CombatEngine
         if (hpPercent > 0.5)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine($"  {Loc.Get("combat.boss_too_strong", boss.Name)}");
+            terminal.WriteLine($"  {Loc.Get("combat.boss_too_strong", boss.LocName())}");
             terminal.SetColor("gray");
             terminal.WriteLine($"  {Loc.Get("combat.weaken_first")}");
             return false;
@@ -30875,7 +30881,7 @@ public partial class CombatEngine
         await Pacing.Wait(800);
 
         terminal.SetColor("white");
-        terminal.WriteLine($"  {Loc.Get("combat.reach_essence", boss.Name)}");
+        terminal.WriteLine($"  {Loc.Get("combat.reach_essence", boss.LocName())}");
         await Pacing.Wait(1000);
 
         // Display save dialogue
@@ -30891,7 +30897,7 @@ public partial class CombatEngine
 
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {Loc.Get("combat.boss_cleansed", boss.Name)}");
+        terminal.WriteLine($"  {Loc.Get("combat.boss_cleansed", boss.LocName())}");
 
         return true;
     }
@@ -32169,7 +32175,7 @@ public partial class CombatEngine
     /// </summary>
     internal static List<string> MonsterSaysRows(Monster m, string phrase, string indent)
     {
-        string said = m.CanSpeak ? Loc.Get("combat.monster_says", m.TheNameOrName, phrase) : $"{m.TheNameOrName} {phrase}";
+        string said = m.CanSpeak ? Loc.Get("combat.monster_says", MonsterNames.TheName(m), phrase) : $"{MonsterNames.TheName(m)} {phrase}";
         return UIHelper.WordWrap(said, UIHelper.WrapWidth - indent.Length).Select(r => indent + r).ToList();
     }
 
@@ -32199,7 +32205,7 @@ public partial class CombatEngine
             else
             {
                 foreach (var m in monsters)
-                    sb.AppendLine($"\u001b[37m  - {m.Name} (Lv{m.Level}, {m.HP} HP)\u001b[0m");
+                    sb.AppendLine($"\u001b[37m  - {MonsterNames.DisplayIn(lang, m)} (Lv{m.Level}, {m.HP} HP)\u001b[0m");
             }
             var alive = teammates?.Where(t => t.IsAlive).ToList() ?? new List<Character>();
             if (alive.Count > 0)
@@ -32227,7 +32233,7 @@ public partial class CombatEngine
         foreach (var m in monsters.Where(m => m.IsAlive))
         {
             int hpPct = (int)(m.HP * 100 / Math.Max(1, m.MaxHP));
-            sb.AppendLine($"\u001b[37m  {m.Name}: {HpColor(m.HP, m.MaxHP)}{hpPct}%\u001b[0m");
+            sb.AppendLine($"\u001b[37m  {MonsterNames.DisplayIn(lang, m)}: {HpColor(m.HP, m.MaxHP)}{hpPct}%\u001b[0m");
         }
         var members = new List<Character> { leader };
         if (teammates != null) members.AddRange(teammates.Where(t => t.IsAlive));

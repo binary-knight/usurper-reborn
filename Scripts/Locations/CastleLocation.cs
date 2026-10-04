@@ -1219,11 +1219,23 @@ public class CastleLocation : BaseLocation
     internal static string CourtFactionLabel(int faction) => CourtFactionLabel((CourtFaction)faction);
 
     /// <summary>v1.2.5: a quest target QuestSystem names "Floor N" in English, shown in the player's language.</summary>
+    /// <summary>v1.2.5: the stored name of the monster guard a typed name means: the stored English name, or
+    /// the name as the reader's language shows it (case ignored). Anything else is returned as typed.</summary>
+    internal static string MonsterGuardNameFromInput(IEnumerable<string> storedNames, string? typed)
+    {
+        string t = (typed ?? "").Trim();
+        var names = storedNames.ToList();
+        return names.FirstOrDefault(n => n == t)
+            ?? names.FirstOrDefault(n => string.Equals(MonsterNames.Display(n), t, StringComparison.OrdinalIgnoreCase))
+            ?? names.FirstOrDefault(n => string.Equals(n, t, StringComparison.OrdinalIgnoreCase))
+            ?? t;
+    }
+
     internal static string QuestTargetLabel(string? target)
     {
         string t = target ?? "";
         return t.StartsWith("Floor ", StringComparison.Ordinal) && int.TryParse(t.Substring(6), out int floor)
-            ? Loc.Get("dungeon.floor", floor) : t;
+            ? Loc.Get("dungeon.floor", floor) : MonsterNames.Display(t);   // v1.2.5: a monster target through its key
     }
 
     // ---- mail and live notices to another player, built in that player's language ----
@@ -2657,7 +2669,7 @@ public class CastleLocation : BaseLocation
             foreach (var monster in currentKing.MonsterGuards)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine($"{monster.Name,-20} {monster.Level,-8} {monster.HP}/{monster.MaxHP,-8} {monster.Strength,-10}");
+                terminal.WriteLine($"{MonsterNames.Display(monster.Name),-20} {monster.Level,-8} {monster.HP}/{monster.MaxHP,-8} {monster.Strength,-10}");
             }
         }
         else
@@ -2798,7 +2810,7 @@ public class CastleLocation : BaseLocation
 
             bool canAfford = currentKing.Treasury >= actualCost;
             terminal.SetColor(canAfford ? "white" : "darkgray");
-            terminal.WriteLine($"{i,-3} {name,-15} {level,-5} {hp,-7} {str,-6} {def,-6} {actualCost:N0,-10} {feedingCost:N0,-10}");
+            terminal.WriteLine($"{i,-3} {MonsterNames.Display(name),-15} {level,-5} {hp,-7} {str,-6} {def,-6} {actualCost:N0,-10} {feedingCost:N0,-10}");
             i++;
         }
 
@@ -2820,9 +2832,9 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("bright_green");
                 // v0.62.1 article fix.
-                terminal.WriteLine(Loc.Get("castle.monster_added", GameConfig.ArticulateForLanguage(name)));
+                terminal.WriteLine(Loc.Get("castle.monster_added", GameConfig.ArticulateForLanguage(MonsterNames.Display(name))));
                 terminal.WriteLine(Loc.Get("castle.beast_lurks"));
-                NewsSystem.Instance.Newsy(true, Loc.Get("castle.news_monster_guard", KingTitle(), currentKing.Name, name));
+                NewsSystem.Instance.Newsy(true, Loc.Get("castle.news_monster_guard", KingTitle(), currentKing.Name, MonsterNames.Display(name)));
             }
             else
             {
@@ -2847,12 +2859,15 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.monster_dismiss_prompt"));
         terminal.SetColor("white");
-        string name = await terminal.ReadLineAsync();
+        string typed = await terminal.ReadLineAsync();
+        // v1.2.5: the list shows each guard in the reader's language, so the name may be typed as shown; the
+        // guard is found by its stored English name either way
+        string name = MonsterGuardNameFromInput(currentKing.MonsterGuards.Select(m => m.Name), typed);
 
         if (await CourtChangeAsync(court => court.MonsterGuards.RemoveAll(m => m.Name == name) > 0))   // v1.1.13: one guarded court change
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("castle.monster_released", name));
+            terminal.WriteLine(Loc.Get("castle.monster_released", MonsterNames.Display(name)));
         }
         else
         {
@@ -9518,7 +9533,7 @@ public class CastleLocation : BaseLocation
         foreach (var monster in currentKing.MonsterGuards.ToList())
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("castle.siege_monster_blocks", monster.Name, monster.Level));
+            terminal.WriteLine(Loc.Get("castle.siege_monster_blocks", MonsterNames.Display(monster.Name), monster.Level));
             terminal.WriteLine("");
 
             long monsterHP = monster.HP;
@@ -9537,7 +9552,7 @@ public class CastleLocation : BaseLocation
                 monsterHP -= teamDmg;
 
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("castle.team_strikes_monster", monster.Name, teamDmg, Math.Max(0, monsterHP)));
+                terminal.WriteLine(Loc.Get("castle.team_strikes_monster", MonsterNames.Display(monster.Name), teamDmg, Math.Max(0, monsterHP)));
 
                 if (monsterHP <= 0) break;
 
@@ -9548,7 +9563,7 @@ public class CastleLocation : BaseLocation
                 teamHP -= monsterDmg;
 
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.siege_monster_strikes", monster.Name, monsterDmg, Math.Max(0, teamHP)));
+                terminal.WriteLine(Loc.Get("castle.siege_monster_strikes", MonsterNames.Display(monster.Name), monsterDmg, Math.Max(0, teamHP)));
 
                 await Pacing.Wait(250);
             }
@@ -9556,7 +9571,7 @@ public class CastleLocation : BaseLocation
             if (teamHP <= 0)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.siege_overwhelmed", monster.Name));
+                terminal.WriteLine(Loc.Get("castle.siege_overwhelmed", MonsterNames.Display(monster.Name)));
                 siegeFailed = true;
                 break;
             }
@@ -9565,7 +9580,7 @@ public class CastleLocation : BaseLocation
                 guardsDefeated++;
                 losses.MonstersSlain.Add(monster.Name);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("castle.siege_monster_defeated", monster.Name));
+                terminal.WriteLine(Loc.Get("castle.siege_monster_defeated", MonsterNames.Display(monster.Name)));
                 terminal.WriteLine("");
                 await Pacing.Wait(500);
             }

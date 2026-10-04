@@ -1530,7 +1530,7 @@ public class AnchorRoadLocation : BaseLocation
         // immediately after the wave-complete reward print, in cyan to stand out.
         currentPlayer.Inventory.Add(currentPlayer.ConvertEquipmentToLegacyItem(drop));
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("anchor_road.champion_drop", drop.Name));
+        terminal.WriteLine(Loc.Get("anchor_road.champion_drop", ItemNames.Display(drop)));
         terminal.SetColor("dark_gray");
         terminal.WriteLine($"  {drop.Description}");
     }

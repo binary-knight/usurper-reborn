@@ -861,6 +861,6 @@ public class RestChar125Tests : IDisposable
         data["Scripts/Systems/VisualNovelDialogueSystem.cs"].Should().Be(2, "the two pronouns are keyed");
         data["Scripts/Systems/CompanionSystem.cs"].Should().Be(94);
         data.Should().NotContainKey("Scripts/Systems/DialogueSystem.cs", "v1.2.5: the dialogue trees are keyed (DataDialogue125Tests)");
-        data["Scripts/Locations/DungeonLocation.cs"].Should().Be(77);
+        data.Should().NotContainKey("Scripts/Locations/DungeonLocation.cs", "v1.2.5: the monster names and event choices are keyed (DataCombat125Tests)");
     }
 }

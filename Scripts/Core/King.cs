@@ -255,7 +255,7 @@ public class King
             var escapedMonsters = court.MonsterGuards.Where(_ => random.Next(100) < 10).ToList();
             foreach (var monster in escapedMonsters)
             {
-                news.Add((true, Loc.Get("castle.news_monster_escaped", monster.Name)));
+                news.Add((true, Loc.Get("castle.news_monster_escaped", MonsterNames.Display(monster.Name))));   // v1.2.5: news in the writer's language
                 court.MonsterGuards.Remove(monster);
             }
 

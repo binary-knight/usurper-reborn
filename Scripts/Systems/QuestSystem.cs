@@ -2082,6 +2082,46 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.2.5: a kill objective's (or a boss quest's title's) arguments with the monster shown in the reader's
+    /// language. The objective stores the monster's English name (TargetName, matched by OnMonsterKilled);
+    /// an argument equal to it, or to its English plural, shows through MonsterNames. A boss quest's champion
+    /// name was written at creation through quest.title.champion in the creator's language around the
+    /// English tier; its tier is the objective's TargetId, so it is written again in the reader's language.
+    /// Every other argument shows as stored. Nothing is written back.
+    /// </summary>
+    internal static object[] ShowMonsterArgs(object[] args, QuestObjective? objective)
+    {
+        if (objective == null || args.Length == 0) return args;
+        if (objective.ObjectiveType != QuestObjectiveType.KillSpecificMonster && objective.ObjectiveType != QuestObjectiveType.KillBoss)
+            return args;
+        string target = objective.TargetName ?? "";
+        string? tier = objective.ObjectiveType == QuestObjectiveType.KillBoss ? TierFromId(objective.TargetId) : null;
+        var shown = (object[])args.Clone();
+        for (int i = 0; i < shown.Length; i++)
+        {
+            if (shown[i] is not string a || a.Length == 0) continue;
+            if (a == target && MonsterNames.KeyOf(target) != null)
+                shown[i] = MonsterNames.Display(target);
+            else if (target.Length > 0 && a == GetPluralName(target) && MonsterNames.KeyOf(target) != null)
+                shown[i] = MonsterNames.Count(Math.Max(2, objective.RequiredProgress), target, GetPluralName);
+            else if (tier != null && Loc.LoadedLanguages.Any(lang => Loc.GetIn(lang, "quest.title.champion", tier) == a))
+                shown[i] = Loc.Get("quest.title.champion", MonsterNames.Display(tier));
+        }
+        return shown;
+    }
+
+    /// <summary>The English tier name a boss quest's TargetId was made from (tier name, lower case, spaces as
+    /// underscores), or null.</summary>
+    private static string? TierFromId(string? targetId)
+    {
+        if (string.IsNullOrEmpty(targetId)) return null;
+        foreach (var family in MonsterFamilies.GetBuiltInFamilies())
+            foreach (var t in family.Tiers)
+                if (t.Name.ToLower().Replace(" ", "_") == targetId) return t.Name;
+        return null;
+    }
+
+    /// <summary>
     /// Get the plural form of a monster name using English pluralization rules.
     /// </summary>
     private static string GetPluralName(string name)

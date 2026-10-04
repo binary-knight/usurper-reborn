@@ -737,7 +737,7 @@ public class CastleRest125Tests : IDisposable
         var news = InLang("hu", () => King.ApplyGuardUpkeep(court, new Dictionary<string, DateTime>(), new Random(1)));
         news.Select(n => n.Text).Should().Contain(L("hu", "castle.news_guard_deserted", "Deserter")).And.Contain(L("hu", "castle.news_treasury_crisis"));
         news.Where(n => n.Text.Contains("unfed") || n.Text.Contains("Royal treasury")).Should().BeEmpty("the news is in the writer's language");
-        news.Any(n => monsters.Any(m => n.Text == L("hu", "castle.news_monster_escaped", m))).Should().BeTrue("an unfed monster escaped");
+        news.Any(n => monsters.Any(m => n.Text == L("hu", "castle.news_monster_escaped", MonsterNames.DisplayIn("hu", m)))).Should().BeTrue("an unfed monster escaped, named in the writer's language (v1.2.5)");
     }
 
     [Fact]

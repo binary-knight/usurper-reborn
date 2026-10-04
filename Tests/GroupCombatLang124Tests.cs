@@ -474,7 +474,7 @@ public class GroupCombatLang124Tests
         string victory = Strip(CombatEngine.GroupVictoryText(lang, new List<Monster> { ogre }));
         Capture($"group-lang-intro-{lang}.txt", intro + victory);
         intro.Should().Contain(Loc.GetIn(lang, "combat.header")).And.Contain(Loc.GetIn(lang, "combat.fighting_alongside"));
-        intro.Should().Contain(Loc.GetIn(lang, "combat.facing", ogre.GetDisplayInfo()));
+        intro.Should().Contain(Loc.GetIn(lang, "combat.facing", CombatEngine.InLanguage(lang, ogre.GetDisplayInfo)));   // v1.2.5: the line in the reader's language
         victory.Should().Contain(Loc.GetIn(lang, "combat.group_defeated_one", "Ogre")).And.Contain(Loc.GetIn(lang, "combat.victory_solo"));
         Strip(CombatEngine.GroupVictoryText(lang, new List<Monster> { ogre, Foe() })).Should().Contain(Loc.GetIn(lang, "combat.defeated_count", 2));
         AllRowsFit(intro, "intro");

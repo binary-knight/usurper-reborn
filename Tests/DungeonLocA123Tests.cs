@@ -137,7 +137,7 @@ public class DungeonLocA123Tests
 
         Hu("dungeon.guardian_name").Should().NotBe(Loc.GetIn("en", "dungeon.guardian_name"));
         Hu("dungeon.guardian_phrase").Should().NotBe(Loc.GetIn("en", "dungeon.guardian_phrase"));
-        Src().Should().Contain("guardian.Name = Loc.Get(\"dungeon.guardian_name\")")
+        Src().Should().Contain("guardian.Name = MonsterNames.FromKey(\"dungeon.guardian_name\")")
             .And.Contain("guardian.Phrase = Loc.Get(\"dungeon.guardian_phrase\")");
     }
 
@@ -291,7 +291,7 @@ public class DungeonLocA123Tests
     public async Task TheyKnowLine_LongestGodAndOutcome_FitsIn79(string lang)
     {
         var god = Enum.GetValues<OldGodType>()
-            .Select(g => { try { return (g, name: OldGodsData.GetGodBossData(g).Name); } catch { return (g, name: ""); } })
+            .Select(g => { try { return (g, name: Loc.GetIn(lang, $"oldgod.{OldGodsData.GetGodBossData(g).NameKeyPart}.name")); } catch { return (g, name: ""); } })
             .OrderByDescending(x => x.name.Length).First();
         var outcomes = new (BossOutcome outcome, string key)[]
         {

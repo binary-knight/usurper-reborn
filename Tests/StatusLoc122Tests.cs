@@ -101,7 +101,7 @@ public class StatusLoc122Tests
         {
             string t = await RenderMonsterDotDeath(burn: true);
             Capture($"status-burn-death-{lang}.txt", t);
-            t.Should().Contain(Loc.Get("combat.monster_burn_death", "Kobold"));
+            t.Should().Contain(Loc.Get("combat.monster_burn_death", MonsterNames.DisplayIn(lang, "Kobold")));
             return t;
         });
         text.Should().NotContain("consumed by flames");

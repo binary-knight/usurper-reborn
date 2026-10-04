@@ -688,14 +688,17 @@ public class Monster
     /// </summary>
     public string GetDisplayInfo()
     {
+        // v1.2.5: the name through MonsterNames and the line and its tags through keys, in the reader's language
         var status = "";
-        if (IsBoss) status += " [BOSS]";
-        else if (IsMiniBoss) status += " [CHAMPION]";
-        if (IsUnique) status += " [UNIQUE]";
-        if (Poisoned) status += " [POISONED]";
-        if (Disease) status += " [DISEASED]";
+        if (IsBoss) status += Tag("monster.tag_boss");
+        else if (IsMiniBoss) status += Tag("monster.tag_champion");
+        if (IsUnique) status += Tag("monster.tag_unique");
+        if (Poisoned) status += Tag("monster.tag_poisoned");
+        if (Disease) status += Tag("monster.tag_diseased");
 
-        return $"{Name} (Level {Level}) - HP: {HP}{status}";
+        return UsurperRemake.Systems.Loc.Get("monster.display_info", UsurperRemake.Systems.MonsterNames.Display(this), Level, HP, status);
+
+        static string Tag(string key) => " [" + UsurperRemake.Systems.Loc.Get(key) + "]";
     }
     
     /// <summary>

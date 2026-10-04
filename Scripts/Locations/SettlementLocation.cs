@@ -719,13 +719,13 @@ public class SettlementLocation : BaseLocation
                 {
                     var m = room.Monsters[0];
                     string plural = room.Monsters.Count > 1 ? Loc.Get("settlement.settlers_more", room.Monsters.Count - 1) : "";
-                    terminal.WriteLine(Loc.Get("dungeon.scout_monster", m.Name, m.Level, plural));
+                    terminal.WriteLine(Loc.Get("dungeon.scout_monster", MonsterNames.Display(m), m.Level, plural));
                 }
                 else
                 {
                     var sample = MonsterGenerator.GenerateMonster(floor);
                     if (sample != null)
-                        terminal.WriteLine(Loc.Get("dungeon.scout_monster", sample.Name, sample.Level, ""));
+                        terminal.WriteLine(Loc.Get("dungeon.scout_monster", MonsterNames.Display(sample), sample.Level, ""));
                 }
             }
         }
@@ -1115,7 +1115,7 @@ public class SettlementLocation : BaseLocation
             var monster = MonsterGenerator.GenerateMonster(f);
             if (monster != null)
             {
-                terminal.WriteLine(Loc.Get("settlement.scouts_floor", f, monster.Level, monster.Name));
+                terminal.WriteLine(Loc.Get("settlement.scouts_floor", f, monster.Level, MonsterNames.Display(monster)));
             }
         }
 
@@ -1289,11 +1289,11 @@ public class SettlementLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "V", Label = "View Buildings", Category = "info", Icon = "buildings" },
-            new() { Key = "C", Label = "Contribute Resources", Category = "service", Icon = "donate" },
-            new() { Key = "P", Label = "Manage Proposals", Category = "team", Icon = "proposal" },
-            new() { Key = "T", Label = "Talk to Settlers", Category = "social", Icon = "talk" },
-            new() { Key = "O", Label = "Visit Oracle", Category = "info", Icon = "oracle" },
+            new() { Key = "V", Label = Loc.Get("settlement.electron_view_buildings"), Category = "info", Icon = "buildings" },
+            new() { Key = "C", Label = Loc.Get("settlement.electron_contribute"), Category = "service", Icon = "donate" },
+            new() { Key = "P", Label = Loc.Get("settlement.electron_proposals"), Category = "team", Icon = "proposal" },
+            new() { Key = "T", Label = Loc.Get("settlement.electron_talk"), Category = "social", Icon = "talk" },
+            new() { Key = "O", Label = Loc.Get("settlement.electron_oracle"), Category = "info", Icon = "oracle" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

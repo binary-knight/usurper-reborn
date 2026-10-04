@@ -7959,7 +7959,10 @@ public abstract class BaseLocation
                 foreach (var ability in artifactAbilities)
                 {
                     terminal.SetColor("bright_yellow");
-                    terminal.WriteLine($"  {ability}");
+                    // v1.2.5: an ability line wraps to fit 79 columns, continuing indented
+                    var rows = UsurperRemake.UI.UIHelper.WordWrap(ability, 75);
+                    for (int r = 0; r < rows.Count; r++)
+                        terminal.WriteLine(r == 0 ? $"  {rows[r]}" : $"    {rows[r]}");
                 }
                 terminal.WriteLine("");
             }

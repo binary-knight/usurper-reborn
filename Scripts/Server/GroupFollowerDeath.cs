@@ -47,7 +47,7 @@ public static class GroupFollowerDeath
 
         terminal.WriteLine("");
         terminal.SetColor("red");
-        terminal.WriteLine($"  {Loc.Get("group.follower_death_header", killerName)}");
+        terminal.WriteLine($"  {Loc.Get("group.follower_death_header", UsurperRemake.Systems.MonsterNames.Display(killerName))}");
 
         bool alive;
         if (UsurperRemake.BBS.DoorMode.IsOnlineMode)
