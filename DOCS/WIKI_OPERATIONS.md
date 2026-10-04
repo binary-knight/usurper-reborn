@@ -200,8 +200,8 @@ After owner review and deployment, configure the web service environment using
 
 - `DISCORD_BOT_TOKEN`: the existing bot token. Keep it only on the server.
 - `DISCORD_WIKI_CHANNEL_IDS`: comma-separated allowed Discord channel IDs.
-- `DISCORD_WIKI_HELPER_ROLE_ID`: the trusted role allowed to Suggest. Empty
-  disables Suggest, not Ask.
+- `DISCORD_WIKI_HELPER_ROLE_ID`: one or more comma-separated trusted role
+  IDs; a member with any of them may Suggest. Empty disables Suggest, not Ask.
 - `WIKI_SITE_ORIGIN`: the HTTPS site origin, with no path or credentials.
 
 Enable the bot's Message Content intent and channel read/send permissions.

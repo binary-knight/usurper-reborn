@@ -25,7 +25,7 @@ function fixture(options = {}) {
   const logger = { error() {} };
   const bot = createWikiBot({
     channels: ["allowed"],
-    roleId: "trusted",
+    roleId: "111",
     index,
     now: () => time,
     logger,
@@ -37,7 +37,7 @@ function fixture(options = {}) {
     channelId: "allowed",
     content,
     author: { id: "user", bot: false },
-    member: { roles: { cache: new Set(["trusted"]) } },
+    member: { roles: { cache: new Set(["111"]) } },
     channel: { send: async (payload) => sent.push(payload) },
     ...changes,
   });
@@ -133,6 +133,81 @@ test("Suggest is role-gated, sanitized, persistent and deduplicated", async () =
     );
   } finally {
     db.close();
+  }
+});
+test("Suggest accepts a comma-separated list of numeric helper roles", async () => {
+  const withRoles = (...ids) => ({ member: { roles: { cache: new Set(ids) } } });
+  const rows = (db) => {
+    const table = db
+      .prepare("SELECT name FROM sqlite_master WHERE name = 'wiki_suggestions'")
+      .get();
+    return table
+      ? db.prepare("SELECT COUNT(*) AS n FROM wiki_suggestions").get().n
+      : 0;
+  };
+  let n = 0;
+  const ask = async (f, changes) => {
+    f.advance();
+    await f.bot.handle(
+      f.message(`<@123> suggest: correction number ${++n}`, {
+        id: String(n),
+        author: { id: `user${n}`, bot: false },
+        ...changes,
+      }),
+      "123",
+    );
+    return f.sent[f.sent.length - 1].content;
+  };
+  const dbs = [];
+  const make = (roleId, logger) => {
+    const db = new Database(":memory:");
+    dbs.push(db);
+    return { db, f: fixture({ db, roleId, ...(logger ? { logger } : {}) }) };
+  };
+  try {
+    // one id, as before
+    const one = make("1001");
+    assert.doesNotMatch(await ask(one.f, withRoles("1001")), /helper role/);
+    assert.match(await ask(one.f, withRoles("1002")), /trusted helper role/);
+    assert.equal(rows(one.db), 1);
+
+    // two ids: either role may Suggest, neither may not
+    const two = make("1001,1002");
+    assert.doesNotMatch(await ask(two.f, withRoles("1001")), /helper role/);
+    assert.doesNotMatch(await ask(two.f, withRoles("1002")), /helper role/);
+    assert.doesNotMatch(await ask(two.f, withRoles("1002", "9")), /helper role/);
+    assert.equal(rows(two.db), 3);
+    assert.match(await ask(two.f, withRoles("1003")), /trusted helper role/);
+    assert.match(await ask(two.f, withRoles()), /trusted helper role/);
+    assert.equal(rows(two.db), 3);
+
+    // malformed, spaces, duplicates, trailing commas; bad entries logged by position only
+    const logs = [];
+    const messy = make(" 1001 , ,abc,1001,, 1002x,1002,", {
+      error: (line) => logs.push(line),
+    });
+    assert.doesNotMatch(await ask(messy.f, withRoles("1002")), /helper role/);
+    assert.match(await ask(messy.f, withRoles("abc")), /trusted helper role/);
+    assert.match(await ask(messy.f, withRoles("1002x")), /trusted helper role/);
+    assert.match(await ask(messy.f, withRoles("")), /trusted helper role/);
+    assert.equal(rows(messy.db), 1);
+    assert.deepEqual(logs, [
+      "[Wiki] Helper role entry 3 ignored: not numeric",
+      "[Wiki] Helper role entry 6 ignored: not numeric",
+    ]);
+
+    // empty or all-invalid trusts nobody; Ask still works
+    for (const value of ["", " , ,", "abc", undefined]) {
+      const empty = make(value);
+      assert.match(await ask(empty.f, withRoles("1001")), /not enabled/);
+      assert.match(await ask(empty.f, withRoles()), /not enabled/);
+      empty.f.advance();
+      await empty.f.bot.handle(empty.f.message("<@123> how does Favor work?"), "123");
+      assert.match(empty.f.sent[empty.f.sent.length - 1].content, /usurper-reborn.net/);
+      assert.equal(rows(empty.db), 0);
+    }
+  } finally {
+    for (const db of dbs) db.close();
   }
 });
 test("Suggestion limits persist across bot restart and global cap is enforced", async () => {
