@@ -35,6 +35,9 @@ namespace UsurperRemake.Systems
         public List<int> ExperiencedMoments { get; set; } = new();
         public List<string> OceanInsightIds { get; set; } = new(); // v1.1.12: distinct insights, by source id
 
+        // 1.2.5: moral paradoxes already answered, by paradox id (an old save has none)
+        public List<string> CompletedParadoxIds { get; set; } = new();
+
         // Seven Seals
         public List<int> CollectedSeals { get; set; } = new();
 

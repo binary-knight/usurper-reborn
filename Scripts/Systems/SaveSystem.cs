@@ -1934,6 +1934,13 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
+            // 1.2.5: answered moral paradoxes, so none repeats after a reload
+            try
+            {
+                data.CompletedParadoxIds = MoralParadoxSystem.Instance.CompletedParadoxIds.ToList();
+            }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
+
             // Grief System - save full grief state (multiple griefs, memories)
             try
             {
@@ -2464,6 +2471,13 @@ namespace UsurperRemake.Systems
                     data.ExperiencedMoments.Select(m => (AwakeningMoment)m),
                     data.OceanInsightIds,
                     data.AwakeningLevel);
+            }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
+
+            // 1.2.5: answered moral paradoxes; an old save has none recorded
+            try
+            {
+                MoralParadoxSystem.Instance.RestoreFromSave(data.CompletedParadoxIds);
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 

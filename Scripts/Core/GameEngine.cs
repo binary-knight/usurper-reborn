@@ -4802,6 +4802,20 @@ public partial class GameEngine
     /// god entry is restored. On an NG+ reroll it clears the previous life, as the NG+ god clear does.
     /// Returns the number of quests and bounties removed.
     /// </summary>
+    /// <summary>
+    /// The narrative systems a new character starts without. 1.2.5: the answered moral paradoxes too,
+    /// so a new character in the same process is offered them again.
+    /// </summary>
+    internal static void ResetNarrativeSystemsForNewGame()
+    {
+        UsurperRemake.Systems.StrangerEncounterSystem.Instance.Reset();
+        UsurperRemake.Systems.TownNPCStorySystem.Instance.Reset();
+        UsurperRemake.Systems.DreamSystem.Instance.Reset();
+        UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
+        UsurperRemake.Systems.GriefSystem.Instance.Reset();
+        UsurperRemake.Systems.MoralParadoxSystem.Instance.Reset();
+    }
+
     public static int ClearLeftoversForNewCharacter(string? name2)
     {
         if (string.IsNullOrWhiteSpace(name2)) return 0;
@@ -4939,11 +4953,7 @@ public partial class GameEngine
         UsurperRemake.Systems.FactionSystem.Instance.Reset();
 
         // Reset narrative systems for new game
-        UsurperRemake.Systems.StrangerEncounterSystem.Instance.Reset();
-        UsurperRemake.Systems.TownNPCStorySystem.Instance.Reset();
-        UsurperRemake.Systems.DreamSystem.Instance.Reset();
-        UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
-        UsurperRemake.Systems.GriefSystem.Instance.Reset();
+        ResetNarrativeSystemsForNewGame();
 
         // In online mode, world-level systems (NPCs, children, marriages) are shared
         // across all players and managed by the WorldSimService. Don't reset them
