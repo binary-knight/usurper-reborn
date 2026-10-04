@@ -4640,7 +4640,11 @@ public class DungeonLocation : BaseLocation
             terminal.WriteLine(Loc.Get("dungeon.fallen_companions"));
             foreach (var (companion, death) in fallen)
             {
-                terminal.WriteLine($"    {companion.Name} - {death.Circumstance}");
+                // v1.2.5: the stored English circumstance in the player's language, rows under the text at 79 columns
+                string fallenPrefix = $"    {companion.Name} - ";
+                var fallenRows = UsurperRemake.UI.UIHelper.WrapAfterPrefix(fallenPrefix, CompanionSystem.CircumstanceLabel(death.Circumstance));
+                for (int r = 0; r < fallenRows.Count; r++)
+                    terminal.WriteLine((r == 0 ? fallenPrefix : new string(' ', fallenPrefix.Length)) + fallenRows[r]);
             }
         }
     }
@@ -9344,7 +9348,7 @@ public class DungeonLocation : BaseLocation
         await Pacing.Wait(1500);
 
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"\"{lyris.DialogueHints[0]}\"");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{lyris.LocDialogueHint(0)}\"");   // v1.2.5: in the player's language
         terminal.WriteLine("");
         await Pacing.Wait(2000);
 
@@ -9352,19 +9356,19 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("quest.lyris_shrine.studies"));
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine($"\"{lyris.DialogueHints[1]}\"");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{lyris.LocDialogueHint(1)}\"");
         terminal.WriteLine("");
         await Pacing.Wait(2000);
 
         // Show her details
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("quest.lyris_shrine.this_is", lyris.Name, lyris.Title));
-        terminal.WriteLine(Loc.Get("quest.lyris_shrine.role", lyris.CombatRole));
-        terminal.WriteLine(Loc.Get("quest.lyris_shrine.abilities", string.Join(", ", lyris.Abilities)));
+        terminal.WriteLine(Loc.Get("quest.lyris_shrine.this_is", lyris.Name, lyris.LocTitle));
+        terminal.WriteLine(Loc.Get("quest.lyris_shrine.role", InnLocation.RoleName(lyris.CombatRole)));
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("quest.lyris_shrine.abilities", string.Join(", ", lyris.LocAbilities)));
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        terminal.WriteLine(lyris.BackstoryBrief);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, lyris.LocBackstory);
         terminal.WriteLine("");
         await Pacing.Wait(1500);
 
@@ -9411,13 +9415,13 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("quest.lyris_shrine.speaks", lyris.Name));
                 terminal.WriteLine("");
                 terminal.SetColor("white");
-                terminal.WriteLine(lyris.Description);
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, lyris.LocDescription);
                 terminal.WriteLine("");
                 if (!string.IsNullOrEmpty(lyris.PersonalQuestDescription))
                 {
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("quest.lyris_shrine.personal_quest", lyris.PersonalQuestName));
-                    terminal.WriteLine($"\"{lyris.PersonalQuestDescription}\"");
+                    terminal.WriteLine(Loc.Get("quest.lyris_shrine.personal_quest", lyris.LocQuestName));
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{lyris.LocQuestDescription}\"");
                     terminal.WriteLine("");
                 }
                 terminal.SetColor("cyan");

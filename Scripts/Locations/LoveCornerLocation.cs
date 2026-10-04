@@ -378,7 +378,8 @@ public class LoveCornerLocation : BaseLocation
             terminal.WriteLine();
             terminal.WriteLine(Loc.Get("love_corner.wedding_ceremony"), TerminalEmulator.ColorYellow);
             terminal.WriteLine();
-            terminal.WriteLine(message, TerminalEmulator.ColorGreen);
+            foreach (var row in RelationshipSystem.MessageRows(message))   // v1.2.5: fits 79 columns
+                terminal.WriteLine(row, TerminalEmulator.ColorGreen);
 
             // v0.65.1: offer the player a family surname (spouse's or a new one).
             await MarriageSurnameHelper.OfferAsync(terminal, player, targetNPC.DisplayName);
@@ -386,7 +387,8 @@ public class LoveCornerLocation : BaseLocation
         else
         {
             terminal.WriteLine();
-            terminal.WriteLine(message, TerminalEmulator.ColorRed);
+            foreach (var row in RelationshipSystem.MessageRows(message))   // v1.2.5: fits 79 columns
+                terminal.WriteLine(row, TerminalEmulator.ColorRed);
             // Refund on failure
             player.Gold += weddingCost;
         }
@@ -614,7 +616,7 @@ public class LoveCornerLocation : BaseLocation
         {
             foreach (var couple in marriedCouples)
             {
-                terminal.WriteLine(couple);
+                foreach (var row in RelationshipSystem.MessageRows(couple)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
             }
         }
 

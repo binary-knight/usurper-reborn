@@ -89,6 +89,8 @@ namespace UsurperRemake.Systems
             // v1.2.5: the arena and tournament champions' themed drops (stored under these English names)
             names.AddRange(UsurperRemake.Data.GauntletChampionData.Champions.Select(c => c.Drop.ItemName));
             names.AddRange(UsurperRemake.Data.HonorTournamentData.Champions.Select(c => c.Drop.ItemName));
+            // v1.2.5: the starting weapons character creation gives (stored under these English names)
+            names.AddRange(Enum.GetValues<CharacterClass>().Select(c => CharacterCreationSystem.StarterWeapon(c).name));
 
             var map = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var name in names)

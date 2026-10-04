@@ -25,6 +25,15 @@ public class SpecDefinition
     public CharacterClass ForClass { get; init; }
     public string Name { get; init; } = "";
     public string DescriptionKey { get; init; } = "";
+
+    /// <summary>v1.2.5: the name's key (spec.{class}.{spec}.name, beside DescriptionKey). Name stays the English
+    /// table name; the save stores the ClassSpecialization id.</summary>
+    public string NameKey => DescriptionKey.EndsWith(".desc") ? DescriptionKey[..^5] + ".name" : "";
+
+    /// <summary>v1.2.5: the name in the reader's language.</summary>
+    public string LocName =>
+        NameKey.Length > 0 && UsurperRemake.Systems.Loc.HasIn("en", NameKey) && UsurperRemake.Systems.Loc.GetIn("en", NameKey) == Name
+            ? UsurperRemake.Systems.Loc.Get(NameKey) : Name;
     public SpecRole Role { get; init; }
 
     // Stat growth modifiers (additive per level-up on top of base class growth)

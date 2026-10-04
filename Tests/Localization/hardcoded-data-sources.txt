@@ -103,7 +103,7 @@ keyed|Scripts/Data/SecretBosses.cs|init.IntroText|secretboss.{key}.intro.N
 keyed|Scripts/Data/SecretBosses.cs|init.VictoryText|secretboss.{key}.victory.N
 names|Scripts/Data/SecretBosses.cs|init.Name|boss names
 names|Scripts/Data/SecretBosses.cs|init.Title|boss titles, kept English by design
-nouns|Scripts/Data/SpecializationData.cs|init.Name|specialization names, TeamCornerLocation and LevelMasterLocation
+keyed|Scripts/Data/SpecializationData.cs|init.Name|spec.{class}.{spec}.name (SpecDefinition.LocName); the save stores the ClassSpecialization id, the wiki exports en and the keys
 keyed|Scripts/Data/WorldBossData.cs|init.DefeatDialogue|worldboss.{id}.defeat.N
 keyed|Scripts/Data/WorldBossData.cs|init.Description|worldboss.{id}.ability.pN.i.desc
 keyed|Scripts/Data/WorldBossData.cs|init.Name|worldboss.{id}.ability.pN.i.name; boss names are proper nouns
@@ -154,9 +154,8 @@ keyed|Scripts/Systems/ArtifactSystem.cs|init.LoreText|artifact.{id}.lore.{n} (Ar
 keyed|Scripts/Systems/ArtifactSystem.cs|init.SpecialAbility|artifact.{id}.ability (ArtifactData.LocAbility)
 keyed|Scripts/Systems/ArtifactSystem.cs|init.Name|artifact.{id}.name (ArtifactData.LocName); artifacts are stored by type
 names|Scripts/Systems/BetrayalSystem.cs|init.NPCName|NPC names
-table|Scripts/Systems/CharacterCreationSystem.cs|dictpair#1|class abbreviations in the race list
-table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|starter weapon description
-table|Scripts/Systems/CharacterCreationSystem.cs|switcharm/tuple#0|starter weapon names
+table|Scripts/Systems/CharacterCreationSystem.cs|init.Description|kept English: stored on the starting weapon (Equipment.Description, saved with the item); no screen shows it
+keyed|Scripts/Systems/CharacterCreationSystem.cs|switcharm/tuple#0|item.* (ItemNames.Display, by the English name); stored English as the starting weapon's Equipment.Name
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Description|ability.{id}.desc
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Name|ability.{id}.name
 names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names: god names stay as they are; the stored English picks the colour and the Electron portrait; the Mysterious Stranger title shows through dialogue.speaker.mysterious_stranger
@@ -197,10 +196,8 @@ keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Dialogue|npc_story.{id}.stageN.
 keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Prompt|npc_story.{id}.stageN.choice.prompt
 keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Text|npc_story.{id}.stageN.choice.{key}.text
 keyed|Scripts/Systems/TownNPCStorySystem.cs|init.Title|npc_story.{id}.title
-names|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:exSpouseName|NPC name fallback
-table|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:prefix|dialogue prefix
 names|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:targetName2|NPC name fallback
-table|Scripts/Systems/VisualNovelDialogueSystem.cs|init.Initiator|quest giver fallback
+table|Scripts/Systems/VisualNovelDialogueSystem.cs|init.Initiator|kept English: stored in Quest.Initiator (saved); the fallback for an NPC with no name
 
 # --- Scripts/UI ---------------------------------------------------------------------------------
 table|Scripts/UI/ANSIArt.cs|decl:BossVictory|art with words, CombatEngine
@@ -308,26 +305,18 @@ keyed|Scripts/Systems/AchievementSystem.cs|init.Name|achievement.{id}.name (Achi
 keyed|Scripts/Systems/AchievementSystem.cs|init.SecretHint|achievement.{id}.hint (Achievement.LocSecretHint); the wiki export keeps the English field
 keyed|Scripts/Systems/AchievementSystem.cs|init.UnlockMessage|achievement.{id}.unlock (Achievement.LocUnlockMessage)
 names|Scripts/Systems/CombatEngine.cs|init.Name|unique boss name
-table|Scripts/Systems/CompanionSystem.cs|decl:drop|companion drop line
-table|Scripts/Systems/CompanionSystem.cs|decl:notification|inn notifications
-table|Scripts/Systems/CompanionSystem.cs|init.Abilities|companion abilities
-table|Scripts/Systems/CompanionSystem.cs|init.BackstoryBrief|companion backstory
-table|Scripts/Systems/CompanionSystem.cs|init.Circumstance|companion death line
-table|Scripts/Systems/CompanionSystem.cs|init.Description|companion description
-table|Scripts/Systems/CompanionSystem.cs|init.DialogueHints|companion dialogue hints
-table|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestDescription|companion quest description
-table|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestLocationHint|companion quest hint
-nouns|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestName|companion quest names
-table|Scripts/Systems/CompanionSystem.cs|init.Title|companion epithet
-table|Scripts/Systems/CompanionSystem.cs|=result.TriggerReason|companion death circumstance
+keyed|Scripts/Systems/CompanionSystem.cs|init.Abilities|ability.*.name, spell.cleric.*.name, music_shop.song_*, companion.ability.* (Companion.AbilityLabel); shown only
+keyed|Scripts/Systems/CompanionSystem.cs|init.BackstoryBrief|companion.{id}.backstory (Companion.LocBackstory)
+keyed|Scripts/Systems/CompanionSystem.cs|init.Description|companion.{id}.desc (Companion.LocDescription)
+keyed|Scripts/Systems/CompanionSystem.cs|init.DialogueHints|companion.{id}.hint.N (Companion.LocDialogueHint)
+keyed|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestDescription|companion.{id}.quest_desc (Companion.LocQuestDescription)
+keyed|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestLocationHint|companion.{id}.quest_hint (Companion.LocQuestHint)
+keyed|Scripts/Systems/CompanionSystem.cs|init.PersonalQuestName|companion.{id}.quest_name (Companion.LocQuestName); the saved history keeps the English name, shown through HistoryLabel
+keyed|Scripts/Systems/CompanionSystem.cs|init.Title|companion.{id}.title (Companion.LocTitle)
 names|Scripts/Systems/CompanionSystem.cs|init.Name|companion names
-table|Scripts/Systems/DivineBlessingSystem.cs|=blessing.Description|blessing description, TempleLocation
-nouns|Scripts/Systems/DivineBlessingSystem.cs|=blessing.Name|blessing name, TempleLocation
-table|Scripts/Systems/DivineBlessingSystem.cs|init.Description|blessing description
-nouns|Scripts/Systems/DivineBlessingSystem.cs|init.Name|blessing name
-table|Scripts/Systems/DivineBoonRegistry.cs|init.Alignments|boon alignment tag
-table|Scripts/Systems/DivineBoonRegistry.cs|init.Description|boon description
-nouns|Scripts/Systems/DivineBoonRegistry.cs|init.Name|boon names
+keyed|Scripts/Systems/DivineBoonRegistry.cs|init.Alignments|temple.align.* (PantheonLocation.AlignmentLabel); stored English: IsAvailableForAlignment compares them with GodAlignment
+keyed|Scripts/Systems/DivineBoonRegistry.cs|init.Description|boon.{id}.desc (BoonDefinition.LocDescription)
+keyed|Scripts/Systems/DivineBoonRegistry.cs|init.Name|boon.{id}.name (BoonDefinition.LocName); the config stores the boon id
 keyed|Scripts/Systems/DreamSystem.cs|init.Content|dream.{id}.content.{i}
 keyed|Scripts/Systems/DreamSystem.cs|init.Description|vision.{id}.desc
 keyed|Scripts/Systems/DreamSystem.cs|init.PhilosophicalHint|dream.{id}.hint
@@ -356,11 +345,6 @@ names|Scripts/Systems/NPCSpawnSystem.cs|decl:ImmigrantMaleNames|NPC first names
 names|Scripts/Systems/NPCSpawnSystem.cs|decl:ImmigrantSurnames|NPC surnames
 names|Scripts/Systems/NPCSpawnSystem.cs|decl:locations|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Systems/NPCSpawnSystem.cs|=npc.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Systems/RelationshipSystem.cs|decl:name|fallback in proposal text
-table|Scripts/Systems/RelationshipSystem.cs|=durationMessage|divorce message
-table|Scripts/Systems/RelationshipSystem.cs|=message|relationship result message, LoveCornerLocation
-table|Scripts/Systems/SpellSystem.cs|=result.Message|spell result message
-table|Scripts/Systems/SpellSystem.cs|=result.RollInfo|spell roll info
 keyed|Scripts/Systems/SpellSystem.cs|new:SpellInfo#1|spell.{class}.{level}.name
 keyed|Scripts/Systems/SpellSystem.cs|new:SpellInfo#2|spell.{class}.{level}.desc
 names|Scripts/Systems/SpellSystem.cs|new:SpellInfo#5|invented incantation words

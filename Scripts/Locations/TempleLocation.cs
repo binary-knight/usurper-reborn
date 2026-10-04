@@ -2193,7 +2193,7 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.notices_watching"));
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine($"\"{mira.DialogueHints[0]}\"");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{mira.LocDialogueHint(0)}\"");   // v1.2.5: in the player's language, fits 79 columns
         terminal.WriteLine("");
         await Pacing.Wait(2000);
 
@@ -2201,19 +2201,19 @@ public partial class TempleLocation : BaseLocation
         terminal.WriteLine(Loc.Get("temple.turns_back"));
         terminal.WriteLine("");
         terminal.SetColor("cyan");
-        terminal.WriteLine($"\"{mira.DialogueHints[1]}\"");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{mira.LocDialogueHint(1)}\"");   // v1.2.5: in the player's language, fits 79 columns
         terminal.WriteLine("");
         await Pacing.Wait(2000);
 
         // Show her details
         terminal.SetColor("yellow");
-        terminal.WriteLine(Loc.Get("temple.this_is_companion", mira.Name, mira.Title));
-        terminal.WriteLine(Loc.Get("temple.role_label", mira.CombatRole));
-        terminal.WriteLine(Loc.Get("temple.abilities_label", string.Join(", ", mira.Abilities)));
+        terminal.WriteLine(Loc.Get("temple.this_is_companion", mira.Name, mira.LocTitle));
+        terminal.WriteLine(Loc.Get("temple.role_label", InnLocation.RoleName(mira.CombatRole)));
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("temple.abilities_label", string.Join(", ", mira.LocAbilities)));
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        terminal.WriteLine(mira.BackstoryBrief);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, mira.LocBackstory);   // v1.2.5: in the player's language, fits 79 columns
         terminal.WriteLine("");
         await Pacing.Wait(1500);
 
@@ -2250,7 +2250,7 @@ public partial class TempleLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("temple.leave_silent_vigil"));
                 terminal.WriteLine(Loc.Get("temple.speaks_without_turning"));
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"\"{mira.DialogueHints[2]}\"");
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{mira.LocDialogueHint(2)}\"");   // v1.2.5: in the player's language, fits 79 columns
                 break;
         }
 
@@ -2339,8 +2339,8 @@ public partial class TempleLocation : BaseLocation
         if (!string.IsNullOrEmpty(mira.PersonalQuestDescription))
         {
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine(Loc.Get("temple.personal_quest_label", mira.PersonalQuestName));
-            terminal.WriteLine($"\"{mira.PersonalQuestDescription}\"");
+            terminal.WriteLine(Loc.Get("temple.personal_quest_label", mira.LocQuestName));
+            UsurperRemake.UI.UIHelper.WriteWrapped(terminal, $"\"{mira.LocQuestDescription}\"");
             terminal.WriteLine("");
         }
 

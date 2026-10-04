@@ -1078,25 +1078,13 @@ public class CharacterCreationSystem
     /// <summary>
     /// Get abbreviated class names for display
     /// </summary>
+    internal static string ClassAbbreviation(CharacterClass cls) =>
+        Loc.Get("class.abbr." + System.Text.RegularExpressions.Regex.Replace(cls.ToString(), "([a-z])([A-Z])", "$1_$2").ToLowerInvariant());
+
     private string GetClassAbbreviations(List<CharacterClass> classes)
     {
-        var abbreviations = new Dictionary<CharacterClass, string>
-        {
-            { CharacterClass.Warrior, "War" },
-            { CharacterClass.Paladin, "Pal" },
-            { CharacterClass.Ranger, "Ran" },
-            { CharacterClass.Assassin, "Asn" },
-            { CharacterClass.Bard, "Brd" },
-            { CharacterClass.Jester, "Jst" },
-            { CharacterClass.Alchemist, "Alc" },
-            { CharacterClass.Magician, "Mag" },
-            { CharacterClass.Cleric, "Clr" },
-            { CharacterClass.Sage, "Sge" },
-            { CharacterClass.Barbarian, "Bar" },
-            { CharacterClass.MysticShaman, "Sha" }
-        };
-
-        return string.Join("/", classes.Select(c => abbreviations[c]));
+        // v1.2.5: three-letter class abbreviations in the player's language (class.abbr.{class})
+        return string.Join("/", classes.Select(ClassAbbreviation));
     }
 
     #region Race Preview Screen
@@ -2832,22 +2820,7 @@ public class CharacterCreationSystem
     /// </summary>
     private void GiveStartingWeapon(Character character)
     {
-        var (name, weaponType, handedness, power) = character.Class switch
-        {
-            CharacterClass.Magician => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
-            CharacterClass.Sage => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
-            CharacterClass.Assassin => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
-            CharacterClass.Ranger => ("Short Bow", WeaponType.Bow, WeaponHandedness.TwoHanded, 5),
-            CharacterClass.Warrior => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
-            CharacterClass.Paladin => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
-            CharacterClass.Barbarian => ("Crude Axe", WeaponType.Axe, WeaponHandedness.OneHanded, 5),
-            CharacterClass.Cleric => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
-            CharacterClass.Bard => ("Old Lute", WeaponType.Instrument, WeaponHandedness.OneHanded, 4),
-            CharacterClass.Jester => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
-            CharacterClass.Alchemist => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
-            CharacterClass.MysticShaman => ("Tribal Mace", WeaponType.Mace, WeaponHandedness.OneHanded, 5),
-            _ => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
-        };
+        var (name, weaponType, handedness, power) = StarterWeapon(character.Class);
 
         var weapon = new Equipment
         {
@@ -2864,6 +2837,30 @@ public class CharacterCreationSystem
 
         EquipmentDatabase.RegisterDynamic(weapon);
         character.EquipItem(weapon, EquipmentSlot.MainHand, out _);
+    }
+
+    /// <summary>
+    /// v1.2.5: a class's starting weapon. The name is stored English on the item (the save keeps it) and is shown
+    /// through its item.* key by ItemNames, which lists these names among its templates.
+    /// </summary>
+    internal static (string name, WeaponType weaponType, WeaponHandedness handedness, int power) StarterWeapon(CharacterClass cls)
+    {
+        return cls switch
+        {
+            CharacterClass.Magician => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
+            CharacterClass.Sage => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
+            CharacterClass.Assassin => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
+            CharacterClass.Ranger => ("Short Bow", WeaponType.Bow, WeaponHandedness.TwoHanded, 5),
+            CharacterClass.Warrior => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
+            CharacterClass.Paladin => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
+            CharacterClass.Barbarian => ("Crude Axe", WeaponType.Axe, WeaponHandedness.OneHanded, 5),
+            CharacterClass.Cleric => ("Wooden Staff", WeaponType.Staff, WeaponHandedness.TwoHanded, 3),
+            CharacterClass.Bard => ("Old Lute", WeaponType.Instrument, WeaponHandedness.OneHanded, 4),
+            CharacterClass.Jester => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
+            CharacterClass.Alchemist => ("Rusty Dagger", WeaponType.Dagger, WeaponHandedness.OneHanded, 4),
+            CharacterClass.MysticShaman => ("Tribal Mace", WeaponType.Mace, WeaponHandedness.OneHanded, 5),
+            _ => ("Dull Sword", WeaponType.Sword, WeaponHandedness.OneHanded, 5),
+        };
     }
 
     /// <summary>

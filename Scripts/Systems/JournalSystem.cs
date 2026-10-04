@@ -107,7 +107,7 @@ public static class JournalSystem
             var comp = CompanionSystem.Instance?.GetRecruitedCompanions()?
                 .FirstOrDefault(c => c.PersonalQuestAvailable && !c.PersonalQuestCompleted);
             if (comp != null)
-                return new JournalNextStep { LocKey = "journal.next_companion_quest", Args = new object[] { comp.Name, comp.PersonalQuestName } };
+                return new JournalNextStep { LocKey = "journal.next_companion_quest", Args = new object[] { comp.Name, comp.LocQuestName } };
         }
         catch { }
 
@@ -201,9 +201,9 @@ public static class JournalSystem
                 {
                     if (c.PersonalQuestCompleted) continue;
                     if (c.PersonalQuestStarted)
-                        lines.Add((Loc.Get("journal.line_companion_quest_active", c.Name, c.PersonalQuestName), "cyan"));
+                        lines.Add((Loc.Get("journal.line_companion_quest_active", c.Name, c.LocQuestName), "cyan"));
                     else if (c.PersonalQuestAvailable)
-                        lines.Add((Loc.Get("journal.line_companion_quest", c.Name, c.PersonalQuestName), "bright_cyan"));
+                        lines.Add((Loc.Get("journal.line_companion_quest", c.Name, c.LocQuestName), "bright_cyan"));
                 }
             }
         }

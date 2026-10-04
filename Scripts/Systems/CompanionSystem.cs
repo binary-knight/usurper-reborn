@@ -432,9 +432,14 @@ namespace UsurperRemake.Systems
         /// </summary>
         private void QueueQuestUnlockNotification(Companion companion)
         {
-            string notification = $"[COMPANION] {companion.Name}'s personal quest '{companion.PersonalQuestName}' is now available!\n" +
-                                  $"            Visit the Inn and talk to {companion.Name} to begin.\n" +
-                                  $"            Location: {companion.PersonalQuestLocationHint}";
+            // v1.2.5: in the player's language, each part wrapped at 79 columns, later rows under the first's text
+            const string indent = "            ";
+            var rows = new List<string>();
+            rows.AddRange(UIHelper.WordWrap(Loc.Get("companion.quest_unlocked_notify", companion.Name, companion.LocQuestName))
+                .Select((row, i) => i == 0 ? row : indent + row));
+            foreach (var part in new[] { Loc.Get("companion.quest_unlocked_visit", companion.Name), Loc.Get("companion.quest_unlocked_location", companion.LocQuestHint) })
+                rows.AddRange(UIHelper.WordWrap(part, UIHelper.WrapWidth - indent.Length).Select(row => indent + row));
+            string notification = string.Join("\n", rows);
             pendingNotifications.Enqueue(notification);
         }
 
@@ -1013,7 +1018,7 @@ namespace UsurperRemake.Systems
             companion.AddHistory(new CompanionEvent
             {
                 Type = CompanionEventType.RomanceAdvanced,
-                Description = GetRomanceMilestone(companion.RomanceLevel),
+                Description = Loc.GetIn("en", RomanceMilestoneKey(companion.RomanceLevel)),   // v1.2.5: saved English, shown through HistoryLabel
                 Timestamp = DateTime.Now
             });
 
@@ -1021,22 +1026,44 @@ namespace UsurperRemake.Systems
             return true;
         }
 
-        private string GetRomanceMilestone(int level)
+        /// <summary>v1.2.5: the key of a romance milestone; the history keeps its English text.</summary>
+        internal static string RomanceMilestoneKey(int level) =>
+            level >= 1 && level <= 10 ? $"companion.romance_milestone.{level}" : "companion.romance_milestone.unknown";
+
+        /// <summary>
+        /// v1.2.5: the history and death texts this system writes. The save keeps them in English
+        /// (CompanionEvent.Description, CompanionDeath.Circumstance); each is shown through its key when the stored
+        /// text is exactly that key's English, and as stored otherwise (texts other systems wrote).
+        /// </summary>
+        private static readonly string[] StoredTextKeys =
         {
-            return level switch
+            "companion.history_level_combat", "companion.history_level_training",
+            "companion.death_reason_aldric_darkness", "companion.death_reason_vex_disease", "companion.death_reason_moral_choice",
+        };
+
+        /// <summary>v1.2.5: a history entry in the player's language (see StoredTextKeys).</summary>
+        public static string HistoryLabel(Companion companion, CompanionEvent evt)
+        {
+            string stored = evt?.Description ?? "";
+            if (companion != null)
             {
-                1 => "You caught her looking at you",
-                2 => "She told you something personal",
-                3 => "Getting comfortable around each other",
-                4 => "She smiled when she saw you",
-                5 => "One of you said it first",
-                6 => "Made a promise",
-                7 => "Cant imagine the road without her",
-                8 => "Always together",
-                9 => "The real thing",
-                10 => "Til death do you part",
-                _ => "Unknown milestone"
-            };
+                string enQuest = companion.PersonalQuestName;
+                foreach (var key in new[] { "companion.history_quest_started", "companion.history_quest_completed", "companion.history_quest_failed" })
+                    if (stored == Loc.GetIn("en", key, enQuest)) return Loc.Get(key, companion.LocQuestName);
+            }
+            for (int level = 1; level <= 10; level++)
+                if (stored == Loc.GetIn("en", RomanceMilestoneKey(level))) return Loc.Get(RomanceMilestoneKey(level));
+            return StoredText(stored);
+        }
+
+        /// <summary>v1.2.5: a death circumstance in the player's language (see StoredTextKeys).</summary>
+        public static string CircumstanceLabel(string stored) => StoredText(stored ?? "");
+
+        private static string StoredText(string stored)
+        {
+            foreach (var key in StoredTextKeys)
+                if (stored == Loc.GetIn("en", key)) return Loc.Get(key);
+            return stored;
         }
 
         #endregion
@@ -1153,7 +1180,7 @@ namespace UsurperRemake.Systems
                 {
                     result.TriggeredCompanion = CompanionId.Aldric;
                     result.TriggerType = DeathType.MoralTrigger;
-                    result.TriggerReason = "Your darkness has grown too great. Aldric cannot stand by.";
+                    result.TriggerReason = Loc.GetIn("en", "companion.death_reason_aldric_darkness");   // v1.2.5: saved English (Circumstance)
                 }
             }
 
@@ -1168,7 +1195,7 @@ namespace UsurperRemake.Systems
                 {
                     result.TriggeredCompanion = CompanionId.Vex;
                     result.TriggerType = DeathType.Inevitable;
-                    result.TriggerReason = "The disease has finally claimed Vex.";
+                    result.TriggerReason = Loc.GetIn("en", "companion.death_reason_vex_disease");   // v1.2.5: saved English (Circumstance)
                 }
             }
 
@@ -1197,7 +1224,7 @@ namespace UsurperRemake.Systems
             companion.AddHistory(new CompanionEvent
             {
                 Type = CompanionEventType.QuestStarted,
-                Description = $"Began personal quest: {companion.PersonalQuestName}",
+                Description = Loc.GetIn("en", "companion.history_quest_started", companion.PersonalQuestName),   // v1.2.5: saved English
                 Timestamp = DateTime.Now
             });
 
@@ -1228,9 +1255,7 @@ namespace UsurperRemake.Systems
             companion.AddHistory(new CompanionEvent
             {
                 Type = CompanionEventType.QuestCompleted,
-                Description = success
-                    ? $"Successfully completed: {companion.PersonalQuestName}"
-                    : $"Quest failed: {companion.PersonalQuestName}",
+                Description = Loc.GetIn("en", success ? "companion.history_quest_completed" : "companion.history_quest_failed", companion.PersonalQuestName),   // v1.2.5: saved English
                 Timestamp = DateTime.Now
             });
 
@@ -1265,7 +1290,7 @@ namespace UsurperRemake.Systems
             {
                 CompanionId = companion.Id,
                 Type = DeathType.ChoiceBased,
-                Circumstance = "Died as a consequence of a moral choice",
+                Circumstance = Loc.GetIn("en", "companion.death_reason_moral_choice"),   // v1.2.5: saved English
                 LastWords = GetLastWords(companion, DeathType.ChoiceBased),
                 DeathDay = GetGameDay(),
                 PlayerLevel = GetPlayerLevel()
@@ -1306,23 +1331,40 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             terminal.WriteLine($"  {companion.Name}", "bright_white");
-            terminal.WriteLine($"  \"{companion.Title}\"", "cyan");
+            terminal.WriteLine($"  \"{companion.LocTitle}\"", "cyan");
             terminal.WriteLine("");
 
-            terminal.WriteLine(companion.Description, "white");
+            terminal.SetColor("white");
+            UIHelper.WriteWrapped(terminal, companion.LocDescription);   // v1.2.5: fits 79 columns
             terminal.WriteLine("");
 
-            terminal.WriteLine(Loc.Get("companion.role_label", companion.CombatRole), "yellow");
-            terminal.WriteLine(Loc.Get("companion.abilities_label", string.Join(", ", companion.Abilities)), "yellow");
+            terminal.WriteLine(Loc.Get("companion.role_label", global::InnLocation.RoleName(companion.CombatRole)), "yellow");
+            terminal.SetColor("yellow");
+            UIHelper.WriteWrapped(terminal, Loc.Get("companion.abilities_label", string.Join(", ", companion.LocAbilities)), "", UIHelper.WrapWidth);
             terminal.WriteLine("");
 
             // Show a hint of their deeper story
             if (companion.DialogueHints.Length > 0)
             {
-                terminal.WriteLine($"  \"{companion.DialogueHints[0]}\"", "dark_cyan");
+                terminal.SetColor("dark_cyan");
+                UIHelper.WriteWrapped(terminal, $"\"{companion.LocDialogueHint(0)}\"", "  ");
             }
 
             await terminal.PressAnyKey(Loc.Get("companion.press_enter_welcome"));
+        }
+
+        /// <summary>v1.2.5: a level-up's stat gains ("ATK +2  DEF +1 ..."), two spaces apart, in rows of at most 79 columns.</summary>
+        internal static List<string> StatGainRows(List<string> gains, int width = 79)
+        {
+            var rows = new List<string>();
+            string row = "";
+            foreach (var gain in gains)
+            {
+                if (row.Length > 0 && 2 + row.Length + 2 + gain.Length > width) { rows.Add("  " + row); row = ""; }
+                row = row.Length == 0 ? gain : row + "  " + gain;
+            }
+            if (row.Length > 0) rows.Add("  " + row);
+            return rows;
         }
 
         /// <summary>
@@ -1368,13 +1410,14 @@ namespace UsurperRemake.Systems
             await Pacing.Wait(2000);
 
             terminal.WriteLine($"  {companion.Name}", "bright_white");
-            terminal.WriteLine($"  \"{companion.Title}\"", "cyan");
+            terminal.WriteLine($"  \"{companion.LocTitle}\"", "cyan");
             terminal.WriteLine("");
 
             await Pacing.Wait(1000);
 
-            // The circumstance of death
-            terminal.WriteLine($"  {circumstance}", "white");
+            // The circumstance of death (v1.2.5: stored English, shown in the player's language, wrapped)
+            terminal.SetColor("white");
+            UIHelper.WriteWrapped(terminal, CircumstanceLabel(circumstance), "  ");
             terminal.WriteLine("");
 
             await Pacing.Wait(1500);
@@ -1924,27 +1967,27 @@ namespace UsurperRemake.Systems
                     int dInt = companion.Intelligence - bInt;
                     int dWis = companion.Wisdom - bWis;
                     int dCha = companion.Charisma - bCha;
-                    if (dAtk > 0) sc.Add($"ATK +{dAtk}");
-                    if (dDef > 0) sc.Add($"DEF +{dDef}");
-                    if (dSpd > 0) sc.Add($"SPD +{dSpd}");
-                    if (dMag > 0) sc.Add($"MAG +{dMag}");
-                    if (dHeal > 0) sc.Add($"HEAL +{dHeal}");
-                    if (dCon > 0) sc.Add($"CON +{dCon}");
-                    if (dDex > 0) sc.Add($"DEX +{dDex}");
-                    if (dAgi > 0) sc.Add($"AGI +{dAgi}");
-                    if (dInt > 0) sc.Add($"INT +{dInt}");
-                    if (dWis > 0) sc.Add($"WIS +{dWis}");
-                    if (dCha > 0) sc.Add($"CHA +{dCha}");
-                    if (dHP > 0) sc.Add($"HP +{dHP}");
+                    if (dAtk > 0) sc.Add($"{Loc.Get("ui.stat_atk")} +{dAtk}");
+                    if (dDef > 0) sc.Add($"{Loc.Get("stats.def")} +{dDef}");
+                    if (dSpd > 0) sc.Add($"{Loc.Get("companion.stat_spd")} +{dSpd}");
+                    if (dMag > 0) sc.Add($"{Loc.Get("companion.stat_mag")} +{dMag}");
+                    if (dHeal > 0) sc.Add($"{Loc.Get("companion.stat_heal")} +{dHeal}");
+                    if (dCon > 0) sc.Add($"{Loc.Get("stats.con")} +{dCon}");
+                    if (dDex > 0) sc.Add($"{Loc.Get("stats.dex")} +{dDex}");
+                    if (dAgi > 0) sc.Add($"{Loc.Get("stats.agi")} +{dAgi}");
+                    if (dInt > 0) sc.Add($"{Loc.Get("stats.int")} +{dInt}");
+                    if (dWis > 0) sc.Add($"{Loc.Get("stats.wis")} +{dWis}");
+                    if (dCha > 0) sc.Add($"{Loc.Get("stats.cha")} +{dCha}");
+                    if (dHP > 0) sc.Add($"{Loc.Get("ui.stat_hp")} +{dHP}");
                     if (sc.Count > 0)
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine("  " + string.Join("  ", sc));
+                        foreach (var row in StatGainRows(sc)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
                     }
                 }
 
                 // Update loyalty slightly on level up (bonding through shared experience)
-                ModifyLoyalty(companion.Id, 1, "Leveled up through shared combat");
+                ModifyLoyalty(companion.Id, 1, Loc.GetIn("en", "companion.history_level_combat"));   // v1.2.5: saved English
 
                 // Calculate next threshold
                 xpForNextLevel = GameConfig.GetExperienceForLevel(companion.Level + 1);
@@ -2093,7 +2136,7 @@ namespace UsurperRemake.Systems
                 levelsGained++;
 
                 // Update loyalty slightly on level up
-                ModifyLoyalty(companion.Id, 1, "Leveled up through shared training");
+                ModifyLoyalty(companion.Id, 1, Loc.GetIn("en", "companion.history_level_training"));   // v1.2.5: saved English
             }
 
             return levelsGained;
@@ -2732,7 +2775,7 @@ namespace UsurperRemake.Systems
             }
             if (dropped > 0)
             {
-                string drop = $"{dropped} item(s) dropped on the battlefield -- your inventory was full.";
+                string drop = Loc.Get("companion.items_dropped_full", dropped);
                 if (terminal != null)
                 {
                     terminal.SetColor("gray");
@@ -2864,6 +2907,48 @@ namespace UsurperRemake.Systems
         public string[] DialogueHints { get; set; } = Array.Empty<string>();
 
         public int OceanPhilosophyAwareness { get; set; } = 0;
+
+        // v1.2.5: the table's texts in the reader's language. The fields above keep the English table text;
+        // each shows through companion.{id}.* when that key's English is the field's text, as stored otherwise.
+        internal string KeyBase => "companion." + Id.ToString().ToLowerInvariant();
+        public string LocTitle => Shown("title", Title);
+        public string LocDescription => Shown("desc", Description);
+        public string LocBackstory => Shown("backstory", BackstoryBrief);
+        public string LocQuestName => Shown("quest_name", PersonalQuestName);
+        public string LocQuestDescription => Shown("quest_desc", PersonalQuestDescription);
+        public string LocQuestHint => Shown("quest_hint", PersonalQuestLocationHint);
+        public string LocDialogueHint(int index) =>
+            index >= 0 && index < DialogueHints.Length ? Shown("hint." + index, DialogueHints[index]) : "";
+        public string[] LocAbilities => Abilities.Select(AbilityLabel).ToArray();
+
+        private string Shown(string part, string english)
+        {
+            string key = KeyBase + "." + part;
+            return english.Length > 0 && Loc.HasIn("en", key) && Loc.GetIn("en", key) == english ? Loc.Get(key) : english;
+        }
+
+        // Companion abilities named like a class ability, spell or song show through that key.
+        private static readonly Dictionary<string, string> AbilityKeys = new()
+        {
+            ["Holy Smite"] = "spell.cleric.9.name", ["Sanctuary"] = "spell.cleric.7.name",
+            ["War March"] = "music_shop.song_war_march", ["Lullaby of Iron"] = "music_shop.song_iron",
+            ["Battle Hymn"] = "music_shop.song_hymn", ["Healing Melody"] = "companion.ability.healing_melody",
+        };
+
+        /// <summary>v1.2.5: the key a companion ability name shows through, or null.</summary>
+        internal static string? AbilityKey(string english)
+        {
+            if (AbilityKeys.TryGetValue(english, out var key)) return key;
+            key = "ability." + System.Text.RegularExpressions.Regex.Replace(english.Replace("'", "").ToLowerInvariant(), "[^a-z0-9]+", "_").Trim('_') + ".name";
+            return Loc.HasIn("en", key) && Loc.GetIn("en", key) == english ? key : null;
+        }
+
+        public static string AbilityLabel(string english)
+        {
+            var key = AbilityKey(english);
+            return key != null ? Loc.Get(key) : english;
+        }
+
         public int LoyaltyThreshold { get; set; } = 80;
         public int DarknessThreshold { get; set; } = 5000;
         public bool HasTimedDeath { get; set; }

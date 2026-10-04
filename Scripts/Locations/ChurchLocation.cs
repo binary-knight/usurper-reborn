@@ -1040,7 +1040,8 @@ namespace UsurperRemake.Locations
                 currentPlayer.Gold += ceremonyCost;
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("church.marriage_bishop_frowns", bishopName), "yellow");
-                terminal.WriteLine($"\"{marriageMessage}\"", "bright_yellow");
+                foreach (var row in RelationshipSystem.MessageRows($"\"{marriageMessage}\""))   // v1.2.5: fits 79 columns
+                    terminal.WriteLine(row, "bright_yellow");
                 await Pacing.Wait(2500);
                 return;
             }

@@ -858,8 +858,8 @@ public class RestChar125Tests : IDisposable
         var data = Counts("hardcoded-data-baseline.json", data: true);
         data.Should().NotContainKey("Scripts/Systems/AchievementSystem.cs", "the 12 popup rows are keyed; v1.2.5: the achievement table too (DataAchieve125Tests)");
         data.Should().NotContainKey("Scripts/Systems/FactionSystem.cs", "the 9 join refusals are keyed; v1.2.5: the names and ranks too (DataAchieve125Tests)");
-        data["Scripts/Systems/VisualNovelDialogueSystem.cs"].Should().Be(2, "the two pronouns are keyed");
-        data["Scripts/Systems/CompanionSystem.cs"].Should().Be(94);
+        data["Scripts/Systems/VisualNovelDialogueSystem.cs"].Should().Be(1, "the two pronouns are keyed; v1.2.5: the winks prefix too, the stored quest initiator stays (DataChars125Tests)");
+        data.Should().NotContainKey("Scripts/Systems/CompanionSystem.cs", "v1.2.5: the companion table is keyed (DataChars125Tests)");
         data.Should().NotContainKey("Scripts/Systems/DialogueSystem.cs", "v1.2.5: the dialogue trees are keyed (DataDialogue125Tests)");
         data.Should().NotContainKey("Scripts/Locations/DungeonLocation.cs", "v1.2.5: the monster names and event choices are keyed (DataCombat125Tests)");
     }

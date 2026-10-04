@@ -251,7 +251,7 @@ public class TownRest125Tests : IDisposable
         var lightOnly = DivineBoonRegistry.AllBoons.First(b => b.Alignments.SequenceEqual(new[] { "Light" }));
         string text = await BoonScreen(lang, "Light", "");
         string locked = L(lang, "pantheon.boon_locked").Trim();
-        var row = Rows(text).Single(r => r.Contains(lightOnly.Name + " I"));
+        var row = Rows(text).Single(r => r.Contains(L(lang, $"boon.{lightOnly.Id}.name") + " I"));   // v1.2.5: boon names are keyed
         row.Should().NotContain(locked, $"a Light god can take {lightOnly.Name} in {lang}");
         row.Should().Contain($"[{L(lang, "temple.align.light")}]");
         lightOnly.Alignments.Should().Equal(new[] { "Light" });

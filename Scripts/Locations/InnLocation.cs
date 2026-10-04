@@ -2840,11 +2840,11 @@ public class InnLocation : BaseLocation
             terminal.SetColor("yellow");
             terminal.Write($"[{index}] ");
             terminal.SetColor("bright_cyan");
-            terminal.Write($"{companion.Name} - {companion.Title}");
+            terminal.Write($"{companion.Name} - {companion.LocTitle}");
             terminal.SetColor("gray");
             terminal.WriteLine($" ({RoleName(companion.CombatRole)})");
             terminal.SetColor("dark_gray");
-            terminal.WriteLine($"    {companion.Description.Substring(0, Math.Min(70, companion.Description.Length))}...");
+            terminal.WriteLine($"    {companion.LocDescription.Substring(0, Math.Min(70, companion.LocDescription.Length))}...");
             terminal.WriteLine("    " + Loc.Get("inn.recruit_req_trust", companion.RecruitLevel, companion.TrustLevel));
             terminal.WriteLine("");
             index++;
@@ -2872,14 +2872,14 @@ public class InnLocation : BaseLocation
     {
         terminal.ClearScreen();
         terminal.SetColor("bright_cyan");
-        terminal.WriteLine(Loc.Get("inn.you_approach", companion.Name, companion.Title));
+        terminal.WriteLine(Loc.Get("inn.you_approach", companion.Name, companion.LocTitle));
         terminal.WriteLine("");
 
         // Show companion's introduction from DialogueHints
         terminal.SetColor("white");
         if (companion.DialogueHints.Length > 0)
         {
-            terminal.WriteLine($"\"{companion.DialogueHints[0]}\"");
+            UIHelper.WriteWrapped(terminal, $"\"{companion.LocDialogueHint(0)}\"");   // v1.2.5: fits 79 columns
         }
         else
         {
@@ -2889,11 +2889,11 @@ public class InnLocation : BaseLocation
 
         // Show companion details
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("inn.background_label", companion.BackstoryBrief));
+        WriteUnder("", Loc.Get("inn.background_label", companion.LocBackstory));   // v1.2.5: fits 79 columns
         terminal.WriteLine("");
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("inn.combat_role_label", RoleName(companion.CombatRole)));
-        terminal.WriteLine(Loc.Get("inn.abilities_label", string.Join(", ", companion.Abilities)));
+        WriteUnder("", Loc.Get("inn.abilities_label", string.Join(", ", companion.LocAbilities)));   // v1.2.5: fits 79 columns
         terminal.WriteLine("");
 
         terminal.SetColor("bright_yellow");
@@ -2935,13 +2935,13 @@ public class InnLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("inn.companion_shares_story", companion.Name));
                 terminal.WriteLine("");
                 terminal.SetColor("white");
-                terminal.WriteLine(companion.BackstoryBrief);
+                UIHelper.WriteWrapped(terminal, companion.LocBackstory);   // v1.2.5: fits 79 columns
                 if (!string.IsNullOrEmpty(companion.PersonalQuestDescription))
                 {
                     terminal.WriteLine("");
                     terminal.SetColor("bright_magenta");
-                    terminal.WriteLine(Loc.Get("inn.personal_quest_label", companion.PersonalQuestName));
-                    terminal.WriteLine($"\"{companion.PersonalQuestDescription}\"");
+                    terminal.WriteLine(Loc.Get("inn.personal_quest_label", companion.LocQuestName));
+                    UIHelper.WriteWrapped(terminal, $"\"{companion.LocQuestDescription}\"");   // v1.2.5: fits 79 columns
                 }
                 break;
 
@@ -3070,9 +3070,9 @@ public class InnLocation : BaseLocation
                 foreach (var (companion, death) in fallen)
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"  {companion.Name} - {companion.Title}");
+                    terminal.WriteLine($"  {companion.Name} - {companion.LocTitle}");
                     terminal.SetColor("dark_gray");
-                    terminal.WriteLine("    " + Loc.Get("inn.died_label", death.Circumstance));
+                    WriteUnder("    ", Loc.Get("inn.died_label", CompanionSystem.CircumstanceLabel(death.Circumstance)));   // v1.2.5: stored English, shown translated
                 }
                 terminal.WriteLine("");
             }
@@ -3138,7 +3138,7 @@ public class InnLocation : BaseLocation
         terminal.SetColor(isActive ? "bright_white" : "white");
         terminal.Write($"  {companion.Name}");
         terminal.SetColor("gray");
-        terminal.WriteLine($" - {companion.Title}");
+        terminal.WriteLine($" - {companion.LocTitle}");
 
         // Stats line
         terminal.SetColor("dark_gray");
@@ -3167,22 +3167,22 @@ public class InnLocation : BaseLocation
         if (companion.PersonalQuestCompleted)
         {
             terminal.SetColor("bright_magenta");
-            terminal.WriteLine("    " + Loc.Get("inn.quest_row_complete", companion.PersonalQuestName));
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_complete", companion.LocQuestName));
         }
         else if (companion.PersonalQuestStarted)
         {
             terminal.SetColor("magenta");
-            terminal.WriteLine("    " + Loc.Get("inn.quest_row_in_progress", companion.PersonalQuestName));
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_in_progress", companion.LocQuestName));
             if (!string.IsNullOrEmpty(companion.PersonalQuestLocationHint))
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"      -> {companion.PersonalQuestLocationHint}");
+                WriteUnder("      -> ", companion.LocQuestHint);   // v1.2.5: the hint in the player's language
             }
         }
         else if (companion.LoyaltyLevel >= 50 || companion.PersonalQuestAvailable)
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine("    " + Loc.Get("inn.quest_row_unlocked", companion.PersonalQuestName));
+            terminal.WriteLine("    " + Loc.Get("inn.quest_row_unlocked", companion.LocQuestName));
         }
         else
         {
@@ -3300,25 +3300,25 @@ public class InnLocation : BaseLocation
     private async Task TalkToRecruitedCompanion(Companion companion)
     {
         terminal.ClearScreen();
-        WriteBoxHeader($"{companion.Name} - {companion.Title}", "bright_cyan", 76);
+        WriteBoxHeader($"{companion.Name} - {companion.LocTitle}", "bright_cyan", 76);
         terminal.WriteLine("");
 
         // Show full description
         terminal.SetColor("white");
-        terminal.WriteLine(companion.Description);
+        UIHelper.WriteWrapped(terminal, companion.LocDescription);   // v1.2.5: fits 79 columns
         terminal.WriteLine("");
 
         // Show backstory
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("inn.background"));
         terminal.SetColor("dark_cyan");
-        terminal.WriteLine(companion.BackstoryBrief);
+        UIHelper.WriteWrapped(terminal, companion.LocBackstory);   // v1.2.5: fits 79 columns
         terminal.WriteLine("");
 
         // Dialogue based on loyalty level
         terminal.SetColor("cyan");
         string dialogueHint = GetCompanionDialogue(companion);
-        terminal.WriteLine($"\"{dialogueHint}\"");
+        UIHelper.WriteWrapped(terminal, $"\"{dialogueHint}\"");   // v1.2.5: fits 79 columns
         terminal.WriteLine("");
 
         // Show stats — always use effective stats (gear included)
@@ -3357,7 +3357,7 @@ public class InnLocation : BaseLocation
         else
         {
             terminal.SetColor("white");
-            WriteUnder("  ", Loc.Get("inn.abilities_label", string.Join(", ", companion.Abilities)));
+            WriteUnder("  ", Loc.Get("inn.abilities_label", string.Join(", ", companion.LocAbilities)));
         }
         terminal.WriteLine("");
 
@@ -3372,11 +3372,11 @@ public class InnLocation : BaseLocation
         if (!companion.PersonalQuestStarted && companion.LoyaltyLevel >= 50)
         {
             if (sr)
-                terminal.WriteLine($"  Q. {Loc.Get("inn.begin_quest", companion.PersonalQuestName)}", "bright_magenta");
+                terminal.WriteLine($"  Q. {Loc.Get("inn.begin_quest", companion.LocQuestName)}", "bright_magenta");
             else
             {
                 terminal.SetColor("bright_yellow"); terminal.Write("  [Q]");
-                terminal.SetColor("bright_magenta"); terminal.WriteLine($" {Loc.Get("inn.begin_quest", companion.PersonalQuestName)}");
+                terminal.SetColor("bright_magenta"); terminal.WriteLine($" {Loc.Get("inn.begin_quest", companion.LocQuestName)}");
             }
         }
         else if (companion.PersonalQuestStarted && !companion.PersonalQuestCompleted)
@@ -3491,7 +3491,7 @@ public class InnLocation : BaseLocation
         else if (companion.DialogueHints.Length > 0)
         {
             int hintIndex = Math.Min(companion.LoyaltyLevel / 20, companion.DialogueHints.Length - 1);
-            return companion.DialogueHints[hintIndex];
+            return companion.LocDialogueHint(hintIndex);
         }
 
         return "...";
@@ -3503,7 +3503,7 @@ public class InnLocation : BaseLocation
     private async Task HandlePersonalQuestInteraction(Companion companion)
     {
         terminal.ClearScreen();
-        WriteSectionHeader(companion.PersonalQuestName, "bright_magenta");
+        WriteSectionHeader(companion.LocQuestName, "bright_magenta");
         terminal.WriteLine("");
 
         if (!companion.PersonalQuestStarted)
@@ -3513,7 +3513,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.speaks_quietly", companion.Name));
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"\"{companion.PersonalQuestDescription}\"");
+            UIHelper.WriteWrapped(terminal, $"\"{companion.LocQuestDescription}\"");   // v1.2.5: fits 79 columns
             terminal.WriteLine("");
 
             terminal.SetColor("bright_yellow");
@@ -3533,7 +3533,7 @@ public class InnLocation : BaseLocation
                 {
                     terminal.SetColor("bright_green");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("inn.quest_begun", companion.PersonalQuestName));
+                    terminal.WriteLine(Loc.Get("inn.quest_begun", companion.LocQuestName));
                     terminal.WriteLine("");
                     terminal.SetColor("white");
                     terminal.WriteLine(Loc.Get("inn.nods_gratefully", companion.Name));
@@ -3548,7 +3548,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.quest_in_progress"));
             terminal.WriteLine("");
             terminal.SetColor("gray");
-            terminal.WriteLine($"\"{companion.PersonalQuestDescription}\"");
+            UIHelper.WriteWrapped(terminal, $"\"{companion.LocQuestDescription}\"");   // v1.2.5: fits 79 columns
             terminal.WriteLine("");
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("inn.seek_clues"));
@@ -3587,7 +3587,7 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(Loc.Get("inn.tavern_fades"));
             terminal.WriteLine("");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"\"{companion.DialogueHints[0]}\"");
+            UIHelper.WriteWrapped(terminal, $"\"{companion.LocDialogueHint(0)}\"");   // v1.2.5: fits 79 columns
         }
         else
         {
@@ -3756,9 +3756,12 @@ public class InnLocation : BaseLocation
             foreach (var evt in recentHistory)
             {
                 terminal.SetColor("gray");
-                terminal.Write($"  {GameConfig.FormatShortDate(evt.Timestamp, currentPlayer.DateFormatPreference)} - ");
+                string when = $"  {GameConfig.FormatShortDate(evt.Timestamp, currentPlayer.DateFormatPreference)} - ";
+                terminal.Write(when);
                 terminal.SetColor("white");
-                terminal.WriteLine(evt.Description);
+                var rows = UIHelper.WrapAfterPrefix(when, CompanionSystem.HistoryLabel(companion, evt));   // v1.2.5: stored English, shown translated
+                for (int r = 0; r < rows.Count; r++)
+                    terminal.WriteLine((r == 0 ? "" : new string(' ', when.Length)) + rows[r]);
             }
         }
 

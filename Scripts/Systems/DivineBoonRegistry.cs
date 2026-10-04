@@ -1,4 +1,5 @@
 using System;
+using UsurperRemake.Systems;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -32,6 +33,17 @@ public class BoonDefinition
 
     public int MaxTier => 3;
 
+    // v1.2.5: the name and description in the reader's language (boon.{id}.*). Id, Name and Alignments stay the
+    // English table values: the config string stores ids and IsAvailableForAlignment compares the alignment words.
+    public string LocName => Shown("name", Name);
+    public string LocDescription => Shown("desc", Description);
+
+    private string Shown(string part, string english)
+    {
+        string key = $"boon.{Id}.{part}";
+        return Loc.HasIn("en", key) && Loc.GetIn("en", key) == english ? Loc.Get(key) : english;
+    }
+
     public bool IsAvailableForAlignment(string alignment)
     {
         if (Alignments.Length == 0) return true; // Any alignment
@@ -43,19 +55,21 @@ public class BoonDefinition
     {
         int idx = Math.Clamp(tier, 1, 3) - 1;
         var parts = new List<string>();
-        if (DamagePercent[idx] > 0) parts.Add($"+{DamagePercent[idx] * 100:0}% damage");
-        if (DefensePercent[idx] > 0) parts.Add($"+{DefensePercent[idx] * 100:0}% defense");
-        if (CritPercent[idx] > 0) parts.Add($"+{CritPercent[idx] * 100:0}% crit chance");
-        if (LifestealPercent[idx] > 0) parts.Add($"+{LifestealPercent[idx] * 100:0}% lifesteal");
-        if (XPPercent[idx] > 0) parts.Add($"+{XPPercent[idx] * 100:0}% XP");
-        if (GoldPercent[idx] > 0) parts.Add($"+{GoldPercent[idx] * 100:0}% gold");
-        if (ShopDiscountPercent[idx] > 0) parts.Add($"{ShopDiscountPercent[idx] * 100:0}% shop discount");
-        if (MaxHPPercent[idx] > 0) parts.Add($"+{MaxHPPercent[idx] * 100:0}% max HP");
-        if (MaxManaPercent[idx] > 0) parts.Add($"+{MaxManaPercent[idx] * 100:0}% max mana");
-        if (FleePercent[idx] > 0) parts.Add($"+{FleePercent[idx] * 100:0}% flee chance");
-        if (LuckPercent[idx] > 0) parts.Add($"+{LuckPercent[idx] * 100:0}% luck");
-        if (FlatAttack[idx] > 0) parts.Add($"+{FlatAttack[idx]} attack");
-        if (FlatDefense[idx] > 0) parts.Add($"+{FlatDefense[idx]} defense");
+        // v1.2.5: each part through boon.effect.* in the reader's language
+        static string Pct(float v) => (v * 100).ToString("0", System.Globalization.CultureInfo.InvariantCulture);
+        if (DamagePercent[idx] > 0) parts.Add(Loc.Get("boon.effect.damage", Pct(DamagePercent[idx])));
+        if (DefensePercent[idx] > 0) parts.Add(Loc.Get("boon.effect.defense", Pct(DefensePercent[idx])));
+        if (CritPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.crit", Pct(CritPercent[idx])));
+        if (LifestealPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.lifesteal", Pct(LifestealPercent[idx])));
+        if (XPPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.xp", Pct(XPPercent[idx])));
+        if (GoldPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.gold", Pct(GoldPercent[idx])));
+        if (ShopDiscountPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.shop_discount", Pct(ShopDiscountPercent[idx])));
+        if (MaxHPPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.max_hp", Pct(MaxHPPercent[idx])));
+        if (MaxManaPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.max_mana", Pct(MaxManaPercent[idx])));
+        if (FleePercent[idx] > 0) parts.Add(Loc.Get("boon.effect.flee", Pct(FleePercent[idx])));
+        if (LuckPercent[idx] > 0) parts.Add(Loc.Get("boon.effect.luck", Pct(LuckPercent[idx])));
+        if (FlatAttack[idx] > 0) parts.Add(Loc.Get("boon.effect.attack", FlatAttack[idx]));
+        if (FlatDefense[idx] > 0) parts.Add(Loc.Get("boon.effect.flat_defense", FlatDefense[idx]));
         return string.Join(", ", parts);
     }
 }
@@ -296,7 +310,7 @@ public static class DivineBoonRegistry
     {
         var boons = ParseConfig(config);
         if (boons.Count == 0)
-            return GetAlignmentFlavor(alignment) + " This deity has not yet configured their divine favors.";
+            return Loc.Get("boon.prose.unconfigured", GetAlignmentFlavor(alignment));
 
         // Group by category
         var combat = new List<string>();
@@ -307,24 +321,10 @@ public static class DivineBoonRegistry
         {
             var boon = GetBoon(boonId);
             if (boon == null) continue;
-            string tierLabel = tier switch { 1 => "minor", 2 => "moderate", 3 => "powerful", _ => "minor" };
-            string phrase = boon.Id switch
-            {
-                "warrior_fury" => $"{tierLabel} battle fury",
-                "shadow_strike" => $"{tierLabel} deadly precision",
-                "divine_shield" => $"{tierLabel} divine protection",
-                "lifedrain" => $"{tierLabel} life-draining power",
-                "battle_rage" => $"{tierLabel} combat prowess",
-                "golden_touch" => $"{tierLabel} golden fortune",
-                "merchants_favor" => $"{tierLabel} merchant connections",
-                "scholars_wisdom" => $"{tierLabel} scholarly insight",
-                "divine_vitality" => $"{tierLabel} divine vitality",
-                "shadow_veil" => $"{tierLabel} shadow concealment",
-                "fortunes_smile" => $"{tierLabel} lucky fortune",
-                "ironhide" => $"{tierLabel} iron resilience",
-                "mana_well" => $"{tierLabel} arcane reserves",
-                _ => $"{tierLabel} blessing"
-            };
+            // v1.2.5: the phrase in the reader's language, one key per boon and tier (boon.prose.{id}.{tier})
+            int t = Math.Clamp(tier, 1, 3);
+            string phraseKey = $"boon.prose.{boon.Id}.{t}";
+            string phrase = Loc.HasIn("en", phraseKey) ? Loc.Get(phraseKey) : Loc.Get($"boon.prose.blessing.{t}");
 
             switch (boon.Category)
             {
@@ -335,15 +335,16 @@ public static class DivineBoonRegistry
         }
 
         var parts = new List<string>();
-        if (combat.Count > 0) parts.Add("empowers followers with " + string.Join(" and ", combat));
-        if (economy.Count > 0) parts.Add("bestows " + string.Join(" and ", economy));
-        if (utility.Count > 0) parts.Add("grants " + string.Join(" and ", utility));
+        string and = Loc.Get("boon.prose.and");
+        if (combat.Count > 0) parts.Add(Loc.Get("boon.prose.combat", string.Join(and, combat)));
+        if (economy.Count > 0) parts.Add(Loc.Get("boon.prose.economy", string.Join(and, economy)));
+        if (utility.Count > 0) parts.Add(Loc.Get("boon.prose.utility", string.Join(and, utility)));
 
         string flavor = GetAlignmentFlavor(alignment);
-        string body = string.Join(", and ", parts);
+        string body = string.Join(Loc.Get("boon.prose.list_and"), parts);
         // Capitalize first letter of body
         if (body.Length > 0) body = char.ToUpper(body[0]) + body.Substring(1);
-        return $"{flavor} {body}.";
+        return Loc.Get("boon.prose.sentence", flavor, body);
     }
 
     /// <summary>Get a short flavor phrase for a god's alignment</summary>
@@ -351,10 +352,10 @@ public static class DivineBoonRegistry
     {
         return alignment?.ToLower() switch
         {
-            "light" => "A radiant spirit of virtue and protection.",
-            "dark" => "A shadow spirit of cunning and power.",
-            "balance" => "A spirit of harmony who walks between light and dark.",
-            _ => "A mysterious divine presence."
+            "light" => Loc.Get("boon.flavor.light"),
+            "dark" => Loc.Get("boon.flavor.dark"),
+            "balance" => Loc.Get("boon.flavor.balance"),
+            _ => Loc.Get("boon.flavor.unknown")
         };
     }
 
@@ -367,7 +368,7 @@ public static class DivineBoonRegistry
             var boon = GetBoon(boonId);
             if (boon == null) continue;
             string tierStr = tier switch { 1 => "I", 2 => "II", 3 => "III", _ => "" };
-            lines.Add($"{boon.Name} {tierStr} -- {boon.GetEffectDescription(tier)}");
+            lines.Add($"{boon.LocName} {tierStr} -- {boon.GetEffectDescription(tier)}");
         }
         return lines;
     }

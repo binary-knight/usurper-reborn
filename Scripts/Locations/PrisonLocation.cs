@@ -1105,14 +1105,15 @@ public partial class PrisonLocation : BaseLocation
         // Pre-extract sub-fields with safe fallbacks so the cinematic
         // never crashes on a missing piece of companion metadata.
         string vexName = vex.Name ?? "Vex";
-        string vexTitle = vex.Title ?? "";
-        string vexRole = vex.CombatRole.ToString();
-        string vexAbilities = vex.Abilities != null ? string.Join(", ", vex.Abilities) : "";
-        string vexBackstory = vex.BackstoryBrief ?? "";
+        // v1.2.5: the companion's texts in the player's language
+        string vexTitle = vex.Title != null ? vex.LocTitle : "";
+        string vexRole = InnLocation.RoleName(vex.CombatRole);
+        string vexAbilities = vex.Abilities != null ? string.Join(", ", vex.LocAbilities) : "";
+        string vexBackstory = vex.BackstoryBrief != null ? vex.LocBackstory : "";
         var hints = vex.DialogueHints;
-        string hint0 = (hints != null && hints.Length > 0) ? hints[0] : "...";
-        string hint1 = (hints != null && hints.Length > 1) ? hints[1] : "...";
-        string hint2 = (hints != null && hints.Length > 2) ? hints[2] : "...";
+        string hint0 = (hints != null && hints.Length > 0) ? vex.LocDialogueHint(0) : "...";
+        string hint1 = (hints != null && hints.Length > 1) ? vex.LocDialogueHint(1) : "...";
+        string hint2 = (hints != null && hints.Length > 2) ? vex.LocDialogueHint(2) : "...";
 
         await terminal.ClearScreenAsync();
         await terminal.WriteLineAsync();
@@ -1157,7 +1158,8 @@ public partial class PrisonLocation : BaseLocation
         await terminal.WriteColorLineAsync(Loc.Get("prison.vex_abilities", vexAbilities), TerminalEmulator.ColorYellow);
         await terminal.WriteLineAsync();
 
-        await terminal.WriteColorLineAsync(vexBackstory, TerminalEmulator.ColorDarkGray);
+        foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(vexBackstory))   // v1.2.5: fits 79 columns
+            await terminal.WriteColorLineAsync(row, TerminalEmulator.ColorDarkGray);
         await terminal.WriteLineAsync();
         await Pacing.Wait(1500);
 
@@ -1314,8 +1316,9 @@ public partial class PrisonLocation : BaseLocation
 
         if (!string.IsNullOrEmpty(vex.PersonalQuestDescription))
         {
-            await terminal.WriteColorLineAsync(Loc.Get("prison.vex_personal_quest", vex.PersonalQuestName ?? ""), TerminalEmulator.ColorMagenta);
-            await terminal.WriteColorLineAsync($"\"{vex.PersonalQuestDescription}\"", TerminalEmulator.ColorMagenta);
+            await terminal.WriteColorLineAsync(Loc.Get("prison.vex_personal_quest", vex.LocQuestName), TerminalEmulator.ColorMagenta);
+            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap($"\"{vex.LocQuestDescription}\""))   // v1.2.5: fits 79 columns
+                await terminal.WriteColorLineAsync(row, TerminalEmulator.ColorMagenta);
             await terminal.WriteLineAsync();
         }
 
