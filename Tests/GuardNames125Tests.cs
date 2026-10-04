@@ -318,6 +318,19 @@ public class GuardNames125Tests
         L("it", "inn.atk_guard_repels", "Drago della Guardia").Should().Be("  La guardia (Drago della Guardia) ti respinge! Attacco fallito!");
     }
 
+    [Fact]
+    public void TheHungarianGuardLines_LeaveTheNameStandingAlone()
+    {
+        // no article or case suffix is glued to the name ("a(z) {0}-t" read "a(z) Őrkutya-t")
+        L("hu", "inn.atk_guard_blocks", "Őrkutya").Should().Be("\n  Egy őr (Őrkutya) állja utadat!");
+        L("hu", "inn.atk_cut_down_guard", "Őrkutya").Should().Be("  Leteríted az őrt (Őrkutya)!");
+        L("hu", "inn.atk_guard_repels", "Veterán Őr").Should().Be("  Az őr (Veterán Őr) visszaver! A támadás kudarcba fulladt!");
+        L("hu", "engine.guard_fought_off", "Őrtroll", "Bo").Should().Be("  Az őröd (Őrtroll) visszaverte a támadót: Bo!");
+        L("hu", "engine.guard_defeated", "Őrtroll", "Bo").Should().Be("  Az őröd (Őrtroll) alulmaradt a támadóval szemben: Bo!");
+        foreach (var key in new[] { "inn.atk_guard_blocks", "inn.atk_cut_down_guard", "inn.atk_guard_repels", "engine.guard_fought_off", "engine.guard_defeated" })
+            Loc.GetIn("hu", key).Should().NotContain("a(z)", key).And.NotContain("A(z)", key).And.NotContain("}-", key);
+    }
+
     // ---------- width ----------
 
     [Fact]
