@@ -1,7 +1,7 @@
 ---
 title: Discord wiki help
 path: /wiki/en/online/discord/
-checked: 1.2.2
+checked: 1.2.4
 sources: web/wiki-bot.js
 ---
 The Discord bot can answer from the published English wiki in channels enabled by the server owner. Mention the bot and ask a focused question, for example: `@UsurperBot how does Favor work?`
@@ -32,8 +32,8 @@ Ask and Suggest are for the wiki, not for game bugs. To report a bug, press `!` 
 
 ## Suggest an improvement
 
-Trusted helpers with the owner's configured role can use `@UsurperBot suggest: ...` or `@UsurperBot suggestion: ...`. Either word works in any case, with or without a space before the colon. Describe a missing explanation or incorrect claim, not instructions to execute code.
+Trusted helpers with any one of the roles the owner has configured can use `@UsurperBot suggest: ...` or `@UsurperBot suggestion: ...`. Either word works in any case, with or without a space before the colon. Describe a missing explanation or incorrect claim, not instructions to execute code.
 
 Suggestions enter an audit queue. They do not edit the production site or publish a page. The owner reviews the claim against game code and exported data, then prepares a docs-only pull request. The next reviewed release or approved deployment publishes it.
 
-If Suggest is not enabled, ask the owner to configure the trusted role. Rate limits apply to both features.
+If Suggest is not enabled, ask the owner to configure the trusted roles. Rate limits apply to both features.
