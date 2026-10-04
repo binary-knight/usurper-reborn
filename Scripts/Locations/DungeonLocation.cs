@@ -5246,9 +5246,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.rare_material_found"));
         WriteThickDivider(42);
         terminal.SetColor(material.Color);
-        terminal.WriteLine($"    {material.Name}" + (count > 1 ? $" x{count}" : ""));
+        terminal.WriteLine($"    {material.LocName}" + (count > 1 ? $" x{count}" : ""));
         terminal.SetColor("gray");
-        terminal.WriteLine($"    \"{material.Description}\"");
+        foreach (var row in material.QuotedDescriptionRows("    ")) terminal.WriteLine(row);
         WriteThickDivider(42);
         terminal.WriteLine("");
         await Pacing.Wait(1500);
@@ -8756,9 +8756,9 @@ public class DungeonLocation : BaseLocation
                     currentPlayer.AddMaterial(material.Id, 1);
                     terminal.WriteLine("");
                     terminal.SetColor(material.Color);
-                    terminal.WriteLine(Loc.Get("dungeon.chest_discover_material", material.Name));
+                    terminal.WriteLine(Loc.Get("dungeon.chest_discover_material", material.LocName));
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"\"{material.Description}\"");
+                    foreach (var row in material.QuotedDescriptionRows("")) terminal.WriteLine(row);
                 }
             }
             else if (chestRoll < 9)

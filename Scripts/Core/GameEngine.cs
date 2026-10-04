@@ -406,7 +406,7 @@ public partial class GameEngine
         if (!string.IsNullOrEmpty(GameConfig.MessageOfTheDay))
         {
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  {GameConfig.MessageOfTheDay}");
+            terminal.WriteLine($"  {GameConfig.MessageOfTheDayText()}");
             terminal.WriteLine("");
         }
 
@@ -2620,10 +2620,10 @@ public partial class GameEngine
             // OOM on a bloated save) instead of a generic "corrupted" line. The old
             // path silently returned null on any exception, which made it look like
             // the save had vanished even when the file was intact on disk.
-            var (saveData, loadError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
+            var (saveData, loadError, loadTooLarge) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (saveData == null)
             {
-                await ShowLoadFailureWithRecovery(fileName, loadError ?? Loc.Get("engine.reason_unknown"));
+                await ShowLoadFailureWithRecovery(fileName, loadError ?? Loc.Get("engine.reason_unknown"), assumeBloat: loadTooLarge);
                 return;
             }
 
@@ -3351,11 +3351,11 @@ public partial class GameEngine
         // over the bloat threshold (~10 MB — well under the 5 MB SAVE_AUDIT
         // warning ceiling but a realistic upper bound for healthy saves), assume
         // bloat and offer [R] regardless of the error text.
-        bool isBloatError = assumeBloat || errorMessage != null && (
-            errorMessage.Contains("Not enough memory", StringComparison.OrdinalIgnoreCase) ||
-            errorMessage.Contains("too large", StringComparison.OrdinalIgnoreCase) ||
-            errorMessage.Contains("more data than", StringComparison.OrdinalIgnoreCase) ||
-            errorMessage.Contains("bloated", StringComparison.OrdinalIgnoreCase));
+        //
+        // v1.2.5: the load errors are shown in the player's language, so the loader says whether the save
+        // was too large (FileSaveBackend.ReadGameDataByFileNameWithError TooLarge) and the callers pass it as
+        // assumeBloat, instead of this method matching English words in the message.
+        bool isBloatError = assumeBloat;
 
         // File-size fallback: scan primary + all recovery candidates. Anything
         // over BloatDetectionBytes is suspicious. Cheap (FileInfo.Length is an
@@ -3483,7 +3483,7 @@ public partial class GameEngine
 
             // Use the filename (not full path) — SaveSystem loads from SaveDirectory.
             string recoveryFileName = System.IO.Path.GetFileName(path);
-            var (recoveryData, recoveryError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(recoveryFileName);
+            var (recoveryData, recoveryError, recoveryTooLarge) = await SaveSystem.Instance.LoadSaveByFileNameWithError(recoveryFileName);
 
             if (recoveryData?.Player == null)
             {
@@ -3497,7 +3497,7 @@ public partial class GameEngine
                 // errorMessage. Pre-fix, if the primary failed for a non-OOM reason
                 // but a recovery file OOMed, the re-entered menu still showed the
                 // primary's error and never offered [R] auto-repair.
-                await ShowLoadFailureWithRecovery(fileName, recoveryError ?? errorMessage, assumeBloat: recoveryError == null && assumeBloat);
+                await ShowLoadFailureWithRecovery(fileName, recoveryError ?? errorMessage, assumeBloat: recoveryTooLarge || recoveryError == null && assumeBloat);
                 return;
             }
 
@@ -3658,7 +3658,7 @@ public partial class GameEngine
             // If the repaired file STILL fails (unrecognized bloat surface, malformed
             // JSON in a non-bloat field, etc.), control returns to the load failure
             // handler which will re-show this menu.
-            var (verifyData, verifyError) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
+            var (verifyData, verifyError, _) = await SaveSystem.Instance.LoadSaveByFileNameWithError(fileName);
             if (verifyData?.Player != null)
             {
                 terminal.WriteLine(Loc.Get("engine.rp_succeeded"), "bright_green");

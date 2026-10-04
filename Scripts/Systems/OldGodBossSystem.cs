@@ -1194,9 +1194,9 @@ namespace UsurperRemake.Systems
                 player.AddMaterial(thematicMaterial.Id, 2);
                 terminal.WriteLine("");
                 terminal.SetColor(thematicMaterial.Color);
-                terminal.WriteLine(Loc.Get("old_god.material_left_behind", boss.LocName(), thematicMaterial.Name, 2));
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("old_god.material_left_behind", boss.LocName(), thematicMaterial.LocName, 2));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
+                foreach (var row in thematicMaterial.QuotedDescriptionRows("  ")) terminal.WriteLine(row);
             }
             if (boss.DungeonFloor >= 50)
             {
@@ -1278,9 +1278,9 @@ namespace UsurperRemake.Systems
                 player.AddMaterial(thematicMaterial.Id, 2);
                 terminal.WriteLine("");
                 terminal.SetColor(thematicMaterial.Color);
-                terminal.WriteLine(Loc.Get("old_god.defeated_crystallizes", thematicMaterial.Name, 2));
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("old_god.defeated_crystallizes", thematicMaterial.LocName, 2));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
+                foreach (var row in thematicMaterial.QuotedDescriptionRows("  ")) terminal.WriteLine(row);
             }
             if (boss.DungeonFloor >= 50)
             {

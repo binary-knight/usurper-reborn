@@ -14,8 +14,7 @@
 # When adding a table of player text, prefer Loc keys; if it must hold English, list it here.
 
 # --- Scripts/Core -------------------------------------------------------------------------------
-table|Scripts/Core/GameConfig.cs|decl:ClassHelpText|character creation help, CharacterCreationSystem
-nouns|Scripts/Core/GameConfig.cs|decl:ClassNames|class names printed raw at character creation
+keyed|Scripts/Core/GameConfig.cs|decl:ClassNames|class.* (GameConfig.GetLocalizedClassName) at character creation; the array is the English name of the wiki export (WikiDataExporter) and the admin tools
 names|Scripts/Core/GameConfig.cs|decl:CanonGodNames|god names
 names|Scripts/Core/GameConfig.cs|decl:DefaultBishopName|NPC name
 names|Scripts/Core/GameConfig.cs|decl:DefaultGossipMongerName|NPC name
@@ -24,22 +23,21 @@ names|Scripts/Core/GameConfig.cs|decl:DefaultPriestName|NPC name
 names|Scripts/Core/GameConfig.cs|decl:SupremeCreatorName|god name
 names|Scripts/Core/GameConfig.cs|decl:DefaultLoveCornerName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Core/GameConfig.cs|decl:DefaultPrisonName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Core/GameConfig.cs|decl:EyeColors|character creation appearance
-table|Scripts/Core/GameConfig.cs|decl:HairColors|character creation appearance
-table|Scripts/Core/GameConfig.cs|decl:SkinColors|character creation appearance
-table|Scripts/Core/GameConfig.cs|decl:GodTitles|god titles, raw in news and chat
-table|Scripts/Core/GameConfig.cs|decl:MessageOfTheDay|default message of the day
-table|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse1|prison guard reply
-table|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse2|prison guard reply
-table|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse3|prison guard reply
-table|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse4|prison guard reply
-table|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse5|prison guard reply
-table|Scripts/Core/GameConfig.cs|decl:RaceHelpText|character creation help
-nouns|Scripts/Core/GameConfig.cs|decl:RaceNames|race names printed raw at character creation
+keyed|Scripts/Core/GameConfig.cs|decl:EyeColors|appearance.eye.N (GameConfig.GetLocalizedEyeColor); the character saves the number
+keyed|Scripts/Core/GameConfig.cs|decl:HairColors|appearance.hair.N (GameConfig.GetLocalizedHairColor); the character saves the number
+keyed|Scripts/Core/GameConfig.cs|decl:SkinColors|appearance.skin.N (GameConfig.GetLocalizedSkinColor); the character saves the number
+table|Scripts/Core/GameConfig.cs|decl:GodTitles|kept English: god rank titles written into the shared news (stored, one text for every reader) and the chat name (MudChatSystem); a god's own screens show god.title.N (GodText.Title, CombatEngine.GodRankTitleLine)
+keyed|Scripts/Core/GameConfig.cs|decl:DefaultMessageOfTheDay|motd.default (GameConfig.MessageOfTheDayText, while the message is still this default); stored English in the sysop config (SysOpConfigSystem) and the server settings (ServerSettingsRegistry motd)
+keyed|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse1|prison.demand_response_1 (PrisonLocation); the const is read only by a test
+keyed|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse2|prison.demand_response_2 (PrisonLocation); the const is read only by a test
+keyed|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse3|prison.demand_response_3 (PrisonLocation); the const is read only by a test
+keyed|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse4|prison.demand_response_4 (PrisonLocation); the const is read only by a test
+keyed|Scripts/Core/GameConfig.cs|decl:PrisonDemandResponse5|prison.demand_response_5 (PrisonLocation); the const is read only by a test
+keyed|Scripts/Core/GameConfig.cs|decl:RaceNames|race.* (GameConfig.GetLocalizedRaceName) at character creation; the array is the English name of the wiki export (WikiDataExporter)
 keyed|Scripts/Core/GameConfig.cs|decl:WeddingCeremonyMessages|wedding.ceremony_msg_N
-table|Scripts/Core/GameConfig.cs|init.Description|crafting material descriptions
-nouns|Scripts/Core/GameConfig.cs|init.Name|crafting material names
-table|Scripts/Core/GameConfig.cs|init.[k]=|race descriptions passed into a Loc template
+keyed|Scripts/Core/GameConfig.cs|init.Description|material.{id}.desc (CraftingMaterialDef.LocDescription); materials are stored by Id
+keyed|Scripts/Core/GameConfig.cs|init.Name|material.{id}.name (CraftingMaterialDef.LocName); materials are stored by Id
+keyed|Scripts/Core/GameConfig.cs|init.[k]=|creation.race_desc.*, creation.race_restriction.*, creation.prestige_desc.* (GameConfig.GetLocalizedRaceDescription, GetLocalizedRaceRestriction, GetLocalizedPrestigeDescription)
 
 # --- Scripts/AI ---------------------------------------------------------------------------------
 
@@ -163,8 +161,7 @@ keyed|Scripts/Systems/FactionSystem.cs|init.Name|faction.name_* (FactionSystem.N
 keyed|Scripts/Systems/FactionSystem.cs|init.Ranks|faction.rank_{faction}_{n} (FactionSystem.RankLabel); FactionRank, the number, is saved
 keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
 names|Scripts/Systems/FeatureInteractionSystem.cs|init.RevealsOldGod|Old God names
-table|Scripts/Systems/FileSaveBackend.cs|init.SaveType|save type in the save list
-table|Scripts/Systems/FileSaveBackend.cs|return/tuple#1|load error shown by GameEngine
+keyed|Scripts/Systems/FileSaveBackend.cs|init.SaveType|engine.save_type_* (GameEngine.SaveTypeLabel, which matches these English words); never written to disk
 names|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#0|god names
 keyed|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#1|god.epithet.*
 keyed|Scripts/Systems/GodSystem.cs|decl:defaultGods/tuple#4|god.desc.*
@@ -186,7 +183,6 @@ keyed|Scripts/Systems/QuestSystem.cs|=targetName|dungeon.floor (CastleLocation.Q
 keyed|Scripts/Systems/QuestSystem.cs|init.Comment|merc.contract.{id}.comment
 keyed|Scripts/Systems/QuestSystem.cs|init.Title|merc.contract.{id}.title
 names|Scripts/Systems/RareEncounters.cs|decl:godNames|god names
-table|Scripts/Systems/SaveFileRepair.cs|=result.ErrorMessage|repair error, GameEngine
 keyed|Scripts/Systems/SettlementSystem.cs|init.Description|settlement.pbuilding.{id}.desc
 keyed|Scripts/Systems/SettlementSystem.cs|init.EffectDescription|settlement.pbuilding.{id}.effect
 keyed|Scripts/Systems/SettlementSystem.cs|init.Name|settlement.pbuilding.{id}.name
@@ -200,20 +196,20 @@ names|Scripts/Systems/VisualNovelDialogueSystem.cs|decl:targetName2|NPC name fal
 table|Scripts/Systems/VisualNovelDialogueSystem.cs|init.Initiator|kept English: stored in Quest.Initiator (saved); the fallback for an NPC with no name
 
 # --- Scripts/UI ---------------------------------------------------------------------------------
-table|Scripts/UI/ANSIArt.cs|decl:BossVictory|art with words, CombatEngine
-table|Scripts/UI/ANSIArt.cs|decl:Death|art with words, CombatEngine
-table|Scripts/UI/ANSIArt.cs|decl:DungeonEntrance|art with words, DungeonLocation
-table|Scripts/UI/ANSIArt.cs|decl:LevelUp|art with words, LevelMasterLocation
-table|Scripts/UI/ANSIArt.cs|decl:Treasure|art with words, DungeonLocation
+table|Scripts/UI/ANSIArt.cs|decl:BossVictory|kept English: words drawn into fixed-width art (user: "Keep the art English"), CombatEngine
+table|Scripts/UI/ANSIArt.cs|decl:Death|kept English: words drawn into fixed-width art (user: "Keep the art English"), CombatEngine
+table|Scripts/UI/ANSIArt.cs|decl:DungeonEntrance|kept English: words drawn into fixed-width art (user: "Keep the art English"), DungeonLocation
+table|Scripts/UI/ANSIArt.cs|decl:LevelUp|kept English: words drawn into fixed-width art (user: "Keep the art English"), LevelMasterLocation
+table|Scripts/UI/ANSIArt.cs|decl:Treasure|kept English: words drawn into fixed-width art (user: "Keep the art English"), DungeonLocation
 
 # --- more tables (second survey pass) -----------------------------------------------------------
 # Not listed on purpose: Electron payload slots (MenuItemData labels and similar, counted in the
 # "electron" category), tuples passed to output helpers such as ShowBBSMenuRow (already counted as
 # output calls), NPC memory descriptions that only the web dashboard shows, and GMCP labels for MUD clients.
-nouns|Scripts/Core/GameEngine.cs|decl:displayName|fallback name in the online who list
+nouns|Scripts/Core/GameEngine.cs|decl:displayName|kept English: fallback name stored as the online presence name (OnlineStateManager.StartOnlineTracking) and shared in the who list and login broadcast
 names|Scripts/Core/GameEngine.cs|decl:locations|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Core/GameEngine.cs|decl:name|fallback NPC name
-nouns|Scripts/Core/GameEngine.cs|decl:ngDisplayName|fallback name in the online who list
+table|Scripts/Core/GameEngine.cs|decl:name|kept English: fallback name of an NPC read from the NPC data file; it becomes the stored NPC.Name, matched by name
+nouns|Scripts/Core/GameEngine.cs|decl:ngDisplayName|kept English: fallback name stored as the online presence name (OnlineStateManager.StartOnlineTracking) and shared in the who list
 names|Scripts/Core/GameEngine.cs|decl:fonts|font names
 keyed|Scripts/Core/Items.cs|decl:ClassicArmorTable/tuple#0|stored English on picked-up armour; ItemNames shows item.{TemplateLocKey}
 keyed|Scripts/Core/Items.cs|decl:ClassicWeaponTable/tuple#0|stored English on picked-up weapons; ItemNames shows item.{TemplateLocKey}
@@ -223,9 +219,7 @@ table|Scripts/Core/King.cs|=name|fallback king name: becomes the stored King.Nam
 names|Scripts/Core/King.cs|=npc.CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Core/NPC.cs|=CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 names|Scripts/Core/NPC.cs|decl:CurrentLocation|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Core/NPC.cs|decl:greetings|NPC greeting
 names|Scripts/Core/NPC.cs|decl:locations|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
-table|Scripts/Core/NPC.cs|decl:status|NPC status, DormitoryLocation
 names|Scripts/Core/Child.cs|decl:femaleNames|given names
 names|Scripts/Core/Child.cs|decl:maleNames|given names
 keyed|Scripts/Data/EquipmentData.cs|init.Name|stored English item names; ItemNames shows item.{TemplateLocKey} by EquipmentData id
@@ -272,9 +266,8 @@ names|Scripts/Locations/CastleLocation.cs|decl:OrphanNamesFemale|orphan names
 names|Scripts/Locations/CastleLocation.cs|decl:OrphanNamesMale|orphan names
 names|Scripts/Locations/CastleLocation.cs|init.[k]=|mercenary names
 names|Scripts/Locations/InnLocation.cs|decl:godFloorMap/tuple#2|Old God names
-table|Scripts/Locations/LevelMasterLocation.cs|=navOptions|crystal navigation options
 names|Scripts/Locations/LevelMasterLocation.cs|new()#0|master names
-table|Scripts/Locations/LevelMasterLocation.cs|new()#1|master description
+keyed|Scripts/Locations/LevelMasterLocation.cs|new()#1|level_master.desc_good, desc_neutral, desc_evil (MasterInfo.LocDescription)
 names|Scripts/Locations/MagicShopLocation.cs|BaseConstructorInitializer#1|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 nouns|Scripts/Locations/MagicShopLocation.cs|decl:StatNames|stat code an enchant appends to the stored item name, English in every language (GearSetFamilyResolver)
 table|Scripts/Locations/MagicShopLocation.cs|decl:NamedEnchantTags/tuple#1|enchant name tags, stored, English in every language (GearSetFamilyResolver)
@@ -322,7 +315,6 @@ keyed|Scripts/Systems/DreamSystem.cs|init.Description|vision.{id}.desc
 keyed|Scripts/Systems/DreamSystem.cs|init.PhilosophicalHint|dream.{id}.hint
 keyed|Scripts/Systems/DreamSystem.cs|init.Title|dream.{id}.title
 names|Scripts/Systems/FamilySystem.cs|decl:GeneratedSurnames|surnames
-table|Scripts/Systems/InventorySystem.cs|=resultMessage|inventory result message
 keyed|Scripts/Systems/LootGenerator.cs|decl:ArmorTemplates/tuple#0|item.{name}
 keyed|Scripts/Systems/LootGenerator.cs|decl:ArmsArmorTemplates/tuple#0|item.{name}
 keyed|Scripts/Systems/LootGenerator.cs|decl:CloakArmorTemplates/tuple#0|item.{name}
@@ -361,7 +353,6 @@ names|Scripts/Systems/StreetEncounterSystem.cs|decl:fallbackNames|gang names
 names|Scripts/Systems/StreetEncounterSystem.cs|decl:hunterNames|bounty hunter personal names
 keyed|Scripts/Systems/StreetEncounterSystem.cs|init.Name|street_encounter.merchant.item.*
 table|Scripts/Systems/StreetEncounterSystem.cs|init.Role|court role "Advisor": saved in CourtMemberSaveData and compared by CastleLocation, so it stays English; CastleLocation prints it raw
-table|Scripts/Systems/VersionChecker.cs|=DownloadError|update download error
 names|Scripts/Systems/WorldEventSystem.cs|decl:DistantRegions|region names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:femaleFirstNames|NPC names
 names|Scripts/Systems/WorldInitializerSystem.cs|decl:lastNames|NPC surnames

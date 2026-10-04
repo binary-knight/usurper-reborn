@@ -1,108 +1,16 @@
 {
   "Scripts/Core/GameConfig.cs": {
     "data": {
-      "count": 101,
+      "count": 9,
       "sites": [
-        "0127b41029",
-        "016e790b0e",
-        "0407b824a4",
-        "0e3290d5a7",
-        "1188461149",
-        "129e97da78",
-        "18329642b1",
-        "1a018e5a3f",
-        "1cad7a73c3",
-        "2026342024",
-        "24660de1fb",
-        "24be643200",
-        "25a8aac635",
-        "26451ebf84",
-        "295f8c634d",
-        "2d8e42197a",
-        "332db53121",
-        "33b53cdb47",
-        "3b9646d5fe",
-        "3c5315ae00",
         "4014166d51",
-        "401bc5be77",
-        "42cfa2e7e9",
         "42d4c4ada7",
-        "44cd5d2454",
-        "452faf40eb",
-        "45387b7562",
-        "47512060e7",
-        "4899c71289",
-        "491ac804b6",
-        "4e01259f60",
-        "53734908f9",
-        "539c4e25a3",
-        "55031a6c88",
         "57b0282923",
-        "5b81dca80f",
-        "5d35a3ccfc",
-        "5ebb911f96",
-        "6212056be5",
-        "6718eb1980",
-        "67b20baaf2",
-        "6a1a02b959",
         "6c7c994234",
-        "6d59f71748",
-        "6f1cdaa124",
-        "705fd743f4",
-        "763dc099dc",
-        "789f51a7ec",
         "7a06743cb0",
-        "7f055ac998",
-        "82bb70e732",
-        "8306dfab4d",
-        "89f98eed9c",
-        "8c7596c110",
-        "8edd90751c",
-        "901982d528",
-        "9f03bc6226",
-        "a00f03a542",
-        "a691b37b3c",
-        "a84ec92dd8",
-        "ac4dbbf076",
-        "ac80c1c493",
-        "ac9cd8a7c3",
-        "b09eef8bbf",
-        "b46c2afd7c",
-        "b56d077ad7",
-        "b7b51770e5",
-        "b8b399a020",
-        "b9b23d84b5",
         "bbb86d5e80",
-        "bd9f6fd0ed",
-        "bebc01a5bf",
-        "bef1646b04",
-        "c49b5e0286",
-        "cf047a7b69",
-        "cf06c732ea",
-        "cf5d01fadc",
-        "d107bd4936",
-        "d249e55e58",
-        "d3636604e2",
-        "d450f3b265",
-        "d8591c487e",
-        "d9cbce3516",
-        "dfe6f536d6",
-        "e25f1c5eff",
         "e41c8fd645",
-        "e5c6df19da",
-        "e61d0ebcf1",
-        "e7644a861e",
-        "e86e503e9c",
-        "e8c224d6ae",
-        "ec9eda4dd6",
-        "ed9ca32058",
-        "edc8c0bc17",
-        "ee275d3a28",
         "ee3fc39b2b",
-        "ee5744fa52",
-        "ef0fb8a45d",
-        "f302e45c03",
-        "f848565cf4",
         "fe62747c2e"
       ]
     }
@@ -123,19 +31,6 @@
       "sites": [
         "5a67b5afaf",
         "ca18507100"
-      ]
-    }
-  },
-  "Scripts/Core/NPC.cs": {
-    "data": {
-      "count": 6,
-      "sites": [
-        "1a466df669",
-        "28acccab09",
-        "2a91bfdc5f",
-        "6336d1906d",
-        "8b47086d82",
-        "f19dc7eb55"
       ]
     }
   },
@@ -192,18 +87,6 @@
       ]
     }
   },
-  "Scripts/Locations/LevelMasterLocation.cs": {
-    "data": {
-      "count": 5,
-      "sites": [
-        "399af1d038",
-        "9e166b8439",
-        "a7ba5c4615",
-        "cb8d13098c",
-        "ef43bb25a6"
-      ]
-    }
-  },
   "Scripts/Locations/MagicShopLocation.cs": {
     "data": {
       "count": 20,
@@ -247,62 +130,11 @@
       ]
     }
   },
-  "Scripts/Systems/FileSaveBackend.cs": {
-    "data": {
-      "count": 17,
-      "sites": [
-        "55415e344a",
-        "5c97ce15b5",
-        "60d2234dea",
-        "6c65fd0d7e",
-        "83cbd3784c",
-        "97043d2827",
-        "a10955241a",
-        "aa1c443338",
-        "aaa7af7194",
-        "aaa7af7194",
-        "b788339ca1",
-        "b788339ca1",
-        "b893b05ad5",
-        "b893b05ad5",
-        "c77850cd60",
-        "f229df6750",
-        "f8f437a4ed"
-      ]
-    }
-  },
-  "Scripts/Systems/InventorySystem.cs": {
-    "data": {
-      "count": 1,
-      "sites": [
-        "5763876627"
-      ]
-    }
-  },
-  "Scripts/Systems/SaveFileRepair.cs": {
-    "data": {
-      "count": 2,
-      "sites": [
-        "2b2e585e95",
-        "ddc858d9c6"
-      ]
-    }
-  },
   "Scripts/Systems/StreetEncounterSystem.cs": {
     "data": {
       "count": 1,
       "sites": [
         "79e325f9b0"
-      ]
-    }
-  },
-  "Scripts/Systems/VersionChecker.cs": {
-    "data": {
-      "count": 3,
-      "sites": [
-        "20d996e662",
-        "24014880b6",
-        "42b5196efe"
       ]
     }
   },

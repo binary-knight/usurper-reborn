@@ -28654,7 +28654,7 @@ public partial class CombatEngine
                         {
                             godPlayer.GodLevel = newLevel;
                             int titleIdx = Math.Clamp(newLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-                            var divineMsg = GodRankLine(session.Context?.Language ?? "en", GameConfig.GodTitles[titleIdx]);
+                            var divineMsg = GodRankTitleLine(session.Context?.Language ?? "en", titleIdx + 1);
                             session.EnqueueMessage(session.ScreenReaderMode ? divineMsg.Replace("✦", "*") : divineMsg);
                             NewsSystem.Instance?.Newsy(true, Loc.Get("combat.news_god_ascended", godPlayer.DivineName, GameConfig.GodTitles[titleIdx]));
                         }
@@ -31894,7 +31894,7 @@ public partial class CombatEngine
                                 {
                                     godPlayer.GodLevel = gpNewLevel;
                                     int titleIdx = Math.Clamp(gpNewLevel - 1, 0, GameConfig.GodTitles.Length - 1);
-                                    var gpDivineMsg = GodRankLine(kvp2.Value.Context?.Language ?? "en", GameConfig.GodTitles[titleIdx]);
+                                    var gpDivineMsg = GodRankTitleLine(kvp2.Value.Context?.Language ?? "en", titleIdx + 1);
                                     kvp2.Value.EnqueueMessage(kvp2.Value.ScreenReaderMode ? gpDivineMsg.Replace("✦", "*") : gpDivineMsg);
                                     NewsSystem.Instance?.Newsy(true, Loc.Get("combat.news_god_ascended", godPlayer.DivineName, GameConfig.GodTitles[titleIdx]));
                                 }
@@ -32098,6 +32098,10 @@ public partial class CombatEngine
         => $"\u001b[33m  ✦ {Loc.GetIn(lang, "combat.god_sacrificed_in_name", believer, monsterDesc, godXP.ToString("N0"))} ✦\u001b[0m";
 
     /// <summary>v1.2.2: the line a god player reads when their divine rank rises.</summary>
+    /// <summary>v1.2.5: the rank line a god reads on rising to a level, the title (god.title.N) in the god's language.</summary>
+    internal static string GodRankTitleLine(string lang, int level)
+        => GodRankLine(lang, Loc.GetIn(lang, "god.title." + Math.Clamp(level, 1, GameConfig.GodTitles.Length)));
+
     internal static string GodRankLine(string lang, string title)
         => $"\u001b[1;36m  ✦ {Loc.GetIn(lang, "daily.divine_power_grows", title).Trim()} ✦\u001b[0m";
 

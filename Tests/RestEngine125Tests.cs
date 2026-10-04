@@ -315,12 +315,16 @@ public class RestEngine125Tests : IDisposable
     }
 
     [Fact]
-    public async Task LoadFailure_TheBackendsEnglishErrorText_StillOffersTheRepair_InHungarian()
+    public async Task LoadFailure_TheBackendsTooLargeError_StillOffersTheRepair_InHungarian()
     {
-        // The save backend's error text stays English (FileSaveBackend, SaveSystem); the bloat detector reads it.
-        string hu = await LoadFailureScreen("hu", "Not enough memory to deserialize the save file.", assumeBloat: false, withFiles: false);
+        // v1.2.5 (data D9): the file backend's load errors are Loc keys in the reader's language; the backend's
+        // TooLarge flag (passed as assumeBloat) carries the bloat signal instead of English words in the text.
+        string error = L("hu", "save.load_error_no_memory", 120, "rest.json");
+        string hu = await LoadFailureScreen("hu", error, assumeBloat: true, withFiles: false);
         hu.Should().Contain(L("hu", "engine.lf_opt_repair").Trim());
-        hu.Should().Contain("Not enough memory to deserialize the save file.", "the backend's own error is shown as it came");
+        hu.Should().Contain(L("hu", "save.load_error_no_memory", 120, "").Split('(')[0].Trim(), "the backend's own error is shown in the reader's language");
+        string noFlag = await LoadFailureScreen("hu", error, assumeBloat: false, withFiles: false);
+        noFlag.Should().NotContain(L("hu", "engine.lf_opt_repair").Trim(), "the detector reads the flag, not words in the message");
         // The Hungarian reason has none of the English words, so the flag carries the bloat assumption.
         string flagless = await LoadFailureScreen("hu", L("hu", "engine.reason_unparsed"), assumeBloat: false, withFiles: false);
         flagless.Should().NotContain(L("hu", "engine.lf_opt_repair").Trim());

@@ -1805,7 +1805,7 @@ public partial class MagicShopLocation : BaseLocation
                         var r = reqs[j];
                         var mat = GameConfig.GetMaterialById(r.materialId);
                         if (j > 0) tail.Add((" + ", "gray"));
-                        tail.Add(($"{r.count}x {mat?.Name ?? r.materialId}", player.HasMaterial(r.materialId, r.count) ? "bright_green" : "red"));
+                        tail.Add(($"{r.count}x {mat?.LocName ?? r.materialId}", player.HasMaterial(r.materialId, r.count) ? "bright_green" : "red"));
                     }
                 }
             }
@@ -2152,7 +2152,7 @@ public partial class MagicShopLocation : BaseLocation
                 foreach (var req in missing)
                 {
                     var mat = GameConfig.GetMaterialById(req.materialId);
-                    WrappedLine($"  {Loc.Get("magic_shop.missing_material", req.count, mat?.Name ?? req.materialId)}", "red");
+                    WrappedLine($"  {Loc.Get("magic_shop.missing_material", req.count, mat?.LocName ?? req.materialId)}", "red");
                 }
                 WrappedLine($"  {Loc.Get("magic_shop.materials_hint")}", "darkgray");
                 await terminal.WaitForKey();
@@ -2210,7 +2210,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_magenta");
             var matList = confirmReqs.Select(r => {
                 var mat = GameConfig.GetMaterialById(r.materialId);
-                return $"{r.count}x {mat?.Name ?? r.materialId}";
+                return $"{r.count}x {mat?.LocName ?? r.materialId}";
             });
             WrappedLine($"  {Loc.Get("magic_shop.materials_line", string.Join(" + ", matList))}", "bright_magenta");
         }
@@ -2253,7 +2253,7 @@ public partial class MagicShopLocation : BaseLocation
             {
                 player.ConsumeMaterial(req.materialId, req.count);
                 var mat = GameConfig.GetMaterialById(req.materialId);
-                WrappedLine($"  {Loc.Get("magic_shop.material_dissolves", mat?.Name ?? req.materialId)}", mat?.Color ?? "white");
+                WrappedLine($"  {Loc.Get("magic_shop.material_dissolves", mat?.LocName ?? req.materialId)}", mat?.Color ?? "white");
             }
             await Pacing.Wait(500);
         }

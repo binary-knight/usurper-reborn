@@ -4612,19 +4612,26 @@ public class InnLocation : BaseLocation
             {
                 long cost = CalculateTrainingCost(timesTrained);
                 terminal.SetColor("white");
-                terminal.Write($"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {cost:N0}g");
+                string trainRow = $"{i + 1,-4} {statLabels[i],-16} {currentVal,-10} {trainedStr,-10} {cost:N0}g";
+                terminal.Write(trainRow);
 
                 // Show material requirements for 4th/5th training
                 var matReqs = GetTrainingMaterialRequirements(timesTrained);
                 if (matReqs != null)
                 {
+                    // v1.2.5: the materials go on a second row, under the stat, when they would pass 79 columns
+                    if (trainRow.Length + 2 + TrainingMaterialsWidth(matReqs) > 79)
+                    {
+                        terminal.WriteLine("");
+                        terminal.Write("   ");
+                    }
                     terminal.Write("  ");
                     for (int j = 0; j < matReqs.Length; j++)
                     {
                         var mat = GameConfig.GetMaterialById(matReqs[j].materialId);
                         bool has = currentPlayer.HasMaterial(matReqs[j].materialId, matReqs[j].count);
                         terminal.SetColor(has ? "bright_green" : "red");
-                        terminal.Write($"{matReqs[j].count}x {mat?.Name ?? matReqs[j].materialId}");
+                        terminal.Write($"{matReqs[j].count}x {mat?.LocName ?? matReqs[j].materialId}");
                         if (j < matReqs.Length - 1)
                         {
                             terminal.SetColor("gray");
@@ -4690,7 +4697,7 @@ public class InnLocation : BaseLocation
                     {
                         var mat = GameConfig.GetMaterialById(req.materialId);
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  {Loc.Get("inn.missing_material", req.count, mat?.Name ?? req.materialId)}");
+                        terminal.WriteLine($"  {Loc.Get("inn.missing_material", req.count, mat?.LocName ?? req.materialId)}");
                     }
                     terminal.SetColor("darkgray");
                     terminal.WriteLine($"  {Loc.Get("inn.materials_dungeon")}");
@@ -4711,7 +4718,7 @@ public class InnLocation : BaseLocation
                     currentPlayer.ConsumeMaterial(req.materialId, req.count);
                     var mat = GameConfig.GetMaterialById(req.materialId);
                     terminal.SetColor(mat?.Color ?? "white");
-                    WriteUnder("  ", Loc.Get("inn.material_dissolves", mat?.Name ?? req.materialId));
+                    WriteUnder("  ", Loc.Get("inn.material_dissolves", mat?.LocName ?? req.materialId));
                 }
                 await Pacing.Wait(500);
             }
@@ -4788,7 +4795,11 @@ public class InnLocation : BaseLocation
     /// 4th training (index 3) requires Heart of the Ocean.
     /// 5th training (index 4) requires Heart of the Ocean + Eye of Manwe.
     /// </summary>
-    private static (string materialId, int count)[]? GetTrainingMaterialRequirements(int timesTrained)
+    /// <summary>v1.2.5: the visible width of "1x Name + 1x Name" for a training's materials, in the reader's language.</summary>
+    internal static int TrainingMaterialsWidth((string materialId, int count)[] reqs) =>
+        reqs.Sum(r => $"{r.count}x {GameConfig.GetMaterialById(r.materialId)?.LocName ?? r.materialId}".Length) + 3 * (reqs.Length - 1);
+
+    internal static (string materialId, int count)[]? GetTrainingMaterialRequirements(int timesTrained)
     {
         return timesTrained switch
         {
