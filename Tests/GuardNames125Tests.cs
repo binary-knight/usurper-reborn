@@ -248,6 +248,48 @@ public class GuardNames125Tests
         InnLocation.ParseAttackGuards("[{\"type\":\"hound\",\"hp\":60}]").Single().maxHp.Should().Be(60);
     }
 
+    // ---------- the guard in the attacker's combat ----------
+
+    [Fact]
+    public void TheGuardInCombat_IsEnglishInside_AndShownInTheAttackersLanguage()
+    {
+        foreach (var type in GuardTypes)
+        {
+            var guard = InLang("hu", () => HeadlessCombatResolver.CreateGuardCharacter(type, 100, 20, new Random(1)));
+            guard.Name2.Should().Be(InnLocation.GuardStoredName(type), "stored English");
+            guard.IsSleepGuard.Should().BeTrue();
+            foreach (var lang in AllLanguages)
+                InLang(lang, () => guard.DisplayName).Should().Be(L(lang, InnLocation.GuardNameKey(type)), $"{type} {lang}");
+        }
+        InLang("hu", () => new Character { Name2 = "Veteran Guard" }.DisplayName).Should().Be("Veteran Guard", "only a guard stand-in is translated");
+
+        // a saved name (a row from before, in its writer's language) fights under that name
+        string hu = L("hu", "inn.guard_default");
+        var saved = HeadlessCombatResolver.CreateGuardCharacter("troll", 100, 20, new Random(1));
+        saved.Name2 = hu;
+        InLang("en", () => saved.DisplayName).Should().Be(hu);
+        Src("Locations", "InnLocation.cs").Should().Contain("if (!string.IsNullOrEmpty(gStoredName)) guardChar.Name2 = gStoredName;");
+    }
+
+    [Fact]
+    public void AGuardsKill_InDeathNews_NamesTheGuardInTheWritersLanguage()
+    {
+        var guard = HeadlessCombatResolver.CreateGuardCharacter("hound", 100, 20, new Random(1));
+        var buffer = new List<string>();
+        var news = NewsSystem.Instance;
+        news.SetCatchUpBuffer(buffer);
+        try
+        {
+            InLang("hu", () => { news.WriteDeathNews(LongName, guard.DisplayName, "Fogado"); return 0; });
+            InLang("en", () => { news.WriteDeathNews(LongName, guard.DisplayName, "Inn"); return 0; });
+        }
+        finally { news.ClearCatchUpBuffer(); }
+        buffer[0].Should().Contain(L("hu", "news.death", LongName, L("hu", "inn.guard_hound"), "Fogado")).And.NotContain("Guard Hound");
+        buffer[1].Should().Contain(L("en", "news.death", LongName, "Guard Hound", "Inn"));
+        guard.Name2.Should().Be("Guard Hound", "the guard itself stays English");
+        Src("Systems", "CombatEngine.cs").Should().Contain("NewsSystem.Instance?.WriteDeathNews(result.Player.DisplayName, result.Opponent?.DisplayName ?? \"an opponent\", location);");
+    }
+
     // ---------- the sleep report ----------
 
     [Fact]

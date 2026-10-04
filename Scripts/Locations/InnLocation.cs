@@ -6008,6 +6008,7 @@ public class InnLocation : BaseLocation
             await Pacing.Wait(1000);
 
             var guardChar = HeadlessCombatResolver.CreateGuardCharacter(gType, gHp, victimLevel, rng);
+            if (!string.IsNullOrEmpty(gStoredName)) guardChar.Name2 = gStoredName;   // v1.2.5: a saved name fights under that name
             var guardCombat = new CombatEngine(terminal);
             var guardResult = await guardCombat.PlayerVsPlayer(currentPlayer, guardChar);
 
