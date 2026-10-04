@@ -185,8 +185,8 @@ public class CharacterCreationLocation : BaseLocation
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("creation.greetings", player.Name2), "bright_yellow");
         terminal.WriteLine("");
-        terminal.WriteLine(Loc.Get("creation.you_are_now", GameConfig.RaceDescriptions[player.Race]), "white");
-        terminal.WriteLine(Loc.Get("creation.class_seeking", GameConfig.ClassNames[(int)player.Class]), "white");
+        terminal.WriteLine(Loc.Get("creation.you_are_now", GameConfig.GetLocalizedRaceDescription(player.Race)), "white");
+        terminal.WriteLine(Loc.Get("creation.class_seeking", GameConfig.GetLocalizedClassName(player.Class)), "white");
         terminal.WriteLine(Loc.Get("creation.in_realm"), "white");
         terminal.WriteLine("");
         terminal.WriteLine(Loc.Get("creation.adventure_begins"), "cyan");

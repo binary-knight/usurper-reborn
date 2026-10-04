@@ -82,13 +82,15 @@ public static class LootGenerator
 
         public static string GetRarityColor(ItemRarity rarity) => Equipment.ColorFor((EquipmentRarity)(int)rarity);
 
+        /// <summary>v1.2.5: the rarity word a new drop's stored name starts with, English whatever the
+        /// player's language (ItemNames shows it in the reader's).</summary>
         public static string GetRarityPrefix(ItemRarity rarity)
         {
             var key = RarityPrefixKey(rarity);
-            return key == null ? "" : Loc.Get(key) + " ";
+            return key == null ? "" : Loc.GetIn("en", key) + " ";
         }
 
-        private static string? RarityPrefixKey(ItemRarity rarity) => rarity switch
+        internal static string? RarityPrefixKey(ItemRarity rarity) => rarity switch
         {
             ItemRarity.Uncommon => "item.rarity.fine",
             ItemRarity.Rare => "item.rarity.superior",
@@ -97,19 +99,6 @@ public static class LootGenerator
             ItemRarity.Artifact => "item.rarity.mythic",
             _ => null
         };
-
-        /// <summary>
-        /// Convert an English template name to a localization key and look it up.
-        /// E.g. "Long Sword" → "item.long_sword" → Loc.Get("item.long_sword")
-        /// Falls back to the original English name if no key exists.
-        /// </summary>
-        private static string LocalizeTemplateName(string englishName)
-        {
-            string key = TemplateLocKey(englishName);
-            string result = Loc.Get(key);
-            // If Loc.Get returns the raw key, the template isn't in the localization file — use original name
-            return result == key ? englishName : result;
-        }
 
         /// <summary>
         /// v1.1.9: every name BuildItemName can give a template in the given language: bare, each
@@ -125,7 +114,7 @@ public static class LootGenerator
             string L(string key) => Loc.GetIn(lang, key);
             string templateKey = TemplateLocKey(englishTemplate);
             string b = L(templateKey);
-            if (b == templateKey) b = englishTemplate;   // as LocalizeTemplateName falls back
+            if (b == templateKey) b = englishTemplate;   // a template without a key reads as stored
             yield return b;
             yield return $"{L("item.rarity.cursed")} {b}";
             foreach (ItemRarity r in Enum.GetValues(typeof(ItemRarity)))
@@ -180,19 +169,49 @@ public static class LootGenerator
             return result.ToLowerInvariant();
         }
 
-        private static string GetLocalizedEffectPrefix(SpecialEffect effect)
+        /// <summary>v1.2.5: the key of an effect's name word, "prefix" or "suffix" (item.effect.fire_damage.prefix).</summary>
+        internal static string EffectWordKey(SpecialEffect effect, string part) => $"item.effect.{GetEffectKey(effect)}.{part}";
+
+        private static string GetEffectNameIn(string lang, SpecialEffect effect)
         {
-            return Loc.Get($"item.effect.{GetEffectKey(effect)}.prefix");
+            return Loc.GetIn(lang, $"item.effect.{GetEffectKey(effect)}.name");
         }
 
-        private static string GetLocalizedEffectSuffix(SpecialEffect effect)
-        {
-            return Loc.Get($"item.effect.{GetEffectKey(effect)}.suffix");
-        }
+        /// <summary>v1.2.5: the English curse line a cursed drop stores in Description[1].</summary>
+        internal static string CurseLine => Loc.GetIn("en", "item.desc_cursed");
 
-        private static string GetLocalizedEffectName(SpecialEffect effect)
+        /// <summary>v1.2.5: the English line curse removal stores in Description[1].</summary>
+        internal static string PurifiedLine => Loc.GetIn("en", "item.desc_purified");
+
+        /// <summary>
+        /// v1.2.5: a stored item description line in the reader's language. A drop stores its lines in English
+        /// (the effect list "Fire Damage +5, Life Steal +3", the curse line, the purified line); they are shown
+        /// through their keys. Any other line (a drop rolled before 1.2.5 in its finder's language, an item's own
+        /// text) shows as stored. Nothing is written back.
+        /// </summary>
+        public static string DescriptionLine(string? stored) => DescriptionLineIn(GameConfig.Language, stored);
+
+        public static string DescriptionLineIn(string lang, string? stored)
         {
-            return Loc.Get($"item.effect.{GetEffectKey(effect)}.name");
+            if (string.IsNullOrEmpty(stored)) return stored ?? "";
+            if (stored == CurseLine) return Loc.GetIn(lang, "item.desc_cursed");
+            if (stored == PurifiedLine) return Loc.GetIn(lang, "item.desc_purified");
+            var parts = stored.Split(", ");
+            var shown = new List<string>(parts.Length);
+            foreach (var part in parts)
+            {
+                var m = Regex.Match(part, @"^(.+) \+(-?\d+)$");
+                if (!m.Success) return stored;
+                SpecialEffect? effect = null;
+                foreach (SpecialEffect e in Enum.GetValues(typeof(SpecialEffect)))
+                {
+                    string key = $"item.effect.{GetEffectKey(e)}.name";
+                    if (e != SpecialEffect.None && Loc.HasIn("en", key) && Loc.GetIn("en", key) == m.Groups[1].Value) { effect = e; break; }
+                }
+                if (effect == null) return stored;
+                shown.Add($"{GetEffectNameIn(lang, effect.Value)} +{m.Groups[2].Value}");
+            }
+            return string.Join(", ", shown);
         }
 
         #endregion
@@ -2026,7 +2045,7 @@ public static class LootGenerator
 
             return new Item
             {
-                Name = $"{GetRarityPrefix(rarity)}{Loc.Get("item.slot.weapon")}",
+                Name = $"{GetRarityPrefix(rarity)}{Loc.GetIn("en", "item.slot.weapon")}",   // v1.2.5: stored English
                 Rarity = (EquipmentRarity)(int)rarity,
                 Type = ObjType.Weapon,
                 Value = power * 15,
@@ -2042,18 +2061,19 @@ public static class LootGenerator
             float levelScale = 1.0f + (level / 40.0f);
             int power = (int)(8 * levelScale * stats.PowerMult);
 
-            string slotName = armorType switch
+            // v1.2.5: stored English; ItemNames shows the slot word in the reader's language
+            string slotName = Loc.GetIn("en", armorType switch
             {
-                ObjType.Head => Loc.Get("item.slot.helm"),
-                ObjType.Arms => Loc.Get("item.slot.armguards"),
-                ObjType.Hands => Loc.Get("item.slot.gauntlets"),
-                ObjType.Legs => Loc.Get("item.slot.greaves"),
-                ObjType.Feet => Loc.Get("item.slot.boots"),
-                ObjType.Waist => Loc.Get("item.slot.belt"),
-                ObjType.Face => Loc.Get("item.slot.mask"),
-                ObjType.Abody => Loc.Get("item.slot.cloak"),
-                _ => Loc.Get("item.slot.armor")
-            };
+                ObjType.Head => "item.slot.helm",
+                ObjType.Arms => "item.slot.armguards",
+                ObjType.Hands => "item.slot.gauntlets",
+                ObjType.Legs => "item.slot.greaves",
+                ObjType.Feet => "item.slot.boots",
+                ObjType.Waist => "item.slot.belt",
+                ObjType.Face => "item.slot.mask",
+                ObjType.Abody => "item.slot.cloak",
+                _ => "item.slot.armor"
+            });
 
             return new Item
             {
@@ -2070,16 +2090,19 @@ public static class LootGenerator
         private static string BuildItemName(string baseName, ItemRarity rarity,
             List<(SpecialEffect effect, int value)> effects, bool isCursed)
         {
-            string localizedBase = LocalizeTemplateName(baseName);
+            // v1.2.5: the stored name is English whatever the player's language: the English template name
+            // with the English rarity, curse or effect word. It is saved, traded, sold at auction and read
+            // by the thematic bonuses below (English keywords); ItemNames shows it in each reader's language.
+            string englishBase = baseName;
 
             if (isCursed)
             {
-                return $"{Loc.Get("item.rarity.cursed")} {localizedBase}";
+                return $"{Loc.GetIn("en", "item.rarity.cursed")} {englishBase}";
             }
 
             if (effects.Count == 0)
             {
-                return GetRarityPrefix(rarity) + localizedBase;
+                return GetRarityPrefix(rarity) + englishBase;
             }
 
             // Use the first effect to name the item
@@ -2088,11 +2111,11 @@ public static class LootGenerator
             // 50% chance prefix, 50% chance suffix
             if (random.NextDouble() < 0.5)
             {
-                return GetLocalizedEffectPrefix(primaryEffect) + " " + localizedBase;
+                return Loc.GetIn("en", EffectWordKey(primaryEffect, "prefix")) + " " + englishBase;
             }
             else
             {
-                return localizedBase + " " + GetLocalizedEffectSuffix(primaryEffect);
+                return englishBase + " " + Loc.GetIn("en", EffectWordKey(primaryEffect, "suffix"));
             }
         }
 
@@ -2208,7 +2231,8 @@ public static class LootGenerator
             // Store effects description
             if (effects.Count > 0)
             {
-                var effectDescs = effects.Select(e => $"{GetLocalizedEffectName(e.effect)} +{e.value}");
+                // v1.2.5: stored in English (saved, auctioned, banked by guilds); shown by DescriptionLine
+                var effectDescs = effects.Select(e => $"{GetEffectNameIn("en", e.effect)} +{e.value}");
                 if (item.Description.Count > 0)
                     item.Description[0] = string.Join(", ", effectDescs);
             }
@@ -2226,7 +2250,7 @@ public static class LootGenerator
 
             // Add curse description
             if (item.Description.Count > 1)
-                item.Description[1] = "This item is CURSED! Visit the Magic Shop to remove the curse.";
+                item.Description[1] = CurseLine;   // v1.2.5: stored English, shown by DescriptionLine
         }
 
         #endregion
@@ -2323,35 +2347,40 @@ public static class LootGenerator
         }
 
         /// <summary>
-        /// Get the display name for an unidentified item (hides real name, shows type hint)
+        /// Get the display name for an unidentified item (hides real name, shows type hint), in the reader's
+        /// language. v1.2.5: display only (every caller writes it to a terminal or into a message); an
+        /// identified item shows its name through ItemNames.
         /// </summary>
-        public static string GetUnidentifiedName(Item item)
-        {
-            if (item.IsIdentified) return item.Name;
+        public static string GetUnidentifiedName(Item item) => GetUnidentifiedNameIn(GameConfig.Language, item);
 
-            string typeHint = item.Type switch
+        /// <summary>v1.2.5: GetUnidentifiedName in a given language (a group member's terminal).</summary>
+        public static string GetUnidentifiedNameIn(string lang, Item item)
+        {
+            if (item.IsIdentified) return ItemNames.DisplayIn(lang, item);
+
+            string typeHint = Loc.GetIn(lang, item.Type switch
             {
-                ObjType.Weapon => "Unidentified Weapon",
-                ObjType.Body => "Unidentified Armor",
-                ObjType.Head => "Unidentified Helm",
-                ObjType.Arms => "Unidentified Bracers",
-                ObjType.Hands => "Unidentified Gauntlets",
-                ObjType.Legs => "Unidentified Greaves",
-                ObjType.Feet => "Unidentified Boots",
-                ObjType.Shield => "Unidentified Shield",
-                ObjType.Fingers => "Unidentified Ring",
-                ObjType.Neck => "Unidentified Amulet",
-                ObjType.Waist => "Unidentified Belt",
-                ObjType.Face => "Unidentified Mask",
-                ObjType.Abody => "Unidentified Cloak",
-                _ => "Unidentified Item"
-            };
+                ObjType.Weapon => "inn.unid_weapon",
+                ObjType.Body => "inn.unid_armor",
+                ObjType.Head => "inn.unid_helm",
+                ObjType.Arms => "inn.unid_bracers",
+                ObjType.Hands => "inn.unid_gauntlets",
+                ObjType.Legs => "inn.unid_greaves",
+                ObjType.Feet => "inn.unid_boots",
+                ObjType.Shield => "inn.unid_shield",
+                ObjType.Fingers => "inn.unid_ring",
+                ObjType.Neck => "inn.unid_amulet",
+                ObjType.Waist => "inn.unid_belt",
+                ObjType.Face => "inn.unid_mask",
+                ObjType.Abody => "inn.unid_cloak",
+                _ => "inn.equip_slot_unidentified"
+            });
 
             // Add a rarity hint based on power level (the item "feels" powerful)
             int power = Math.Max(item.Attack, item.Armor);
-            if (power > 200) return $"Glowing {typeHint}";
-            if (power > 100) return $"Shimmering {typeHint}";
-            if (power > 50) return $"Ornate {typeHint}";
+            if (power > 200) return Loc.GetIn(lang, "item.unidentified.glowing", typeHint);
+            if (power > 100) return Loc.GetIn(lang, "item.unidentified.shimmering", typeHint);
+            if (power > 50) return Loc.GetIn(lang, "item.unidentified.ornate", typeHint);
             return typeHint;
         }
 
@@ -2473,9 +2502,10 @@ public static class LootGenerator
                         return (true, null);
 
                     // Class not in the allowed list
-                    string classList = string.Join(", ", classes);
-                    string itemType = lootItem.Type == ObjType.Shield ? "shield" : "weapon";
-                    return (false, $"Only {classList} can equip this {itemType}.");
+                    // v1.2.5: in the player's language; the class names come from the template (English enum names).
+                    string classList = string.Join(", ", classes.Select(c =>
+                        Enum.TryParse<CharacterClass>(c, out var cc) ? GameConfig.GetLocalizedClassName(cc) : c));
+                    return (false, Loc.Get(lootItem.Type == ObjType.Shield ? "item.class_only_shield" : "item.class_only_weapon", classList));
                 }
             }
 

@@ -17,6 +17,7 @@ public class WeaponShopLocation : BaseLocation
     private WeaponCategory? currentCategory = null;
     private int currentPage = 0;
     private const int ItemsPerPage = 15;
+    private List<int> pageStarts = new() { 0 };   // v1.2.5: the first item of each page of the list last shown
 
     private enum WeaponCategory
     {
@@ -187,8 +188,8 @@ public class WeaponShopLocation : BaseLocation
         var mainHand = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
         var offHand = currentPlayer.GetEquipment(EquipmentSlot.OffHand);
         terminal.SetColor("white");
-        terminal.WriteLine($"{Loc.Get("shop.main_hand")} {(mainHand != null ? $"{mainHand.Name} (Pow:{mainHand.WeaponPower})" : Loc.Get("shop.empty"))}");
-        terminal.WriteLine($"{Loc.Get("shop.off_hand")} {(offHand != null ? (offHand.WeaponType == WeaponType.Shield || offHand.WeaponType == WeaponType.Buckler || offHand.WeaponType == WeaponType.TowerShield ? $"{offHand.Name} (AC:{offHand.ShieldBonus})" : $"{offHand.Name} (Pow:{offHand.WeaponPower})") : (mainHand?.Handedness == WeaponHandedness.TwoHanded ? Loc.Get("shop.using_2h") : Loc.Get("shop.empty")))}");
+        terminal.WriteLine($"{Loc.Get("shop.main_hand")} {(mainHand != null ? $"{ItemNames.Display(mainHand)} {Loc.Get("weapon_shop.pow_tag", mainHand.WeaponPower)}" : Loc.Get("shop.empty"))}");
+        terminal.WriteLine($"{Loc.Get("shop.off_hand")} {(offHand != null ? (offHand.WeaponType == WeaponType.Shield || offHand.WeaponType == WeaponType.Buckler || offHand.WeaponType == WeaponType.TowerShield ? $"{ItemNames.Display(offHand)} {Loc.Get("armor_shop.ac_tag", offHand.ShieldBonus)}" : $"{ItemNames.Display(offHand)} {Loc.Get("weapon_shop.pow_tag", offHand.WeaponPower)}") : (mainHand?.Handedness == WeaponHandedness.TwoHanded ? Loc.Get("shop.using_2h") : Loc.Get("shop.empty")))}");
         terminal.WriteLine("");
 
         ShowNPCsInLocation();
@@ -229,11 +230,11 @@ public class WeaponShopLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.Write(Loc.Get("weapon_shop.main_label"));
         terminal.SetColor("white");
-        terminal.Write(mainHand != null ? $"{mainHand.Name}" : Loc.Get("ui.empty"));
+        terminal.Write(mainHand != null ? $"{ItemNames.Display(mainHand)}" : Loc.Get("ui.empty"));
         terminal.SetColor("gray");
         terminal.Write(Loc.Get("weapon_shop.off_label"));
         terminal.SetColor("white");
-        terminal.WriteLine(offHand != null ? $"{offHand.Name}" : Loc.Get("ui.empty"));
+        terminal.WriteLine(offHand != null ? $"{ItemNames.Display(offHand)}" : Loc.Get("ui.empty"));
 
         // NPCs
         ShowBBSNPCs();
@@ -262,7 +263,7 @@ public class WeaponShopLocation : BaseLocation
         if (mainHand != null)
         {
             terminal.SetColor("bright_white");
-            terminal.Write(mainHand.Name);
+            terminal.Write(ItemNames.Display(mainHand));
             terminal.SetColor("gray");
             if (mainHand.Handedness == WeaponHandedness.TwoHanded)
                 terminal.WriteLine(Loc.Get("weapon_shop.stat_2h_pow", mainHand.WeaponPower));
@@ -280,7 +281,7 @@ public class WeaponShopLocation : BaseLocation
         if (offHand != null)
         {
             terminal.SetColor("bright_white");
-            terminal.Write(offHand.Name);
+            terminal.Write(ItemNames.Display(offHand));
             terminal.SetColor("gray");
             if (offHand.WeaponType == WeaponType.Shield || offHand.WeaponType == WeaponType.Buckler || offHand.WeaponType == WeaponType.TowerShield)
                 terminal.WriteLine(Loc.Get("weapon_shop.stat_shield", offHand.ShieldBonus, offHand.BlockChance));
@@ -406,7 +407,7 @@ public class WeaponShopLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("weapon_shop.current_prefix"));
             terminal.SetColor("bright_white");
-            terminal.Write(currentItem.Name);
+            terminal.Write(ItemNames.Display(currentItem));
             terminal.SetColor("gray");
             if (category == WeaponCategory.Shields)
                 terminal.WriteLine(Loc.Get("weapon_shop.current_shield_stats", currentItem.ShieldBonus, currentItem.BlockChance, FormatNumber(currentItem.Value)));
@@ -415,27 +416,27 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine("");
         }
 
-        // Paginate
-        int startIndex = currentPage * ItemsPerPage;
-        var pageItems = items.Skip(startIndex).Take(ItemsPerPage).ToList();
-        int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
+        // v1.2.5: compact columns, one space apart, each as wide as its widest value or header word; a row
+        // whose tail does not fit 79 wraps it under the bonus column, and a BBS page holds what fits 24 lines
+        int valueWidth = Math.Max(7, items.Select(i => FormatNumber(i.Value).Length).DefaultIfEmpty(0).Max());
+        int typeWidth = items.Select(i => WeaponTypeLabel(i.WeaponType).Length).DefaultIfEmpty(0).Max();
+        var cols = category == WeaponCategory.Shields
+            ? UsurperRemake.UI.ShopColumns.From(Loc.Get("weapon_shop.shield_header"), 3, 4, 4, valueWidth)
+            : UsurperRemake.UI.ShopColumns.From(Loc.Get("weapon_shop.weapon_header"), 3, 4, -typeWidth, valueWidth);
+        pageStarts = PageStarts(items.Select(i => UsurperRemake.UI.UIHelper.TailRows(cols.BonusColumn, cols.BonusColumn,
+            RowTail(i, true, true)).Count).ToList(), ItemsPerPage, ShopLineBudget(terminal));
+        currentPage = Math.Clamp(currentPage, 0, pageStarts.Count - 1);
+        int startIndex = pageStarts[currentPage];
+        var pageItems = items.Skip(startIndex).Take((currentPage + 1 < pageStarts.Count ? pageStarts[currentPage + 1] : items.Count) - startIndex).ToList();
+        int totalPages = pageStarts.Count;
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("weapon_shop.page_info", currentPage + 1, totalPages, items.Count));
         terminal.WriteLine("");
 
-        if (category == WeaponCategory.Shields)
-        {
-            terminal.SetColor("bright_blue");
-            terminal.WriteLine(Loc.Get("weapon_shop.shield_header"));
-            WriteDivider(67);
-        }
-        else
-        {
-            terminal.SetColor("bright_blue");
-            terminal.WriteLine(Loc.Get("weapon_shop.weapon_header"));
-            WriteDivider(74);
-        }
+        terminal.SetColor("bright_blue");
+        terminal.WriteLine(cols.Header);
+        WriteDivider(category == WeaponCategory.Shields ? 67 : 74);
 
         int num = 1;
         foreach (var item in pageItems)
@@ -451,52 +452,38 @@ public class WeaponShopLocation : BaseLocation
             terminal.Write($"{num,3}. ");
 
             terminal.SetColor(canBuy ? "white" : "darkgray");
-            terminal.Write($"{item.Name,-26}");
+            terminal.Write(ItemNames.Column(item, 26));
 
             // Level requirement
             if (item.MinLevel > 1)
             {
                 terminal.SetColor(!meetsLevel ? "red" : (canBuy ? "bright_cyan" : "darkgray"));
-                terminal.Write($"{item.MinLevel,3}  ");
+                terminal.Write(cols.Cell(0, $"{item.MinLevel}"));
             }
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"--",3}  ");
+                terminal.Write(cols.Cell(0, "--"));
             }
 
             if (category == WeaponCategory.Shields)
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{item.ShieldBonus,4}  ");
-                terminal.Write($"{item.BlockChance,3}%   ");
+                terminal.Write(cols.Cell(1, $"{item.ShieldBonus}"));
+                terminal.Write(cols.Cell(2, $"{item.BlockChance}%"));
             }
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{item.WeaponPower,4}  ");
-                terminal.Write($"{item.WeaponType.ToString().Substring(0, Math.Min(8, item.WeaponType.ToString().Length)),-8}  ");
+                terminal.Write(cols.Cell(1, $"{item.WeaponPower}"));
+                terminal.Write(cols.Cell(2, WeaponTypeLabel(item.WeaponType)));
             }
 
             terminal.SetColor(canBuy ? "yellow" : "darkgray");
-            terminal.Write($"{FormatNumber(item.Value),10}  ");
+            terminal.Write(cols.Cell(3, FormatNumber(item.Value)));
 
-            // Show bonus stats
-            var bonuses = GetBonusDescription(item);
-            if (!string.IsNullOrEmpty(bonuses))
-            {
-                terminal.SetColor(canBuy ? "green" : "darkgray");
-                terminal.Write(bonuses);
-            }
-
-            // Show class restriction tag
-            var classTag = GetClassTag(item);
-            if (!string.IsNullOrEmpty(classTag))
-            {
-                terminal.SetColor(!meetsClass ? "red" : "gray");
-                terminal.Write($" [{classTag}]");
-            }
-
+            // bonus stats and class restriction, wrapped under the bonus column
+            UsurperRemake.UI.UIHelper.WriteTail(terminal, cols.BonusColumn, RowTail(item, canBuy, meetsClass));
             terminal.WriteLine("");
             num++;
         }
@@ -572,28 +559,19 @@ public class WeaponShopLocation : BaseLocation
         return string.Join(" ", bonuses);
     }
 
-    private static string GetClassTag(Equipment item)
+    /// <summary>v1.2.5: a list row's tail: bonuses and the class tag, each in its colour.</summary>
+    private (string? Color, string Text)[] RowTail(Equipment item, bool canBuy, bool meetsClass)
     {
-        if (item.ClassRestrictions == null || item.ClassRestrictions.Count == 0)
-            return "";
-        var abbrevs = item.ClassRestrictions.Select(c => c switch
-        {
-            CharacterClass.Warrior => "War",
-            CharacterClass.Paladin => "Pal",
-            CharacterClass.Barbarian => "Bar",
-            CharacterClass.Ranger => "Rng",
-            CharacterClass.Assassin => "Asn",
-            CharacterClass.Magician => "Mag",
-            CharacterClass.Sage => "Sag",
-            CharacterClass.Cleric => "Clr",
-            CharacterClass.Bard => "Brd",
-            CharacterClass.Alchemist => "Alc",
-            CharacterClass.Jester => "Jst",
-            CharacterClass.MysticShaman => "Sha",
-            _ => c.ToString().Substring(0, 3),
-        });
-        return string.Join("/", abbrevs);
+        var tail = new List<(string? Color, string Text)>();
+        var bonuses = GetBonusDescription(item);
+        if (!string.IsNullOrEmpty(bonuses)) tail.Add((canBuy ? "green" : "darkgray", bonuses));
+        var classTag = GetClassTag(item);
+        if (!string.IsNullOrEmpty(classTag)) tail.Add((!meetsClass ? "red" : "gray", $" [{classTag}]"));
+        return tail.ToArray();
     }
+
+    // v1.2.5: the class tag is shown through keys (ClassRestrictionTag); the restriction itself stays the enum list
+    private static string GetClassTag(Equipment item) => ClassRestrictionTag(item);
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
@@ -695,7 +673,8 @@ public class WeaponShopLocation : BaseLocation
 
             case "N":
                 List<Equipment> items = GetShopItemsForCategory(currentCategory.Value);
-                int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
+                // v1.2.5: the text list pages by pageStarts; the Electron list keeps fixed pages
+                int totalPages = GameConfig.ElectronMode ? (items.Count + ItemsPerPage - 1) / ItemsPerPage : pageStarts.Count;
                 if (currentPage < totalPages - 1) currentPage++;
                 RequestRedisplay();
                 return false;
@@ -717,7 +696,8 @@ public class WeaponShopLocation : BaseLocation
     {
         List<Equipment> items = GetShopItemsForCategory(category);
 
-        int actualIndex = currentPage * ItemsPerPage + itemIndex - 1;
+        int pageStart = !GameConfig.ElectronMode && currentPage < pageStarts.Count ? pageStarts[currentPage] : currentPage * ItemsPerPage;
+        int actualIndex = pageStart + itemIndex - 1;
         if (actualIndex < 0 || actualIndex >= items.Count)
         {
             terminal.WriteLine(Loc.Get("weapon_shop.invalid_item"), "red");
@@ -806,11 +786,11 @@ public class WeaponShopLocation : BaseLocation
         }
 
         // Show tax breakdown
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, adjustedPrice);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, ItemNames.Display(item), adjustedPrice);
 
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.Write(Loc.Get("weapon_shop.buy_prompt_name", item.Name));
+        terminal.Write(Loc.Get("weapon_shop.buy_prompt_name", ItemNames.Display(item)));
         terminal.SetColor("yellow");
         terminal.Write(FormatNumber(totalWithTax));
         terminal.SetColor("white");
@@ -900,7 +880,7 @@ public class WeaponShopLocation : BaseLocation
                 var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                 currentPlayer.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("shop.purchased_inventory", item.Name));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
             }
             else
             {
@@ -915,7 +895,7 @@ public class WeaponShopLocation : BaseLocation
                         var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                         currentPlayer.Inventory.Add(invItem);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("shop.purchased_inventory", item.Name));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
                         await SaveSystem.Instance.AutoSave(currentPlayer);
                         await Pause();
                         return;
@@ -926,11 +906,11 @@ public class WeaponShopLocation : BaseLocation
                 {
                     terminal.SetColor("bright_green");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.purchased_equipped", item.Name));
+                    terminal.WriteLine(Loc.Get("shop.purchased_equipped", ItemNames.Display(item)));
                     if (!string.IsNullOrEmpty(message))
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(message);
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                     }
                     currentPlayer.RecalculateStats();
                 }
@@ -941,7 +921,7 @@ public class WeaponShopLocation : BaseLocation
                     currentPlayer.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.couldnt_equip", item.Name));
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.couldnt_equip", ItemNames.Display(item)));
                 }
             }
         }
@@ -952,7 +932,7 @@ public class WeaponShopLocation : BaseLocation
             currentPlayer.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("shop.purchased_inventory", item.Name));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
         }
 
         QuestSystem.OnEquipmentPurchased(currentPlayer, item);
@@ -991,12 +971,12 @@ public class WeaponShopLocation : BaseLocation
         var mainHand = currentPlayer.GetEquipment(EquipmentSlot.MainHand);
         if (mainHand != null)
         {
-            sellableItems.Add((true, EquipmentSlot.MainHand, null, mainHand.Name, mainHand.Value, mainHand.IsCursed));
+            sellableItems.Add((true, EquipmentSlot.MainHand, null, ItemNames.Display(mainHand), mainHand.Value, mainHand.IsCursed));
             long displayPrice = (long)((mainHand.Value / 2) * fenceModifier);
             terminal.SetColor("bright_cyan");
             terminal.Write($"{num}. ");
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("weapon_shop.sell_main_hand", mainHand.Name));
+            terminal.Write(Loc.Get("weapon_shop.sell_main_hand", ItemNames.Display(mainHand)));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("weapon_shop.sell_for_gold", FormatNumber(displayPrice)));
             num++;
@@ -1005,12 +985,12 @@ public class WeaponShopLocation : BaseLocation
         var offHand = currentPlayer.GetEquipment(EquipmentSlot.OffHand);
         if (offHand != null)
         {
-            sellableItems.Add((true, EquipmentSlot.OffHand, null, offHand.Name, offHand.Value, offHand.IsCursed));
+            sellableItems.Add((true, EquipmentSlot.OffHand, null, ItemNames.Display(offHand), offHand.Value, offHand.IsCursed));
             long displayPrice = (long)((offHand.Value / 2) * fenceModifier);
             terminal.SetColor("bright_cyan");
             terminal.Write($"{num}. ");
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("weapon_shop.sell_off_hand", offHand.Name));
+            terminal.Write(Loc.Get("weapon_shop.sell_off_hand", ItemNames.Display(offHand)));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("weapon_shop.sell_for_gold", FormatNumber(displayPrice)));
             num++;
@@ -1031,12 +1011,12 @@ public class WeaponShopLocation : BaseLocation
             foreach (var (item, invIndex) in inventoryWeapons)
             {
                 if (!item.IsIdentified || item.IsCursed) continue; // v1.1.1: [A] sells only these; the list used to show more than it sold
-                sellableItems.Add((false, null, invIndex, item.Name, item.Value, item.IsCursed));
+                sellableItems.Add((false, null, invIndex, ItemNames.Display(item), item.Value, item.IsCursed));
                 long displayPrice = (long)((item.Value / 2) * fenceModifier);
                 terminal.SetColor("bright_cyan");
                 terminal.Write($"{num}. ");
                 terminal.SetColor("white");
-                terminal.Write($"{item.Name}");
+                terminal.Write($"{ItemNames.Display(item)}");
                 if (item.Type == ObjType.Weapon)
                     terminal.Write(Loc.Get("weapon_shop.inv_wp", item.Attack));
                 else
@@ -1198,7 +1178,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("weapon_shop.reforge_current"));
         terminal.SetColor(weapon.GetRarityColor());
-        terminal.Write($"  {weapon.Name}");
+        terminal.Write($"  {ItemNames.Display(weapon)}");
         WriteEquipmentStatSummary(weapon);
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -1260,7 +1240,7 @@ public class WeaponShopLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("weapon_shop.reforge_result"));
         terminal.SetColor(reforged.GetRarityColor());
-        terminal.Write($"  {reforged.Name}");
+        terminal.Write($"  {ItemNames.Display(reforged)}");
         WriteEquipmentStatSummary(reforged);
         terminal.WriteLine("");
         terminal.SetColor("gray");
@@ -1370,6 +1350,7 @@ public class WeaponShopLocation : BaseLocation
 
     internal static void ApplyReforge(Equipment weapon, Equipment reforged)
     {
+        var before = weapon.Clone();
         weapon.WeaponPower = reforged.WeaponPower;
         weapon.Rarity = reforged.Rarity;
         weapon.StrengthBonus = reforged.StrengthBonus;
@@ -1390,6 +1371,7 @@ public class WeaponShopLocation : BaseLocation
         weapon.PoisonDamage = reforged.PoisonDamage;
         weapon.Value = reforged.Value;
         weapon.ClampStats();
+        weapon.ShiftEnchantBase(before);   // v1.2.5: an enchant removal later keeps the reforge
     }
 
     internal static int RerollStat(int original, double variance, double rarityBoost, Random rng, int bound, int minValue = int.MinValue)
@@ -1456,7 +1438,7 @@ public class WeaponShopLocation : BaseLocation
             if (currentWeapon != null)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("weapon_shop.autobuy_already_best", currentWeapon.Name, currentPow));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("weapon_shop.autobuy_already_best", ItemNames.Display(currentWeapon), currentPow));
                 terminal.WriteLine(Loc.Get("weapon_shop.autobuy_best_afford", FormatNumber(currentPlayer.Gold)));
             }
             else
@@ -1470,7 +1452,7 @@ public class WeaponShopLocation : BaseLocation
         }
 
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_current", currentWeapon?.Name ?? Loc.Get("ui.none"), currentPow));
+        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_current", (currentWeapon != null ? ItemNames.Display(currentWeapon) : Loc.Get("ui.none")), currentPow));
         terminal.WriteLine(Loc.Get("weapon_shop.autobuy_your_gold", FormatNumber(currentPlayer.Gold)));
         terminal.WriteLine("");
 
@@ -1500,14 +1482,14 @@ public class WeaponShopLocation : BaseLocation
             // Show the weapon offer
             WriteDivider(37, "bright_yellow");
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {weapon.Name}");
+            terminal.WriteLine($"  {ItemNames.Display(weapon)}");
             terminal.SetColor("white");
             terminal.WriteLine(Loc.Get("weapon_shop.autobuy_wp", weapon.WeaponPower, currentPow, weapon.WeaponPower - currentPow));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("weapon_shop.autobuy_price", FormatNumber(adjustedPrice)));
 
             // Show tax breakdown
-            CityControlSystem.Instance.DisplayTaxBreakdown(terminal, weapon.Name, adjustedPrice);
+            CityControlSystem.Instance.DisplayTaxBreakdown(terminal, ItemNames.Display(weapon), adjustedPrice);
 
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("weapon_shop.autobuy_gold_after", FormatNumber(currentPlayer.Gold - abTotal)));
@@ -1556,11 +1538,11 @@ public class WeaponShopLocation : BaseLocation
                     if (currentPlayer.EquipItem(weapon, targetSlot, out string message))
                     {
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_purchased", weapon.Name));
+                        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_purchased", ItemNames.Display(weapon)));
                         if (!string.IsNullOrEmpty(message))
                         {
                             terminal.SetColor("gray");
-                            terminal.WriteLine(message);
+                            UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                         }
                         purchased = true;
                         currentPlayer.RecalculateStats();
@@ -1572,7 +1554,7 @@ public class WeaponShopLocation : BaseLocation
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_failed", message));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("weapon_shop.autobuy_failed", message));
                         currentPlayer.Gold += abTotal;
                     }
 
@@ -1644,7 +1626,7 @@ public class WeaponShopLocation : BaseLocation
         if (mainHandItem != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(mainHandItem.Name);
+            terminal.WriteLine(ItemNames.Display(mainHandItem));
         }
         else
         {
@@ -1657,7 +1639,7 @@ public class WeaponShopLocation : BaseLocation
         if (offHandItem != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(offHandItem.Name);
+            terminal.WriteLine(ItemNames.Display(offHandItem));
         }
         else
         {
@@ -1723,8 +1705,9 @@ public class WeaponShopLocation : BaseLocation
             browseItems.Add(new ElectronBridge.ShopBrowseItem
             {
                 Key = (i + 1).ToString(),
-                Name = item.Name,
-                Slot = category == WeaponCategory.Shields ? "Shield" : "Weapon",
+                Name = ItemNames.Display(item),
+                // v1.2.5: shown on the item card only (game-ui.js prints item.slot); never matched
+                Slot = Loc.Get(category == WeaponCategory.Shields ? "base.item_type_shield" : "base.item_type_weapon"),
                 Price = item.Value,
                 Power = power,
                 MinLevel = item.MinLevel,
@@ -1771,12 +1754,12 @@ public class WeaponShopLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "1", Label = "One-Handed", Category = "browse", Icon = "sword" },
-            new() { Key = "2", Label = "Two-Handed", Category = "browse", Icon = "greatsword" },
-            new() { Key = "3", Label = "Bows", Category = "browse", Icon = "bow" },
-            new() { Key = "4", Label = "Shields", Category = "browse", Icon = "shield" },
-            new() { Key = "S", Label = "Sell Weapon", Category = "sell", Icon = "sell" },
-            new() { Key = "I", Label = "Identify Item", Category = "service", Icon = "identify" },
+            new() { Key = "1", Label = Loc.Get("equip.class_one_handed"), Category = "browse", Icon = "sword" },
+            new() { Key = "2", Label = Loc.Get("equip.class_two_handed"), Category = "browse", Icon = "greatsword" },
+            new() { Key = "3", Label = Loc.Get("weapon_shop.cat_bows"), Category = "browse", Icon = "bow" },
+            new() { Key = "4", Label = Loc.Get("weapon_shop.cat_shields"), Category = "browse", Icon = "shield" },
+            new() { Key = "S", Label = Loc.Get("weapon_shop.electron_sell"), Category = "sell", Icon = "sell" },
+            new() { Key = "I", Label = Loc.Get("shop.identify"), Category = "service", Icon = "identify" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

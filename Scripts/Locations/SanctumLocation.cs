@@ -272,7 +272,7 @@ namespace UsurperRemake.Locations
             terminal.SetColor(atCap ? "dark_gray" : "white");
             terminal.Write(Loc.Get(labelKey));
             terminal.SetColor("gray");
-            terminal.WriteLine($"  -- {cost} {GameConfig.MoneyType}  ({usedToday}/{dailyCap} today)");
+            terminal.WriteLine(Loc.Get("sanctum.option_cost", cost, usedToday, dailyCap));
         }
 
         private void WriteSanctumOption(string key, string label)
@@ -595,7 +595,7 @@ namespace UsurperRemake.Locations
                 terminal.SetColor("yellow");
                 foreach (var line in championData.LocEntrance())
                 {
-                    terminal.WriteLine($"  {string.Format(line, currentPlayer.Name2 ?? "you")}");
+                    terminal.WriteLine($"  {string.Format(line, currentPlayer.Name2 ?? Loc.Get("sanctum.you"))}");
                 }
                 terminal.SetColor("dark_magenta");
                 terminal.WriteLine("");
@@ -727,12 +727,12 @@ namespace UsurperRemake.Locations
                         {
                             currentPlayer.Inventory.Add(drop);
                             terminal.SetColor("cyan");
-                            terminal.WriteLine($"  {Loc.Get("tournament.drop_claimed", drop.Name, championData.LocDropFlavor())}");
+                            terminal.WriteLine($"  {Loc.Get("tournament.drop_claimed", ItemNames.Display(drop), championData.LocDropFlavor())}");
                         }
                         else
                         {
                             terminal.SetColor("dark_gray");
-                            terminal.WriteLine($"  {Loc.Get("tournament.drop_inventory_full", drop.Name)}");
+                            terminal.WriteLine($"  {Loc.Get("tournament.drop_inventory_full", ItemNames.Display(drop))}");
                         }
                     }
                 }
@@ -838,7 +838,7 @@ namespace UsurperRemake.Locations
             // multiply that bit the Gauntlet at v0.61.6 (Quent the Lv.55 Barbarian getting one-shot
             // by the WEAKEST champion). See AnchorRoadLocation.cs:1340-1365 for the source rationale.
             var monster = MonsterGenerator.GenerateMonster(effLevel, isBoss: false, isMiniBoss: false, rng);
-            monster.Name = champion.LocName();
+            monster.Name = champion.StoredName();   // v1.2.5: stored English, shown by MonsterNames (champion.LocName() was the session's language)
             monster.MonsterColor = "bright_yellow";
             monster.HP = (long)(monster.HP * champion.HpMultiplier);
             monster.MaxHP = (long)(monster.MaxHP * champion.HpMultiplier);

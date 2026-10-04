@@ -119,7 +119,7 @@ public class MarketplaceLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write(Loc.Get("marketplace.total_value"));
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"{stats.TotalValue:N0} {GameConfig.MoneyType}");
+            terminal.WriteLine(Loc.Get("anchor_road.gold_amount", $"{stats.TotalValue:N0}"));
         }
         terminal.WriteLine("");
 
@@ -230,7 +230,7 @@ public class MarketplaceLocation : BaseLocation
         var stats = MarketplaceSystem.Instance.GetStatistics();
         terminal.WriteLine(Loc.Get("marketplace.sr_listings", stats.TotalListings, stats.PlayerListings, stats.NPCListings));
         if (stats.TotalValue > 0)
-            terminal.WriteLine(Loc.Get("marketplace.sr_total_value", $"{stats.TotalValue:N0}", GameConfig.MoneyType));
+            terminal.WriteLine(Loc.Get("marketplace.sr_total_value", $"{stats.TotalValue:N0}", Loc.Get("marketplace.money")));
         terminal.WriteLine(Loc.Get("marketplace.sr_your_gold", $"{currentPlayer.Gold:N0}"));
         terminal.WriteLine("");
 
@@ -321,7 +321,9 @@ public class MarketplaceLocation : BaseLocation
 
                 // Price
                 terminal.SetColor("bright_yellow");
-                terminal.Write($" {listing.Price,12:N0} gc ");
+                // v1.2.5: the coin abbreviation in the player's language, in the same 14 columns
+                string priceCell = $"{listing.Price,12:N0} {Loc.Get("marketplace.gc")}";
+                terminal.Write($" {priceCell,-14} ");
 
                 // Seller
                 terminal.SetColor(listing.IsNPCSeller ? "bright_cyan" : "bright_green");
@@ -402,7 +404,7 @@ public class MarketplaceLocation : BaseLocation
             if (listing.IsNPCSeller)
             {
                 NewsSystem.Instance?.Newsy(false,
-                    $"{currentPlayer.DisplayName} purchased {listing.Item.Name} from {listing.Seller} at the marketplace.");
+                    Loc.Get("marketplace.news_purchased", currentPlayer.DisplayName, ItemNames.Display(listing.Item), listing.Seller));
             }
         }
         else
@@ -444,7 +446,7 @@ public class MarketplaceLocation : BaseLocation
         var item = sellable[choice - 1];
 
         // Suggest a price based on item value
-        terminal.WriteLine(Loc.Get("marketplace.suggested_price", $"{item.Value:N0}", GameConfig.MoneyType));
+        terminal.WriteLine(Loc.Get("marketplace.suggested_price", $"{item.Value:N0}", Loc.Get("marketplace.money")));
         terminal.WriteLine(Loc.Get("marketplace.enter_price"));
         var priceInput = await terminal.GetInput();
 
@@ -502,9 +504,9 @@ public class MarketplaceLocation : BaseLocation
                 terminal.SetColor("gray");
                 terminal.Write(" -- ");
                 terminal.SetColor("bright_yellow");
-                terminal.Write($"{listing.Price:N0} {GameConfig.MoneyType}");
+                terminal.Write(Loc.Get("anchor_road.gold_amount", $"{listing.Price:N0}"));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  (posted {ageStr})");
+                terminal.WriteLine(Loc.Get("marketplace.posted_label", ageStr));
             }
         }
         terminal.WriteLine("");
@@ -535,11 +537,11 @@ public class MarketplaceLocation : BaseLocation
         terminal.SetColor("gray");
         terminal.Write(Loc.Get("marketplace.total_value_label"));
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine($"{stats.TotalValue:N0} {GameConfig.MoneyType}");
+        terminal.WriteLine(Loc.Get("anchor_road.gold_amount", $"{stats.TotalValue:N0}"));
         terminal.SetColor("gray");
         terminal.Write(Loc.Get("marketplace.your_gold_label"));
         terminal.SetColor("yellow");
-        terminal.WriteLine($"{currentPlayer.Gold:N0} {GameConfig.MoneyType}");
+        terminal.WriteLine(Loc.Get("anchor_road.gold_amount", $"{currentPlayer.Gold:N0}"));
         terminal.WriteLine("");
 
         await terminal.PressAnyKey();

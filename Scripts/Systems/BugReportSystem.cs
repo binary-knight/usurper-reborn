@@ -43,6 +43,9 @@ public static class BugReportSystem
         }
     }
 
+    /// <summary>v1.2.5: the bug report title centred under the 59-column rule as the English one was.</summary>
+    internal static string TitleRow(string title) => new string(' ', Math.Max(0, 25 + (10 - title.Length) / 2)) + title;
+
     /// <summary>
     /// Generate a bug report, save locally, post to Discord, and optionally open browser.
     /// </summary>
@@ -52,12 +55,12 @@ public static class BugReportSystem
         terminal.SetColor("bright_yellow");
         if (GameConfig.ScreenReaderMode)
         {
-            terminal.WriteLine("BUG REPORT");
+            terminal.WriteLine(Loc.Get("bug_report.title"));
         }
         else
         {
             terminal.WriteLine("═══════════════════════════════════════════════════════════");
-            terminal.WriteLine("                         BUG REPORT");
+            terminal.WriteLine(TitleRow(Loc.Get("bug_report.title")));
             terminal.WriteLine("═══════════════════════════════════════════════════════════");
         }
         terminal.SetColor("white");

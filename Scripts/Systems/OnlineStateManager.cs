@@ -2213,6 +2213,7 @@ namespace UsurperRemake.Systems
                             IsCursed = equip.IsCursed,
                             Rarity = (int)equip.Rarity,
                         Family = equip.Family ?? "",
+                        EnchantBase = equip.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                         IsIdentified = equip.IsIdentified, // v1.1.1: defaulted true on reload
                             WeaponType = (int)equip.WeaponType,
                             Handedness = (int)equip.Handedness,

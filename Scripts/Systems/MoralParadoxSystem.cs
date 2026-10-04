@@ -54,44 +54,14 @@ namespace UsurperRemake.Systems
             paradoxes["possessed_child"] = new MoralParadox
             {
                 Id = "possessed_child",
-                Name = "The Innocent Vessel",
                 TriggerFloor = 25,
                 TriggerChapter = StoryChapter.RisingPower,
-                Setup = new[]
-                {
-                    "A village has been placed under quarantine.",
-                    "A demon has possessed a young child - no more than seven years old.",
-                    "The demon grows stronger each day, feeding on the villagers' fear.",
-                    "",
-                    "The priest tells you: 'The child is gone. Only the demon remains.'",
-                    "The mother weeps: 'Please... my baby is still in there. I can feel her.'",
-                    "",
-                    "If the demon is not stopped, it will consume the village within three days.",
-                    "There is no known exorcism that works. The only certain method is death.",
-                    "",
-                    "One hundred innocent lives hang in the balance.",
-                    "One innocent life holds the demon.",
-                    "",
-                    "What do you do?"
-                },
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
                     {
                         Id = "kill_child",
-                        Label = "End the child's life to save the village",
                         MoralType = MoralType.Utilitarian,
-                        Outcome = new[]
-                        {
-                            "Your blade is swift. Merciful, perhaps.",
-                            "The demon's scream echoes as it is banished.",
-                            "The mother's wail echoes longer.",
-                            "",
-                            "The village is saved. One hundred lives continue.",
-                            "But the mother never speaks again.",
-                            "And you... you remember the child's eyes.",
-                            "In that last moment, they were human."
-                        },
                         ChivalryChange = -100,
                         DarknessChange = 200,
                         WisdomChange = 2,
@@ -100,21 +70,7 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "spare_child",
-                        Label = "Refuse to kill the child - there must be another way",
                         MoralType = MoralType.Deontological,
-                        Outcome = new[]
-                        {
-                            "You cannot. You will not. There must be another way.",
-                            "You search desperately for alternatives.",
-                            "Three days pass.",
-                            "",
-                            "The demon consumes the village.",
-                            "One hundred souls are devoured.",
-                            "The child's body, a husk, laughs with a voice from the abyss.",
-                            "",
-                            "Your principles remain intact.",
-                            "The graves are full."
-                        },
                         ChivalryChange = 100,
                         DarknessChange = 0,
                         WisdomChange = 0,
@@ -124,36 +80,13 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "sacrifice_self",
-                        Label = "Offer yourself as a vessel instead",
                         MoralType = MoralType.Virtue,
-                        Outcome = new[]
-                        {
-                            "You kneel before the possessed child.",
-                            "'Take me instead,' you whisper. 'A stronger vessel.'",
-                            "",
-                            "The demon considers... and accepts.",
-                            "You feel it enter you like ice through your veins.",
-                            "",
-                            "But you are not a child. You have trained. You have will.",
-                            "For now, you contain it. But it grows.",
-                            "How long can you hold?",
-                            "",
-                            "The child is free. The village is saved.",
-                            "And you carry a passenger who whispers in the dark."
-                        },
                         ChivalryChange = 500,
                         DarknessChange = 300,
                         WisdomChange = 5,
                         HasDemonPassenger = true,
                         StoryFlag = "carries_demon"
                     }
-                },
-                OceanPhilosophyReflection = new[]
-                {
-                    "The wave that saves must destroy.",
-                    "The wave that destroys believes it saves.",
-                    "The ocean contains all outcomes.",
-                    "Which wave are you?"
                 }
             };
 
@@ -164,44 +97,15 @@ namespace UsurperRemake.Systems
             paradoxes["velouras_cure"] = new MoralParadox
             {
                 Id = "velouras_cure",
-                Name = "The Soulweaver's Price",
                 TriggerFloor = 65,
                 TriggerChapter = StoryChapter.FirstGod,
                 RequiredArtifact = ArtifactType.SoulweaversLoom,
-                Setup = new[]
-                {
-                    "The Soulweaver's Loom hums with potential, but it needs",
-                    "a soul to truly activate - a soul willingly given.",
-                    "",
-                    "Lyris steps forward. 'I have a confession.'",
-                    "'I am... a fragment of Veloura herself.'",
-                    "'Sent to earth to find one who could save her.'",
-                    "'My soul can power the Loom. It always could.'",
-                    "",
-                    "She looks at you with eyes full of love and sorrow.",
-                    "'Let me do this. Let my death have meaning.'",
-                    "",
-                    "A goddess can be saved.",
-                    "But the cost may be the woman you love."
-                },
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
                     {
                         Id = "sacrifice_lyris",
-                        Label = "Accept Lyris's sacrifice - empower the Loom",
                         MoralType = MoralType.Utilitarian,
-                        Outcome = new[]
-                        {
-                            "Lyris smiles through tears. 'Thank you for letting me choose.'",
-                            "Her form shimmers as the Loom activates.",
-                            "You feel her hand in yours, then... nothing.",
-                            "",
-                            "The Loom blazes with light. Its threads glow gold.",
-                            "You can feel Veloura's curse within it, ready to be unwoven.",
-                            "",
-                            "Return to Veloura on floor 40 to complete the cure."
-                        },
                         ChivalryChange = 0,
                         DarknessChange = 0,
                         WisdomChange = 5,
@@ -211,22 +115,7 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "refuse_sacrifice",
-                        Label = "Refuse - Lyris's life matters more than a goddess",
                         MoralType = MoralType.Virtue,
-                        Outcome = new[]
-                        {
-                            "'No,' you say firmly. 'I won't let you die.'",
-                            "Lyris's eyes fill with tears. 'But Veloura...'",
-                            "",
-                            "'Is already dying. Has been dying for millennia.'",
-                            "'I will not trade a certain love for a distant goddess.'",
-                            "",
-                            "The Loom dims but does not go dark.",
-                            "Perhaps... perhaps love itself can power it.",
-                            "But Lyris remains at your side.",
-                            "",
-                            "Return to Veloura on floor 40 to attempt the cure."
-                        },
                         ChivalryChange = 100,
                         DarknessChange = 50,
                         WisdomChange = 2,
@@ -235,37 +124,13 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "offer_own_soul",
-                        Label = "Offer your own soul instead",
                         MoralType = MoralType.Virtue,
-                        Outcome = new[]
-                        {
-                            "'Take mine,' you say. 'I love her. That makes it valid.'",
-                            "",
-                            "The Loom pulses. It considers.",
-                            "",
-                            "'No,' it resonates. 'Your soul is... fractured.'",
-                            "'Pieces are missing. Pieces you do not remember.'",
-                            "'You are not whole enough to pay this price.'",
-                            "",
-                            "The Loom dims, then steadies. Your attempt moved something.",
-                            "Lyris looks at you with newfound wonder.",
-                            "'What ARE you?'",
-                            "",
-                            "Return to Veloura on floor 40 to attempt the cure."
-                        },
                         ChivalryChange = 200,
                         DarknessChange = 0,
                         WisdomChange = 3,
                         RevealsPlayerSecret = true,
                         StoryFlag = "soul_rejected_by_loom"
                     }
-                },
-                OceanPhilosophyReflection = new[]
-                {
-                    "A wave dies to become the shore.",
-                    "A shore dies to become the wave.",
-                    "Love is the current between them.",
-                    "What are you willing to become?"
                 }
             };
 
@@ -273,55 +138,14 @@ namespace UsurperRemake.Systems
             paradoxes["free_terravok"] = new MoralParadox
             {
                 Id = "free_terravok",
-                Name = "The Sleeping Mountain",
                 TriggerFloor = 80,
                 TriggerChapter = StoryChapter.GodWar,
-                Setup = new[]
-                {
-                    "Terravok, the god of earth, slumbers beneath the dungeon.",
-                    "His prison weakens. Soon he will wake regardless.",
-                    "",
-                    "But you could wake him NOW.",
-                    "",
-                    "Awake, he could end the God War.",
-                    "His strength is unmatched. His wisdom ancient.",
-                    "He was the only god Manwe truly trusted.",
-                    "",
-                    "But his waking will shake the world.",
-                    "Mountains will rise. Valleys will open.",
-                    "Thousands will die in the upheaval.",
-                    "",
-                    "To stop a war that kills slowly...",
-                    "You could trigger a cataclysm that kills quickly.",
-                    "",
-                    "Is a swift death kinder than a slow one?",
-                    "Is certainty better than hope?"
-                },
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
                     {
                         Id = "wake_terravok",
-                        Label = "Wake Terravok - end the war at any cost",
                         MoralType = MoralType.Utilitarian,
-                        Outcome = new[]
-                        {
-                            "You break the final seal.",
-                            "The ground splits. The sky darkens.",
-                            "",
-                            "TERRAVOK RISES.",
-                            "",
-                            "Cities crumble. Rivers change course.",
-                            "The death toll is... immense.",
-                            "",
-                            "But the god of earth looks upon the warring deities",
-                            "and speaks with a voice like grinding stone:",
-                            "",
-                            "'ENOUGH.'",
-                            "",
-                            "The God War ends in a single word.",
-                            "And you are left to count the cost."
-                        },
                         ChivalryChange = -500,
                         DarknessChange = 500,
                         WisdomChange = 3,
@@ -332,23 +156,7 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "let_sleep",
-                        Label = "Let him sleep - find another way to end the war",
                         MoralType = MoralType.Deontological,
-                        Outcome = new[]
-                        {
-                            "You cannot trade lives so callously.",
-                            "There must be another way.",
-                            "",
-                            "You leave Terravok to his dreams.",
-                            "",
-                            "The God War continues.",
-                            "More die each day - slowly, in skirmishes.",
-                            "Perhaps more will die than would have in the cataclysm.",
-                            "Perhaps not.",
-                            "",
-                            "You will never know which path cost more.",
-                            "That uncertainty is its own weight."
-                        },
                         ChivalryChange = 100,
                         DarknessChange = 0,
                         WisdomChange = 1,
@@ -357,38 +165,13 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "partial_wake",
-                        Label = "Speak to him without fully waking - seek counsel",
                         MoralType = MoralType.Virtue,
-                        Outcome = new[]
-                        {
-                            "You press your hand to the seal.",
-                            "Not breaking it. Speaking through it.",
-                            "",
-                            "'Terravok,' you whisper. 'I need guidance.'",
-                            "",
-                            "An eternity passes. Then...",
-                            "",
-                            "'YOUNG WAVE. I HEAR YOU.'",
-                            "'THE OCEAN STIRS IN YOUR SOUL.'",
-                            "'WHEN I WAKE, FIND ME. SPEAK YOUR TRUTH.'",
-                            "'BUT DO NOT BREAK WHAT IS NOT YET READY TO BREAK.'",
-                            "",
-                            "The presence recedes.",
-                            "You have an ally, when the time comes."
-                        },
                         ChivalryChange = 50,
                         DarknessChange = 0,
                         WisdomChange = 5,
                         StoryFlag = "spoke_to_terravok",
                         OceanPhilosophyBonus = true
                     }
-                },
-                OceanPhilosophyReflection = new[]
-                {
-                    "The mountain is the ocean, crystallized into patience.",
-                    "To wake it is to release what was always there.",
-                    "Destruction and creation are the same wave.",
-                    "The timing is all that matters."
                 }
             };
 
@@ -396,56 +179,15 @@ namespace UsurperRemake.Systems
             paradoxes["destroy_darkness"] = new MoralParadox
             {
                 Id = "destroy_darkness",
-                Name = "The Purging Light",
                 TriggerFloor = 95,
                 TriggerChapter = StoryChapter.Ascension,
                 RequiredArtifact = ArtifactType.SunforgedBlade,
-                Setup = new[]
-                {
-                    "Aurelion offers you a gift beyond measure:",
-                    "The power to purge ALL darkness from the realm.",
-                    "",
-                    "No more evil. No more suffering caused by malice.",
-                    "Every dark thought, every cruel impulse - gone.",
-                    "",
-                    "Paradise, given freely.",
-                    "",
-                    "But Noctura appears, her voice unusually earnest:",
-                    "'Consider carefully. Darkness is not only evil.'",
-                    "'It is the capacity for hard choices.'",
-                    "'It is the strength to sacrifice for what matters.'",
-                    "'Without darkness, there can be no courage.'",
-                    "'For courage requires fear to overcome.'",
-                    "",
-                    "A world without darkness...",
-                    "Is a world without growth.",
-                    "Without meaning.",
-                    "Without free will."
-                },
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
                     {
                         Id = "purge_darkness",
-                        Label = "Accept the gift - create paradise",
                         MoralType = MoralType.Utilitarian,
-                        Outcome = new[]
-                        {
-                            "Light spreads across the world.",
-                            "Every shadow flees. Every cruel thought dissolves.",
-                            "",
-                            "For a moment, there is perfect peace.",
-                            "",
-                            "Then you realize... you feel nothing.",
-                            "Not joy. Not satisfaction. Not pride.",
-                            "Those require contrast. Light needs dark to shine.",
-                            "",
-                            "The world is peaceful.",
-                            "The world is empty.",
-                            "The world is... done.",
-                            "",
-                            "There are no more stories to tell."
-                        },
                         ChivalryChange = 0,
                         DarknessChange = -10000, // Removes all darkness
                         WisdomChange = -10, // Wisdom requires understanding darkness
@@ -455,24 +197,7 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "refuse_paradise",
-                        Label = "Refuse - balance requires both light and shadow",
                         MoralType = MoralType.Virtue,
-                        Outcome = new[]
-                        {
-                            "You decline the gift.",
-                            "",
-                            "Aurelion's light dims with disappointment.",
-                            "But Noctura's shadow deepens with respect.",
-                            "",
-                            "'You understand,' she says. 'Better than most.'",
-                            "'The dance requires both partners.'",
-                            "'Light and dark, forever entwined.'",
-                            "",
-                            "The world remains imperfect.",
-                            "But it remains ALIVE.",
-                            "With all its pain. All its joy.",
-                            "All its potential for growth."
-                        },
                         ChivalryChange = 0,
                         DarknessChange = 0,
                         WisdomChange = 10,
@@ -482,40 +207,13 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "take_darkness",
-                        Label = "Take the realm's darkness into yourself",
                         MoralType = MoralType.Virtue,
-                        Outcome = new[]
-                        {
-                            "'Give me the darkness,' you say. 'I will carry it.'",
-                            "",
-                            "Both gods stare in disbelief.",
-                            "",
-                            "'No mortal could survive-' Aurelion begins.",
-                            "",
-                            "But you are not mortal. Not truly.",
-                            "You are a fragment of something greater.",
-                            "",
-                            "The darkness flows into you.",
-                            "Every cruel thought. Every hateful impulse.",
-                            "You contain it. You transmute it.",
-                            "Pain becoming wisdom. Hate becoming understanding.",
-                            "",
-                            "The world is lighter.",
-                            "And you carry its shadow."
-                        },
                         ChivalryChange = 1000, // Maxes out chivalry — "transmuted the world's pain into wisdom"
                         DarknessChange = 1000, // v0.57.12: was 5000 (stale against pre-cap 30000 constant). Max darkness is now 1000 — intent preserved (absorb the world's darkness until you max out).
                         WisdomChange = 20,
                         StoryFlag = "absorbed_world_darkness",
                         OceanPhilosophyBonus = true
                     }
-                },
-                OceanPhilosophyReflection = new[]
-                {
-                    "The ocean has depths and surfaces.",
-                    "To remove either is to destroy the whole.",
-                    "Darkness is not your enemy.",
-                    "It is the weight that teaches the wave to rise."
                 }
             };
 
@@ -523,53 +221,14 @@ namespace UsurperRemake.Systems
             paradoxes["final_choice"] = new MoralParadox
             {
                 Id = "final_choice",
-                Name = "The Endless Cycle",
                 TriggerFloor = 100,
                 TriggerChapter = StoryChapter.FinalConfrontation,
-                Setup = new[]
-                {
-                    "Manwe speaks, and his voice is weary beyond measure:",
-                    "",
-                    "'You stand where so many have stood.'",
-                    "'Ready to become a god. Ready to 'win.''",
-                    "'But have you understood anything?'",
-                    "",
-                    "'The cycle continues because of GRASPING.'",
-                    "'The desire to accumulate. To conquer. To become MORE.'",
-                    "'Every hero who reaches me seeks power.'",
-                    "'And in seeking, they perpetuate the very cycle they claim to fight.'",
-                    "",
-                    "'You have killed. You have conquered. You have WANTED.'",
-                    "'Do you truly believe you are different?'",
-                    "'That YOUR ascension will end the suffering?'",
-                    "",
-                    "'Or are you just another wave, crashing against the shore,'",
-                    "'believing itself the ocean?'"
-                },
                 Choices = new List<ParadoxOption>
                 {
                     new ParadoxOption
                     {
                         Id = "claim_power",
-                        Label = "Claim divine power - you WILL be different",
                         MoralType = MoralType.Nihilist, // Ironically
-                        Outcome = new[]
-                        {
-                            "You seize the power. It floods through you.",
-                            "You are a god now. Everything you ever wanted.",
-                            "",
-                            "Manwe sighs. 'As I expected.'",
-                            "",
-                            "'In ten thousand years, another will stand here.'",
-                            "'Ready to take YOUR power.'",
-                            "'And the cycle continues.'",
-                            "",
-                            "You ARE different. Every god was different.",
-                            "And yet... the cycle remains.",
-                            "",
-                            "You have won everything.",
-                            "And changed nothing."
-                        },
                         ChivalryChange = 0,
                         DarknessChange = 1000,
                         WisdomChange = 0,
@@ -579,23 +238,7 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "refuse_power",
-                        Label = "Refuse power - break the cycle by not playing",
                         MoralType = MoralType.Deontological,
-                        Outcome = new[]
-                        {
-                            "'No,' you say. 'I will not play this game.'",
-                            "",
-                            "Manwe's eyes widen. 'You... refuse?'",
-                            "",
-                            "'The cycle is fed by desire. By grasping.'",
-                            "'I release my grip. I want nothing from you.'",
-                            "'I am content to be mortal. To live. To die.'",
-                            "'As the wave returns to the ocean.'",
-                            "",
-                            "For the first time in millennia, Manwe smiles.",
-                            "",
-                            "'Perhaps... perhaps there is hope after all.'"
-                        },
                         ChivalryChange = 500,
                         DarknessChange = -500,
                         WisdomChange = 20,
@@ -606,26 +249,8 @@ namespace UsurperRemake.Systems
                     new ParadoxOption
                     {
                         Id = "remember_truth",
-                        Label = "[REQUIRES ALL SEALS] 'I remember who I am.'",
                         MoralType = MoralType.Virtue,
                         RequiresAllSeals = true,
-                        Outcome = new[]
-                        {
-                            "'I am not here to take power, Father.'",
-                            "",
-                            "Manwe freezes. 'What did you call me?'",
-                            "",
-                            "'You sent me. A fragment of yourself.'",
-                            "'To experience mortality. To understand suffering.'",
-                            "'To remember what you forgot in your loneliness.'",
-                            "",
-                            "'I am the wave that remembers it is the ocean.'",
-                            "",
-                            "Tears stream down the Creator's face.",
-                            "",
-                            "'You... you came back. After all this time.'",
-                            "'You came back to me.'"
-                        },
                         ChivalryChange = 0,
                         DarknessChange = 0,
                         WisdomChange = 50,
@@ -633,18 +258,33 @@ namespace UsurperRemake.Systems
                         StoryFlag = "remembered_truth",
                         OceanPhilosophyBonus = true
                     }
-                },
-                OceanPhilosophyReflection = new[]
-                {
-                    "The wave that stops grasping returns to the ocean.",
-                    "The wave that keeps grasping becomes foam.",
-                    "Which will you be?",
-                    "The choice was always yours."
                 }
             };
 
+            // v1.2.5: each option knows its paradox, so its shown text is looked up by the two ids
+            foreach (var paradox in paradoxes.Values)
+                foreach (var option in paradox.Choices)
+                    option.ParadoxId = paradox.Id;
+
             // GD.Print($"[MoralParadox] Initialized {paradoxes.Count} moral paradoxes");
         }
+
+        /// <summary>
+        /// v1.2.5: the key of a paradox's shown text (name, setup, reflection), built from its id. Two titles
+        /// reuse the dungeon story keys that show the same title before the choice.
+        /// </summary>
+        internal static string ParadoxKey(string paradoxId, string part) => (paradoxId, part) switch
+        {
+            ("velouras_cure", "name") => "dungeon.story_soulweaver_price_title",
+            ("destroy_darkness", "name") => "dungeon.story_purging_title",
+            _ => $"moral.{paradoxId}.{part}"
+        };
+
+        /// <summary>v1.2.5: the key of an option's shown text (label, outcome), built from the paradox and option ids.</summary>
+        internal static string OptionKey(string paradoxId, string optionId, string part) => $"moral.{paradoxId}.{optionId}.{part}";
+
+        /// <summary>v1.2.5: the rows of a text kept under one key, in the reader's language.</summary>
+        internal static string[] Rows(string key) => Loc.Get(key).Split('\n');
 
         /// <summary>
         /// Present a moral paradox to the player
@@ -678,10 +318,7 @@ namespace UsurperRemake.Systems
             ApplyChoiceEffects(choice, player);
 
             // Display Ocean Philosophy reflection
-            if (paradox.OceanPhilosophyReflection != null)
-            {
-                await DisplayPhilosophyReflection(paradox, terminal);
-            }
+            await DisplayPhilosophyReflection(paradox, terminal);
 
             // Record choice
             var paradoxChoice = new ParadoxChoice
@@ -904,7 +541,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("moral.deeper_understanding")}", "cyan");
             terminal.WriteLine("");
 
-            foreach (var line in paradox.OceanPhilosophyReflection!)
+            foreach (var line in paradox.OceanPhilosophyReflection)
             {
                 terminal.WriteLine($"  {line}", "bright_cyan");
                 await Pacing.Wait(400);
@@ -996,20 +633,44 @@ namespace UsurperRemake.Systems
             return madeChoices.TryGetValue(paradoxId, out var choice) ? choice : null;
         }
 
-        /// <summary>
-        /// Get summary of moral choices for endings
-        /// </summary>
-        public string GetMoralSummary()
+        /// <summary>1.2.5: a new character starts with no paradox answered.</summary>
+        public void Reset()
         {
-            var dominant = GetDominantMoralType();
-            return dominant switch
+            madeChoices.Clear();
+            UtilitarianChoices = 0;
+            DeontologicalChoices = 0;
+            VirtueChoices = 0;
+            NihilistChoices = 0;
+        }
+
+        /// <summary>1.2.5: the ids of the paradoxes already answered, as the save writes them.</summary>
+        public IEnumerable<string> CompletedParadoxIds => madeChoices.Keys;
+
+        /// <summary>
+        /// 1.2.5: load step. Replaces the answered paradoxes with the saved ids, so a paradox never
+        /// comes back after a reload. Its effects are not applied again; they are in the saved stats.
+        /// </summary>
+        public void RestoreFromSave(IEnumerable<string>? completedIds)
+        {
+            madeChoices.Clear();
+            if (completedIds == null) return;
+            foreach (var id in completedIds)
             {
-                MoralType.Utilitarian => "You chose the greater good, even at terrible cost.",
-                MoralType.Deontological => "You held to your principles, even when it hurt.",
-                MoralType.Virtue => "You followed your heart, seeking wisdom in compassion.",
-                MoralType.Nihilist => "You rejected the false choices, seeing through the illusion.",
-                _ => "Your path was your own."
-            };
+                if (string.IsNullOrEmpty(id)) continue;
+                madeChoices[id] = new ParadoxChoice { ParadoxId = id };
+            }
+        }
+
+        /// <summary>
+        /// 1.2.5: load step. Replaces the moral-type counters with the saved values; an old save
+        /// has none, so all four start at zero. A negative value from an edited file reads as zero.
+        /// </summary>
+        public void RestoreMoralCounters(int utilitarian, int deontological, int virtue, int nihilist)
+        {
+            UtilitarianChoices = Math.Max(0, utilitarian);
+            DeontologicalChoices = Math.Max(0, deontological);
+            VirtueChoices = Math.Max(0, virtue);
+            NihilistChoices = Math.Max(0, nihilist);
         }
 
         /// <summary>
@@ -1049,21 +710,24 @@ namespace UsurperRemake.Systems
     public class MoralParadox
     {
         public string Id { get; set; } = "";
-        public string Name { get; set; } = "";
+        /// <summary>v1.2.5: shown in the reader's language, from the key built from Id.</summary>
+        public string Name => Loc.Get(MoralParadoxSystem.ParadoxKey(Id, "name"));
         public int TriggerFloor { get; set; }
         public StoryChapter TriggerChapter { get; set; }
         public ArtifactType? RequiredArtifact { get; set; }
-        public string[] Setup { get; set; } = Array.Empty<string>();
+        public string[] Setup => MoralParadoxSystem.Rows(MoralParadoxSystem.ParadoxKey(Id, "setup"));
         public List<ParadoxOption> Choices { get; set; } = new();
-        public string[]? OceanPhilosophyReflection { get; set; }
+        public string[] OceanPhilosophyReflection => MoralParadoxSystem.Rows(MoralParadoxSystem.ParadoxKey(Id, "reflection"));
     }
 
     public class ParadoxOption
     {
         public string Id { get; set; } = "";
-        public string Label { get; set; } = "";
+        /// <summary>v1.2.5: the paradox this option belongs to (stamped at start); with Id it keys the shown text.</summary>
+        public string ParadoxId { get; set; } = "";
+        public string Label => Loc.Get(MoralParadoxSystem.OptionKey(ParadoxId, Id, "label"));
         public MoralType MoralType { get; set; }
-        public string[] Outcome { get; set; } = Array.Empty<string>();
+        public string[] Outcome => MoralParadoxSystem.Rows(MoralParadoxSystem.OptionKey(ParadoxId, Id, "outcome"));
         public long ChivalryChange { get; set; }
         public long DarknessChange { get; set; }
         public int WisdomChange { get; set; }

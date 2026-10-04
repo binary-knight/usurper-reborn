@@ -375,14 +375,16 @@ public partial class QuestSystem
                 var (family, tier) = MonsterFamilies.GetMonsterForLevel(
                     Math.Min(playerLevel + quest.Difficulty * 3, maxAccessibleFloor), random);
                 // Use base tier name as targetId so it matches OnMonsterKilled tierId
-                var bossName = Loc.Get("quest.title.champion", tier.Name);
+                // v1.2.5: stored English (quest.title.champion around the English tier); shown in the reader's
+                // language by ShowMonsterArgs, which rebuilds it from the tier in TargetId
+                var bossName = Loc.GetIn("en", "quest.title.champion", tier.Name);
                 var bossId = tier.Name.ToLower().Replace(" ", "_");
                 quest.Objectives.Add(QuestObjective.Localized(
                     QuestObjectiveType.KillBoss,
                     "quest.objective.defeat_boss",
                     new object[] { bossName },
                     1, bossId, bossName));
-                quest.Title = Loc.Get("quest.title.defeat_boss", bossName);
+                quest.Title = Loc.GetIn("en", "quest.title.defeat_boss", bossName);
                 quest.TitleKey = "quest.title.defeat_boss";
                 quest.TitleArgs = new List<string> { bossName };
                 break;
@@ -452,22 +454,34 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.2.5: the stored initiator of bounty board quests. It stays English (saved, compared here); Quest.GetDisplayInitiator
+    /// shows it through quest.initiator.bounty_board.
+    /// </summary>
+    public const string BountyBoardInitiator = "Bounty Board";
+
+    /// <summary>
     /// Create a dungeon quest (bounty board style)
     /// </summary>
-    public static Quest CreateDungeonQuest(QuestTarget target, byte difficulty, string dungeonName = "The Dungeon", int playerLevel = 10, int deepestFloor = 0)
+    public static Quest CreateDungeonQuest(QuestTarget target, byte difficulty, string? dungeonName = null, int playerLevel = 10, int deepestFloor = 0)
     {
         if (target < QuestTarget.ClearBoss || target > QuestTarget.SurviveDungeon)
         {
             throw new ArgumentException("Invalid dungeon quest target type");
         }
 
+        // v1.2.5: the comment is stored as a key and its arguments, shown in each reader's language
+        // (GetDisplayComment); Comment keeps the English text. The default dungeon name is a loc: argument.
+        bool defaultDungeon = dungeonName == null || dungeonName == Loc.Get("quest.dungeon_name");
+        string dungeonArg = defaultDungeon ? "loc:quest.dungeon_name" : dungeonName!;
         var quest = new Quest
         {
-            Initiator = "Bounty Board",  // English only — shared quest data
+            Initiator = BountyBoardInitiator,  // English only: shared quest data
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
-            Comment = Loc.Get("quest.dungeon_quest_comment", dungeonName),
+            Comment = Loc.GetIn("en", "quest.dungeon_quest_comment", defaultDungeon ? Loc.GetIn("en", "quest.dungeon_name") : dungeonName!),
+            CommentKey = "quest.dungeon_quest_comment",
+            CommentArgs = new List<string> { dungeonArg },
             Date = DateTime.Now,
             MinLevel = Math.Max(1, playerLevel - 5),
             MaxLevel = playerLevel + 15,
@@ -496,7 +510,7 @@ public partial class QuestSystem
         return questDatabase.Where(q =>
             !q.Deleted &&
             string.IsNullOrEmpty(q.Occupier) &&
-            q.Initiator == "Bounty Board" &&
+            q.Initiator == BountyBoardInitiator &&
             player.Level >= q.MinLevel &&
             player.Level <= q.MaxLevel
         ).ToList();
@@ -508,10 +522,10 @@ public partial class QuestSystem
     public static void RefreshBountyBoard(int playerLevel, int deepestFloor = 0)
     {
         // Remove old unclaimed bounty board quests
-        questDatabase.RemoveAll(q => q.Initiator == "Bounty Board" && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
+        questDatabase.RemoveAll(q => q.Initiator == BountyBoardInitiator && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
 
         // Count existing bounty board quests
-        var existingCount = questDatabase.Count(q => q.Initiator == "Bounty Board" && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
+        var existingCount = questDatabase.Count(q => q.Initiator == BountyBoardInitiator && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
 
         // Add quests until we have 5 available
         var targetCount = 5;
@@ -524,7 +538,7 @@ public partial class QuestSystem
             var questTypes = new[] { QuestTarget.ClearBoss, QuestTarget.ReachFloor, QuestTarget.ClearFloor, QuestTarget.SurviveDungeon };
             var questType = questTypes[random.Next(questTypes.Length)];
 
-            CreateDungeonQuest(questType, difficulty, Loc.Get("quest.dungeon_name"), playerLevel, deepestFloor);
+            CreateDungeonQuest(questType, difficulty, null, playerLevel, deepestFloor);
             existingCount++;
         }
 
@@ -730,6 +744,19 @@ public partial class QuestSystem
             && q.Occupier == player.Name2
         ).ToList();
     }
+
+    /// <summary>
+    /// v1.2.5: the refusal shown for a CompleteMercContract result code, in the player's language. The codes
+    /// stay English (the caller compares them); the turn-in screen printed the bare code ("not_merc").
+    /// </summary>
+    internal static string MercTurnInReasonLabel(string code) => code switch
+    {
+        "null" => Loc.Get("merc.turnin_reason_null"),
+        "not_merc" => Loc.Get("merc.turnin_reason_not_merc"),
+        "not_yours" => Loc.Get("merc.turnin_reason_not_yours"),
+        "incomplete" => Loc.Get("merc.turnin_reason_incomplete"),
+        _ => code
+    };
 
     /// <summary>
     /// Turn in a completed merc contract: pay gold + Reputation cascade + alignment shift (Faith/Shadows
@@ -2063,6 +2090,46 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.2.5: a kill objective's (or a boss quest's title's) arguments with the monster shown in the reader's
+    /// language. The objective stores the monster's English name (TargetName, matched by OnMonsterKilled);
+    /// an argument equal to it, or to its English plural, shows through MonsterNames. A boss quest's champion
+    /// name was written at creation through quest.title.champion in the creator's language around the
+    /// English tier; its tier is the objective's TargetId, so it is written again in the reader's language.
+    /// Every other argument shows as stored. Nothing is written back.
+    /// </summary>
+    internal static object[] ShowMonsterArgs(object[] args, QuestObjective? objective)
+    {
+        if (objective == null || args.Length == 0) return args;
+        if (objective.ObjectiveType != QuestObjectiveType.KillSpecificMonster && objective.ObjectiveType != QuestObjectiveType.KillBoss)
+            return args;
+        string target = objective.TargetName ?? "";
+        string? tier = objective.ObjectiveType == QuestObjectiveType.KillBoss ? TierFromId(objective.TargetId) : null;
+        var shown = (object[])args.Clone();
+        for (int i = 0; i < shown.Length; i++)
+        {
+            if (shown[i] is not string a || a.Length == 0) continue;
+            if (a == target && MonsterNames.KeyOf(target) != null)
+                shown[i] = MonsterNames.Display(target);
+            else if (target.Length > 0 && a == GetPluralName(target) && MonsterNames.KeyOf(target) != null)
+                shown[i] = MonsterNames.Count(Math.Max(2, objective.RequiredProgress), target, GetPluralName);
+            else if (tier != null && Loc.LoadedLanguages.Any(lang => Loc.GetIn(lang, "quest.title.champion", tier) == a))
+                shown[i] = Loc.Get("quest.title.champion", MonsterNames.Display(tier));
+        }
+        return shown;
+    }
+
+    /// <summary>The English tier name a boss quest's TargetId was made from (tier name, lower case, spaces as
+    /// underscores), or null.</summary>
+    private static string? TierFromId(string? targetId)
+    {
+        if (string.IsNullOrEmpty(targetId)) return null;
+        foreach (var family in MonsterFamilies.GetBuiltInFamilies())
+            foreach (var t in family.Tiers)
+                if (t.Name.ToLower().Replace(" ", "_") == targetId) return t.Name;
+        return null;
+    }
+
+    /// <summary>
     /// Get the plural form of a monster name using English pluralization rules.
     /// </summary>
     private static string GetPluralName(string name)
@@ -2362,9 +2429,33 @@ public partial class QuestSystem
     /// Create a special royal quest from a direct audience with the king
     /// These are personal quests given directly to the player with better rewards
     /// </summary>
+    /// <summary>v1.2.5: the TitleKey every royal audience quest carries.</summary>
+    public const string RoyalCommissionTitleKey = "quest.royal_commission";
+
+    /// <summary>
+    /// v1.2.5: a royal audience quest, in any language. A quest made before 1.2.5 has no TitleKey, but its Comment
+    /// is always the English description from CastleLocation.RoyalQuestTypes.
+    /// </summary>
+    public static bool IsRoyalCommission(Quest q) =>
+        q != null && (q.TitleKey == RoyalCommissionTitleKey || Array.IndexOf(CastleLocation.RoyalQuestTypes, q.Comment) >= 0);
+
+    /// <summary>v1.2.5: 0 monsters, 1 artifact (a floor to reach), 2 a floor to clear, 3 investigation (a floor to
+    /// reach), 4 a criminal; a RoyalQuestTypes index is its own kind.</summary>
+    internal static int RoyalQuestKind(int royalType, string questDescription)
+    {
+        if (royalType >= 0) return royalType;
+        string d = questDescription ?? "";
+        if (d.Contains("floor") || d.Contains("clear")) return 2;
+        if (d.Contains("monster") || d.Contains("creature")) return 0;
+        if (d.Contains("artifact") || d.Contains("recover")) return 1;
+        if (d.Contains("criminal") || d.Contains("hunt")) return 4;
+        return 3;
+    }
+
     public static Quest CreateRoyalAudienceQuest(Character player, string kingName, int difficulty,
         long goldReward, long xpReward, string questDescription)
     {
+        int royalType = Array.IndexOf(CastleLocation.RoyalQuestTypes, questDescription);
         // Determine quest type based on description
         QuestTarget questTarget;
         QuestObjectiveType objectiveType;
@@ -2379,14 +2470,18 @@ public partial class QuestSystem
         int maxAccessibleFloor = Math.Min(GameConfig.MaxDungeonLevel, player.Level + 10);
         int ClampFloor(int raw) => Math.Clamp(raw, 1, maxAccessibleFloor);
 
-        if (questDescription.Contains("monster") || questDescription.Contains("creature"))
+        // v1.2.5: the type is read from the quest's index in CastleLocation.RoyalQuestTypes; only a description
+        // from elsewhere is read by its words, floor first ("Clear a dungeon floor of all hostile creatures" was
+        // read as a monster quest because "creature" was checked first).
+        int kind = RoyalQuestKind(royalType, questDescription);
+        if (kind == 0)
         {
             questTarget = QuestTarget.Monster;
             objectiveType = QuestObjectiveType.KillMonsters;
             targetValue = 5 + difficulty * 3; // 8, 11, 14, 17 monsters
             targetName = GetRandomMonsterForLevel(player.Level);
         }
-        else if (questDescription.Contains("artifact") || questDescription.Contains("recover"))
+        else if (kind == 1)
         {
             // FindArtifact removed (no tracking/completion code) — treat as dungeon exploration
             questTarget = QuestTarget.ReachFloor;
@@ -2394,14 +2489,14 @@ public partial class QuestSystem
             targetValue = ClampFloor(player.Level + difficulty * 3);
             targetName = $"Floor {targetValue}";
         }
-        else if (questDescription.Contains("floor") || questDescription.Contains("clear"))
+        else if (kind == 2)
         {
             questTarget = QuestTarget.ClearFloor;
             objectiveType = QuestObjectiveType.ClearDungeonFloor;
             targetValue = ClampFloor(player.Level - 5 + difficulty * 5); // Near player level
             targetName = $"Floor {targetValue}";
         }
-        else if (questDescription.Contains("criminal") || questDescription.Contains("hunt"))
+        else if (kind == 4)
         {
             questTarget = QuestTarget.DefeatNPC;
             objectiveType = QuestObjectiveType.KillBoss;
@@ -2418,7 +2513,11 @@ public partial class QuestSystem
 
         var quest = new Quest
         {
-            Title = Loc.Get("quest.royal_commission", questDescription),
+            // v1.2.5: the shown title is built in the viewer's language from TitleKey; Title is the legacy
+            // fallback. The description (Comment) stays the English text the type was read from.
+            Title = Loc.Get("quest.royal_commission", royalType >= 0 ? Loc.Get($"castle.quest_type_{royalType}") : questDescription),
+            TitleKey = RoyalCommissionTitleKey,
+            TitleArgs = new List<string> { royalType >= 0 ? $"loc:castle.quest_type_{royalType}" : questDescription },
             Initiator = kingName,
             QuestType = QuestType.SingleQuest,
             QuestTarget = questTarget,

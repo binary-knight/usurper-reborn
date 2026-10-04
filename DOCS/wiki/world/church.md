@@ -1,8 +1,9 @@
 ---
 title: The Old Church
 path: /wiki/en/world/church/
-checked: 1.2.1
+checked: 1.2.5
 sources: Scripts/Locations/ChurchLocation.cs, Scripts/Systems/GodDeedSystem.cs
+history: 1.2.5 | Church screens and the Electron Church menu are shown in all five languages, and a long refused marriage message wraps at 79 columns.
 ---
 The Church is distinct from the Temple. Its menu includes donations, purchased blessings, healing services, marriage, confession, records and speaking with the Bishop. Entry and services have their own conditions.
 

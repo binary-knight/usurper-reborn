@@ -583,7 +583,7 @@ public class CombatLocB122Tests
         foreach (var english in new[] { "\"the dungeons\"", "\"an unknown end\"", "\"unknown forces\"", "\"the unknown\"", "\"Hero\"", "\"Ally\"",
                      "fell forever to", "COMPANION SACRIFICE", "is afflicted with {", "echo dissipates...\"" })
             src.Should().NotContain(english);
-        src.Should().Contain("Loc.Get(\"combat.news_permadeath\", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), killerName)");
+        src.Should().Contain("Loc.Get(\"combat.news_permadeath\", displayName, finalLevel, GameConfig.GetLocalizedClassName(player.Class), KillerIn(GameConfig.Language))");
     }
 
     // ---------- 10. boss mechanics ----------

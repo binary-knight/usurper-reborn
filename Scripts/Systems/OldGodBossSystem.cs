@@ -176,7 +176,7 @@ namespace UsurperRemake.Systems
                 return new BossEncounterResult { Success = false, Outcome = BossOutcome.Fled, God = type };
 
             var story = StoryProgressionSystem.Instance;
-            string godName = boss.Name;
+            string godName = boss.LocName();   // v1.2.5: shown only
 
             // The god remembers the player's promise
             terminal.WriteLine("");
@@ -368,7 +368,7 @@ namespace UsurperRemake.Systems
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("old_god.say_nothing"), "gray");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("old_god.god_stares", boss.Name), boss.ThemeColor);
+                    terminal.WriteLine(Loc.Get("old_god.god_stares", boss.LocName()), boss.ThemeColor);
                     terminal.WriteLine("");
                     terminal.WriteLine($"\"{(type == OldGodType.Maelketh ? Loc.Get("old_god.maelketh_silence_rage") : Loc.Get("old_god.god_have_it_your_way"))}\"", boss.ThemeColor);
                     terminal.WriteLine("");
@@ -400,7 +400,7 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("old_god.ancient_power_stirs"), "bright_red");
             await Pacing.Wait(800);
 
-            terminal.WriteLine(Loc.Get("old_god.seal_shatters", boss.Name), "bright_magenta");
+            terminal.WriteLine(Loc.Get("old_god.seal_shatters", boss.LocName()), "bright_magenta");
             await Pacing.Wait(1200);
 
             terminal.WriteLine("");
@@ -408,14 +408,14 @@ namespace UsurperRemake.Systems
             {
                 terminal.WriteLine($"╔════════════════════════════════════════════════════════════════╗", boss.ThemeColor);
                 terminal.WriteLine($"║                                                                ║", boss.ThemeColor);
-                terminal.WriteLine($"║     {CenterText(boss.Name.ToUpper(), 58)}     ║", boss.ThemeColor);
-                terminal.WriteLine($"║     {CenterText(boss.Title, 58)}     ║", boss.ThemeColor);
+                terminal.WriteLine($"║     {CenterText(boss.LocName().ToUpper(), 58)}     ║", boss.ThemeColor);
+                terminal.WriteLine($"║     {CenterText(boss.LocTitle(), 58)}     ║", boss.ThemeColor);
                 terminal.WriteLine($"║                                                                ║", boss.ThemeColor);
                 terminal.WriteLine($"╚════════════════════════════════════════════════════════════════╝", boss.ThemeColor);
             }
             else
             {
-                terminal.WriteLine($"{boss.Name.ToUpper()} - {boss.Title}", boss.ThemeColor);
+                terminal.WriteLine($"{boss.LocName().ToUpper()} - {boss.LocTitle()}", boss.ThemeColor);
             }
             terminal.WriteLine("");
 
@@ -449,7 +449,7 @@ namespace UsurperRemake.Systems
                     OldGodType.Manwe => Loc.Get("old_god.armor_creators_ward"),
                     _ => Loc.Get("old_god.armor_divine")
                 };
-                terminal.WriteLine(Loc.Get("old_god.warning_protected", boss.Name, armorName));
+                terminal.WriteLine(Loc.Get("old_god.warning_protected", boss.LocName(), armorName));
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("old_god.warning_less_damage", $"{divineArmor * 100:N0}"));
                 terminal.SetColor("yellow");
@@ -998,7 +998,7 @@ namespace UsurperRemake.Systems
         private static bool AnnounceFightHP(Monster bossMonster, OldGodBossData boss, TerminalEmulator terminal)
         {
             if (bossMonster.MaxHP == FightHP(boss)) return false;
-            terminal.WriteLine($"  {Loc.Get("old_god.enters_with_hp", boss.Name, $"{bossMonster.MaxHP:N0}")}", "red");
+            terminal.WriteLine($"  {Loc.Get("old_god.enters_with_hp", boss.LocName(), $"{bossMonster.MaxHP:N0}")}", "red");
             return true;
         }
 
@@ -1148,12 +1148,12 @@ namespace UsurperRemake.Systems
         {
             terminal.Clear();
             terminal.WriteLine("");
-            UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_saved", boss.Name.ToUpper()), "bright_green", 63);
+            UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_saved", boss.LocName().ToUpper()), "bright_green", 63);
             terminal.WriteLine("");
 
             await Pacing.Wait(1500);
 
-            terminal.WriteLine(Loc.Get("old_god.saved_darkness_lifts", boss.Name), "white");
+            terminal.WriteLine(Loc.Get("old_god.saved_darkness_lifts", boss.LocName()), "white");
             terminal.WriteLine($"  {Loc.Get("old_god.saved_seeing_world")}", "white");
             terminal.WriteLine("");
 
@@ -1183,7 +1183,7 @@ namespace UsurperRemake.Systems
 
             // Saved gods give their artifact as a gift (instead of looting from their corpse)
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("old_god.entrusts_relic", boss.Name)}", "bright_magenta");
+            terminal.WriteLine($"  {Loc.Get("old_god.entrusts_relic", boss.LocName())}", "bright_magenta");
             await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
 
             // Award thematic crafting materials (same as defeat)
@@ -1194,9 +1194,9 @@ namespace UsurperRemake.Systems
                 player.AddMaterial(thematicMaterial.Id, 2);
                 terminal.WriteLine("");
                 terminal.SetColor(thematicMaterial.Color);
-                terminal.WriteLine(Loc.Get("old_god.material_left_behind", boss.Name, thematicMaterial.Name, 2));
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("old_god.material_left_behind", boss.LocName(), thematicMaterial.LocName, 2));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
+                foreach (var row in thematicMaterial.QuotedDescriptionRows("  ")) terminal.WriteLine(row);
             }
             if (boss.DungeonFloor >= 50)
             {
@@ -1233,7 +1233,7 @@ namespace UsurperRemake.Systems
         {
             terminal.Clear();
             terminal.WriteLine("");
-            UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_defeated", boss.Name.ToUpper()), "bright_yellow", 63);
+            UIHelper.WriteBoxHeader(terminal, Loc.Get("old_god.header_defeated", boss.LocName().ToUpper()), "bright_yellow", 63);
             terminal.WriteLine("");
 
             await Pacing.Wait(1500);
@@ -1247,11 +1247,11 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
             await terminal.PressAnyKey();
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("old_god.defeated_fades", boss.Name), "white");
+            terminal.WriteLine(Loc.Get("old_god.defeated_fades", boss.LocName()), "white");
             terminal.WriteLine("");
 
             // 1.2.0 Temple gods: a Chosen follower's god, which echoes this Old God, speaks as it falls
-            string? echoFall = OldGodEchoSystem.FallLine(player, boss.Type, boss.Name);
+            string? echoFall = OldGodEchoSystem.FallLine(player, boss.Type, boss.LocName());
             if (echoFall != null)
             {
                 terminal.WriteLine(echoFall, "bright_yellow");
@@ -1278,9 +1278,9 @@ namespace UsurperRemake.Systems
                 player.AddMaterial(thematicMaterial.Id, 2);
                 terminal.WriteLine("");
                 terminal.SetColor(thematicMaterial.Color);
-                terminal.WriteLine(Loc.Get("old_god.defeated_crystallizes", thematicMaterial.Name, 2));
+                UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("old_god.defeated_crystallizes", thematicMaterial.LocName, 2));
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  \"{thematicMaterial.Description}\"");
+                foreach (var row in thematicMaterial.QuotedDescriptionRows("  ")) terminal.WriteLine(row);
             }
             if (boss.DungeonFloor >= 50)
             {
@@ -1506,7 +1506,7 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(1500);
 
-            terminal.WriteLine(Loc.Get("old_god.defeat_hit_ground", boss.Name), "red");
+            terminal.WriteLine(Loc.Get("old_god.defeat_hit_ground", boss.LocName()), "red");
             terminal.WriteLine("");
 
             terminal.WriteLine(Loc.Get("old_god.defeat_not_good_enough"), boss.ThemeColor);

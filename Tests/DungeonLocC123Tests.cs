@@ -279,7 +279,8 @@ public class DungeonLocC123Tests
     public void ArenaChampionName_IsKeyed_AndKeepsTheEnglishMonsterName()
     {
         Src("Systems", "RareEncounters.cs").Should()
-            .Contain("champion.Name = Loc.Get(\"dungeon.arena_champion_name\", champion.Name);").And.NotContain("$\"Arena {champion.Name}\"");
+            // v1.2.5 (D11, bug 13): stored English through MonsterNames.FromKey, shown in the reader's language
+            .Contain("champion.Name = MonsterNames.FromKey(\"dungeon.arena_champion_name\", champion.Name);").And.NotContain("$\"Arena {champion.Name}\"");
         L("en", "dungeon.arena_champion_name", "Zombie").Should().Be("Arena Zombie");
         L("hu", "dungeon.arena_champion_name", "Zombie").Should().Be("Aréna Zombie");
         // CombatEngine's undead check and the kill quests read the English monster name inside it.
@@ -455,7 +456,7 @@ public class DungeonLocC123Tests
             return Shown(term, output);
         });
         Capture($"dungeon-c-beast-{id}-{lang}.txt", text);
-        text.Should().Contain(L(lang, "wilderness.beast_encounter_header", beast.Name, L(lang, $"dungeon.beast.{id}.species")));
+        text.Should().Contain(L(lang, "wilderness.beast_encounter_header", MonsterNames.DisplayIn(lang, beast.Name), L(lang, $"dungeon.beast.{id}.species")));   // v1.2.5: the name shown in the reader's language
         L("en", $"dungeon.beast.{id}.species").Should().Be(beast.Species);
         ShowsWrapped(text, L(lang, $"beast.{id}.encounter").Replace('\n', ' '), "  ", "encounter flavor");
         ShowsWrapped(text, L(lang, $"beast.{id}.passive"), "  ", "passive summary");
@@ -545,9 +546,10 @@ public class DungeonLocC123Tests
     public void KeptEnglish_WildernessMonsterNames_BeastNames_ChampionItems_StayListed()
     {
         string sources = File.ReadAllText(Path.Combine(HardcodedTextScannerTests.RepoRoot(), "Tests", "Localization", "hardcoded-data-sources.txt"));
-        sources.Should().Contain("nouns|Scripts/Data/WildernessData.cs|init.MonsterNames|")
-            .And.Contain("nouns|Scripts/Data/BeastData.cs|init.Name|")
-            .And.Contain("nouns|Scripts/Data/GauntletChampionData.cs|init.ItemName|")
+        // v1.2.5: still stored English, now shown through keys (DataCombat125Tests)
+        sources.Should().Contain("keyed|Scripts/Data/WildernessData.cs|init.MonsterNames|monster.name.{id}")
+            .And.Contain("keyed|Scripts/Data/BeastData.cs|init.Name|monster.name.{id}")
+            .And.Contain("keyed|Scripts/Data/GauntletChampionData.cs|init.ItemName|item.{name}")
             .And.Contain("keyed|Scripts/Data/BeastData.cs|init.Species|dungeon.beast.{id}.species");
         // The wilderness fight looks its monster up by the English name.
         foreach (var region in WildernessData.Regions)

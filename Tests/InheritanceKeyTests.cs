@@ -122,7 +122,10 @@ public class InheritanceKeyTests : IDisposable
         }
         term.StreamWriterInternal!.Flush();
         string shown = System.Text.Encoding.UTF8.GetString(output.ToArray());
-        shown.Should().Contain(Loc.Get("engine.inheritance_waiting", 2)).And.NotContain(Loc.Get("engine.inheritance_header"));
+        // v1.2.5: the notice is word wrapped at 79 columns, so its words are compared across the rows.
+        string Words(string t) => System.Text.RegularExpressions.Regex.Replace(
+            System.Text.RegularExpressions.Regex.Replace(t, "\u001b\\[[0-9;?]*[A-Za-z]", ""), "\\s+", " ").Trim();
+        Words(shown).Should().Contain(Words(Loc.Get("engine.inheritance_waiting", 2))).And.NotContain(Words(Loc.Get("engine.inheritance_header")));
         _db.GetPendingInheritance("rage").Should().HaveCount(2, "they keep waiting");
     }
 

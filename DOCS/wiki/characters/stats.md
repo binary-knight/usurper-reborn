@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs
+history: 1.2.5 | Equip messages and the equipment summary show item names in the player's language.
 history: 1.2.4 | none
 ---
 ## Offensive and defensive attributes

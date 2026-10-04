@@ -803,7 +803,7 @@ public partial class NPC : Character
         // Fallback for non-Player characters - use legacy personality-based greeting
         string playerName = player?.Name2 ?? player?.Name1 ?? "stranger";
         int relationship = Relationships?.GetRelationshipWith(playerName) ?? 0;
-        return Brain?.GenerateGreeting(player!, relationship) ?? "Hello there.";
+        return Brain?.GenerateGreeting(player!, relationship) ?? Loc.Get("npc_gen.greet.normal.3");
     }
 
     /// <summary>
@@ -811,7 +811,7 @@ public partial class NPC : Character
     /// </summary>
     public string GetFarewell(Player player)
     {
-        if (player == null) return "Farewell.";
+        if (player == null) return Loc.Get("npc_gen.farewell.normal.1");
         return NPCDialogueGenerator.GenerateFarewell(this, player);
     }
 
@@ -843,28 +843,22 @@ public partial class NPC : Character
         return SpecialScript switch
         {
             "drunk_fighter" => GetSethAbleGreeting(player),
-            "dungeon_guardian" => "The dungeon is dangerous! Many never return...",
-            "castle_guard" => "Halt! State your business in the castle!",
-            "tavern_keeper" => "Welcome to my establishment! What can I get you?",
-            _ => "Hello there, traveler."
+            "dungeon_guardian" => Loc.Get("npc.special_greeting.dungeon_guardian"),
+            "castle_guard" => Loc.Get("npc.special_greeting.castle_guard"),
+            "tavern_keeper" => Loc.Get("npc.special_greeting.tavern_keeper"),
+            _ => Loc.Get("npc.special_greeting.default")
         };
     }
     
     /// <summary>
-    /// Seth Able specific greetings (from Pascal)
+    /// Seth Able specific greetings (from Pascal). v1.2.5: the five lines are Loc keys
+    /// (npc.seth_greeting.1 to 5), one picked at random as before.
     /// </summary>
+    internal const int SethGreetingCount = 5;
+
     private string GetSethAbleGreeting(Character player)
     {
-        var greetings = new[]
-        {
-            "You lookin' at me funny?!",
-            "*hiccup* Want to fight?",
-            "I can take anyone in this place!",
-            "*burp* You think you're tough?",
-            "Another pretty boy... pfft!"
-        };
-        
-        return greetings[Random.Shared.Next(0, greetings.Length)];
+        return Loc.Get("npc.seth_greeting." + (Random.Shared.Next(0, SethGreetingCount) + 1));
     }
     
     /// <summary>
@@ -873,8 +867,17 @@ public partial class NPC : Character
     public string GetDisplayInfo()
     {
         var marker = IsNPC ? GameConfig.NpcMark : "";
-        var status = IsHostile ? " (Hostile)" : "";
-        return $"{marker}{DisplayName} [{Archetype}, Level {Level}]{status}";
+        // v1.2.5: the line in the reader's language; Archetype is the stored id, shown through ArchetypeLabel
+        return Loc.Get(IsHostile ? "npc.display_info_hostile" : "npc.display_info", marker, DisplayName, ArchetypeLabel(Archetype), Level);
+    }
+
+    /// <summary>v1.2.5: an NPC's stored archetype id (commoner, merchant, ...) in the reader's language
+    /// (npc.archetype.{id}); an id without a key shows as stored.</summary>
+    internal static string ArchetypeLabel(string? id)
+    {
+        if (string.IsNullOrEmpty(id)) return id ?? "";
+        string key = "npc.archetype." + id.ToLowerInvariant();
+        return Loc.Has(key) ? Loc.Get(key) : id;
     }
     
     // Helper methods for world state

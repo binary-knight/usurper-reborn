@@ -205,7 +205,7 @@ namespace UsurperRemake.Systems
 
         public async Task<SaveGameData?> ReadGameDataByFileName(string fileName)
         {
-            var (data, _) = await ReadGameDataByFileNameWithError(fileName);
+            var (data, _, _) = await ReadGameDataByFileNameWithError(fileName);
             return data;
         }
 
@@ -217,7 +217,7 @@ namespace UsurperRemake.Systems
         /// Error messages also include the file path so the player knows where to
         /// look for manual recovery (backup file, autosaves, text editor).
         /// </summary>
-        public async Task<(SaveGameData? Data, string? Error)> ReadGameDataByFileNameWithError(string fileName)
+        public async Task<(SaveGameData? Data, string? Error, bool TooLarge)> ReadGameDataByFileNameWithError(string fileName)
         {
             string filePath = "";
             try
@@ -226,7 +226,7 @@ namespace UsurperRemake.Systems
 
                 if (!File.Exists(filePath))
                 {
-                    return (null, $"Save file not found on disk: {filePath}");
+                    return (null, Loc.Get("save.load_error_not_found", filePath), false);
                 }
 
                 var fileInfo = new FileInfo(filePath);
@@ -240,15 +240,15 @@ namespace UsurperRemake.Systems
                 catch (OutOfMemoryException)
                 {
                     long sizeMB = fileSizeBytes / (1024 * 1024);
-                    return (null, $"Save file is too large to load ({sizeMB} MB at {filePath}). This indicates the save has accumulated state unexpectedly. Try the backup file if present.");
+                    return (null, Loc.Get("save.load_error_too_large", sizeMB, filePath), true);
                 }
                 catch (IOException ex)
                 {
-                    return (null, $"Cannot read save file ({ex.Message}). Path: {filePath}. Another program may have the file open.");
+                    return (null, Loc.Get("save.load_error_io", ex.Message, filePath), false);
                 }
                 catch (UnauthorizedAccessException ex)
                 {
-                    return (null, $"Permission denied reading save file ({ex.Message}). Path: {filePath}.");
+                    return (null, Loc.Get("save.load_error_denied", ex.Message, filePath), false);
                 }
 
                 SaveGameData? saveData;
@@ -259,29 +259,29 @@ namespace UsurperRemake.Systems
                 catch (OutOfMemoryException)
                 {
                     long sizeMB = fileSizeBytes / (1024 * 1024);
-                    return (null, $"Not enough memory to parse save file ({sizeMB} MB at {filePath}). The save contains more data than the process can hold.");
+                    return (null, Loc.Get("save.load_error_no_memory", sizeMB, filePath), true);
                 }
                 catch (JsonException ex)
                 {
-                    return (null, $"Save file has malformed JSON near line {ex.LineNumber}, position {ex.BytePositionInLine} ({ex.Message}). Path: {filePath}.");
+                    return (null, Loc.Get("save.load_error_json", ex.LineNumber, ex.BytePositionInLine, ex.Message, filePath), false);
                 }
 
                 if (saveData == null)
                 {
-                    return (null, $"Save file deserialized to null (unexpected JSON structure). Path: {filePath}.");
+                    return (null, Loc.Get("save.load_error_null", filePath), false);
                 }
 
                 if (saveData.Version < GameConfig.MinSaveVersion)
                 {
-                    return (null, $"Save file version {saveData.Version} is older than the minimum supported version {GameConfig.MinSaveVersion}. Path: {filePath}.");
+                    return (null, Loc.Get("save.load_error_version", saveData.Version, GameConfig.MinSaveVersion, filePath), false);
                 }
 
-                return (saveData, null);
+                return (saveData, null, false);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SAVE", $"Unexpected error loading '{fileName}': {ex.GetType().Name}: {ex.Message}\n{ex.StackTrace}");
-                return (null, $"Unexpected error loading save ({ex.GetType().Name}: {ex.Message}). Path: {filePath}.");
+                return (null, Loc.Get("save.load_error_unexpected", ex.GetType().Name, ex.Message, filePath), false);
             }
         }
 

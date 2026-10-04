@@ -293,7 +293,7 @@ public class StreetEncounterSystem
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("street_encounter.hostile.blocks_path", attacker.Name));
         terminal.SetColor("yellow");
-        terminal.WriteLine($"  \"{GetHostilePhrase(attacker, player)}\"");
+        UIHelper.WriteWrapped(terminal, $"\"{GetHostilePhrase(attacker, player)}\"", "  ");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -372,7 +372,7 @@ public class StreetEncounterSystem
                 // Create a low-level thief
                 var thief = CreateRandomHostileNPC(Math.Max(1, player.Level - 3));
                 thief.Class = CharacterClass.Assassin;
-                thief.Name2 = "Pickpocket"; thief.Name1 = "Pickpocket";
+                thief.Name2 = Loc.Get("street_encounter.foe.pickpocket"); thief.Name1 = thief.Name2;
 
                 terminal.WriteLine("");
                 terminal.SetColor("yellow");
@@ -502,7 +502,7 @@ public class StreetEncounterSystem
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("street_encounter.brawl.not_enough_gold"));
                 var brawler = CreateRandomHostileNPC(player.Level);
-                brawler.Name2 = "Angry Drunk"; brawler.Name1 = "Angry Drunk";
+                brawler.Name2 = Loc.Get("street_encounter.foe.angry_drunk"); brawler.Name1 = brawler.Name2;
                 await FightNPC(player, brawler, result, terminal, isBrawl: true);
             }
         }
@@ -530,7 +530,7 @@ public class StreetEncounterSystem
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("street_encounter.challenge.walks_up", challenger.Name));
         terminal.SetColor("yellow");
-        terminal.WriteLine($"  \"{GetChallengePhrase(challenger, player)}\"");
+        UIHelper.WriteWrapped(terminal, $"\"{GetChallengePhrase(challenger, player)}\"", "  ");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -782,7 +782,7 @@ public class StreetEncounterSystem
 
             // Create gang leader
             var gangLeader = CreateRandomHostileNPC(player.Level + 2);
-            gangLeader.Name2 = $"{gangName} Leader"; gangLeader.Name1 = gangLeader.Name2;
+            gangLeader.Name2 = Loc.Get("street_encounter.foe.gang_leader", gangName); gangLeader.Name1 = gangLeader.Name2;
 
             await FightNPC(player, gangLeader, result, terminal);
 
@@ -839,8 +839,9 @@ public class StreetEncounterSystem
                 result.Message = Loc.Get("street_encounter.gang.msg_joined", gangName);
 
                 // Announce to news
-                NewsSystem.Instance?.WriteTeamNews("Gang Recruitment!",
-                    $"{GameConfig.NewsColorPlayer}{player.Name2}{GameConfig.NewsColorDefault} joined {GameConfig.NewsColorHighlight}{gangName}{GameConfig.NewsColorDefault}!");
+                NewsSystem.Instance?.WriteTeamNews(Loc.Get("street_encounter.gang.news_header"),
+                    Loc.Get("street_encounter.gang.news_joined", $"{GameConfig.NewsColorPlayer}{player.Name2}{GameConfig.NewsColorDefault}",
+                        $"{GameConfig.NewsColorHighlight}{gangName}{GameConfig.NewsColorDefault}"));
             }
             else if (player.Level < 3)
             {
@@ -871,7 +872,7 @@ public class StreetEncounterSystem
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("street_encounter.gang.nobody_refuses"));
                 var gangMember = CreateRandomHostileNPC(player.Level);
-                gangMember.Name2 = $"{gangName} Enforcer"; gangMember.Name1 = gangMember.Name2;
+                gangMember.Name2 = Loc.Get("street_encounter.foe.gang_enforcer", gangName); gangMember.Name1 = gangMember.Name2;
                 await FightNPC(player, gangMember, result, terminal);
             }
         }
@@ -1220,7 +1221,7 @@ public class StreetEncounterSystem
             else if (choice == "F")
             {
                 var guard = CreateRandomHostileNPC(player.Level + 3);
-                guard.Name2 = "Town Guard Captain"; guard.Name1 = "Town Guard Captain";
+                guard.Name2 = Loc.Get("street_encounter.foe.guard_captain"); guard.Name1 = guard.Name2;
                 guard.Class = CharacterClass.Warrior;
                 await FightNPC(player, guard, result, terminal);
 
@@ -1314,7 +1315,7 @@ public class StreetEncounterSystem
 
         // No choice - must fight
         var assassin = CreateRandomHostileNPC(player.Level + 1);
-        assassin.Name2 = "Hired Assassin"; assassin.Name1 = "Hired Assassin";
+        assassin.Name2 = Loc.Get("street_encounter.foe.hired_assassin"); assassin.Name1 = assassin.Name2;
         assassin.Class = CharacterClass.Assassin;
 
         // Assassin gets first strike
@@ -1405,12 +1406,12 @@ public class StreetEncounterSystem
                     {
                         player.Inventory.Add(loot);
                         terminal.SetColor("cyan");
-                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot", loot.Name));
+                        UIHelper.WriteRow(terminal, Loc.Get("street_encounter.bounty_hunter.victory_loot", ItemNames.Display(loot)));
                     }
                     else
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(Loc.Get("street_encounter.bounty_hunter.victory_loot_dropped", loot.Name));
+                        UIHelper.WriteRow(terminal, Loc.Get("street_encounter.bounty_hunter.victory_loot_dropped", ItemNames.Display(loot)));
                     }
                 }
             }
@@ -1431,12 +1432,13 @@ public class StreetEncounterSystem
 
         // Evocative named pool. These are NOT proper-noun titles (no Sir/Dame/king collision);
         // they're flavor character names that read as hardened freelance hunters.
-        string[] names = {
+        // 1.2.5: personal names, the same in every language (hardcoded-data-sources.txt lists them as names).
+        string[] hunterNames = {
             "Hex the Hound", "Greymark", "Black Iris", "Vance the Stalker",
             "Iron Lyra", "Cold Mercy", "Sable Roan", "The Silent Maw",
             "Vendrik the Patient", "Ash Wren"
         };
-        string selectedName = names[_random.Next(names.Length)];
+        string selectedName = hunterNames[_random.Next(hunterNames.Length)];
 
         var hunter = new NPC
         {
@@ -1932,13 +1934,8 @@ public class StreetEncounterSystem
     {
         level = Math.Max(1, level);
 
-        string[] names = {
-            "Street Thug", "Ruffian", "Cutthroat", "Brigand", "Footpad",
-            "Rogue", "Bandit", "Highwayman", "Scoundrel", "Villain",
-            "Desperado", "Outlaw", "Marauder", "Raider", "Prowler"
-        };
-
-        string selectedName = names[_random.Next(names.Length)];
+        // 1.2.5: a throwaway foe, never saved; its name is shown in the player's language.
+        string selectedName = Loc.Get(HostileFoeNameKeys[_random.Next(HostileFoeNameKeys.Length)]);
         var npc = new NPC
         {
             Name1 = selectedName,
@@ -2000,48 +1997,51 @@ public class StreetEncounterSystem
             return Loc.Get($"family.revenge_phrase_{_random.Next(5)}");
         }
 
-        string[] phrases = {
-            "Your gold or your life!",
-            "This is your last day!",
-            "I'll cut you down!",
-            "Prepare to die!",
-            "Nobody escapes me!",
-            "Time to bleed!",
-            "Say your prayers!",
-            "You picked the wrong street!",
-            "I've been waiting for someone like you!",
-            "End of the line for you!"
-        };
-        return phrases[_random.Next(phrases.Length)];
+        return Loc.Get($"street.hostile_phrase_{_random.Next(HostilePhraseCount) + 1}");
     }
 
     private string GetChallengePhrase(NPC challenger, Character player)
     {
-        string[] phrases = {
-            $"I challenge you, {player.Name2}! Let us see who is stronger!",
-            "Ive heard about you. Fight me!",
-            "They say youre tough. Lets see about that!",
-            "Think youre tough? Lets find out!",
-            "My sword needs blood. Youll do.",
-            "Come on then. Unless youre scared."
-        };
-        return phrases[_random.Next(phrases.Length)];
+        return Loc.Get($"street.challenge_phrase_{_random.Next(ChallengePhraseCount) + 1}", player.Name2);
     }
 
     private string GetRandomBrawlerName()
     {
-        string[] names = {
-            "Drunk Sailor", "Angry Patron", "Burly Mercenary", "Rowdy Barbarian",
-            "Tavern Regular", "Off-duty Guard", "Gambling Loser", "Jealous Rival"
-        };
-        return names[_random.Next(names.Length)];
+        return Loc.Get(BrawlerNameKeys[_random.Next(BrawlerNameKeys.Length)]);
     }
 
     private string GetMuggerName(int index)
     {
-        string[] names = { "Mugger", "Thug", "Brute", "Goon" };
-        return names[index % names.Length];
+        return MonsterNames.FromKey(MuggerNameKeys[index % MuggerNameKeys.Length]);   // v1.2.5: a Monster's name, stored English
     }
+
+    // 1.2.5: the street foes' names and lines are Loc keys, shown in the player's language. These foes are
+    // throwaway NPCs and Monsters: nothing saves them, and FightNPC's GetNPCByName lookup finds no world NPC
+    // by these names in any language.
+    internal static readonly string[] HostileFoeNameKeys =
+    {
+        "street_encounter.foe.street_thug", "street_encounter.foe.ruffian", "street_encounter.foe.cutthroat",
+        "street_encounter.foe.brigand", "street_encounter.foe.footpad", "street_encounter.foe.rogue",
+        "street_encounter.foe.bandit", "street_encounter.foe.highwayman", "street_encounter.foe.scoundrel",
+        "street_encounter.foe.villain", "street_encounter.foe.desperado", "street_encounter.foe.outlaw",
+        "street_encounter.foe.marauder", "street_encounter.foe.raider", "street_encounter.foe.prowler",
+    };
+
+    internal static readonly string[] BrawlerNameKeys =
+    {
+        "street_encounter.foe.drunk_sailor", "street_encounter.foe.angry_patron", "street_encounter.foe.burly_mercenary",
+        "street_encounter.foe.rowdy_barbarian", "street_encounter.foe.tavern_regular", "street_encounter.foe.off_duty_guard",
+        "street_encounter.foe.gambling_loser", "street_encounter.foe.jealous_rival",
+    };
+
+    internal static readonly string[] MuggerNameKeys =
+    {
+        "street_encounter.foe.mugger", "street_encounter.foe.thug", "street_encounter.foe.brute", "street_encounter.foe.goon",
+    };
+
+    // street.hostile_phrase_1..10 and street.challenge_phrase_1..6 (challenge_phrase_1 names the player).
+    internal const int HostilePhraseCount = 10;
+    internal const int ChallengePhraseCount = 6;
 
     private string GetRandomRumor(Character player)
     {
@@ -2572,7 +2572,7 @@ public class StreetEncounterSystem
                     Importance = 0.6f,
                     EmotionalImpact = -0.5f
                 });
-                NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2}'s murder revenge attempt!");
+                NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.murder_revenge_failed", player.Name2, grudgeNpc.Name2));
             }
             else if (fought)
             {
@@ -2585,7 +2585,7 @@ public class StreetEncounterSystem
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("street_encounter.grudge.take_gold", goldTaken));
                 result.GoldLost = goldTaken;
-                NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} got bloody revenge on {player.Name2}!");
+                NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.murder_revenge", grudgeNpc.Name2, player.Name2));
             }
         }
         else if (isWitnessRevenge)
@@ -2619,7 +2619,7 @@ public class StreetEncounterSystem
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("street_encounter.witness.one_less", grudgeNpc.Name2));
                         player.Darkness += 10; // Extra darkness for silencing a witness
-                        NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2} who confronted them!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.witness_defeated", player.Name2, grudgeNpc.Name2));
                     }
                     else
                     {
@@ -2628,7 +2628,7 @@ public class StreetEncounterSystem
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("street_encounter.witness.justice_served", grudgeNpc.Name2, goldTaken));
                         result.GoldLost = goldTaken;
-                        NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} brought justice to {player.Name2}!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.witness_justice", grudgeNpc.Name2, player.Name2));
                     }
                     break;
 
@@ -2716,7 +2716,7 @@ public class StreetEncounterSystem
                             Importance = 0.5f,
                             EmotionalImpact = -0.3f
                         });
-                        NewsSystem.Instance?.Newsy($"{player.Name2} defeated {grudgeNpc.Name2} in a grudge match!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.grudge_won", player.Name2, grudgeNpc.Name2));
                     }
                     else
                     {
@@ -2725,7 +2725,7 @@ public class StreetEncounterSystem
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("street_encounter.grudge.takes_gold_satisfied", grudgeNpc.Name2, goldTaken));
                         result.GoldLost = goldTaken;
-                        NewsSystem.Instance?.Newsy($"{grudgeNpc.Name2} got revenge on {player.Name2}!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.grudge_lost", grudgeNpc.Name2, player.Name2));
                     }
                     break;
 
@@ -2934,7 +2934,7 @@ public class StreetEncounterSystem
 
                 if (result.Victory)
                 {
-                    NewsSystem.Instance?.Newsy($"{player.Name2} humiliated {spouse.Name2} in a confrontation over an affair!");
+                    NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.spouse_humiliated", player.Name2, spouse.Name2));
                 }
                 break;
 
@@ -2944,7 +2944,7 @@ public class StreetEncounterSystem
                 await FightNPC(player, spouse, result, terminal);
                 player.Darkness += 10;
 
-                NewsSystem.Instance?.Newsy($"{player.Name2} and {spouse.Name2} came to blows over a love affair!");
+                NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.spouse_blows", player.Name2, spouse.Name2));
                 break;
         }
 
@@ -2997,7 +2997,7 @@ public class StreetEncounterSystem
                     {
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("street_encounter.throne.imprisoned", challenger.Name2, 7));
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} defeated {challenger.Name2}'s throne challenge! The challenger is imprisoned.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.throne_defended", player.Name2, challenger.Name2));
                     }
                 }
                 else
@@ -3010,7 +3010,7 @@ public class StreetEncounterSystem
                         player.King = false;
                         player.RoyalMercenaries?.Clear(); // Dismiss bodyguards on dethronement
                         player.RecalculateStats(); // Remove Royal Authority HP bonus
-                        NewsSystem.Instance?.Newsy($"{challenger.Name2} defeated King {player.Name2} and seized the throne!");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.throne_seized", challenger.Name2, player.Name2));
                     }
                 }
                 break;
@@ -3025,7 +3025,7 @@ public class StreetEncounterSystem
                         terminal.WriteLine(Loc.Get("street_encounter.throne.guards_remove"));
                         terminal.SetColor("bright_green");
                         terminal.WriteLine(Loc.Get("street_encounter.throne.guards_drag", challenger.Name2));
-                        NewsSystem.Instance?.Newsy($"King {player.Name2}'s guards repelled {challenger.Name2}'s challenge.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.throne_guards", player.Name2, challenger.Name2));
                     }
                     else
                     {
@@ -3060,7 +3060,7 @@ public class StreetEncounterSystem
                             court.CourtMembers.Add(new CourtMemberSaveData { Name = advisor, Role = "Advisor", LoyaltyToKing = 40 });
                             return true;
                         }))
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} negotiated with would-be usurper {challenger.Name2}, offering them a court position.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.throne_negotiated", player.Name2, challenger.Name2));
                 }
                 else
                 {
@@ -3085,7 +3085,7 @@ public class StreetEncounterSystem
                         terminal.SetColor("yellow");
                         terminal.WriteLine(Loc.Get("street_encounter.throne.dragged_away", challenger.Name2));
                         player.Darkness += 5;
-                        NewsSystem.Instance?.Newsy($"King {player.Name2} imprisoned {challenger.Name2} for challenging the throne.");
+                        NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.throne_imprisoned", player.Name2, challenger.Name2));
                     }
                     else
                     {
@@ -3134,7 +3134,7 @@ public class StreetEncounterSystem
         result.EncounterOccurred = true;
         result.Type = EncounterType.CityControlContest;
 
-        string rivalTeam = rival.Team ?? "Unknown";
+        string rivalTeam = rival.Team ?? Loc.Get("base.bc_unknown");
 
         terminal.ClearScreen();
         UIHelper.DrawBoxTop(terminal, Loc.Get("street_encounter.turf.title"), "bright_red");
@@ -3165,13 +3165,13 @@ public class StreetEncounterSystem
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("street_encounter.turf.backs_off", rival.Name2, rivalTeam));
                     player.Fame += 20;
-                    NewsSystem.Instance?.Newsy($"{player.Name2} defended their turf by defeating {rival.Name2} of '{rivalTeam}'!");
+                    NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.turf_defended", player.Name2, rival.Name2, rivalTeam));
                 }
                 else
                 {
                     terminal.SetColor("red");
                     terminal.WriteLine(Loc.Get("street_encounter.turf.cheers_lost", rivalTeam));
-                    NewsSystem.Instance?.Newsy($"'{rivalTeam}' defeated {player.Name2} in a turf war!");
+                    NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.turf_lost", rivalTeam, player.Name2));
                 }
                 break;
 
@@ -3184,7 +3184,7 @@ public class StreetEncounterSystem
                     terminal.SetColor("white");
                     terminal.WriteLine(Loc.Get("street_encounter.turf.smart_move", rival.Name2));
                     result.GoldLost = payoffCost;
-                    NewsSystem.Instance?.Newsy($"{player.Name2} paid off '{rivalTeam}' to avoid a turf war.");
+                    NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.turf_paid", player.Name2, rivalTeam));
                 }
                 else
                 {
@@ -3202,7 +3202,7 @@ public class StreetEncounterSystem
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("street_encounter.turf.takes_control", rivalTeam));
                 player.Fame = Math.Max(0, player.Fame - 10);
-                NewsSystem.Instance?.Newsy($"{player.Name2} surrendered turf to '{rivalTeam}' without a fight.");
+                NewsSystem.Instance?.Newsy(Loc.Get("street_encounter.news.turf_surrendered", player.Name2, rivalTeam));
                 break;
 
             default: // Run
@@ -3383,7 +3383,7 @@ public class StreetEncounterSystem
 
             // === NEWS (permadeath — this one isn't coming back) ===
             NewsSystem.Instance?.Newsy(
-                $"\u2620 {player.Name2} murdered {npc.Name2 ?? npc.Name} in cold blood! They will not return.");
+                "\u2620 " + Loc.Get("street_encounter.news.murdered", player.Name2, npc.Name2 ?? npc.Name));
 
             // No respawn queue — deliberate murder is always permanent (IsPermaDead blocks respawn)
 

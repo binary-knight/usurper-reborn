@@ -40,19 +40,35 @@ public class PrisonActivitySystem
     }
 
     /// <summary>
-    /// Activity descriptions for display
+    /// v1.2.5: each effect states what PerformActivity gives the player (it promised +1-2 where the gain is
+    /// +1, attack and defence for Shadow Boxing and +5 MaxHP for Stretching).
+    /// Activity descriptions, the English source of the prison.activity_{id}_name, _desc and _effect keys.
+    /// v1.2.5: the screen shows them through ActivityName, ActivityDescription and ActivityEffect.
     /// </summary>
     public static readonly Dictionary<PrisonActivity, (string Name, string Description, string Effect)> ActivityInfo = new()
     {
-        { PrisonActivity.Pushups, ("Pushups", "Build upper body strength", "+1-2 Strength") },
-        { PrisonActivity.Yoga, ("Yoga", "Improve flexibility and balance", "+1-2 Dexterity/Agility") },
-        { PrisonActivity.Reading, ("Reading", "Study whatever texts you can find", "+1-2 Intelligence, +5 Mana") },
+        { PrisonActivity.Pushups, ("Pushups", "Build upper body strength", "+1 Strength") },
+        { PrisonActivity.Yoga, ("Yoga", "Improve flexibility and balance", "+1 Dexterity, +0-1 Agility") },
+        { PrisonActivity.Reading, ("Reading", "Study whatever texts you can find", "+1 Intelligence, +5 Mana") },
         { PrisonActivity.Meditation, ("Meditation", "Clear your mind and find inner peace", "+1 Wisdom, Heal 10% HP") },
-        { PrisonActivity.ShadowBoxing, ("Shadow Boxing", "Practice combat moves", "+1 Attack, +1 Defence") },
-        { PrisonActivity.Stretching, ("Stretching", "Build endurance and vitality", "+1 Stamina, +5 MaxHP") },
-        { PrisonActivity.Planning, ("Planning", "Strategize your future moves", "+1-2 Charisma") },
+        { PrisonActivity.ShadowBoxing, ("Shadow Boxing", "Practice combat moves", "+10 Combat Stamina") },
+        { PrisonActivity.Stretching, ("Stretching", "Build endurance and vitality", "+1 Stamina, Heal 5% HP") },
+        { PrisonActivity.Planning, ("Planning", "Strategize your future moves", "+1 Charisma") },
         { PrisonActivity.Praying, ("Praying", "Seek divine guidance", "+10-20 Chivalry or Darkness") }
     };
+
+    /// <summary>v1.2.5: the Loc key id of an activity (pushups, shadow_boxing, ...).</summary>
+    internal static string ActivityKeyId(PrisonActivity activity) =>
+        activity == PrisonActivity.ShadowBoxing ? "shadow_boxing" : activity.ToString().ToLowerInvariant();
+
+    /// <summary>v1.2.5: an activity's name in the player's language.</summary>
+    public static string ActivityName(PrisonActivity activity) => Loc.Get($"prison.activity_{ActivityKeyId(activity)}_name");
+
+    /// <summary>v1.2.5: an activity's description in the player's language.</summary>
+    public static string ActivityDescription(PrisonActivity activity) => Loc.Get($"prison.activity_{ActivityKeyId(activity)}_desc");
+
+    /// <summary>v1.2.5: an activity's effect in the player's language.</summary>
+    public static string ActivityEffect(PrisonActivity activity) => Loc.Get($"prison.activity_{ActivityKeyId(activity)}_effect");
 
     /// <summary>
     /// Perform a prison activity for a character
@@ -301,7 +317,7 @@ public class PrisonActivitySystem
                     if (CastleLocation.GetCurrentKing()?.Prisoners.ContainsKey(prisonerName) == true)
                         CastleLocation.CourtChangeAsync(court => court.Prisoners.RemoveAll(p => p.CharacterName == prisonerName) > 0)
                             .GetAwaiter().GetResult();
-                    NewsSystem.Instance?.Newsy(true, $"{prisoner.Name} has been released from prison.");
+                    NewsSystem.Instance?.Newsy(true, Loc.Get("prison.news_released", prisoner.Name));
                 }
             }
         }

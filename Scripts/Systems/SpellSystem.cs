@@ -32,6 +32,11 @@ public static class SpellSystem
         public float ProficiencyMultiplier { get; set; } = 1.0f;  // Effect power multiplier
         public bool SkillImproved { get; set; }              // Did skill level up?
         public string NewProficiencyLevel { get; set; } = ""; // New level name if improved
+
+        // v1.2.5: the cast's parts as data, so no reader matches the shown (localized) text
+        public bool IsCriticalCast { get; set; }             // the roll was a critical success
+        public string CastLine { get; set; } = "";           // the incantation line (and the critical tag), without the effect
+        public bool CooldownBlocked { get; set; }            // the spell was still recovering; nothing was cast
     }
     
     /// <summary>
@@ -74,6 +79,23 @@ public static class SpellSystem
 
         public string DisplayDescription =>
             LocKeyBase.Length > 0 && Description == DefaultDescription && Loc.Has(LocKeyBase + ".desc") ? Loc.Get(LocKeyBase + ".desc") : Description;
+    }
+
+    /// <summary>
+    /// v1.2.5: a spell message as screen rows: each of its lines wrapped at `width` columns (whole words),
+    /// keeping the line's indent. A line that fits is one row, unchanged.
+    /// </summary>
+    internal static List<string> MessageRows(string message, int width = 79)
+    {
+        var rows = new List<string>();
+        foreach (var line in (message ?? "").Split('\n'))
+        {
+            string body = line.TrimStart(' ');
+            string indent = line.Substring(0, line.Length - body.Length);
+            foreach (var row in CombatMessages.Rows(body, Math.Max(20, width - indent.Length)))
+                rows.Add(indent + row);
+        }
+        return rows;
     }
 
     static SpellSystem()
@@ -619,7 +641,7 @@ public static class SpellSystem
         if (!CanCastSpell(caster, spellLevel))
         {
             result.Success = false;
-            result.Message = "Cannot cast this spell!";
+            result.Message = Loc.Get("combat.spell_cannot_cast");
             return result;
         }
 
@@ -627,7 +649,7 @@ public static class SpellSystem
         if (spellInfo == null)
         {
             result.Success = false;
-            result.Message = "Unknown spell!";
+            result.Message = Loc.Get("combat.spell_unknown");
             return result;
         }
 
@@ -643,7 +665,7 @@ public static class SpellSystem
         var rollResult = TrainingSystem.RollAbilityCheck(caster, skillId, baseDC, random);
 
         // Store roll info in result message
-        result.RollInfo = $"[Roll: {rollResult.NaturalRoll} + {rollResult.Modifier} = {rollResult.Total} vs DC {baseDC}]";
+        result.RollInfo = Loc.Get("combat.spell_roll_info", rollResult.NaturalRoll, rollResult.Modifier, rollResult.Total, baseDC);
 
         // Deduct mana cost regardless of success (casting attempt uses mana)
         var manaCost = CalculateManaCost(spellInfo, caster);
@@ -679,13 +701,13 @@ public static class SpellSystem
             if (rollResult.NaturalRoll == 0)
             {
                 // Flat fumble from inexperience
-                result.Message = $"{caster.Name2} fumbles the spell! The magic fizzles harmlessly.";
-                result.Message += $"\n  [Miscast! Train at the Level Master to reduce fumble chance.]";
+                result.Message = Loc.Get("combat.spell_fumble", caster.Name2);
+                result.Message += $"\n  {Loc.Get("combat.spell_miscast_hint")}";
                 result.SpecialEffect = "fizzle";
             }
             else
             {
-                result.Message = $"{caster.Name2} utters '{spellInfo.MagicWords}'... but the spell fails!";
+                result.Message = Loc.Get("combat.spell_utters_fails", caster.Name2, spellInfo.MagicWords);
                 result.Message += $"\n  {result.RollInfo}";
                 result.SpecialEffect = "fail";
             }
@@ -703,7 +725,7 @@ public static class SpellSystem
         }
 
         result.Success = true;
-        result.Message = $"{caster.Name2} utters '{spellInfo.MagicWords}'!";
+        result.Message = Loc.Get("combat.spell_utters", caster.Name2, spellInfo.MagicWords);
         result.IsMultiTarget = spellInfo.IsMultiTarget;
 
         // Track archetype - Magician for spell casting
@@ -717,12 +739,15 @@ public static class SpellSystem
         if (rollResult.IsCriticalSuccess)
         {
             result.ProficiencyMultiplier *= 1.5f; // 50% bonus on critical
-            result.Message += " CRITICAL CAST!";
+            result.Message += " " + Loc.Get("combat.spell_critical_cast");
+            result.IsCriticalCast = true;
         }
         else if (rollResult.Total >= baseDC + 10)
         {
             result.ProficiencyMultiplier *= 1.25f; // 25% bonus on great roll
         }
+
+        result.CastLine = result.Message;
 
         // Execute spell effects based on class and level
         ExecuteSpellEffect(caster, spellLevel, target, allTargets, result);
@@ -974,7 +999,7 @@ public static class SpellSystem
                 int baseDamage9 = 45 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage9, caster, random, profMult);
                 result.SpecialEffect = "holy";
-                result.Message += $" {Loc.Get("combat.spell_holy_smite", target?.Name2 ?? "the enemy", result.Damage)}";
+                result.Message += $" {Loc.Get("combat.spell_holy_smite", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
 
             case 10: // Armor of Faith - Protection +28
@@ -1027,7 +1052,7 @@ public static class SpellSystem
             case 17: // Divine Lightning - Base: 90-120 damage
                 int baseDamage17 = 90 + random.Next(31);
                 result.Damage = ScaleSpellEffect(baseDamage17, caster, random, profMult);
-                result.Message += $" {Loc.Get("combat.spell_divine_lightning", target?.Name2 ?? "the enemy", result.Damage)}";
+                result.Message += $" {Loc.Get("combat.spell_divine_lightning", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
 
             case 18: // Restoration - Base: 160-220 hp
@@ -1105,19 +1130,19 @@ public static class SpellSystem
             case 1: // Magic Missile - Base: 18-28 damage
                 int baseDamage1 = 18 + random.Next(11);
                 result.Damage = ScaleSpellEffect(baseDamage1, caster, random, profMult);
-                result.Message += $" Magic missiles strike {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_magic_missile_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 2: // Arcane Shield - Protection +10
                 result.ProtectionBonus = ScaleProtectionEffect(10 + (caster.Level / 10), caster, profMult);
                 result.Duration = 999;
-                result.Message += $" A shimmering shield surrounds {caster.Name2}! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_arcane_shield_cast", caster.Name2, result.ProtectionBonus)}";
                 break;
 
             case 3: // Spark - Base: 28-40 damage
                 int baseDamage3 = 28 + random.Next(13);
                 result.Damage = ScaleSpellEffect(baseDamage3, caster, random, profMult);
-                result.Message += $" Sparks jolt {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_spark_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 4: // Sleep
@@ -1131,13 +1156,13 @@ public static class SpellSystem
                 int baseDamage5 = 40 + random.Next(19);
                 result.Damage = ScaleSpellEffect(baseDamage5, caster, random, profMult);
                 result.SpecialEffect = "frost";
-                result.Message += $" Frost chills {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_frost_touch_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 6: // Web
                 result.SpecialEffect = "web";
                 result.Duration = (int)((random.Next(4) + 2 + (caster.Level / 20)) * profMult);
-                result.Message += $" A Magic Web traps {target?.Name2 ?? "the enemy"}!";
+                result.Message += $" {Loc.Get("combat.spell_web_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"))}";
                 break;
 
             case 7: // Haste - Attack bonus
@@ -1145,7 +1170,7 @@ public static class SpellSystem
                 result.AttackBonus = baseAttack7;
                 result.Duration = 999;
                 result.SpecialEffect = "haste";
-                result.Message += $" {caster.Name2} accelerates through time! (+{result.AttackBonus} attack)";
+                result.Message += $" {Loc.Get("combat.spell_haste_cast", caster.Name2, result.AttackBonus)}";
                 break;
 
             // --- MID TIER (Levels 26-50) ---
@@ -1154,33 +1179,33 @@ public static class SpellSystem
                 result.Healing = ScaleHealingEffect(baseHeal8, caster, random, profMult);
                 result.ProtectionBonus = ScaleProtectionEffect(12 + (caster.Level / 8), caster, profMult);
                 result.Duration = 999;
-                result.Message += $" {caster.Name2} regains {result.Healing} hp! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_power_hat_cast", caster.Name2, result.Healing, result.ProtectionBonus)}";
                 break;
 
             case 9: // Fireball - Base: 55-75 damage
                 int baseDamage9 = 55 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage9, caster, random, profMult);
                 result.SpecialEffect = "fire";
-                result.Message += $" A Fireball engulfs {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_fireball_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 10: // Fear
                 result.SpecialEffect = "fear";
                 result.Duration = (int)((random.Next(6) + 2 + (caster.Level / 15)) * profMult);
-                result.Message += $" {target?.Name2 ?? "The enemy"} is overwhelmed by terror!";
+                result.Message += $" {Loc.Get("combat.spell_fear_cast", target?.Name2 ?? Loc.Get("combat.spell_the_enemy_cap"))}";
                 break;
 
             case 11: // Lightning Bolt - Base: 60-80 damage
                 int baseDamage11 = 60 + random.Next(21);
                 result.Damage = ScaleSpellEffect(baseDamage11, caster, random, profMult);
-                result.Message += $" Lightning strikes {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_lightning_bolt_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 12: // Mirror Image - Protection +35
                 result.ProtectionBonus = ScaleProtectionEffect(35 + (caster.Level / 4), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "mirror";
-                result.Message += $" Illusory duplicates confuse enemies! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_mirror_image_cast", result.ProtectionBonus)}";
                 break;
 
             case 13: // Ice Storm - Base: 50-70 damage to all
@@ -1188,13 +1213,13 @@ public static class SpellSystem
                 result.Damage = ScaleSpellEffect(baseDamage13, caster, random, profMult);
                 result.IsMultiTarget = true;
                 result.SpecialEffect = "frost";
-                result.Message += $" An Ice Storm assaults all foes for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_ice_storm_cast", result.Damage)}";
                 break;
 
             case 14: // Prismatic Shield - Protection +45
                 result.ProtectionBonus = ScaleProtectionEffect(45 + (caster.Level / 4), caster, profMult);
                 result.Duration = 999;
-                result.Message += $" A prismatic cage protects {caster.Name2}! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_prismatic_shield_cast", caster.Name2, result.ProtectionBonus)}";
                 break;
 
             // --- HIGH TIER (Levels 51-75) ---
@@ -1202,21 +1227,21 @@ public static class SpellSystem
                 int baseDamage15 = 80 + random.Next(26);
                 result.Damage = ScaleSpellEffect(baseDamage15, caster, random, profMult);
                 result.IsMultiTarget = true;
-                result.Message += $" Chain lightning arcs through all enemies for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_chain_lightning_cast", result.Damage)}";
                 break;
 
             case 16: // Disintegrate - Base: 110-150 damage
                 int baseDamage16 = 110 + random.Next(41);
                 result.Damage = ScaleSpellEffect(baseDamage16, caster, random, profMult);
                 result.SpecialEffect = "disintegrate";
-                result.Message += $" {target?.Name2 ?? "The target"} is disintegrated for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_disintegrate_cast", target?.Name2 ?? Loc.Get("combat.spell_the_target_cap"), result.Damage)}";
                 break;
 
             case 17: // Pillar of Fire - Base: 120-160 damage, penetrates armor
                 int baseDamage17 = 120 + random.Next(41);
                 result.Damage = ScaleSpellEffect(baseDamage17, caster, random, profMult);
                 result.SpecialEffect = "piercing_fire";
-                result.Message += $" A Pillar of Fire consumes {target?.Name2 ?? "the target"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_pillar_of_fire_cast", target?.Name2 ?? Loc.Get("combat.sage_the_target"), result.Damage)}";
                 break;
 
             case 18: // Time Stop - Extra turn
@@ -1225,7 +1250,7 @@ public static class SpellSystem
                 result.ProtectionBonus = ScaleProtectionEffect(35 + (caster.Level / 3), caster, profMult);
                 result.Duration = 1;
                 result.SpecialEffect = "timestop";
-                result.Message += $" Time itself halts! (+{result.AttackBonus} atk, +{result.ProtectionBonus} def)";
+                result.Message += $" {Loc.Get("combat.spell_time_stop_cast", result.AttackBonus, result.ProtectionBonus)}";
                 break;
 
             case 19: // Meteor Swarm - Base: 130-180 damage to all
@@ -1233,28 +1258,28 @@ public static class SpellSystem
                 result.Damage = ScaleSpellEffect(baseDamage19, caster, random, profMult);
                 result.IsMultiTarget = true;
                 result.SpecialEffect = "fire";
-                result.Message += $" Meteors rain down for {result.Damage} damage to all!";
+                result.Message += $" {Loc.Get("combat.spell_meteor_swarm_cast", result.Damage)}";
                 break;
 
             case 20: // Arcane Immunity - Protection +65
                 result.ProtectionBonus = ScaleProtectionEffect(65 + (caster.Level / 2), caster, profMult);
                 result.Duration = 999;
                 result.SpecialEffect = "immunity";
-                result.Message += $" {caster.Name2} becomes immune to lesser magic! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_arcane_immunity_cast", caster.Name2, result.ProtectionBonus)}";
                 break;
 
             // --- LEGENDARY TIER (Levels 76-100) ---
             case 21: // Power Word: Stun
                 result.SpecialEffect = "stun";
                 result.Duration = 3;
-                result.Message += $" A word of power paralyzes {target?.Name2 ?? "the enemy"}!";
+                result.Message += $" {Loc.Get("combat.spell_power_word_stun_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"))}";
                 break;
 
             case 22: // Manwe's Creation - Base: 200-280 damage
                 int baseDamage22 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(baseDamage22, caster, random, profMult);
                 result.SpecialEffect = "creation";
-                result.Message += $" Manwe's creative force destroys for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_manwes_creation_cast", result.Damage)}";
                 break;
 
             case 23: // Summon Demon - Attack +100
@@ -1262,20 +1287,20 @@ public static class SpellSystem
                 result.AttackBonus = baseAttack23;
                 result.Duration = 999;
                 result.SpecialEffect = "demon";
-                result.Message += $" A demon is summoned from the abyss! (+{result.AttackBonus} attack)";
+                result.Message += $" {Loc.Get("combat.spell_summon_demon_cast", result.AttackBonus)}";
                 break;
 
             case 24: // Power Word: Kill - Base: 280-380 damage
                 int baseDamage24 = 280 + random.Next(101);
                 result.Damage = ScaleSpellEffect(baseDamage24, caster, random, profMult);
                 result.SpecialEffect = "death";
-                result.Message += $" The POWER WORD KILL strikes for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_power_word_kill_cast", result.Damage)}";
                 break;
 
             case 25: // Wish - All stats doubled (stat doubling applied by handler)
                 result.Duration = 999;
                 result.SpecialEffect = "wish";
-                result.Message += $" Reality bends to {caster.Name2}'s will! All stats doubled!";
+                result.Message += $" {Loc.Get("combat.spell_wish_cast", caster.Name2)}";
                 break;
         }
     }
@@ -1533,33 +1558,33 @@ public static class SpellSystem
                 caster.TempThornReflectDuration = 999;
                 result.Duration = 999;
                 result.SpecialEffect = "tidal_reflect";
-                result.Message += $" A barrier of living water surrounds {caster.Name2}! (+{result.ProtectionBonus} defense, reflects {reflectPct}% melee damage)";
+                result.Message += $" {Loc.Get("combat.spell_alethias_ward_cast", caster.Name2, result.ProtectionBonus, reflectPct)}";
                 break;
             case 2: // Purifying Surge - 40-60 heal + cure disease/poison
                 int tideHeal2 = 40 + random.Next(21);
                 result.Healing = ScaleHealingEffect(tideHeal2, caster, random, profMult);
                 result.SpecialEffect = "cure_disease";
-                result.Message += $" Sacred water cleanses and heals {caster.Name2} for {result.Healing} HP!";
+                result.Message += $" {Loc.Get("combat.spell_purifying_surge_cast", caster.Name2, result.Healing)}";
                 break;
             case 3: // Ocean's Rebuke - 70-95 damage
                 int tideDmg3 = 70 + random.Next(26);
                 result.Damage = ScaleSpellEffect(tideDmg3, caster, random, profMult);
                 result.SpecialEffect = "holy";
-                result.Message += $" A crashing wave strikes {target?.Name2 ?? "the enemy"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_oceans_rebuke_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
             case 4: // Covenant of the Deep - All allies +40 protection, +20 attack
                 result.ProtectionBonus = ScaleProtectionEffect(40 + (caster.Level / 5), caster, profMult);
                 result.AttackBonus = (int)((20 + (caster.Level / 8)) * profMult);
                 result.Duration = 999;
                 result.IsMultiTarget = true;
-                result.Message += $" The Ocean shields the faithful! (+{result.ProtectionBonus} defense, +{result.AttackBonus} attack to all)";
+                result.Message += $" {Loc.Get("combat.spell_covenant_deep_cast", result.ProtectionBonus, result.AttackBonus)}";
                 break;
             case 5: // Deluge of Sanctity - 200-280 AoE damage + heal self 100 (2-round cooldown)
                 int tideDmg5 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(tideDmg5, caster, random, profMult);
                 result.Healing = ScaleHealingEffect(100, caster, random, profMult);
                 result.IsMultiTarget = true;
-                result.Message += $" The Ocean's wrath floods all enemies for {result.Damage} damage! {caster.Name2} is restored for {result.Healing} HP!";
+                result.Message += $" {Loc.Get("combat.spell_deluge_cast", result.Damage, caster.Name2, result.Healing)}";
                 caster.DelugeCooldown = 3; // Ticks down each round, castable again after 2 rounds
                 break;
         }
@@ -1573,17 +1598,17 @@ public static class SpellSystem
                 result.AttackBonus = (int)((15 + (caster.Level / 10)) * profMult);
                 result.ProtectionBonus = ScaleProtectionEffect(10 + (caster.Level / 12), caster, profMult);
                 result.Duration = 999;
-                result.Message += $" Attuned to harmonic rhythms! (+{result.AttackBonus} attack, +{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_harmonic_resonance_cast", result.AttackBonus, result.ProtectionBonus)}";
                 break;
             case 2: // Tidecall Barrier - All allies +25 protection
                 result.ProtectionBonus = ScaleProtectionEffect(25 + (caster.Level / 6), caster, profMult);
                 result.Duration = 999;
                 result.IsMultiTarget = true;
-                result.Message += $" Shimmering wave-light protects all allies! (+{result.ProtectionBonus} defense)";
+                result.Message += $" {Loc.Get("combat.spell_tidecall_barrier_cast", result.ProtectionBonus)}";
                 break;
             case 3: // Siren's Lament - All enemies debuffed + base damage (crit = double duration + bonus damage)
                 result.SpecialEffect = "weaken";
-                bool sirenCrit = result.Message.Contains("CRITICAL CAST");
+                bool sirenCrit = result.IsCriticalCast;
                 result.Duration = sirenCrit ? 8 : 4;
                 int sirenBaseDmg = 25 + random.Next(15) + (caster.Level / 2);
                 result.Damage = sirenCrit
@@ -1591,15 +1616,15 @@ public static class SpellSystem
                     : ScaleSpellEffect(sirenBaseDmg, caster, random, profMult);
                 result.IsMultiTarget = true;
                 if (sirenCrit)
-                    result.Message += $" The Ocean's grief OVERWHELMS enemy will! (-30% ATK, -20% DEF for {result.Duration} rounds + {result.Damage} psychic damage!)";
+                    result.Message += $" {Loc.Get("combat.spell_sirens_lament_crit_cast", result.Duration, result.Damage)}";
                 else
-                    result.Message += $" The Ocean's grief saps enemy will! ({result.Damage} damage, -30% attack, -20% defense for {result.Duration} rounds)";
+                    result.Message += $" {Loc.Get("combat.spell_sirens_lament_cast", result.Damage, result.Duration)}";
                 break;
             case 4: // Alethia's Grace - 80-120 heal to all allies
                 int waveHeal4 = 80 + random.Next(41);
                 result.Healing = ScaleHealingEffect(waveHeal4, caster, random, profMult);
                 result.IsMultiTarget = true;
-                result.Message += $" A warm healing wave restores {result.Healing} HP to all allies!";
+                result.Message += $" {Loc.Get("combat.spell_alethias_grace_cast", result.Healing)}";
                 break;
             case 5: // Symphony of the Depths - Massive buff + guaranteed crit, costs 50% HP
                 result.AttackBonus = (int)((60 + (caster.Level / 3)) * profMult);
@@ -1618,7 +1643,7 @@ public static class SpellSystem
                     caster.ActiveStatuses[StatusEffect.Hidden] = 2;
                 int hpCost = (int)(caster.MaxHP * 0.50);
                 caster.HP = Math.Max(1, caster.HP - hpCost);
-                result.Message += $" The Ocean's full harmonic spectrum unleashed! (+{result.AttackBonus} attack, +{result.ProtectionBonus} defense, guaranteed crit on next hit) {caster.Name2} sacrifices {hpCost} HP!";
+                result.Message += $" {Loc.Get("combat.spell_symphony_cast", result.AttackBonus, result.ProtectionBonus, caster.Name2, hpCost)}";
                 break;
         }
     }
@@ -1630,30 +1655,30 @@ public static class SpellSystem
             case 1: // Deja Vu - Dodge next attack
                 result.SpecialEffect = "dodge_next";
                 result.Duration = 1;
-                result.Message += $" {caster.Name2} glimpses a past cycle -- next attack will miss!";
+                result.Message += $" {Loc.Get("combat.spell_deja_vu_cast", caster.Name2)}";
                 break;
             case 2: // Probability Shift - Target crit=0%, miss+30% for 3 rounds
                 result.SpecialEffect = "probability_shift";
                 result.Duration = 3;
-                result.Message += $" Fate twists against {target?.Name2 ?? "the enemy"} -- accuracy ruined for 3 rounds!";
+                result.Message += $" {Loc.Get("combat.spell_probability_shift_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"))}";
                 break;
             case 3: // Echo of Tomorrow - 80-110 damage, ignores 50% defense
                 int cbDmg3 = 80 + random.Next(31);
                 result.Damage = ScaleSpellEffect(cbDmg3, caster, random, profMult);
                 result.SpecialEffect = "ignore_half_defense";
-                result.Message += $" Future timeline damage strikes {target?.Name2 ?? "the enemy"} for {result.Damage}!";
+                result.Message += $" {Loc.Get("combat.spell_echo_tomorrow_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
             case 4: // Cycle Rewind - Heal 30% max HP (simplified from "HP 3 rounds ago")
                 int rewindHeal = (int)(caster.MaxHP * 0.30);
                 result.Healing = ScaleHealingEffect(rewindHeal, caster, random, profMult);
                 result.SpecialEffect = "cure_disease";
-                result.Message += $" {caster.Name2} rewinds the cycle, restoring {result.Healing} HP!";
+                result.Message += $" {Loc.Get("combat.spell_cycle_rewind_cast", caster.Name2, result.Healing)}";
                 break;
             case 5: // Paradox Collapse - 250-350 damage + 10% of all damage dealt this fight
                 int cbDmg5 = 250 + random.Next(101);
                 result.Damage = ScaleSpellEffect(cbDmg5, caster, random, profMult);
                 result.SpecialEffect = "paradox_collapse";
-                result.Message += $" Multiple timelines collapse onto {target?.Name2 ?? "the enemy"} for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_paradox_collapse_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
         }
     }
@@ -1666,33 +1691,33 @@ public static class SpellSystem
                 int abDmg1 = 12 + random.Next(7);
                 result.Damage = ScaleSpellEffect(abDmg1, caster, random, profMult);
                 result.Healing = result.Damage / 2;
-                result.Message += $" {caster.Name2} siphons prison energy for {result.Damage} damage, healing {result.Healing} HP!";
+                result.Message += $" {Loc.Get("combat.spell_prison_siphon_cast", caster.Name2, result.Damage, result.Healing)}";
                 break;
             case 2: // Noctura's Whisper - Debuff: -25% attack, -25% defense, 20% skip
                 result.SpecialEffect = "weaken";
                 result.Duration = 3;
-                result.Message += $" Noctura's paranoia grips {target?.Name2 ?? "the enemy"}! (-25% attack/defense)";
+                result.Message += $" {Loc.Get("combat.spell_nocturas_whisper_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"))}";
                 break;
             case 3: // Abyssal Chains - 65-85 damage, immobilize 2 rounds
                 int abDmg3 = 65 + random.Next(21);
                 result.Damage = ScaleSpellEffect(abDmg3, caster, random, profMult);
                 result.SpecialEffect = "stun";
                 result.Duration = 2;
-                result.Message += $" Abyssal chains bind {target?.Name2 ?? "the enemy"} for {result.Damage} damage! Immobilized!";
+                result.Message += $" {Loc.Get("combat.spell_abyssal_chains_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
             case 4: // Devour Essence - 100-140 damage, heal 75%, restore 20 mana
                 int abDmg4 = 100 + random.Next(41);
                 result.Damage = ScaleSpellEffect(abDmg4, caster, random, profMult);
                 result.Healing = (int)(result.Damage * 0.75);
                 caster.Mana = Math.Min(caster.MaxMana, caster.Mana + 20);
-                result.Message += $" {caster.Name2} devours life force for {result.Damage} damage, healing {result.Healing} HP! (+20 mana)";
+                result.Message += $" {Loc.Get("combat.spell_devour_essence_cast", caster.Name2, result.Damage, result.Healing)}";
                 break;
             case 5: // Maelketh's Prison Break - 220-300 damage, 10% backlash
                 int abDmg5 = 220 + random.Next(81);
                 result.Damage = ScaleSpellEffect(abDmg5, caster, random, profMult);
                 int backlash = (int)(result.Damage * 0.10);
                 caster.HP = Math.Max(1, caster.HP - backlash);
-                result.Message += $" The War God's fury unleashed for {result.Damage} damage! ({backlash} backlash to {caster.Name2})";
+                result.Message += $" {Loc.Get("combat.spell_prison_break_cast", result.Damage, backlash, caster.Name2)}";
                 break;
         }
     }
@@ -1704,7 +1729,7 @@ public static class SpellSystem
             case 1: // Soul Shred - 15-22 + 5% current HP
                 int vrDmg1 = 15 + random.Next(8) + (int)(caster.HP * 0.05);
                 result.Damage = ScaleSpellEffect(vrDmg1, caster, random, profMult);
-                result.Message += $" {caster.Name2} tears at the enemy's soul for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_soul_shred_cast", caster.Name2, result.Damage)}";
                 break;
             case 2: // Blood Pact - Sacrifice 20% max HP, gain attack bonus + guaranteed crit
                 int sacrifice = (int)(caster.MaxHP * 0.20);
@@ -1717,26 +1742,27 @@ public static class SpellSystem
                 // player got their next attack.
                 if (!caster.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     caster.ActiveStatuses[StatusEffect.Hidden] = 2;
-                result.Message += $" {caster.Name2} sacrifices {sacrifice} HP! (+{result.AttackBonus} attack, guaranteed crit on next hit!)";
+                result.Message += $" {Loc.Get("combat.spell_blood_pact_cast", caster.Name2, sacrifice, result.AttackBonus)}";
                 break;
             case 3: // Void Bolt - 90-120 damage, ignores all defense
                 int vrDmg3 = 90 + random.Next(31);
                 result.Damage = ScaleSpellEffect(vrDmg3, caster, random, profMult);
                 result.SpecialEffect = "ignore_defense";
-                result.Message += $" A bolt of annihilating nothingness strikes for {result.Damage} damage!";
+                result.Message += $" {Loc.Get("combat.spell_void_bolt_cast", result.Damage)}";
                 break;
             case 4: // Consume the Fallen - Heal 100+ HP (simplified from "50% of last killed")
                 int consumeHeal = Math.Max(100, (int)(caster.MaxHP * 0.25));
                 result.Healing = ScaleHealingEffect(consumeHeal, caster, random, profMult);
-                result.Message += $" {caster.Name2} consumes fallen energy, restoring {result.Healing} HP!";
+                result.Message += $" {Loc.Get("combat.spell_consume_fallen_cast", caster.Name2, result.Healing)}";
                 break;
             case 5: // Unmaking - 200-280 damage, costs 25% current HP (reduced from 350-450)
                 // 1-round cooldown — can't spam the most powerful spell every round
                 if (caster.UnmakingCooldown > 0)
                 {
                     result.Success = false;
-                    result.Message += $" The void hasn't recovered -- Unmaking needs 1 more round!";
+                    result.Message += $" {Loc.Get("combat.spell_unmaking_recovering")}";
                     result.SpecialEffect = "fail";
+                    result.CooldownBlocked = true;
                     // Refund mana since we blocked the cast
                     caster.Mana += result.ManaCost;
                     break;
@@ -1746,7 +1772,7 @@ public static class SpellSystem
                 int vrDmg5 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(vrDmg5, caster, random, profMult);
                 result.SpecialEffect = "unmaking";
-                result.Message += $" {caster.Name2} erases reality for {result.Damage} damage! (-{unmakeCost} HP)";
+                result.Message += $" {Loc.Get("combat.spell_unmaking_cast", caster.Name2, result.Damage, unmakeCost)}";
                 caster.UnmakingCooldown = 2; // Ticks down each round, castable again after 1 round
                 break;
         }

@@ -95,7 +95,7 @@ public class MudServer
     internal async Task KickStaleSessionAsync(string key, PlayerSession stale, string why)
     {
         Console.Error.WriteLine($"[MUD] Kicking stale session for '{key}' ({why})");
-        await stale.DisconnectAsync("Disconnected: logged in from another session");
+        await stale.DisconnectAsync(lang => Loc.GetIn(lang, "mud.disconnect_other_session"));
         RemoveOwnSession(key, stale);
     }
 
@@ -406,7 +406,7 @@ public class MudServer
             Console.Error.WriteLine("[MUD] Server stopped.");
 
             // Gracefully disconnect all sessions (closes streams, unblocks ReadLines)
-            var disconnectTasks = ActiveSessions.Values.Select(s => s.DisconnectAsync("Server shutting down")).ToArray();
+            var disconnectTasks = ActiveSessions.Values.Select(s => s.DisconnectAsync(lang => Loc.GetIn(lang, "mud.shutdown_default_reason"))).ToArray();
             await Task.WhenAll(disconnectTasks);
 
             // CRITICAL: Wait for all session task finally blocks to complete (emergency saves).
@@ -832,7 +832,8 @@ public class MudServer
                 // If TryAdd fails (race condition), kick stale session and retry
                 if (!await RegisterSessionAsync(sessionUsernameKey, session))
                 {
-                    await WriteAnsiAsync(stream, "\r\n\u001b[1;31m  Could not start session. Try again.\u001b[0m\r\n", isCp437);
+                    string startLang = sqlBackend.GetAccountPreferences(username).language;
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {Loc.GetIn(startLang, "auth.err_session_start")}\u001b[0m\r\n", isCp437);
                     client.Close();
                     return;
                 }
@@ -883,16 +884,6 @@ public class MudServer
         if (langCodes.Count == 0) langCodes.Add("en");
         string L(string key, params object[] args) => UsurperRemake.Systems.Loc.GetIn(authLang, key, args);
 
-        // Pads a hotkey menu row into the 78-char box interior; colors sit on
-        // the hotkey only so visible length stays computable for the padding.
-        string BoxRow(string colorCode, string hotkey, string label)
-        {
-            string visible = $"  [{hotkey}] {label}";
-            if (visible.Length > 78) visible = visible.Substring(0, 78);
-            int pad = 78 - visible.Length;
-            return $"\u2551  \u001b[{colorCode}m[{hotkey}]\u001b[0;37m {label}{new string(' ', pad)}\u2551\r\n";
-        }
-
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             if (ct.IsCancellationRequested) return null;
@@ -915,27 +906,14 @@ public class MudServer
             }
             else
             {
-                string title = L("auth.title");
-                if (title.Length > 78) title = title.Substring(0, 78);
-                int tpad = 78 - title.Length;
-                int tleft = tpad / 2;
-
+                // v1.2.5: the box is 79 columns wide (it was 80); AuthBoxRows, shared with the SSH relay.
                 await WriteAnsiAsync(stream, "\u001b[2J\u001b[H", isCp437); // Clear screen
-                await WriteAnsiAsync(stream, "\u001b[1;36m", isCp437);
-                await WriteAnsiAsync(stream, "\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557\r\n", isCp437);
-                await WriteAnsiAsync(stream, "\u001b[1;37m", isCp437);
-                await WriteAnsiAsync(stream, "\u2551" + new string(' ', tleft) + title + new string(' ', tpad - tleft) + "\u2551\r\n", isCp437);
-                await WriteAnsiAsync(stream, "\u001b[1;36m", isCp437);
-                await WriteAnsiAsync(stream, "\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563\r\n", isCp437);
-                await WriteAnsiAsync(stream, "\u001b[0;37m", isCp437);
-                await WriteAnsiAsync(stream, "\u2551" + new string(' ', 78) + "\u2551\r\n", isCp437);
-                await WriteAnsiAsync(stream, BoxRow("1;36", "L", L("auth.login")), isCp437);
-                await WriteAnsiAsync(stream, BoxRow("1;32", "R", L("auth.register")), isCp437);
-                await WriteAnsiAsync(stream, BoxRow("1;35", "G", $"{L("auth.language")} ({langName})"), isCp437);
-                await WriteAnsiAsync(stream, BoxRow("1;31", "Q", L("auth.quit")), isCp437);
-                await WriteAnsiAsync(stream, "\u2551" + new string(' ', 78) + "\u2551\r\n", isCp437);
-                await WriteAnsiAsync(stream, "\u001b[1;36m", isCp437);
-                await WriteAnsiAsync(stream, "\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d\r\n", isCp437);
+                foreach (var row in AuthBoxRows(L("auth.title"), new[] {
+                    ("1;36", "L", L("auth.login")),
+                    ("1;32", "R", L("auth.register")),
+                    ("1;35", "G", $"{L("auth.language")} ({langName})"),
+                    ("1;31", "Q", L("auth.quit")) }))
+                    await WriteAnsiAsync(stream, row + "\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[0m", isCp437);
                 await WriteAnsiAsync(stream, $"\r\n  {L("auth.choice")} ", isCp437);
             }
@@ -1048,12 +1026,12 @@ public class MudServer
             // Process registration
             if (isRegistration)
             {
-                var (regSuccess, regMessage) = await sqlBackend.RegisterPlayer(username!, password!, effectiveIp);
+                var (regSuccess, regMessage) = await sqlBackend.RegisterPlayer(username!, password!, effectiveIp, authLang);
                 if (!regSuccess)
                 {
                     Console.Error.WriteLine($"[MUD] Registration failed for '{username}': {regMessage}");
                     if (isPlainText)
-                        await WriteAnsiAsync(stream, $"Error: {regMessage}\r\n\r\n", isCp437);
+                        await WriteAnsiAsync(stream, $"{L("auth.err_prefix", regMessage)}\r\n\r\n", isCp437);
                     else
                         await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {regMessage}\u001b[0m\r\n\r\n", isCp437);
                     continue;
@@ -1073,19 +1051,19 @@ public class MudServer
                 Console.Error.WriteLine($"[MUD] SECURITY: throttled interactive login from {effectiveIp} ({interactiveWait}s remaining)");
                 string throttleMsg = L("auth.err_throttled", interactiveWait);
                 if (isPlainText)
-                    await WriteAnsiAsync(stream, $"Error: {throttleMsg}\r\n\r\n", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.err_prefix", throttleMsg)}\r\n\r\n", isCp437);
                 else
                     await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {throttleMsg}\u001b[0m\r\n\r\n", isCp437);
                 break; // end the attempt loop; connection closes below
             }
 
-            var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp);
+            var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp, authLang);
             if (!success)
             {
                 RecordFailedLogin(effectiveIp);
                 Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
                 if (isPlainText)
-                    await WriteAnsiAsync(stream, $"Error: {message}\r\n\r\n", isCp437);
+                    await WriteAnsiAsync(stream, $"{L("auth.err_prefix", message)}\r\n\r\n", isCp437);
                 else
                     await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {message}\u001b[0m\r\n\r\n", isCp437);
                 continue;
@@ -1596,7 +1574,8 @@ public class MudServer
     /// Used for real-time announcements built outside any session context (e.g. world boss spawn
     /// fired from the world-sim tick) so each player sees the announcement in their language.
     /// </summary>
-    public void BroadcastLocalized(Func<string, string> buildMessage, string? excludeUsername = null)
+    /// v1.2.5: channelKey and historyChannel as in BroadcastToAll (per-channel mutes, /history).
+    public void BroadcastLocalized(Func<string, string> buildMessage, string? excludeUsername = null, string? channelKey = null, string? historyChannel = null)
     {
         foreach (var kvp in ActiveSessions)
         {
@@ -1606,9 +1585,80 @@ public class MudServer
             if (kvp.Value.IsSpectating) continue;
             if (kvp.Value.IsGroupFollower) continue;
 
+            if (channelKey != null
+                && kvp.Value.Context?.Engine?.CurrentPlayer?.MutedChannels?.Contains(channelKey) == true)
+                continue;
+
             string lang = kvp.Value.Context?.Language ?? "en";
-            kvp.Value.EnqueueMessage(buildMessage(lang));
+            string rendered = buildMessage(lang);
+            kvp.Value.EnqueueMessage(rendered);
+            if (historyChannel != null)
+                MudChatSystem.RecordDelivered(kvp.Value, historyChannel, rendered);
         }
+    }
+
+    /// <summary>v1.2.5: the language a session reads (its Context.Language), English when it has none.</summary>
+    internal static string LangOf(PlayerSession? session) => session?.Context?.Language ?? "en";
+
+    /// <summary>
+    /// v1.2.5: the rows of a notice to one player: two columns in, after an optional bullet ("* "),
+    /// word wrapped at 79 columns with later rows under the text. A notice that fits is one row, as it is.
+    /// </summary>
+    internal static List<string> NoticeRows(string text, string bullet = "")
+    {
+        string lead = "  " + bullet;
+        if (!text.Contains('\n') && lead.Length + UsurperRemake.UI.UIHelper.VisibleLength(text) <= UsurperRemake.UI.UIHelper.WrapWidth)
+            return new List<string> { lead + text };
+        var rows = new List<string>();
+        var lines = UsurperRemake.UI.UIHelper.WordWrap(text, UsurperRemake.UI.UIHelper.WrapWidth - lead.Length);
+        for (int i = 0; i < lines.Count; i++)
+            rows.Add((i == 0 ? lead : new string(' ', lead.Length)) + lines[i]);
+        return rows;
+    }
+
+    /// <summary>
+    /// v1.2.5: a notice for one session in that session's language (buildText gets its language code),
+    /// enqueued one message per row (NoticeRows), each row in the ANSI colour `ansi` ("1;33").
+    /// </summary>
+    internal static void EnqueueNotice(PlayerSession session, string ansi, Func<string, string> buildText, string bullet = "")
+    {
+        foreach (var row in NoticeRows(buildText(LangOf(session)), bullet))
+            session.EnqueueMessage($"\u001b[{ansi}m{row}\u001b[0m");
+    }
+
+    /// <summary>v1.2.5: the idle warning in a language, as rows of at most 79 columns.</summary>
+    internal static List<string> IdleWarningRows(string lang, int minutesLeft) =>
+        NoticeRows($"*** {Loc.GetIn(lang, minutesLeft == 1 ? "mud.idle_warning_one" : "mud.idle_warning_many", minutesLeft)} ***");
+
+    /// <summary>
+    /// v1.2.5: the login box of the direct connection gate and the SSH relay: 79 columns wide (77 inside),
+    /// a centred title, a blank row, one row per menu entry and a blank row. Each row starts with its
+    /// colour; the colour of an entry sits on its hotkey only. The caller resets the colour after.
+    /// </summary>
+    internal static List<string> AuthBoxRows(string title, IEnumerable<(string Color, string Hotkey, string Label)> entries)
+    {
+        const int inner = 77;
+        if (title.Length > inner) title = title.Substring(0, inner);
+        int tpad = inner - title.Length;
+        int tleft = tpad / 2;
+        var rows = new List<string>
+        {
+            "\u001b[1;36m\u2554" + new string('\u2550', inner) + "\u2557",
+            "\u001b[1;37m\u2551" + new string(' ', tleft) + title + new string(' ', tpad - tleft) + "\u2551",
+            "\u001b[1;36m\u2560" + new string('\u2550', inner) + "\u2563",
+            "\u001b[0;37m\u2551" + new string(' ', inner) + "\u2551",
+        };
+        foreach (var (color, hotkey, label) in entries)
+        {
+            string text = label;
+            int room = inner - $"  [{hotkey}] ".Length;
+            if (text.Length > room) text = text.Substring(0, room);
+            int pad = room - text.Length;
+            rows.Add($"\u2551  \u001b[{color}m[{hotkey}]\u001b[0;37m {text}{new string(' ', pad)}\u2551");
+        }
+        rows.Add("\u2551" + new string(' ', inner) + "\u2551");
+        rows.Add("\u001b[1;36m\u255a" + new string('\u2550', inner) + "\u255d");
+        return rows;
     }
 
     /// <summary>Send a message to a specific player by username.</summary>
@@ -1639,6 +1689,20 @@ public class MudServer
         if (ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
         {
             session.EnqueueMessage(message);
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// v1.2.5: send a message to a specific player by username, rendered in that session's language.
+    /// `buildMessage` receives the language code, as in BroadcastLocalized. False when the player is not online.
+    /// </summary>
+    public bool SendToPlayerLocalized(string username, Func<string, string> buildMessage)
+    {
+        if (ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
+        {
+            session.EnqueueMessage(buildMessage(session.Context?.Language ?? "en"));
             return true;
         }
         return false;
@@ -1748,7 +1812,8 @@ public class MudServer
                             session.Context?.Terminal?.WriteRawAnsi("\x07\x07");
                             session.Context?.Terminal?.WriteLine("");
                             session.Context?.Terminal?.SetColor("bright_yellow");
-                            session.Context?.Terminal?.WriteLine($"  *** WARNING: You will be disconnected in ~{minutesLeft} minute{(minutesLeft != 1 ? "s" : "")} due to inactivity! Press any key. ***");
+                            foreach (var row in IdleWarningRows(LangOf(session), minutesLeft))
+                                session.Context?.Terminal?.WriteLine(row);
                             session.Context?.Terminal?.SetColor("white");
 
                             // Electron client: emit a structured sound event so the
@@ -1770,7 +1835,8 @@ public class MudServer
                     if (idleTime >= IdleTimeout)
                     {
                         Console.Error.WriteLine($"[MUD] [{session.Username}] Idle timeout ({idleTime.TotalMinutes:F0} min) — disconnecting");
-                        await session.DisconnectAsync($"Disconnected: idle for {(int)idleTime.TotalMinutes} minutes.");
+                        int idleMinutes = (int)idleTime.TotalMinutes;
+                        await session.DisconnectAsync(lang => Loc.GetIn(lang, "mud.disconnect_idle", idleMinutes));
                         session.LastActivityTime = DateTime.UtcNow; // v1.1.1: removal happens in the session's own finally; without this the next tick disconnected it again and stalled the watchdog
                     }
                 }
@@ -1783,19 +1849,26 @@ public class MudServer
     /// Initiate a graceful server shutdown with a countdown.
     /// Broadcasts warnings at intervals, then cancels the server token.
     /// </summary>
-    public async Task InitiateShutdown(int seconds, string? reason = null)
+    public Task InitiateShutdown(int seconds, string? reason = null) =>
+        InitiateShutdownLocalized(seconds, reason == null ? null : _ => reason);
+
+    /// <summary>
+    /// v1.2.5: the countdown in each player's language. `reasonIn` builds the reason for a language
+    /// (a reason an admin typed is shown as typed); null is "Server shutting down" in each language.
+    /// </summary>
+    internal async Task InitiateShutdownLocalized(int seconds, Func<string, string>? reasonIn)
     {
         if (ShutdownCountdownSeconds.HasValue)
             return; // Already shutting down
 
         ShutdownCountdownSeconds = seconds;
-        var shutdownReason = reason ?? "Server shutting down";
+        Func<string, string> reasonFor = reasonIn ?? (lang => Loc.GetIn(lang, "mud.shutdown_default_reason"));
 
         // Broadcast warnings at decreasing intervals
         int remaining = seconds;
         int[] warnAt = { 300, 120, 60, 30, 10, 5, 3, 2, 1 };
 
-        BroadcastToAll($"\u001b[1;31m  *** SERVER SHUTDOWN in {remaining} seconds: {shutdownReason} ***\u001b[0m");
+        BroadcastLocalized(lang => $"\u001b[1;31m  *** {Loc.GetIn(lang, "mud.shutdown_in_reason", seconds, reasonFor(lang))} ***\u001b[0m");
 
         while (remaining > 0 && !(_cts?.IsCancellationRequested ?? true))
         {
@@ -1805,13 +1878,14 @@ public class MudServer
 
             if (Array.IndexOf(warnAt, remaining) >= 0)
             {
-                BroadcastToAll($"\u001b[1;33m  *** SERVER SHUTDOWN in {remaining} seconds ***\u001b[0m");
+                int left = remaining;
+                BroadcastLocalized(lang => $"\u001b[1;33m  *** {Loc.GetIn(lang, "mud.shutdown_in", left)} ***\u001b[0m");
             }
         }
 
         if (!(_cts?.IsCancellationRequested ?? true))
         {
-            BroadcastToAll("\u001b[1;31m  *** SERVER SHUTTING DOWN NOW ***\u001b[0m");
+            BroadcastLocalized(lang => $"\u001b[1;31m  *** {Loc.GetIn(lang, "mud.shutdown_now")} ***\u001b[0m");
             await Task.Delay(500);
             _cts?.Cancel();
         }
@@ -1820,12 +1894,15 @@ public class MudServer
     /// <summary>
     /// Kick a specific player by username with a reason message.
     /// </summary>
-    public async Task<bool> KickPlayer(string username, string reason)
+    public Task<bool> KickPlayer(string username, string reason) => KickPlayerLocalized(username, _ => reason);
+
+    /// <summary>v1.2.5: kick with the reason built in the player's language ("Kicked: reason").</summary>
+    internal async Task<bool> KickPlayerLocalized(string username, Func<string, string> reasonIn)
     {
         if (ActiveSessions.TryGetValue(username.ToLowerInvariant(), out var session))
         {
-            Console.Error.WriteLine($"[MUD] Kicking player '{username}': {reason}");
-            await session.DisconnectAsync($"Kicked: {reason}");
+            Console.Error.WriteLine($"[MUD] Kicking player '{username}': {reasonIn("en")}");
+            await session.DisconnectAsync(lang => Loc.GetIn(lang, "mud.kicked", reasonIn(lang)));
             return true;
         }
         return false;
@@ -1905,8 +1982,10 @@ public class MudServer
                     // Also fan out via GMCP so chat-capture clients (Mudlet/MUSHclient
                     // split panes) see Discord posts on the same Comm.Channel.Text
                     // stream as in-game gossip, with the same mute-respecting logic.
-                    RoomRegistry.Instance?.BroadcastGlobal(
-                        $"[92m  [Gossip] {msg.Author}: {msg.Message}[0m",
+                    var author = msg.Author;
+                    var text = msg.Message;
+                    RoomRegistry.Instance?.BroadcastGlobalLocalized(
+                        lang => $"\u001b[92m  {Loc.GetIn(lang, "chat.gossip_line", author, text)}\u001b[0m",
                         excludeUsername: null,
                         channelKey: "gossip");
                     UsurperRemake.Server.MudChatSystem.FanoutChannelText("gossip", msg.Author, msg.Message);
@@ -2095,7 +2174,7 @@ public class MudServer
                         _sqlBackend.MarkAdminCommandFailed(cmd.Id, "No target specified");
                         return;
                     }
-                    if (await KickPlayer(target, reason ?? "Kicked by admin"))
+                    if (await KickPlayerLocalized(target, reason != null ? _ => reason : lang => Loc.GetIn(lang, "mud.kick_by_admin")))
                         _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Kicked {target}");
                     else
                         _sqlBackend.MarkAdminCommandFailed(cmd.Id, $"Player '{target}' is not online");
@@ -2107,7 +2186,7 @@ public class MudServer
                     if (session != null)
                     {
                         session.IsFrozen = true;
-                        session.EnqueueMessage("\u001b[1;36m  *** You have been frozen by the gods. ***\u001b[0m");
+                        EnqueueNotice(session, "1;36", lang => $"*** {Loc.GetIn(lang, "mud.gods_frozen")} ***");
                     }
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Frozen {target}" + (session != null ? " (live)" : " (DB only, offline)"));
                     break;
@@ -2118,7 +2197,7 @@ public class MudServer
                     if (session != null)
                     {
                         session.IsFrozen = false;
-                        session.EnqueueMessage("\u001b[1;32m  *** The gods have thawed you. You may move again. ***\u001b[0m");
+                        EnqueueNotice(session, "1;32", lang => $"*** {Loc.GetIn(lang, "mud.gods_thawed")} ***");
                     }
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Thawed {target}");
                     break;
@@ -2129,7 +2208,7 @@ public class MudServer
                     if (session != null)
                     {
                         session.IsMuted = true;
-                        session.EnqueueMessage("\u001b[1;33m  *** You have been silenced by the gods. ***\u001b[0m");
+                        EnqueueNotice(session, "1;33", lang => $"*** {Loc.GetIn(lang, "mud.gods_silenced")} ***");
                     }
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Muted {target}");
                     break;
@@ -2140,7 +2219,7 @@ public class MudServer
                     if (session != null)
                     {
                         session.IsMuted = false;
-                        session.EnqueueMessage("\u001b[1;32m  *** The gods have restored your voice. ***\u001b[0m");
+                        EnqueueNotice(session, "1;32", lang => $"*** {Loc.GetIn(lang, "mud.gods_voice_restored")} ***");
                     }
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Unmuted {target}");
                     break;
@@ -2149,7 +2228,7 @@ public class MudServer
                     if (target == null) { _sqlBackend.MarkAdminCommandFailed(cmd.Id, "No target"); return; }
                     if (session != null)
                     {
-                        session.EnqueueMessage("\u001b[1;31m  *** The gods have struck you down! ***\u001b[0m");
+                        EnqueueNotice(session, "1;31", lang => $"*** {Loc.GetIn(lang, "mud.gods_struck_down")} ***");
                         // The player will die on their next action when HP is checked
                         // We send a force-kill message — the session's game engine will handle death
                     }
@@ -2164,7 +2243,7 @@ public class MudServer
                     }
                     await _sqlBackend.SendMessageToKey("Admin", target, "system", message);
                     if (session != null)
-                        session.EnqueueMessage($"\u001b[1;33m  [Admin Message] {message}\u001b[0m");
+                        session.EnqueueMessage($"\u001b[1;33m  {Loc.GetIn(LangOf(session), "mud.admin_message", message)}\u001b[0m");
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Message sent to {target}");
                     break;
 
@@ -2188,7 +2267,7 @@ public class MudServer
                         catch { }
                     }
                     _sqlBackend.MarkAdminCommandExecuted(cmd.Id, $"Shutdown initiated ({shutdownSeconds}s): {reason ?? "Server update"}");
-                    _ = InitiateShutdown(shutdownSeconds, reason ?? "Server update");
+                    _ = InitiateShutdownLocalized(shutdownSeconds, reason != null ? _ => reason : lang => Loc.GetIn(lang, "mud.shutdown_server_update"));
                     break;
 
                 case "snoop_start":
@@ -2224,7 +2303,7 @@ public class MudServer
                         SqlSaveBackend.MarkUsernameErased(target);
                         session.SuppressDisconnectSave = true;
                         session.SuppressDisconnectSaveKey = target;
-                        await KickPlayer(target, "Account deleted");
+                        await KickPlayerLocalized(target, lang => Loc.GetIn(lang, "mud.kick_account_deleted"));
                     }
                     var (deleted, deleteResult) = await DeletePlayerAsync(_sqlBackend, target);
                     if (deleted) _sqlBackend.MarkAdminCommandExecuted(cmd.Id, deleteResult);

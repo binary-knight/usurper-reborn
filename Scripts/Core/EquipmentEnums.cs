@@ -193,6 +193,17 @@ public static class ArmorTypeExtensions
     };
 
     /// <summary>
+    /// v1.2.5: the weight tag of the shop and equipment rows in the reader's language: three letters on screen,
+    /// the whole word in screen reader mode (read aloud as before).
+    /// </summary>
+    public static string ShortTag(this ArmorWeightClass weight)
+    {
+        if (weight == ArmorWeightClass.None) return "";
+        string id = weight.ToString().ToLowerInvariant();
+        return UsurperRemake.Systems.Loc.Get(GameConfig.ScreenReaderMode ? $"equip.weight.{id}" : $"equip.weight_short.{id}");
+    }
+
+    /// <summary>
     /// Get display color for weight class
     /// </summary>
     public static string GetWeightColor(this ArmorWeightClass weight) => weight switch

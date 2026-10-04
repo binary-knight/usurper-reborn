@@ -2,6 +2,7 @@ using UsurperRemake;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
 using UsurperRemake.BBS;
+using UsurperRemake.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -208,26 +209,44 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
 
         // Menu rows - Shopping
+        // v1.2.5: whole-word labels in the player's language, the key shown apart: "[S]ell" when the label starts
+        // with its key letter (English), "[S] Eladás" otherwise (BaseLocation.MenuKeyLabel). The keys stay the typed commands.
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_shopping")}");
-        ShowBBSMenuRow(("1", "bright_yellow", $" {Loc.Get("magic_shop.rings")}"), ("2", "bright_yellow", $" {Loc.Get("magic_shop.necklaces")}"), ("S", "bright_yellow", Loc.Get("magic_shop.bbs_sell")), ("I", "bright_yellow", Loc.Get("magic_shop.bbs_identify")));
+        ShowBBSWordRow(("1", Loc.Get("magic_shop.rings")), ("2", Loc.Get("magic_shop.necklaces")), ("S", Loc.Get("shop.sell")), ("I", Loc.Get("magic_shop.bbs_word_identify")));
 
         // Potions & Scrolls
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_potions_scrolls")}");
-        ShowBBSMenuRow(("H", "bright_yellow", Loc.Get("magic_shop.bbs_healing_pots")), ("M", "bright_yellow", Loc.Get("magic_shop.bbs_mana_pots")), ("D", "bright_yellow", Loc.Get("magic_shop.bbs_dungeon_reset")));
+        ShowBBSWordRow(("H", Loc.Get("magic_shop.bbs_word_healing_pots")), ("M", Loc.Get("magic_shop.bbs_word_mana_pots")), ("D", Loc.Get("magic_shop.bbs_word_dungeon_reset")));
 
         // Enchanting & Arcane
         terminal.SetColor("cyan");
         terminal.WriteLine($" {Loc.Get("magic_shop.bbs_enchanting_arcane")}");
-        ShowBBSMenuRow(("E", "bright_yellow", Loc.Get("magic_shop.bbs_enchant")), ("W", "bright_yellow", Loc.Get("magic_shop.bbs_remove_ench")), ("C", "bright_yellow", Loc.Get("magic_shop.bbs_curse_removal")));
-        ShowBBSMenuRow(("V", "bright_yellow", Loc.Get("magic_shop.bbs_love_spells")), ("K", "bright_yellow", Loc.Get("magic_shop.bbs_dark_arts")), ("Y", "bright_yellow", Loc.Get("magic_shop.bbs_study")), ("G", "bright_yellow", Loc.Get("magic_shop.bbs_scry")));
+        ShowBBSWordRow(("E", Loc.Get("magic_shop.bbs_word_enchant")), ("W", Loc.Get("magic_shop.bbs_remove_ench")), ("C", Loc.Get("magic_shop.menu_curse_removal")));
+        ShowBBSWordRow(("V", Loc.Get("magic_shop.bbs_love_spells")), ("K", Loc.Get("magic_shop.bbs_dark_arts")), ("Y", Loc.Get("magic_shop.bbs_study")), ("G", Loc.Get("magic_shop.bbs_scry")));
 
         // Talk & Return
-        ShowBBSMenuRow(("T", "bright_yellow", Loc.Get("magic_shop.bbs_talk_to", _ownerName)), ("R", "bright_yellow", Loc.Get("shop.return")));
+        ShowBBSWordRow(("T", Loc.Get("magic_shop.talk_to", _ownerName)), ("R", Loc.Get("shop.return")));
 
         // Footer
         ShowBBSFooter();
+    }
+
+    /// <summary>v1.2.5: one compact BBS menu row, each key followed by its whole label (MenuKeyLabel), a space
+    /// between items and none after the last, so a 30-character owner name still fits in 79 columns.</summary>
+    private void ShowBBSWordRow(params (string key, string label)[] items)
+    {
+        terminal.Write(" ");
+        for (int i = 0; i < items.Length; i++)
+        {
+            var (letter, tail) = MenuKeyLabel(items[i].key, items[i].label);
+            terminal.SetColor("darkgray"); terminal.Write(i == 0 ? "[" : " [");
+            terminal.SetColor("bright_yellow"); terminal.Write(letter);
+            terminal.SetColor("darkgray"); terminal.Write("]");
+            terminal.SetColor("white"); terminal.Write(tail);
+        }
+        terminal.WriteLine("");
     }
 
     protected override async Task<bool> ProcessChoice(string choice)
@@ -443,25 +462,27 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
 
         // Menu options - two-column layout
-        DisplayMessage("  ═══ Shopping ═══                      ═══ Enchanting ═══", "cyan");
+        // v1.2.5: whole-word labels in the player's language; a label that starts with its key letter shows as
+        // "[E]nchant Equipment" (English unchanged), any other as "[E] Felszerelés bűvölése" (BaseLocation.MenuKeyLabel).
+        DisplayMessage(MenuSectionRow("magic_shop.menu_sec_shopping", "magic_shop.menu_sec_enchanting"), "cyan");
         terminal.WriteLine("");
-        WriteMenuRow("1", "bright_yellow", " Rings", "E", "bright_yellow", "nchant Equipment");
-        WriteMenuRow("2", "bright_yellow", " Necklaces", "W", "bright_yellow", " Remove Enchantment");
-        WriteMenuRow("S", "bright_yellow", "ell Accessories", "C", "bright_yellow", "urse Removal");
+        WriteMenuRow("1", "bright_yellow", Loc.Get("magic_shop.rings"), "E", "bright_yellow", Loc.Get("magic_shop.enchant"));
+        WriteMenuRow("2", "bright_yellow", Loc.Get("magic_shop.necklaces"), "W", "bright_yellow", Loc.Get("magic_shop.remove_enchant"));
+        WriteMenuRow("S", "bright_yellow", Loc.Get("magic_shop.sell"), "C", "bright_yellow", Loc.Get("magic_shop.menu_curse_removal"));
         terminal.Write("  ");
-        WriteMenuKey("I", "bright_yellow", "dentify Item");
+        WriteMenuKey("I", "bright_yellow", Loc.Get("magic_shop.identify"));
         terminal.WriteLine("");
         terminal.WriteLine("");
-        DisplayMessage("  ═══ Potions & Scrolls ═══             ═══ Arcane Arts ═══", "cyan");
+        DisplayMessage(MenuSectionRow("magic_shop.menu_sec_potions", "magic_shop.menu_sec_arcane"), "cyan");
         terminal.WriteLine("");
-        WriteMenuRow("H", "bright_yellow", "ealing Potions", "V", "bright_yellow", " Love Spells");
-        WriteMenuRow("M", "bright_yellow", "ana Potions", "K", "bright_yellow", " Dark Arts");
-        WriteMenuRow("D", "bright_yellow", "ungeon Reset Scroll", "Y", "bright_yellow", " Study Spells");
+        WriteMenuRow("H", "bright_yellow", Loc.Get("magic_shop.healing_potions"), "V", "bright_yellow", Loc.Get("magic_shop.love_spells"));
+        WriteMenuRow("M", "bright_yellow", Loc.Get("magic_shop.mana_potions"), "K", "bright_yellow", Loc.Get("magic_shop.dark_arts"));
+        WriteMenuRow("D", "bright_yellow", Loc.Get("magic_shop.reset_scroll"), "Y", "bright_yellow", Loc.Get("magic_shop.study_spells"));
         terminal.Write(new string(' ', 42));
-        WriteMenuKey("G", "bright_yellow", " Scrying (NPC Info)");
+        WriteMenuKey("G", "bright_yellow", Loc.Get("magic_shop.menu_scrying"));
         terminal.WriteLine("");
         terminal.WriteLine("");
-        WriteMenuRow("T", "bright_yellow", $"alk to {_ownerName}", "R", "bright_yellow", "eturn to street");
+        WriteMenuRow("T", "bright_yellow", Loc.Get("magic_shop.talk_to", _ownerName), "R", "bright_yellow", Loc.Get("shop.return"));
         terminal.WriteLine("");
         terminal.WriteLine("");
 
@@ -539,7 +560,7 @@ public partial class MagicShopLocation : BaseLocation
 
                 DisplayMessage(Loc.Get("magic_shop.identify_ritual", _ownerName), "gray");
                 DisplayMessage("");
-                DisplayMessage(Loc.Get("magic_shop.identify_result", item.Name), "bright_green");
+                DisplayMessage(Loc.Get("magic_shop.identify_result", ItemNames.Display(item)), "bright_green");
                 DisplayMessage("");
 
                 // Show full item details
@@ -551,7 +572,7 @@ public partial class MagicShopLocation : BaseLocation
     private void DisplayItemDetails(Item item)
     {
         WriteSectionHeader(Loc.Get("magic_shop.item_properties"), "cyan");
-        DisplayMessage($"{Loc.Get("ui.name_label")}: {item.Name}", "white");
+        DisplayMessage($"{Loc.Get("ui.name_label")}: {ItemNames.Display(item)}", "white");
         DisplayMessage($"{Loc.Get("ui.value_label")}: {item.Value:N0} {Loc.Get("shop.gold_crowns")}", "yellow");
         
         if (item.Strength != 0) DisplayMessage($"{Loc.Get("ui.stat_strength")}: {(item.Strength > 0 ? "+" : "")}{item.Strength}", "green");
@@ -582,7 +603,7 @@ public partial class MagicShopLocation : BaseLocation
         // Restrictions
         if (item.OnlyForGood) DisplayMessage(Loc.Get("shop.alignment_good_only"), "blue");
         if (item.OnlyForEvil) DisplayMessage(Loc.Get("shop.alignment_evil_only"), "red");
-        if (item.IsCursed) DisplayMessage(Loc.Get("shop.cursed_warning", item.Name), "darkred");
+        if (item.IsCursed) DisplayMessage(Loc.Get("shop.cursed_warning", ItemNames.Display(item)), "darkred");
     }
     
     private void BuyHealingPotions(Character player)
@@ -748,7 +769,7 @@ public partial class MagicShopLocation : BaseLocation
                 var item = cursedItems[i];
                 long removalCost = CalculateCurseRemovalCost(item, player);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage(Loc.Get("magic_shop.cursed_item_entry", $"{displayNum}", item.Name, $"{listedTotal:N0}"), "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_item_entry", $"{displayNum}", ItemNames.Display(item), $"{listedTotal:N0}"), "red");
                 DisplayCurseDetails(item);
             }
         }
@@ -757,14 +778,14 @@ public partial class MagicShopLocation : BaseLocation
         if (cursedPlayerGear.Count > 0)
         {
             DisplayMessage("");
-            DisplayMessage("Cursed gear you are wearing:", "darkred");
+            DisplayMessage(Loc.Get("magic_shop.cursed_worn_list"), "darkred");
             for (int i = 0; i < cursedPlayerGear.Count; i++)
             {
                 displayNum++;
                 var (slot, equip) = cursedPlayerGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage($"  {displayNum}. {equip.Name} (your {slot.GetDisplayName()}) -- {listedTotal:N0} gold", "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_worn_entry", $"{displayNum}", ItemNames.Display(equip), slot.GetDisplayName(), $"{listedTotal:N0}"), "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -773,14 +794,14 @@ public partial class MagicShopLocation : BaseLocation
         if (cursedTeamGear.Count > 0)
         {
             DisplayMessage("");
-            DisplayMessage("Cursed gear found on your team members:", "darkred");
+            DisplayMessage(Loc.Get("magic_shop.cursed_team_list"), "darkred");
             for (int i = 0; i < cursedTeamGear.Count; i++)
             {
                 displayNum++;
                 var (ownerName, slot, equip) = cursedTeamGear[i];
                 long removalCost = CalculateEquipmentCurseRemovalCost(equip);
                 var (_, _, listedTotal) = CityControlSystem.CalculateTaxedPrice(removalCost);
-                DisplayMessage($"  {displayNum}. {equip.Name} ({ownerName}'s {slot.GetDisplayName()}) -- {listedTotal:N0} gold", "red");
+                DisplayMessage(Loc.Get("magic_shop.cursed_team_entry", $"{displayNum}", ItemNames.Display(equip), ownerName, slot.GetDisplayName(), $"{listedTotal:N0}"), "red");
                 DisplayEquipmentCurseDetails(equip);
             }
         }
@@ -836,14 +857,14 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm", targetItem.Name, $"{curseTotalWithTax:N0}")))
+        if (await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.curse_confirm", ItemNames.Display(targetItem), $"{curseTotalWithTax:N0}"))))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
 
             // Dramatic curse removal scene
             DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.curse_scene_1", _ownerName, targetItem.Name), "gray");
+            DisplayMessage(Loc.Get("magic_shop.curse_scene_1", _ownerName, ItemNames.Display(targetItem)), "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_2"), "gray");
             await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_3"), "magenta");
@@ -890,20 +911,24 @@ public partial class MagicShopLocation : BaseLocation
             // Value partially restored (curse halved it, purification recovers most but not all)
             targetItem.Value = (long)(targetItem.Value * 1.6); // 80% of original value (was halved, now x1.6)
 
-            // Clean up curse-related name prefix, add "Purified" tag
+            // Clean up curse-related name prefix, add "Purified" tag. v1.2.5: a name stored in another
+            // language (a drop rolled before 1.2.5) gets that language's words (ItemNames.PurifiedName)
             if (targetItem.Name.StartsWith("Cursed "))
                 targetItem.Name = "Purified " + targetItem.Name.Substring(7);
+            else
+                targetItem.Name = ItemNames.PurifiedName(targetItem.Name);
 
-            // Fix curse description
+            // Fix curse description. v1.2.5: the item was cursed (its flag), so its curse line, in whatever
+            // language it was stored, becomes the English purified line (shown by LootGenerator.DescriptionLine)
             if (targetItem.Description != null && targetItem.Description.Count > 1 &&
-                targetItem.Description[1] != null && targetItem.Description[1].Contains("CURSED"))
-                targetItem.Description[1] = "Purified -- some power was lost in the cleansing.";
+                !string.IsNullOrEmpty(targetItem.Description[1]))
+                targetItem.Description[1] = LootGenerator.PurifiedLine;
 
             // Fix any negative magic resistance
             if (targetItem.MagicProperties.MagicResistance < 0)
                 targetItem.MagicProperties.MagicResistance = Math.Abs(targetItem.MagicProperties.MagicResistance) / 2;
 
-            DisplayMessage(Loc.Get("magic_shop.curse_success", targetItem.Name), "bright_green");
+            DisplayMessage(Loc.Get("magic_shop.curse_success", ItemNames.Display(targetItem)), "bright_green");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_1"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_2"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_3"), "cyan");
@@ -916,7 +941,7 @@ public partial class MagicShopLocation : BaseLocation
             {
                 DisplayMessage("");
                 DisplayMessage(Loc.Get("shop.ocean_flavor"), "magenta");
-                DisplayMessage("'Perhaps it was not cursed, but merely... homesick.'", "magenta");
+                DisplayMessage(Loc.Get("magic_shop.ocean_homesick"), "magenta");
             }
         }
     }
@@ -938,14 +963,14 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm_team", ownerName, targetEquip.Name, $"{curseTotalWithTax:N0}")))
+        if (await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.curse_confirm_team", ownerName, ItemNames.Display(targetEquip), $"{curseTotalWithTax:N0}"))))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
 
             // Dramatic curse removal scene
             DisplayMessage("");
-            DisplayMessage($"{_ownerName} places {ownerName}'s {targetEquip.Name} on the altar...", "gray");
+            DisplayMessage(Loc.Get("magic_shop.curse_team_scene_1", _ownerName, ownerName, ItemNames.Display(targetEquip)), "gray");
             DisplayMessage(Loc.Get("magic_shop.curse_scene_2"), "gray");
             await Pacing.Wait(500);
             DisplayMessage(Loc.Get("magic_shop.curse_scene_3"), "magenta");
@@ -978,18 +1003,20 @@ public partial class MagicShopLocation : BaseLocation
             // Value partially restored
             targetEquip.Value = (long)(targetEquip.Value * 1.6);
 
-            // Clean up name
+            // Clean up name. v1.2.5: a name stored in another language gets that language's words
             if (targetEquip.Name.StartsWith("Cursed "))
                 targetEquip.Name = "Purified " + targetEquip.Name.Substring(7);
+            else
+                targetEquip.Name = ItemNames.PurifiedName(targetEquip.Name);
 
             // Fix any negative magic resistance
             if (targetEquip.MagicResistance < 0)
                 targetEquip.MagicResistance = Math.Abs(targetEquip.MagicResistance) / 2;
 
-            DisplayMessage($"The curse on {ownerName}'s {targetEquip.Name} has been lifted!", "bright_green");
+            DisplayMessage(Loc.Get("magic_shop.curse_team_success", ownerName, ItemNames.Display(targetEquip)), "bright_green");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_1"), "cyan");
             DisplayMessage(Loc.Get("magic_shop.curse_aftermath_2"), "cyan");
-            DisplayMessage($"{ownerName} looks visibly relieved.", "cyan");
+            DisplayMessage(Loc.Get("magic_shop.curse_team_relieved", ownerName), "cyan");
 
             player.Statistics?.RecordGoldSpent(curseTotalWithTax);
             player.Statistics?.RecordMagicShopPurchase(curseTotalWithTax);
@@ -1011,12 +1038,12 @@ public partial class MagicShopLocation : BaseLocation
     private void DisplayEquipmentCurseDetails(Equipment equip)
     {
         var negatives = new List<string>();
-        if (equip.StrengthBonus < 0) negatives.Add($"Str{equip.StrengthBonus}");
-        if (equip.DefenceBonus < 0) negatives.Add($"Def{equip.DefenceBonus}");
-        if (equip.DexterityBonus < 0) negatives.Add($"Dex{equip.DexterityBonus}");
-        if (equip.WisdomBonus < 0) negatives.Add($"Wis{equip.WisdomBonus}");
+        if (equip.StrengthBonus < 0) negatives.Add($"{Loc.Get("ui.stat_str")}{equip.StrengthBonus}");
+        if (equip.DefenceBonus < 0) negatives.Add($"{Loc.Get("ui.stat_def")}{equip.DefenceBonus}");
+        if (equip.DexterityBonus < 0) negatives.Add($"{Loc.Get("ui.stat_dex")}{equip.DexterityBonus}");
+        if (equip.WisdomBonus < 0) negatives.Add($"{Loc.Get("ui.stat_wis")}{equip.WisdomBonus}");
         if (negatives.Count > 0)
-            DisplayMessage($"     Curse effect: {string.Join(", ", negatives)}", "darkred");
+            DisplayMessage($"     {Loc.Get("magic_shop.curse_effect", string.Join(", ", negatives))}", "darkred");
     }
 
     private long CalculateCurseRemovalCost(Item item, Character player)
@@ -1040,16 +1067,16 @@ public partial class MagicShopLocation : BaseLocation
     private void DisplayCurseDetails(Item item)
     {
         var negatives = new List<string>();
-        if (item.Strength < 0) negatives.Add($"Str{item.Strength}");
-        if (item.Defence < 0) negatives.Add($"Def{item.Defence}");
-        if (item.Dexterity < 0) negatives.Add($"Dex{item.Dexterity}");
-        if (item.Wisdom < 0) negatives.Add($"Wis{item.Wisdom}");
+        if (item.Strength < 0) negatives.Add($"{Loc.Get("ui.stat_str")}{item.Strength}");
+        if (item.Defence < 0) negatives.Add($"{Loc.Get("ui.stat_def")}{item.Defence}");
+        if (item.Dexterity < 0) negatives.Add($"{Loc.Get("ui.stat_dex")}{item.Dexterity}");
+        if (item.Wisdom < 0) negatives.Add($"{Loc.Get("ui.stat_wis")}{item.Wisdom}");
 
         if (negatives.Count > 0)
-            DisplayMessage($"     Curse effect: {string.Join(", ", negatives)}", "darkred");
+            DisplayMessage($"     {Loc.Get("magic_shop.curse_effect", string.Join(", ", negatives))}", "darkred");
 
         if (HasLoreDescription(item))
-            DisplayMessage($"     \"{item.Description[0]}\"", "gray");
+            DisplayMessage($"     \"{LootGenerator.DescriptionLine(item.Description[0])}\"", "gray");   // v1.2.5: in the reader's language
     }
 
     /// <summary>
@@ -1070,7 +1097,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         WriteSectionHeader(Loc.Get("magic_shop.enchant_bless"), "magenta");
         DisplayMessage("");
-        DisplayMessage($"{_ownerName} waves a gnarled hand over a collection of glowing runes.", "gray");
+        DisplayMessage(Loc.Get("magic_shop.old_enchant_waves", _ownerName), "gray");
         DisplayMessage(Loc.Get("magic_shop.old_enchant_intro"), "cyan");
         DisplayMessage("");
 
@@ -1093,7 +1120,7 @@ public partial class MagicShopLocation : BaseLocation
         if (player.Gold < enchTotalWithTax)
         {
             DisplayMessage("");
-            DisplayMessage("'The magical arts require material compensation,' the gnome says pointedly.", "cyan");
+            DisplayMessage(Loc.Get("magic_shop.old_enchant_no_gold"), "cyan");
             DisplayMessage(Loc.Get("shop.insufficient_gold_enchant", $"{enchTotalWithTax:N0}"), "red");
             await terminal.WaitForKey();
             return;
@@ -1118,7 +1145,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             var item = enchantableItems[i];
             string status = item.IsCursed ? Loc.Get("shop.cursed_no_enchant") : "";
-            DisplayMessage($"{i + 1}. {item.Name}{status}", item.IsCursed ? "red" : "white");
+            DisplayMessage($"{i + 1}. {ItemNames.Display(item)}{status}", item.IsCursed ? "red" : "white");
         }
 
         DisplayMessage("");
@@ -1161,7 +1188,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.old_enchant_confirm", targetItem.Name, $"{enchTotalWithTax:N0}")))
+        if (!await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.old_enchant_confirm", ItemNames.Display(targetItem), $"{enchTotalWithTax:N0}"))))
             return;
 
         player.Gold -= enchTotalWithTax;
@@ -1177,7 +1204,7 @@ public partial class MagicShopLocation : BaseLocation
         };
 
         DisplayMessage("");
-        DisplayMessage($"{_ownerName} begins the enchantment ritual...", "gray");
+        DisplayMessage(Loc.Get("magic_shop.old_enchant_ritual", _ownerName), "gray");
         await Pacing.Wait(500);
 
         switch (enchantChoice)
@@ -1186,7 +1213,7 @@ public partial class MagicShopLocation : BaseLocation
             case 2:
             case 3:
                 ApplyStatEnchant(targetItem, statChoice, bonus);
-                DisplayMessage($"Magical energy flows into the {targetItem.Name}!", "magenta");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_flows", ItemNames.Display(targetItem)), "magenta");
                 break;
 
             case 4: // Divine Blessing
@@ -1196,24 +1223,24 @@ public partial class MagicShopLocation : BaseLocation
                 targetItem.Wisdom += 3;
                 targetItem.Attack += 3;
                 targetItem.MagicProperties.Wisdom += 3;
-                DisplayMessage("Divine light suffuses the item with holy power!", "bright_yellow");
-                DisplayMessage($"The {targetItem.Name} is now blessed!", "blue");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_divine"), "bright_yellow");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_blessed", ItemNames.Display(targetItem)), "blue");
                 break;
 
             case 5: // Ocean's Touch
                 targetItem.MagicProperties.Mana += 30;
                 targetItem.Wisdom += 2;
                 targetItem.MagicProperties.Wisdom += 2;
-                DisplayMessage("The scent of salt and distant tides fills the air...", "cyan");
-                DisplayMessage($"The {targetItem.Name} now carries the Ocean's blessing!", "blue");
-                DisplayMessage("'The waves remember all who seek their wisdom,' the gnome whispers.", "gray");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_salt"), "cyan");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_ocean", ItemNames.Display(targetItem)), "blue");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_waves_remember"), "gray");
                 break;
 
             case 6: // Ward Against Evil
                 targetItem.MagicProperties.MagicResistance += 20;
                 targetItem.Defence += 2;
-                DisplayMessage("Protective runes flare to life on the item's surface!", "yellow");
-                DisplayMessage($"The {targetItem.Name} now provides magical protection!", "green");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_runes"), "yellow");
+                DisplayMessage(Loc.Get("magic_shop.old_enchant_protect", ItemNames.Display(targetItem)), "green");
                 break;
         }
 
@@ -1223,9 +1250,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             string suffix = enchantChoice switch
             {
-                4 => " (Blessed)",
-                5 => " (Ocean-Touched)",
-                6 => " (Warded)",
+                4 or 5 or 6 => NamedEnchantTag(enchantChoice + 1),   // Blessed, Ocean-Touched, Warded
                 _ => $" +{bonus}"
             };
 
@@ -1468,21 +1493,115 @@ public partial class MagicShopLocation : BaseLocation
     private void DisplayMessage(string message, string color = "white", bool newLine = true)
     {
         if (newLine)
-            terminal.WriteLine(message, color);
+            WrappedLine(message, color);
         else
             terminal.Write(message, color);
     }
 
+    /// <summary>v1.2.5: a line that fits 79 columns is written as is; a wider one (a long item or NPC name,
+    /// a longer translation) wraps at spaces, each later row under the text after the line's leading spaces.</summary>
+    private void WrappedLine(string message, string color = "white")
+    {
+        foreach (var row in WrapRows(message))
+            terminal.WriteLine(row, color);
+    }
+
+    internal static List<string> WrapRows(string message)
+    {
+        if (UIHelper.VisibleLength(message) <= UIHelper.WrapWidth) return new List<string> { message };
+        string body = message.TrimStart(' ');
+        string indent = new string(' ', Math.Min(message.Length - body.Length, 8));
+        return UIHelper.WordWrap(body, UIHelper.WrapWidth - indent.Length).Select(r => indent + r).ToList();
+    }
+
+    /// <summary>v1.2.5: a translated template (fetched with "{0}", "{1}"... as its arguments, so the placeholders
+    /// stay in place) whose {0}, {1}... are written in their own colours and the rest in
+    /// baseColor, so a language can put the names in its own order; word-wrapped at 79 columns, later rows under
+    /// the text after indent.</summary>
+    private void WriteTemplate(string indent, string template, string baseColor, params (string text, string color)[] args)
+    {
+        foreach (var row in TemplateRows(indent, template, baseColor, args))
+        {
+            foreach (var (text, color) in row)
+            {
+                terminal.SetColor(color);
+                terminal.Write(text);
+            }
+            terminal.WriteLine("");
+        }
+    }
+
+    internal static List<List<(string text, string color)>> TemplateRows(string indent, string template, string baseColor,
+        params (string text, string color)[] args)
+    {
+        var pieces = new List<(string text, string color)>();
+        int pos = 0;
+        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(template, @"\{(\d+)\}"))
+        {
+            if (m.Index > pos) pieces.Add((template.Substring(pos, m.Index - pos), baseColor));
+            int a = int.Parse(m.Groups[1].Value);
+            pieces.Add(a < args.Length ? args[a] : (m.Value, baseColor));
+            pos = m.Index + m.Length;
+        }
+        if (pos < template.Length) pieces.Add((template.Substring(pos), baseColor));
+
+        // Words (split at spaces) keep the colour of each of their parts.
+        var words = new List<List<(string text, string color)>>();
+        var cur = new List<(string text, string color)>();
+        foreach (var (text, color) in pieces)
+        {
+            var parts = text.Split(' ');
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (i > 0) { words.Add(cur); cur = new(); }
+                if (parts[i].Length > 0) cur.Add((parts[i], color));
+            }
+        }
+        words.Add(cur);
+
+        var rows = new List<List<(string text, string color)>>();
+        var row = new List<(string text, string color)> { (indent, baseColor) };
+        int len = indent.Length;
+        bool empty = true;
+        foreach (var w in words.Where(w => w.Count > 0))
+        {
+            int wl = w.Sum(p => p.text.Length);
+            if (!empty && len + 1 + wl > UIHelper.WrapWidth)
+            {
+                rows.Add(row);
+                row = new() { (indent, baseColor) };
+                len = indent.Length;
+                empty = true;
+            }
+            if (!empty) { row.Add((" ", baseColor)); len++; }
+            row.AddRange(w);
+            len += wl;
+            empty = false;
+        }
+        rows.Add(row);
+        return rows;
+    }
+
+    /// <summary>v1.2.5: a menu section row, "  ═══ Shopping ═══" and the right column's title from column 40.</summary>
+    internal static string MenuSectionRow(string leftKey, string rightKey)
+    {
+        string left = $"  ═══ {Loc.Get(leftKey)} ═══";
+        return left.PadRight(40) + $"═══ {Loc.Get(rightKey)} ═══";
+    }
+
+    /// <summary>v1.2.5: "[K]label" from a whole-word label: "[E]nchant Equipment" when the label starts with the
+    /// key letter, "[1] Rings" otherwise (BaseLocation.MenuKeyLabel). The key letters stay the typed commands.</summary>
     private void WriteMenuKey(string key, string keyColor, string label)
     {
+        var (letter, tail) = MenuKeyLabel(key, label);
         terminal.SetColor("darkgray");
         terminal.Write("[");
         terminal.SetColor(keyColor);
-        terminal.Write(key);
+        terminal.Write(letter);
         terminal.SetColor("darkgray");
         terminal.Write("]");
         terminal.SetColor("white");
-        terminal.Write(label);
+        terminal.Write(tail);
     }
 
     private void WriteMenuRow(string key1, string color1, string label1, string key2, string color2, string label2)
@@ -1490,8 +1609,8 @@ public partial class MagicShopLocation : BaseLocation
         // Fixed-width two-column layout: left column 38 chars, right column starts at position 39
         terminal.Write("  ");
         WriteMenuKey(key1, color1, label1);
-        // Calculate visible chars used: 2 (indent) + 3 ([X]) + label1.Length
-        int leftUsed = 2 + 3 + label1.Length;
+        // Calculate visible chars used: 2 (indent) + 3 ([X]) + the label after the key
+        int leftUsed = 2 + 3 + MenuKeyLabel(key1, label1).Tail.Length;
         int padding = Math.Max(1, 40 - leftUsed);
         terminal.Write(new string(' ', padding));
         WriteMenuKey(key2, color2, label2);
@@ -1502,24 +1621,31 @@ public partial class MagicShopLocation : BaseLocation
     // EQUIPMENT ENCHANTING - Enchant equipped weapons and armor
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // v1.2.5: name and description are Loc keys, resolved when shown (a static table holds no language). The
+    // description takes the bonus as {0}. Nothing stores or matches a tier name: the item records its kind code
+    // (GetEnchantKindCode) and an English suffix (see StatNames).
     private static readonly (string name, int bonus, long baseCost, int levelScale, int minLevel, string description)[] EnchantTiers = new[]
     {
-        ("Minor",           2,  3000L,  100, 1,  "+2 to one stat"),
-        ("Standard",        4,  8000L,  200, 10, "+4 to one stat"),
-        ("Greater",         6,  20000L, 400, 20, "+6 to one stat"),
-        ("Superior",        8,  50000L, 800, 40, "+8 to one stat"),
-        ("Divine Blessing", 3,  35000L, 600, 30, "+3 to all stats"),
-        ("Ocean's Touch",   0,  20000L, 300, 20, "+30 mana, +4 wisdom"),
-        ("Ward",            0,  12000L, 200, 15, "+20 magic resist, +2 defence"),
-        ("Predator",        0,  25000L, 500, 30, "+5% crit, +10% crit damage"),
-        ("Lifedrinker",     0,  30000L, 500, 35, "+3% lifesteal"),
+        ("magic_shop.tier_minor",           2,  3000L,  100, 1,  "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_standard",        4,  8000L,  200, 10, "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_greater",         6,  20000L, 400, 20, "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_superior",        8,  50000L, 800, 40, "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_divine_blessing", 3,  35000L, 600, 30, "magic_shop.tier_desc_all_stats"),
+        ("magic_shop.tier_oceans_touch",    0,  20000L, 300, 20, "magic_shop.tier_desc_ocean"),
+        ("magic_shop.tier_ward",            0,  12000L, 200, 15, "magic_shop.tier_desc_ward"),
+        ("magic_shop.tier_predator",        0,  25000L, 500, 30, "magic_shop.tier_desc_predator"),
+        ("magic_shop.tier_lifedrinker",     0,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),
         // New tiers (v0.30.9)
-        ("Mythic",          24, 180000L, 2000, 55, "+24 to one stat"),
-        ("Legendary",       30, 300000L, 3000, 65, "+30 to one stat"),
-        ("Godforged",       38, 500000L, 5000, 75, "+38 to one stat"),
-        ("Phoenix Fire",    20, 400000L, 4000, 60, "+20 power + fire damage on hit"),
-        ("Frostbite",       20, 400000L, 4000, 60, "+20 power + chance to slow enemies"),
+        ("magic_shop.tier_mythic",          24, 180000L, 2000, 55, "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_legendary",       30, 300000L, 3000, 65, "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_godforged",       38, 500000L, 5000, 75, "magic_shop.tier_desc_one_stat"),
+        ("magic_shop.tier_phoenix_fire",    20, 400000L, 4000, 60, "magic_shop.tier_desc_phoenix"),
+        ("magic_shop.tier_frostbite",       20, 400000L, 4000, 60, "magic_shop.tier_desc_frostbite"),
     };
+
+    /// <summary>v1.2.5: a tier's name and description in the player's language.</summary>
+    internal static string TierName(int index) => Loc.Get(EnchantTiers[index].name);
+    internal static string TierDescription(int index) => Loc.Get(EnchantTiers[index].description, EnchantTiers[index].bonus);
 
     // Material requirements for high-tier enchantments (0-indexed tier → required materials)
     private static readonly Dictionary<int, (string materialId, int count)[]> EnchantMaterialRequirements = new()
@@ -1531,7 +1657,179 @@ public partial class MagicShopLocation : BaseLocation
         [13] = new[] { ("shadow_silk_thread", 1), ("fading_starlight_dust", 1) },              // Frostbite
     };
 
-    private static readonly string[] StatNames = { "Weapon Power", "Strength", "Dexterity", "Defence", "Wisdom", "Armor Power", "Constitution", "Intelligence", "Charisma", "Agility", "Stamina" };
+    // v1.2.5: the stat an enchant raises, in menu order (ApplyEquipmentStatBonus, GetEnchantKindCode). StatNames
+    // holds the English three-letter code an enchant appends to the item's stored name (" +6 Dex"), in every
+    // language: GearSetFamilyResolver.TrailingEnchant peels it and RemoveEnchantment strips it by pattern, and
+    // the name is saved as is. StatLabelKeys are what the stat menu and the confirm line show.
+    private static readonly string[] StatNames = { "Wea", "Str", "Dex", "Def", "Wis", "Arm", "Con", "Int", "Cha", "Agi", "Sta" };
+    private static readonly string[] StatLabelKeys =
+    {
+        "ui.weapon_power", "ui.stat_strength", "ui.stat_dexterity", "combat.status_defence_label", "ui.stat_wisdom",
+        "ui.armor_class", "ui.stat_constitution", "ui.stat_intelligence", "ui.stat_charisma", "ui.stat_agility", "ui.stat_stamina",
+    };
+
+    /// <summary>v1.2.5: what an enchant of this stat appends to the stored item name, English in every language.</summary>
+    internal static string StatSuffix(int bonus, int statChoice) => $" +{bonus} {StatNames[statChoice - 1]}";
+
+    /// <summary>v1.2.5: the English tag a named enchant appends to the item's stored name, by enchant tier
+    /// (both enchant flows write it from here, the legacy one by its own choice + 1), "" for a stat tier.
+    /// RemoveEnchantment strips every tag this returns, so a new tag is stripped as soon as it is written.</summary>
+    internal static string NamedEnchantTag(int tierChoice) =>
+        NamedEnchantTags.FirstOrDefault(t => t.Tier == tierChoice).Tag ?? "";
+
+    // v1.2.5: the named enchant tags by tier, the one list both enchant flows write from and removal strips.
+    private static readonly (int Tier, string Tag)[] NamedEnchantTags =
+    {
+        (5, " (Blessed)"),
+        (6, " (Ocean-Touched)"),
+        (7, " (Warded)"),
+        (8, " (Predator)"),
+        (9, " (Lifedrinker)"),
+        (13, " (Phoenix Fire)"),
+        (14, " (Frostbite)"),
+    };
+
+    /// <summary>v1.2.5: every named enchant tag (NamedEnchantTag over every tier).</summary>
+    internal static IEnumerable<string> AllNamedEnchantTags() =>
+        Enumerable.Range(1, EnchantTiers.Length).Select(NamedEnchantTag).Where(t => t.Length > 0);
+
+    /// <summary>v1.2.5: the stored name with every enchant tag taken out: each named tag, each stat suffix
+    /// (" +6 Dex", StatSuffix) and the legacy flow's bare " +N". Used by RemoveEnchantment.</summary>
+    internal static string StripEnchantTags(string name)
+    {
+        foreach (var tag in AllNamedEnchantTags())
+            name = name.Replace(tag, "");
+        // Any three letters, as before and as GearSetFamilyResolver.TrailingEnchant reads it, so an older code still goes.
+        return System.Text.RegularExpressions.Regex.Replace(name, @"\s\+\d+(?:\s\p{L}{3})?(?!\w)", "");
+    }
+
+    /// <summary>v1.2.5: a stat's name in the player's language, for the stat menu and the confirm line.</summary>
+    internal static string StatLabel(int statChoice) => Loc.Get(StatLabelKeys[statChoice - 1]);
+
+    /// <summary>v1.2.5: the slot column of the enchant list in the player's language. English as before
+    /// ("Weapon", "OffHand", "L.Ring", "R.Ring", "Neck", the other slots by name, "Bag").</summary>
+    internal static string EnchantSlotLabel(EquipmentSlot slot) => slot switch
+    {
+        EquipmentSlot.MainHand => Loc.Get("magic_shop.slot_weapon"),
+        EquipmentSlot.OffHand => Loc.Get("magic_shop.slot_offhand"),
+        EquipmentSlot.LFinger => Loc.Get("magic_shop.slot_lring"),
+        EquipmentSlot.RFinger => Loc.Get("magic_shop.slot_rring"),
+        EquipmentSlot.Neck => Loc.Get("magic_shop.slot_neck"),
+        _ => slot.GetDisplayName()
+    };
+
+    private static readonly EquipmentSlot[] EnchantListSlots =
+    {
+        EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head, EquipmentSlot.Body,
+        EquipmentSlot.Arms, EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet,
+        EquipmentSlot.Waist, EquipmentSlot.Face, EquipmentSlot.Cloak,
+        EquipmentSlot.Neck, EquipmentSlot.LFinger, EquipmentSlot.RFinger
+    };
+
+    /// <summary>v1.2.5: the slot field, 9 columns or one more than the longest slot label in the player's language.</summary>
+    internal static int EnchantSlotWidth() =>
+        Math.Max(9, EnchantListSlots.Select(EnchantSlotLabel).Append(Loc.Get("magic_shop.slot_bag")).Append(Loc.Get("magic_shop.col_slot"))
+            .Max(l => l.Length) + 1);
+
+    /// <summary>v1.2.5: the enchant list header, each label over its field (number 7, slot, name 35, stats).</summary>
+    internal static string EnchantListHeader(int slotWidth) =>
+        "   #   " + Loc.Get("magic_shop.col_slot").PadRight(slotWidth) + Loc.Get("arena.col_name").PadRight(35) + Loc.Get("base.col_stats");
+
+    /// <summary>v1.2.5: tokens joined by spaces into rows that each fit the columns left after startColumn.</summary>
+    internal static List<string> WrapTokens(IReadOnlyList<string> tokens, int startColumn)
+    {
+        var rows = new List<string> { "" };
+        int room = Math.Max(10, UIHelper.WrapWidth - startColumn);
+        foreach (var t in tokens)
+        {
+            string cur = rows[^1];
+            if (cur.Length == 0) rows[^1] = t;
+            else if (cur.Length + 1 + t.Length <= room) rows[^1] = cur + " " + t;
+            else rows.Add(t);
+        }
+        return rows;
+    }
+
+    /// <summary>v1.2.5: one section of the enchant menu (tiers from..to-1). The name and effect fields fit the
+    /// section's longest entry in the player's language; the header labels sit in them. A level or Awakening
+    /// requirement, or a material list, that would pass column 79 goes on the next row under the name.</summary>
+    private void WriteTierSection(Character player, int from, int to, bool wide)
+    {
+        var range = Enumerable.Range(from, to - from).ToList();
+        int nameW = Math.Max(Loc.Get("magic_shop.col_tier").Length, range.Max(i => TierName(i).Length)) + 1;
+        int effW = Math.Max(Loc.Get("magic_shop.col_effect").Length, range.Max(i => TierDescription(i).Length)) + 1;
+        int prefix = wide ? 7 : 6;
+        int baseWidth = prefix + nameW + effW + 11;
+
+        terminal.SetColor("darkgray");
+        terminal.WriteLine("#".PadLeft(prefix - 2) + "  " + Loc.Get("magic_shop.col_tier").PadRight(nameW)
+            + Loc.Get("magic_shop.col_effect").PadRight(effW) + Loc.Get("castle.header_cost").PadLeft(11));
+        WriteDivider(baseWidth);
+
+        foreach (int i in range)
+        {
+            var tier = EnchantTiers[i];
+            long cost = ApplyAllPriceModifiers(tier.baseCost + (player.Level * tier.levelScale), player);
+            bool canAfford = player.Gold >= cost;
+            bool meetsLevel = player.Level >= tier.minLevel;
+            bool meetsAwakening = i != 5 || (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) >= 2;
+            string name = TierName(i).PadRight(nameW);
+            string effect = TierDescription(i).PadRight(effW);
+            string price = Loc.Get("magic_shop.gold_short", $"{cost:N0}").PadLeft(11);
+
+            terminal.SetColor("gray");
+            terminal.Write(wide ? $"  [{i + 1,2}] " : $"  [{i + 1}] ");
+
+            var tail = new List<(string text, string color)>();
+            if (!meetsLevel || !meetsAwakening)
+            {
+                terminal.SetColor("darkgray");
+                terminal.Write(name + effect + price);
+                tail.Add(!meetsLevel
+                    ? (Loc.Get("magic_shop.req_level", tier.minLevel), "red")
+                    : (Loc.Get("magic_shop.req_awakening", 2), "magenta"));
+            }
+            else
+            {
+                terminal.SetColor(canAfford ? (wide ? "bright_magenta" : "white") : "red");
+                terminal.Write(name);
+                terminal.SetColor(canAfford ? "cyan" : "red");
+                terminal.Write(effect);
+                terminal.SetColor(canAfford ? "yellow" : "red");
+                terminal.Write(price);
+
+                // Show material requirements for high-tier enchants
+                if (wide && EnchantMaterialRequirements.TryGetValue(i, out var reqs))
+                {
+                    for (int j = 0; j < reqs.Length; j++)
+                    {
+                        var r = reqs[j];
+                        var mat = GameConfig.GetMaterialById(r.materialId);
+                        if (j > 0) tail.Add((" + ", "gray"));
+                        tail.Add(($"{r.count}x {mat?.LocName ?? r.materialId}", player.HasMaterial(r.materialId, r.count) ? "bright_green" : "red"));
+                    }
+                }
+            }
+
+            if (tail.Count > 0)
+            {
+                int tailLen = tail.Sum(t => t.text.Length);
+                if (baseWidth + 2 + tailLen > UIHelper.WrapWidth)
+                {
+                    terminal.WriteLine("");
+                    terminal.Write(new string(' ', prefix));
+                }
+                else
+                    terminal.Write("  ");
+                foreach (var (text, color) in tail)
+                {
+                    terminal.SetColor(color);
+                    terminal.Write(text);
+                }
+            }
+            terminal.WriteLine("");
+        }
+    }
 
     /// <summary>
     /// Whether an inventory item is enchantable. Weapons, shields, armor, and
@@ -1626,9 +1924,10 @@ public partial class MagicShopLocation : BaseLocation
             EquipmentSlot.Neck, EquipmentSlot.LFinger, EquipmentSlot.RFinger
         };
 
-        // Column header
+        // Column header (v1.2.5: each label in its row's field; the slot field fits the longest slot label)
+        int slotWidth = EnchantSlotWidth();
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("magic_shop.enchant_col_header"));
+        terminal.WriteLine(EnchantListHeader(slotWidth));
         WriteDivider(72);
 
         // v0.60.11 hotfix: enchant targets unified across equipped + inventory. The
@@ -1643,14 +1942,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             var equip = player.GetEquipment(slot);
             if (equip == null) continue;
-            string slotName = slot switch
-            {
-                EquipmentSlot.MainHand => "Weapon",
-                EquipmentSlot.OffHand => "OffHand",
-                EquipmentSlot.LFinger => "L.Ring",
-                EquipmentSlot.RFinger => "R.Ring",
-                _ => slot.ToString()
-            };
+            string slotName = EnchantSlotLabel(slot);
             var capturedSlot = slot;
             enchantTargets.Add((slotName, equip, (newEq) =>
             {
@@ -1660,6 +1952,8 @@ public partial class MagicShopLocation : BaseLocation
                 player.RecalculateStats();
             }));
         }
+
+        int equippedCount = enchantTargets.Count;   // the rest are bag items
 
         // Inventory items that occupy an enchantable slot type (weapons, armor,
         // shields, accessories). Consumables / potions / quest items get filtered out.
@@ -1671,7 +1965,7 @@ public partial class MagicShopLocation : BaseLocation
                 if (!IsEnchantableInventoryItem(item)) continue;
                 var equipFromBag = ConvertInventoryItemToEquipmentForEnchant(item);
                 var capturedIdx = i;
-                enchantTargets.Add(("Bag", equipFromBag, (newEq) =>
+                enchantTargets.Add((Loc.Get("magic_shop.slot_bag"), equipFromBag, (newEq) =>
                 {
                     // Convert the enchanted Equipment back into an Item (LootEffects
                     // and all) and replace at the original index so the player keeps
@@ -1690,14 +1984,14 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"  [{idx,2}] ");
 
-            // Slot label (9 chars) -- "Bag" for inventory items, slot name for equipped.
-            terminal.SetColor(slotLabel == "Bag" ? "dark_yellow" : "darkgray");
-            terminal.Write($"{slotLabel,-9}");
+            // Slot label -- the bag label for inventory items, the slot name for equipped.
+            terminal.SetColor(idx > equippedCount ? "dark_yellow" : "darkgray");
+            terminal.Write(slotLabel.PadRight(slotWidth));
 
             // Item name with enchant/cursed tags
             string enchTag = equip.GetEnchantmentCount() > 0 ? $" [E:{equip.GetEnchantmentCount()}/{GameConfig.MaxEnchantments}]" : "";
             string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
-            string displayName = equip.Name + enchTag + cursedTag;
+            string displayName = ItemNames.Display(equip) + enchTag + cursedTag;
             if (displayName.Length > 34) displayName = displayName.Substring(0, 31) + "...";
 
             if (equip.IsCursed)
@@ -1726,7 +2020,14 @@ public partial class MagicShopLocation : BaseLocation
             // v0.62.1 stat-order consistency.
             stats.Sort(System.StringComparer.Ordinal);
             terminal.SetColor("green");
-            terminal.Write(string.Join(" ", stats));
+            // v1.2.5: stats that would pass column 79 continue on the next row, under the stats column.
+            var statRows = WrapTokens(stats, 7 + slotWidth + 35);
+            terminal.Write(statRows[0]);
+            for (int r = 1; r < statRows.Count; r++)
+            {
+                terminal.WriteLine("");
+                terminal.Write(new string(' ', 7 + slotWidth + 35) + statRows[r]);
+            }
 
             terminal.WriteLine("");
             idx++;
@@ -1743,7 +2044,7 @@ public partial class MagicShopLocation : BaseLocation
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+        terminal.WriteLine(IsScreenReader ? $"  0. {Loc.Get("ui.cancel")}" : $"  [0] {Loc.Get("ui.cancel")}");
         terminal.WriteLine("");
         var slotInput = await terminal.GetInput($"  {Loc.Get("magic_shop.select_item_enchant")}");
         if (!int.TryParse(slotInput, out int slotChoice) || slotChoice < 1 || slotChoice > enchantTargets.Count)
@@ -1773,164 +2074,43 @@ public partial class MagicShopLocation : BaseLocation
 
         // Show enchantment options
         terminal.ClearScreen();
-        WriteBoxHeader($"Enchanting: {selectedEquip.Name}", "magenta");
+        WriteBoxHeader(Loc.Get("magic_shop.enchanting_title", ItemNames.Display(selectedEquip)), "magenta");
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
         terminal.WriteLine($"  {Loc.Get("magic_shop.you_have_gold", $"{player.Gold:N0}")}");
         terminal.WriteLine("");
 
+        // v1.2.5: each section sizes its name and effect fields to its longest entry in the player's language,
+        // the header labels sit in those fields, and a requirement or material list that would pass column 79
+        // goes on the next row under the name.
         // Section: Stat enchants (tiers 1-4)
         WriteSectionHeader(Loc.Get("magic_shop.stat_enchant"), "white");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("magic_shop.enchant_tier_header"));
-        WriteDivider(60);
-
-        for (int i = 0; i < 4; i++)
-        {
-            var tier = EnchantTiers[i];
-            long cost = ApplyAllPriceModifiers(tier.baseCost + (player.Level * tier.levelScale), player);
-            bool canAfford = player.Gold >= cost;
-            bool meetsLevel = player.Level >= tier.minLevel;
-
-            terminal.SetColor("gray");
-            terminal.Write($"  [{i + 1}] ");
-
-            if (!meetsLevel)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write($"{tier.name,-17}{tier.description,-24}{cost,10:N0}g");
-                terminal.SetColor("red");
-                terminal.Write($"  Lv.{tier.minLevel}+");
-            }
-            else
-            {
-                terminal.SetColor(canAfford ? "white" : "red");
-                terminal.Write($"{tier.name,-17}");
-                terminal.SetColor(canAfford ? "cyan" : "red");
-                terminal.Write($"{tier.description,-24}");
-                terminal.SetColor(canAfford ? "yellow" : "red");
-                terminal.Write($"{cost,10:N0}g");
-            }
-            terminal.WriteLine("");
-        }
+        WriteTierSection(player, 0, 4, false);
 
         // Section: Special enchants (tiers 5-9)
         terminal.WriteLine("");
         WriteSectionHeader(Loc.Get("magic_shop.special_enchant"), "white");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("magic_shop.enchant_tier_header"));
-        WriteDivider(60);
-
-        for (int i = 4; i < 9; i++)
-        {
-            var tier = EnchantTiers[i];
-            long cost = ApplyAllPriceModifiers(tier.baseCost + (player.Level * tier.levelScale), player);
-            bool canAfford = player.Gold >= cost;
-            bool meetsLevel = player.Level >= tier.minLevel;
-            bool meetsAwakening = i != 5 || (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) >= 2;
-
-            terminal.SetColor("gray");
-            terminal.Write($"  [{i + 1}] ");
-
-            if (!meetsLevel)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write($"{tier.name,-17}{tier.description,-24}{cost,10:N0}g");
-                terminal.SetColor("red");
-                terminal.Write($"  Lv.{tier.minLevel}+");
-            }
-            else if (!meetsAwakening)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write($"{tier.name,-17}{tier.description,-24}{cost,10:N0}g");
-                terminal.SetColor("magenta");
-                terminal.Write("  Awakening 2+");
-            }
-            else
-            {
-                terminal.SetColor(canAfford ? "white" : "red");
-                terminal.Write($"{tier.name,-17}");
-                terminal.SetColor(canAfford ? "cyan" : "red");
-                terminal.Write($"{tier.description,-24}");
-                terminal.SetColor(canAfford ? "yellow" : "red");
-                terminal.Write($"{cost,10:N0}g");
-            }
-            terminal.WriteLine("");
-        }
+        WriteTierSection(player, 4, 9, false);
 
         // Section: High-tier and Elemental enchants (tiers 10-14)
         terminal.WriteLine("");
         WriteSectionHeader(Loc.Get("magic_shop.mythic_enchant"), "white");
-        terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("magic_shop.enchant_tier_header_wide"));
-        WriteDivider(66);
-
-        for (int i = 9; i < EnchantTiers.Length; i++)
-        {
-            var tier = EnchantTiers[i];
-            long cost = ApplyAllPriceModifiers(tier.baseCost + (player.Level * tier.levelScale), player);
-            bool canAfford = player.Gold >= cost;
-            bool meetsLevel = player.Level >= tier.minLevel;
-
-            terminal.SetColor("gray");
-            terminal.Write($"  [{i + 1,2}] ");
-
-            if (!meetsLevel)
-            {
-                terminal.SetColor("darkgray");
-                terminal.Write($"{tier.name,-17}{tier.description,-30}{cost,10:N0}g");
-                terminal.SetColor("red");
-                terminal.Write($"  Lv.{tier.minLevel}+");
-            }
-            else
-            {
-                terminal.SetColor(canAfford ? "bright_magenta" : "red");
-                terminal.Write($"{tier.name,-17}");
-                terminal.SetColor(canAfford ? "cyan" : "red");
-                terminal.Write($"{tier.description,-30}");
-                terminal.SetColor(canAfford ? "yellow" : "red");
-                terminal.Write($"{cost,10:N0}g");
-
-                // Show material requirements for high-tier enchants
-                if (EnchantMaterialRequirements.TryGetValue(i, out var reqs))
-                {
-                    var matNames = reqs.Select(r => {
-                        var mat = GameConfig.GetMaterialById(r.materialId);
-                        bool has = player.HasMaterial(r.materialId, r.count);
-                        return (name: $"{r.count}x {mat?.Name ?? r.materialId}", has);
-                    }).ToList();
-                    bool hasAll = matNames.All(m => m.has);
-                    terminal.Write("  ");
-                    for (int j = 0; j < matNames.Count; j++)
-                    {
-                        terminal.SetColor(matNames[j].has ? "bright_green" : "red");
-                        terminal.Write(matNames[j].name);
-                        if (j < matNames.Count - 1)
-                        {
-                            terminal.SetColor("gray");
-                            terminal.Write(" + ");
-                        }
-                    }
-                }
-            }
-            terminal.WriteLine("");
-        }
+        WriteTierSection(player, 9, EnchantTiers.Length, true);
 
         // Show warning about 4th/5th enchant failure risk
         int currentEnchants = selectedEquip.GetEnchantmentCount();
         if (currentEnchants >= 3)
         {
             terminal.WriteLine("");
-            terminal.SetColor("bright_red");
             float failChance = currentEnchants == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
-            terminal.WriteLine(Loc.Get("shop.enchant_warning", currentEnchants, $"{failChance * 100:N0}"));
-            terminal.WriteLine(Loc.Get("magic_shop.enchant_failure_warning"));
+            WrappedLine(Loc.Get("shop.enchant_warning", currentEnchants, $"{failChance * 100:N0}"), "bright_red");
+            WrappedLine(Loc.Get("magic_shop.enchant_failure_warning"), "bright_red");
         }
 
         terminal.WriteLine("");
         terminal.SetColor("gray");
-        terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+        terminal.WriteLine(IsScreenReader ? $"  0. {Loc.Get("ui.cancel")}" : $"  [0] {Loc.Get("ui.cancel")}");
         terminal.WriteLine("");
         var tierInput = await terminal.GetInput($"  {Loc.Get("magic_shop.select_enchantment")}");
         if (!int.TryParse(tierInput, out int tierChoice) || tierChoice < 1 || tierChoice > EnchantTiers.Length)
@@ -1948,7 +2128,7 @@ public partial class MagicShopLocation : BaseLocation
 
         if (tierChoice == 6 && (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) < 2)
         {
-            DisplayMessage("'The Ocean's power requires a deeper connection than you possess.'", "cyan");
+            DisplayMessage(Loc.Get("magic_shop.ocean_requires_awakening"), "cyan");
             await terminal.WaitForKey();
             return;
         }
@@ -1969,15 +2149,13 @@ public partial class MagicShopLocation : BaseLocation
             if (missing.Count > 0)
             {
                 DisplayMessage("");
-                DisplayMessage("'This enchantment requires rare materials,' the gnome says.", "cyan");
+                DisplayMessage(Loc.Get("magic_shop.needs_materials"), "cyan");
                 foreach (var req in missing)
                 {
                     var mat = GameConfig.GetMaterialById(req.materialId);
-                    terminal.SetColor("red");
-                    terminal.WriteLine($"  Missing: {req.count}x {mat?.Name ?? req.materialId}");
+                    WrappedLine($"  {Loc.Get("magic_shop.missing_material", req.count, mat?.LocName ?? req.materialId)}", "red");
                 }
-                terminal.SetColor("darkgray");
-                terminal.WriteLine("  These materials can be found deep in the dungeon.");
+                WrappedLine($"  {Loc.Get("magic_shop.materials_hint")}", "darkgray");
                 await terminal.WaitForKey();
                 return;
             }
@@ -1991,16 +2169,16 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("white");
             terminal.WriteLine($"  {Loc.Get("magic_shop.choose_stat")}");
             terminal.WriteLine("");
-            for (int i = 0; i < StatNames.Length; i++)
+            for (int i = 0; i < StatLabelKeys.Length; i++)
             {
                 terminal.SetColor("gray");
                 terminal.Write($"  [{i + 1}] ");
                 terminal.SetColor("cyan");
-                terminal.WriteLine($"{StatNames[i]}");
+                terminal.WriteLine(StatLabel(i + 1));
             }
             terminal.WriteLine("");
             var statInput = await terminal.GetInput($"  {Loc.Get("magic_shop.stat_choice_prompt")}");
-            if (!int.TryParse(statInput, out statChoice) || statChoice < 1 || statChoice > StatNames.Length)
+            if (!int.TryParse(statInput, out statChoice) || statChoice < 1 || statChoice > StatLabelKeys.Length)
                 return;
         }
 
@@ -2021,19 +2199,10 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // Confirm
-        string enchantDesc = (tierChoice <= 4 || (tierChoice >= 10 && tierChoice <= 12)) ? $"+{selectedTier.bonus} {StatNames[statChoice - 1]}" : selectedTier.description;
+        string enchantDesc = (tierChoice <= 4 || (tierChoice >= 10 && tierChoice <= 12)) ? $"+{selectedTier.bonus} {StatLabel(statChoice)}" : TierDescription(tierChoice - 1);
         terminal.WriteLine("");
-        terminal.SetColor("yellow");
-        terminal.Write($"  Enchant ");
-        terminal.SetColor(selectedEquip.GetRarityColor());
-        terminal.Write(selectedEquip.Name);
-        terminal.SetColor("yellow");
-        terminal.Write($" with ");
-        terminal.SetColor("bright_magenta");
-        terminal.Write($"{selectedTier.name}");
-        terminal.SetColor("yellow");
-        terminal.Write($" ({enchantDesc})");
-        terminal.WriteLine("");
+        WriteTemplate("  ", Loc.Get("magic_shop.enchant_confirm_line", "{0}", "{1}", "{2}"), "yellow",
+            (ItemNames.Display(selectedEquip), selectedEquip.GetRarityColor()), (TierName(tierChoice - 1), "bright_magenta"), (enchantDesc, "yellow"));
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("magic_shop.enchant_cost", $"{enchantCost:N0}")}");
         // Show material cost in confirmation
@@ -2042,9 +2211,9 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_magenta");
             var matList = confirmReqs.Select(r => {
                 var mat = GameConfig.GetMaterialById(r.materialId);
-                return $"{r.count}x {mat?.Name ?? r.materialId}";
+                return $"{r.count}x {mat?.LocName ?? r.materialId}";
             });
-            terminal.WriteLine($"  Materials: {string.Join(" + ", matList)}");
+            WrappedLine($"  {Loc.Get("magic_shop.materials_line", string.Join(" + ", matList))}", "bright_magenta");
         }
         // v0.60.0: pre-attempt warning when the weapon already has 3+ enchants.
         // Player report (Lumina, Lv.39 Wavecaller): "Adding enchantment to a
@@ -2061,14 +2230,12 @@ public partial class MagicShopLocation : BaseLocation
                 : GameConfig.FifthEnchantFailChance * 100f;
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
-            terminal.WriteLine($"  WARNING: this item already carries {existingEnchants} enchantments.");
-            terminal.SetColor("yellow");
-            terminal.WriteLine($"  Adding another has a {failPct:F0}% chance to FAIL.");
-            terminal.WriteLine($"  On failure: gold and materials are consumed, AND one of the");
-            terminal.WriteLine($"  existing enchantments is destroyed at random.");
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_risk_1", existingEnchants)}", "bright_red");
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_risk_2", $"{failPct:F0}")}", "yellow");
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_risk_3")}", "yellow");
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_risk_4")}", "yellow");
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  '{_ownerName} narrows her eyes. \"You are testing the weave.\"'");
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_risk_weave", _ownerName)}", "cyan");
             terminal.WriteLine("");
         }
 
@@ -2087,8 +2254,7 @@ public partial class MagicShopLocation : BaseLocation
             {
                 player.ConsumeMaterial(req.materialId, req.count);
                 var mat = GameConfig.GetMaterialById(req.materialId);
-                terminal.SetColor(mat?.Color ?? "white");
-                terminal.WriteLine($"  The {mat?.Name ?? req.materialId} dissolves into the enchantment...");
+                WrappedLine($"  {Loc.Get("magic_shop.material_dissolves", mat?.LocName ?? req.materialId)}", mat?.Color ?? "white");
             }
             await Pacing.Wait(500);
         }
@@ -2103,11 +2269,11 @@ public partial class MagicShopLocation : BaseLocation
             {
                 // FAILURE — gold consumed, random existing enchant destroyed
                 DisplayMessage("");
-                DisplayMessage($"{_ownerName} places the item on the anvil...", "gray");
+                DisplayMessage(Loc.Get("magic_shop.fail_anvil", _ownerName), "gray");
                 await Pacing.Wait(500);
-                DisplayMessage("The runes flare wildly! Unstable energies crackle!", "bright_red");
+                DisplayMessage(Loc.Get("magic_shop.fail_flare"), "bright_red");
                 await Pacing.Wait(500);
-                DisplayMessage("CRACK! The enchantment backfires!", "bright_red");
+                DisplayMessage(Loc.Get("magic_shop.fail_crack"), "bright_red");
                 await Pacing.Wait(500);
 
                 // Destroy one random existing enchant by decrementing count
@@ -2139,9 +2305,9 @@ public partial class MagicShopLocation : BaseLocation
                 }
 
                 DisplayMessage("");
-                DisplayMessage("An existing enchantment was destroyed in the backlash!", "bright_red");
-                DisplayMessage($"'I warned you... that's the risk of pushing beyond three enchantments.'", "cyan");
-                DisplayMessage($"Your {enchantCost:N0} gold has been consumed by the failed attempt.", "yellow");
+                DisplayMessage(Loc.Get("magic_shop.fail_destroyed"), "bright_red");
+                DisplayMessage(Loc.Get("magic_shop.fail_warned"), "cyan");
+                DisplayMessage(Loc.Get("magic_shop.fail_gold", $"{enchantCost:N0}"), "yellow");
                 player.Statistics?.RecordGoldSpent(enchantCost);
                 await terminal.WaitForKey();
                 return;
@@ -2150,6 +2316,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Clone the equipment
         var enchanted = selectedEquip.Clone();
+        enchanted.RecordEnchantBase();   // v1.2.5: before the first enchant, keep the item as it is, for full removal
         enchanted.IncrementEnchantmentCount();
         // Record which kind was applied so future enchant attempts can refuse a
         // duplicate of the same stat / named enchant on this item.
@@ -2162,43 +2329,19 @@ public partial class MagicShopLocation : BaseLocation
         {
             case 1: case 2: case 3: case 4: // Stat enchants
                 ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
-                suffix = $" +{selectedTier.bonus} {StatNames[statChoice - 1].Substring(0, 3)}";
+                suffix = StatSuffix(selectedTier.bonus, statChoice);
                 break;
-            case 5: // Divine Blessing
-                enchanted.StrengthBonus += 3; enchanted.DexterityBonus += 3;
-                enchanted.DefenceBonus += 3; enchanted.WisdomBonus += 3;
-                enchanted.WeaponPower += 3; enchanted.ArmorClass += 3;
-                suffix = " (Blessed)";
-                break;
-            case 6: // Ocean's Touch
-                enchanted.IntelligenceBonus += 6; enchanted.WisdomBonus += 4;
-                suffix = " (Ocean-Touched)";
-                break;
-            case 7: // Ward
-                enchanted.MagicResistance += 20; enchanted.DefenceBonus += 2;
-                suffix = " (Warded)";
-                break;
-            case 8: // Predator
-                enchanted.CriticalChanceBonus += 5; enchanted.CriticalDamageBonus += 10;
-                suffix = " (Predator)";
-                break;
-            case 9: // Lifedrinker
-                enchanted.LifeSteal += 3;
-                suffix = " (Lifedrinker)";
+            case 5: case 6: case 7: case 8: case 9: // Divine Blessing, Ocean's Touch, Ward, Predator, Lifedrinker
+                ApplyNamedEnchant(enchanted, tierChoice);
+                suffix = NamedEnchantTag(tierChoice);
                 break;
             case 10: case 11: case 12: // Mythic/Legendary/Godforged stat enchants
                 ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
-                suffix = $" +{selectedTier.bonus} {StatNames[statChoice - 1].Substring(0, 3)}";
+                suffix = StatSuffix(selectedTier.bonus, statChoice);
                 break;
-            case 13: // Phoenix Fire
-                enchanted.WeaponPower += 20;
-                enchanted.HasFireEnchant = true;
-                suffix = " (Phoenix Fire)";
-                break;
-            case 14: // Frostbite
-                enchanted.WeaponPower += 20;
-                enchanted.HasFrostEnchant = true;
-                suffix = " (Frostbite)";
+            case 13: case 14: // Phoenix Fire, Frostbite
+                ApplyNamedEnchant(enchanted, tierChoice);
+                suffix = NamedEnchantTag(tierChoice);
                 break;
             default:
                 suffix = "";
@@ -2220,12 +2363,12 @@ public partial class MagicShopLocation : BaseLocation
 
         // Dramatic enchantment scene
         DisplayMessage("");
-        DisplayMessage($"{_ownerName} places the {selectedEquip.Name} on an anvil carved with ancient runes...", "gray");
+        DisplayMessage(Loc.Get("magic_shop.enchant_anvil", _ownerName, ItemNames.Display(selectedEquip)), "gray");
         await Pacing.Wait(500);
-        DisplayMessage("Sparks fly as magical energy courses through the item!", "magenta");
+        DisplayMessage(Loc.Get("magic_shop.enchant_sparks"), "magenta");
         await Pacing.Wait(500);
         DisplayMessage("");
-        DisplayMessage($"Your {selectedEquip.Name} is now {enchanted.Name}!", "bright_green");
+        DisplayMessage(Loc.Get("magic_shop.enchant_result", ItemNames.Display(selectedEquip), ItemNames.Display(enchanted)), "bright_green");
 
         // Track stats
         player.Statistics?.RecordEnchantment(enchantCost);
@@ -2282,7 +2425,98 @@ public partial class MagicShopLocation : BaseLocation
         };
     }
 
-    private void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
+    /// <summary>v1.2.5: what a named enchant tier adds to an item (the enchant applies it; removal of an item
+    /// enchanted before 1.2.5 reads it to check the item against its template).</summary>
+    internal static void ApplyNamedEnchant(Equipment e, int tierChoice)
+    {
+        switch (tierChoice)
+        {
+            case 5: // Divine Blessing
+                e.StrengthBonus += 3; e.DexterityBonus += 3; e.DefenceBonus += 3; e.WisdomBonus += 3;
+                e.WeaponPower += 3; e.ArmorClass += 3;
+                break;
+            case 6: e.IntelligenceBonus += 6; e.WisdomBonus += 4; break;      // Ocean's Touch
+            case 7: e.MagicResistance += 20; e.DefenceBonus += 2; break;      // Ward
+            case 8: e.CriticalChanceBonus += 5; e.CriticalDamageBonus += 10; break;   // Predator
+            case 9: e.LifeSteal += 3; break;                                  // Lifedrinker
+            case 13: e.WeaponPower += 20; e.HasFireEnchant = true; break;     // Phoenix Fire
+            case 14: e.WeaponPower += 20; e.HasFrostEnchant = true; break;    // Frostbite
+        }
+    }
+
+    // v1.2.5: the enchant-touched stats of a record as one vector, to compare an item with its template.
+    private static int[] StatVector(Equipment.EnchantBaseRecord r) => new[]
+    {
+        r.WeaponPower, r.ArmorClass, r.StrengthBonus, r.DexterityBonus, r.ConstitutionBonus, r.IntelligenceBonus,
+        r.WisdomBonus, r.CharismaBonus, r.DefenceBonus, r.StaminaBonus, r.AgilityBonus, r.CriticalChanceBonus,
+        r.CriticalDamageBonus, r.MagicResistance, r.LifeSteal,
+    };
+
+    /// <summary>v1.2.5: the form enchant removal returns an item to. The record taken before its first enchant
+    /// when there is one; for an item enchanted before 1.2.5 (no record), its built-in template, but only when
+    /// the item is exactly that template plus the enchants its kind list names; otherwise null (unknown).</summary>
+    internal static Equipment.EnchantBaseRecord? EnchantBaseOf(Equipment item)
+    {
+        var recorded = item.GetEnchantBase();
+        if (recorded != null) return recorded;
+        var template = VerifiedTemplate(item);
+        return template?.ToEnchantBaseRecord();
+    }
+
+    /// <summary>v1.2.5: the built-in template (same name once the enchant tags are stripped, same slot) that this
+    /// item is plus its recorded enchants and nothing else: every field an enchant never touches equal, the
+    /// named enchants' exact amounts, each stat enchant one stat tier's bonus on its own stat. Failure damage,
+    /// a rolled loot item or a kind list that does not match the enchant count all fail the check.</summary>
+    internal static Equipment? VerifiedTemplate(Equipment item)
+    {
+        var kinds = item.GetEnchantedKinds();
+        if (kinds.Count == 0 || kinds.Count != item.GetEnchantmentCount()) return null;
+        string baseName = StripEnchantTags(item.Name);
+        foreach (var t in EquipmentDatabase.GetBuiltInTemplates())
+            if (t.Slot == item.Slot && t.Name == baseName && IsTemplatePlusKinds(item, t, kinds))
+                return t;
+        return null;
+    }
+
+    private static bool IsTemplatePlusKinds(Equipment item, Equipment t, List<string> kinds)
+    {
+        bool untouchedSame = item.Handedness == t.Handedness && item.WeaponType == t.WeaponType && item.ArmorType == t.ArmorType
+            && item.Rarity == t.Rarity && item.MinLevel == t.MinLevel && item.MaxHPBonus == t.MaxHPBonus && item.MaxManaBonus == t.MaxManaBonus
+            && item.ShieldBonus == t.ShieldBonus && item.BlockChance == t.BlockChance && item.PoisonDamage == t.PoisonDamage
+            && item.ManaSteal == t.ManaSteal && item.ArmorPiercing == t.ArmorPiercing && item.Thorns == t.Thorns
+            && item.HPRegen == t.HPRegen && item.ManaRegen == t.ManaRegen && item.HasLightningEnchant == t.HasLightningEnchant
+            && item.HasPoisonEnchant == t.HasPoisonEnchant && item.HasHolyEnchant == t.HasHolyEnchant
+            && item.HasShadowEnchant == t.HasShadowEnchant && item.HasBossSlayer == t.HasBossSlayer && item.HasTitanResolve == t.HasTitanResolve
+            && item.Value >= t.Value;
+        if (!untouchedSame) return false;
+
+        // The template with every named enchant on the list applied, and each stat enchant's stat noted.
+        var expected = t.Clone();
+        var statTiers = Enumerable.Range(1, EnchantTiers.Length).Where(tier => tier <= 4 || (tier >= 10 && tier <= 12)).ToList();
+        var statBonuses = statTiers.Select(tier => EnchantTiers[tier - 1].bonus).ToHashSet();
+        var statFields = new List<int>();
+        foreach (var kind in kinds)
+        {
+            int named = NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
+            if (named > 0) { ApplyNamedEnchant(expected, named); continue; }
+            int stat = Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
+            if (stat == 0) return false;
+            var unit = new Equipment();
+            ApplyEquipmentStatBonus(unit, stat, 1);
+            statFields.Add(Array.IndexOf(StatVector(unit.ToEnchantBaseRecord()), 1));
+        }
+        if (item.HasFireEnchant != expected.HasFireEnchant || item.HasFrostEnchant != expected.HasFrostEnchant) return false;
+        var have = StatVector(item.ToEnchantBaseRecord());
+        var want = StatVector(expected.ToEnchantBaseRecord());
+        for (int i = 0; i < have.Length; i++)
+        {
+            int extra = have[i] - want[i];
+            if (statFields.Contains(i) ? !statBonuses.Contains(extra) : extra != 0) return false;
+        }
+        return true;
+    }
+
+    private static void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
     {
         switch (statChoice)
         {
@@ -2309,7 +2543,7 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         WriteSectionHeader(Loc.Get("magic_shop.enchant_removal"), "magenta");
         DisplayMessage("");
-        DisplayMessage($"'{_ownerName} nods gravely. 'Removing an enchantment is delicate work.'", "cyan");
+        DisplayMessage(Loc.Get("magic_shop.remove_nods", _ownerName), "cyan");
         DisplayMessage("");
 
         // Find enchanted equipment
@@ -2328,7 +2562,7 @@ public partial class MagicShopLocation : BaseLocation
             if (equip != null && equip.GetEnchantmentCount() > 0)
             {
                 enchantedItems.Add((slot, equip));
-                DisplayMessage($"  ({idx}) {slot}: {equip.Name} [E:{equip.GetEnchantmentCount()}]", equip.GetRarityColor());
+                DisplayMessage($"  ({idx}) {slot}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]", equip.GetRarityColor());
                 idx++;
             }
         }
@@ -2352,35 +2586,43 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
+        var (rmSlot, rmEquip) = enchantedItems[choice - 1];
+        // v1.2.5: removal returns the item to its base form; when that form is not known, nothing is done
+        // and nothing is charged (clearing the count but keeping the powers would let enchants stack).
+        var baseForm = EnchantBaseOf(rmEquip);
+        if (baseForm == null)
+        {
+            DisplayMessage(Loc.Get("magic_shop.remove_no_base"), "red");
+            await terminal.WaitForKey();
+            return;
+        }
+
         if (player.Gold < removalCost)
         {
-            DisplayMessage("'You lack the gold,' the gnome says.", "red");
+            DisplayMessage(Loc.Get("magic_shop.remove_no_gold"), "red");
             await terminal.WaitForKey();
             return;
         }
 
-        var (rmSlot, rmEquip) = enchantedItems[choice - 1];
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.remove_enchant_confirm", rmEquip.Name)))
+        if (!await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.remove_enchant_confirm", ItemNames.Display(rmEquip)))))
         {
             await terminal.WaitForKey();
             return;
         }
 
-        // Find the base equipment by looking up by original ID pattern
-        // For dynamic equipment, we can't easily get back to the original - so just strip enchantments
         player.Gold -= removalCost;
 
-        // Create a clean clone and reset enchantment tracking
+        // v1.2.5: back to the base form: every stat, the fire and frost flags, the value and the name the
+        // enchants changed. The record goes too, so a later first enchant records afresh.
         var stripped = rmEquip.Clone();
+        stripped.ApplyEnchantBaseRecord(baseForm);
+        stripped.EnchantBase = "";
         stripped.ClearEnchantMarkers();   // v1.1.7: the count and the kinds, so paid removal really frees the item
 
-        // Strip name suffixes
-        string[] suffixes = { " (Blessed)", " (Ocean-Touched)", " (Warded)", " (Predator)", " (Lifedrinker)" };
-        foreach (var sfx in suffixes)
-            stripped.Name = stripped.Name.Replace(sfx, "");
-        // Strip stat suffixes like " +2 Str", " +4 Dex", etc.
-        stripped.Name = System.Text.RegularExpressions.Regex.Replace(stripped.Name, @"\s\+\d+\s\w{3}", "");
+        // Strip every tag an enchant writes (v1.2.5: the list is NamedEnchantTag, so Phoenix Fire and
+        // Frostbite are stripped too, and so is a stale tag on the base name)
+        stripped.Name = StripEnchantTags(stripped.Name);
 
         EquipmentDatabase.RegisterDynamic(stripped);
         player.UnequipSlot(rmSlot);
@@ -2388,8 +2630,8 @@ public partial class MagicShopLocation : BaseLocation
         player.RecalculateStats();
 
         DisplayMessage("");
-        DisplayMessage("The enchantments dissolve into wisps of fading light...", "magenta");
-        DisplayMessage($"Your {stripped.Name} has been restored to its base form.", "yellow");
+        DisplayMessage(Loc.Get("magic_shop.remove_dissolve"), "magenta");
+        DisplayMessage(Loc.Get("magic_shop.remove_restored", stripped.Name), "yellow");
         player.Statistics?.RecordGoldSpent(removalCost);
 
         await terminal.WaitForKey();
@@ -2477,7 +2719,7 @@ public partial class MagicShopLocation : BaseLocation
                 terminal.SetColor("cyan");
                 terminal.Write($"  {Loc.Get("magic_shop.equipped_label")} ");
                 terminal.SetColor("bright_white");
-                terminal.Write(currentItem.Name);
+                terminal.Write(ItemNames.Display(currentItem));
                 var eqStats = GetAccessoryBonusDescription(currentItem);
                 if (!string.IsNullOrEmpty(eqStats)) { terminal.SetColor("green"); terminal.Write($"  {eqStats}"); }
                 terminal.WriteLine("");
@@ -2522,7 +2764,7 @@ public partial class MagicShopLocation : BaseLocation
 
             // Name (colored by rarity if affordable, dim if not)
             terminal.SetColor(canBuy ? item.GetRarityColor() : "darkgray");
-            terminal.Write($"{item.Name,-26}");
+            terminal.Write(ItemNames.Column(item, 26));
 
             // Level requirement
             if (item.MinLevel > 1)
@@ -2703,7 +2945,7 @@ public partial class MagicShopLocation : BaseLocation
         // Show item detail before purchase
         terminal.WriteLine("");
         terminal.SetColor("bright_white");
-        terminal.WriteLine($"  {item.Name}");
+        terminal.WriteLine($"  {ItemNames.Display(item)}");
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("weapon_shop.reforge_rarity")}: ");
         terminal.SetColor(item.GetRarityColor());
@@ -2722,7 +2964,7 @@ public partial class MagicShopLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, item.Name, price);
+        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, ItemNames.Display(item), price);
 
         // v1.2.4 (design item C): [H]aggle over the pre-tax price; tax is recomputed on the agreed amount
         while (true)
@@ -2779,7 +3021,7 @@ public partial class MagicShopLocation : BaseLocation
                 var invItem = player.ConvertEquipmentToLegacyItem(item);
                 player.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", item.Name)}");
+                UIHelper.WriteRow(terminal, $"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
             }
             else
             {
@@ -2840,7 +3082,7 @@ public partial class MagicShopLocation : BaseLocation
                 {
                     player.RecalculateStats();
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  {Loc.Get("magic_shop.now_wearing", item.Name)}");
+                    terminal.WriteLine($"  {Loc.Get("magic_shop.now_wearing", ItemNames.Display(item))}");
                 }
                 else
                 {
@@ -2848,7 +3090,7 @@ public partial class MagicShopLocation : BaseLocation
                     var invItem = player.ConvertEquipmentToLegacyItem(item);
                     player.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", item.Name)}");
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
                 }
             }
         }
@@ -2858,7 +3100,7 @@ public partial class MagicShopLocation : BaseLocation
             var invItem = player.ConvertEquipmentToLegacyItem(item);
             player.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", item.Name)}");
+            UIHelper.WriteRow(terminal, $"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
         }
 
         player.Statistics?.RecordPurchase(totalWithTax);
@@ -2933,7 +3175,7 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("bright_cyan");
             terminal.Write($"  {i + 1,2}. ");
             terminal.SetColor("white");
-            terminal.Write($"{item.Name,-30}");
+            terminal.Write(ItemNames.Column(item, 30));
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("magic_shop.sell_for_gold", sellPrice.ToString("N0")));
         }
@@ -2994,7 +3236,7 @@ public partial class MagicShopLocation : BaseLocation
                     player.Statistics?.RecordSale(sellPrice);
                     player.Inventory.RemoveAt(i);
                     terminal.SetColor("bright_green");
-                    terminal.WriteLine($"  {Loc.Get("shop.sold_single", item.Name, $"{sellPrice:N0}")}");
+                    terminal.WriteLine($"  {Loc.Get("shop.sold_single", ItemNames.Display(item), $"{sellPrice:N0}")}");
                     await SaveSystem.Instance.AutoSave(player);
                     break;
                 }
@@ -3075,30 +3317,53 @@ public partial class MagicShopLocation : BaseLocation
     // LOVE SPELLS - Relationship magic
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // v1.2.5: name and effect are Loc keys, resolved when shown. Nothing stores or matches a spell name: the
+    // daily Binding limit is kept by NPC name (_bindingOfSoulsUsedToday, LastBindingOfSoulsRealDate) and the
+    // bypassCap flag, the statistics by gold.
     private static readonly (string name, int steps, long baseCost, int levelScale, int manaCost, int minLevel, bool bypassCap, string effect)[] LoveSpells = new[]
     {
-        ("Charm of Fondness",         1, 300L,   30,  10, 3,  false, "Warm their feelings slightly"),
-        ("Enchantment of Attraction", 2, 1000L,  60,  20, 8,  false, "Noticeably improve their regard"),
-        ("Heart's Desire",            3, 3000L,  120, 40, 18, false, "Deeply shift their affections"),
-        ("Binding of Souls",          2, 8000L,  300, 80, 35, true,  "Powerful bond (ignores daily limit)"),
+        ("magic_shop.love_spell_fondness",   1, 300L,   30,  10, 3,  false, "magic_shop.love_spell_fondness_effect"),
+        ("magic_shop.love_spell_attraction", 2, 1000L,  60,  20, 8,  false, "magic_shop.love_spell_attraction_effect"),
+        ("magic_shop.love_spell_desire",     3, 3000L,  120, 40, 18, false, "magic_shop.love_spell_desire_effect"),
+        ("magic_shop.love_spell_binding",    2, 8000L,  300, 80, 35, true,  "magic_shop.love_spell_binding_effect"),
     };
 
+    /// <summary>v1.2.5: a spell row's second line, its effect, under the name (wrapped if a translation is long).</summary>
+    private void WriteSpellEffect(string effect, string color)
+    {
+        terminal.SetColor(color);
+        foreach (var row in UIHelper.WordWrap(effect, UIHelper.WrapWidth - 6))
+            terminal.WriteLine("      " + row);
+    }
+
+    /// <summary>v1.2.5: the name field of a spell list, the longest name or the label, plus one.</summary>
+    internal static int SpellNameWidth(IEnumerable<string> nameKeys) =>
+        Math.Max(Loc.Get("magic_shop.col_spell").Length, nameKeys.Max(k => Loc.Get(k).Length)) + 1;
+
+    /// <summary>v1.2.5: the love spell header, two rows like the spells: name, cost and mana, then the effect.</summary>
+    internal static string[] LoveHeader(int nameW) => new[]
+    {
+        "   #  " + Loc.Get("magic_shop.col_spell").PadRight(nameW) + Loc.Get("castle.header_cost").PadLeft(9) + " " + Loc.Get("ui.stat_mana").PadLeft(6),
+        "      " + Loc.Get("magic_shop.col_effect"),
+    };
+
+    // v1.2.5: the relationship band in the player's language (the love_corner.rel_* names, English as before).
     private static string GetRelationshipDisplayName(int rel)
     {
-        return rel switch
+        return Loc.Get(rel switch
         {
-            <= 10 => "Married",
-            <= 20 => "Love",
-            <= 30 => "Passion",
-            <= 40 => "Friendship",
-            <= 50 => "Trust",
-            <= 60 => "Respect",
-            <= 70 => "Neutral",
-            <= 80 => "Suspicious",
-            <= 90 => "Anger",
-            <= 100 => "Enemy",
-            _ => "Hate"
-        };
+            <= 10 => "love_corner.rel_married",
+            <= 20 => "love_corner.rel_love",
+            <= 30 => "love_corner.rel_passion",
+            <= 40 => "love_corner.rel_friendship",
+            <= 50 => "love_corner.rel_trust",
+            <= 60 => "love_corner.rel_respect",
+            <= 70 => "love_corner.rel_neutral",
+            <= 80 => "love_corner.rel_suspicious",
+            <= 90 => "love_corner.rel_anger",
+            <= 100 => "love_corner.rel_enemy",
+            _ => "love_corner.rel_hate"
+        });
     }
 
     private static string GetRelationshipColor(int rel)
@@ -3117,6 +3382,32 @@ public partial class MagicShopLocation : BaseLocation
             <= 100 => "bright_red",    // Enemy
             _ => "bright_red"          // Hate
         };
+    }
+
+    /// <summary>v1.2.5: a picker command, "[N]ext" when the label starts with its key letter, "[N] Tovább" otherwise;
+    /// "N. Next" for a screen reader. The typed letters stay N, P, S and C.</summary>
+    private string PickerKey(string key, string labelKey)
+    {
+        string label = Loc.Get(labelKey);
+        if (IsScreenReader) return $"{key}. {label}";
+        var (letter, tail) = MenuKeyLabel(key, label);
+        return $"[{letter}]{tail}";
+    }
+
+    internal static int PickerClassWidth(IEnumerable<NPC> shown) =>
+        Math.Max(13, Math.Max(Loc.Get("arena.col_class").Length, shown.Select(n => n.ClassName.Length).DefaultIfEmpty(0).Max()) + 1);
+
+    /// <summary>v1.2.5: the level field, 4 columns or one more than its label.</summary>
+    internal static int PickerLevelWidth() => Math.Max(4, Loc.Get("main_street.fame_lv").Length + 1);
+
+    /// <summary>v1.2.5: the picker's column header: number, name (28), class, level, relationship or status.</summary>
+    internal static string PickerHeader(int classW, bool showRelationship, bool showLevel)
+    {
+        string h = "    #  " + Loc.Get("arena.col_name").PadRight(28) + Loc.Get("arena.col_class").PadRight(classW);
+        if (showLevel) h += Loc.Get("main_street.fame_lv").PadRight(PickerLevelWidth());
+        if (showRelationship) h += Loc.Get("magic_shop.col_relationship");
+        else if (showLevel) h += Loc.Get("arena.col_status");
+        return h.TrimEnd();
     }
 
     /// <summary>
@@ -3148,26 +3439,22 @@ public partial class MagicShopLocation : BaseLocation
             if (searchFilter != null)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"  Search: \"{searchFilter}\" ({filtered.Count} matches)");
+                WrappedLine($"  {Loc.Get("magic_shop.picker_search", searchFilter, filtered.Count)}", "yellow");
             }
             terminal.WriteLine("");
 
             // Column headers
+            // v1.2.5: labels in the player's language over their fields; the class field fits the longest
+            // class name on the page (13 columns at least, as before).
+            int classW = PickerClassWidth(filtered.Skip(startIdx).Take(endIdx - startIdx));
             terminal.SetColor("darkgray");
-            if (showRelationship && showLevel)
-                terminal.WriteLine("    #  Name                        Class        Lv  Relationship");
-            else if (showRelationship)
-                terminal.WriteLine("    #  Name                        Class        Relationship");
-            else if (showLevel)
-                terminal.WriteLine("    #  Name                        Class        Lv  Status");
-            else
-                terminal.WriteLine("    #  Name                        Class");
+            terminal.WriteLine(PickerHeader(classW, showRelationship, showLevel));
             WriteDivider(68);
 
             if (filtered.Count == 0)
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine("  No NPCs found.");
+                terminal.WriteLine($"  {Loc.Get("magic_shop.picker_none")}");
             }
             else
             {
@@ -3191,12 +3478,12 @@ public partial class MagicShopLocation : BaseLocation
                     terminal.Write($"{npcName,-28}");
 
                     terminal.SetColor("darkgray");
-                    terminal.Write($"{npc.Class,-13}");
+                    terminal.Write(npc.ClassName.PadRight(classW));
 
                     if (showLevel)
                     {
                         terminal.SetColor("gray");
-                        terminal.Write($"{npc.Level,-4}");
+                        terminal.Write($"{npc.Level}".PadRight(PickerLevelWidth()));
                     }
 
                     if (showRelationship)
@@ -3209,13 +3496,13 @@ public partial class MagicShopLocation : BaseLocation
                         if (rel <= 20)
                         {
                             terminal.SetColor("darkgray");
-                            terminal.Write(" (max)");
+                            terminal.Write($" {Loc.Get("magic_shop.picker_max")}");
                         }
                     }
                     else if (showLevel)
                     {
                         terminal.SetColor(npc.IsDead ? "red" : "green");
-                        terminal.Write(npc.IsDead ? "Dead" : "Alive");
+                        terminal.Write(Loc.Get(npc.IsDead ? "team.status_dead_label" : "team.status_alive"));
                     }
 
                     terminal.WriteLine("");
@@ -3223,20 +3510,39 @@ public partial class MagicShopLocation : BaseLocation
             }
 
             terminal.WriteLine("");
-            terminal.SetColor("gray");
-            terminal.Write(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+            // v1.2.5: the command bar; a command that would pass column 79 starts a new row.
+            var bar = new List<(string text, string color)> { (IsScreenReader ? $"0. {Loc.Get("ui.cancel")}" : $"[0] {Loc.Get("ui.cancel")}", "gray") };
             if (totalPages > 1)
             {
-                terminal.Write(IsScreenReader ? "   N. Next   P. Prev" : "   [N]ext   [P]rev");
-                terminal.SetColor("darkgray");
-                terminal.Write($"   Page {page + 1}/{totalPages}");
+                bar.Add((PickerKey("N", "magic_shop.picker_next"), "gray"));
+                bar.Add((PickerKey("P", "magic_shop.picker_prev"), "gray"));
+                bar.Add((Loc.Get("magic_shop.picker_page", page + 1, totalPages), "darkgray"));
             }
-            terminal.Write("   [S]earch");
-            if (searchFilter != null) terminal.Write("   [C]lear search");
+            bar.Add((PickerKey("S", "magic_shop.picker_search_key"), "darkgray"));
+            if (searchFilter != null) bar.Add((PickerKey("C", "magic_shop.picker_clear"), "darkgray"));
+            int col = 2;
+            terminal.Write("  ");
+            for (int b = 0; b < bar.Count; b++)
+            {
+                if (b > 0 && col + 3 + bar[b].text.Length > UIHelper.WrapWidth)
+                {
+                    terminal.WriteLine("");
+                    terminal.Write("  ");
+                    col = 2;
+                }
+                else if (b > 0)
+                {
+                    terminal.Write("   ");
+                    col += 3;
+                }
+                terminal.SetColor(bar[b].color);
+                terminal.Write(bar[b].text);
+                col += bar[b].text.Length;
+            }
             terminal.WriteLine("");
             terminal.WriteLine("");
 
-            var input = await terminal.GetInput("  Target: ");
+            var input = await terminal.GetInput($"  {Loc.Get("magic_shop.picker_target_prompt")}");
             if (string.IsNullOrEmpty(input)) continue;
 
             string upper = input.Trim().ToUpper();
@@ -3245,7 +3551,7 @@ public partial class MagicShopLocation : BaseLocation
             if (upper == "P" && totalPages > 1) { page = (page - 1 + totalPages) % totalPages; continue; }
             if (upper == "S")
             {
-                var search = await terminal.GetInput("  Search name: ");
+                var search = await terminal.GetInput($"  {Loc.Get("magic_shop.picker_search_prompt")}");
                 if (!string.IsNullOrWhiteSpace(search))
                 {
                     searchFilter = search.Trim();
@@ -3267,18 +3573,15 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         WriteBoxHeader(Loc.Get("magic_shop.romance_header"), "magenta");
         terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine($"  {_ownerName} produces a collection of shimmering vials and glowing crystals.");
-        terminal.SetColor("cyan");
-        terminal.WriteLine("  'Love is the most powerful magic. And the most dangerous.'");
+        WrappedLine($"  {Loc.Get("magic_shop.love_intro_vials", _ownerName)}", "gray");
+        WrappedLine($"  {Loc.Get("magic_shop.love_intro_power")}", "cyan");
 
         // Ocean Philosophy warning
         if ((OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) >= 4)
         {
             terminal.WriteLine("");
-            terminal.SetColor("magenta");
-            terminal.WriteLine("  'You understand that these bonds are real, even if begun through magic?'");
-            terminal.WriteLine("  'The wave cannot force the ocean to love it -- it already does.'");
+            WrappedLine($"  {Loc.Get("magic_shop.love_ocean_1")}", "magenta");
+            WrappedLine($"  {Loc.Get("magic_shop.love_ocean_2")}", "magenta");
         }
         terminal.WriteLine("");
 
@@ -3289,10 +3592,12 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("magic_shop.gold_and_mana", $"{player.Gold:N0}", $"{player.Mana}")}");
         terminal.WriteLine("");
 
-        // Column header
+        // Column header (v1.2.5: each spell takes two rows, name, cost and mana, then its effect, so a row fits
+        // 79 columns in every language; it was one row of 82 to 90)
+        int loveNameW = SpellNameWidth(LoveSpells.Select(sp => sp.name));
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("magic_shop.love_col_header"));
-        WriteDivider(78);
+        foreach (var h in LoveHeader(loveNameW)) terminal.WriteLine(h);
+        WriteDivider(Math.Min(UIHelper.WrapWidth, 6 + loveNameW + 16 + 10));
 
         for (int i = 0; i < LoveSpells.Length; i++)
         {
@@ -3306,34 +3611,39 @@ public partial class MagicShopLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"  [{i + 1}] ");
 
+            string spellName = Loc.Get(spell.name).PadRight(loveNameW);
+            string spellEffect = Loc.Get(spell.effect);
+            string price = Loc.Get("magic_shop.gold_short", $"{cost:N0}").PadLeft(9) + " ";
+            string mana = Loc.Get("base.prompt_mp", spell.manaCost).PadLeft(6);
             if (!meetsLevel)
             {
                 terminal.SetColor("darkgray");
-                terminal.Write($"{spell.name,-27}{spell.effect,-35}{cost,7:N0}g {spell.manaCost,3}mp");
+                terminal.Write(spellName + price + mana);
                 terminal.SetColor("red");
-                terminal.Write($"  Lv.{spell.minLevel}+");
+                terminal.Write($"  {Loc.Get("magic_shop.req_level", spell.minLevel)}");
+                terminal.WriteLine("");
+                WriteSpellEffect(spellEffect, "darkgray");
             }
             else if (!hasMana)
             {
                 terminal.SetColor("red");
-                terminal.Write($"{spell.name,-27}");
-                terminal.SetColor("red");
-                terminal.Write($"{spell.effect,-35}{cost,7:N0}g ");
+                terminal.Write(spellName + price);
                 terminal.SetColor("bright_red");
-                terminal.Write($"{spell.manaCost,3}mp");
+                terminal.Write(mana);
+                terminal.WriteLine("");
+                WriteSpellEffect(spellEffect, "red");
             }
             else
             {
                 terminal.SetColor(canAfford ? "white" : "red");
-                terminal.Write($"{spell.name,-27}");
-                terminal.SetColor(canAfford ? "cyan" : "red");
-                terminal.Write($"{spell.effect,-35}");
+                terminal.Write(spellName);
                 terminal.SetColor(canAfford ? "yellow" : "red");
-                terminal.Write($"{cost,7:N0}g ");
+                terminal.Write(price);
                 terminal.SetColor(canAfford ? "gray" : "red");
-                terminal.Write($"{spell.manaCost,3}mp");
+                terminal.Write(mana);
+                terminal.WriteLine("");
+                WriteSpellEffect(spellEffect, canAfford ? "cyan" : "red");
             }
-            terminal.WriteLine("");
         }
 
         if (evilSurcharge)
@@ -3384,15 +3694,14 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        var targetNPC = await PickNPCTarget(player, npcsAlive, $"Casting: {selected.name}", showRelationship: true, showLevel: false);
+        var targetNPC = await PickNPCTarget(player, npcsAlive, Loc.Get("magic_shop.picker_casting", Loc.Get(selected.name)), showRelationship: true, showLevel: false);
         if (targetNPC == null) return;
 
         // Check if already at Love or better
         int currentRel = RelationshipSystem.GetRelationshipLevel(player, targetNPC);
         if (currentRel <= 20)
         {
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  '{targetNPC.Name1} already adores you. My magic cannot improve upon that.'");
+            WrappedLine($"  {Loc.Get("magic_shop.love_adores", targetNPC.Name1)}", "cyan");
             await terminal.WaitForKey();
             return;
         }
@@ -3413,8 +3722,7 @@ public partial class MagicShopLocation : BaseLocation
 
             if (alreadyUsedToday)
             {
-                terminal.SetColor("red");
-                terminal.WriteLine("  'The Binding can only be cast once per day on the same soul.'");
+                WrappedLine($"  {Loc.Get("magic_shop.love_binding_once")}", "red");
                 await terminal.WaitForKey();
                 return;
             }
@@ -3429,16 +3737,8 @@ public partial class MagicShopLocation : BaseLocation
         string afterName = GetRelationshipDisplayName(projectedRel);
 
         terminal.WriteLine("");
-        terminal.SetColor("white");
-        terminal.Write($"  Cast ");
-        terminal.SetColor("bright_magenta");
-        terminal.Write(selected.name);
-        terminal.SetColor("white");
-        terminal.Write(" on ");
-        terminal.SetColor("bright_magenta");
-        terminal.Write(targetNPC.Name1);
-        terminal.SetColor("white");
-        terminal.WriteLine("?");
+        WriteTemplate("  ", Loc.Get("magic_shop.love_cast_confirm", "{0}", "{1}"), "white",
+            (Loc.Get(selected.name), "bright_magenta"), (targetNPC.Name1, "bright_magenta"));
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("magic_shop.relationship_label")} ");
         terminal.SetColor(GetRelationshipColor(currentRel));
@@ -3466,15 +3766,11 @@ public partial class MagicShopLocation : BaseLocation
         if (commitment > 0.7f && random.Next(100) < 25)
         {
             terminal.WriteLine("");
-            terminal.SetColor("gray");
-            terminal.WriteLine($"  {_ownerName} whispers ancient words over a rose-colored crystal...");
+            WrappedLine($"  {Loc.Get("magic_shop.love_whisper", _ownerName)}", "gray");
             await Pacing.Wait(500);
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  The magic dissipates harmlessly.");
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {targetNPC.Name1} has too strong a will for such charms.");
-            terminal.SetColor("darkgray");
-            terminal.WriteLine("  (Gold and mana still consumed)");
+            WrappedLine($"  {Loc.Get("magic_shop.love_dissipates")}", "yellow");
+            WrappedLine($"  {Loc.Get("magic_shop.love_resists", targetNPC.Name1)}", "red");
+            WrappedLine($"  {Loc.Get("magic_shop.spell_still_consumed")}", "darkgray");
             player.Statistics?.RecordLoveSpellCast(loveTotalWithTax);
             player.Statistics?.RecordGoldSpent(loveTotalWithTax);
             await terminal.WaitForKey();
@@ -3499,18 +3795,14 @@ public partial class MagicShopLocation : BaseLocation
         string newRelName = GetRelationshipDisplayName(newRel);
 
         terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine($"  {_ownerName} whispers ancient words over a rose-colored crystal...");
+        WrappedLine($"  {Loc.Get("magic_shop.love_whisper", _ownerName)}", "gray");
         await Pacing.Wait(500);
-        terminal.SetColor("magenta");
-        terminal.WriteLine("  The crystal pulses with warmth and then shatters softly.");
-        terminal.SetColor("white");
-        terminal.WriteLine("  A feeling of connection washes over you.");
+        WrappedLine($"  {Loc.Get("magic_shop.love_shatter")}", "magenta");
+        WrappedLine($"  {Loc.Get("magic_shop.love_connection")}", "white");
         terminal.WriteLine("");
-        terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {targetNPC.Name1}'s feelings toward you have improved!");
+        WrappedLine($"  {Loc.Get("magic_shop.love_improved", targetNPC.Name1)}", "bright_green");
         terminal.SetColor("gray");
-        terminal.Write("  Relationship: ");
+        terminal.Write($"  {Loc.Get("magic_shop.relationship_label")} ");
         terminal.SetColor(GetRelationshipColor(currentRel));
         terminal.Write(beforeName);
         terminal.SetColor("gray");
@@ -3530,11 +3822,24 @@ public partial class MagicShopLocation : BaseLocation
     // DEATH SPELLS - Dark Arts
     // ═══════════════════════════════════════════════════════════════════════════
 
+    // v1.2.5: name and description are Loc keys, resolved when shown; nothing stores or matches a spell name.
     private static readonly (string name, int baseSuccess, long baseCost, int levelScale, int manaCost, int minLevel, int darkShift, string desc)[] DeathSpells = new[]
     {
-        ("Weakening Hex",   40, 3000L,  200, 30,  15, 5,  "Drains life force - may kill target"),
-        ("Death's Touch",   60, 10000L, 500, 60,  25, 15, "Kills target with necrotic energy"),
-        ("Soul Severance",  80, 30000L, 1000, 100, 40, 25, "Rips the soul from the body"),
+        ("magic_shop.dark_spell_hex",       40, 3000L,  200, 30,  15, 5,  "magic_shop.dark_spell_hex_desc"),
+        ("magic_shop.dark_spell_touch",     60, 10000L, 500, 60,  25, 15, "magic_shop.dark_spell_touch_desc"),
+        ("magic_shop.dark_spell_severance", 80, 30000L, 1000, 100, 40, 25, "magic_shop.dark_spell_severance_desc"),
+    };
+
+    /// <summary>v1.2.5: the chance field of the dark arts list, 4 columns or the label's width.</summary>
+    internal static int DarkChanceWidth() => Math.Max(4, Loc.Get("magic_shop.col_chance").Length);
+
+    /// <summary>v1.2.5: the dark arts header, two rows like the spells: name, chance, cost, mana and darkness,
+    /// then the effect.</summary>
+    internal static string[] DarkHeader(int nameW) => new[]
+    {
+        "   #  " + Loc.Get("magic_shop.col_spell").PadRight(nameW) + Loc.Get("magic_shop.col_chance").PadLeft(DarkChanceWidth())
+            + "  " + Loc.Get("castle.header_cost").PadLeft(11) + " " + Loc.Get("ui.stat_mana").PadLeft(6) + "  " + Loc.Get("magic_shop.col_dark"),
+        "      " + Loc.Get("magic_shop.col_effect"),
     };
 
     // Shopkeepers and companions that cannot be targeted
@@ -3561,15 +3866,12 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         WriteBoxHeader(Loc.Get("magic_shop.dark_arts_header"), "red");
         terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine($"  {_ownerName}'s eyes darken. 'These are not services I offer lightly.'");
-        terminal.SetColor("cyan");
-        terminal.WriteLine("  'The shadows exact a price beyond gold.'");
+        WrappedLine($"  {Loc.Get("magic_shop.dark_eyes", _ownerName)}", "gray");
+        WrappedLine($"  {Loc.Get("magic_shop.dark_price")}", "cyan");
 
         if ((OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) >= 3)
         {
-            terminal.SetColor("magenta");
-            terminal.WriteLine("  'You know what you do is the Ocean hurting itself. Proceed?'");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_ocean")}", "magenta");
         }
         terminal.WriteLine("");
 
@@ -3579,10 +3881,12 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine($"  {Loc.Get("magic_shop.gold_and_mana", $"{player.Gold:N0}", $"{player.Mana}")}");
         terminal.WriteLine("");
 
-        // Column header
+        // Column header (v1.2.5: two rows per spell, as the love spells; the one row was 87 columns)
+        int darkNameW = SpellNameWidth(DeathSpells.Select(sp => sp.name));
+        int chanceW = DarkChanceWidth();
         terminal.SetColor("darkgray");
-        terminal.WriteLine(Loc.Get("magic_shop.dark_col_header"));
-        WriteDivider(86);
+        foreach (var h in DarkHeader(darkNameW)) terminal.WriteLine(h);
+        WriteDivider(Math.Min(UIHelper.WrapWidth, 6 + darkNameW + chanceW + 2 + 11 + 7 + 2 + 8));
 
         for (int i = 0; i < DeathSpells.Length; i++)
         {
@@ -3592,6 +3896,8 @@ public partial class MagicShopLocation : BaseLocation
             bool meetsLevel = player.Level >= spell.minLevel;
             bool canAfford = player.Gold >= cost && player.Mana >= spell.manaCost;
             int darkShift = isGood ? spell.darkShift * 2 : spell.darkShift;
+            string spellName = Loc.Get(spell.name).PadRight(darkNameW);
+            string spellDesc = Loc.Get(spell.desc);
 
             terminal.SetColor("gray");
             terminal.Write($"  [{i + 1}] ");
@@ -3599,27 +3905,26 @@ public partial class MagicShopLocation : BaseLocation
             if (!meetsLevel)
             {
                 terminal.SetColor("darkgray");
-                terminal.Write($"{spell.name,-19}{spell.desc,-32}");
-                terminal.Write($"  ---   ");
-                terminal.Write($"{"---",11}  {"---",3}   ");
-                terminal.Write($"[Lv.{spell.minLevel}]");
+                terminal.Write(spellName + "---".PadLeft(chanceW) + "  " + "---".PadLeft(11) + " " + "---".PadLeft(6) + "  ");
+                terminal.Write($"[{Loc.Get("magic_shop.lv_tag", spell.minLevel)}]");
+                terminal.WriteLine("");
+                WriteSpellEffect(spellDesc, "darkgray");
             }
             else
             {
                 terminal.SetColor(canAfford ? "bright_red" : "red");
-                terminal.Write($"{spell.name,-19}");
-                terminal.SetColor(canAfford ? "gray" : "darkgray");
-                terminal.Write($"{spell.desc,-32}");
+                terminal.Write(spellName);
                 terminal.SetColor(canAfford ? "white" : "darkgray");
-                terminal.Write($"{displaySuccess,4}%   ");
+                terminal.Write($"{displaySuccess}%".PadLeft(chanceW) + "  ");
                 terminal.SetColor(canAfford ? "yellow" : "darkgray");
-                terminal.Write($"{cost,11:N0}");
+                terminal.Write($"{cost:N0}".PadLeft(11));
                 terminal.SetColor(canAfford ? "cyan" : "darkgray");
-                terminal.Write($" {spell.manaCost,4}mp");
+                terminal.Write(" " + Loc.Get("base.prompt_mp", spell.manaCost).PadLeft(6));
                 terminal.SetColor("red");
                 terminal.Write($"  +{darkShift}");
+                terminal.WriteLine("");
+                WriteSpellEffect(spellDesc, canAfford ? "gray" : "darkgray");
             }
-            terminal.WriteLine("");
         }
 
         terminal.WriteLine("");
@@ -3667,8 +3972,7 @@ public partial class MagicShopLocation : BaseLocation
         if (isGood)
         {
             terminal.WriteLine("");
-            terminal.SetColor("blue");
-            terminal.WriteLine("  Your noble heart resists this dark path.");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_noble_resists")}", "blue");
             // v1.1.15: yesno-convert-a, strict (Y/N)
             if (!await terminal.AskYesNoAsync($"  {Loc.Get("magic_shop.proceed_yn")}")) return;
         }
@@ -3691,7 +3995,7 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        var targetNPC = await PickNPCTarget(player, validTargets, $"Dark Arts: {selected.name}", showRelationship: false, showLevel: true);
+        var targetNPC = await PickNPCTarget(player, validTargets, Loc.Get("magic_shop.picker_dark_arts", Loc.Get(selected.name)), showRelationship: false, showLevel: true);
         if (targetNPC == null) return;
 
         // Confirmation screen with full details
@@ -3699,7 +4003,7 @@ public partial class MagicShopLocation : BaseLocation
         int darkShiftAmount = isGood ? selected.darkShift * 2 : selected.darkShift;
 
         terminal.ClearScreen();
-        WriteBoxHeader($"Confirm: {selected.name}", "red");
+        WriteBoxHeader(Loc.Get("magic_shop.dark_confirm_title", Loc.Get(selected.name)), "red");
         terminal.WriteLine("");
 
         terminal.SetColor("white");
@@ -3742,21 +4046,17 @@ public partial class MagicShopLocation : BaseLocation
         bool success = random.Next(100) < successChance;
 
         terminal.WriteLine("");
-        terminal.SetColor("gray");
-        terminal.WriteLine($"  {_ownerName} draws a circle of black salt on the floor...");
+        WrappedLine($"  {Loc.Get("magic_shop.dark_circle", _ownerName)}", "gray");
         await Pacing.Wait(800);
-        terminal.SetColor("darkred");
-        terminal.WriteLine("  Dark energy gathers, spiraling toward an unseen target...");
+        WrappedLine($"  {Loc.Get("magic_shop.dark_gathers")}", "darkred");
         await Pacing.Wait(800);
 
         if (success)
         {
-            terminal.SetColor("gray");
-            terminal.WriteLine("  The candles flicker and die.");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_candles")}", "gray");
             await Pacing.Wait(500);
             terminal.WriteLine("");
-            terminal.SetColor("cyan");
-            terminal.WriteLine($"  'It is done. {targetNPC.Name1} has passed beyond the veil.'");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_done", targetNPC.Name1)}", "cyan");
 
             // Kill the NPC — will respawn after world sim cycle
             targetNPC.IsDead = true;
@@ -3771,8 +4071,7 @@ public partial class MagicShopLocation : BaseLocation
             long darkBefore = player.Darkness;
             UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, darkShiftAmount, isGood: false, "magic_shop.death_spell");
             long darkActual = player.Darkness - darkBefore;
-            terminal.SetColor("red");
-            terminal.WriteLine($"  Your alignment shifts toward darkness. (+{darkActual} Darkness)");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_shift", darkActual)}", "red");
 
             // Worsen relationships with ALL living NPCs (not just first 10)
             int affectedCount = 0;
@@ -3782,9 +4081,8 @@ public partial class MagicShopLocation : BaseLocation
                 RelationshipSystem.UpdateRelationship(player, npc, -1, worsenSteps);
                 affectedCount++;
             }
-            terminal.SetColor("gray");
             if (affectedCount > 0)
-                terminal.WriteLine($"  News of the death spreads. {affectedCount} NPCs view you with suspicion.");
+                WrappedLine($"  {Loc.Get("magic_shop.dark_news", affectedCount)}", "gray");
 
             player.Statistics?.RecordDeathSpellCast(deathTotalWithTax);
             AchievementSystem.TryUnlock(player, "dark_magician");
@@ -3800,26 +4098,21 @@ public partial class MagicShopLocation : BaseLocation
         }
         else
         {
-            terminal.SetColor("yellow");
-            terminal.WriteLine("  The dark energy dissipates... the spell has failed.");
-            terminal.SetColor("white");
-            terminal.WriteLine($"  {targetNPC.Name1} somehow resists the magic!");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_failed")}", "yellow");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_resists", targetNPC.Name1)}", "white");
             terminal.WriteLine("");
 
             // Failure consequences: NPC becomes hostile
             RelationshipSystem.UpdateRelationship(player, targetNPC, -1, 5);
-            terminal.SetColor("red");
-            terminal.WriteLine($"  {targetNPC.Name1} senses what you attempted. They are furious.");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_furious", targetNPC.Name1)}", "red");
 
             // Still shift alignment (you tried) -- v0.60.0 alignment audit: route through ChangeAlignment
             long darkBefore2 = player.Darkness;
             UsurperRemake.Systems.AlignmentSystem.Instance.ChangeAlignment(player, darkShiftAmount / 2, isGood: false, "magic_shop.death_spell_failed");
             long darkActual2 = player.Darkness - darkBefore2;
-            terminal.SetColor("red");
-            terminal.WriteLine($"  Your alignment shifts toward darkness. (+{darkActual2} Darkness)");
+            WrappedLine($"  {Loc.Get("magic_shop.dark_shift", darkActual2)}", "red");
 
-            terminal.SetColor("darkgray");
-            terminal.WriteLine("  (Gold and mana still consumed)");
+            WrappedLine($"  {Loc.Get("magic_shop.spell_still_consumed")}", "darkgray");
 
             player.Statistics?.RecordDeathSpellCast(deathTotalWithTax);
         }
@@ -3897,8 +4190,8 @@ public partial class MagicShopLocation : BaseLocation
         terminal.ClearScreen();
         WriteSectionHeader(Loc.Get("magic_shop.scrying"), "magenta");
         DisplayMessage("");
-        DisplayMessage($"{_ownerName} gazes into a crystal orb that swirls with mist...", "gray");
-        DisplayMessage("'Name the soul you seek, and I shall find them.'", "cyan");
+        DisplayMessage(Loc.Get("magic_shop.scry_gaze", _ownerName), "gray");
+        DisplayMessage(Loc.Get("magic_shop.scry_name_soul"), "cyan");
         DisplayMessage("");
 
         long scryCost = ApplyAllPriceModifiers(1000 + (player.Level * 50), player);
@@ -3922,14 +4215,14 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        var target = await PickNPCTarget(player, allNPCs, "Scrying - Choose a Soul", showRelationship: true, showLevel: true);
+        var target = await PickNPCTarget(player, allNPCs, Loc.Get("magic_shop.picker_scry_title"), showRelationship: true, showLevel: true);
         if (target == null) return;
 
         player.Gold -= scryTotalWithTax;
         CityControlSystem.Instance.ProcessSaleTax(scryCost);
 
         DisplayMessage("");
-        DisplayMessage("The mists part to reveal...", "magenta");
+        DisplayMessage(Loc.Get("magic_shop.scry_reveal"), "magenta");
         await Pacing.Wait(500);
         DisplayMessage("");
         WriteSectionHeader(target.Name1, "cyan");
@@ -3948,8 +4241,10 @@ public partial class MagicShopLocation : BaseLocation
         if (target.Brain?.Personality != null)
         {
             var p = target.Brain.Personality;
-            string trait1 = p.Romanticism > 0.7f ? "Romantic" : p.Aggression > 0.7f ? "Aggressive" : p.Intelligence > 0.7f ? "Scholarly" : "Practical";
-            string trait2 = p.Greed > 0.7f ? "Greedy" : p.Loyalty > 0.7f ? "Loyal" : p.Sociability > 0.7f ? "Social" : "Reserved";
+            string trait1 = Loc.Get(p.Romanticism > 0.7f ? "magic_shop.trait_romantic" : p.Aggression > 0.7f ? "magic_shop.trait_aggressive"
+                : p.Intelligence > 0.7f ? "magic_shop.trait_scholarly" : "magic_shop.trait_practical");
+            string trait2 = Loc.Get(p.Greed > 0.7f ? "magic_shop.trait_greedy" : p.Loyalty > 0.7f ? "magic_shop.trait_loyal"
+                : p.Sociability > 0.7f ? "magic_shop.trait_social" : "magic_shop.trait_reserved");
             DisplayMessage($"  {Loc.Get("magic_shop.scry_personality")} {trait1}, {trait2}", "gray");
         }
 
@@ -4134,13 +4429,13 @@ public partial class MagicShopLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "1", Label = "Rings", Category = "browse", Icon = "ring" },
-            new() { Key = "2", Label = "Necklaces", Category = "browse", Icon = "necklace" },
-            new() { Key = "P", Label = "Healing Potions", Category = "shop", Icon = "potion" },
-            new() { Key = "M", Label = "Mana Potions", Category = "shop", Icon = "mana-potion" },
-            new() { Key = "I", Label = "Identify Item", Category = "service", Icon = "identify" },
-            new() { Key = "C", Label = "Remove Curse", Category = "service", Icon = "decurse" },
-            new() { Key = "S", Label = "Sell Accessory", Category = "sell", Icon = "sell" },
+            new() { Key = "1", Label = Loc.Get("magic_shop.rings"), Category = "browse", Icon = "ring" },
+            new() { Key = "2", Label = Loc.Get("magic_shop.necklaces"), Category = "browse", Icon = "necklace" },
+            new() { Key = "P", Label = Loc.Get("magic_shop.healing_potions"), Category = "shop", Icon = "potion" },
+            new() { Key = "M", Label = Loc.Get("magic_shop.mana_potions"), Category = "shop", Icon = "mana-potion" },
+            new() { Key = "I", Label = Loc.Get("magic_shop.identify"), Category = "service", Icon = "identify" },
+            new() { Key = "C", Label = Loc.Get("magic_shop.electron_remove_curse"), Category = "service", Icon = "decurse" },
+            new() { Key = "S", Label = Loc.Get("magic_shop.electron_sell"), Category = "sell", Icon = "sell" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

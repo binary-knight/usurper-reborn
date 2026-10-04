@@ -35,6 +35,15 @@ namespace UsurperRemake.Systems
         public List<int> ExperiencedMoments { get; set; } = new();
         public List<string> OceanInsightIds { get; set; } = new(); // v1.1.12: distinct insights, by source id
 
+        // 1.2.5: moral paradoxes already answered, by paradox id (an old save has none)
+        public List<string> CompletedParadoxIds { get; set; } = new();
+
+        // 1.2.5: how often each kind of moral answer was chosen (an old save has all four at zero)
+        public int MoralUtilitarianChoices { get; set; }
+        public int MoralDeontologicalChoices { get; set; }
+        public int MoralVirtueChoices { get; set; }
+        public int MoralNihilistChoices { get; set; }
+
         // Seven Seals
         public List<int> CollectedSeals { get; set; } = new();
 
@@ -1140,6 +1149,7 @@ namespace UsurperRemake.Systems
         public List<string> Description { get; set; } = new();
         public List<LootEffectData>? LootEffects { get; set; }
         public string? EnchantMarkers { get; set; }   // v1.1.7: enchant count and kinds, carried through the bag
+        public string? EnchantBase { get; set; }      // v1.2.5: pre-enchant form (Equipment.EnchantBase), carried through the bag
 
         /// <summary>
         /// Full Item -> DTO conversion: every stat field, MinLevel, the cursed/identified flags,
@@ -1172,6 +1182,7 @@ namespace UsurperRemake.Systems
             EnchantMarkers = string.IsNullOrEmpty(item.EnchantMarkers) ? null : item.EnchantMarkers,
             Rarity = (int)item.Rarity, // issue #112
             Family = item.Family ?? "",
+            EnchantBase = item.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
             // IsCursed (the flag decurse/warnings/loot checks read) is authoritative; Item also
             // carries a legacy Cursed bool, so OR them to never drop a curse in transit.
             IsCursed = item.IsCursed || item.Cursed,
@@ -1211,6 +1222,7 @@ namespace UsurperRemake.Systems
                 EnchantMarkers = EnchantMarkers ?? "",
                 Rarity = (EquipmentRarity)Rarity, // issue #112
                 Family = Family ?? "",
+                EnchantBase = this.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                 IsCursed = IsCursed,
                 Cursed = IsCursed, // keep Item's legacy curse bool consistent with IsCursed
                 IsIdentified = IsIdentified,
@@ -1301,6 +1313,8 @@ namespace UsurperRemake.Systems
         public bool HasBossSlayer { get; set; }
         public bool HasTitanResolve { get; set; }
         public bool IsIdentified { get; set; } = true;
+        /// <summary>v1.2.5: the item before its first Magic Shop enchant (Equipment.EnchantBase, JSON), "" or null for none.</summary>
+        public string? EnchantBase { get; set; }
     }
 
     /// <summary>

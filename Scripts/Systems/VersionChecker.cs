@@ -490,7 +490,7 @@ namespace UsurperRemake.Systems
             var asset = GetPlatformAsset();
             if (asset == null || string.IsNullOrEmpty(asset.browser_download_url))
             {
-                DownloadError = "No compatible update package found for this platform.";
+                DownloadError = Loc.Get("version.download_no_package");
                 return false;
             }
 
@@ -567,7 +567,7 @@ namespace UsurperRemake.Systems
                 var updaterPath = CreateUpdaterScript(appDir, extractDir, tempDir, BBS.DoorMode.IsInDoorMode);
                 if (string.IsNullOrEmpty(updaterPath))
                 {
-                    DownloadError = "Failed to create updater script.";
+                    DownloadError = Loc.Get("version.download_no_updater");
                     return false;
                 }
 
@@ -579,7 +579,7 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex)
             {
-                DownloadError = $"Download failed: {ex.Message}";
+                DownloadError = Loc.Get("version.download_failed", ex.Message);
                 DebugLogger.Instance.LogWarning("UPDATE", $"Auto-update failed: {ex.Message}");
                 return false;
             }
@@ -1001,7 +1001,7 @@ rd /S /Q ""{tempDir}"" 2>nul
             else
             {
                 terminal.SetColor("red");
-                terminal.WriteLine($"  {DownloadError}");
+                UIHelper.WriteWrapped(terminal, DownloadError, "  ");
                 terminal.SetColor("gray");
                 terminal.WriteLine("");
                 terminal.Write($"  {Loc.Get("version.manual_download_prompt")}");

@@ -268,7 +268,7 @@ namespace UsurperRemake.Systems
 
             if (story.CollectedArtifacts.Contains(type))
             {
-                terminal.WriteLine(Loc.Get("artifact.already_possess", artifact.Name), "yellow");
+                terminal.WriteLine(Loc.Get("artifact.already_possess", artifact.LocName()), "yellow");
                 return false;
             }
 
@@ -313,20 +313,23 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(500);
 
-            terminal.WriteLine($"  {artifact.Name}", "bright_white");
+            terminal.WriteLine($"  {artifact.LocName()}", "bright_white");
             terminal.WriteLine("");
 
             await Pacing.Wait(300);
 
-            terminal.WriteLine($"  \"{artifact.Description}\"", "cyan");
+            // v1.2.5: the text through artifact.{id}.* keys, each row wrapped to fit 79 columns
+            foreach (var row in UIHelper.WordWrap($"\"{artifact.LocDescription()}\"", 77))
+                terminal.WriteLine($"  {row}", "cyan");
             terminal.WriteLine("");
 
             await Pacing.Wait(500);
 
             terminal.WriteLine($"  --- {Loc.Get("artifact.lore")} ---", "dark_cyan");
-            foreach (var line in artifact.LoreText)
+            foreach (var line in artifact.LocLore())
             {
-                terminal.WriteLine($"  {line}", "white");
+                foreach (var row in line.Length == 0 ? new List<string> { "" } : UIHelper.WordWrap(line, 77))
+                    terminal.WriteLine(row.Length == 0 ? "" : $"  {row}", "white");
                 await Pacing.Wait(100);
             }
             terminal.WriteLine("");
@@ -336,11 +339,12 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  --- {Loc.Get("artifact.powers_granted")} ---", "bright_green");
             foreach (var bonus in artifact.StatBonuses)
             {
-                terminal.WriteLine($"  +{bonus.Value} {bonus.Key}", "green");
+                terminal.WriteLine($"  +{bonus.Value} {ArtifactData.StatLabel(bonus.Key)}", "green");
                 await Pacing.Wait(100);
             }
             terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("artifact.special")}: {artifact.SpecialAbility}", "bright_yellow");
+            foreach (var row in UIHelper.WordWrap($"{Loc.Get("artifact.special")}: {artifact.LocAbility()}", 77))
+                terminal.WriteLine($"  {row}", "bright_yellow");
             terminal.WriteLine("");
 
             await terminal.PressAnyKey();
@@ -569,7 +573,7 @@ namespace UsurperRemake.Systems
             {
                 if (artifacts.TryGetValue(type, out var artifact))
                 {
-                    abilities.Add($"{artifact.Name}: {artifact.SpecialAbility}");
+                    abilities.Add($"{artifact.LocName()}: {artifact.LocAbility()}");   // v1.2.5: shown text
                 }
             }
             return abilities;
@@ -591,5 +595,50 @@ namespace UsurperRemake.Systems
         public Dictionary<string, int> StatBonuses { get; set; } = new();
         public string SpecialAbility { get; set; } = "";
         public string IconColor { get; set; } = "white";
+
+        // v1.2.5: the shown text, in the reader's language, through artifact.{id}.* keys (id: the type in
+        // snake case). The English fields stay the source and fallback; an artifact is stored by its Type
+        // (StoryProgressionSystem.CollectedArtifacts), so no name or text here is saved or compared.
+        private string KeyId => System.Text.RegularExpressions.Regex.Replace(Type.ToString(), "([a-z])([A-Z])", "$1_$2").ToLowerInvariant();
+
+        private string Keyed(string field, string english) =>
+            Loc.HasIn("en", $"artifact.{KeyId}.{field}") && Loc.GetIn("en", $"artifact.{KeyId}.{field}") == english
+                ? Loc.Get($"artifact.{KeyId}.{field}") : english;
+
+        public string LocName() => Keyed("name", Name);
+        public string LocDescription() => Keyed("desc", Description);
+        public string LocAbility() => Keyed("ability", SpecialAbility);
+
+        /// <summary>The lore as shown: each paragraph of LoreText (rows split by a blank row) through
+        /// artifact.{id}.lore.{n}, whose text keeps its own line breaks; blank rows stay.</summary>
+        public string[] LocLore()
+        {
+            var rows = new List<string>();
+            var paragraph = new List<string>();
+            int n = 0;
+            void Flush()
+            {
+                if (paragraph.Count == 0) return;
+                string english = string.Join("\n", paragraph);
+                rows.AddRange(Keyed($"lore.{n}", english).Split('\n'));
+                paragraph.Clear();
+                n++;
+            }
+            foreach (var line in LoreText)
+            {
+                if (line.Length == 0) { Flush(); rows.Add(""); }
+                else paragraph.Add(line);
+            }
+            Flush();
+            return rows.ToArray();
+        }
+
+        /// <summary>A stat bonus key ("Wisdom", "MaxMana") as shown, through artifact.stat.{key}. The keys stay
+        /// English: ApplyArtifactBonuses and ArtifactStatGrants read them.</summary>
+        public static string StatLabel(string statKey)
+        {
+            string key = "artifact.stat." + statKey.ToLowerInvariant();
+            return Loc.HasIn("en", key) ? Loc.Get(key) : statKey;
+        }
     }
 }

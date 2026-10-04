@@ -89,6 +89,9 @@ public class Item
     /// five-enchant limit and the one-of-each-kind rule reset on every conversion.
     /// </summary>
     public string EnchantMarkers { get; set; } = "";
+
+    /// <summary>v1.2.5: the pre-enchant form of the Equipment this Item was converted from (Equipment.EnchantBase).</summary>
+    public string EnchantBase { get; set; } = "";
     
     /// <summary>
     /// Constructor for creating items
@@ -265,10 +268,11 @@ public class Item
     /// </summary>
     public string GetDisplayName()
     {
-        var name = Name;
+        // v1.2.5: the name in the reader's language (ItemNames); Name itself stays as stored.
+        var name = ItemNames.Display(Name);
         
         if (Cursed)
-            name += " (Cursed)";
+            name += $" ({Loc.Get("item.rarity.cursed")})";
             
         if (Durability < 100)
         {
@@ -294,7 +298,7 @@ public class Item
     /// </summary>
     public string GetFullDescription()
     {
-        var desc = string.Join("\n", Description.Where(d => !string.IsNullOrEmpty(d)));
+        var desc = string.Join("\n", Description.Where(d => !string.IsNullOrEmpty(d)).Select(d => LootGenerator.DescriptionLine(d)));   // v1.2.5
         
         if (!string.IsNullOrEmpty(desc))
         {
@@ -432,6 +436,107 @@ public static class ItemManager
     private static Dictionary<int, Item> gameItems = new Dictionary<int, Item>();
     private static Dictionary<int, ClassicWeapon> classicWeapons = new Dictionary<int, ClassicWeapon>();
     private static Dictionary<int, ClassicArmor> classicArmor = new Dictionary<int, ClassicArmor>();
+
+    // From Pascal INIT.PAS: weapon[x].name, value, pow. The names are stored on items picked up from
+    // a monster (CombatEngine) and stay English; ItemNames shows them in the reader's language.
+    private static readonly (string name, long value, long power)[] ClassicWeaponTable =
+    {
+        ("Fists", 0, 1),
+        ("Stick", 10, 2),
+        ("Dagger", 25, 3),
+        ("Club", 50, 4),
+        ("Short Sword", 100, 5),
+        ("Mace", 200, 6),
+        ("Long Sword", 400, 7),
+        ("Broad Sword", 800, 8),
+        ("Battle Axe", 1500, 9),
+        ("Two-Handed Sword", 3000, 10),
+        ("War Hammer", 5000, 11),
+        ("Halberd", 8000, 12),
+        ("Bastard Sword", 12000, 13),
+        ("Great Sword", 18000, 14),
+        ("Executioner's Axe", 25000, 15),
+        // ... continue for all 35 weapons from Pascal
+    };
+
+    // Expanded armor list from basic to legendary (50 total); names stored and shown as above.
+    private static readonly (string name, long value, long power)[] ClassicArmorTable =
+    {
+        // Basic armors (AC 0-5)
+        ("Skin", 0, 0),
+        ("Cloth Rags", 25, 1),
+        ("Padded Cloth", 50, 2),
+        ("Leather Tunic", 100, 3),
+        ("Hardened Leather", 200, 4),
+        ("Studded Leather", 400, 5),
+
+        // Light mail (AC 6-10)
+        ("Ring Mail", 750, 6),
+        ("Scale Mail", 1200, 7),
+        ("Chain Shirt", 2000, 8),
+        ("Chain Mail", 3200, 9),
+        ("Reinforced Chain", 5000, 10),
+
+        // Medium armor (AC 11-15)
+        ("Splint Mail", 7500, 11),
+        ("Banded Mail", 11000, 12),
+        ("Bronze Plate", 16000, 13),
+        ("Steel Plate", 22000, 14),
+        ("Plate Mail", 30000, 15),
+
+        // Heavy armor (AC 16-20)
+        ("Field Plate", 40000, 16),
+        ("Full Plate", 52000, 17),
+        ("Master Plate", 66000, 18),
+        ("Knight's Plate", 82000, 19),
+        ("Royal Plate", 100000, 20),
+
+        // Enchanted armor (AC 21-25)
+        ("Plate of Valor", 125000, 21),
+        ("Blessed Plate", 155000, 22),
+        ("Plate of Honor", 190000, 23),
+        ("Sacred Plate", 230000, 24),
+        ("Holy Plate", 275000, 25),
+
+        // Dark armors (AC 26-30)
+        ("Shadow Plate", 330000, 26),
+        ("Demon Plate", 390000, 27),
+        ("Cursed Plate", 460000, 28),
+        ("Infernal Plate", 540000, 29),
+        ("Abyssal Armor", 630000, 30),
+
+        // Dragon armors (AC 31-35)
+        ("Dragon Scale", 730000, 31),
+        ("Wyrm Scale", 840000, 32),
+        ("Ancient Dragon Hide", 960000, 33),
+        ("Great Wyrm Armor", 1100000, 34),
+        ("Elder Dragon Plate", 1250000, 35),
+
+        // Celestial armors (AC 36-40)
+        ("Celestial Armor", 1420000, 36),
+        ("Heavenly Plate", 1600000, 37),
+        ("Angelic Armor", 1800000, 38),
+        ("Seraphim Plate", 2050000, 39),
+        ("Divine Protection", 2300000, 40),
+
+        // Legendary armors (AC 41-45)
+        ("Titan Armor", 2600000, 41),
+        ("Godforged Plate", 2950000, 42),
+        ("Eternal Guardian", 3350000, 43),
+        ("Mythril Armor", 3800000, 44),
+        ("Adamantine Plate", 4300000, 45),
+
+        // Ultimate armors (AC 46-50)
+        ("Supreme Protection", 4900000, 46),
+        ("Armor of the Ancients", 5600000, 47),
+        ("Immortal's Shell", 6400000, 48),
+        ("Armor of Eternity", 7300000, 49),
+        ("Ultimate Defense", 8500000, 50)
+    };
+
+    /// <summary>v1.2.5: the classic weapon and armour names, for ItemNames.</summary>
+    internal static IEnumerable<string> ClassicTemplateNames =>
+        ClassicWeaponTable.Select(w => w.name).Concat(ClassicArmorTable.Select(a => a.name));
     
     /// <summary>
     /// Initialize items from Pascal data - based on Init_Items procedure
@@ -440,7 +545,7 @@ public static class ItemManager
     {
         InitializeClassicWeapons();
         InitializeClassicArmor();
-        InitializeSpecialItems();
+        // v1.2.5: the four supreme being items (IDs 1001 to 1004) were removed: nothing read them
     }
     
     /// <summary>
@@ -450,30 +555,9 @@ public static class ItemManager
     {
         // From Pascal INIT.PAS weapon initialization
         // weapon[x].name := 'Weapon Name'; weapon[x].value := cost; weapon[x].pow := damage;
-        
-        var weapons = new (string name, long value, long power)[]
+        for (int i = 0; i < ClassicWeaponTable.Length; i++)
         {
-            ("Fists", 0, 1),
-            ("Stick", 10, 2),
-            ("Dagger", 25, 3),
-            ("Club", 50, 4),
-            ("Short Sword", 100, 5),
-            ("Mace", 200, 6),
-            ("Long Sword", 400, 7),
-            ("Broad Sword", 800, 8),
-            ("Battle Axe", 1500, 9),
-            ("Two-Handed Sword", 3000, 10),
-            ("War Hammer", 5000, 11),
-            ("Halberd", 8000, 12),
-            ("Bastard Sword", 12000, 13),
-            ("Great Sword", 18000, 14),
-            ("Executioner's Axe", 25000, 15),
-            // ... continue for all 35 weapons from Pascal
-        };
-        
-        for (int i = 0; i < weapons.Length; i++)
-        {
-            classicWeapons[i] = new ClassicWeapon(weapons[i].name, weapons[i].value, weapons[i].power);
+            classicWeapons[i] = new ClassicWeapon(ClassicWeaponTable[i].name, ClassicWeaponTable[i].value, ClassicWeaponTable[i].power);
         }
     }
     
@@ -484,131 +568,11 @@ public static class ItemManager
     private static void InitializeClassicArmor()
     {
         // Expanded armor list from basic to legendary (50 total)
-        var armor = new (string name, long value, long power)[]
+
+        for (int i = 0; i < ClassicArmorTable.Length; i++)
         {
-            // Basic armors (AC 0-5)
-            ("Skin", 0, 0),
-            ("Cloth Rags", 25, 1),
-            ("Padded Cloth", 50, 2),
-            ("Leather Tunic", 100, 3),
-            ("Hardened Leather", 200, 4),
-            ("Studded Leather", 400, 5),
-
-            // Light mail (AC 6-10)
-            ("Ring Mail", 750, 6),
-            ("Scale Mail", 1200, 7),
-            ("Chain Shirt", 2000, 8),
-            ("Chain Mail", 3200, 9),
-            ("Reinforced Chain", 5000, 10),
-
-            // Medium armor (AC 11-15)
-            ("Splint Mail", 7500, 11),
-            ("Banded Mail", 11000, 12),
-            ("Bronze Plate", 16000, 13),
-            ("Steel Plate", 22000, 14),
-            ("Plate Mail", 30000, 15),
-
-            // Heavy armor (AC 16-20)
-            ("Field Plate", 40000, 16),
-            ("Full Plate", 52000, 17),
-            ("Master Plate", 66000, 18),
-            ("Knight's Plate", 82000, 19),
-            ("Royal Plate", 100000, 20),
-
-            // Enchanted armor (AC 21-25)
-            ("Plate of Valor", 125000, 21),
-            ("Blessed Plate", 155000, 22),
-            ("Plate of Honor", 190000, 23),
-            ("Sacred Plate", 230000, 24),
-            ("Holy Plate", 275000, 25),
-
-            // Dark armors (AC 26-30)
-            ("Shadow Plate", 330000, 26),
-            ("Demon Plate", 390000, 27),
-            ("Cursed Plate", 460000, 28),
-            ("Infernal Plate", 540000, 29),
-            ("Abyssal Armor", 630000, 30),
-
-            // Dragon armors (AC 31-35)
-            ("Dragon Scale", 730000, 31),
-            ("Wyrm Scale", 840000, 32),
-            ("Ancient Dragon Hide", 960000, 33),
-            ("Great Wyrm Armor", 1100000, 34),
-            ("Elder Dragon Plate", 1250000, 35),
-
-            // Celestial armors (AC 36-40)
-            ("Celestial Armor", 1420000, 36),
-            ("Heavenly Plate", 1600000, 37),
-            ("Angelic Armor", 1800000, 38),
-            ("Seraphim Plate", 2050000, 39),
-            ("Divine Protection", 2300000, 40),
-
-            // Legendary armors (AC 41-45)
-            ("Titan Armor", 2600000, 41),
-            ("Godforged Plate", 2950000, 42),
-            ("Eternal Guardian", 3350000, 43),
-            ("Mythril Armor", 3800000, 44),
-            ("Adamantine Plate", 4300000, 45),
-
-            // Ultimate armors (AC 46-50)
-            ("Supreme Protection", 4900000, 46),
-            ("Armor of the Ancients", 5600000, 47),
-            ("Immortal's Shell", 6400000, 48),
-            ("Armor of Eternity", 7300000, 49),
-            ("Ultimate Defense", 8500000, 50)
-        };
-
-        for (int i = 0; i < armor.Length; i++)
-        {
-            classicArmor[i + 1] = new ClassicArmor(armor[i].name, armor[i].value, armor[i].power);
+            classicArmor[i + 1] = new ClassicArmor(ClassicArmorTable[i].name, ClassicArmorTable[i].value, ClassicArmorTable[i].power);
         }
-    }
-    
-    /// <summary>
-    /// Initialize special items and artifacts
-    /// </summary>
-    private static void InitializeSpecialItems()
-    {
-        // Supreme Being items (from Pascal global_s_* constants)
-        CreateSupremeItem(1001, "Lantern of Eternal Light", ObjType.Weapon, 
-            "A mystical lantern that never dims", true);
-            
-        CreateSupremeItem(1002, "Sword of Supreme Justice", ObjType.Weapon,
-            "The ultimate weapon of righteousness", true);
-            
-        CreateSupremeItem(1003, "Staff of Black Magic", ObjType.Weapon,
-            "A staff that channels dark powers", true);
-            
-        CreateSupremeItem(1004, "Staff of White Magic", ObjType.Weapon,
-            "A staff blessed with holy power", true);
-    }
-    
-    /// <summary>
-    /// Create a supreme being item
-    /// </summary>
-    private static void CreateSupremeItem(int id, string name, ObjType type, string description, bool artifact)
-    {
-        var item = new Item
-        {
-            ItemID = id,
-            Name = name,
-            Type = type,
-            Rarity = artifact ? EquipmentRarity.Artifact : EquipmentRarity.Legendary, // v1.1: was Common with IsArtifact set
-            Value = 999999,
-            Attack = type == ObjType.Weapon ? 50 : 0,
-            Armor = type != ObjType.Weapon ? 50 : 0,
-            OnlyOne = true,
-            IsArtifact = artifact,
-            MinLevel = 100,
-            RequiresGood = name.Contains("White") || name.Contains("Justice"),
-            RequiresEvil = name.Contains("Black"),
-            StrengthNeeded = 25
-        };
-        
-        item.Description[0] = description;
-        item.Description[1] = "This legendary item pulses with incredible power.";
-        
-        gameItems[id] = item;
     }
     
     /// <summary>
@@ -793,6 +757,9 @@ public class Equipment
     public EquipmentRarity Rarity { get; set; } = EquipmentRarity.Common;
     /// <summary>v1.1: English template name this piece was generated from; see Item.Family.</summary>
     public string Family { get; set; } = "";
+    /// <summary>v1.2.5: the item as it was before its first Magic Shop enchant (EnchantBaseRecord as JSON),
+    /// "" when it carries no record. Enchant removal restores it; see RecordEnchantBase.</summary>
+    public string EnchantBase { get; set; } = "";
 
     // Economics
     public long Value { get; set; }         // Buy price
@@ -1178,7 +1145,7 @@ public class Equipment
             };
             if (!companionAllowed)
             {
-                reason = $"{character.DisplayName} can't use that type of weapon";
+                reason = Loc.Get("ui.cannot_use_weapon_type", character.DisplayName);
                 return false;
             }
         }
@@ -1279,6 +1246,7 @@ public class Equipment
             WeightClass = this.WeightClass,
             Rarity = this.Rarity,
             Family = this.Family, // v1.1: an enchanted or reforged copy stays in its set
+            EnchantBase = this.EnchantBase, // v1.2.5: an enchanted copy keeps its pre-enchant form
             // Economics
             Value = this.Value,
             // Combat stats
@@ -1448,6 +1416,99 @@ public class Equipment
         {
             Description = Description + " " + newMarker;
         }
+    }
+
+    /// <summary>v1.2.5: what a Magic Shop enchant can change on an item: the name, the value, the stats the enchant
+    /// tiers raise, and the fire and frost flags. Stored as JSON in Equipment.EnchantBase.</summary>
+    public sealed class EnchantBaseRecord
+    {
+        public string Name { get; set; } = "";
+        public long Value { get; set; }
+        public int WeaponPower { get; set; }
+        public int ArmorClass { get; set; }
+        public int StrengthBonus { get; set; }
+        public int DexterityBonus { get; set; }
+        public int ConstitutionBonus { get; set; }
+        public int IntelligenceBonus { get; set; }
+        public int WisdomBonus { get; set; }
+        public int CharismaBonus { get; set; }
+        public int DefenceBonus { get; set; }
+        public int StaminaBonus { get; set; }
+        public int AgilityBonus { get; set; }
+        public int CriticalChanceBonus { get; set; }
+        public int CriticalDamageBonus { get; set; }
+        public int MagicResistance { get; set; }
+        public int LifeSteal { get; set; }
+        public bool HasFireEnchant { get; set; }
+        public bool HasFrostEnchant { get; set; }
+    }
+
+    /// <summary>v1.2.5: this item's enchantable fields as a record.</summary>
+    public EnchantBaseRecord ToEnchantBaseRecord() => new()
+    {
+        Name = Name, Value = Value, WeaponPower = WeaponPower, ArmorClass = ArmorClass,
+        StrengthBonus = StrengthBonus, DexterityBonus = DexterityBonus, ConstitutionBonus = ConstitutionBonus,
+        IntelligenceBonus = IntelligenceBonus, WisdomBonus = WisdomBonus, CharismaBonus = CharismaBonus,
+        DefenceBonus = DefenceBonus, StaminaBonus = StaminaBonus, AgilityBonus = AgilityBonus,
+        CriticalChanceBonus = CriticalChanceBonus, CriticalDamageBonus = CriticalDamageBonus,
+        MagicResistance = MagicResistance, LifeSteal = LifeSteal, HasFireEnchant = HasFireEnchant, HasFrostEnchant = HasFrostEnchant,
+    };
+
+    /// <summary>v1.2.5: set this item's enchantable fields to the record's.</summary>
+    public void ApplyEnchantBaseRecord(EnchantBaseRecord r)
+    {
+        Name = r.Name; Value = r.Value; WeaponPower = r.WeaponPower; ArmorClass = r.ArmorClass;
+        StrengthBonus = r.StrengthBonus; DexterityBonus = r.DexterityBonus; ConstitutionBonus = r.ConstitutionBonus;
+        IntelligenceBonus = r.IntelligenceBonus; WisdomBonus = r.WisdomBonus; CharismaBonus = r.CharismaBonus;
+        DefenceBonus = r.DefenceBonus; StaminaBonus = r.StaminaBonus; AgilityBonus = r.AgilityBonus;
+        CriticalChanceBonus = r.CriticalChanceBonus; CriticalDamageBonus = r.CriticalDamageBonus;
+        MagicResistance = r.MagicResistance; LifeSteal = r.LifeSteal; HasFireEnchant = r.HasFireEnchant; HasFrostEnchant = r.HasFrostEnchant;
+    }
+
+    /// <summary>v1.2.5: before the first enchant (no enchant count yet, no record), keep the item as it is now,
+    /// so removal can return it to exactly this. An item enchanted before 1.2.5 has a count and no record and
+    /// gets none here: its later enchants would otherwise be counted as its base.</summary>
+    public void RecordEnchantBase()
+    {
+        if (!string.IsNullOrEmpty(EnchantBase) || GetEnchantmentCount() > 0) return;
+        EnchantBase = System.Text.Json.JsonSerializer.Serialize(ToEnchantBaseRecord());
+    }
+
+    /// <summary>v1.2.5: the recorded pre-enchant form, or null when there is none (or it does not parse).</summary>
+    public EnchantBaseRecord? GetEnchantBase()
+    {
+        if (string.IsNullOrEmpty(EnchantBase)) return null;
+        try { return System.Text.Json.JsonSerializer.Deserialize<EnchantBaseRecord>(EnchantBase); }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    /// <summary>v1.2.5: after a change to an enchanted item that is not an enchant (a reforge), move the recorded
+    /// base by the same change, so removal later keeps that change and takes off only the enchants. Each number
+    /// moves by (now - before), never above the item's new value and never below the smaller of its old base and
+    /// zero; a flag or the name that changed takes its new state. No record, nothing to do.</summary>
+    public void ShiftEnchantBase(Equipment before)
+    {
+        var record = GetEnchantBase();
+        if (record == null) return;
+        var was = before.ToEnchantBaseRecord();
+        var now = ToEnchantBaseRecord();
+        foreach (var prop in typeof(EnchantBaseRecord).GetProperties())
+        {
+            if (prop.PropertyType == typeof(int))
+            {
+                int b = (int)prop.GetValue(record)!, w = (int)prop.GetValue(was)!, n = (int)prop.GetValue(now)!;
+                long moved = (long)b + n - w;
+                prop.SetValue(record, (int)Math.Clamp(moved, Math.Min(b, 0), Math.Max(n, Math.Min(b, 0))));
+            }
+            else if (prop.PropertyType == typeof(long))
+            {
+                long b = (long)prop.GetValue(record)!, w = (long)prop.GetValue(was)!, n = (long)prop.GetValue(now)!;
+                prop.SetValue(record, Math.Clamp(b + n - w, Math.Min(b, 0), Math.Max(n, Math.Min(b, 0))));
+            }
+            else if (!Equals(prop.GetValue(was), prop.GetValue(now)))
+                prop.SetValue(record, prop.GetValue(now));
+        }
+        EnchantBase = System.Text.Json.JsonSerializer.Serialize(record);
     }
 
     #region Fluent Setters (for builder pattern)

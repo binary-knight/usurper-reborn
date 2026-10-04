@@ -35,7 +35,9 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         var dagger = Assert.Single(items.Where(item => item.GetProperty("id").GetInt32() == 1000));
         Assert.Equal("Rusty Dagger", dagger.GetProperty("name").GetProperty("en").GetString());
         Assert.Equal(2, dagger.GetProperty("stats").GetProperty("weaponPower").GetInt32());
-        Assert.Single(dagger.GetProperty("name").EnumerateObject());
+        // v1.2.5: every language its own name (ItemNames keys), the English one is the stored name
+        Assert.Equal(5, dagger.GetProperty("name").EnumerateObject().Count());
+        Assert.Equal("Rozsdás Tőr", dagger.GetProperty("name").GetProperty("hu").GetString());
     }
 
     [Fact]

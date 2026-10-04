@@ -362,14 +362,14 @@ namespace UsurperRemake.Systems
         /// instead of "corrupted". Only supported on file backends; online (SQL)
         /// backend falls back to the nullable return with a generic error.
         /// </summary>
-        public async Task<(SaveGameData? Data, string? Error)> LoadSaveByFileNameWithError(string fileName)
+        public async Task<(SaveGameData? Data, string? Error, bool TooLarge)> LoadSaveByFileNameWithError(string fileName)
         {
             if (backend is FileSaveBackend fileBackend)
             {
                 return await fileBackend.ReadGameDataByFileNameWithError(fileName);
             }
             var data = await backend.ReadGameDataByFileName(fileName);
-            return (data, data == null ? $"Could not read save: {fileName}" : null);
+            return (data, data == null ? Loc.Get("save.load_error_unreadable", fileName) : null, false);   // v1.2.5
         }
 
         /// <summary>
@@ -622,6 +622,7 @@ namespace UsurperRemake.Systems
                     IsCursed = equip.IsCursed,
                     Rarity = (int)equip.Rarity,
                         Family = equip.Family ?? "",
+                        EnchantBase = equip.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                     WeaponType = (int)equip.WeaponType,
                     Handedness = (int)equip.Handedness,
                     ArmorType = (int)equip.ArmorType,
@@ -1463,6 +1464,7 @@ namespace UsurperRemake.Systems
                             IsCursed = equip.IsCursed,
                             Rarity = (int)equip.Rarity,
                         Family = equip.Family ?? "",
+                        EnchantBase = equip.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                             WeaponType = (int)equip.WeaponType,
                             Handedness = (int)equip.Handedness,
                             ArmorType = (int)equip.ArmorType,
@@ -1929,6 +1931,18 @@ namespace UsurperRemake.Systems
                 data.CollectedFragments = ocean.CollectedFragments.Select(f => (int)f).ToList();
                 data.ExperiencedMoments = ocean.ExperiencedMoments.Select(m => (int)m).ToList();
                 data.OceanInsightIds = ocean.InsightIds.ToList(); // v1.1.12
+            }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
+
+            // 1.2.5: answered moral paradoxes, so none repeats after a reload, and the moral-type counters
+            try
+            {
+                data.CompletedParadoxIds = MoralParadoxSystem.Instance.CompletedParadoxIds.ToList();
+                var moral = MoralParadoxSystem.Instance;
+                data.MoralUtilitarianChoices = moral.UtilitarianChoices;
+                data.MoralDeontologicalChoices = moral.DeontologicalChoices;
+                data.MoralVirtueChoices = moral.VirtueChoices;
+                data.MoralNihilistChoices = moral.NihilistChoices;
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"System not initialized: {ex.Message}"); }
 
@@ -2462,6 +2476,15 @@ namespace UsurperRemake.Systems
                     data.ExperiencedMoments.Select(m => (AwakeningMoment)m),
                     data.OceanInsightIds,
                     data.AwakeningLevel);
+            }
+            catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
+
+            // 1.2.5: answered moral paradoxes and the moral-type counters; an old save has none recorded
+            try
+            {
+                MoralParadoxSystem.Instance.RestoreFromSave(data.CompletedParadoxIds);
+                MoralParadoxSystem.Instance.RestoreMoralCounters(data.MoralUtilitarianChoices, data.MoralDeontologicalChoices,
+                    data.MoralVirtueChoices, data.MoralNihilistChoices);
             }
             catch (Exception ex) { DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"System not available: {ex.Message}"); }
 

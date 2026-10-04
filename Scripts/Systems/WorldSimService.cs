@@ -1809,6 +1809,7 @@ namespace UsurperRemake.Systems
                             IsCursed = equipData.IsCursed,
                             Rarity = (EquipmentRarity)equipData.Rarity,
                     Family = equipData.Family ?? "",
+                    EnchantBase = equipData.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                     IsIdentified = equipData.IsIdentified,
                             WeaponType = (WeaponType)equipData.WeaponType,
                             Handedness = (WeaponHandedness)equipData.Handedness,
@@ -1998,7 +1999,7 @@ namespace UsurperRemake.Systems
             // Log financial summary
             var netChange = king.CalculateDailyIncome() - king.CalculateDailyExpenses();
             if (netChange < 0 && Math.Abs(netChange) > 100)
-                NewsSystem.Instance?.Newsy(false, $"The royal treasury hemorrhages {Math.Abs(netChange)} gold daily!");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_treasury_bleeds", Math.Abs(netChange)));
 
             DebugLogger.Instance.LogInfo("WORLDSIM",
                 $"World daily reset: King {king.Name}, Treasury {treasuryBefore:N0} -> {king.Treasury:N0}, Reign day {king.TotalReign}");
@@ -2009,6 +2010,9 @@ namespace UsurperRemake.Systems
         {
             try
             {
+                // 1.2.5: System mail older than the cap goes (it never fails the reset; it logs and returns)
+                sqlBackend.PruneOldSystemMail(GameConfig.SystemMailKeepDays);
+
                 // v1.1.13: the day's treasury, reign, prisoners and guards, as one guarded court change
                 if (CastleLocation.GetCurrentKing()?.IsActive == true)
                     ProcessCourtDailyAsync().GetAwaiter().GetResult();
@@ -2029,7 +2033,7 @@ namespace UsurperRemake.Systems
                 // column).
                 _ = sqlBackend.PruneOldNPCDecisionLog(daysToKeep: 30);
 
-                NewsSystem.Instance?.Newsy(false, "A new day dawns in the realm...");
+                NewsSystem.Instance?.Newsy(false, Loc.Get("worldsim.news_new_day"));
             }
             catch (Exception ex)
             {

@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+history: 1.2.5 | After an Arena win, players in every language now salvage gold from the target's worn weapon and armor; before, English players never did.
 history: 1.2.4 | The notice a defender gets after your Arena attack now reaches their mailbox.
 history: 1.2.3 | none
 ---
@@ -28,7 +29,7 @@ There is a minimum level to fight, a daily attack limit and a maximum level diff
 
 ## Winning and losing
 
-A win takes a share of the target's gold, with a cap based on your level and a lower cap against alternate characters. It also claims any bounty on the target and adds Fame.
+A win takes a share of the target's gold, with a cap based on your level and a lower cap against alternate characters. A win can also salvage gold from the target's worn weapon (30% chance) and armor (25% chance) at half their value, and salvage counts toward the same level cap. It also claims any bounty on the target and adds Fame.
 
 A loss costs experience, a larger share of your gold and some Fame, and you revive at the Inn with half your HP. The defender then also takes a share of the gold you have left.
 

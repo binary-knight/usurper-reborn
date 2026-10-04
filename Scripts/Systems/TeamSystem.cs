@@ -22,16 +22,23 @@ public partial class TeamSystem
     private const string TeamRecordFile = GameConfig.DataDir + "TEAMREC.DAT";
     private const string TeamRecordText = GameConfig.DataDir + "TEAMREC.TXT";
     
-    // Team battle headers from AUTOGANG.PAS
-    private readonly string[] GangWarHeaders = 
+    // Team battle headers from AUTOGANG.PAS (v1.2.5: Loc keys, in the writer's language)
+    private static readonly string[] GangWarHeaderKeys =
     {
-        "Gang War!",
-        "Team Bash!",
-        "Team War!",
-        "Turf War!",
-        "Gang Fight!",
-        "Rival Gangs Clash!"
+        "team.war_header_1",
+        "team.war_header_2",
+        "team.war_header_3",
+        "team.war_header_4",
+        "team.war_header_5",
+        "team.war_header_6"
     };
+
+    private static string RandomGangWarHeader() => Loc.Get(GangWarHeaderKeys[Random.Shared.Next(GangWarHeaderKeys.Length)]);
+
+    // v1.2.5: names in news and mail keep the news colours around them
+    private static string PlayerName(string name) => $"{GameConfig.NewsColorPlayer}{name}{GameConfig.NewsColorDefault}";
+    private static string TeamName(string team) => $"{GameConfig.NewsColorHighlight}{team}{GameConfig.NewsColorDefault}";
+    private static string LoserName(string team) => $"{GameConfig.NewsColorDeath}{team}{GameConfig.NewsColorDefault}";
     
     public TeamSystem()
     {
@@ -67,8 +74,8 @@ public partial class TeamSystem
         player.TeamRec = 0;   // No record yet
         
         // News announcement
-        newsSystem.WriteTeamNews("New Gang Formed!", 
-            $"{GameConfig.NewsColorPlayer}{player.Name2}{GameConfig.NewsColorDefault} formed the gang {GameConfig.NewsColorHighlight}{teamName}{GameConfig.NewsColorDefault}!");
+        newsSystem.WriteTeamNews(Loc.Get("team.news_formed_header"),
+            Loc.Get("team.news_gang_formed", PlayerName(player.Name2), TeamName(teamName)));
             
         return true;
     }
@@ -97,11 +104,11 @@ public partial class TeamSystem
         TransferTeamStatus(teamLeader, player);
         
         // News announcement
-        newsSystem.WriteTeamNews("Gang Recruitment!",
-            $"{GameConfig.NewsColorPlayer}{player.Name2}{GameConfig.NewsColorDefault} joined {GameConfig.NewsColorHighlight}{teamName}{GameConfig.NewsColorDefault}!");
+        newsSystem.WriteTeamNews(Loc.Get("street_encounter.gang.news_header"),
+            Loc.Get("street_encounter.gang.news_joined", PlayerName(player.Name2), TeamName(teamName)));
             
         // Notify team members
-        NotifyTeamMembers(teamName, $"{player.Name2} has joined the team!", player.Name2);
+        NotifyTeamMembers(teamName, Loc.Get("team.notify_joined", player.Name2), player.Name2);
         
         return true;
     }
@@ -135,16 +142,16 @@ public partial class TeamSystem
                 CityControlSystem.Instance.RemoveCityControl(oldTeam);
             }
 
-            newsSystem.WriteTeamNews("Gang Dissolved!",
-                $"Gang {GameConfig.NewsColorHighlight}{oldTeam}{GameConfig.NewsColorDefault} has been disbanded!");
+            newsSystem.WriteTeamNews(Loc.Get("team.news_dissolved_header"),
+                Loc.Get("team.news_dissolved", TeamName(oldTeam)));
         }
         else
         {
             // Notify remaining team members
-            NotifyTeamMembers(oldTeam, $"{player.Name2} has left the team!", player.Name2);
+            NotifyTeamMembers(oldTeam, Loc.Get("team.notify_left", player.Name2), player.Name2);
 
-            newsSystem.WriteTeamNews("Gang Deserter!",
-                $"{GameConfig.NewsColorPlayer}{player.Name2}{GameConfig.NewsColorDefault} left {GameConfig.NewsColorHighlight}{oldTeam}{GameConfig.NewsColorDefault}!");
+            newsSystem.WriteTeamNews(Loc.Get("team.news_deserter_header"),
+                Loc.Get("team.news_deserter", PlayerName(player.Name2), TeamName(oldTeam)));
         }
         
         return true;
@@ -193,15 +200,15 @@ public partial class TeamSystem
         }
 
         // Mail the sacked member
-        MailSystem.SendMail(member.Name2, "Team", 
-            $"You were {GameConfig.NewsColorDeath}sacked{GameConfig.NewsColorDefault} from the team by {GameConfig.NewsColorPlayer}{leader.Name2}{GameConfig.NewsColorDefault}!");
+        MailSystem.SendMail(member.Name2, Loc.Get("team.mail_subject_team"),
+            Loc.Get("team.mail_sacked", GameConfig.NewsColorDeath, GameConfig.NewsColorDefault, PlayerName(leader.Name2)));
         
         // Notify team members
-        NotifyTeamMembers(teamName, $"{leader.Name2} sacked {memberName} from the team!", leader.Name2);
+        NotifyTeamMembers(teamName, Loc.Get("team.notify_sacked", leader.Name2, memberName), leader.Name2);
         
         // News announcement
-        newsSystem.WriteTeamNews($"Internal Gang Turbulence!",
-            $"{GameConfig.NewsColorPlayer}{leader.Name2}{GameConfig.NewsColorDefault} sacked {GameConfig.NewsColorPlayer}{memberName}{GameConfig.NewsColorDefault} from {GameConfig.NewsColorHighlight}{teamName}{GameConfig.NewsColorDefault}!");
+        newsSystem.WriteTeamNews(Loc.Get("team.news_turbulence_header"),
+            Loc.Get("team.news_gang_sacked", PlayerName(leader.Name2), PlayerName(memberName), TeamName(teamName)));
         
         return true;
     }
@@ -219,8 +226,8 @@ public partial class TeamSystem
         {
             if (member.Name2 != player.Name2)
             {
-                MailSystem.SendMail(member.Name2, "Team Message", 
-                    $"From {GameConfig.NewsColorPlayer}{player.Name2}{GameConfig.NewsColorDefault}: {message}");
+                MailSystem.SendMail(member.Name2, Loc.Get("team.mail_subject_message"),
+                    Loc.Get("team.mail_from", PlayerName(player.Name2), message));
             }
         }
     }
@@ -279,9 +286,9 @@ public partial class TeamSystem
         var defenderTeam = PrepareTeamForBattle(opponentMembers, opponentTeam);
         
         // Battle announcement
-        string header = GangWarHeaders[Random.Shared.Next(GangWarHeaders.Length)];
+        string header = RandomGangWarHeader();
         newsSystem.WriteTeamNews(header,
-            $"{GameConfig.NewsColorHighlight}{attacker.Team}{GameConfig.NewsColorDefault} challenged {GameConfig.NewsColorHighlight}{opponentTeam}{GameConfig.NewsColorDefault}!");
+            Loc.Get("team.news_challenged", TeamName(attacker.Team), TeamName(opponentTeam)));
         
         // Conduct team battle
         var battleResult = await ConductTeamBattle(attackerTeam, defenderTeam, turfWar);
@@ -300,10 +307,10 @@ public partial class TeamSystem
         // Set territory control
         SetRemoveTurfFlags(attacker, opponentTeam, 1); // 1 = mail about easy takeover
         
-        newsSystem.WriteTeamNews("Gang Takeover!",
-            $"{GameConfig.NewsColorHighlight}{attacker.Team}{GameConfig.NewsColorDefault} took over the town without bloodshed.");
+        newsSystem.WriteTeamNews(Loc.Get("team.news_takeover_header"),
+            Loc.Get("team.news_takeover", TeamName(attacker.Team)));
             
-        newsSystem.Newsy($"{GameConfig.NewsColorPlayer}{attacker.Name2}{GameConfig.NewsColorDefault} led their team to this victory. The old rulers, {GameConfig.NewsColorDeath}{opponentTeam}{GameConfig.NewsColorDefault} were unable to put up a fight.",
+        newsSystem.Newsy(Loc.Get("team.news_takeover_led", PlayerName(attacker.Name2), LoserName(opponentTeam)),
             false, GameConfig.NewsCategory.General);
     }
     
@@ -336,10 +343,10 @@ public partial class TeamSystem
                 // Only mail alive members
                 if (member.IsAlive && !memberPermaDead)
                 {
-                    string mailSubject = "Town Control!";
+                    string mailSubject = Loc.Get("team.mail_subject_town_control");
                     string mailMessage = mailType == 1
-                        ? $"{winner.Name2} led your team to a glorious victory! The opponents were not able to defend the Town. You are in charge now!"
-                        : $"{winner.Name2} led your team to a glorious victory! {loserTeam} put up a fight, but was not able to defend their turf. You are in charge now!";
+                        ? Loc.Get("team.mail_won_easy", winner.Name2)
+                        : Loc.Get("team.mail_won_contested", winner.Name2, loserTeam);
 
                     MailSystem.SendMail(member.Name2, mailSubject, mailMessage);
                 }
@@ -356,10 +363,10 @@ public partial class TeamSystem
             bool loserPermaDead = member is NPC npcL && npcL.IsDead;
             if (member.IsAlive && !loserPermaDead)
             {
-                string lossSubject = $"{GameConfig.NewsColorDeath}Lost Town Control!{GameConfig.NewsColorDefault}";
+                string lossSubject = LoserName(Loc.Get("team.mail_subject_lost_control"));
                 string lossMessage = mailType == 1
-                    ? $"{winner.Name2} led their team to a victory against your gang! Your team was not ready to meet them! The Town is no longer yours..."
-                    : $"{winner.Name2} led their team to a victory against your bunch! Your team was not able to fend off the attack! The Town is no longer yours...";
+                    ? Loc.Get("team.mail_lost_easy", winner.Name2)
+                    : Loc.Get("team.mail_lost_contested", winner.Name2);
 
                 MailSystem.SendMail(member.Name2, lossSubject, lossMessage);
             }
@@ -385,9 +392,9 @@ public partial class TeamSystem
         bool turfWar = team1Members.Any(m => m.CTurf) || team2Members.Any(m => m.CTurf);
         
         // Battle announcement
-        string header = GangWarHeaders[Random.Shared.Next(GangWarHeaders.Length)];
-        string announcement = $"{GameConfig.NewsColorHighlight}{gang1}{GameConfig.NewsColorDefault} challenged {GameConfig.NewsColorHighlight}{gang2}{GameConfig.NewsColorDefault}";
-        string turfMessage = turfWar ? "A challenge for Town Control!" : "";
+        string header = RandomGangWarHeader();
+        string announcement = Loc.Get("team.news_auto_challenged", TeamName(gang1), TeamName(gang2));
+        string turfMessage = turfWar ? Loc.Get("team.news_turf_challenge") : "";
         
         newsSystem.Newsy($"{header}: {announcement} {turfMessage}", false, GameConfig.NewsCategory.General);
         
@@ -620,7 +627,7 @@ public partial class TeamSystem
             if (member.Name2 != excludePlayer)
             {
                 // Send online message if possible, otherwise mail
-                MailSystem.SendMail(member.Name2, "Team Update", message);
+                MailSystem.SendMail(member.Name2, Loc.Get("team.mail_subject_update"), message);
             }
         }
     }
@@ -761,8 +768,8 @@ public partial class TeamSystem
         if (result.Winner == attacker.Team)
         {
             // Attacker won
-            newsSystem.WriteTeamNews("Gang Victory!",
-                $"{GameConfig.NewsColorHighlight}{result.Winner}{GameConfig.NewsColorDefault} defeated {GameConfig.NewsColorDeath}{result.Loser}{GameConfig.NewsColorDefault}!");
+            newsSystem.WriteTeamNews(Loc.Get("team.news_victory_header"),
+                Loc.Get("team.news_defeated", TeamName(result.Winner), LoserName(result.Loser)));
             
             if (turfWar)
             {
@@ -772,8 +779,8 @@ public partial class TeamSystem
         else
         {
             // Attacker lost
-            newsSystem.WriteTeamNews("Gang Repelled!",
-                $"{GameConfig.NewsColorHighlight}{result.Winner}{GameConfig.NewsColorDefault} successfully defended against {GameConfig.NewsColorDeath}{result.Loser}{GameConfig.NewsColorDefault}!");
+            newsSystem.WriteTeamNews(Loc.Get("team.news_repelled_header"),
+                Loc.Get("team.news_defended", TeamName(result.Winner), LoserName(result.Loser)));
         }
     }
     
@@ -782,8 +789,8 @@ public partial class TeamSystem
     /// </summary>
     private async Task ProcessAutoBattleResults(TeamBattleResult result, string gang1, string gang2, bool turfWar)
     {
-        newsSystem.WriteTeamNews("Automated Gang Battle!",
-            $"{GameConfig.NewsColorHighlight}{result.Winner}{GameConfig.NewsColorDefault} defeated {GameConfig.NewsColorDeath}{result.Loser}{GameConfig.NewsColorDefault} in automated combat!");
+        newsSystem.WriteTeamNews(Loc.Get("team.news_auto_header"),
+            Loc.Get("team.news_auto_defeated", TeamName(result.Winner), LoserName(result.Loser)));
         
         if (turfWar)
         {

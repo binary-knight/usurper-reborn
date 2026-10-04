@@ -53,7 +53,7 @@ namespace UsurperRemake.UI
                 terminal.SetColor("bright_white");
                 terminal.WriteLine("  USURPER REBORN");
                 terminal.SetColor("gray");
-                terminal.WriteLine("  A modern recreation of the classic 1993 BBS door game");
+                terminal.WriteLine(UsurperRemake.Systems.Loc.Get("splash.tagline"));
                 terminal.WriteLine("");
             }
             else
@@ -75,7 +75,7 @@ namespace UsurperRemake.UI
             terminal.Write(new string(' ', pad) + version);
             terminal.WriteLine("");
             terminal.SetColor("bright_white");
-            string prompt = "Press any key...";
+            string prompt = UsurperRemake.Systems.Loc.Get("splash.press_any_key");
             int promptPad = (80 - prompt.Length) / 2;
             terminal.Write(new string(' ', promptPad) + prompt);
             terminal.SetColor("white");

@@ -23,10 +23,65 @@ public class PantheonLocation : BaseLocation
     internal static int BoonRowFixedWidth(string label, string alignTag, int tailLength) =>
         6 + Math.Max(25, label.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + tailLength;
 
-    /// <summary>Description column for a boon row: at most cap wide, cut with "..." so the whole row stays within 79 columns.</summary>
+    /// <summary>
+    /// v1.2.5: the marker a divine news line starts with. PantheonLocation's news screen colours a line holding it,
+    /// so it is the same in every language and is not a Loc value.
+    /// </summary>
+    internal const string DivineNewsTag = "[DIVINE]";
+
+    /// <summary>v1.2.5: a divine news line: the marker, then the text in the writer's language.</summary>
+    internal static string DivineNews(string text) => DivineNewsTag + " " + text;
+
+    /// <summary>
+    /// v1.2.5: the favor budget row: label, value and breakdown on one row when it fits 79 columns; otherwise
+    /// the breakdown moves to its own row (or rows) under the label.
+    /// </summary>
+    internal static (string Label, string Value, List<string> Breakdown, bool OwnRow) BudgetRows(string label, string value, string breakdown)
+    {
+        if (UIHelper.VisibleLength(label + value + breakdown) <= UIHelper.WrapWidth)
+            return (label, value, new List<string> { breakdown }, false);
+        string indent = new string(' ', label.Length - label.TrimStart(' ').Length);
+        return (label, value, UIHelper.MessageRows(indent + breakdown.TrimStart(' ')), true);
+    }
+
+    /// <summary>
+    /// v1.2.5: a boon's alignment tag in the player's language ("[Light/Balance]", "[Any]"). The boon keeps its
+    /// English alignment words (IsAvailableForAlignment compares them with the stored GodAlignment).
+    /// </summary>
+    internal static string BoonAlignTag(BoonDefinition boon) => boon.Alignments.Length > 0
+        ? "[" + string.Join("/", boon.Alignments.Select(AlignmentLabel)) + "]"
+        : Loc.Get("pantheon.align_any");
+
+    /// <summary>v1.2.5: a stored alignment word (Light, Dark, Balance) in the player's language.</summary>
+    internal static string AlignmentLabel(string alignment) => alignment switch
+    {
+        "Light" => Loc.Get("temple.align.light"),
+        "Dark" => Loc.Get("temple.align.dark"),
+        "Balance" => Loc.Get("temple.align.balance"),
+        _ => alignment,
+    };
+
+    /// <summary>v1.2.5: to a follower's session, in that session's language: the patron changed the boons.</summary>
+    internal static string PatronReconfiguredMessage(string lang, string divineName) =>
+        $"\u001b[1;33m  \u2726 {Loc.GetIn(lang, "pantheon.msg_patron_reconfigured", divineName)} \u2726\u001b[0m";
+
+    /// <summary>v1.2.5: to a recruited player's session, in that session's language.</summary>
+    internal static string NowWorshipMessage(string lang, string godName) =>
+        $"\u001b[1;33m  \u2726 {Loc.GetIn(lang, "pantheon.msg_now_worship", godName)} \u2726\u001b[0m";
+
+    /// <summary>v1.2.5: the mail an offline recruited player gets, in the account's language.</summary>
+    internal static string ClaimedMail(string lang, string godName) => Loc.GetIn(lang, "pantheon.mail_claimed", godName);
+
+    /// <summary>v1.2.5: a proclamation as each online player reads it, in that player's language; the rank title is
+    /// the shared English one, the message is the god's own words.</summary>
+    internal static string ProclamationBroadcast(string lang, string godName, string godTitle, string message) =>
+        $"\u001b[1;33m  {DivineNews(Loc.GetIn(lang, "pantheon.news_proclaims", godName, godTitle, message))}\u001b[0m";
+
+    /// <summary>Description column for a boon row: at most cap wide, cut with "..." so the whole row stays within 79 columns.
+    /// v1.2.5: the column may shrink to 4 (was 10), so a long translated alignment tag and lock word still fit.</summary>
     internal static string FitBoonText(string text, int fixedWidth, int cap)
     {
-        int width = Math.Min(cap, Math.Max(10, BoonRowWidth - fixedWidth));
+        int width = Math.Min(cap, Math.Max(4, BoonRowWidth - fixedWidth));
         if (text.Length > width) text = text.Substring(0, width - 3) + "...";
         return text.PadRight(width);
     }
@@ -156,7 +211,7 @@ public class PantheonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("pantheon.the_title", godTitle));
 
         terminal.SetColor("gray");
-        terminal.WriteLine(Loc.Get("pantheon.status_line", currentPlayer.GodAlignment, believers, currentPlayer.DeedsLeft, deedsMax));
+        terminal.WriteLine(Loc.Get("pantheon.status_line", AlignmentLabel(currentPlayer.GodAlignment), believers, currentPlayer.DeedsLeft, deedsMax));
         terminal.WriteLine("");
 
         // Menu
@@ -168,7 +223,7 @@ public class PantheonLocation : BaseLocation
         WriteMenuOption("N", Loc.Get("pantheon.menu_news"), Loc.Get("pantheon.menu_news_desc"));
         WriteMenuOption("C", Loc.Get("pantheon.menu_comment"), Loc.Get("pantheon.menu_comment_desc"));
         WriteMenuOption("V", Loc.Get("pantheon.menu_visit_manwe"), Loc.Get("pantheon.menu_visit_manwe_desc"));
-        WriteMenuOption("H", "Hall of the Ascended", "Walk among the alpha-era founder statues");
+        WriteMenuOption("H", Loc.Get("pantheon.menu_hall"), Loc.Get("pantheon.menu_hall_desc"));
         terminal.WriteLine("");
         WriteMenuOption("R", Loc.Get("pantheon.menu_renounce"), Loc.Get("pantheon.menu_renounce_desc"));
         WriteMenuOption("Q", Loc.Get("pantheon.menu_quit"), Loc.Get("pantheon.menu_quit_desc"));
@@ -183,9 +238,21 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("darkgray");
         terminal.Write("] ");
         terminal.SetColor("white");
-        terminal.Write(label.PadRight(18));
-        terminal.SetColor("gray");
-        terminal.WriteLine(desc);
+        // v1.2.5: a long label keeps a space before its description; a row that would pass column 79 puts the
+        // description on the next row, under the labels' column
+        string padded = label.PadRight(Math.Max(18, label.Length + 1));
+        if (6 + padded.Length + desc.Length <= BoonRowWidth)
+        {
+            terminal.Write(padded);
+            terminal.SetColor("gray");
+            terminal.WriteLine(desc);
+        }
+        else
+        {
+            terminal.WriteLine(label);
+            terminal.SetColor("gray");
+            terminal.WriteLine($"{new string(' ', 6 + 18)}{desc}");
+        }
     }
 
     #region Status
@@ -214,7 +281,7 @@ public class PantheonLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("pantheon.alignment_label"));
         terminal.SetColor("white");
-        terminal.WriteLine($"{currentPlayer.GodAlignment}");
+        terminal.WriteLine(AlignmentLabel(currentPlayer.GodAlignment));
 
         // 1.2.0 Temple gods piece 2: the god's domain and its boon's current scale for followers
         var ownDomain = GodBoonSystem.ParseDomain(currentPlayer.DivineDomain);
@@ -358,16 +425,24 @@ public class PantheonLocation : BaseLocation
             int baseBudget = Math.Max(1, currentPlayer.GodLevel) * GameConfig.GodBoonBudgetPerLevel;
             int concentration = Math.Max(0, GameConfig.GodBoonConcentrationMax - believers * GameConfig.GodBoonConcentrationPerBeliever);
 
+            var budgetRows = BudgetRows(Loc.Get("pantheon.budget_label"), Loc.Get("pantheon.budget_value", spent, totalBudget),
+                Loc.Get("pantheon.budget_breakdown", baseBudget, currentPlayer.GodLevel, concentration, believers));
             terminal.SetColor("cyan");
-            terminal.Write(Loc.Get("pantheon.budget_label"));
+            terminal.Write(budgetRows.Label);
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("pantheon.budget_value", spent, totalBudget));
+            terminal.Write(budgetRows.Value);
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("pantheon.budget_breakdown", baseBudget, currentPlayer.GodLevel, concentration, believers));
+            if (!budgetRows.OwnRow)
+                terminal.WriteLine(budgetRows.Breakdown[0]);
+            else
+            {
+                terminal.WriteLine("");
+                foreach (var row in budgetRows.Breakdown) terminal.WriteLine(row);
+            }
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("pantheon.alignment_label"));
             terminal.SetColor("white");
-            terminal.WriteLine($"{currentPlayer.GodAlignment}");
+            terminal.WriteLine(AlignmentLabel(currentPlayer.GodAlignment));
             terminal.WriteLine("");
 
             // Show active boons
@@ -383,16 +458,17 @@ public class PantheonLocation : BaseLocation
                     if (boon == null) continue;
                     string tierStr = tier switch { 1 => "I", 2 => "II", 3 => "III", _ => "" };
                     int cost = boon.CostPerTier * tier;
-                    string alignTag = boon.Alignments.Length > 0 ? $"[{string.Join("/", boon.Alignments)}]" : "[Any]";
+                    string alignTag = BoonAlignTag(boon);
+                    string costTail = " " + Loc.Get("pantheon.boon_cost", cost);
 
                     terminal.SetColor("white");
                     terminal.Write($"  {idx,2}. ");
                     terminal.SetColor("bright_green");
-                    terminal.Write($"{boon.Name} {tierStr,-5}");
+                    terminal.Write($"{boon.LocName} {tierStr,-5}");
                     terminal.SetColor("gray");
-                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + $" ({cost} pts)".Length, 29)}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(tier), 6 + boon.LocName.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + costTail.Length, 29)}");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($" {alignTag,-12} ({cost} pts)");
+                    terminal.WriteLine($" {alignTag,-12}{costTail}");
                     idx++;
                 }
                 terminal.WriteLine("");
@@ -417,22 +493,23 @@ public class PantheonLocation : BaseLocation
                 bool alignmentMatch = boon.IsAvailableForAlignment(currentPlayer.GodAlignment);
 
                 string tierStr = nextTier switch { 1 => "I", 2 => "II", 3 => "III", _ => "" };
-                string alignTag = boon.Alignments.Length > 0 ? $"[{string.Join("/", boon.Alignments)}]" : "[Any]";
+                string alignTag = BoonAlignTag(boon);
+                string addedTail = " " + Loc.Get("pantheon.boon_added_cost", addedCost);
                 string action = currentTier > 0 ? "upgrade to" : "add";
-                string label = currentTier > 0 ? $"{boon.Name} → {tierStr}" : $"{boon.Name} {tierStr}";
+                string label = currentTier > 0 ? $"{boon.LocName} → {tierStr}" : $"{boon.LocName} {tierStr}";
 
                 if (!alignmentMatch)
                 {
                     terminal.SetColor("darkgray");
                     string lockedTail = Loc.Get("pantheon.boon_locked");
-                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {FitBoonText(boon.Description, BoonRowFixedWidth(label, alignTag, 1 + lockedTail.Length), 27)} {alignTag,-12} {lockedTail}");
+                    terminal.WriteLine($"  {optNum,2}. {label,-25} -- {FitBoonText(boon.LocDescription, BoonRowFixedWidth(label, alignTag, 1 + lockedTail.Length), 27)} {alignTag,-12} {lockedTail}");
                 }
                 else if (!canAfford)
                 {
                     terminal.SetColor("darkgray");
                     terminal.Write($"  {optNum,2}. ");
                     terminal.SetColor("gray");
-                    terminal.WriteLine($"{label,-25} -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts) *".Length), 27)} {alignTag,-12} (+{addedCost} pts) *");
+                    terminal.WriteLine($"{label,-25} -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, addedTail.Length + 2), 27)} {alignTag,-12}{addedTail} *");
                 }
                 else
                 {
@@ -441,9 +518,9 @@ public class PantheonLocation : BaseLocation
                     terminal.SetColor("bright_cyan");
                     terminal.Write($"{label,-25}");
                     terminal.SetColor("gray");
-                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, $" (+{addedCost} pts)".Length), 27)}");
+                    terminal.Write($" -- {FitBoonText(boon.GetEffectDescription(nextTier), BoonRowFixedWidth(label, alignTag, addedTail.Length), 27)}");
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($" {alignTag,-12} (+{addedCost} pts)");
+                    terminal.WriteLine($" {alignTag,-12}{addedTail}");
                     optionMap[optNum] = (boon.Id, nextTier, addedCost);
                 }
                 optNum++;
@@ -498,7 +575,7 @@ public class PantheonLocation : BaseLocation
 
                 var boon = DivineBoonRegistry.GetBoon(boonId);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("pantheon.boon_configured", boon?.Name ?? boonId));
+                terminal.WriteLine(Loc.Get("pantheon.boon_configured", boon?.LocName ?? boonId));
                 await Pacing.Wait(500);
             }
         }
@@ -546,8 +623,8 @@ public class PantheonLocation : BaseLocation
             if (player != null && player.WorshippedGod == divineName && !player.IsImmortal)
             {
                 GodBoonSystem.SetConfiguredBoons(player, newConfig);   // 1.2.0: max HP and mana follow at the follower's next safe point
-                session.EnqueueMessage(
-                    $"\u001b[1;33m  ✦ Your patron {divineName} has reconfigured their divine favors! ✦\u001b[0m");
+                // v1.2.5: in the follower's session language
+                session.EnqueueMessage(PatronReconfiguredMessage(session.Context?.Language ?? "en", divineName));
             }
         }
     }
@@ -636,7 +713,7 @@ public class PantheonLocation : BaseLocation
                 {
                     if (m.WorshippedGod == currentPlayer.DivineName) continue;
                     string status = string.IsNullOrEmpty(m.WorshippedGod) ? Loc.Get("pantheon.pagan") : Loc.Get("pantheon.follows", m.WorshippedGod);
-                    string onTag = m.IsOnline ? " [ONLINE]" : "";
+                    string onTag = m.IsOnline ? Loc.Get("pantheon.believer_online_tag") : "";
                     targets.Add(new DeedTarget
                     {
                         Name = m.DisplayName, Level = m.Level, Status = status + onTag,
@@ -655,7 +732,7 @@ public class PantheonLocation : BaseLocation
             return;
         }
 
-        var target = await PickTarget(targets, "RECRUIT BELIEVER", "bright_yellow", "Target #");
+        var target = await PickTarget(targets, Loc.Get("pantheon.recruit_pick_title"), "bright_yellow", Loc.Get("pantheon.recruit_pick_prompt"));
         if (target == null) return;
         // 1.2.0 Temple gods: a pagan, or an NPC loosely devout to its canon god, is recruited as a pagan
         bool isPagan = target.RecruitsLikePagan;
@@ -687,7 +764,7 @@ public class PantheonLocation : BaseLocation
                 RecalculateGodLevel();
 
                 if (target.IsPlayer)
-                    NewsSystem.Instance?.Newsy(true, $"[DIVINE] {target.Name} has converted to {currentPlayer.DivineName}!");
+                    NewsSystem.Instance?.Newsy(true, DivineNews(Loc.Get("pantheon.news_converted", target.Name, currentPlayer.DivineName)));
             }
             else
             {
@@ -722,7 +799,7 @@ public class PantheonLocation : BaseLocation
                 RecalculateGodLevel();
 
                 if (target.IsPlayer)
-                    NewsSystem.Instance?.Newsy(true, $"[DIVINE] {target.Name} has converted to {currentPlayer.DivineName}!");
+                    NewsSystem.Instance?.Newsy(true, DivineNews(Loc.Get("pantheon.news_converted", target.Name, currentPlayer.DivineName)));
             }
             else
             {
@@ -843,7 +920,7 @@ public class PantheonLocation : BaseLocation
                         (DateTime.UtcNow - lastSmite).TotalMinutes < GameConfig.GodSmitePlayerCooldownMinutes)
                         continue;
 
-                    string onTag = m.IsOnline ? " [ONLINE]" : "";
+                    string onTag = m.IsOnline ? Loc.Get("pantheon.believer_online_tag") : "";
                     targets.Add(new DeedTarget
                     {
                         Name = m.DisplayName, Level = m.Level,
@@ -980,10 +1057,10 @@ public class PantheonLocation : BaseLocation
             return;
         }
 
-        int idx1 = await PickNPC(npcs, "POISON RELATIONSHIP  (33% chance)", "bright_magenta", "First mortal #");
+        int idx1 = await PickNPC(npcs, Loc.Get("pantheon.poison_pick_title"), "bright_magenta", Loc.Get("pantheon.poison_pick_first"));
         if (idx1 < 0) return;
 
-        int idx2 = await PickNPC(npcs, $"POISON RELATIONSHIP  (vs {npcs[idx1].DisplayName})", "bright_magenta", "Second mortal #");
+        int idx2 = await PickNPC(npcs, Loc.Get("pantheon.poison_pick_title_vs", npcs[idx1].DisplayName), "bright_magenta", Loc.Get("pantheon.poison_pick_second"));
         if (idx2 < 0 || idx2 == idx1) return;
 
         // Adjust to 1-based for the existing logic below
@@ -1030,7 +1107,7 @@ public class PantheonLocation : BaseLocation
             return;
         }
 
-        int pickedIdx = await PickNPC(prisoners, "FREE PRISONER", "bright_cyan", "Free #",
+        int pickedIdx = await PickNPC(prisoners, Loc.Get("pantheon.free_pick_title"), "bright_cyan", Loc.Get("pantheon.free_pick_prompt"),
             npc => $"{npc.DaysInPrison}{Loc.Get("pantheon.prison_days")}");
         if (pickedIdx < 0) return;
 
@@ -1068,12 +1145,12 @@ public class PantheonLocation : BaseLocation
 
         // Broadcast via news system
         string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news and broadcast: English
-        string newsEntry = $"[DIVINE] {currentPlayer.DivineName} the {godTitle} proclaims: \"{message}\"";
+        string godName = currentPlayer.DivineName;
+        string newsEntry = DivineNews(Loc.Get("pantheon.news_proclaims", godName, godTitle, message));
 
-        // Broadcast to all online players
+        // Broadcast to all online players, each in their own session language (v1.2.5)
         if (UsurperRemake.Server.SessionContext.IsActive)
-            UsurperRemake.Server.RoomRegistry.Instance?.BroadcastGlobal(
-                $"\u001b[1;33m  {newsEntry}\u001b[0m");
+            UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(lang => ProclamationBroadcast(lang, godName, godTitle, message));
 
         // Write to news
         NewsSystem.Instance?.Newsy(true, newsEntry);
@@ -1170,9 +1247,9 @@ public class PantheonLocation : BaseLocation
         {
             foreach (var item in news)
             {
-                bool isDivine = item.Contains("[DIVINE]");
+                bool isDivine = item.Contains(DivineNewsTag);
                 terminal.SetColor(isDivine ? "bright_yellow" : "white");
-                terminal.WriteLine($"  {item}");
+                UIHelper.WriteRow(terminal, $"  {item}");   // v1.2.5: wrapped at 79
             }
         }
 
@@ -1199,7 +1276,7 @@ public class PantheonLocation : BaseLocation
         if (message.Length > 120) message = message.Substring(0, 120);
 
         string godTitle = GetGodTitleShared(currentPlayer.GodLevel);   // shared news: English
-        string newsEntry = $"{currentPlayer.DivineName} the {godTitle} speaks: \"{message}\"";
+        string newsEntry = Loc.Get("pantheon.news_speaks", currentPlayer.DivineName, godTitle, message);
 
         NewsSystem.Instance?.Newsy(true,newsEntry);
 
@@ -1263,7 +1340,7 @@ public class PantheonLocation : BaseLocation
 
                 // News
                 NewsSystem.Instance?.Newsy(true,
-                    $"[DIVINE] {currentPlayer.DivineName} has ascended to {GetGodTitleShared(currentPlayer.GodLevel)}!");
+                    DivineNews(Loc.Get("pantheon.news_ascended", currentPlayer.DivineName, GetGodTitleShared(currentPlayer.GodLevel))));
             }
             else
             {
@@ -1328,8 +1405,7 @@ public class PantheonLocation : BaseLocation
         await ClearFollowersOfAsync(currentPlayer.DivineName);
 
         // News
-        NewsSystem.Instance?.Newsy(true,
-            $"[DIVINE] {currentPlayer.DivineName} has fallen from the heavens! Their believers are left godless.");
+        NewsSystem.Instance?.Newsy(true, DivineNews(Loc.Get("pantheon.news_fallen", currentPlayer.DivineName)));
 
         // Capture alignment before clearing (needed for legacy migration below)
         string godAlignment = currentPlayer.GodAlignment ?? "";
@@ -1664,7 +1740,16 @@ public class PantheonLocation : BaseLocation
                 string tag = t.IsPlayer ? Loc.Get("pantheon.believer_player_tag") : "";
                 terminal.Write($"{tag}{t.Name,-20}");
                 terminal.SetColor("gray");
-                terminal.WriteLine($" {Loc.Get("pantheon.rankings_col_lvl")} {t.Level,3}  {t.Status}");
+                string levelPart = $" {Loc.Get("pantheon.rankings_col_lvl")} {t.Level,3}";
+                // v1.2.5: a status that would pass column 79 goes on the next row, under the name
+                int used = 7 + tag.Length + Math.Max(20, t.Name.Length) + levelPart.Length;
+                if (used + 2 + t.Status.Length <= BoonRowWidth)
+                    terminal.WriteLine($"{levelPart}  {t.Status}");
+                else
+                {
+                    terminal.WriteLine(levelPart);
+                    terminal.WriteLine($"{new string(' ', 7)}{t.Status}");
+                }
             }
 
             terminal.WriteLine("");
@@ -1675,7 +1760,7 @@ public class PantheonLocation : BaseLocation
                 terminal.WriteLine("");
             }
 
-            string input = await terminal.GetInputAsync($"  {prompt} (0 to cancel): ");
+            string input = await terminal.GetInputAsync(Loc.Get("pantheon.pick_prompt", prompt));
             string upper = input.Trim().ToUpper();
 
             if (upper == "N" && page < totalPages - 1) { page++; continue; }
@@ -1729,7 +1814,7 @@ public class PantheonLocation : BaseLocation
                 terminal.WriteLine("");
             }
 
-            string input = await terminal.GetInputAsync($"  {prompt} (0 to cancel): ");
+            string input = await terminal.GetInputAsync(Loc.Get("pantheon.pick_prompt", prompt));
             string upper = input.Trim().ToUpper();
 
             if (upper == "N" && page < totalPages - 1) { page++; continue; }
@@ -1896,16 +1981,17 @@ public class PantheonLocation : BaseLocation
                 // the worshipper's, so Favor goes with the old god and no wrath follows
                 GodSwitchSystem.Switch(player, godName, GodChangeBy.Other, otherSession: true);
                 await GodBoonSystem.ApplyRecruitAsync(currentPlayer, player);   // 1.2.0: the god's boons and domain at once
-                session.EnqueueMessage(
-                    $"\u001b[1;33m  ✦ A divine presence fills your soul... You now worship {godName}! ✦\u001b[0m");
+                // v1.2.5: in the recruited player's session language
+                session.EnqueueMessage(NowWorshipMessage(session.Context?.Language ?? "en", godName));
                 return;
             }
         }
 
         // Offline: atomic DB update + message
         await backend.SetPlayerWorshippedGod(target.Username, godName);
-        await backend.SendMessageToKey(godName, target.Username, "divine",
-            $"The god {godName} has claimed you as a believer!");
+        // v1.2.5: in the recruited player's account language
+        await backend.SendMessageToKeyLocalized(godName, target.Username, "divine",
+            lang => ClaimedMail(lang, godName));
     }
 
     #endregion
@@ -1975,17 +2061,17 @@ public class PantheonLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "S", Label = "Divine Status", Category = "info", Icon = "info" },
-            new() { Key = "B", Label = "Manage Believers", Category = "divine", Icon = "believers" },
-            new() { Key = "D", Label = "Perform Divine Deeds", Category = "divine", Icon = "deed" },
-            new() { Key = "F", Label = "Configure Boons", Category = "divine", Icon = "boon" },
-            new() { Key = "I", Label = "Immortal Rankings", Category = "info", Icon = "rank" },
-            new() { Key = "N", Label = "World News", Category = "info", Icon = "news" },
-            new() { Key = "C", Label = "Send Proclamation", Category = "divine", Icon = "proclaim" },
-            new() { Key = "V", Label = "Visit Manwe", Category = "social", Icon = "manwe" },
-            new() { Key = "H", Label = "Hall of the Ascended", Category = "info", Icon = "statue" },
-            new() { Key = "R", Label = "Renounce Immortality", Category = "danger", Icon = "renounce" },
-            new() { Key = "Q", Label = "Quit Realm", Category = "navigate", Icon = "back" },
+            new() { Key = "S", Label = Loc.Get("pantheon.electron_status"), Category = "info", Icon = "info" },
+            new() { Key = "B", Label = Loc.Get("pantheon.electron_believers"), Category = "divine", Icon = "believers" },
+            new() { Key = "D", Label = Loc.Get("pantheon.electron_deeds"), Category = "divine", Icon = "deed" },
+            new() { Key = "F", Label = Loc.Get("pantheon.electron_boons"), Category = "divine", Icon = "boon" },
+            new() { Key = "I", Label = Loc.Get("pantheon.electron_rankings"), Category = "info", Icon = "rank" },
+            new() { Key = "N", Label = Loc.Get("pantheon.electron_news"), Category = "info", Icon = "news" },
+            new() { Key = "C", Label = Loc.Get("pantheon.electron_proclamation"), Category = "divine", Icon = "proclaim" },
+            new() { Key = "V", Label = Loc.Get("pantheon.menu_visit_manwe"), Category = "social", Icon = "manwe" },
+            new() { Key = "H", Label = Loc.Get("pantheon.menu_hall"), Category = "info", Icon = "statue" },
+            new() { Key = "R", Label = Loc.Get("pantheon.electron_renounce"), Category = "danger", Icon = "renounce" },
+            new() { Key = "Q", Label = Loc.Get("pantheon.electron_quit"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);
     }

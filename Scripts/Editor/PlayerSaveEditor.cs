@@ -531,6 +531,7 @@ internal static class PlayerSaveEditor
             Name = eq.Name,
             Rarity = (int)eq.Rarity, // v1.1: was dropped, so a Legendary template became a Common bag item
             Family = eq.Family ?? "",
+            EnchantBase = eq.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
             Value = eq.Value,
             Attack = eq.WeaponPower,
             Armor = eq.ArmorClass,
@@ -705,6 +706,7 @@ internal static class PlayerSaveEditor
                     IsCursed = equipData.IsCursed,
                     Rarity = (EquipmentRarity)equipData.Rarity,
                     Family = equipData.Family ?? "",
+                    EnchantBase = equipData.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                     WeaponType = (WeaponType)equipData.WeaponType,
                     Handedness = (WeaponHandedness)equipData.Handedness,
                     ArmorType = (ArmorType)equipData.ArmorType,

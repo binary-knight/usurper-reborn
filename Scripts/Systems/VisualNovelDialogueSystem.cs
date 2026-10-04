@@ -223,15 +223,17 @@ namespace UsurperRemake.Systems
         {
             terminal!.ClearScreen();
             string relColor = GetRelationColor(relationLevel);
-            string romanticStatus = romanceType != RomanceRelationType.None ? $" [{romanceType}]" : "";
+            string romanticStatus = romanceType != RomanceRelationType.None ? $" [{RomanceTag(romanceType)}]" : "";
             if (!GameConfig.ScreenReaderMode)
             {
+                // v1.2.5: the frame is 79 columns and the name row is padded to it (it was 80, and the row
+                // padded only the tag, so it ran past the frame for any name longer than 14 characters).
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+                terminal.WriteLine("╔" + new string('═', HeaderInner) + "╗");
                 terminal.SetColor(relColor);
-                terminal.WriteLine($"║  {npc.Name2}{romanticStatus,-60}  ║");
+                terminal.WriteLine("║" + $"  {npc.Name2}{romanticStatus}".PadRight(HeaderInner) + "║");
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+                terminal.WriteLine("╚" + new string('═', HeaderInner) + "╝");
             }
             else
             {
@@ -242,12 +244,12 @@ namespace UsurperRemake.Systems
 
             // NPC description
             terminal.SetColor("gray");
-            terminal.WriteLine($"  Level {npc.Level} {npc.Race} {npc.ClassName}");
+            terminal.WriteLine(Loc.Get("dialogue.npc_profile_line", npc.Level, GameConfig.GetLocalizedRaceName(npc.Race), npc.ClassName));
 
             // Physical description based on gender and traits
             string physicalDesc = GeneratePhysicalDescription(npc);
             terminal.SetColor("white");
-            terminal.WriteLine($"  {physicalDesc}");
+            UIHelper.WriteWrapped(terminal, physicalDesc, "  "); // v1.2.5: wrapped at 79 (five adjectives ran past it)
             terminal.WriteLine("");
 
             // v0.62.1 (player report Lv.6 Sage on Main Street): the orange
@@ -262,13 +264,26 @@ namespace UsurperRemake.Systems
             await Pacing.Wait(100);
         }
 
+        private const int HeaderInner = 77;
+
+        /// <summary>v1.2.5: the romance tag of the conversation header in the player's language.</summary>
+        internal static string RomanceTag(RomanceRelationType type) => type switch
+        {
+            RomanceRelationType.Spouse => Loc.Get("love_street.tag_spouse"),
+            RomanceRelationType.Lover => Loc.Get("love_street.tag_lover"),
+            RomanceRelationType.FWB => Loc.Get("love_street.tag_fwb"),
+            RomanceRelationType.Ex => Loc.Get("dialogue.romance_tag_ex"),
+            _ => type.ToString()
+        };
+
         /// <summary>
         /// Generate a physical description for the NPC
         /// </summary>
         private string GeneratePhysicalDescription(NPC npc)
         {
+            // v1.2.5: in the player's language; the adjectives agree with the NPC's sex.
             var profile = npc.Brain?.Personality;
-            string gender = npc.Sex == CharacterSex.Female ? "She" : "He";
+            string sex = npc.Sex == CharacterSex.Female ? "she" : "he";
 
             var adjectives = new List<string>();
 
@@ -277,29 +292,30 @@ namespace UsurperRemake.Systems
                 if (profile.Sensuality > 0.7f)
                     adjectives.Add("alluring");
                 if (profile.Passion > 0.7f)
-                    adjectives.Add("intense-eyed");
+                    adjectives.Add("intense");
                 if (profile.Aggression > 0.7f)
-                    adjectives.Add("fierce-looking");
+                    adjectives.Add("fierce");
                 if (profile.Sociability > 0.7f)
                     adjectives.Add("approachable");
                 if (profile.Intelligence > 0.7f)
-                    adjectives.Add("sharp-witted");
+                    adjectives.Add("sharp");
             }
 
             if (adjectives.Count == 0)
                 adjectives.Add("unremarkable");
 
-            string raceDesc = npc.Race switch
+            string raceDesc = Loc.Get(npc.Race switch
             {
-                CharacterRace.Elf => "with graceful elven features",
-                CharacterRace.Dwarf => "with sturdy dwarven build",
-                CharacterRace.Orc => "with powerful orcish physique",
-                CharacterRace.Hobbit => "with a small but nimble frame",
-                CharacterRace.Troll => "with massive, intimidating stature",
-                _ => "of average build"
-            };
+                CharacterRace.Elf => "dialogue.phys_race_elf",
+                CharacterRace.Dwarf => "dialogue.phys_race_dwarf",
+                CharacterRace.Orc => "dialogue.phys_race_orc",
+                CharacterRace.Hobbit => "dialogue.phys_race_hobbit",
+                CharacterRace.Troll => "dialogue.phys_race_troll",
+                _ => "dialogue.phys_race_other"
+            });
 
-            return $"{gender} appears {string.Join(", ", adjectives)} {raceDesc}.";
+            string adjectiveList = string.Join(", ", adjectives.Select(a => Loc.Get($"dialogue.phys_adj_{a}_{sex}")));
+            return Loc.Get($"dialogue.phys_appears_{sex}", adjectiveList, raceDesc);
         }
 
         /// <summary>
@@ -352,7 +368,7 @@ namespace UsurperRemake.Systems
             }
 
             terminal!.SetColor("yellow");
-            terminal.WriteLine($"  {npc.Name2} says:");
+            terminal.WriteLine(Loc.Get("base.npc_says", npc.Name2));
             terminal.SetColor("white");
             terminal.WriteLine($"  \"{greeting}\"");
             terminal.WriteLine("");
@@ -1602,7 +1618,7 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("bright_red");
                             terminal.WriteLine(GameConfig.ScreenReaderMode ? $"  {Loc.Get("dialogue.affair_forbidden")}" : $"  ♥ {Loc.Get("dialogue.affair_forbidden")} ♥");
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             terminal.WriteLine("");
                             terminal.SetColor("gray");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_now", npc.Name2)}");
@@ -1612,19 +1628,19 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("red");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_tension")}");
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             break;
 
                         case AffairMilestone.EmotionalConnection:
                             terminal.SetColor("magenta");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_spark")}");
                             terminal.SetColor("yellow");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             break;
 
                         default: // Flirting
                             terminal.SetColor("bright_magenta");
-                            terminal.WriteLine($"  {affairResult.Message}");
+                            UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
                             break;
                     }
 
@@ -1642,7 +1658,7 @@ namespace UsurperRemake.Systems
                         else
                             terminal.WriteLine($"  {Loc.Get("dialogue.narr_decision_made")}");
                         terminal.SetColor("yellow");
-                        terminal.WriteLine($"  {divorceCheck.Reason}");
+                        UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, divorceCheck.Reason, "  ");
                         terminal.WriteLine("");
 
                         // Offer player a choice - become spouse or just lovers
@@ -1694,7 +1710,7 @@ namespace UsurperRemake.Systems
                     // v0.64.1 audit fix: removed double-count (caller increments).
 
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {affairResult.Message}");
+                    UsurperRemake.UI.UIHelper.WriteWrapped(terminal!, affairResult.Message, "  ");
 
                     if (affairResult.SpouseNoticed)
                     {
@@ -2258,14 +2274,14 @@ namespace UsurperRemake.Systems
                 if (choice?.Trim().ToUpper() == "M" || choice?.Trim().ToUpper() == "L")
                 {
                     bool marry = choice.Trim().ToUpper() == "M";
-                    string exSpouseName = npc.SpouseName ?? "their spouse";
+                    string exSpouseName = npc.SpouseName ?? Loc.Get("dialogue.vn.their_spouse");
                     EnhancedNPCBehaviors.ProcessAffairDivorce(npc, player!, marry);
 
                     if (marry)
                     {
                         terminal.SetColor("bright_red");
                         terminal.WriteLine($"  {Loc.Get("dialogue.affair_leaves_spouse", npc.Name2, exSpouseName)}");
-                        NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} for {player.Name}!");
+                        NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_left_spouse_for", npc.Name2, exSpouseName, player.Name));
                     }
                     else
                     {
@@ -2274,14 +2290,14 @@ namespace UsurperRemake.Systems
                         {
                             terminal.SetColor("red");
                             terminal.WriteLine($"  {Loc.Get("dialogue.affair_now_lover", npc.Name2)}");
-                            NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} in a scandal involving {player.Name}!");
+                            NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_left_spouse_scandal", npc.Name2, exSpouseName, player.Name));
                         }
                         else
                         {
                             terminal.SetColor("gray");
                             terminal.WriteLine($"  {Loc.Get("dialogue.lover_cap_reached", npc.Name2)}");
                             // Affair-divorce already fired; NPC is now single, not the player's lover.
-                            NewsSystem.Instance?.Newsy(true, $"{npc.Name2} has left {exSpouseName} after a scandal, but did not stay with {player.Name}.");
+                            NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_left_spouse_alone", npc.Name2, exSpouseName, player.Name));
                         }
                     }
                 }
@@ -2752,7 +2768,7 @@ namespace UsurperRemake.Systems
                 player.ID ?? "", npc.ID, player.DisplayName, npc.Name2);
 
             // Generate news
-            NewsSystem.Instance?.Newsy(true, $"{player.Name} and {npc.Name2} have gotten married! Congratulations to the happy couple!");
+            NewsSystem.Instance?.Newsy(true, Loc.Get("dialogue.news_married", player.Name, npc.Name2));
 
             terminal.SetColor("bright_green");
             if (!GameConfig.ScreenReaderMode)
@@ -2819,7 +2835,7 @@ namespace UsurperRemake.Systems
                 spoken = UsurperRemake.Systems.DialogueEnhancer.Enhance(spoken, npc, player);
 
             // FWB keeps the *winks* action prefix.
-            string prefix = romanceType == RomanceRelationType.FWB ? "*winks* " : "";
+            string prefix = romanceType == RomanceRelationType.FWB ? Loc.Get("dialogue.vn.winks_prefix") : "";
             terminal.WriteLine($"  {npc.Name2}: {prefix}\"{spoken}\"");
             terminal.WriteLine("");
 

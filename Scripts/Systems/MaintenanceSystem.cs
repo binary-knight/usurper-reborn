@@ -130,6 +130,27 @@ public class MaintenanceSystem
     }
 
     /// <summary>
+    /// v1.2.5: the language of mail written to this player (their character's language), so a mail
+    /// reads in the recipient's language whoever runs the maintenance.
+    /// </summary>
+    internal static string RecipientLanguage(Character player) =>
+        string.IsNullOrEmpty(player?.Language) ? "en" : player.Language;
+
+    /// <summary>v1.2.5: the mail an unpaid team member leaves with, in the recipient's language.</summary>
+    internal static string TeamDepartureMail(string lang, string npcName, int days) =>
+        Loc.GetIn(lang, "maint.mail_team_departure", npcName, days);
+
+    /// <summary>
+    /// v1.2.5: the maintenance title row, centred as the English row was (15 columns in, trailing spaces to 66).
+    /// </summary>
+    internal static string HeaderTitleRow(string title)
+    {
+        int left = Math.Max(0, (67 - title.Length) / 2);
+        int right = Math.Max(0, 66 - left - title.Length);
+        return new string(' ', left) + title + new string(' ', right);
+    }
+
+    /// <summary>
     /// Display maintenance header - Pascal maintenance display
     /// </summary>
     private async Task DisplayMaintenanceHeader(bool forced)
@@ -138,12 +159,12 @@ public class MaintenanceSystem
         terminal.WriteLine("", "white");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════════════════════════════", "bright_cyan");
-        terminal.WriteLine("               U S U R P E R   M A I N T E N A N C E              ", "bright_cyan");
+        terminal.WriteLine(HeaderTitleRow(Loc.Get("maint.header_title")), "bright_cyan");
         if (!GameConfig.ScreenReaderMode)
             terminal.WriteLine("═══════════════════════════════════════════════════════════════", "bright_cyan");
         terminal.WriteLine("", "white");
         
-        var maintenanceType = forced ? "FORCED" : "SCHEDULED";
+        var maintenanceType = Loc.Get(forced ? "maint.type_forced" : "maint.type_scheduled");
         var dateString = DateTime.Now.ToString("MM-dd-yyyy HH:mm:ss");
         
         terminal.WriteLine(Loc.Get("maint.type", maintenanceType), "yellow");
@@ -213,7 +234,7 @@ public class MaintenanceSystem
             var bonus = player.Level * GameConfig.AliveBonus;
             player.AliveBonus += bonus;
 
-            WriteIfNotSilent($"  {player.Name2}: Alive bonus +{bonus}", "green");
+            WriteIfNotSilent($"  {Loc.Get("maint.alive_bonus", player.Name2, bonus)}", "green");
         }
         
         // NPC team daily wages (v0.30.9)
@@ -284,7 +305,7 @@ public class MaintenanceSystem
             // Pay all wages
             player.Gold -= totalWages;
             player.Statistics?.RecordGoldSpent(totalWages);
-            WriteIfNotSilent($"  Team wages: -{totalWages:N0}g ({teamNPCs.Count} members)", "yellow");
+            WriteIfNotSilent($"  {Loc.Get("maint.team_wages_paid", $"{totalWages:N0}", teamNPCs.Count)}", "yellow");
 
             // Clear all unpaid days since we paid in full
             player.UnpaidWageDays?.Clear();
@@ -297,7 +318,7 @@ public class MaintenanceSystem
             if (partialPay > 0)
                 player.Statistics?.RecordGoldSpent(partialPay);
 
-            WriteIfNotSilent($"  Team wages: Can't afford {totalWages:N0}g! (had {partialPay:N0}g)", "red");
+            WriteIfNotSilent($"  {Loc.Get("maint.team_wages_short", $"{totalWages:N0}", $"{partialPay:N0}")}", "red");
 
             // Track unpaid days per NPC and check for departures
             var npcsToRemove = new List<NPC>();
@@ -327,17 +348,17 @@ public class MaintenanceSystem
                 npc.TeamPW = "";
                 player.UnpaidWageDays?.Remove(npcKey);
 
-                WriteIfNotSilent($"  {npc.DisplayName} has LEFT your team due to unpaid wages!", "bright_red");
+                WriteIfNotSilent($"  {Loc.Get("maint.npc_left_unpaid", npc.DisplayName)}", "bright_red");
 
-                // Send mail to player explaining why they left
+                // Send mail to player explaining why they left (v1.2.5: in the player's language)
                 if (OnlineStateManager.Instance != null)
                 {
-                    string mailMessage = $"{npc.DisplayName} has left your team. \"You haven't paid me in {GameConfig.MaxUnpaidWageDays} days. I'm no charity worker -- find yourself another sword arm. Maybe when your coffers aren't empty, we can talk again.\"";
+                    string mailMessage = TeamDepartureMail(RecipientLanguage(player), npc.DisplayName, GameConfig.MaxUnpaidWageDays);
                     await OnlineStateManager.Instance.SendMessage(player.Name2 ?? "", "team_departure", mailMessage);
                 }
 
-                // Also post to news
-                NewsSystem.Instance?.Newsy(true, $"{npc.DisplayName} quit {player.DisplayName}'s team over unpaid wages!");
+                // Also post to news (in the writer's language, as other news)
+                NewsSystem.Instance?.Newsy(true, Loc.Get("maint.news_quit_unpaid", npc.DisplayName, player.DisplayName));
             }
         }
 
@@ -355,13 +376,13 @@ public class MaintenanceSystem
             case CharacterClass.Bard:
                 // Reset bard songs (Pascal: bard song reset)
                 player.BardSongsLeft = GameConfig.DefaultBardSongs;
-                WriteIfNotSilent($"  {player.Name2}: Bard songs restored", "cyan");
+                WriteIfNotSilent($"  {Loc.Get("maint.bard_songs", player.Name2)}", "cyan");
                 break;
                 
             case CharacterClass.Assassin:
                 // Assassins get extra thief attempts (Pascal: assassin bonus)
                 player.Thiefs += GameConfig.AssassinThiefBonus;
-                WriteIfNotSilent($"  {player.Name2}: Assassin thief bonus applied", "yellow");
+                WriteIfNotSilent($"  {Loc.Get("maint.assassin_bonus", player.Name2)}", "yellow");
                 break;
         }
         return Task.CompletedTask;
@@ -419,7 +440,7 @@ public class MaintenanceSystem
     /// Process healing potion spoilage
     /// Pascal: Healing potion spoilage in MAINT.PAS lines 937-980
     /// </summary>
-    private void ProcessHealingSpoilage(Character player)
+    internal void ProcessHealingSpoilage(Character player)
     {
         var maxHealing = GameConfig.MaxHealingPotions;
         var extraHealing = player.Healing - maxHealing;
@@ -429,12 +450,13 @@ public class MaintenanceSystem
             var spoiled = (int)(extraHealing * GameConfig.HealingSpoilageRate);
             player.Healing -= spoiled;
             
-            WriteIfNotSilent($"  {player.Name2}: {spoiled} healing potions spoiled", "yellow");
+            WriteIfNotSilent($"  {Loc.Get("maint.potions_spoiled", player.Name2, spoiled)}", "yellow");
             
-            // Send mail notification (Pascal: spoilage mail)
-            MailSystem.SendSystemMail(player.Name2, "Healing Potions",
-                "Some of your extra potions seem to have spoiled during the night!",
-                $"Lost {spoiled} healing potions due to spoilage.");
+            // Send mail notification (Pascal: spoilage mail), v1.2.5: in the recipient's language
+            using (Loc.RenderLanguage(RecipientLanguage(player)))
+                MailSystem.SendSystemMail(player.Name2, Loc.Get("maint.mail_potions_subject"),
+                    Loc.Get("maint.mail_potions_line1"),
+                    Loc.Get("maint.mail_potions_line2", spoiled));
         }
     }
     
@@ -448,10 +470,11 @@ public class MaintenanceSystem
         if (random.Next(365) == 0) // 1 in 365 chance for birthday
         {
             player.Age++;
-            WriteIfNotSilent($"  {player.Name2}: Birthday! Now age {player.Age}", "bright_yellow");
+            WriteIfNotSilent($"  {Loc.Get("maint.birthday_row", player.Name2, player.Age)}", "bright_yellow");
 
-            // Send birthday mail with gift options (Pascal: birthday mail system)
-            MailSystem.SendBirthdayMail(player.Name2, player.Age);
+            // Send birthday mail with gift options (Pascal: birthday mail system), in the recipient's language
+            using (Loc.RenderLanguage(RecipientLanguage(player)))
+                MailSystem.SendBirthdayMail(player.Name2, player.Age);
         }
         return Task.CompletedTask;
     }
@@ -462,7 +485,7 @@ public class MaintenanceSystem
     /// </summary>
     private async Task ProcessRoyalSystem(MaintenanceConfig config)
     {
-        WriteIfNotSilent("Processing royal system...", "white");
+        WriteIfNotSilent(Loc.Get("maint.royal_processing"), "white");
 
         // Load king data (in real implementation, would load from king file)
         var gameEngine = GameEngine.Instance;
@@ -481,11 +504,11 @@ public class MaintenanceSystem
             // Increment days in power
             king.DaysInPower++;
 
-            WriteIfNotSilent("  Royal limits reset", "cyan");
-            WriteIfNotSilent($"  Days in power: {king.DaysInPower}", "white");
+            WriteIfNotSilent($"  {Loc.Get("maint.royal_limits_reset")}", "cyan");
+            WriteIfNotSilent($"  {Loc.Get("maint.days_in_power", king.DaysInPower)}", "white");
         }
 
-        WriteIfNotSilent("Royal system processing complete.", "green");
+        WriteIfNotSilent(Loc.Get("maint.royal_complete"), "green");
         if (!silentMode)
             await Pacing.Wait(500);
     }
@@ -496,7 +519,7 @@ public class MaintenanceSystem
     /// </summary>
     private async Task ProcessEconomicSystems(MaintenanceConfig config)
     {
-        WriteIfNotSilent("Processing economic systems...", "white");
+        WriteIfNotSilent(Loc.Get("maint.economy_processing"), "white");
 
         // Bank interest processing
         await ProcessBankInterest(config);
@@ -507,7 +530,7 @@ public class MaintenanceSystem
         // Town pot management
         ProcessTownPot(config);
 
-        WriteIfNotSilent("Economic processing complete.", "green");
+        WriteIfNotSilent(Loc.Get("maint.economy_complete"), "green");
         if (!silentMode)
             await Pacing.Wait(500);
     }
@@ -520,24 +543,26 @@ public class MaintenanceSystem
     {
         var gameEngine = GameEngine.Instance;
         if (gameEngine?.CurrentPlayer != null)
-        {
-            var player = gameEngine.CurrentPlayer;
-
-            if (player.BankGold > 0)
-            {
-                var interest = (long)(player.BankGold * config.BankInterest / 100.0);
-                player.BankGold += interest;
-                player.Interest += interest;
-
-                WriteIfNotSilent($"  Bank interest: {interest} gold added", "green");
-
-                // Send bank statement mail
-                MailSystem.SendSystemMail(player.Name2, "Bank Interest",
-                    "Your bank account has earned interest!",
-                    $"Interest earned: {interest} gold");
-            }
-        }
+            ApplyBankInterest(gameEngine.CurrentPlayer, config);
         return Task.CompletedTask;
+    }
+
+    /// <summary>v1.2.5: one player's bank interest and statement mail (split out of ProcessBankInterest).</summary>
+    internal void ApplyBankInterest(Character player, MaintenanceConfig config)
+    {
+        if (player.BankGold <= 0) return;
+
+        var interest = (long)(player.BankGold * config.BankInterest / 100.0);
+        player.BankGold += interest;
+        player.Interest += interest;
+
+        WriteIfNotSilent($"  {Loc.Get("maint.bank_interest_row", interest)}", "green");
+
+        // Send bank statement mail, v1.2.5: in the recipient's language
+        using (Loc.RenderLanguage(RecipientLanguage(player)))
+            MailSystem.SendSystemMail(player.Name2, Loc.Get("maint.mail_interest_subject"),
+                Loc.Get("maint.mail_interest_line1"),
+                Loc.Get("maint.mail_interest_line2", interest));
     }
 
     /// <summary>
@@ -547,7 +572,7 @@ public class MaintenanceSystem
     private void ProcessSafeReset()
     {
         // Bank safe reset logic (Pascal implementation)
-        WriteIfNotSilent("  Bank safes reset", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.bank_safes_reset")}", "cyan");
     }
     
     /// <summary>
@@ -557,7 +582,7 @@ public class MaintenanceSystem
     private void ProcessTownPot(MaintenanceConfig config)
     {
         // Town pot value maintenance (Pascal implementation)
-        WriteIfNotSilent($"  Town pot: {config.TownPotValue} gold", "white");
+        WriteIfNotSilent($"  {Loc.Get("maint.town_pot", config.TownPotValue)}", "white");
     }
     
     /// <summary>
@@ -566,7 +591,7 @@ public class MaintenanceSystem
     /// </summary>
     private async Task CleanupSystems(MaintenanceConfig config)
     {
-        WriteIfNotSilent("Running system cleanup...", "white");
+        WriteIfNotSilent(Loc.Get("maint.cleanup_running"), "white");
 
         // Clean up inactive players
         await CleanupInactivePlayers(config);
@@ -577,7 +602,7 @@ public class MaintenanceSystem
         // Clean up royal guard
         await CleanupRoyalGuard();
 
-        WriteIfNotSilent("System cleanup complete.", "green");
+        WriteIfNotSilent(Loc.Get("maint.cleanup_complete"), "green");
         if (!silentMode)
             await Pacing.Wait(500);
     }
@@ -588,19 +613,19 @@ public class MaintenanceSystem
     /// </summary>
     private Task CleanupInactivePlayers(MaintenanceConfig config)
     {
-        WriteIfNotSilent("  Inactive players checked", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.inactive_checked")}", "cyan");
         return Task.CompletedTask;
     }
 
     private Task CleanupBountyLists()
     {
-        WriteIfNotSilent("  Bounty lists updated", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.bounty_updated")}", "cyan");
         return Task.CompletedTask;
     }
 
     private Task CleanupRoyalGuard()
     {
-        WriteIfNotSilent("  Royal guard validated", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.guard_validated")}", "cyan");
         return Task.CompletedTask;
     }
     
@@ -610,12 +635,12 @@ public class MaintenanceSystem
     /// </summary>
     private async Task UpdateSystemRecords()
     {
-        WriteIfNotSilent("Updating system records...", "white");
+        WriteIfNotSilent(Loc.Get("maint.records_updating"), "white");
 
         // Update various system records
-        WriteIfNotSilent("  Player statistics updated", "cyan");
-        WriteIfNotSilent("  Game records updated", "cyan");
-        WriteIfNotSilent("  News files updated", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.stats_updated")}", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.records_updated")}", "cyan");
+        WriteIfNotSilent($"  {Loc.Get("maint.news_updated")}", "cyan");
 
         if (!silentMode)
             await Pacing.Wait(500);

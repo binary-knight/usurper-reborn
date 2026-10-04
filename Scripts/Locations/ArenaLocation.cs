@@ -15,13 +15,6 @@ namespace UsurperRemake.Locations;
 /// </summary>
 public class ArenaLocation : BaseLocation
 {
-    private static readonly string[] ClassNames = {
-        "Alchemist", "Assassin", "Barbarian", "Bard", "Cleric",
-        "Jester", "Magician", "Paladin", "Ranger", "Sage", "Warrior",
-        "Tidesworn", "Wavecaller", "Cyclebreaker", "Abysswarden", "Voidreaver",
-        "Mystic Shaman"
-    };
-
     public ArenaLocation() : base(GameLocation.Arena,
         "The Arena",
         "A blood-stained combat pit where warriors settle scores.")
@@ -713,7 +706,8 @@ public class ArenaLocation : BaseLocation
 
     private string GetClassName(int classId)
     {
-        return classId >= 0 && classId < ClassNames.Length ? ClassNames[classId] : "Unknown";
+        // v1.2.5: the class in the player's language (the ids follow CharacterClass)
+        return classId >= 0 && classId <= (int)CharacterClass.MysticShaman ? GameConfig.GetLocalizedClassName(classId) : Loc.Get("base.bc_unknown");
     }
 
     /// <summary>
@@ -740,10 +734,10 @@ public class ArenaLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "A", Label = "Attack Player", Category = "combat", Icon = "pvp" },
-            new() { Key = "L", Label = "Leaderboard", Category = "info", Icon = "rank" },
-            new() { Key = "H", Label = "Fight History", Category = "info", Icon = "history" },
-            new() { Key = "S", Label = "PvP Statistics", Category = "info", Icon = "stats" },
+            new() { Key = "A", Label = Loc.Get("arena.electron_attack"), Category = "combat", Icon = "pvp" },
+            new() { Key = "L", Label = Loc.Get("arena.electron_leaderboard"), Category = "info", Icon = "rank" },
+            new() { Key = "H", Label = Loc.Get("arena.electron_history"), Category = "info", Icon = "history" },
+            new() { Key = "S", Label = Loc.Get("arena.electron_stats"), Category = "info", Icon = "stats" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

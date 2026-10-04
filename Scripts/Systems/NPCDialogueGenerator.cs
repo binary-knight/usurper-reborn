@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UsurperRemake.Data;
+using UsurperRemake.Systems;
+using UsurperRemake.UI;
 
 /// <summary>
 /// Dynamic NPC Dialogue Generator
@@ -15,408 +17,165 @@ using UsurperRemake.Data;
 ///
 /// Now queries the pre-generated NPCDialogueDatabase first for higher-quality lines,
 /// falling back to the original template system if no suitable match is found.
+///
+/// v1.2.5: every line is a Loc key (npc_gen.*). A line is picked first, as a list of keys, with the
+/// same random draws in every language; it is written in the current language only when shown, and
+/// every piece of it in that one language. Pieces that go into a sentence (a title, a personality
+/// prefix or suffix, a topic, a time) are whole-sentence templates, so each language orders its own
+/// sentence. Nothing here is stored: the dialogue database keeps only line ids (RecentDialogueIds).
 /// </summary>
 public static class NPCDialogueGenerator
 {
-    private static readonly Random _random = new();
+    /// <summary>v1.2.5: the random source of every pick; tests seed it.</summary>
+    internal static Random Rng = Random.Shared;
 
-    #region Relationship-Tiered Greetings
+    private const string K = "npc_gen.";
 
-    private static readonly Dictionary<int, string[]> RelationshipGreetings = new()
+    #region Tables (counts of keyed lines; the text is in Localization/*.json)
+
+    /// <summary>Relationship tiers in ascending order, with the key group of their greetings (5 each).</summary>
+    private static readonly (int Tier, string Group)[] GreetingTiers =
     {
-        // Married (10) - Intimate, loving
-        [GameConfig.RelationMarried] = new[]
-        {
-            "My love, you've returned to me!",
-            "Darling! I've missed you so much.",
-            "There you are, my heart.",
-            "Dont you ever scare me like that again.",
-            "Welcome home, beloved."
-        },
-        // Love (20) - Deeply affectionate
-        [GameConfig.RelationLove] = new[]
-        {
-            "There you are! I was worried.",
-            "I've been thinking of you...",
-            "Good timing. I needed to see a friendly face.",
-            "I was hoping you'd come by.",
-            "It's you! I'm so happy!"
-        },
-        // Passion (30) - Strong attraction/bond
-        [GameConfig.RelationPassion] = new[]
-        {
-            "There's no one I'd rather see right now.",
-            "I was just thinking about you...",
-            "You always know when to appear.",
-            "Hey! Was hoping youd show up.",
-            "Finally, a familiar face I actually want to see!"
-        },
-        // Friendship (40) - Close friends
-        [GameConfig.RelationFriendship] = new[]
-        {
-            "My friend! Good to see you!",
-            "Ah, just the person I wanted to talk to!",
-            "It's always a pleasure!",
-            "Welcome, welcome! What brings you by?",
-            "There's my favorite {player_class}!"
-        },
-        // Trust (50) - Trusted acquaintance
-        [GameConfig.RelationTrust] = new[]
-        {
-            "Good to see you again.",
-            "Ah, you're back. Welcome!",
-            "I was hoping you'd stop by.",
-            "Always welcome here, friend.",
-            "How have you been?"
-        },
-        // Respect (60) - Respectful acknowledgment
-        [GameConfig.RelationRespect] = new[]
-        {
-            "Greetings, {player_title}.",
-            "A pleasure to see you.",
-            "Welcome. What can I do for you?",
-            "Ah, we meet again.",
-            "Good day to you."
-        },
-        // Normal (70) - Neutral/stranger
-        [GameConfig.RelationNormal] = new[]
-        {
-            "Greetings, traveler.",
-            "What brings you here?",
-            "Hello there.",
-            "Can I help you with something?",
-            "Hmm? Oh, hello."
-        },
-        // Suspicious (80) - Wary
-        [GameConfig.RelationSuspicious] = new[]
-        {
-            "Oh... it's you.",
-            "What do you want?",
-            "You again? What is it?",
-            "State your business.",
-            "I'm keeping my eye on you."
-        },
-        // Anger (90) - Irritated/displeased
-        [GameConfig.RelationAnger] = new[]
-        {
-            "You've got some nerve showing up here.",
-            "Make it quick.",
-            "I don't have time for you.",
-            "What NOW?",
-            "Haven't you caused enough trouble?"
-        },
-        // Enemy (100) - Hostile
-        [GameConfig.RelationEnemy] = new[]
-        {
-            "You dare show your face?",
-            "Leave before I lose my patience.",
-            "We have nothing to discuss.",
-            "You're not welcome here.",
-            "I should have known it was you."
-        },
-        // Hate (110) - Despised
-        [GameConfig.RelationHate] = new[]
-        {
-            "Get out of my sight!",
-            "I have nothing to say to you.",
-            "You... you have some nerve!",
-            "Don't speak to me.",
-            "I'd sooner talk to a plague rat."
-        }
+        (GameConfig.RelationMarried, "married"),
+        (GameConfig.RelationLove, "love"),
+        (GameConfig.RelationPassion, "passion"),
+        (GameConfig.RelationFriendship, "friendship"),
+        (GameConfig.RelationTrust, "trust"),
+        (GameConfig.RelationRespect, "respect"),
+        (GameConfig.RelationNormal, "normal"),
+        (GameConfig.RelationSuspicious, "suspicious"),
+        (GameConfig.RelationAnger, "anger"),
+        (GameConfig.RelationEnemy, "enemy"),
+        (GameConfig.RelationHate, "hate"),
     };
+    private const int GreetingsPerTier = 5;
+
+    /// <summary>Archetype vocabularies: how many titles, phrases and topics each has (npc_gen.title/phrase/topic.{archetype}.{n}).</summary>
+    private static readonly Dictionary<string, (int Titles, int Phrases, int Topics)> ArchetypeVocabularies = new()
+    {
+        ["guard"] = (4, 5, 4),
+        ["merchant"] = (4, 5, 5),
+        ["thief"] = (3, 5, 5),
+        ["assassin"] = (2, 5, 4),
+        ["priest"] = (4, 5, 5),
+        ["noble"] = (4, 5, 5),
+        ["thug"] = (3, 5, 4),
+        ["citizen"] = (3, 5, 4),
+        ["mystic"] = (3, 5, 4),
+    };
+
+    /// <summary>Memory references, 3 per memory type (npc_gen.memory.{type}.{n}, {0} is the time).</summary>
+    private static readonly MemoryType[] MemoryReferences =
+    {
+        MemoryType.Helped, MemoryType.Attacked, MemoryType.Betrayed, MemoryType.Traded, MemoryType.SharedDrink,
+        MemoryType.Defended, MemoryType.Saved, MemoryType.Insulted, MemoryType.Complimented, MemoryType.SharedItem,
+    };
+    private const int ReferencesPerMemory = 3;
+
+    /// <summary>Context comments (npc_gen.context.{group}.{n}). has_companion, diseased and powerful_weapon are never chosen (as before).</summary>
+    private static readonly Dictionary<string, int> ContextComments = new()
+    {
+        ["low_hp"] = 4, ["high_level"] = 4, ["low_level"] = 4, ["rich"] = 4, ["poor"] = 4, ["is_king"] = 4,
+        ["has_companion"] = 4, ["diseased"] = 4, ["powerful_weapon"] = 4,
+        ["morning"] = 3, ["evening"] = 3, ["night"] = 3,
+    };
+
+    /// <summary>Emotional indicators (npc_gen.emote.{emotion}.{n}).</summary>
+    private static readonly Dictionary<EmotionType, int> EmotionalIndicators = new()
+    {
+        [EmotionType.Joy] = 4, [EmotionType.Sadness] = 4, [EmotionType.Anger] = 4, [EmotionType.Fear] = 4,
+        [EmotionType.Confidence] = 4, [EmotionType.Loneliness] = 3, [EmotionType.Hope] = 3, [EmotionType.Peace] = 3,
+    };
+
+    /// <summary>
+    /// Personality modifiers, 3 per trait (npc_gen.mod.{trait}.{n}). Each is a template around the line:
+    /// {0} the whole line, {1} the line without its closing punctuation, {2} that punctuation.
+    /// </summary>
+    private static readonly string[] PersonalityModifiers =
+    {
+        "high_aggression", "low_aggression", "high_intelligence", "high_greed", "high_romanticism",
+        "high_humor", "high_loyalty", "high_bravery", "high_deceitfulness",
+    };
+    private const int ModifiersPerTrait = 3;
+
+    /// <summary>Farewells by relationship, 4 each (npc_gen.farewell.{group}.{n}).</summary>
+    private const int FarewellsPerTier = 4;
+
+    /// <summary>Archetypes that add a farewell sentence (npc_gen.farewell_add.{archetype}).</summary>
+    private static readonly string[] FarewellAdditions = { "guard", "priest", "merchant", "thief", "noble" };
+
+    private const int GenericSmallTalk = 6;
+    private const int TopicTemplates = 5;
 
     #endregion
 
-    #region Archetype Vocabularies
-
-    private static readonly Dictionary<string, ArchetypeVocabulary> ArchetypeVocabularies = new()
+    /// <summary>v1.2.5: every key this generator can write (tests check each in five languages).</summary>
+    internal static IEnumerable<string> AllKeys()
     {
-        ["guard"] = new ArchetypeVocabulary
+        foreach (var (_, group) in GreetingTiers)
+            for (int i = 1; i <= GreetingsPerTier; i++) yield return $"{K}greet.{group}.{i}";
+        foreach (var (arch, v) in ArchetypeVocabularies)
         {
-            Titles = new[] { "Citizen", "Traveler", "Sir", "Ma'am" },
-            Phrases = new[] { "Halt!", "Move along.", "Stay out of trouble.", "Keep the peace.", "By order of the crown..." },
-            Topics = new[] { "patrol routes", "recent crimes", "the King's orders", "keeping order" },
-            StyleModifiers = new[] { "formal", "military", "authoritative" }
-        },
-        ["merchant"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "Customer", "Valued patron", "Friend", "Good sir/madam" },
-            Phrases = new[] { "What can I get for you?", "Fine quality!", "A steal at this price!", "Best deals in town!", "You won't find better anywhere!" },
-            Topics = new[] { "trade routes", "supply shortages", "prices", "business", "competition" },
-            StyleModifiers = new[] { "persuasive", "friendly", "calculating" }
-        },
-        ["thief"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "mate", "friend", "pal" },
-            Phrases = new[] { "Keep your voice down.", "You didn't hear this from me.", "What's in it for me?", "Watch your back out there.", "Interesting times, eh?" },
-            Topics = new[] { "the job", "marks", "fences", "the shadows", "scores" },
-            StyleModifiers = new[] { "cryptic", "street", "cautious" }
-        },
-        ["assassin"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "stranger", "traveler" },
-            Phrases = new[] { "Keep quiet.", "Dont ask questions you dont want answers to.", "Everybody dies eventually.", "Watch your step.", "Walls have ears." },
-            Topics = new[] { "contracts", "targets", "the guild", "poisons" },
-            StyleModifiers = new[] { "ominous", "measured", "cold" }
-        },
-        ["priest"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "Child", "Pilgrim", "Seeker", "Blessed one" },
-            Phrases = new[] { "Blessings.", "May the gods watch over you.", "Welcome, friend.", "Peace be with you.", "The gods smile on you today." },
-            Topics = new[] { "faith", "blessings", "the gods", "spiritual matters", "healing" },
-            StyleModifiers = new[] { "serene", "pious", "compassionate" }
-        },
-        ["noble"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "Commoner", "Peasant", "Good fellow", "Citizen" },
-            Phrases = new[] { "How dreadfully common.", "In my circles...", "One must maintain standards.", "Indeed.", "How quaint." },
-            Topics = new[] { "court gossip", "bloodlines", "estates", "politics", "social standing" },
-            StyleModifiers = new[] { "pompous", "condescending", "refined" }
-        },
-        ["thug"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "weakling", "punk", "fool" },
-            Phrases = new[] { "You looking at something?", "This is our turf.", "Pay up or else.", "Got a problem?", "Think you're tough?" },
-            Topics = new[] { "territory", "fights", "respect", "the gang" },
-            StyleModifiers = new[] { "aggressive", "crude", "threatening" }
-        },
-        ["citizen"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "Friend", "Stranger", "Traveler" },
-            Phrases = new[] { "Hard times.", "You hear about...?", "Just getting by, you know.", "Nice weather, huh?", "Same old, same old." },
-            Topics = new[] { "weather", "gossip", "daily life", "local news" },
-            StyleModifiers = new[] { "humble", "friendly", "simple" }
-        },
-        ["mystic"] = new ArchetypeVocabulary
-        {
-            Titles = new[] { "Seeker", "Mortal", "Curious one" },
-            Phrases = new[] { "The stars say things...", "Something feels off.", "Magic everywhere today.", "Youve got a strange aura.", "You were meant to come here." },
-            Topics = new[] { "magic", "prophecy", "the cosmos", "mystical forces" },
-            StyleModifiers = new[] { "enigmatic", "mystical", "otherworldly" }
+            for (int i = 1; i <= v.Titles; i++) yield return $"{K}title.{arch}.{i}";
+            for (int i = 1; i <= v.Phrases; i++) yield return $"{K}phrase.{arch}.{i}";
+            for (int i = 1; i <= v.Topics; i++) yield return $"{K}topic.{arch}.{i}";
         }
-    };
+        foreach (var m in MemoryReferences)
+            for (int i = 1; i <= ReferencesPerMemory; i++) yield return $"{K}memory.{m.ToString().ToLower()}.{i}";
+        foreach (var t in new[] { "yesterday", "other_day", "recently", "some_time", "while_back", "long_ago" })
+            yield return K + "time." + t;
+        foreach (var (group, n) in ContextComments)
+            for (int i = 1; i <= n; i++) yield return $"{K}context.{group}.{i}";
+        foreach (var (emotion, n) in EmotionalIndicators)
+            for (int i = 1; i <= n; i++) yield return $"{K}emote.{emotion.ToString().ToLower()}.{i}";
+        foreach (var trait in PersonalityModifiers)
+            for (int i = 1; i <= ModifiersPerTrait; i++) yield return $"{K}mod.{trait}.{i}";
+        foreach (var group in new[] { "married", "love", "friendship", "normal", "anger", "hate" })
+            for (int i = 1; i <= FarewellsPerTier; i++) yield return $"{K}farewell.{group}.{i}";
+        foreach (var arch in FarewellAdditions) yield return K + "farewell_add." + arch;
+        for (int i = 1; i <= GenericSmallTalk; i++) yield return $"{K}smalltalk.{i}";
+        for (int i = 1; i <= TopicTemplates; i++) yield return $"{K}topic_line.{i}";
+        foreach (var k in new[] { "with_title", "join", "join_emote", "smalltalk_none", "react_none", "react_other" })
+            yield return K + k;
+        foreach (var (kind, kinds) in new (string, string[])[]
+        {
+            ("defeat", new[] { "aggressive", "social", "plain" }),
+            ("gift", new[] { "love", "friend", "greedy", "plain" }),
+            ("insult", new[] { "aggressive", "vengeful", "timid", "plain" }),
+            ("compliment", new[] { "romantic", "brave", "social", "plain" }),
+            ("threat", new[] { "brave", "aggressive", "timid", "plain" }),
+            ("flee", new[] { "aggressive", "brave", "loyal", "timid", "plain" }),
+            ("ally_death", new[] { "aggressive", "social", "loyal", "brave", "romantic", "plain" }),
+        })
+            foreach (var k in kinds) yield return $"{K}rx.{kind}.{k}";
+    }
 
-    #endregion
+    #region Lines picked now, written later
 
-    #region Memory References
-
-    private static readonly Dictionary<MemoryType, string[]> MemoryReferences = new()
+    /// <summary>
+    /// v1.2.5: a generated line: the keys picked, and how to write them. Render writes it in the current
+    /// language; every piece comes from that language.
+    /// </summary>
+    public sealed class NpcLine
     {
-        [MemoryType.Helped] = new[]
+        private readonly Func<string> _render;
+
+        /// <summary>The keys picked, in order (the same in every language).</summary>
+        public IReadOnlyList<string> Keys { get; }
+
+        internal NpcLine(Func<string> render, List<string> keys)
         {
-            "I haven't forgotten how you helped me {time_ref}.",
-            "I still owe you for what you did {time_ref}.",
-            "Your kindness {time_ref} meant a lot to me."
-        },
-        [MemoryType.Attacked] = new[]
-        {
-            "After what you did {time_ref}... I can't forget that easily.",
-            "You attacked me {time_ref}. I haven't forgotten.",
-            "The wounds from {time_ref} haven't fully healed."
-        },
-        [MemoryType.Betrayed] = new[]
-        {
-            "Your betrayal {time_ref} still stings.",
-            "After what you did... I'm not sure I can trust you.",
-            "You betrayed me once. Never again."
-        },
-        [MemoryType.Traded] = new[]
-        {
-            "Looking for another deal? The last one worked out.",
-            "Our trade {time_ref} was profitable. More business?",
-            "I remember our transaction {time_ref}. Fair dealing."
-        },
-        [MemoryType.SharedDrink] = new[]
-        {
-            "We should share another drink sometime, like {time_ref}.",
-            "I remember that night at the tavern {time_ref}...",
-            "Good times at the inn {time_ref}, eh?"
-        },
-        [MemoryType.Defended] = new[]
-        {
-            "I haven't forgotten how you stood up for me {time_ref}.",
-            "You defended me {time_ref}. That means something.",
-            "We fought together {time_ref}. I respect that."
-        },
-        [MemoryType.Saved] = new[]
-        {
-            "You saved my life {time_ref}. I owe you everything.",
-            "I'd be dead if not for you {time_ref}.",
-            "I'll never forget what you did for me {time_ref}."
-        },
-        [MemoryType.Insulted] = new[]
-        {
-            "Your words {time_ref} still sting, you know.",
-            "I haven't forgotten what you said {time_ref}.",
-            "Those insults {time_ref}... they hurt."
-        },
-        [MemoryType.Complimented] = new[]
-        {
-            "Your kind words {time_ref} still make me smile.",
-            "I remember what you said {time_ref}. Thank you.",
-            "The compliment {time_ref} meant a lot."
-        },
-        [MemoryType.SharedItem] = new[]
-        {
-            "I still have what you gave me {time_ref}.",
-            "Your gift {time_ref} was very thoughtful.",
-            "That item you shared {time_ref}... I treasure it."
+            _render = render;
+            Keys = keys;
         }
-    };
 
-    private static readonly string[] TimeReferences = new[]
-    {
-        "just yesterday", "the other day", "recently", "some time ago", "a while back", "long ago"
-    };
+        public string Render() => _render();
+    }
 
-    #endregion
+    private static NpcLine Fixed(string key) => new(() => Loc.Get(key), new List<string> { key });
 
-    #region Context Comments
-
-    private static readonly Dictionary<string, string[]> ContextComments = new()
-    {
-        ["low_hp"] = new[]
-        {
-            "You look terrible! Are you wounded?",
-            "You should see a healer, you don't look well.",
-            "By the gods, what happened to you?",
-            "You're in rough shape. Are you alright?"
-        },
-        ["high_level"] = new[]
-        {
-            "Your reputation precedes you.",
-            "I've heard tales of your exploits.",
-            "A legendary {player_class}, if I'm not mistaken?",
-            "You've made quite a name for yourself."
-        },
-        ["low_level"] = new[]
-        {
-            "New to these parts?",
-            "Be careful out there, youngster.",
-            "Careful out there. It's rough for necomers.",
-            "Just starting your journey, I see."
-        },
-        ["rich"] = new[]
-        {
-            "Business must be good!",
-            "Coin weighing you down, I see.",
-            "You look prosperous today.",
-            "Heavy purse you got there."
-        },
-        ["poor"] = new[]
-        {
-            "Times are tough for all of us.",
-            "Not much coin in your purse, eh?",
-            "I'd offer gold if I had any to spare.",
-            "Nobody has coin these days."
-        },
-        ["is_king"] = new[]
-        {
-            "Your Majesty! An honor!",
-            "The throne suits you, my liege.",
-            "My King/Queen, how may I serve?",
-            "All hail! The ruler graces us!"
-        },
-        ["has_companion"] = new[]
-        {
-            "I see you've got company.",
-            "Traveling with friends? Smart.",
-            "Who's your companion there?",
-            "Good to see you're not alone."
-        },
-        ["diseased"] = new[]
-        {
-            "You don't look well... keep your distance.",
-            "Is that... a plague symptom? Stay back!",
-            "There's sickness in you. I can tell.",
-            "You should seek a healer for that affliction."
-        },
-        ["powerful_weapon"] = new[]
-        {
-            "That's quite the weapon you carry.",
-            "Fine blade! Where'd you get it?",
-            "I wouldn't want to be on the wrong end of that.",
-            "That's a nasty looking weapon."
-        },
-        ["morning"] = new[]
-        {
-            "Early riser, I see.",
-            "Up with the dawn? Good habits.",
-            "Morning air suits you."
-        },
-        ["evening"] = new[]
-        {
-            "Out late, aren't you?",
-            "Out for a walk this late?",
-            "Careful after dark."
-        },
-        ["night"] = new[]
-        {
-            "Dangerous to be wandering at this hour.",
-            "Watch yourself. Bad things happen at night.",
-            "Most sensible folk are asleep by now."
-        }
-    };
-
-    #endregion
-
-    #region Emotional Indicators
-
-    private static readonly Dictionary<EmotionType, string[]> EmotionalIndicators = new()
-    {
-        [EmotionType.Joy] = new[] { "*smiles warmly*", "*beams happily*", "*chuckles*", "*grins*" },
-        [EmotionType.Sadness] = new[] { "*sighs deeply*", "*looks downcast*", "*speaks softly*", "*trails off...*" },
-        [EmotionType.Anger] = new[] { "*scowls*", "*narrows eyes*", "*speaks curtly*", "*clenches fists*" },
-        [EmotionType.Fear] = new[] { "*looks around nervously*", "*whispers*", "*eyes dart about*", "*trembles slightly*" },
-        [EmotionType.Confidence] = new[] { "*stands tall*", "*speaks firmly*", "*nods confidently*", "*meets your gaze*" },
-        [EmotionType.Loneliness] = new[] { "*looks relieved to see you*", "*perks up*", "*seems eager to talk*" },
-        [EmotionType.Hope] = new[] { "*eyes brighten*", "*speaks hopefully*", "*smiles faintly*" },
-        [EmotionType.Peace] = new[] { "*speaks calmly*", "*seems serene*", "*nods peacefully*" }
-    };
-
-    #endregion
-
-    #region Personality Modifiers
-
-    private static readonly Dictionary<string, (string prefix, string suffix)[]> PersonalityModifiers = new()
-    {
-        ["high_aggression"] = new[]
-        {
-            ("Look, ", ""), ("", " Now get to the point."), ("", " I don't have all day.")
-        },
-        ["low_aggression"] = new[]
-        {
-            ("Oh, ", ""), ("", ", if you don't mind."), ("", " I hope that's alright.")
-        },
-        ["high_intelligence"] = new[]
-        {
-            ("Think about it. ", ""), ("Heres the thing. ", ""), ("Way I see it, ", "")
-        },
-        ["high_greed"] = new[]
-        {
-            ("", " Speaking of which, got any coin?"), ("", " Business opportunity, perhaps?"), ("", " Gold talks, you know.")
-        },
-        ["high_romanticism"] = new[]
-        {
-            ("Ah, ", ""), ("", ", my dear."), ("", " Good to see you, gorgeous.")
-        },
-        ["high_humor"] = new[]
-        {
-            ("Ha! ", ""), ("", " Just kidding... mostly."), ("", " Don't take that too seriously!")
-        },
-        ["high_loyalty"] = new[]
-        {
-            ("", " You can count on me."), ("As always, ", ""), ("", " I dont go back on my word.")
-        },
-        ["high_bravery"] = new[]
-        {
-            ("", " Im not afraid of anything."), ("", " Let em come."), ("Bring it on. ", "")
-        },
-        ["high_deceitfulness"] = new[]
-        {
-            ("Between you and me... ", ""), ("", " But who knows what's really true?"), ("", " Or so I've heard...")
-        }
-    };
+    private static NpcLine FromDatabase(NPCDialogueDatabase.DialogueLine line, NPC npc, Player player)
+        => new(() => NPCDialogueDatabase.RenderLine(line, npc, player), new List<string> { "npc_dialogue." + line.Id });
 
     #endregion
 
@@ -425,128 +184,139 @@ public static class NPCDialogueGenerator
     /// <summary>
     /// Generate a context-aware greeting for the player
     /// </summary>
-    public static string GenerateGreeting(NPC npc, Player player)
+    public static string GenerateGreeting(NPC npc, Player player) => PickGreeting(npc, player).Render();
+
+    /// <summary>v1.2.5: the greeting picked, to be written in the reader's language.</summary>
+    public static NpcLine PickGreeting(NPC npc, Player player)
     {
-        if (npc == null || player == null) return "Hello there.";
+        if (npc == null || player == null) return Fixed(K + "greet.normal.3");
 
         // Try pre-generated dialogue database first
-        var dbLine = NPCDialogueDatabase.GetBestLine("greeting", npc, player);
-        if (dbLine != null) return dbLine;
+        var dbLine = NPCDialogueDatabase.PickLine("greeting", npc, player, null, Rng);
+        if (dbLine != null) return FromDatabase(dbLine, npc, player);
 
         // Fall back to template system
-        // Get relationship level
+        var keys = new List<string>();
         int relationshipLevel = GetRelationshipLevel(npc, player);
 
         // Get base greeting
-        string greeting = GetBaseGreeting(relationshipLevel, player);
+        string baseKey = GetBaseGreetingKey(relationshipLevel);
+        keys.Add(baseKey);
+        Func<string> greeting = () => Loc.Get(baseKey, player.ClassName, PlayerTitle(player));
 
         // Apply archetype vocabulary (30% chance to modify)
-        if (_random.NextDouble() < 0.30)
+        if (Rng.NextDouble() < 0.30)
         {
-            greeting = ApplyArchetypeStyle(greeting, npc.Archetype, player);
+            greeting = ApplyArchetypeStyle(greeting, npc.Archetype, keys);
         }
 
         // Apply personality modifiers (40% chance)
-        if (npc.Personality != null && _random.NextDouble() < 0.40)
+        if (npc.Personality != null && Rng.NextDouble() < 0.40)
         {
-            greeting = ApplyPersonalityModifiers(greeting, npc.Personality);
+            greeting = ApplyPersonalityModifiers(greeting, npc.Personality, keys);
         }
 
         // Add memory reference (20% chance)
-        if (npc.Memory != null && _random.NextDouble() < 0.20)
+        if (npc.Memory != null && Rng.NextDouble() < 0.20)
         {
-            var memoryRef = GetMemoryReference(npc.Memory, player);
-            if (!string.IsNullOrEmpty(memoryRef))
+            var memory = GetMemoryReference(npc.Memory, player);
+            if (memory != null)
             {
-                greeting = $"{greeting} {memoryRef}";
+                var (refKey, timeKey) = memory.Value;
+                keys.Add(refKey);
+                keys.Add(timeKey);
+                var inner = greeting;
+                greeting = () => Join(K + "join", inner(), Loc.Get(refKey, Loc.Get(timeKey)));
             }
         }
 
         // Add context comment (30% chance)
-        if (_random.NextDouble() < 0.30)
+        if (Rng.NextDouble() < 0.30)
         {
-            var contextComment = GetContextComment(player);
-            if (!string.IsNullOrEmpty(contextComment))
+            var contextKey = GetContextCommentKey(player);
+            if (contextKey != null)
             {
-                greeting = $"{greeting} {contextComment}";
+                keys.Add(contextKey);
+                var inner = greeting;
+                greeting = () => Join(K + "join", inner(), Loc.Get(contextKey, player.ClassName, PlayerTitle(player)));
             }
         }
 
         // Add emotional indicator (25% chance)
-        if (npc.EmotionalState != null && _random.NextDouble() < 0.25)
+        if (npc.EmotionalState != null && Rng.NextDouble() < 0.25)
         {
-            var indicator = GetEmotionalIndicator(npc.EmotionalState);
-            if (!string.IsNullOrEmpty(indicator))
-            {
-                greeting = $"{indicator} {greeting}";
-            }
+            greeting = AddEmotionalIndicator(greeting, npc.EmotionalState, keys);
         }
 
-        return greeting;
+        return new NpcLine(greeting, keys);
     }
 
     /// <summary>
     /// Generate a farewell for the player
     /// </summary>
-    public static string GenerateFarewell(NPC npc, Player player)
+    public static string GenerateFarewell(NPC npc, Player player) => PickFarewell(npc, player).Render();
+
+    /// <summary>v1.2.5: the farewell picked, to be written in the reader's language.</summary>
+    public static NpcLine PickFarewell(NPC npc, Player player)
     {
-        if (npc == null || player == null) return "Farewell.";
+        if (npc == null || player == null) return Fixed(K + "farewell.normal.1");
 
         // Try pre-generated dialogue database first
-        var dbLine = NPCDialogueDatabase.GetBestLine("farewell", npc, player);
-        if (dbLine != null) return dbLine;
+        var dbLine = NPCDialogueDatabase.PickLine("farewell", npc, player, null, Rng);
+        if (dbLine != null) return FromDatabase(dbLine, npc, player);
 
         // Fall back to template system
+        var keys = new List<string>();
         int relationshipLevel = GetRelationshipLevel(npc, player);
-        string farewell = GetBaseFarewell(relationshipLevel);
+        string baseKey = GetBaseFarewellKey(relationshipLevel);
+        keys.Add(baseKey);
+        Func<string> farewell = () => Loc.Get(baseKey);
 
         // Apply archetype flavor
-        farewell = ApplyArchetypeFarewell(farewell, npc.Archetype);
-
-        // Add emotional indicator
-        if (npc.EmotionalState != null && _random.NextDouble() < 0.25)
+        string arch = npc.Archetype?.ToLower() ?? "";
+        if (FarewellAdditions.Contains(arch) && Rng.NextDouble() < 0.5)
         {
-            var indicator = GetEmotionalIndicator(npc.EmotionalState);
-            if (!string.IsNullOrEmpty(indicator))
-            {
-                farewell = $"{indicator} {farewell}";
-            }
+            string addKey = K + "farewell_add." + arch;
+            keys.Add(addKey);
+            var inner = farewell;
+            farewell = () => Join(K + "join", inner(), Loc.Get(addKey));
         }
 
-        return farewell;
+        // Add emotional indicator
+        if (npc.EmotionalState != null && Rng.NextDouble() < 0.25)
+        {
+            farewell = AddEmotionalIndicator(farewell, npc.EmotionalState, keys);
+        }
+
+        return new NpcLine(farewell, keys);
     }
 
     /// <summary>
     /// Generate small talk/conversation topic
     /// </summary>
-    public static string GenerateSmallTalk(NPC npc, Player player)
+    public static string GenerateSmallTalk(NPC npc, Player player) => PickSmallTalk(npc, player).Render();
+
+    /// <summary>v1.2.5: the small talk picked, to be written in the reader's language.</summary>
+    public static NpcLine PickSmallTalk(NPC npc, Player player)
     {
-        if (npc == null) return "Huh. Weird day.";
+        if (npc == null) return Fixed(K + "smalltalk_none");
 
         // Try pre-generated dialogue database first
-        var dbLine = NPCDialogueDatabase.GetBestLine("smalltalk", npc, player);
-        if (dbLine != null) return dbLine;
+        var dbLine = NPCDialogueDatabase.PickLine("smalltalk", npc, player, null, Rng);
+        if (dbLine != null) return FromDatabase(dbLine, npc, player);
 
         // Get archetype-appropriate topics
-        var vocab = GetArchetypeVocabulary(npc.Archetype);
-        if (vocab != null && vocab.Topics.Length > 0)
+        string arch = npc.Archetype?.ToLower() ?? "";
+        if (ArchetypeVocabularies.TryGetValue(arch, out var vocab) && vocab.Topics > 0)
         {
-            var topic = vocab.Topics[_random.Next(vocab.Topics.Length)];
-            return GenerateTopicComment(topic, npc.Personality);
+            string topicKey = $"{K}topic.{arch}.{Rng.Next(vocab.Topics) + 1}";
+            string templateKey = $"{K}topic_line.{Rng.Next(TopicTemplates) + 1}";
+            return new NpcLine(() => CapitalizeFirst(Loc.Get(templateKey, Loc.Get(topicKey))),
+                new List<string> { topicKey, templateKey });
         }
 
         // Fallback generic small talk
-        var genericTopics = new[]
-        {
-            "The weather's been strange lately, hasn't it?",
-            "Have you heard the latest news from the castle?",
-            "The dungeon's been particularly dangerous these days.",
-            "Trade's been slow lately. Economy's rough.",
-            "More adventurers coming through than usual.",
-            "Strange happenings in town, they say."
-        };
-
-        return genericTopics[_random.Next(genericTopics.Length)];
+        return Fixed($"{K}smalltalk.{Rng.Next(GenericSmallTalk) + 1}");
     }
 
     /// <summary>
@@ -561,38 +331,59 @@ public static class NPCDialogueGenerator
     /// </summary>
     public static Func<string> ReactionInLanguage(NPC npc, Player player, string eventType)
     {
-        if (npc?.Personality == null) return () => "Hm.";
+        if (npc?.Personality == null) return () => Loc.Get(K + "react_none");
 
         // Try pre-generated dialogue database first
-        var line = NPCDialogueDatabase.PickLine("reaction", npc, player, eventType);
+        var line = NPCDialogueDatabase.PickLine("reaction", npc, player, eventType, Rng);
         if (line != null) return () => NPCDialogueDatabase.RenderLine(line, npc, player);
 
         // v1.2.4: the victory fallback is a key, written in each reader's language
-        if (eventType.ToLower() == "combat_victory")
-        {
-            string key = CombatVictoryFallbackKey(npc.Personality);
-            return () => UsurperRemake.Systems.Loc.Get(key);
-        }
-
-        string fallback = FallbackReaction(npc, player, eventType);
-        return () => fallback;
+        // v1.2.5: so are the other fallbacks
+        string key = FallbackReactionKey(npc, player, eventType);
+        return () => Loc.Get(key);
     }
 
-    private static string FallbackReaction(NPC npc, Player player, string eventType)
+    /// <summary>v1.2.5: the key of the reaction used when no dialogue line fits.</summary>
+    internal static string FallbackReactionKey(NPC npc, Player player, string eventType)
     {
+        var p = npc.Personality;
         return eventType.ToLower() switch
         {
-            "combat_victory" => UsurperRemake.Systems.Loc.Get(CombatVictoryFallbackKey(npc.Personality)),
-            "combat_defeat" => GenerateCombatDefeatReaction(npc.Personality),
-            "combat_flee" => GenerateFleeReaction(npc.Personality),
-            "ally_death" => GenerateAllyDeathReaction(npc.Personality),
-            "gift_received" => GenerateGiftReaction(npc.Personality, GetRelationshipLevel(npc, player)),
-            "insult" => GenerateInsultReaction(npc.Personality),
-            "compliment" => GenerateComplimentReaction(npc.Personality),
-            "threat" => GenerateThreatReaction(npc.Personality),
-            _ => "Huh. Alright then."
+            "combat_victory" => CombatVictoryFallbackKey(p),
+            "combat_defeat" => K + "rx.defeat." + CombatDefeatReaction(p),
+            "combat_flee" => K + "rx.flee." + FleeReaction(p),
+            "ally_death" => K + "rx.ally_death." + AllyDeathReaction(p),
+            "gift_received" => K + "rx.gift." + GiftReaction(p, GetRelationshipLevel(npc, player)),
+            "insult" => K + "rx.insult." + InsultReaction(p),
+            "compliment" => K + "rx.compliment." + ComplimentReaction(p),
+            "threat" => K + "rx.threat." + ThreatReaction(p),
+            _ => K + "react_other"
         };
     }
+
+    #endregion
+
+    #region Display
+
+    /// <summary>
+    /// v1.2.5: spoken text as rows of at most 79 columns: two spaces and an opening quote, the text
+    /// wrapped under itself, the closing quote after the last word.
+    /// </summary>
+    public static List<string> QuotedRows(string text)
+    {
+        var rows = UIHelper.WordWrap(text, 75);
+        var result = new List<string>();
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string row = (i == 0 ? "  \"" : "   ") + rows[i];
+            if (i == rows.Count - 1) row += "\"";
+            result.Add(row);
+        }
+        return result;
+    }
+
+    /// <summary>v1.2.5: a narrated line (a shopkeeper's mood) as rows of at most 79 columns.</summary>
+    public static List<string> NarrationRows(string text) => UIHelper.WordWrap(text, 79);
 
     #endregion
 
@@ -610,125 +401,63 @@ public static class NPCDialogueGenerator
         }
     }
 
-    private static string GetBaseGreeting(int relationLevel, Player player)
+    private static string GetBaseGreetingKey(int relationLevel)
     {
         // Find the closest relationship tier
-        int closestTier = GameConfig.RelationNormal;
-        foreach (var tier in RelationshipGreetings.Keys.OrderBy(k => k))
+        string group = "normal";
+        foreach (var (tier, name) in GreetingTiers)
         {
-            if (relationLevel <= tier)
-            {
-                closestTier = tier;
-                break;
-            }
-            closestTier = tier;
+            group = name;
+            if (relationLevel <= tier) break;
         }
-
-        var greetings = RelationshipGreetings.GetValueOrDefault(closestTier, RelationshipGreetings[GameConfig.RelationNormal]);
-        var greeting = greetings[_random.Next(greetings.Length)];
-
-        // Replace placeholders
-        greeting = ReplacePlaceholders(greeting, player);
-
-        return greeting;
+        return $"{K}greet.{group}.{Rng.Next(GreetingsPerTier) + 1}";
     }
 
-    private static string GetBaseFarewell(int relationLevel)
+    private static string GetBaseFarewellKey(int relationLevel)
     {
-        return relationLevel switch
+        string group = relationLevel switch
         {
-            <= GameConfig.RelationMarried => new[] {
-                "Hurry back to me, my love.",
-                "Be safe, darling.",
-                "I'll be waiting for you.",
-                "Come back safe. Please."
-            }[_random.Next(4)],
-            <= GameConfig.RelationLove => new[] {
-                "I'll miss you!",
-                "Come back soon!",
-                "Take care of yourself!",
-                "Ill be thinking about you."
-            }[_random.Next(4)],
-            <= GameConfig.RelationFriendship => new[] {
-                "See you around, friend!",
-                "Take care out there!",
-                "Until next time!",
-                "Safe travels, my friend!"
-            }[_random.Next(4)],
-            <= GameConfig.RelationNormal => new[] {
-                "Farewell.",
-                "Safe travels.",
-                "Until we meet again.",
-                "Good luck out there."
-            }[_random.Next(4)],
-            <= GameConfig.RelationAnger => new[] {
-                "Just go.",
-                "Finally.",
-                "Good riddance.",
-                "Don't let the door hit you."
-            }[_random.Next(4)],
-            _ => new[] {
-                "Leave. Now.",
-                "Get out of my sight!",
-                "I hope we never meet again.",
-                "And stay away!"
-            }[_random.Next(4)]
+            <= GameConfig.RelationMarried => "married",
+            <= GameConfig.RelationLove => "love",
+            <= GameConfig.RelationFriendship => "friendship",
+            <= GameConfig.RelationNormal => "normal",
+            <= GameConfig.RelationAnger => "anger",
+            _ => "hate"
         };
+        return $"{K}farewell.{group}.{Rng.Next(FarewellsPerTier) + 1}";
     }
 
-    private static string ReplacePlaceholders(string text, Player player)
+    /// <summary>The player's title as an NPC addresses them: Your Majesty for a ruler, else their class.</summary>
+    private static string PlayerTitle(Player player)
+        => player.King ? Loc.Get("npc_dialogue.ph.majesty") : player.ClassName;
+
+    private static Func<string> ApplyArchetypeStyle(Func<string> greeting, string archetype, List<string> keys)
     {
-        if (player == null) return text;
-
-        text = text.Replace("{player_name}", player.Name2 ?? player.Name1 ?? "Adventurer");
-        text = text.Replace("{player_class}", player.Class.ToString());
-        text = text.Replace("{player_title}", player.King ? "Your Majesty" : player.Class.ToString());
-
-        return text;
-    }
-
-    private static ArchetypeVocabulary GetArchetypeVocabulary(string archetype)
-    {
-        if (string.IsNullOrEmpty(archetype)) return null;
-        return ArchetypeVocabularies.GetValueOrDefault(archetype.ToLower());
-    }
-
-    private static string ApplyArchetypeStyle(string greeting, string archetype, Player player)
-    {
-        var vocab = GetArchetypeVocabulary(archetype);
-        if (vocab == null) return greeting;
+        string arch = archetype?.ToLower() ?? "";
+        if (!ArchetypeVocabularies.TryGetValue(arch, out var vocab)) return greeting;
 
         // Sometimes use archetype-specific title
-        if (_random.NextDouble() < 0.5 && vocab.Titles.Length > 0)
+        if (Rng.NextDouble() < 0.5 && vocab.Titles > 0)
         {
-            var title = vocab.Titles[_random.Next(vocab.Titles.Length)];
-            greeting = $"{greeting}, {title}.";
+            string titleKey = $"{K}title.{arch}.{Rng.Next(vocab.Titles) + 1}";
+            keys.Add(titleKey);
+            var inner = greeting;
+            greeting = () => Wrap(K + "with_title", inner(), Loc.Get(titleKey));
         }
 
         // Sometimes add archetype phrase
-        if (_random.NextDouble() < 0.3 && vocab.Phrases.Length > 0)
+        if (Rng.NextDouble() < 0.3 && vocab.Phrases > 0)
         {
-            var phrase = vocab.Phrases[_random.Next(vocab.Phrases.Length)];
-            greeting = $"{greeting} {phrase}";
+            string phraseKey = $"{K}phrase.{arch}.{Rng.Next(vocab.Phrases) + 1}";
+            keys.Add(phraseKey);
+            var inner = greeting;
+            greeting = () => Join(K + "join", inner(), Loc.Get(phraseKey));
         }
 
         return greeting;
     }
 
-    private static string ApplyArchetypeFarewell(string farewell, string archetype)
-    {
-        return archetype?.ToLower() switch
-        {
-            "guard" => _random.NextDouble() < 0.5 ? $"{farewell} Stay out of trouble." : farewell,
-            "priest" => _random.NextDouble() < 0.5 ? $"{farewell} May the gods watch over you." : farewell,
-            "merchant" => _random.NextDouble() < 0.5 ? $"{farewell} Come back when you need more goods!" : farewell,
-            "thief" => _random.NextDouble() < 0.5 ? $"{farewell} Watch your coin purse out there." : farewell,
-            "noble" => _random.NextDouble() < 0.5 ? $"{farewell} One must maintain proper farewells." : farewell,
-            _ => farewell
-        };
-    }
-
-    private static string ApplyPersonalityModifiers(string greeting, PersonalityProfile personality)
+    private static Func<string> ApplyPersonalityModifiers(Func<string> greeting, PersonalityProfile personality, List<string> keys)
     {
         // Select modifier based on dominant personality trait
         string modifierKey = null;
@@ -743,16 +472,16 @@ public static class NPCDialogueGenerator
         else if (personality.Courage > 0.7f) modifierKey = "high_bravery";
         else if (personality.Trustworthiness < 0.3f) modifierKey = "high_deceitfulness";
 
-        if (modifierKey != null && PersonalityModifiers.TryGetValue(modifierKey, out var modifiers))
-        {
-            var (prefix, suffix) = modifiers[_random.Next(modifiers.Length)];
-            greeting = $"{prefix}{greeting}{suffix}";
-        }
+        if (modifierKey == null) return greeting;
 
-        return greeting;
+        string key = $"{K}mod.{modifierKey}.{Rng.Next(ModifiersPerTrait) + 1}";
+        keys.Add(key);
+        var inner = greeting;
+        return () => Wrap(key, inner());
     }
 
-    private static string GetMemoryReference(MemorySystem memory, Player player)
+    /// <summary>The memory reference key and the time key, or null when there is no memory of the player.</summary>
+    private static (string RefKey, string TimeKey)? GetMemoryReference(MemorySystem memory, Player player)
     {
         if (memory == null || player == null) return null;
 
@@ -761,130 +490,168 @@ public static class NPCDialogueGenerator
 
         // Get recent memories about this player
         var memories = memory.GetMemoriesAboutCharacter(playerName)
-            .Where(m => MemoryReferences.ContainsKey(m.Type))
+            .Where(m => MemoryReferences.Contains(m.Type))
             .OrderByDescending(m => m.Importance)
             .Take(3)
             .ToList();
 
         if (!memories.Any()) return null;
 
-        var selectedMemory = memories[_random.Next(memories.Count)];
-        var references = MemoryReferences[selectedMemory.Type];
-        var reference = references[_random.Next(references.Length)];
+        var selectedMemory = memories[Rng.Next(memories.Count)];
+        string refKey = $"{K}memory.{selectedMemory.Type.ToString().ToLower()}.{Rng.Next(ReferencesPerMemory) + 1}";
 
         // Determine time reference
         var age = selectedMemory.GetAge();
-        string timeRef = age.TotalDays switch
+        string time = age.TotalDays switch
         {
-            < 1 => "just yesterday",
-            < 3 => "the other day",
+            < 1 => "yesterday",
+            < 3 => "other_day",
             < 10 => "recently",
-            < 30 => "some time ago",
-            < 60 => "a while back",
-            _ => "long ago"
+            < 30 => "some_time",
+            < 60 => "while_back",
+            _ => "long_ago"
         };
 
-        return reference.Replace("{time_ref}", timeRef);
+        return (refKey, K + "time." + time);
     }
 
-    private static string GetContextComment(Player player)
+    private static string GetContextCommentKey(Player player)
     {
         if (player == null) return null;
 
         // Check various player conditions
         var possibleComments = new List<string>();
+        void AddGroup(string group)
+        {
+            for (int i = 1; i <= ContextComments[group]; i++)
+                possibleComments.Add($"{K}context.{group}.{i}");
+        }
 
         // Low HP
-        if (player.HP < player.MaxHP * 0.25f)
-        {
-            possibleComments.AddRange(ContextComments["low_hp"]);
-        }
+        if (player.HP < player.MaxHP * 0.25f) AddGroup("low_hp");
 
         // High level (50+)
-        if (player.Level >= 50)
-        {
-            possibleComments.AddRange(ContextComments["high_level"]);
-        }
+        if (player.Level >= 50) AddGroup("high_level");
         // Low level (<5)
-        else if (player.Level < 5)
-        {
-            possibleComments.AddRange(ContextComments["low_level"]);
-        }
+        else if (player.Level < 5) AddGroup("low_level");
 
         // Rich (>10000 gold)
-        if (player.Gold > 10000)
-        {
-            possibleComments.AddRange(ContextComments["rich"]);
-        }
+        if (player.Gold > 10000) AddGroup("rich");
         // Poor (<100 gold)
-        else if (player.Gold < 100)
-        {
-            possibleComments.AddRange(ContextComments["poor"]);
-        }
+        else if (player.Gold < 100) AddGroup("poor");
 
         // Is King/Queen
-        if (player.King)
-        {
-            possibleComments.AddRange(ContextComments["is_king"]);
-        }
+        if (player.King) AddGroup("is_king");
 
         // Check time of day
-        var hour = DateTime.Now.Hour;
-        if (hour >= 5 && hour < 9)
-        {
-            possibleComments.AddRange(ContextComments["morning"]);
-        }
-        else if (hour >= 18 && hour < 22)
-        {
-            possibleComments.AddRange(ContextComments["evening"]);
-        }
-        else if (hour >= 22 || hour < 5)
-        {
-            possibleComments.AddRange(ContextComments["night"]);
-        }
+        var hour = NPCDialogueDatabase.Hour();
+        if (hour >= 5 && hour < 9) AddGroup("morning");
+        else if (hour >= 18 && hour < 22) AddGroup("evening");
+        else if (hour >= 22 || hour < 5) AddGroup("night");
 
         if (!possibleComments.Any()) return null;
 
-        var comment = possibleComments[_random.Next(possibleComments.Count)];
-        return ReplacePlaceholders(comment, player);
+        return possibleComments[Rng.Next(possibleComments.Count)];
     }
 
-    private static string GetEmotionalIndicator(EmotionalState emotionalState)
+    private static Func<string> AddEmotionalIndicator(Func<string> line, EmotionalState emotionalState, List<string> keys)
     {
-        if (emotionalState == null) return null;
+        if (emotionalState == null) return line;
 
         // Get current dominant emotion
         var activeEmotions = emotionalState.GetActiveEmotions();
-        if (activeEmotions == null || !activeEmotions.Any()) return null;
+        if (activeEmotions == null || !activeEmotions.Any()) return line;
 
         // Find strongest emotion (activeEmotions is Dictionary<EmotionType, Emotion>)
         var strongestPair = activeEmotions
             .OrderByDescending(e => e.Value.Intensity)
             .FirstOrDefault();
 
-        if (strongestPair.Value == null || strongestPair.Value.Intensity < 0.3f) return null;
+        if (strongestPair.Value == null || strongestPair.Value.Intensity < 0.3f) return line;
 
-        if (EmotionalIndicators.TryGetValue(strongestPair.Key, out var indicators))
-        {
-            return indicators[_random.Next(indicators.Length)];
-        }
+        if (!EmotionalIndicators.TryGetValue(strongestPair.Key, out int count)) return line;
 
-        return null;
+        string key = $"{K}emote.{strongestPair.Key.ToString().ToLower()}.{Rng.Next(count) + 1}";
+        keys.Add(key);
+        return () => Join(K + "join_emote", Loc.Get(key), line());
     }
 
-    private static string GenerateTopicComment(string topic, PersonalityProfile personality)
+    #endregion
+
+    #region Joining (v1.2.5)
+
+    /// <summary>Two pieces in the current language, by a join template ({0} {1}).</summary>
+    internal static string Join(string joinKey, string first, string second)
+        => Format(Loc.Get(joinKey), first, second);
+
+    /// <summary>
+    /// A line inside a template of the current language: {0} the line, {1} the line without its closing
+    /// punctuation, {2} that punctuation, {3} an extra piece (a title). When the template puts words
+    /// ending in a comma before the line, the line goes on in lower case (the joined sentence has one
+    /// capital, at its start).
+    /// </summary>
+    internal static string Wrap(string templateKey, string line, string extra = "")
     {
-        var templates = new[]
-        {
-            $"Heard anything about {topic}?",
-            $"Been thinking about {topic} lately.",
-            $"What do you make of {topic}?",
-            $"Everyone keeps talking about {topic}.",
-            $"Whats the deal with {topic} these days?"
-        };
-
-        return templates[_random.Next(templates.Length)];
+        string template = Loc.Get(templateKey);
+        var (body, punct) = SplitClosingPunctuation(line);
+        int at = template.IndexOf("{0}", StringComparison.Ordinal);
+        string whole = at > 0 && template.Substring(0, at).TrimEnd().EndsWith(",") ? LowerFirst(line) : line;
+        return Format(template, whole, body, punct, extra);
     }
+
+    private static string Format(string template, params object[] args)
+    {
+        try { return string.Format(template, args); }
+        catch (FormatException) { return template; }
+    }
+
+    /// <summary>The line without its closing . ! ? or ..., and that punctuation (with a French space before it).</summary>
+    internal static (string Body, string Punct) SplitClosingPunctuation(string line)
+    {
+        int end = line.Length;
+        while (end > 0 && ".!?\u2026".IndexOf(line[end - 1]) >= 0) end--;
+        if (end == line.Length) return (line, "");
+        int start = end;
+        while (start > 0 && (line[start - 1] == ' ' || line[start - 1] == '\u00A0' || line[start - 1] == '\u202F')) start--;
+        return (line.Substring(0, start), line.Substring(start));
+    }
+
+    /// <summary>
+    /// The first letter in lower case, after any opening marks (¡ ¿ * "). English keeps "I" and its
+    /// contractions, and a word in capitals.
+    /// </summary>
+    internal static string LowerFirst(string line)
+    {
+        int i = FirstLetter(line);
+        if (i < 0) return line;
+        int end = i;
+        while (end < line.Length && (char.IsLetter(line[end]) || line[end] == '\'')) end++;
+        string word = line.Substring(i, end - i);
+        if (word.Length > 1 && word.All(c => !char.IsLetter(c) || char.IsUpper(c))) return line;
+        if (GameConfig.Language == "en" && (word == "I" || word.StartsWith("I'"))) return line;
+        return line.Substring(0, i) + char.ToLower(line[i]) + line.Substring(i + 1);
+    }
+
+    /// <summary>The first letter in upper case, after any opening marks.</summary>
+    internal static string CapitalizeFirst(string line)
+    {
+        int i = FirstLetter(line);
+        return i < 0 ? line : line.Substring(0, i) + char.ToUpper(line[i]) + line.Substring(i + 1);
+    }
+
+    private static int FirstLetter(string line)
+    {
+        for (int i = 0; i < line.Length; i++)
+        {
+            if (char.IsLetter(line[i])) return i;
+            if ("\u00A1\u00BF*\"'(\u00AB \u201E\u201C".IndexOf(line[i]) < 0) return -1;
+        }
+        return -1;
+    }
+
+    #endregion
+
+    #region Reactions
 
     /// <summary>v1.2.4: the victory reaction used when no dialogue line fits, as a Loc key.</summary>
     internal static string CombatVictoryFallbackKey(PersonalityProfile personality)
@@ -898,97 +665,63 @@ public static class NPCDialogueGenerator
         return "npc_dialogue.rx_cv_fb_plain";
     }
 
-    private static string GenerateCombatDefeatReaction(PersonalityProfile personality)
+    private static string CombatDefeatReaction(PersonalityProfile personality)
     {
-        if (personality.Aggression > 0.7f)
-            return "Get up and fight! Don't let them win!";
-        if (personality.Sociability > 0.7f)
-            return "Oh no! Are you alright? That was terrible!";
-        return "Tough break. Happens to everyone.";
+        if (personality.Aggression > 0.7f) return "aggressive";
+        if (personality.Sociability > 0.7f) return "social";
+        return "plain";
     }
 
-    private static string GenerateGiftReaction(PersonalityProfile personality, int relationship)
+    private static string GiftReaction(PersonalityProfile personality, int relationship)
     {
-        if (relationship <= GameConfig.RelationLove)
-            return "*takes it carefully* You didn't have to... thank you.";
-        if (relationship <= GameConfig.RelationFriendship)
-            return "For me? You're too kind! Thank you, friend!";
-        if (personality.Greed > 0.7f)
-            return "Hmm, this will do nicely. What do you want in return?";
-        return "A gift? How... unexpected. Thank you.";
+        if (relationship <= GameConfig.RelationLove) return "love";
+        if (relationship <= GameConfig.RelationFriendship) return "friend";
+        if (personality.Greed > 0.7f) return "greedy";
+        return "plain";
     }
 
-    private static string GenerateInsultReaction(PersonalityProfile personality)
+    private static string InsultReaction(PersonalityProfile personality)
     {
-        if (personality.Aggression > 0.7f)
-            return "*clenches fists* Say that again. I dare you!";
-        if (personality.Vengefulness > 0.7f)
-            return "*narrows eyes* I won't forget this. Mark my words.";
-        if (personality.Courage < 0.3f)
-            return "*looks down* That... that hurt.";
-        return "*scowls* Watch your tongue.";
+        if (personality.Aggression > 0.7f) return "aggressive";
+        if (personality.Vengefulness > 0.7f) return "vengeful";
+        if (personality.Courage < 0.3f) return "timid";
+        return "plain";
     }
 
-    private static string GenerateComplimentReaction(PersonalityProfile personality)
+    private static string ComplimentReaction(PersonalityProfile personality)
     {
-        if (personality.Romanticism > 0.7f)
-            return "*blushes* Oh my... you're too kind!";
-        if (personality.Courage > 0.7f)
-            return "*smiles confidently* I know, but thank you for noticing.";
-        if (personality.Sociability > 0.7f)
-            return "*beams* That's so sweet of you to say!";
-        return "*nods* Thank you, I appreciate that.";
+        if (personality.Romanticism > 0.7f) return "romantic";
+        if (personality.Courage > 0.7f) return "brave";
+        if (personality.Sociability > 0.7f) return "social";
+        return "plain";
     }
 
-    private static string GenerateThreatReaction(PersonalityProfile personality)
+    private static string ThreatReaction(PersonalityProfile personality)
     {
-        if (personality.Courage > 0.7f)
-            return "*stands firm* You don't scare me. Try me.";
-        if (personality.Aggression > 0.7f)
-            return "*draws closer* Is that a threat? Because I can make threats too.";
-        if (personality.Courage < 0.3f)
-            return "*backs away* P-please, I don't want any trouble...";
-        return "*tenses* Let's not do anything we'll regret.";
+        if (personality.Courage > 0.7f) return "brave";
+        if (personality.Aggression > 0.7f) return "aggressive";
+        if (personality.Courage < 0.3f) return "timid";
+        return "plain";
     }
 
-    private static string GenerateFleeReaction(PersonalityProfile personality)
+    private static string FleeReaction(PersonalityProfile personality)
     {
-        if (personality.Aggression > 0.7f)
-            return "*growls* Running away? We should have fought to the end!";
-        if (personality.Courage > 0.7f)
-            return "Smart move. Live to fight another day.";
-        if (personality.Loyalty > 0.7f)
-            return "I'm with you, whatever you decide. Let's get out of here!";
-        if (personality.Courage < 0.3f)
-            return "*relieved* Thank goodness we're getting away from that!";
-        return "Yeah, lets get out of here.";
+        if (personality.Aggression > 0.7f) return "aggressive";
+        if (personality.Courage > 0.7f) return "brave";
+        if (personality.Loyalty > 0.7f) return "loyal";
+        if (personality.Courage < 0.3f) return "timid";
+        return "plain";
     }
 
-    private static string GenerateAllyDeathReaction(PersonalityProfile personality)
+    private static string AllyDeathReaction(PersonalityProfile personality)
     {
-        if (personality.Aggression > 0.7f)
-            return "*enraged* No! Get up! We're not done fighting!";
-        if (personality.Sociability > 0.7f)
-            return "*cries out* No, please no! Stay with me!";
-        if (personality.Loyalty > 0.7f)
-            return "*kneels beside you* Don't you dare leave me! Not like this!";
-        if (personality.Courage > 0.7f)
-            return "*grabs your hand* Hold on! You're stronger than this!";
-        if (personality.Romanticism > 0.7f)
-            return "*tears streaming* My heart... please, don't leave me!";
-        return "*gasps* No... this can't be happening!";
+        if (personality.Aggression > 0.7f) return "aggressive";
+        if (personality.Sociability > 0.7f) return "social";
+        if (personality.Loyalty > 0.7f) return "loyal";
+        if (personality.Courage > 0.7f) return "brave";
+        if (personality.Romanticism > 0.7f) return "romantic";
+        return "plain";
     }
 
     #endregion
-}
-
-/// <summary>
-/// Container for archetype-specific vocabulary and speech patterns
-/// </summary>
-public class ArchetypeVocabulary
-{
-    public string[] Titles { get; set; } = Array.Empty<string>();
-    public string[] Phrases { get; set; } = Array.Empty<string>();
-    public string[] Topics { get; set; } = Array.Empty<string>();
-    public string[] StyleModifiers { get; set; } = Array.Empty<string>();
 }

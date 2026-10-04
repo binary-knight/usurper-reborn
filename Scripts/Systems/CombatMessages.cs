@@ -46,34 +46,41 @@ public static class CombatMessages
     }
 
     /// <summary>
-    /// Player attack messages
+    /// v1.2.5: how many whole-sentence forms each damage tier has, for the player's, an ally's and a
+    /// monster's attack (combat.msg.{player|ally|monster}.{tier}.{i}). One form is drawn per message with
+    /// the caller's RNG, one draw from the same count the verb lists had before, so seeded fights draw
+    /// the same numbers. Before 1.2.5 the sentences were glued from English verbs.
     /// </summary>
-    private static readonly Dictionary<DamageTier, List<string>> PlayerAttackVerbs = new()
+    private static readonly Dictionary<DamageTier, int> AttackForms = new()
     {
-        [DamageTier.Miss] = new List<string> { "miss", "whiff at", "swing wildly at" },
-        [DamageTier.Graze] = new List<string> { "graze", "scratch", "nick", "clip" },
-        [DamageTier.Light] = new List<string> { "hit", "strike", "slash", "cut" },
-        [DamageTier.Moderate] = new List<string> { "wound", "strike hard", "cleave", "rend" },
-        [DamageTier.Heavy] = new List<string> { "smash", "crush", "savage", "maul" },
-        [DamageTier.Severe] = new List<string> { "devastate", "shatter", "pulverize", "obliterate" },
-        [DamageTier.Critical] = new List<string> { "DEMOLISH", "EVISCERATE", "ANNIHILATE", "DESTROY" },
-        [DamageTier.Devastating] = new List<string> { "***OBLITERATE***", "***DEVASTATE***", "***ANNIHILATE***" }
+        [DamageTier.Miss] = 3,
+        [DamageTier.Graze] = 4,
+        [DamageTier.Light] = 4,
+        [DamageTier.Moderate] = 4,
+        [DamageTier.Heavy] = 4,
+        [DamageTier.Severe] = 4,
+        [DamageTier.Critical] = 4,
+        [DamageTier.Devastating] = 3
     };
 
-    /// <summary>
-    /// Monster attack messages
-    /// </summary>
-    private static readonly Dictionary<DamageTier, List<string>> MonsterAttackVerbs = new()
+    private static readonly Dictionary<DamageTier, int> MonsterAttackForms = new()
     {
-        [DamageTier.Miss] = new List<string> { "misses you", "swings wildly", "attacks but misses" },
-        [DamageTier.Graze] = new List<string> { "grazes you", "scratches you", "barely touches you" },
-        [DamageTier.Light] = new List<string> { "hits you", "strikes you", "attacks you" },
-        [DamageTier.Moderate] = new List<string> { "wounds you", "strikes you hard", "slashes you deeply" },
-        [DamageTier.Heavy] = new List<string> { "smashes you", "crushes you", "mauls you" },
-        [DamageTier.Severe] = new List<string> { "devastates you", "savages you", "rips into you" },
-        [DamageTier.Critical] = new List<string> { "DEMOLISHES you", "EVISCERATES you", "RIPS you apart" },
-        [DamageTier.Devastating] = new List<string> { "***OBLITERATES you***", "***DESTROYS you***", "***ANNIHILATES you***" }
+        [DamageTier.Miss] = 3,
+        [DamageTier.Graze] = 3,
+        [DamageTier.Light] = 3,
+        [DamageTier.Moderate] = 3,
+        [DamageTier.Heavy] = 3,
+        [DamageTier.Severe] = 3,
+        [DamageTier.Critical] = 3,
+        [DamageTier.Devastating] = 3
     };
+
+    /// <summary>The number of forms a speaker's tier has, for the tests.</summary>
+    internal static int FormCount(string who, DamageTier tier) => who == "monster" ? MonsterAttackForms[tier] : AttackForms[tier];
+
+    /// <summary>The key of one attack sentence.</summary>
+    internal static string FormKey(string who, DamageTier tier, int index) =>
+        $"combat.msg.{who}.{tier.ToString().ToLowerInvariant()}.{index}";
 
     /// <summary>
     /// Color for damage tier
@@ -91,84 +98,74 @@ public static class CombatMessages
     };
 
     /// <summary>
-    /// Generate player attack message
+    /// Generate player attack message. `targetName` is the name as shown (MonsterNames.Display).
     /// </summary>
     public static string GetPlayerAttackMessage(string targetName, long damage, long targetMaxHP, Random? random = null)
     {
         random ??= Random.Shared;
         var tier = GetDamageTier(damage, targetMaxHP);
-
-        if (tier == DamageTier.Miss)
-        {
-            var verb = PlayerAttackVerbs[tier][random.Next(PlayerAttackVerbs[tier].Count)];
-            return $"You {verb} {targetName}!";
-        }
-
-        var attackVerb = PlayerAttackVerbs[tier][random.Next(PlayerAttackVerbs[tier].Count)];
-        var color = DamageColors[tier];
-
-        return $"You {attackVerb} {targetName} for [{color}]{damage}[/] damage!";
+        int form = random.Next(AttackForms[tier]);
+        return tier == DamageTier.Miss
+            ? Loc.Get(FormKey("player", tier, form), targetName)
+            : Loc.Get(FormKey("player", tier, form), targetName, DamageColors[tier], damage);
     }
 
     /// <summary>
-    /// Generate ally/teammate/companion attack message
+    /// Generate ally/teammate/companion attack message. v1.2.5: whole sentences per language; the English
+    /// third person forms the old verb gluing got wrong ("whiff ates", "strike hards", "DEMOLISHs") read right.
     /// </summary>
     public static string GetAllyAttackMessage(string allyName, string targetName, long damage, long targetMaxHP, Random? random = null)
     {
         random ??= Random.Shared;
         var tier = GetDamageTier(damage, targetMaxHP);
-
-        if (tier == DamageTier.Miss)
-        {
-            var verb = PlayerAttackVerbs[tier][random.Next(PlayerAttackVerbs[tier].Count)];
-            return $"[bright_cyan]{allyName}[/] {verb}es {targetName}!";
-        }
-
-        var attackVerb = PlayerAttackVerbs[tier][random.Next(PlayerAttackVerbs[tier].Count)];
-        var color = DamageColors[tier];
-
-        // Conjugate verb for third person (add s/es)
-        string thirdPersonVerb = attackVerb;
-        if (!attackVerb.Contains("*")) // Don't modify emphasis verbs like ***ANNIHILATE***
-        {
-            if (attackVerb.EndsWith("sh") || attackVerb.EndsWith("ch"))
-                thirdPersonVerb = attackVerb + "es";
-            else if (attackVerb.EndsWith("e"))
-                thirdPersonVerb = attackVerb + "s";
-            else
-                thirdPersonVerb = attackVerb + "s";
-        }
-
-        return $"[bright_cyan]{allyName}[/] {thirdPersonVerb} {targetName} for [{color}]{damage}[/] damage!";
+        int form = random.Next(AttackForms[tier]);
+        return tier == DamageTier.Miss
+            ? Loc.Get(FormKey("ally", tier, form), allyName, targetName)
+            : Loc.Get(FormKey("ally", tier, form), allyName, targetName, DamageColors[tier], damage);
     }
 
     /// <summary>
-    /// Generate monster attack message
+    /// Generate monster attack message. The raw damage is not shown here: the damage after armor is shown
+    /// separately (showing both confused players into thinking they were hit twice).
     /// </summary>
     public static string GetMonsterAttackMessage(string monsterName, string monsterColor, long damage, long playerMaxHP, Random? random = null)
     {
         random ??= Random.Shared;
         var tier = GetDamageTier(damage, playerMaxHP);
-
-        if (tier == DamageTier.Miss)
-        {
-            var verb = MonsterAttackVerbs[tier][random.Next(MonsterAttackVerbs[tier].Count)];
-            return $"[{monsterColor}]{monsterName}[/] {verb}!";
-        }
-
-        var attackVerb = MonsterAttackVerbs[tier][random.Next(MonsterAttackVerbs[tier].Count)];
-
-        // Don't show raw damage here — the actual damage (after armor) is shown separately
-        // Showing both confused players into thinking they were hit twice
-        return $"[{monsterColor}]{monsterName}[/] {attackVerb}!";
+        int form = random.Next(MonsterAttackForms[tier]);
+        return Loc.Get(FormKey("monster", tier, form), monsterColor, monsterName);
     }
 
     /// <summary>
-    /// Get spell cast message with appropriate color
+    /// v1.2.5: an attack message as rows of at most `width` visible columns (colour markup does not count). A
+    /// message that fits is one row, unchanged. A colour open at a break is closed at the end of the row and
+    /// opened again at the start of the next, so each row is whole markup.
     /// </summary>
-    public static string GetSpellCastMessage(string casterName, string spellName, string casterColor = "white")
+    internal static List<string> Rows(string message, int width = 79)
     {
-        return $"[{casterColor}]{casterName}[/] casts [bright_magenta]{spellName}[/]!";
+        var rows = new List<string>();
+        var row = new System.Text.StringBuilder();
+        int used = 0;
+        string? open = null;
+        foreach (var word in message.Split(' '))
+        {
+            int w = System.Text.RegularExpressions.Regex.Replace(word, @"\[/?[a-z_]*\]", "").Length;
+            if (used > 0 && used + 1 + w > width)
+            {
+                if (open != null) row.Append("[/]");
+                rows.Add(row.ToString());
+                row.Clear();
+                used = 0;
+                if (open != null) row.Append('[').Append(open).Append(']');
+            }
+            else if (row.Length > 0) { row.Append(' '); used++; }
+            row.Append(word);
+            used += w;
+            foreach (System.Text.RegularExpressions.Match tag in System.Text.RegularExpressions.Regex.Matches(word, @"\[(/?)([a-z_]*)\]"))
+                open = tag.Groups[1].Value == "/" ? null : tag.Groups[2].Value;
+        }
+        rows.Add(row.ToString());
+        return rows;
     }
 
     /// <summary>

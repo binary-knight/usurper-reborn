@@ -426,7 +426,7 @@ public class MusicShopLocation : BaseLocation
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("music_shop.current"));
             terminal.SetColor("bright_white");
-            terminal.Write(currentWeapon.Name);
+            terminal.Write(ItemNames.Display(currentWeapon));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("music_shop.pow_value", currentWeapon.WeaponPower, FormatNumber(currentWeapon.Value)));
             terminal.WriteLine("");
@@ -456,7 +456,7 @@ public class MusicShopLocation : BaseLocation
             terminal.Write($"{num,3}. ");
 
             terminal.SetColor(canBuy ? "white" : "darkgray");
-            terminal.Write($"{item.Name,-26}");
+            terminal.Write(ItemNames.Column(item, 26));
 
             if (item.MinLevel > 1)
             {
@@ -577,7 +577,7 @@ public class MusicShopLocation : BaseLocation
         }
 
         terminal.SetColor("bright_yellow");
-        terminal.Write($"\n{Loc.Get("music_shop.buy_confirm", item.Name)}");
+        terminal.Write($"\n{Loc.Get("music_shop.buy_confirm", ItemNames.Display(item))}");
         terminal.SetColor("yellow");
         terminal.Write(FormatNumber(totalCost));
         if (kingTax > 0 || cityTax > 0)
@@ -604,18 +604,18 @@ public class MusicShopLocation : BaseLocation
             if (currentPlayer.EquipItem(item, null, out string message))
             {
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"\n{Loc.Get("shop.purchased_equipped", item.Name)}");
+                terminal.WriteLine($"\n{Loc.Get("shop.purchased_equipped", ItemNames.Display(item))}");
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                 }
                 currentPlayer.RecalculateStats();
             }
             else
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"\n{Loc.Get("shop.purchased_inventory_alt", item.Name)}");
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, $"\n{Loc.Get("shop.purchased_inventory_alt", ItemNames.Display(item))}");
             }
         }
         else
@@ -635,7 +635,7 @@ public class MusicShopLocation : BaseLocation
                 MinLevel = item.MinLevel
             });
             terminal.SetColor("yellow");
-            terminal.WriteLine($"\n{Loc.Get("shop.purchased_inventory_alt", item.Name)}");
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, $"\n{Loc.Get("shop.purchased_inventory_alt", ItemNames.Display(item))}");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("music_shop.bard_only"));
         }
@@ -1307,10 +1307,10 @@ public class MusicShopLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "B", Label = "Buy Instruments", Category = "browse", Icon = "instrument" },
-            new() { Key = "P", Label = "Hire Performance", Category = "service", Icon = "music" },
-            new() { Key = "T", Label = "Talk to Melodia", Category = "social", Icon = "talk" },
-            new() { Key = "L", Label = "Lore Songs", Category = "info", Icon = "scroll" },
+            new() { Key = "B", Label = Loc.Get("music_shop.buy_instruments"), Category = "browse", Icon = "instrument" },
+            new() { Key = "P", Label = Loc.Get("music_shop.electron_performance"), Category = "service", Icon = "music" },
+            new() { Key = "T", Label = Loc.Get("music_shop.talk_melodia"), Category = "social", Icon = "talk" },
+            new() { Key = "L", Label = Loc.Get("music_shop.electron_lore_songs"), Category = "info", Icon = "scroll" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

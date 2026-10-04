@@ -76,18 +76,19 @@ public class DashWidth124Tests
         foreach (var boon in DivineBoonRegistry.AllBoons)
         {
             string alignTag = boon.Alignments.Length > 0 ? $"[{string.Join("/", boon.Alignments)}]" : "[Any]";
+            string name = L(lang, $"boon.{boon.Id}.name"), description = L(lang, $"boon.{boon.Id}.desc");   // v1.2.5: as the row shows them
             string locked = L(lang, "pantheon.boon_locked");
             for (int tier = 1; tier <= 3; tier++)
             {
                 string tierStr = tier switch { 1 => "I", 2 => "II", _ => "III" };
                 string eff = boon.GetEffectDescription(tier);
                 string activeTail = $" ({boon.CostPerTier * tier} pts)";
-                yield return (lang, $"  {99,2}. {boon.Name} {tierStr,-5} -- {PantheonLocation.FitBoonText(eff, 6 + boon.Name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + activeTail.Length, 29)} {alignTag,-12}{activeTail}");
-                foreach (var label in new[] { $"{boon.Name} {tierStr}", $"{boon.Name} \u2192 {tierStr}" })
+                yield return (lang, $"  {99,2}. {name} {tierStr,-5} -- {PantheonLocation.FitBoonText(eff, 6 + name.Length + 1 + Math.Max(5, tierStr.Length) + 4 + 1 + Math.Max(12, alignTag.Length) + activeTail.Length, 29)} {alignTag,-12}{activeTail}");
+                foreach (var label in new[] { $"{name} {tierStr}", $"{name} \u2192 {tierStr}" })
                 {
                     string poor = $" (+{boon.CostPerTier} pts) *";
                     string buy = $" (+{boon.CostPerTier} pts)";
-                    yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(boon.Description, PantheonLocation.BoonRowFixedWidth(label, alignTag, 1 + locked.Length), 27)} {alignTag,-12} {locked}");
+                    yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(description, PantheonLocation.BoonRowFixedWidth(label, alignTag, 1 + locked.Length), 27)} {alignTag,-12} {locked}");
                     yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(eff, PantheonLocation.BoonRowFixedWidth(label, alignTag, poor.Length), 27)} {alignTag,-12}{poor}");
                     yield return (lang, $"  {99,2}. {label,-25} -- {PantheonLocation.FitBoonText(eff, PantheonLocation.BoonRowFixedWidth(label, alignTag, buy.Length), 27)} {alignTag,-12}{buy}");
                 }

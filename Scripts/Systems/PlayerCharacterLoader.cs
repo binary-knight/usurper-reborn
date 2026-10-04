@@ -131,6 +131,7 @@ public static class PlayerCharacterLoader
                     IsCursed = equipData.IsCursed,
                     Rarity = (EquipmentRarity)equipData.Rarity,
                     Family = equipData.Family ?? "",
+                    EnchantBase = equipData.EnchantBase ?? "",   // v1.2.5: the pre-enchant form, for full removal
                     WeaponType = (WeaponType)equipData.WeaponType,
                     Handedness = (WeaponHandedness)equipData.Handedness,
                     ArmorType = (ArmorType)equipData.ArmorType,

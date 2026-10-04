@@ -1,8 +1,9 @@
 ---
 title: The Healer
 path: /wiki/en/world/healer/
-checked: 1.2.1
+checked: 1.2.5
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs
+history: 1.2.5 | The Healer's Electron menu labels and the names of cursed items shown for curse removal are in the player's language.
 ---
 The Healer treats more than missing HP. Decide whether you need wound treatment, supplies, addiction rehab or Mental therapy.
 

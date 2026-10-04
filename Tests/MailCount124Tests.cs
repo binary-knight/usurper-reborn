@@ -213,12 +213,12 @@ public class MailCount124Tests : IDisposable
     {
         string Src(params string[] p) => File.ReadAllText(Path.Combine(new[] { FindRepoRoot(), "Scripts" }.Concat(p).ToArray()));
         Src("Locations", "PantheonLocation.cs").Should().NotContain("SendMessage(godName, target.Username");
-        Src("Locations", "TempleLocation.cs").Should().Contain("SendMessageToKey(\"Temple\", godInfo.Username");
-        Src("Locations", "InnLocation.cs").Should().Contain("SendMessageToKey(currentPlayer.Name2, target.Username");
-        Src("Locations", "DormitoryLocation.cs").Should().Contain("SendMessageToKey(currentPlayer.Name2, target.Username");
+        Src("Locations", "TempleLocation.cs").Should().Contain("SendMessageToKeyLocalized(\"Temple\", godInfo.Username");   // 1.2.5: localized
+        Src("Locations", "InnLocation.cs").Should().Contain("SendMessageToKeyLocalized(murderer, target.Username");   // 1.2.5: localized
+        Src("Locations", "DormitoryLocation.cs").Should().Contain("SendMessageToKeyLocalized(murderer, target.Username");   // 1.2.5: localized
         Src("Locations", "ArenaLocation.cs").Should().Contain("SendMessageToKey(myUsername, defenderUsername");
-        Src("Systems", "WorldBossSystem.cs").Should().Contain("SendMessageToKey(\"System\", username, \"world_boss\"");
-        Src("Systems", "WorldSimulator.cs").Should().Contain("SendMessageToKey(\"The Town Crier\", username").And.Contain("SendMessageToKey(attackerNPC.Name2, sleeper.Username");
+        Src("Systems", "WorldBossSystem.cs").Should().NotContain("SendMessageToKey(", "1.2.5: the boss notice is no longer mailed");
+        Src("Systems", "WorldSimulator.cs").Should().Contain("SendMessageToKeyLocalized(\"The Town Crier\", username").And.Contain("SendMessageToKeyLocalized(attackerNPC.Name2, sleeper.Username");   // 1.2.5: localized
         Src("Server", "MudServer.cs").Should().Contain("SendMessageToKey(\"Admin\", target");
 
         string mailbox = Src("Locations", "BaseLocation.cs");

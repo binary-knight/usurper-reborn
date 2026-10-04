@@ -1,6 +1,7 @@
 using UsurperRemake.BBS;
 using UsurperRemake.Utils;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -28,6 +29,8 @@ public class LoveStreetLocation : BaseLocation
     private Dictionary<string, HashSet<string>> _revealedTraits = new();
 
     // Courtesans (female workers) - based on Pascal WHORES.PAS
+    // 1.2.5: the name is a personal name, the same in every language; the race is shown with
+    // GameConfig.GetLocalizedRaceName and the description and intro are love_street.courtesan.{id}.* keys.
     // v0.60.10 (Zen Lv.23 Cyclebreaker report): prices doubled across the board so a single
     // visit is a more meaningful gold sink relative to the alignment shift it produces (paired
     // movement via GiveDarkness now applies +darkness AND -chivalry from one transaction).
@@ -35,48 +38,31 @@ public class LoveStreetLocation : BaseLocation
     // cost is now ~10x higher than the pre-fix value.
     private static readonly List<Courtesan> Courtesans = new()
     {
-        new Courtesan("Elly", "Mutant", 1000, 0.35f, "A strange mix between races - exotic and dangerous.",
-            "The mutant woman leads you to a small, dimly lit room upstairs. Her eyes glow faintly in the darkness as she approaches..."),
-        new Courtesan("Lusha", "Troll", 4000, 0.30f, "An experienced troll woman with dark, weathered skin.",
-            "Lusha takes your hand with surprising gentleness and leads you to her chambers. Despite her rough exterior, there's a practiced grace to her movements..."),
-        new Courtesan("Irma", "Gnoll", 10000, 0.25f, "A young gnoll with nervous energy and exotic features.",
-            "The gnoll girl leads you upstairs with quick, darting movements. Her fur is soft and warm as she draws close..."),
-        new Courtesan("Elynthia", "Dwarf", 20000, 0.20f, "A middle-aged dwarven woman with knowing eyes.",
-            "Elynthia gives you a tired but genuine smile. 'Let mama show you how it's done,' she says, leading you to a surprisingly cozy room..."),
-        new Courtesan("Melissa", "Elf", 40000, 0.15f, "A beautiful elf maiden with sad, distant eyes.",
-            "Melissa moves with ethereal grace, her long silver hair catching the candlelight. There's an ancient sadness in her eyes as she leads you to her chambers..."),
-        new Courtesan("Seraphina", "Human", 60000, 0.12f, "A stunning redhead with fiery passion in her eyes.",
-            "Seraphina's eyes burn with intensity as she takes your hand. 'Tonight, you're mine,' she whispers, pulling you toward the velvet curtains..."),
-        new Courtesan("Sonya", "Elf", 80000, 0.10f, "A voluptuous elf woman in her prime, radiating sensuality.",
-            "Sonya's curves are legendary in the district. She circles you slowly, appraising, before leading you to a room filled with silk and incense..."),
-        new Courtesan("Arabella", "Human", 140000, 0.08f, "A breathtaking beauty that makes hearts stop.",
-            "Arabella is perfection incarnate. Every movement is calculated to enchant. She leads you to the finest room, lit by a hundred candles..."),
-        new Courtesan("Loretta", "Elf", 200000, 0.05f, "The legendary Elf Princess - the crown jewel of Love Street.",
-            "Loretta, the Princess of Pleasure, graces you with her presence. Her touch is electric, her beauty beyond words. This night will change you forever...")
+        new Courtesan("Elly", CharacterRace.Mutant, 1000, 0.35f, "elly"),
+        new Courtesan("Lusha", CharacterRace.Troll, 4000, 0.30f, "lusha"),
+        new Courtesan("Irma", CharacterRace.Gnoll, 10000, 0.25f, "irma"),
+        new Courtesan("Elynthia", CharacterRace.Dwarf, 20000, 0.20f, "elynthia"),
+        new Courtesan("Melissa", CharacterRace.Elf, 40000, 0.15f, "melissa"),
+        new Courtesan("Seraphina", CharacterRace.Human, 60000, 0.12f, "seraphina"),
+        new Courtesan("Sonya", CharacterRace.Elf, 80000, 0.10f, "sonya"),
+        new Courtesan("Arabella", CharacterRace.Human, 140000, 0.08f, "arabella"),
+        new Courtesan("Loretta", CharacterRace.Elf, 200000, 0.05f, "loretta")
     };
 
     // Gigolos (male workers) - based on Pascal GIGOLOC.PAS
+    // 1.2.5: as the courtesans, with love_street.gigolo.{id}.* keys.
     // v0.60.10 (Zen Lv.23 Cyclebreaker report): prices doubled, see Courtesans note above.
     private static readonly List<Gigolo> Gigolos = new()
     {
-        new Gigolo("Signori", "Human", 1000, 0.35f, "A slender, effeminate young man with delicate features.",
-            "Signori leads you to a small but clean room. His touch is surprisingly skilled as he helps you relax..."),
-        new Gigolo("Tod", "Human", 4000, 0.30f, "A muscular blonde viking type from the Northern lands.",
-            "Tod's chamber is dominated by an enormous bed. He wastes no time, his powerful hands surprisingly gentle..."),
-        new Gigolo("Mbuto", "Human", 10000, 0.25f, "A dark, muscular man with an air of mystery.",
-            "Mbuto leads you to a candlelit cell. He locks the door and extinguishes the candles, plunging you into darkness filled with anticipation..."),
-        new Gigolo("Merson", "Human", 20000, 0.20f, "A battle-scarred gladiator with intense eyes.",
-            "Merson's room is spartan, like the warrior he is. But his touch reveals layers of tenderness beneath the hardened exterior..."),
-        new Gigolo("Brian", "Human", 40000, 0.15f, "A fallen prince with divine looks and refined manners.",
-            "Brian treats you like royalty, his noble bearing making you feel like the only person in the world..."),
-        new Gigolo("Rasputin", "Human", 60000, 0.12f, "A mysterious mage who never removes his top hat.",
-            "Rasputin offers you a strange potion. 'To enhance the experience,' he says with a knowing smile. The night becomes dreamlike..."),
-        new Gigolo("Manhio", "Elf", 80000, 0.10f, "A tall, elegant elf aristocrat with centuries of experience.",
-            "Manhio's chambers smell of exotic incense. His elven touch is unlike anything human, transcendent and electric..."),
-        new Gigolo("Jake", "Human", 140000, 0.08f, "A rugged ranger in his prime, adored by many.",
-            "Jake's wild nature comes through in passionate waves. The experience is primal, untamed, unforgettable..."),
-        new Gigolo("Banco", "Human", 200000, 0.05f, "The Lord of Jah - legendary lover whose skills are whispered of in awe.",
-            "Banco, the Lord of Pleasure himself, honors you with his attention. What follows defies description...")
+        new Gigolo("Signori", CharacterRace.Human, 1000, 0.35f, "signori"),
+        new Gigolo("Tod", CharacterRace.Human, 4000, 0.30f, "tod"),
+        new Gigolo("Mbuto", CharacterRace.Human, 10000, 0.25f, "mbuto"),
+        new Gigolo("Merson", CharacterRace.Human, 20000, 0.20f, "merson"),
+        new Gigolo("Brian", CharacterRace.Human, 40000, 0.15f, "brian"),
+        new Gigolo("Rasputin", CharacterRace.Human, 60000, 0.12f, "rasputin"),
+        new Gigolo("Manhio", CharacterRace.Elf, 80000, 0.10f, "manhio"),
+        new Gigolo("Jake", CharacterRace.Human, 140000, 0.08f, "jake"),
+        new Gigolo("Banco", CharacterRace.Human, 200000, 0.05f, "banco")
     };
 
     public LoveStreetLocation() : base(
@@ -290,8 +276,10 @@ public class LoveStreetLocation : BaseLocation
         terminal.WriteLine("");
 
         // Menu rows
-        ShowBBSMenuRow(("1", "bright_red", "BeautyNest"), ("2", "bright_blue", "HallDreams"), ("M", "yellow", "Mingle"), ("D", "green", "Date"));
-        ShowBBSMenuRow(("G", "cyan", "Gifts"), ("V", "magenta", "Gossip"), ("L", "cyan", "Potions"), ("R", "red", "Return"));
+        ShowBBSMenuRow(("1", "bright_red", Loc.Get("love_street.bbs_beauty_nest")), ("2", "bright_blue", Loc.Get("love_street.bbs_hall_dreams")),
+            ("M", "yellow", Loc.Get("love_street.mingle")), ("D", "green", Loc.Get("love_street.bbs_date")));
+        ShowBBSMenuRow(("G", "cyan", Loc.Get("love_street.bbs_gifts")), ("V", "magenta", Loc.Get("love_street.gossip")),
+            ("L", "cyan", Loc.Get("love_street.bbs_potions")), ("R", "red", Loc.Get("ui.return")));
 
         // Gold + active potions
         terminal.SetColor("gray");
@@ -402,8 +390,8 @@ public class LoveStreetLocation : BaseLocation
             var c = Courtesans[i];
             if (IsScreenReader)
             {
-                WriteSRMenuOption($"{i + 1}", $"{c.Name} ({c.Race}), {c.Price:N0}g, Risk: {GetRiskLevel(c.DiseaseChance)}");
-                terminal.WriteLine($"    {c.Description}");
+                WriteSRMenuOption($"{i + 1}", Loc.Get("love_street.sr_worker_row", c.Name, c.RaceName, $"{c.Price:N0}", GetRiskLevel(c.DiseaseChance)));
+                UIHelper.WriteWrapped(terminal, c.Description, "    ");
             }
             else
             {
@@ -412,7 +400,7 @@ public class LoveStreetLocation : BaseLocation
                 terminal.SetColor("bright_magenta");
                 terminal.Write($"{c.Name}");
                 terminal.SetColor("gray");
-                terminal.Write($" ({c.Race}) - ");
+                terminal.Write($" ({c.RaceName}) - ");
                 terminal.SetColor("yellow");
                 terminal.Write($"{c.Price:N0} {Loc.Get("ui.gold_word")}");
 
@@ -430,7 +418,7 @@ public class LoveStreetLocation : BaseLocation
                 terminal.WriteLine("]");
 
                 terminal.SetColor("white");
-                terminal.WriteLine($"    {c.Description}");
+                UIHelper.WriteWrapped(terminal, c.Description, "    ");
             }
             terminal.WriteLine("");
         }
@@ -461,11 +449,11 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.ClearScreen();
         terminal.WriteLine("");
-        WriteBoxHeader($"{courtesan.Name} the {courtesan.Race}", "bright_magenta", 77);
+        WriteBoxHeader(Loc.Get("love_street.worker_title", courtesan.Name, courtesan.RaceName), "bright_magenta", 77);
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine(courtesan.IntroText);
+        UIHelper.WriteWrapped(terminal, courtesan.IntroText);
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -496,7 +484,7 @@ public class LoveStreetLocation : BaseLocation
         currentPlayer.Statistics?.RecordGoldSpent(courtesan.Price);
 
         // Show the intimate encounter
-        await ShowIntimateEncounter(courtesan.Name, courtesan.Race, courtesan.Price, courtesan.DiseaseChance);
+        await ShowIntimateEncounter(courtesan.Name, courtesan.RaceName, courtesan.Price, courtesan.DiseaseChance);
     }
 
     #endregion
@@ -542,8 +530,8 @@ public class LoveStreetLocation : BaseLocation
             var g = Gigolos[i];
             if (IsScreenReader)
             {
-                WriteSRMenuOption($"{i + 1}", $"{g.Name} ({g.Race}), {g.Price:N0}g, Risk: {GetRiskLevel(g.DiseaseChance)}");
-                terminal.WriteLine($"    {g.Description}");
+                WriteSRMenuOption($"{i + 1}", Loc.Get("love_street.sr_worker_row", g.Name, g.RaceName, $"{g.Price:N0}", GetRiskLevel(g.DiseaseChance)));
+                UIHelper.WriteWrapped(terminal, g.Description, "    ");
             }
             else
             {
@@ -552,7 +540,7 @@ public class LoveStreetLocation : BaseLocation
                 terminal.SetColor("bright_blue");
                 terminal.Write($"{g.Name}");
                 terminal.SetColor("gray");
-                terminal.Write($" ({g.Race}) - ");
+                terminal.Write($" ({g.RaceName}) - ");
                 terminal.SetColor("yellow");
                 terminal.Write($"{g.Price:N0} {Loc.Get("ui.gold_word")}");
 
@@ -570,7 +558,7 @@ public class LoveStreetLocation : BaseLocation
                 terminal.WriteLine("]");
 
                 terminal.SetColor("white");
-                terminal.WriteLine($"    {g.Description}");
+                UIHelper.WriteWrapped(terminal, g.Description, "    ");
             }
             terminal.WriteLine("");
         }
@@ -598,11 +586,11 @@ public class LoveStreetLocation : BaseLocation
 
         terminal.ClearScreen();
         terminal.WriteLine("");
-        WriteBoxHeader($"{gigolo.Name} the {gigolo.Race}", "bright_blue", 77);
+        WriteBoxHeader(Loc.Get("love_street.worker_title", gigolo.Name, gigolo.RaceName), "bright_blue", 77);
         terminal.WriteLine("");
 
         terminal.SetColor("white");
-        terminal.WriteLine(gigolo.IntroText);
+        UIHelper.WriteWrapped(terminal, gigolo.IntroText);
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -633,7 +621,7 @@ public class LoveStreetLocation : BaseLocation
         currentPlayer.Statistics?.RecordGoldSpent(gigolo.Price);
 
         // Show the intimate encounter
-        await ShowIntimateEncounter(gigolo.Name, gigolo.Race, gigolo.Price, gigolo.DiseaseChance);
+        await ShowIntimateEncounter(gigolo.Name, gigolo.RaceName, gigolo.Price, gigolo.DiseaseChance);
     }
 
     #endregion
@@ -1040,16 +1028,16 @@ public class LoveStreetLocation : BaseLocation
                 };
                 var profile = npc.Brain?.Personality;
                 string hint = profile != null ? $", {GetPersonalityHint(profile)}" : "";
-                WriteSRMenuOption($"{i + 1}", $"{npc.Name}, Lv{npc.Level} {npc.Race} {npc.ClassName}{tag}{hint}");
+                WriteSRMenuOption($"{i + 1}", $"{npc.Name}, {Loc.Get("love_street.npc_level_race_class", npc.Level, GameConfig.GetLocalizedRaceName(npc.Race), npc.ClassName)}{tag}{hint}");
             }
             else
             {
-                terminal.SetColor("bright_yellow");
-                terminal.Write($" [{i + 1}] ");
-                terminal.SetColor("white");
-                terminal.Write($"{npc.Name}");
-                terminal.SetColor("gray");
-                terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.ClassName})");
+                var parts = new List<(string text, string color)>
+                {
+                    ($" [{i + 1}] ", "bright_yellow"),
+                    (npc.Name, "white"),
+                    ($" ({Loc.Get("love_street.npc_level_race_class", npc.Level, GameConfig.GetLocalizedRaceName(npc.Race), npc.ClassName)})", "gray"),
+                };
 
                 // Relationship tag
                 string tag = romanceType switch
@@ -1061,22 +1049,18 @@ public class LoveStreetLocation : BaseLocation
                 };
                 if (!string.IsNullOrEmpty(tag))
                 {
-                    terminal.SetColor(romanceType == RomanceRelationType.Spouse ? "bright_red" :
-                                      romanceType == RomanceRelationType.Lover ? "bright_magenta" :
-                                      romanceType == RomanceRelationType.FWB ? "cyan" :
-                                      relationLevel <= 40 ? "bright_green" : "darkgray");
-                    terminal.Write(tag);
+                    parts.Add((tag, romanceType == RomanceRelationType.Spouse ? "bright_red" :
+                                    romanceType == RomanceRelationType.Lover ? "bright_magenta" :
+                                    romanceType == RomanceRelationType.FWB ? "cyan" :
+                                    relationLevel <= 40 ? "bright_green" : "darkgray"));
                 }
 
                 // Personality hint
                 var profile = npc.Brain?.Personality;
                 if (profile != null)
-                {
-                    terminal.SetColor("darkgray");
-                    terminal.Write($" - {GetPersonalityHint(profile)}");
-                }
+                    parts.Add(($" - {GetPersonalityHint(profile)}", "darkgray"));
 
-                terminal.WriteLine("");
+                WriteParts(parts, 5);
             }
         }
 
@@ -1368,14 +1352,14 @@ public class LoveStreetLocation : BaseLocation
         {
             var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             var name = npc?.Name ?? (!string.IsNullOrEmpty(spouse.NPCName) ? spouse.NPCName : spouse.NPCId);
-            potentialDates.Add((spouse.NPCId, name, "Spouse"));
+            potentialDates.Add((spouse.NPCId, name, Loc.Get("love_street.tag_spouse")));
         }
 
         foreach (var lover in romance.CurrentLovers)
         {
             var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             var name = npc?.Name ?? (!string.IsNullOrEmpty(lover.NPCName) ? lover.NPCName : lover.NPCId);
-            potentialDates.Add((lover.NPCId, name, "Lover"));
+            potentialDates.Add((lover.NPCId, name, Loc.Get("love_street.tag_lover")));
         }
 
         var friendlyNpcs = NPCSpawnSystem.Instance?.ActiveNPCs?
@@ -1387,7 +1371,7 @@ public class LoveStreetLocation : BaseLocation
 
         foreach (var npc in friendlyNpcs)
         {
-            potentialDates.Add((npc.ID, npc.Name, "Friend"));
+            potentialDates.Add((npc.ID, npc.Name, Loc.Get("love_street.tag_friend")));
         }
 
         if (potentialDates.Count == 0)
@@ -1618,6 +1602,19 @@ public class LoveStreetLocation : BaseLocation
 
     #region Gift Shop
 
+    internal static readonly (string key, long cost, int boost)[] Gifts =
+    {
+        ("love_street.gift_red_roses", 100, 3),
+        ("love_street.gift_chocolates", 200, 4),
+        ("love_street.gift_fine_wine", 500, 6),
+        ("love_street.gift_exotic_perfume", 1000, 8),
+        ("love_street.gift_silver_necklace", 2000, 10),
+        ("love_street.gift_diamond_ring", 10000, 20),
+        ("love_street.gift_enchanted_locket", 25000, 25),
+        ("love_street.gift_moonstone_tiara", 50000, 30),
+        ("love_street.gift_star_of_eternity", 100000, 40),
+    };
+
     private async Task VisitGiftShop()
     {
         terminal.ClearScreen();
@@ -1628,18 +1625,8 @@ public class LoveStreetLocation : BaseLocation
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("love_street.gift_welcome"));
 
-        var gifts = new (string name, long cost, int boost)[]
-        {
-            ("Red Roses", 100, 3),
-            ("Box of Chocolates", 200, 4),
-            ("Bottle of Fine Wine", 500, 6),
-            ("Exotic Perfume", 1000, 8),
-            ("Silver Necklace", 2000, 10),
-            ("Diamond Ring", 10000, 20),
-            ("Enchanted Locket", 25000, 25),
-            ("Moonstone Tiara", 50000, 30),
-            ("Star of Eternity", 100000, 40)
-        };
+        // 1.2.5: gift names are shown in the player's language; nothing stores them.
+        var gifts = Gifts.Select(g => (name: Loc.Get(g.key), g.cost, g.boost)).ToArray();
 
         for (int i = 0; i < gifts.Length; i++)
         {
@@ -1963,7 +1950,10 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("gray");
             foreach (var news in scandalous)
             {
-                terminal.WriteLine($" - {news}");
+                // v1.2.5: a long entry wraps at 79, its later rows under the text after the dash
+                var parts = UIHelper.WrapAfterPrefix(" - ", news);
+                for (int i = 0; i < parts.Count; i++)
+                    terminal.WriteLine((i == 0 ? " - " : "   ") + parts[i]);
                 count++;
             }
         }
@@ -2014,22 +2004,16 @@ public class LoveStreetLocation : BaseLocation
             int relation = RelationshipSystem.GetRelationshipStatus(currentPlayer, npc);
             var profile = npc.Brain?.Personality;
 
-            terminal.SetColor("bright_yellow");
-            terminal.Write($" * ");
-            terminal.SetColor("white");
-            terminal.Write($"{npc.Name}");
-            terminal.SetColor("gray");
-            terminal.Write($" (Lv{npc.Level} {npc.Race} {npc.ClassName})");
-
-            if (profile != null)
+            var parts = new List<(string text, string color)>
             {
-                terminal.SetColor("darkgray");
-                terminal.Write($" - {GetPersonalityHint(profile)}");
-            }
-
-            terminal.SetColor(relation <= 40 ? "bright_green" : relation <= 60 ? "yellow" : "gray");
-            terminal.Write($" [{GetRelationDescription(relation)}]");
-            terminal.WriteLine("");
+                (" * ", "bright_yellow"),
+                (npc.Name, "white"),
+                ($" ({Loc.Get("love_street.npc_level_race_class", npc.Level, GameConfig.GetLocalizedRaceName(npc.Race), npc.ClassName)})", "gray"),
+            };
+            if (profile != null)
+                parts.Add(($" - {GetPersonalityHint(profile)}", "darkgray"));
+            parts.Add(($" [{GetRelationDescription(relation)}]", relation <= 40 ? "bright_green" : relation <= 60 ? "yellow" : "gray"));
+            WriteParts(parts, 3);
         }
 
         terminal.SetColor("gray");
@@ -2056,7 +2040,7 @@ public class LoveStreetLocation : BaseLocation
 
         for (int i = 0; i < npcs.Count; i++)
         {
-            WriteSRMenuOption($"{i + 1}", $"{npcs[i].Name}, Lv{npcs[i].Level} {npcs[i].Race}");
+            WriteSRMenuOption($"{i + 1}", $"{npcs[i].Name}, {Loc.Get("love_street.npc_level_race", npcs[i].Level, GameConfig.GetLocalizedRaceName(npcs[i].Race))}");
         }
 
         terminal.WriteLine("");
@@ -2463,6 +2447,59 @@ public class LoveStreetLocation : BaseLocation
         };
     }
 
+    /// <summary>
+    /// 1.2.5: coloured parts laid out in rows of at most <paramref name="width"/> columns. A part that would pass the
+    /// width starts a new row, indented by <paramref name="indent"/> and without its leading space; a part too long
+    /// for a row of its own is word-wrapped.
+    /// </summary>
+    internal static List<List<(string text, string color)>> WrapParts(IReadOnlyList<(string text, string color)> parts, int indent, int width = 79)
+    {
+        var rows = new List<List<(string text, string color)>> { new() };
+        int used = 0;
+        foreach (var (raw, color) in parts)
+        {
+            if (string.IsNullOrEmpty(raw)) continue;
+            string text = raw;
+            if (used > indent && used + text.Length > width)
+            {
+                rows.Add(new() { (new string(' ', indent), color) });
+                used = indent;
+                text = text.TrimStart();
+            }
+            if (used + text.Length <= width)
+            {
+                rows[^1].Add((text, color));
+                used += text.Length;
+                continue;
+            }
+            var pieces = UIHelper.WordWrap(text, width - indent, Math.Max(0, used - indent));
+            for (int i = 0; i < pieces.Count; i++)
+            {
+                if (i > 0)
+                {
+                    rows.Add(new() { (new string(' ', indent), color) });
+                    used = indent;
+                }
+                rows[^1].Add((pieces[i], color));
+                used += pieces[i].Length;
+            }
+        }
+        return rows;
+    }
+
+    private void WriteParts(IReadOnlyList<(string text, string color)> parts, int indent)
+    {
+        foreach (var row in WrapParts(parts, indent))
+        {
+            foreach (var (text, color) in row)
+            {
+                terminal.SetColor(color);
+                terminal.Write(text);
+            }
+            terminal.WriteLine("");
+        }
+    }
+
     private string GetRelationDescription(int level)
     {
         return level switch
@@ -2539,13 +2576,13 @@ public class LoveStreetLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "1", Label = "Beauty Nest", Category = "shop", Icon = "love" },
-            new() { Key = "2", Label = "Hall of Dreams", Category = "shop", Icon = "love" },
-            new() { Key = "M", Label = "Mingle with NPCs", Category = "social", Icon = "mingle" },
-            new() { Key = "D", Label = "Date Someone", Category = "social", Icon = "date" },
-            new() { Key = "G", Label = "Gift Shop", Category = "shop", Icon = "gift" },
-            new() { Key = "V", Label = "Gossip", Category = "social", Icon = "gossip" },
-            new() { Key = "L", Label = "Love Potions", Category = "shop", Icon = "potion" },
+            new() { Key = "1", Label = Loc.Get("love_street.beauty_nest"), Category = "shop", Icon = "love" },
+            new() { Key = "2", Label = Loc.Get("love_street.hall_dreams"), Category = "shop", Icon = "love" },
+            new() { Key = "M", Label = Loc.Get("love_street.electron_mingle"), Category = "social", Icon = "mingle" },
+            new() { Key = "D", Label = Loc.Get("love_street.electron_date"), Category = "social", Icon = "date" },
+            new() { Key = "G", Label = Loc.Get("love_corner.gift_shop"), Category = "shop", Icon = "gift" },
+            new() { Key = "V", Label = Loc.Get("love_street.gossip"), Category = "social", Icon = "gossip" },
+            new() { Key = "L", Label = Loc.Get("love_street.love_potions"), Category = "shop", Icon = "potion" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);
@@ -2558,41 +2595,47 @@ public class LoveStreetLocation : BaseLocation
 
 public class Courtesan
 {
+    /// <summary>A personal name, the same in every language (also part of the saved partner id "courtesan_" + Name).</summary>
     public string Name { get; }
-    public string Race { get; }
+    public CharacterRace Race { get; }
     public long Price { get; }
     public float DiseaseChance { get; }
-    public string Description { get; }
-    public string IntroText { get; }
+    /// <summary>1.2.5: the id of the love_street.courtesan.{id}.desc and .intro keys.</summary>
+    public string TextId { get; }
+    public string RaceName => GameConfig.GetLocalizedRaceName(Race);
+    public string Description => Loc.Get($"love_street.courtesan.{TextId}.desc");
+    public string IntroText => Loc.Get($"love_street.courtesan.{TextId}.intro");
 
-    public Courtesan(string name, string race, long price, float diseaseChance, string description, string introText)
+    public Courtesan(string name, CharacterRace race, long price, float diseaseChance, string textId)
     {
         Name = name;
         Race = race;
         Price = price;
         DiseaseChance = diseaseChance;
-        Description = description;
-        IntroText = introText;
+        TextId = textId;
     }
 }
 
 public class Gigolo
 {
+    /// <summary>A personal name, the same in every language (also part of the saved partner id "courtesan_" + Name).</summary>
     public string Name { get; }
-    public string Race { get; }
+    public CharacterRace Race { get; }
     public long Price { get; }
     public float DiseaseChance { get; }
-    public string Description { get; }
-    public string IntroText { get; }
+    /// <summary>1.2.5: the id of the love_street.gigolo.{id}.desc and .intro keys.</summary>
+    public string TextId { get; }
+    public string RaceName => GameConfig.GetLocalizedRaceName(Race);
+    public string Description => Loc.Get($"love_street.gigolo.{TextId}.desc");
+    public string IntroText => Loc.Get($"love_street.gigolo.{TextId}.intro");
 
-    public Gigolo(string name, string race, long price, float diseaseChance, string description, string introText)
+    public Gigolo(string name, CharacterRace race, long price, float diseaseChance, string textId)
     {
         Name = name;
         Race = race;
         Price = price;
         DiseaseChance = diseaseChance;
-        Description = description;
-        IntroText = introText;
+        TextId = textId;
     }
 }
 

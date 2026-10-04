@@ -1,8 +1,9 @@
 ---
 title: Immortals, player-gods and the Pantheon
 path: /wiki/en/gods/player-gods/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDomainPicker.cs, Scripts/Systems/DivineBoonRegistry.cs, Scripts/Systems/ImmortalDeedSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WeeklyGodSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/LocationManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/GameEngine.cs, Scripts/Server/MudChatSystem.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.5 | Pantheon screens are shown in all five languages, and proclamations, blessings and renounce notices reach each player in that player's own language.
 history: 1.2.4 | Renouncing releases player followers, who are told; an alt is refused ascension before it gives up its throne, team or guild; the alt slot stays after renouncing; Status shows the believer experience the game pays.
 ---
 An immortal is a player who finished the main story and chose to ascend instead of starting a new life. The character becomes a player-god: it lives in the Pantheon, gathers believers, performs divine deeds and grants a domain boon to the players who worship it. Mortals find player-gods on the same Temple altar list as the ten Temple gods.

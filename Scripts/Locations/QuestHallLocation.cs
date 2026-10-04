@@ -600,7 +600,7 @@ public class QuestHallLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("quest_hall.targets")}", "cyan");
             foreach (var monster in quest.Monsters)
             {
-                terminal.WriteLine($"    - {monster.MonsterName} x{monster.Count}");
+                terminal.WriteLine($"    - {MonsterNames.Display(monster.MonsterName)} x{monster.Count}");
             }
         }
 
@@ -658,16 +658,19 @@ public class QuestHallLocation : BaseLocation
         EmitNPCsInLocationToElectron();
     }
 
+    /// <summary>v1.2.5: a quest's state in the Electron quest list, in the player's language.</summary>
+    internal static string StatusLabel(Quest quest) => Loc.Get(quest.IsAbandoned ? "quest_hall.status_abandoned"
+        : quest.IsActive ? "quest_hall.status_active"
+        : quest.IsAvailable ? "quest_hall.status_available"
+        : "quest_hall.status_unknown");
+
     /// <summary>
     /// Build a compact quest summary for the Electron quest list overlay.
     /// Used by available, claim, turn-in, abandon, and bounty list emits.
     /// </summary>
     private ElectronBridge.QuestSummaryData BuildQuestSummary(Quest quest, string key)
     {
-        string status = quest.IsAbandoned ? "Abandoned"
-            : quest.IsActive ? "Active"
-            : quest.IsAvailable ? "Available"
-            : "Unknown";
+        string status = StatusLabel(quest);
 
         return new ElectronBridge.QuestSummaryData
         {
@@ -698,7 +701,7 @@ public class QuestHallLocation : BaseLocation
         {
             foreach (var m in quest.Monsters)
             {
-                objectives.Add($"Defeat {m.MonsterName} x{m.Count}");
+                objectives.Add(Loc.Get("quest_hall.objective_defeat", MonsterNames.Display(m.MonsterName), m.Count));
             }
         }
 
@@ -728,10 +731,7 @@ public class QuestHallLocation : BaseLocation
         string rewardDesc = quest.GetRewardDescription();
         if (!string.IsNullOrWhiteSpace(rewardDesc)) reward.Extras.Add(rewardDesc);
 
-        string status = quest.IsAbandoned ? "Abandoned"
-            : quest.IsActive ? "Active"
-            : quest.IsAvailable ? "Available"
-            : "Unknown";
+        string status = StatusLabel(quest);
 
         return new ElectronBridge.QuestDetailData
         {
@@ -744,7 +744,7 @@ public class QuestHallLocation : BaseLocation
             Objectives = objectives,
             Giver = quest.GetDisplayInitiator(),
             Status = status,
-            TimeLimit = quest.DaysToComplete > 0 ? $"{quest.DaysToComplete} days" : null,
+            TimeLimit = quest.DaysToComplete > 0 ? Loc.Get("quest_hall.time_limit_days", quest.DaysToComplete) : null,
             Reward = reward
         };
     }

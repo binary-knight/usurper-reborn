@@ -16,6 +16,11 @@ namespace UsurperRemake.Locations;
 /// </summary>
 public class DormitoryLocation : BaseLocation
 {
+    /// <summary>v1.2.5: the mail a sleeper murdered in the Dormitory gets, in the given language; the item name is the stored name.</summary>
+    internal static string SleepMurderMail(string lang, string murderer, long gold, string? itemName, string? itemFamily = null) => itemName != null
+        ? Loc.GetIn(lang, "dormitory.mail_sleep_murder_item", murderer, $"{gold:N0}", ItemNames.DisplayIn(lang, itemName, itemFamily))   // v1.2.5
+        : Loc.GetIn(lang, "dormitory.mail_sleep_murder", murderer, $"{gold:N0}");
+
     private List<NPC> sleepers = new();
     private readonly Random rng = new();
 
@@ -631,7 +636,7 @@ public class DormitoryLocation : BaseLocation
                 var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
                 factionSystem?.ModifyReputation(npc.NPCFaction.Value, -200);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("dormitory.faction_plummeted", UsurperRemake.Systems.FactionSystem.Factions[npc.NPCFaction.Value].Name));
+                terminal.WriteLine(Loc.Get("dormitory.faction_plummeted", UsurperRemake.Systems.FactionSystem.NameLabel(npc.NPCFaction.Value)));
             }
 
             // Witness memories for other NPCs at this location
@@ -653,7 +658,7 @@ public class DormitoryLocation : BaseLocation
             WorldSimulator.WakeUpNPC(npcName);
 
             // Post news
-            try { OnlineStateManager.Instance?.AddNews($"{currentPlayer.Name2} murdered {npcName} in their sleep at the Dormitory!", "combat"); } catch { }
+            try { OnlineStateManager.Instance?.AddNews(Loc.Get("dormitory.news_murdered_sleep", currentPlayer.Name2, npcName), "combat"); } catch { }
 
             await Pacing.Wait(2000);
         }
@@ -733,7 +738,7 @@ public class DormitoryLocation : BaseLocation
                 EquipmentDatabase.RegisterDynamic(stolenEquipment);
                 var legacyItem = currentPlayer.ConvertEquipmentToLegacyItem(stolenEquipment);
                 currentPlayer.Inventory.Add(legacyItem);
-                terminal.WriteLine(Loc.Get("dormitory.also_take_item", stolenItemName), "yellow");
+                terminal.WriteLine(Loc.Get("dormitory.also_take_item", ItemNames.Display(stolenEquipment)), "yellow");
             }
 
             // Apply XP loss to victim
@@ -757,8 +762,10 @@ public class DormitoryLocation : BaseLocation
             await backend.AppendSleepAttackLog(target.Username, logEntry);
 
             // Send message to victim
-            await backend.SendMessageToKey(currentPlayer.Name2, target.Username, "sleep_attack",
-                $"{currentPlayer.Name2} murdered you in your sleep! They stole {stolenGold:N0} gold{(stolenItemName != null ? $" and your {stolenItemName}" : "")}.");
+            // v1.2.5: in the victim's account language. The item name is the stored (English) item name.
+            string murderer = currentPlayer.Name2;
+            await backend.SendMessageToKeyLocalized(murderer, target.Username, "sleep_attack",
+                lang => SleepMurderMail(lang, murderer, stolenGold, stolenItemName, stolenEquipment?.Family));
 
             terminal.SetColor("dark_red");
             terminal.WriteLine($"\n{Loc.Get("dormitory.leave_lifeless", target.Username)}");
@@ -776,6 +783,39 @@ public class DormitoryLocation : BaseLocation
         }
         await terminal.WaitForKeyPress();
     }
+
+    /// <summary>The Equipment a sleeper's saved item becomes when it is stolen (field by field from the save).</summary>
+    internal static Equipment StolenEquipmentFrom(DynamicEquipmentData d, string fallbackName) => new Equipment
+        {
+            Id = d.Id,
+            Name = d.Name ?? fallbackName,
+            Slot = (EquipmentSlot)(d.Slot),
+            Handedness = (WeaponHandedness)(d.Handedness),
+            WeaponType = (WeaponType)(d.WeaponType),
+            WeaponPower = d.WeaponPower,
+            ArmorClass = d.ArmorClass,
+            ShieldBonus = d.ShieldBonus,
+            BlockChance = d.BlockChance,
+            DefenceBonus = d.DefenceBonus,
+            StrengthBonus = d.StrengthBonus,
+            DexterityBonus = d.DexterityBonus,
+            AgilityBonus = d.AgilityBonus,
+            ConstitutionBonus = d.ConstitutionBonus,
+            IntelligenceBonus = d.IntelligenceBonus,
+            WisdomBonus = d.WisdomBonus,
+            CharismaBonus = d.CharismaBonus,
+            MaxHPBonus = d.MaxHPBonus,
+            MaxManaBonus = d.MaxManaBonus,
+            Value = d.Value,
+            IsIdentified = true,
+            MinLevel = d.MinLevel,
+            Rarity = (EquipmentRarity)d.Rarity, // v1.1: was dropped; a stolen Legendary arrived Common
+            Family = d.Family ?? "",
+            // v1.2.5: the enchant count and kinds (in Description) and the pre-enchant record, so a stolen
+            // enchanted item keeps its enchant limit and can still have its enchants removed
+            Description = d.Description ?? "",
+            EnchantBase = d.EnchantBase ?? ""
+        };
 
     private async Task<(string? name, Equipment? equipment)> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
     {
@@ -803,33 +843,7 @@ public class DormitoryLocation : BaseLocation
             var stolenEquip = playerData.DynamicEquipment![index];
 
             // Build an Equipment object from the save data before removing it
-            var equipment = new Equipment
-            {
-                Id = stolenEquip.Id,
-                Name = stolenEquip.Name ?? name,
-                Slot = (EquipmentSlot)(stolenEquip.Slot),
-                Handedness = (WeaponHandedness)(stolenEquip.Handedness),
-                WeaponType = (WeaponType)(stolenEquip.WeaponType),
-                WeaponPower = stolenEquip.WeaponPower,
-                ArmorClass = stolenEquip.ArmorClass,
-                ShieldBonus = stolenEquip.ShieldBonus,
-                BlockChance = stolenEquip.BlockChance,
-                DefenceBonus = stolenEquip.DefenceBonus,
-                StrengthBonus = stolenEquip.StrengthBonus,
-                DexterityBonus = stolenEquip.DexterityBonus,
-                AgilityBonus = stolenEquip.AgilityBonus,
-                ConstitutionBonus = stolenEquip.ConstitutionBonus,
-                IntelligenceBonus = stolenEquip.IntelligenceBonus,
-                WisdomBonus = stolenEquip.WisdomBonus,
-                CharismaBonus = stolenEquip.CharismaBonus,
-                MaxHPBonus = stolenEquip.MaxHPBonus,
-                MaxManaBonus = stolenEquip.MaxManaBonus,
-                Value = stolenEquip.Value,
-                IsIdentified = true,
-                MinLevel = stolenEquip.MinLevel,
-                Rarity = (EquipmentRarity)stolenEquip.Rarity, // v1.1: was dropped; a stolen Legendary arrived Common
-                Family = stolenEquip.Family ?? ""
-            };
+            var equipment = StolenEquipmentFrom(stolenEquip, name);
 
             // Also remove from equipped slots if this item is equipped
             if (playerData.EquippedItems != null)

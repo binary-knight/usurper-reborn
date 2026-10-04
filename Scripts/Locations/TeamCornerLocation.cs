@@ -791,7 +791,7 @@ public class TeamCornerLocation : BaseLocation
     }
 
     private static string SpecTag(NPC npc) => npc.Specialization == ClassSpecialization.None ? ""
-        : $" [{UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.Name ?? npc.Specialization.ToString()}]";
+        : $" [{UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.LocName ?? npc.Specialization.ToString()}]";
 
     private static string MemberPickRow(TeamMemberEntry e)
     {
@@ -2220,7 +2220,7 @@ public class TeamCornerLocation : BaseLocation
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(member.Specialization);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.Name ?? member.Specialization.ToString()} ({(specDef != null ? SpecRoleName(specDef.Role) : "")})");
+            terminal.WriteLine($"  {Loc.Get("spec.label")}: {specDef?.LocName ?? member.Specialization.ToString()} ({(specDef != null ? SpecRoleName(specDef.Role) : "")})");
             terminal.SetColor("white");
         }
         terminal.WriteLine($"  {Loc.Get("status.race")}: {GameConfig.GetLocalizedRaceName(member.Race)}");   // v1.1.12: localized
@@ -3240,7 +3240,7 @@ public class TeamCornerLocation : BaseLocation
             if (currentItem != null)
             {
                 terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-                terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("ui.unidentified"));
+                terminal.Write(currentItem.IsIdentified ? ItemNames.Display(currentItem) : Loc.Get("ui.unidentified"));
                 if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
                 terminal.WriteLine("");
             }
@@ -3299,7 +3299,7 @@ public class TeamCornerLocation : BaseLocation
             if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))   // v1.1.13: the listed instance
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", ItemNames.Display(selectedItem)));
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -3337,11 +3337,11 @@ public class TeamCornerLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("team.equipped_success", target.DisplayName, selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equipped_success", target.DisplayName, ItemNames.Display(selectedItem)));
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                 }
             }
             else
@@ -3350,7 +3350,7 @@ public class TeamCornerLocation : BaseLocation
                 var legacyItem = sourceItem ?? ConvertEquipmentToItem(selectedItem);
                 currentPlayer.Inventory.Add(legacyItem);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_failed", message));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("team.equip_failed", message));
             }
 
             await Pacing.Wait(2000);
@@ -3398,7 +3398,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"[{slot.GetDisplayName(),-12}] ");
             terminal.SetColor("white");
-            terminal.Write($"{item.Name}");
+            terminal.Write($"{ItemNames.Display(item)}");
             if (item.IsCursed)
             {
                 terminal.SetColor("red");
@@ -3427,7 +3427,7 @@ public class TeamCornerLocation : BaseLocation
         if (selectedItem.IsCursed)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("team.cursed_cannot_remove", selectedItem.Name));
+            terminal.WriteLine(Loc.Get("team.cursed_cannot_remove", ItemNames.Display(selectedItem)));
             await Pacing.Wait(2000);
             return;
         }
@@ -3446,7 +3446,7 @@ public class TeamCornerLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("team.took_item", unequipped.Name, target.DisplayName));
+            terminal.WriteLine(Loc.Get("team.took_item", ItemNames.Display(unequipped), target.DisplayName));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("team.item_added_inventory"));
         }
@@ -3500,7 +3500,7 @@ public class TeamCornerLocation : BaseLocation
             {
                 if (item.IsCursed)
                 {
-                    cursedItems.Add(item.Name);
+                    cursedItems.Add(ItemNames.Display(item));
                     continue;
                 }
                 if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first
@@ -4299,7 +4299,7 @@ public class TeamCornerLocation : BaseLocation
 
         // Show current spec
         string currentSpecName = npc.Specialization != ClassSpecialization.None
-            ? (UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.Name ?? npc.Specialization.ToString())
+            ? (UsurperRemake.Data.SpecializationData.GetSpec(npc.Specialization)?.LocName ?? npc.Specialization.ToString())
             : Loc.Get("spec.unspecialized");
         terminal.SetColor("white");
         terminal.WriteLine(Loc.Get("spec.current_spec", currentSpecName));
@@ -4321,7 +4321,7 @@ public class TeamCornerLocation : BaseLocation
             terminal.SetColor(isCurrentSpec ? "bright_green" : "bright_yellow");
             terminal.Write($"  {i + 1}. ");
             terminal.SetColor(isCurrentSpec ? "bright_green" : "white");
-            terminal.Write($"{spec.Name} ");
+            terminal.Write($"{spec.LocName} ");
             terminal.SetColor("cyan");
             terminal.Write($"({SpecRoleName(spec.Role)}) ");
             if (isCurrentSpec)
@@ -4417,7 +4417,7 @@ public class TeamCornerLocation : BaseLocation
         {
             var specDef = UsurperRemake.Data.SpecializationData.GetSpec(newSpec);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("spec.set", npc.DisplayName, specDef?.Name ?? newSpec.ToString(), specDef != null ? SpecRoleName(specDef.Role) : ""));
+            terminal.WriteLine(Loc.Get("spec.set", npc.DisplayName, specDef?.LocName ?? newSpec.ToString(), specDef != null ? SpecRoleName(specDef.Role) : ""));
         }
 
         terminal.SetColor("gray");

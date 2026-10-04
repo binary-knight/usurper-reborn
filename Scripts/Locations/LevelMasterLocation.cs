@@ -178,7 +178,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
-        terminal.WriteLine(currentMaster.Description);
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, currentMaster.LocDescription);
         terminal.WriteLine("");
 
         // Show alignment-specific greeting
@@ -337,7 +337,7 @@ public class LevelMasterLocation : BaseLocation
         terminal.SetColor(currentMaster.Color);
         terminal.Write($" {currentMaster.Name}");
         terminal.SetColor("gray");
-        terminal.Write("  XP:");
+        terminal.Write(Loc.Get("level_master.bbs_xp"));
         terminal.SetColor("cyan");
         terminal.Write($"{currentPlayer.Experience:N0}");
         if (currentPlayer.Level >= GameConfig.MaxLevel)
@@ -632,7 +632,7 @@ public class LevelMasterLocation : BaseLocation
         {
             var cur = UsurperRemake.Data.SpecializationData.GetSpec(player.Specialization);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {Loc.Get("spec.current", cur?.Name ?? player.Specialization.ToString())}");
+            terminal.WriteLine($"  {Loc.Get("spec.current", cur?.LocName ?? player.Specialization.ToString())}");
         }
         else
         {
@@ -645,7 +645,7 @@ public class LevelMasterLocation : BaseLocation
         {
             var s = specs[i];
             terminal.SetColor("bright_yellow");
-            terminal.WriteLine($"  [{i + 1}] {s.Name}  ({Loc.Get("spec.role_" + s.Role.ToString().ToLowerInvariant())})");
+            terminal.WriteLine($"  [{i + 1}] {s.LocName}  ({Loc.Get("spec.role_" + s.Role.ToString().ToLowerInvariant())})");
             terminal.SetColor("gray");
             terminal.WriteLine($"      {Loc.Get(s.DescriptionKey)}");
             string growth = BuildSpecGrowthSummary(s);
@@ -679,7 +679,7 @@ public class LevelMasterLocation : BaseLocation
                 await terminal.PressAnyKey();
                 return;
             }
-            if (!await terminal.AskYesNoAsync(Loc.Get("spec.confirm_respec", chosen.Name, $"{respecCost:N0}"))) return;
+            if (!await terminal.AskYesNoAsync(Loc.Get("spec.confirm_respec", chosen.LocName, $"{respecCost:N0}"))) return;
             player.Gold -= respecCost;
         }
 
@@ -687,7 +687,7 @@ public class LevelMasterLocation : BaseLocation
         await GameEngine.Instance.SaveCurrentGame();
 
         terminal.SetColor("bright_green");
-        terminal.WriteLine($"  {Loc.Get("spec.chosen", chosen.Name)}");
+        terminal.WriteLine($"  {Loc.Get("spec.chosen", chosen.LocName)}");
         terminal.SetColor("white");
         await terminal.PressAnyKey();
     }
@@ -794,7 +794,7 @@ public class LevelMasterLocation : BaseLocation
         }
         terminal.WriteLine("");
 
-        await terminal.PressAnyKey("  Press Enter to continue...");
+        await terminal.PressAnyKey("  " + Loc.Get("ui.press_enter"));
     }
 
     /// <summary>
@@ -1563,7 +1563,7 @@ public class LevelMasterLocation : BaseLocation
                 var displayName = player.Name2 ?? player.Name1;
                 if (player.Level % 5 == 0 || player.Level <= 3)
                     _ = UsurperRemake.Systems.OnlineStateManager.Instance!.AddNews(
-                        $"{displayName} has reached level {player.Level}!", "combat");
+                        Loc.Get("level_master.reached_level_news", displayName, player.Level), "combat");
             }
 
             // Auto-add newly unlocked spells/abilities to empty quickbar slots
@@ -1658,8 +1658,9 @@ public class LevelMasterLocation : BaseLocation
 
             terminal.SetColor("cyan");
             string navOptions = "";
-            if (currentPage > 0) navOptions += "[P]rev  ";
-            if (currentPage < totalPages - 1) navOptions += "[N]ext  ";
+            // v1.2.5: the labels in the reader's language; the keys stay P and N in every language
+            if (currentPage > 0) navOptions += Loc.Get("level_master.crystal_nav_prev") + "  ";
+            if (currentPage < totalPages - 1) navOptions += Loc.Get("level_master.crystal_nav_next") + "  ";
             terminal.WriteLine(Loc.Get("level_master.crystal_nav", navOptions));
             terminal.WriteLine("");
             terminal.Write(Loc.Get("ui.choice"));
@@ -2266,7 +2267,11 @@ public class LevelMasterLocation : BaseLocation
 /// <summary>
 /// Represents a level master's information
 /// </summary>
-public record MasterInfo(string Name, string Description, string Color, PlayerAlignment Alignment);
+public record MasterInfo(string Name, string Description, string Color, PlayerAlignment Alignment)
+{
+    /// <summary>v1.2.5: the description in the reader's language (level_master.desc_{good|neutral|evil}); Description stays the English source.</summary>
+    public string LocDescription => Loc.Get("level_master.desc_" + Alignment.ToString().ToLowerInvariant());
+}
 
 /// <summary>
 /// Player alignment for determining which master to use

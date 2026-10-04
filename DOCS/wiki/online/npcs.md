@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Systems/CompanionSystem.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.5 | Companion screens, romance milestones and companion quest notices are shown in all five languages.
 history: 1.2.4 | none
 ---
 Townsfolk are part of the persistent world, not static vending machines. Relationships, family events and deaths can change the people you meet.

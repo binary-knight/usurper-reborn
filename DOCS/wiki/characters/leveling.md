@@ -1,8 +1,9 @@
 ---
 title: Leveling and training
 path: /wiki/en/characters/leveling/
-checked: 1.2.1
+checked: 1.2.5
 sources: Scripts/Locations/LevelMasterLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.5 | The Level Master's description, crystal page navigation and level-up news are shown in all five languages.
 ---
 Visit the Level Master when you have enough experience. The location checks eligibility, advances your level and applies class growth. Your class page shows the generated base growth, not a complete formula for an equipped character.
 

@@ -1011,7 +1011,7 @@ public class HomeLocation : BaseLocation
                 int max = GameConfig.HerbMaxCarry[i];
                 bool full = count >= max;
                 string color = full ? "darkgray" : HerbData.GetColor(type);
-                string fullTag = full ? " [FULL]" : "";
+                string fullTag = full ? $" [{Loc.Get("home.herb_full_tag")}]" : "";
                 terminal.SetColor(color);
                 terminal.WriteLine($"  [{i}] {HerbData.LocName(type)} ({count}/{max}){fullTag}");
                 terminal.SetColor("gray");
@@ -1327,16 +1327,19 @@ public class HomeLocation : BaseLocation
                 if (categoryAchievements.Any())
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  === {category} ===");
+                    terminal.WriteLine($"  === {MainStreetLocation.AchievementCategoryLabel(category)} ===");
 
                     foreach (var achievement in categoryAchievements)
                     {
                         terminal.SetColor(achievement.GetTierColor());
                         terminal.Write($"    {achievement.GetTierSymbol()} ");
                         terminal.SetColor("bright_green");
-                        terminal.Write($"[X] {achievement.Name}");
+                        terminal.Write($"[X] {achievement.LocName()}");
                         terminal.SetColor("gray");
-                        terminal.WriteLine($" - {achievement.Description}");
+                        // v1.2.5: the goal wraps at 79 columns
+                        var goal = AchievementSystem.TrophyGoalRows(achievement);
+                        terminal.WriteLine(goal[0]);
+                        foreach (var row in goal.Skip(1)) terminal.WriteLine(row);
                     }
                     terminal.WriteLine();
                 }
@@ -1630,13 +1633,13 @@ public class HomeLocation : BaseLocation
             if (!string.IsNullOrEmpty(message))
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine(message);
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
             }
         }
         else
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("home.equip_cannot", message));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("home.equip_cannot", message));
         }
     }
 
@@ -1664,7 +1667,7 @@ public class HomeLocation : BaseLocation
         if (mainHandItem != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(mainHandItem.Name);
+            terminal.WriteLine(ItemNames.Display(mainHandItem));
         }
         else
         {
@@ -1677,7 +1680,7 @@ public class HomeLocation : BaseLocation
         if (offHandItem != null)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(offHandItem.Name);
+            terminal.WriteLine(ItemNames.Display(offHandItem));
         }
         else
         {
@@ -1996,7 +1999,7 @@ public class HomeLocation : BaseLocation
                 terminal.Write($"  ");
                 terminal.Write($"[{i + 1}] ", "bright_yellow");
                 terminal.Write($"{c.Name}", "bright_white");
-                terminal.Write($" (age {c.Age}, ", "gray");
+                terminal.Write($" ({Loc.Get("home.parenting_child_age", c.Age)}, ", "gray");
                 terminal.Write(c.GetSoulDescription(), soulColor);
                 terminal.WriteLine(")", "gray");
             }
@@ -4174,10 +4177,18 @@ public class HomeLocation : BaseLocation
 
         if (maxed)
         {
+            string head = $"  [{num}] {name}", maxedLabel = Loc.Get("home.upgrade_maxed_label", currentTierName, level, currentBonus);
             terminal.SetColor("bright_green");
-            terminal.Write($"  [{num}] {name}");
+            terminal.Write(head);
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("home.upgrade_maxed_label", currentTierName, level, currentBonus));
+            // v1.2.5: a row past 79 columns puts the tier on the next row
+            if (head.Length + maxedLabel.Length > 79)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"      {maxedLabel.TrimStart()}");
+            }
+            else
+                terminal.WriteLine(maxedLabel);
         }
         else
         {
@@ -4185,9 +4196,18 @@ public class HomeLocation : BaseLocation
             terminal.Write($"  [{num}]");
             terminal.SetColor(affordable ? "white" : "dark_gray");
             string tierText = nextTierName != "" ? $": {nextTierName}" : "";
-            terminal.Write($" {name} Lv {level + 1}{tierText}");
+            string label = $" {Loc.Get("home.upgrade_next_label", name, level + 1, tierText)}";
+            string price = $"  {cost:N0}g  [{nextBonus}]";
+            terminal.Write(label);
             terminal.SetColor(affordable ? "yellow" : "dark_gray");
-            terminal.WriteLine($"  {cost:N0}g  [{nextBonus}]");
+            // v1.2.5: a row past 79 columns puts the price on the next row
+            if ($"  [{num}]".Length + label.Length + price.Length > 79)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"      {price.TrimStart()}");
+            }
+            else
+                terminal.WriteLine(price);
         }
     }
 
@@ -4338,7 +4358,7 @@ public class HomeLocation : BaseLocation
         terminal.WriteLine(Loc.Get("home.pet_roster_header"));
         terminal.WriteLine("");
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("home.pet_roster_intro", currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize));
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, Loc.Get("home.pet_roster_intro", currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize), "", 79);
         terminal.WriteLine("");
 
         if (currentPlayer.PetRoster.Count == 0)
@@ -4355,24 +4375,34 @@ public class HomeLocation : BaseLocation
             var pet = currentPlayer.PetRoster[i];
             var def = pet.GetDefinition();
             bool isActive = string.Equals(currentPlayer.ActivePetId, pet.Id, StringComparison.OrdinalIgnoreCase);
-            terminal.SetColor("gray");
-            terminal.Write($"  [{i + 1}] ");
-            terminal.SetColor(isActive ? "bright_green" : "white");
-            terminal.Write($"{pet.Name,-22}");
-            terminal.SetColor("dark_gray");
+            string number = $"  [{i + 1}] ", petName = $"{MonsterNames.Display(pet.Name),-22}", levelRole = "";
             if (def != null)
             {
-                string roleLabel = def.Role == UsurperRemake.Data.BeastData.BeastRole.Combat ? "[Combat]" : "[Passive]";
-                terminal.Write($"  Lv{pet.Level,-2} {roleLabel,-9}");
+                string roleLabel = $"[{Loc.Get(def.Role == UsurperRemake.Data.BeastData.BeastRole.Combat ? "home.pet_role_combat" : "home.pet_role_passive")}]";
+                levelRole = $"  {Loc.Get("home.pet_roster_level", pet.Level)} {roleLabel,-9}";
             }
+            string passive = $"  {def?.LocPassiveDescription() ?? ""}";
+            terminal.SetColor("gray");
+            terminal.Write(number);
+            terminal.SetColor(isActive ? "bright_green" : "white");
+            terminal.Write(petName);
+            terminal.SetColor("dark_gray");
+            terminal.Write(levelRole);
             terminal.SetColor("cyan");
-            terminal.WriteLine($"  {def?.LocPassiveDescription() ?? ""}");
+            // v1.2.5: a row past 79 columns puts the description on the next row
+            if (number.Length + petName.Length + levelRole.Length + passive.Length > 79)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"      {passive.TrimStart()}");
+            }
+            else
+                terminal.WriteLine(passive);
         }
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("home.pet_roster_active_prompt"));
         terminal.WriteLine(Loc.Get("home.pet_roster_unset_prompt"));
-        terminal.WriteLine(IsScreenReader ? "  0. Cancel" : "  [0] Cancel");
+        terminal.WriteLine(IsScreenReader ? $"  0. {Loc.Get("ui.cancel")}" : $"  [0] {Loc.Get("ui.cancel")}");
         terminal.WriteLine("");
 
         var input = await terminal.GetInput(Loc.Get("home.pet_roster_select"));
@@ -4394,7 +4424,7 @@ public class HomeLocation : BaseLocation
         var selected = currentPlayer.PetRoster[choice - 1];
         currentPlayer.ActivePetId = selected.Id;
         terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("home.pet_roster_set_active", selected.Name));
+        terminal.WriteLine(Loc.Get("home.pet_roster_set_active", MonsterNames.Display(selected.Name)));
         await terminal.PressAnyKey();
     }
 
@@ -4512,7 +4542,7 @@ public class HomeLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("home.resurrect_success", toResurrect.DisplayName));
                 terminal.WriteLine(Loc.Get("home.resurrect_cost", $"{cost:N0}"));
 
-                NewsSystem.Instance.Newsy(true, $"{toResurrect.DisplayName} was resurrected by their ally '{currentPlayer.Name}'!");
+                NewsSystem.Instance.Newsy(true, Loc.Get("home.news_resurrected", toResurrect.DisplayName, currentPlayer.Name));
             }
         }
 
@@ -4581,7 +4611,7 @@ public class HomeLocation : BaseLocation
             var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(spouse.NPCId, spouse.NPCName);
             if (npc != null && npc.IsAlive)
             {
-                partners.Add((npc, "Spouse"));
+                partners.Add((npc, Loc.Get("inn.relationship_spouse")));
             }
         }
 
@@ -4591,7 +4621,7 @@ public class HomeLocation : BaseLocation
             var npc = NPCSpawnSystem.Instance?.ResolvePartnerNpc(lover.NPCId, lover.NPCName);
             if (npc != null && npc.IsAlive)
             {
-                partners.Add((npc, "Lover"));
+                partners.Add((npc, Loc.Get("inn.relationship_lover")));
             }
         }
 
@@ -4801,7 +4831,7 @@ public class HomeLocation : BaseLocation
             if (currentItem != null)
             {
                 terminal.SetColor(currentItem.IsIdentified ? currentItem.GetRarityColor() : "magenta");
-                terminal.Write(currentItem.IsIdentified ? currentItem.Name : Loc.Get("ui.unidentified"));
+                terminal.Write(currentItem.IsIdentified ? ItemNames.Display(currentItem) : Loc.Get("ui.unidentified"));
                 if (currentItem.IsIdentified) WriteEquipmentStatSummary(currentItem);
                 terminal.WriteLine("");
             }
@@ -4859,7 +4889,7 @@ public class HomeLocation : BaseLocation
             if (!TakeFromPlayerForEquip(selectedItem, wasEquipped, sourceSlot, sourceItem))
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_item_gone", selectedItem.Name));
+                terminal.WriteLine(Loc.Get("team.equip_item_gone", ItemNames.Display(selectedItem)));
                 await Pacing.Wait(2000);
                 continue;
             }
@@ -4889,11 +4919,11 @@ public class HomeLocation : BaseLocation
 
                 terminal.WriteLine("");
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("home.equipped_item", target.DisplayName, selectedItem.Name));
+                terminal.WriteLine(Loc.Get("home.equipped_item", target.DisplayName, ItemNames.Display(selectedItem)));
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                 }
             }
             else
@@ -4902,7 +4932,7 @@ public class HomeLocation : BaseLocation
                 var legacyItem = sourceItem ?? ConvertEquipmentToItem(selectedItem);
                 currentPlayer.Inventory.Add(legacyItem);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("home.equip_failed", message));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("home.equip_failed", message));
             }
 
             await Pacing.Wait(2000);
@@ -4950,7 +4980,7 @@ public class HomeLocation : BaseLocation
             terminal.SetColor("gray");
             terminal.Write($"[{slot.GetDisplayName(),-12}] ");
             terminal.SetColor("white");
-            terminal.Write($"{item.Name}");
+            terminal.Write($"{ItemNames.Display(item)}");
             if (item.IsCursed)
             {
                 terminal.SetColor("red");
@@ -4979,7 +5009,7 @@ public class HomeLocation : BaseLocation
         if (selectedItem.IsCursed)
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("home.cursed_no_remove", selectedItem.Name));
+            terminal.WriteLine(Loc.Get("home.cursed_no_remove", ItemNames.Display(selectedItem)));
             await Pacing.Wait(2000);
             return;
         }
@@ -4998,7 +5028,7 @@ public class HomeLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("home.took_item", unequipped.Name, target.DisplayName));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("home.took_item", ItemNames.Display(unequipped), target.DisplayName));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("home.item_to_inventory"));
         }
@@ -5041,7 +5071,7 @@ public class HomeLocation : BaseLocation
             {
                 if (item.IsCursed)
                 {
-                    cursedItems.Add(item.Name);
+                    cursedItems.Add(ItemNames.Display(item));
                     continue;
                 }
                 if (!ClaimGearRecovery(target, slot, item.Name)) continue;   // v1.1.14: another process took it first
@@ -5141,26 +5171,26 @@ public class HomeLocation : BaseLocation
 
         var menu = new List<ElectronBridge.MenuItemData>
         {
-            new() { Key = "E", Label = "Rest & Recover", Category = "service", Icon = "rest" },
-            new() { Key = "U", Label = "Upgrade Home", Category = "service", Icon = "upgrade" },
-            new() { Key = "D", Label = "Deposit to Chest", Category = "storage", Icon = "chest" },
-            new() { Key = "W", Label = "Withdraw from Chest", Category = "storage", Icon = "chest" },
-            new() { Key = "L", Label = "List Chest", Category = "storage", Icon = "chest" },
-            new() { Key = "A", Label = "Gather Herbs", Category = "service", Icon = "herb" },
-            new() { Key = "J", Label = "Use Herb", Category = "service", Icon = "herb" },
-            new() { Key = "T", Label = "Trophies", Category = "info", Icon = "trophy" },
-            new() { Key = "F", Label = "Family", Category = "social", Icon = "family" },
-            new() { Key = "C", Label = "Spend Time with Children", Category = "social", Icon = "children" },
-            new() { Key = "P", Label = "Spend Time with Spouse", Category = "social", Icon = "love" },
-            new() { Key = "B", Label = "Bedroom", Category = "social", Icon = "bedroom" },
-            new() { Key = "X", Label = "Resurrect Partner", Category = "service", Icon = "resurrect" },
-            new() { Key = "Y", Label = "Tamed Beasts", Category = "social", Icon = "pet" },
-            new() { Key = "I", Label = "Inventory", Category = "info", Icon = "inventory" },
-            new() { Key = "G", Label = "Gear for Partner", Category = "service", Icon = "gear" },
-            new() { Key = "V", Label = "Party Inventory", Category = "info", Icon = "party" },
-            new() { Key = "H", Label = "Healing Potion", Category = "service", Icon = "potion" },
-            new() { Key = "Z", Label = "Sleep / Wait Night", Category = "service", Icon = "sleep" },
-            new() { Key = "S", Label = "Status", Category = "info", Icon = "info" },
+            new() { Key = "E", Label = Loc.Get("home.rest"), Category = "service", Icon = "rest" },
+            new() { Key = "U", Label = Loc.Get("home.electron_upgrade"), Category = "service", Icon = "upgrade" },
+            new() { Key = "D", Label = Loc.Get("home.electron_deposit"), Category = "storage", Icon = "chest" },
+            new() { Key = "W", Label = Loc.Get("home.electron_withdraw"), Category = "storage", Icon = "chest" },
+            new() { Key = "L", Label = Loc.Get("home.list_chest"), Category = "storage", Icon = "chest" },
+            new() { Key = "A", Label = Loc.Get("home.gather_herbs"), Category = "service", Icon = "herb" },
+            new() { Key = "J", Label = Loc.Get("home.use_herb"), Category = "service", Icon = "herb" },
+            new() { Key = "T", Label = Loc.Get("home.trophies"), Category = "info", Icon = "trophy" },
+            new() { Key = "F", Label = Loc.Get("home.electron_family"), Category = "social", Icon = "family" },
+            new() { Key = "C", Label = Loc.Get("home.electron_children"), Category = "social", Icon = "children" },
+            new() { Key = "P", Label = Loc.Get("home.electron_spouse"), Category = "social", Icon = "love" },
+            new() { Key = "B", Label = Loc.Get("home.bedroom"), Category = "social", Icon = "bedroom" },
+            new() { Key = "X", Label = Loc.Get("home.electron_resurrect"), Category = "service", Icon = "resurrect" },
+            new() { Key = "Y", Label = Loc.Get("home.pet_roster"), Category = "social", Icon = "pet" },
+            new() { Key = "I", Label = Loc.Get("menu.action.inventory"), Category = "info", Icon = "inventory" },
+            new() { Key = "G", Label = Loc.Get("home.electron_gear"), Category = "service", Icon = "gear" },
+            new() { Key = "V", Label = Loc.Get("home.electron_party_inventory"), Category = "info", Icon = "party" },
+            new() { Key = "H", Label = Loc.Get("home.electron_potion"), Category = "service", Icon = "potion" },
+            new() { Key = "Z", Label = Loc.Get("home.electron_sleep"), Category = "service", Icon = "sleep" },
+            new() { Key = "S", Label = Loc.Get("menu.action.status"), Category = "info", Icon = "info" },
             new() { Key = "R", Label = Loc.Get("ui.return"), Category = "navigate", Icon = "back" },
         };
         ElectronBridge.EmitMenu(menu);

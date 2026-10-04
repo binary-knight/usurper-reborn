@@ -112,7 +112,7 @@ public static class WikiDataExporter
     private static object Items() => EquipmentDatabase.GetBuiltInTemplates().Select(item => new
     {
         id = item.Id,
-        name = Names(null, item.Name),
+        name = Names(ItemNames.KeyOf(item.Name), item.Name),   // v1.2.5: each language its own name; en is the stored name
         description = item.Description,
         slot = item.Slot,
         handedness = item.Handedness,
@@ -146,13 +146,13 @@ public static class WikiDataExporter
         .OrderBy(f => f.FamilyName).Select(family => new
         {
             id = KeyPart(family.FamilyName),
-            name = Names(null, family.FamilyName),
+            name = Names(MonsterNames.FamilyKeyOf(family.FamilyName), family.FamilyName),   // v1.2.5: monster.family.*
             description = family.Description,
             attackType = family.AttackType,
             tiers = family.Tiers.Select(tier => new
             {
                 id = KeyPart(tier.Name),
-                name = Names(null, tier.Name),
+                name = Names(MonsterNames.KeyOf(tier.Name), tier.Name),   // v1.2.5: monster.name.*; en is the stored name
                 tier.MinLevel, tier.MaxLevel, tier.PowerMultiplier,
                 abilities = tier.SpecialAbilities,
                 normalStatsAtMinLevel = MonsterStats(tier.MinLevel, tier.PowerMultiplier),
@@ -181,7 +181,7 @@ public static class WikiDataExporter
                 .Select(spec => new
                 {
                     id = spec.Spec.ToString(),
-                    name = Names(null, spec.Name),
+                    name = Names(spec.NameKey, spec.Name),   // v1.2.5: es fr hu it through spec.{class}.{spec}.name; en is the table name
                     description = Names(spec.DescriptionKey, "").GetValueOrDefault("en", ""),
                     role = spec.Role,
                     bonusesPerLevel = new
@@ -334,7 +334,7 @@ public static class WikiDataExporter
     private static object Achievements() => AchievementSystem.GetBuiltInAchievements()
         .OrderBy(a => a.Id).Select(a => new
         {
-            id = a.Id, name = Names(null, a.Name), description = Names(null, a.Description),
+            id = a.Id, name = Names(a.KeyOf("name", a.Name), a.Name), description = Names(a.KeyOf("desc", a.Description), a.Description),   // v1.2.5: es fr hu it through achievement.{id}.*
             a.Category, a.Tier, a.IsSecret, spoiler = a.IsSecret, a.SecretHint, a.PointValue,
             a.GoldReward, a.ExperienceReward
         }).ToArray();
@@ -344,7 +344,7 @@ public static class WikiDataExporter
         var oldGods = OldGodsData.GetAllOldGods().Select(b => new
         {
             id = b.Type.ToString(), kind = "oldGod", spoiler = true,
-            name = Names(null, b.Name), b.Title, baseLevel = b.Level, b.DungeonFloor,
+            name = Names(MonsterNames.KeyOf(b.Name), b.Name), b.Title, baseLevel = b.Level, b.DungeonFloor,   // v1.2.5: oldgod.{key}.name
             baseHP = b.HP, baseStrength = b.Strength, baseDefence = b.Defence,
             baseAgility = b.Agility, b.AttacksPerRound,
             phases = new[] { b.Phase1Abilities, b.Phase2Abilities, b.Phase3Abilities }

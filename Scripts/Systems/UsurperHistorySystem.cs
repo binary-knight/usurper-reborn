@@ -1,14 +1,32 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
+using UsurperRemake.Systems;
+using UsurperRemake.UI;
 
 /// <summary>
 /// Displays the history of Usurper and BBS culture from the 1990s.
 /// Honors the original creators and explains the context of this remake.
+/// v1.2.5: every page in the player's language. Each paragraph is one key; the English values keep their
+/// hand made line breaks, and every row is word wrapped to fit 79 columns (inside the frames, to the frame).
+/// The names of people and games are not translated.
 /// </summary>
 public class UsurperHistorySystem
 {
     private static UsurperHistorySystem? _instance;
     public static UsurperHistorySystem Instance => _instance ??= new UsurperHistorySystem();
+
+    // Proper names, the same in every language.
+    internal const string JakobName = "JAKOB DANGARDEN";
+    internal const string RickName = "RICK PARRISH";
+    internal const string DanName = "DANIEL ZINGARO";
+    internal const string JasonName = "JASON KNIGHT";
+
+    // The page frame is 79 columns; the name boxes are 75 (two columns in), with 69 columns of text.
+    private const int PageWidth = 79;
+    private const int HeadingWidth = 70;
+    private const int BoxInner = 71;
+    private const int BoxText = 69;
 
     public UsurperHistorySystem()
     {
@@ -27,54 +45,135 @@ public class UsurperHistorySystem
         await ShowRemakePage(terminal);
     }
 
+    // ---------- rows ----------
+
+    /// <summary>v1.2.5: text centred in a field of the given width (no padding after it).</summary>
+    internal static string Centered(string text, int width)
+    {
+        int pad = Math.Max(0, (width - UIHelper.VisibleLength(text)) / 2);
+        return new string(' ', pad) + text;
+    }
+
+    /// <summary>v1.2.5: the rows of a paragraph, two columns in, wrapped at 79.</summary>
+    internal static List<string> ParagraphRows(string text)
+    {
+        var rows = new List<string>();
+        foreach (var row in UIHelper.WordWrap(text, PageWidth - 2))
+            rows.Add("  " + row);
+        return rows;
+    }
+
+    /// <summary>v1.2.5: the rows of a list, one item per line of the text, "    - " before each, later rows under the text.</summary>
+    internal static List<string> ListRows(string text)
+    {
+        var rows = new List<string>();
+        foreach (var item in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            var lines = UIHelper.WordWrap(item, PageWidth - 6);
+            for (int i = 0; i < lines.Count; i++)
+                rows.Add((i == 0 ? "    - " : "      ") + lines[i]);
+        }
+        return rows;
+    }
+
+    /// <summary>v1.2.5: the rows of a paragraph inside a name box: "  |  text   |", 75 columns, at least two spaces before the right edge.</summary>
+    internal static List<string> BoxRows(string text)
+    {
+        var rows = new List<string>();
+        foreach (var row in UIHelper.WordWrap(text, BoxText - 2))
+            rows.Add("  |  " + row + new string(' ', Math.Max(0, BoxText - UIHelper.VisibleLength(row))) + "|");
+        return rows;
+    }
+
+    /// <summary>v1.2.5: a centred row inside a name box.</summary>
+    internal static string BoxCenteredRow(string text)
+    {
+        var inner = Centered(text, BoxInner);
+        return "  |" + inner + new string(' ', Math.Max(0, BoxInner - UIHelper.VisibleLength(inner))) + "|";
+    }
+
+    private static readonly string BoxRule = "  +" + new string('-', BoxInner) + "+";
+
+    private static void Para(TerminalEmulator terminal, string key, string color)
+    {
+        terminal.SetColor(color);
+        foreach (var row in ParagraphRows(Loc.Get(key)))
+            terminal.WriteLine(row);
+    }
+
+    private static void Bullets(TerminalEmulator terminal, string key, string color)
+    {
+        terminal.SetColor(color);
+        foreach (var row in ListRows(Loc.Get(key)))
+            terminal.WriteLine(row);
+    }
+
+    private static void Heading(TerminalEmulator terminal, string text, string color)
+    {
+        terminal.SetColor(color);
+        terminal.WriteLine(Centered(text, HeadingWidth));
+    }
+
+    /// <summary>v1.2.5: the page title: a 79-column frame, or the plain title for a screen reader.</summary>
+    private static void PageTitle(TerminalEmulator terminal)
+    {
+        string title = Loc.Get("history.title");
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.WriteLine(title, "bright_cyan");
+        }
+        else
+        {
+            terminal.SetColor("bright_cyan");
+            string inner = Centered(title, PageWidth - 2);
+            terminal.WriteLine("+" + new string('=', PageWidth - 2) + "+");
+            terminal.WriteLine("|" + inner + new string(' ', Math.Max(0, PageWidth - 2 - UIHelper.VisibleLength(inner))) + "|");
+            terminal.WriteLine("+" + new string('=', PageWidth - 2) + "+");
+        }
+        terminal.WriteLine("");
+    }
+
+    /// <summary>v1.2.5: a person's name, role and story: plain rows for a screen reader, else a name box.</summary>
+    private static void PersonBox(TerminalEmulator terminal, string name, string roleKey, string bioKey, string color)
+    {
+        string role = Loc.Get(roleKey);
+        if (GameConfig.ScreenReaderMode)
+        {
+            terminal.WriteLine("  " + Loc.Get("history.sr_name_role", name, role), color);
+            if (bioKey.Length > 0) Para(terminal, bioKey, "gray");
+            return;
+        }
+        terminal.SetColor(color);
+        terminal.WriteLine(BoxRule);
+        terminal.WriteLine(BoxCenteredRow(name));
+        terminal.WriteLine(BoxCenteredRow(role));
+        terminal.WriteLine(BoxRule);
+        if (bioKey.Length == 0) return;
+        terminal.SetColor("gray");
+        foreach (var row in BoxRows(Loc.Get(bioKey)))
+            terminal.WriteLine(row);
+        terminal.WriteLine(BoxRule);
+    }
+
     /// <summary>
     /// Page 1: What was a BBS?
     /// </summary>
     private async Task ShowBBSCulturePage(TerminalEmulator terminal)
     {
         terminal.ClearScreen();
+        PageTitle(terminal);
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("USURPER HISTORY - A Journey Through Time", "bright_cyan");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("+=============================================================================+");
-            terminal.WriteLine("|                    USURPER HISTORY - A Journey Through Time                 |");
-            terminal.WriteLine("+=============================================================================+");
-        }
+        Heading(terminal, Loc.Get("history.bbs_heading"), "bright_yellow");
+        Heading(terminal, "(1978 - 1999)", "bright_yellow");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("                        ~ The Age of the BBS ~");
-        terminal.WriteLine("                            (1978 - 1999)");
+        Para(terminal, "history.bbs_p1", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  Before the World Wide Web, before social media, before smartphones...");
-        terminal.WriteLine("  there were Bulletin Board Systems.");
+        Para(terminal, "history.bbs_p2", "gray");
         terminal.WriteLine("");
-
-        terminal.SetColor("gray");
-        terminal.WriteLine("  A BBS was a computer you could dial into with your telephone modem. You'd");
-        terminal.WriteLine("  hear the screech of the handshake, watch your screen fill with ANSI art,");
-        terminal.WriteLine("  and suddenly you were connected to a community of people you'd never meet");
-        terminal.WriteLine("  in person - but who became your friends, rivals, and companions.");
+        Para(terminal, "history.bbs_p3", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  By 1992, there were over 25,000 BBSes in the United States alone. Each");
-        terminal.WriteLine("  one was a tiny digital world, run by a 'SysOp' (System Operator) from");
-        terminal.WriteLine("  their basement or bedroom. You could post messages, download files, chat");
-        terminal.WriteLine("  with other callers... and play games.");
-        terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine("  Because most BBSes had only ONE phone line, you were typically alone when");
-        terminal.WriteLine("  you called. But the games... the games let you exist in a shared world");
-        terminal.WriteLine("  with everyone else who called that BBS.");
+        Para(terminal, "history.bbs_p4", "cyan");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -87,55 +186,22 @@ public class UsurperHistorySystem
     private async Task ShowDoorGamesPage(TerminalEmulator terminal)
     {
         terminal.ClearScreen();
+        PageTitle(terminal);
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("USURPER HISTORY - A Journey Through Time", "bright_cyan");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("+=============================================================================+");
-            terminal.WriteLine("|                    USURPER HISTORY - A Journey Through Time                 |");
-            terminal.WriteLine("+=============================================================================+");
-        }
+        Heading(terminal, Loc.Get("history.doors_heading"), "bright_green");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("                          ~ The Door Games ~");
+        Para(terminal, "history.doors_p1", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  'Door Games' were external programs that BBSes could launch for callers.");
-        terminal.WriteLine("  They were called 'doors' because the BBS software would open a 'door' to");
-        terminal.WriteLine("  let you step into another program, then bring you back when you were done.");
+        Para(terminal, "history.doors_p2", "gray");
         terminal.WriteLine("");
-
-        terminal.SetColor("gray");
-        terminal.WriteLine("  The constraints were brutal by modern standards:");
+        Bullets(terminal, "history.doors_list", "cyan");
         terminal.WriteLine("");
-        terminal.SetColor("cyan");
-        terminal.WriteLine("    - Text only (or ANSI art at best)");
-        terminal.WriteLine("    - Slow connections (2400-14400 baud - slower than a single image today)");
-        terminal.WriteLine("    - One caller at a time (usually)");
-        terminal.WriteLine("    - Limited play time (to share the phone line with others)");
+        Para(terminal, "history.doors_p3", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  Yet from these constraints came innovation. Games like Trade Wars 2002,");
-        terminal.WriteLine("  Legend of the Red Dragon, Solar Realms Elite, and Usurper created entire");
-        terminal.WriteLine("  persistent worlds where your actions TODAY affected what other players");
-        terminal.WriteLine("  found TOMORROW.");
+        Para(terminal, "history.doors_p4", "bright_yellow");
         terminal.WriteLine("");
-
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  These games were the first massively multiplayer online games accessible");
-        terminal.WriteLine("  to ordinary people - not just universities or corporations with mainframes.");
-        terminal.WriteLine("");
-
-        terminal.SetColor("gray");
-        terminal.WriteLine("  The golden age of door games ran from roughly 1989 to 1996, when the");
-        terminal.WriteLine("  rise of the Internet and the World Wide Web slowly made BBSes obsolete.");
+        Para(terminal, "history.doors_p5", "gray");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -148,53 +214,20 @@ public class UsurperHistorySystem
     private async Task ShowUsurperOriginPage(TerminalEmulator terminal)
     {
         terminal.ClearScreen();
+        PageTitle(terminal);
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("USURPER HISTORY - A Journey Through Time", "bright_cyan");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("+=============================================================================+");
-            terminal.WriteLine("|                    USURPER HISTORY - A Journey Through Time                 |");
-            terminal.WriteLine("+=============================================================================+");
-        }
+        Heading(terminal, Loc.Get("history.origin_heading"), "bright_red");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_red");
-        terminal.WriteLine("                    ~ The Birth of Usurper (1993) ~");
+        Para(terminal, "history.origin_p1", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  In 1993, a programmer named Jakob Dangarden created Usurper.");
+        Para(terminal, "history.origin_p2", "gray");
         terminal.WriteLine("");
-
-        terminal.SetColor("gray");
-        terminal.WriteLine("  At a time when Legend of the Red Dragon dominated the door game scene,");
-        terminal.WriteLine("  Usurper dared to be different. While LORD focused on daily adventures");
-        terminal.WriteLine("  and simple combat, Usurper offered something more complex:");
+        Bullets(terminal, "history.origin_list", "cyan");
         terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine("    - Multiple races and classes with real mechanical differences");
-        terminal.WriteLine("    - A deep dungeon with 100 levels to explore");
-        terminal.WriteLine("    - Team/Gang warfare - players could form groups and compete");
-        terminal.WriteLine("    - Political systems - become King and rule over other players");
-        terminal.WriteLine("    - Real-time multiplayer - multiple players could be online together");
-        terminal.WriteLine("    - Complex equipment, spells, and character progression");
+        Para(terminal, "history.origin_p3", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  The game was set in the realm of Dorashire, where adventurers explored");
-        terminal.WriteLine("  the Dungeons of Durunghins. The ultimate goal? Reach the deepest level,");
-        terminal.WriteLine("  accumulate power, and perhaps... usurp the throne itself.");
-        terminal.WriteLine("");
-
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  Usurper quickly gained a devoted following. It was dark, complex, and");
-        terminal.WriteLine("  rewarded players who mastered its systems. The game received updates");
-        terminal.WriteLine("  throughout the 1990s and early 2000s, eventually reaching version 0.20e.");
+        Para(terminal, "history.origin_p4", "bright_yellow");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -207,82 +240,18 @@ public class UsurperHistorySystem
     private async Task ShowCreatorsPage(TerminalEmulator terminal)
     {
         terminal.ClearScreen();
+        PageTitle(terminal);
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("USURPER HISTORY - A Journey Through Time", "bright_cyan");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("+=============================================================================+");
-            terminal.WriteLine("|                    USURPER HISTORY - A Journey Through Time                 |");
-            terminal.WriteLine("+=============================================================================+");
-        }
+        Heading(terminal, Loc.Get("history.creators_heading"), "bright_magenta");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine("                      ~ Those Who Preserved the Dream ~");
+        Para(terminal, "history.creators_intro", "white");
         terminal.WriteLine("");
 
-        terminal.SetColor("white");
-        terminal.WriteLine("  This remake would not exist without these three individuals:");
+        PersonBox(terminal, JakobName, "history.jakob_role", "history.jakob_bio", "bright_yellow");
         terminal.WriteLine("");
 
-        // Jakob Dangarden
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("  JAKOB DANGARDEN - Creator of Usurper (1993)", "bright_yellow");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Jakob created the original masterpiece in Turbo Pascal. His vision");
-            terminal.WriteLine("  of a complex, politically-driven RPG door game set Usurper apart");
-            terminal.WriteLine("  from everything else in the BBS era. In 2004, he made the historic");
-            terminal.WriteLine("  decision to release Usurper as open source under the GPL license,");
-            terminal.WriteLine("  ensuring the game could live on forever.");
-        }
-        else
-        {
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.WriteLine("  |                       JAKOB DANGARDEN                                 |");
-            terminal.WriteLine("  |                    Creator of Usurper (1993)                          |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  |  Jakob created the original masterpiece in Turbo Pascal. His vision   |");
-            terminal.WriteLine("  |  of a complex, politically-driven RPG door game set Usurper apart     |");
-            terminal.WriteLine("  |  from everything else in the BBS era. In 2004, he made the historic   |");
-            terminal.WriteLine("  |  decision to release Usurper as open source under the GPL license,    |");
-            terminal.WriteLine("  |  ensuring the game could live on forever.                             |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-        }
-        terminal.WriteLine("");
-
-        // Rick Parrish
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("  RICK PARRISH - Preserver of the Source Code", "bright_green");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Rick of R&M Software took on the monumental task of porting the");
-            terminal.WriteLine("  original Pascal source code to modern systems. He created 32-bit");
-            terminal.WriteLine("  and 64-bit versions using Free Pascal/Lazarus, ensuring the game");
-            terminal.WriteLine("  could run on Windows, Linux, and beyond. His GameSrv BBS server");
-            terminal.WriteLine("  software keeps the entire door game era alive today.");
-        }
-        else
-        {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.WriteLine("  |                        RICK PARRISH                                   |");
-            terminal.WriteLine("  |                  Preserver of the Source Code                         |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  |  Rick of R&M Software took on the monumental task of porting the      |");
-            terminal.WriteLine("  |  original Pascal source code to modern systems. He created 32-bit     |");
-            terminal.WriteLine("  |  and 64-bit versions using Free Pascal/Lazarus, ensuring the game     |");
-            terminal.WriteLine("  |  could run on Windows, Linux, and beyond. His GameSrv BBS server      |");
-            terminal.WriteLine("  |  software keeps the entire door game era alive today.                 |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-        }
+        PersonBox(terminal, RickName, "history.rick_role", "history.rick_bio", "bright_green");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -290,60 +259,17 @@ public class UsurperHistorySystem
 
         // Continue with Dan Zingaro
         terminal.ClearScreen();
+        PageTitle(terminal);
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("USURPER HISTORY - A Journey Through Time", "bright_cyan");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("+=============================================================================+");
-            terminal.WriteLine("|                    USURPER HISTORY - A Journey Through Time                 |");
-            terminal.WriteLine("+=============================================================================+");
-        }
+        Heading(terminal, Loc.Get("history.creators_heading"), "bright_magenta");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_magenta");
-        terminal.WriteLine("                      ~ Those Who Preserved the Dream ~");
+        PersonBox(terminal, DanName, "history.dan_role", "history.dan_bio", "bright_cyan");
         terminal.WriteLine("");
 
-        // Daniel Zingaro
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("  DANIEL ZINGARO - The Bug Slayer Supreme", "bright_cyan");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  Dan Zingaro provided 'tremendous help' (in Rick's words) with");
-            terminal.WriteLine("  massive bug fixing efforts on the Pascal source code. His patient");
-            terminal.WriteLine("  work tracking down edge cases and fixing issues in decades-old");
-            terminal.WriteLine("  code helped make version 0.20e the most stable release ever.");
-            terminal.WriteLine("  Without his dedication, many subtle bugs would have remained.");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.WriteLine("  |                       DANIEL ZINGARO                                  |");
-            terminal.WriteLine("  |                    The Bug Slayer Supreme                             |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.SetColor("gray");
-            terminal.WriteLine("  |  Dan Zingaro provided 'tremendous help' (in Rick's words) with        |");
-            terminal.WriteLine("  |  massive bug fixing efforts on the Pascal source code. His patient    |");
-            terminal.WriteLine("  |  work tracking down edge cases and fixing issues in decades-old       |");
-            terminal.WriteLine("  |  code helped make version 0.20e the most stable release ever.         |");
-            terminal.WriteLine("  |  Without his dedication, many subtle bugs would have remained.        |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-        }
+        Para(terminal, "history.creators_together", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  Together, these three individuals ensured that Usurper didn't disappear");
-        terminal.WriteLine("  into digital oblivion like so many other door games. The source code");
-        terminal.WriteLine("  they preserved became the foundation for this modern remake.");
-        terminal.WriteLine("");
-
-        terminal.SetColor("bright_white");
-        terminal.WriteLine("  We honor their work by carrying the torch forward.");
+        Para(terminal, "history.creators_honor", "bright_white");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
@@ -356,76 +282,30 @@ public class UsurperHistorySystem
     private async Task ShowRemakePage(TerminalEmulator terminal)
     {
         terminal.ClearScreen();
+        PageTitle(terminal);
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("USURPER HISTORY - A Journey Through Time", "bright_cyan");
-        }
-        else
-        {
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine("+=============================================================================+");
-            terminal.WriteLine("|                    USURPER HISTORY - A Journey Through Time                 |");
-            terminal.WriteLine("+=============================================================================+");
-        }
+        Heading(terminal, Loc.Get("history.remake_heading"), "bright_white");
+        Heading(terminal, Loc.Get("history.remake_years"), "bright_white");
         terminal.WriteLine("");
 
-        terminal.SetColor("bright_white");
-        terminal.WriteLine("                         ~ Usurper Reborn ~");
-        terminal.WriteLine("                           (2024 - Present)");
+        PersonBox(terminal, JasonName, "history.jason_role", "", "bright_green");
         terminal.WriteLine("");
 
-        if (GameConfig.ScreenReaderMode)
-        {
-            terminal.WriteLine("  JASON KNIGHT - Creator of Usurper Reborn", "bright_green");
-        }
-        else
-        {
-            terminal.SetColor("bright_green");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-            terminal.WriteLine("  |                        JASON KNIGHT                                   |");
-            terminal.WriteLine("  |                   Creator of Usurper Reborn                           |");
-            terminal.WriteLine("  +-----------------------------------------------------------------------+");
-        }
+        Para(terminal, "history.remake_p1", "white");
         terminal.WriteLine("");
-
-        terminal.SetColor("white");
-        terminal.WriteLine("  This remake began with a simple question: what if Usurper had continued");
-        terminal.WriteLine("  to evolve? What if the limitations of 1990s hardware were lifted, but");
-        terminal.WriteLine("  the soul of the game remained intact?");
+        Para(terminal, "history.remake_p2", "gray");
         terminal.WriteLine("");
-
-        terminal.SetColor("gray");
-        terminal.WriteLine("  Usurper Reborn is built in C# with modern architecture, but it stays");
-        terminal.WriteLine("  true to the original vision. The core gameplay loops, the class system,");
-        terminal.WriteLine("  the dungeon structure, and the political intrigue are all preserved.");
+        Para(terminal, "history.remake_features", "cyan");
         terminal.WriteLine("");
-
-        terminal.SetColor("cyan");
-        terminal.WriteLine("  New features added to the remake:");
+        Bullets(terminal, "history.remake_list", "white");
         terminal.WriteLine("");
-        terminal.SetColor("white");
-        terminal.WriteLine("    - 50 unique NPCs with distinct personalities and AI behaviors");
-        terminal.WriteLine("    - Dynamic world simulation where NPCs live their own lives");
-        terminal.WriteLine("    - Enhanced narrative with story progression and mysteries to uncover");
-        terminal.WriteLine("    - Improved team/gang warfare systems");
-        terminal.WriteLine("    - New Game+ cycles with persistent progress");
-        terminal.WriteLine("    - Modern save system with multiple slots");
-        terminal.WriteLine("    - Expanded dungeon with new monsters and challenges");
+        Para(terminal, "history.remake_p3", "bright_yellow");
         terminal.WriteLine("");
-
-        terminal.SetColor("bright_yellow");
-        terminal.WriteLine("  The text-based interface is intentional. It's a love letter to an era");
-        terminal.WriteLine("  when imagination filled in what graphics couldn't show. When the words");
-        terminal.WriteLine("  on your screen became worlds in your mind.");
-        terminal.WriteLine("");
-
-        terminal.SetColor("bright_green");
-        terminal.WriteLine("  Welcome to Usurper. Welcome to history. Welcome home.");
+        Para(terminal, "history.remake_welcome", "bright_green");
         terminal.WriteLine("");
 
         terminal.SetColor("yellow");
-        terminal.WriteLine("                              [Press Enter to return]");
+        terminal.WriteLine(Centered(Loc.Get("engine.press_enter_return"), PageWidth));
         await terminal.WaitForKey();
     }
 }

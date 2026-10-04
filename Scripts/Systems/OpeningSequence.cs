@@ -12,79 +12,82 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class OpeningSequenceSystem
     {
-        private static OpeningSequenceSystem? instance;
-        public static OpeningSequenceSystem Instance => instance ??= new OpeningSequenceSystem();
+        // v1.2.5: one instance per session. It holds no story state (that is in the session's story
+        // flags, which are saved); only which character this session last entered a location as.
+        private static OpeningSequenceSystem? _fallbackInstance;
+        public static OpeningSequenceSystem Instance
+        {
+            get
+            {
+                var ctx = UsurperRemake.Server.SessionContext.Current;
+                if (ctx != null) return ctx.OpeningSequence ??= new OpeningSequenceSystem();
+                return _fallbackInstance ??= new OpeningSequenceSystem();
+            }
+        }
 
-        private bool strangerEncounterPending = false;
-        private int daysSinceCreation = 0;
+        /// <summary>The flag that marks the scene seen. It is set when the scene ends.</summary>
+        internal const string MetFlag = "met_mysterious_stranger";
+        internal const int MinLevel = 3;
+
+        /// <summary>The roll against the trigger chance, in [0, 1). Tests replace it.</summary>
+        internal Func<double> Roll { get; set; } = () => Random.Shared.NextDouble();
+
+        // The character this session last entered a location as. The first entry after a login, a load
+        // or a door re-entry (a new Character object) never shows the scene.
+        private Character? _enteredAs;
 
         /// <summary>
-        /// Check if player should trigger opening sequence events
-        /// Called each time player enters a location
+        /// v1.2.5: called by BaseLocation.LocationLoop once per location entry, after the entry encounters
+        /// and before the narrative encounters, outside combat and the location menu. Returns true when
+        /// the scene was shown (the caller then shows no other entry scene).
+        /// <paramref name="otherSceneShown"/>: an entry encounter already ran, so the scene waits.
         /// </summary>
-        public async Task<bool> CheckOpeningSequenceTriggers(Character player, string locationId, TerminalEmulator terminal)
+        public async Task<bool> CheckOpeningSequenceTriggers(Character player, GameLocation location, TerminalEmulator terminal,
+            bool otherSceneShown = false)
         {
-            var story = StoryProgressionSystem.Instance;
-
-            // If already met the stranger, no need for opening sequence
-            if (story.HasStoryFlag("met_mysterious_stranger"))
-            {
+            bool firstEntry = !ReferenceEquals(_enteredAs, player);
+            _enteredAs = player;
+            if (firstEntry || otherSceneShown || !player.IsAlive)
                 return false;
-            }
 
-            // Trigger stranger encounter at level 3+ and after some gameplay
-            // This gives player time to learn the basics first
-            if (player.Level >= 3 && !strangerEncounterPending)
+            if (IsEligible(player) && CanTriggerHere(location) && Roll() < GetTriggerChance(location, player))
             {
-                // Higher chance on Main Street, Inn, or Dark Alley
-                var triggerChance = GetTriggerChance(locationId, player);
-
-                if (Random.Shared.NextDouble() < triggerChance)
-                {
-                    strangerEncounterPending = true;
-                }
-            }
-
-            // Execute pending encounter
-            if (strangerEncounterPending && CanTriggerHere(locationId))
-            {
-                strangerEncounterPending = false;
                 await TriggerStrangerEncounter(player, terminal);
                 return true;
             }
 
-            // After meeting stranger, check for follow-up hooks
-            if (story.HasStoryFlag("met_mysterious_stranger"))
-            {
-                return await CheckFollowUpHooks(player, locationId, terminal);
-            }
-
-            return false;
+            return await CheckFollowUpHooks(player, location, terminal);
         }
 
         /// <summary>
-        /// Get trigger chance based on location and player state
+        /// Who may meet the Stranger's opening scene: a living character of level 3 or more who has not
+        /// seen it, has had no encounter with Noctura's disguised stranger and does not know the truth
+        /// about her (user decision 2026-10-04: the scene's "You don't know me. Not yet." must stay true).
         /// </summary>
-        private double GetTriggerChance(string locationId, Character player)
+        internal static bool IsEligible(Character player)
         {
-            double baseChance = 0.05; // 5% base chance
+            var story = StoryProgressionSystem.Instance;
+            var stranger = StrangerEncounterSystem.Instance;
+            return player.IsAlive
+                && player.Level >= MinLevel
+                && !story.HasStoryFlag(MetFlag)
+                && stranger.EncountersHad == 0
+                && !stranger.PlayerKnowsTruth
+                && !story.HasFlag(StoryFlag.KnowsNocturaTruth);
+        }
 
-            // Location modifiers
-            switch (locationId.ToLower())
+        /// <summary>
+        /// Trigger chance based on location and player state
+        /// </summary>
+        internal static double GetTriggerChance(GameLocation location, Character player)
+        {
+            double baseChance = location switch
             {
-                case "main street":
-                    baseChance = 0.15; // 15% on main street
-                    break;
-                case "inn":
-                    baseChance = 0.12; // 12% at inn
-                    break;
-                case "dark alley":
-                    baseChance = 0.25; // 25% in dark alley (mysterious!)
-                    break;
-                case "tavern":
-                    baseChance = 0.10;
-                    break;
-            }
+                GameLocation.MainStreet => 0.15,
+                GameLocation.TheInn => 0.12,
+                GameLocation.DarkAlley => 0.25, // mysterious!
+                _ => 0.05
+            };
 
             // Level modifier - higher level = more likely
             baseChance += player.Level * 0.02;
@@ -96,19 +99,14 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Check if location is appropriate for stranger encounter
+        /// The locations the scene may happen in. The dungeon, homes and every other location are left
+        /// out. (The Temple keeps its own loop and never reaches BaseLocation.LocationLoop.)
         /// </summary>
-        private bool CanTriggerHere(string locationId)
+        internal static bool CanTriggerHere(GameLocation location) => location switch
         {
-            var validLocations = new[]
-            {
-                "main street", "inn", "dark alley", "tavern",
-                "temple", "market"
-            };
-
-            return Array.Exists(validLocations,
-                loc => locationId.Equals(loc, StringComparison.OrdinalIgnoreCase));
-        }
+            GameLocation.MainStreet or GameLocation.TheInn or GameLocation.DarkAlley or GameLocation.AuctionHouse => true,
+            _ => false
+        };
 
         /// <summary>
         /// Trigger the mysterious stranger encounter
@@ -142,38 +140,61 @@ namespace UsurperRemake.Systems
             var dialogue = DialogueSystem.Instance;
             await dialogue.StartDialogue(player, "mysterious_stranger_intro", terminal);
 
-            // After dialogue, set story state
+            // v1.2.5: the scene has ended (played through, or the player said nothing), so it is marked
+            // seen now and never earlier: a run cut off by a disconnect plays again on a later entry, and
+            // its rewards carry once flags, so they are never paid twice.
+            StoryProgressionSystem.Instance.SetStoryFlag(MetFlag, true);
             StoryProgressionSystem.Instance.AdvanceChapter(StoryChapter.TheFirstSeal);
 
-            // Log event
+            await terminal.PressAnyKey();
         }
 
+        internal const string PriestFlag = "first_seal_hint";
+        internal const string MaelkethWarningFlag = "maelketh_stirring_warning";
+
         /// <summary>
-        /// Check for follow-up story hooks after the initial encounter
+        /// v1.2.5: the two follow-up scenes, for a character who has seen the Stranger's scene. Each is shown
+        /// once; its flag is set after the closing key press. Neither gives anything but its flag.
+        /// The Temple priest (Temple, level 10+) while the Seal of Creation, which lies in the Temple, is
+        /// not yet found. The Maelketh warning (Inn, level 25+) while Maelketh has not been met: his state is
+        /// still the one a character starts with, not Defeated, Saved, Allied, Consumed or Awakened.
         /// </summary>
-        private async Task<bool> CheckFollowUpHooks(Character player, string locationId, TerminalEmulator terminal)
+        internal static bool PriestEligible(Character player, GameLocation location)
         {
             var story = StoryProgressionSystem.Instance;
+            return location == GameLocation.Temple
+                && player.Level >= 10
+                && story.HasStoryFlag(MetFlag)
+                && !story.HasStoryFlag(PriestFlag)
+                && !story.CollectedSeals.Contains(SealType.Creation);
+        }
 
-            // Check for dungeon hints at specific levels
-            if (player.Level >= 10 && !story.HasStoryFlag("first_seal_hint"))
+        internal static bool MaelkethWarningEligible(Character player, GameLocation location)
+        {
+            var story = StoryProgressionSystem.Instance;
+            return location == GameLocation.TheInn
+                && player.Level >= 25
+                && story.HasStoryFlag(MetFlag)
+                && !story.HasStoryFlag(MaelkethWarningFlag)
+                && MaelkethUnmet(story);
+        }
+
+        internal static bool MaelkethUnmet(StoryProgressionSystem story) =>
+            !story.OldGodStates.TryGetValue(OldGodType.Maelketh, out var state)
+            || state.Status is GodStatus.Unknown or GodStatus.Imprisoned or GodStatus.Dormant or GodStatus.Corrupted;
+
+        private async Task<bool> CheckFollowUpHooks(Character player, GameLocation location, TerminalEmulator terminal)
+        {
+            if (PriestEligible(player, location))
             {
-                if (locationId.Equals("temple", StringComparison.OrdinalIgnoreCase))
-                {
-                    await ShowFirstSealHint(player, terminal);
-                    return true;
-                }
+                await ShowFirstSealHint(player, terminal);
+                return true;
             }
 
-            // Check for god awakening warnings
-            if (player.Level >= 25 && !story.HasStoryFlag("maelketh_stirring_warning"))
+            if (MaelkethWarningEligible(player, location))
             {
-                if (locationId.Equals("tavern", StringComparison.OrdinalIgnoreCase) ||
-                    locationId.Equals("inn", StringComparison.OrdinalIgnoreCase))
-                {
-                    await ShowGodStirringWarning(player, terminal, "Maelketh");
-                    return true;
-                }
+                await ShowGodStirringWarning(player, terminal, "Maelketh");
+                return true;
             }
 
             return false;
@@ -211,9 +232,10 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("opening.priest_fades"), "gray");
             terminal.WriteLine("");
 
-            StoryProgressionSystem.Instance.SetStoryFlag("first_seal_hint", true);
-
             await terminal.PressAnyKey();
+
+            // v1.2.5: seen once the closing key is pressed; a disconnect before it shows it again
+            StoryProgressionSystem.Instance.SetStoryFlag(PriestFlag, true);
         }
 
         /// <summary>
@@ -239,17 +261,10 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("opening.veteran_do_it_soon"), "white");
             terminal.WriteLine("");
 
-            StoryProgressionSystem.Instance.SetStoryFlag($"{godName.ToLower()}_stirring_warning", true);
-
             await terminal.PressAnyKey();
-        }
 
-        /// <summary>
-        /// Force trigger the stranger encounter (for testing or specific story points)
-        /// </summary>
-        public void ForceStrangerEncounter()
-        {
-            strangerEncounterPending = true;
+            // v1.2.5: seen once the closing key is pressed; a disconnect before it shows it again
+            StoryProgressionSystem.Instance.SetStoryFlag($"{godName.ToLower()}_stirring_warning", true);
         }
 
         /// <summary>
@@ -257,21 +272,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool IsOpeningComplete()
         {
-            return StoryProgressionSystem.Instance.HasStoryFlag("met_mysterious_stranger");
-        }
-
-        /// <summary>
-        /// Handle daily progression for opening sequence
-        /// </summary>
-        public void OnDayPassed()
-        {
-            daysSinceCreation++;
-
-            // After 3 days, increase trigger chance significantly
-            if (daysSinceCreation >= 3)
-            {
-                strangerEncounterPending = true;
-            }
+            return StoryProgressionSystem.Instance.HasStoryFlag(MetFlag);
         }
     }
 

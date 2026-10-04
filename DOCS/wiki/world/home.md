@@ -1,8 +1,9 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.2.5 | The Home screens are shown in all five languages, and long upgrade, trophy and pet rows wrap at 79 columns.
 history: 1.2.4 | Online your Home is private, and a spouse left alone for 21 days you were present writes you a letter.
 ---
 Your Home is a private base with rest, storage, upgrades and family life. Online, "Also here" is not shown at home, and say, emote, disconnect notices and other room lines from other players do not reach you there. From Main Street open the Home and Hearth district with H, then press H for Home. It appears after your first few levels.

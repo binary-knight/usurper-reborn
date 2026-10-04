@@ -403,6 +403,58 @@ namespace UsurperRemake.Systems
             return "";
         }
 
+        // v1.2.5: the deed reasons the callers pass in English, and their keys (alignment.deed_*).
+        private static readonly Dictionary<string, string> DeedKeys = new()
+        {
+            ["gave alms to the poor"] = "alignment.deed_alms_poor",
+            ["donated generously to the temple"] = "alignment.deed_donated_temple",
+            ["defended an innocent"] = "alignment.deed_defended_innocent",
+            ["showed mercy to a defeated foe"] = "alignment.deed_showed_mercy",
+            ["completed a holy quest"] = "alignment.deed_holy_quest",
+            ["murdered an innocent"] = "alignment.deed_murdered_innocent",
+            ["stole from a merchant"] = "alignment.deed_stole_merchant",
+            ["betrayed an ally"] = "alignment.deed_betrayed_ally",
+            ["used forbidden dark magic"] = "alignment.deed_dark_magic",
+            ["made a pact with darkness"] = "alignment.deed_pact_darkness",
+            ["bank robbery"] = "alignment.deed_bank_robbery",
+            ["Faith merc contract"] = "alignment.deed_faith_contract",
+            ["Shadows merc contract"] = "alignment.deed_shadows_contract",
+            ["demanded tribute"] = "alignment.deed_demanded_tribute",
+            ["publicly hustled at the dice table"] = "alignment.deed_hustled_dice",
+            ["thunderous shout at sleepers"] = "alignment.deed_shout_sleepers",
+            ["Tournament of Honor wave victory"] = "alignment.deed_tournament_wave",
+            ["Dungeon discovery"] = "alignment.deed_dungeon_discovery",
+            ["murder"] = "alignment.deed_murder",
+            ["alms to the poor"] = "alignment.deed_alms",
+            ["funded the orphanage"] = "alignment.deed_funded_orphanage",
+            ["tithed the hospice"] = "alignment.deed_tithed_hospice",
+        };
+
+        // v1.2.5: reasons the callers build around a name: the English prefix and the key that takes the name.
+        private static readonly (string Prefix, string Key)[] DeedPrefixes =
+        {
+            ("attacked sleeping player ", "alignment.deed_attacked_sleeping_player"),
+            ("attacked sleeping ", "alignment.deed_attacked_sleeping"),
+            ("desecrated altar of ", "alignment.deed_desecrated_altar"),
+            ("Pilgrimage to ", "alignment.deed_pilgrimage"),
+        };
+
+        /// <summary>
+        /// v1.2.5: the deed the alignment news names, in the writer's language, or null when the reason is a
+        /// tag the callers use only for bookkeeping ("castle.knighthood", "spared_npc_in_pvp"): the news printed
+        /// such tags as the deed. A reason not listed is shown as given.
+        /// </summary>
+        internal static string? DeedLabel(string reason)
+        {
+            if (string.IsNullOrWhiteSpace(reason)) return null;
+            if (DeedKeys.TryGetValue(reason, out var key)) return Loc.Get(key);
+            foreach (var (prefix, prefixKey) in DeedPrefixes)
+                if (reason.StartsWith(prefix, StringComparison.Ordinal) && reason.Length > prefix.Length)
+                    return Loc.Get(prefixKey, reason.Substring(prefix.Length));
+            if (!reason.Contains(' ') && (reason.Contains('.') || reason.Contains('_'))) return null;
+            return reason;
+        }
+
         /// <summary>
         /// Apply alignment change with news generation
         /// </summary>
@@ -418,10 +470,15 @@ namespace UsurperRemake.Systems
                 var newsSystem = NewsSystem.Instance;
                 if (newsSystem != null)
                 {
+                    string? deed = DeedLabel(reason);
                     if (chivalryChange >= 20)
-                        newsSystem.Newsy(true, $"{character.Name} performed a noble deed: {reason}");
+                        newsSystem.Newsy(true, deed != null
+                            ? Loc.Get("alignment.news_noble_deed", character.Name, deed)
+                            : Loc.Get("alignment.news_noble_deed_plain", character.Name));
                     else if (darknessChange >= 20)
-                        newsSystem.Newsy(true, $"{character.Name} committed a dark act: {reason}");
+                        newsSystem.Newsy(true, deed != null
+                            ? Loc.Get("alignment.news_dark_act", character.Name, deed)
+                            : Loc.Get("alignment.news_dark_act_plain", character.Name));
                 }
             }
         }

@@ -1081,6 +1081,10 @@ namespace UsurperRemake.Systems
             EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
             RenameCaseVariantTeams();                    // v1.1.14
 
+            EnsureMailUpkeepTables(connection);                       // 1.2.5
+            PurgeWorldBossMailOnce();                                 // 1.2.5: once per database
+            PruneOldSystemMail(GameConfig.SystemMailKeepDays);        // 1.2.5: also at the world-sim daily reset
+
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
         }
 
@@ -2160,7 +2164,7 @@ namespace UsurperRemake.Systems
                                 TurnsRemaining = saveData.Player.TurnsRemaining,
                                 FileName = reader.GetString(0), // username as "filename"
                                 IsAutosave = false,
-                                SaveType = "Online Save"
+                                SaveType = Loc.Get("save.type_online")
                             });
                         }
                     }
@@ -2209,7 +2213,7 @@ namespace UsurperRemake.Systems
                                 TurnsRemaining = saveData.Player.TurnsRemaining,
                                 FileName = playerName,
                                 IsAutosave = false,
-                                SaveType = "Online Save"
+                                SaveType = Loc.Get("save.type_online")
                             });
                         }
                     }
@@ -5066,42 +5070,50 @@ namespace UsurperRemake.Systems
             return rows;
         }
 
-        public async Task<(bool success, string message)> RegisterPlayer(string username, string password, string? ipAddress = null)
+        /// <summary>
+        /// v1.2.5: an account message in <paramref name="lang"/> (the login gate's language, before a
+        /// session exists), or in the session's language when it is null.
+        /// </summary>
+        private static string AuthText(string? lang, string key, params object[] args) =>
+            Loc.GetIn(string.IsNullOrEmpty(lang) ? GameConfig.Language : lang, key, args);
+
+        public async Task<(bool success, string message)> RegisterPlayer(string username, string password, string? ipAddress = null, string? lang = null)
         {
+            string T(string key, params object[] args) => AuthText(lang, key, args);
             // v1.1.1: the relay and desktop clients send AUTH:user:password:type; a colon in the
             // password split that line wrong and locked the account out of every relay login.
             if (password != null && password.Contains(':'))
-                return (false, "Password cannot contain ':'.");
+                return (false, T("auth.err_password_colon"));
             // v0.60.5: full ban means no new accounts from this IP either. Same
             // defense-in-depth pattern as AuthenticatePlayer.
             if (!string.IsNullOrWhiteSpace(ipAddress) && IsIpBanned(ipAddress))
             {
-                return (false, "Registration refused: this address is banned from the server.");
+                return (false, T("auth.err_register_ip_banned"));
             }
 
             try
             {
                 if (string.IsNullOrWhiteSpace(username) || username.Length < 2 || username.Length > 20)
-                    return (false, "Username must be 2-20 characters.");
+                    return (false, T("auth.err_username_len"));
 
                 if (password.Length < 4)
-                    return (false, "Password must be at least 4 characters.");
+                    return (false, T("auth.err_password_len"));
 
                 // (reserved-name gate is applied with the other name rules below)
 
                 // Block reserved alt character suffix
                 if (username.Contains(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase))
-                    return (false, "Username contains reserved characters.");
+                    return (false, T("auth.err_username_reserved_chars"));
 
                 // Block the Implementor account (security audit F1, v0.65.14)
                 if (IsReservedUsername(username))
-                    return (false, "That username is reserved.");
+                    return (false, T("auth.err_username_reserved"));
 
                 // Check for valid characters (alphanumeric, spaces, hyphens, underscores)
                 foreach (char c in username)
                 {
                     if (!char.IsLetterOrDigit(c) && c != ' ' && c != '-' && c != '_')
-                        return (false, "Username can only contain letters, numbers, spaces, hyphens, and underscores.");
+                        return (false, T("auth.err_username_chars"));
                 }
 
                 using var connection = OpenConnection();
@@ -5113,7 +5125,7 @@ namespace UsurperRemake.Systems
                     checkCmd.Parameters.AddWithValue("@username", username);
                     var count = Convert.ToInt64(await checkCmd.ExecuteScalarAsync());
                     if (count > 0)
-                        return (false, "That username is already taken.");
+                        return (false, T("auth.err_username_taken"));
                 }
 
                 // v0.60.5: per-IP registration rate limit. Loopback skipped so
@@ -5133,7 +5145,7 @@ namespace UsurperRemake.Systems
                     {
                         DebugLogger.Instance.LogWarning("BAN",
                             $"Registration rate-limited for IP {ipAddress}: {recentCount} accounts in last 24h (cap {GameConfig.MaxRegistrationsPerIpPer24h})");
-                        return (false, "Too many accounts registered from this address recently. Try again tomorrow.");
+                        return (false, T("auth.err_register_rate"));
                     }
                 }
 
@@ -5146,7 +5158,7 @@ namespace UsurperRemake.Systems
                     {
                         var count = Convert.ToInt64(await banCmd.ExecuteScalarAsync());
                         if (count > 0)
-                            return (false, "That username is not available.");
+                            return (false, T("auth.err_username_unavailable"));
                     }
                     catch { /* banned_names table may not exist yet, that's fine */ }
                 }
@@ -5173,7 +5185,7 @@ namespace UsurperRemake.Systems
                     "account_created",
                     UsurperRemake.Server.SessionContext.Current?.ConnectionType);
 
-                return (true, "Account created successfully!");
+                return (true, T("auth.account_created"));
             }
             catch (Exception ex)
             {
@@ -5185,10 +5197,10 @@ namespace UsurperRemake.Systems
                 if (ex.Message.Contains("UNIQUE constraint failed"))
                 {
                     DebugLogger.Instance.LogInfo("SQL", $"Registration rejected (name already taken): {ex.Message}");
-                    return (false, "That name is already taken. Please choose a different name.");
+                    return (false, T("auth.err_name_taken"));
                 }
                 DebugLogger.Instance.LogError("SQL", $"Failed to register player: {ex.Message}");
-                return (false, "Registration failed. Please try again.");
+                return (false, T("auth.err_register_failed"));
             }
         }
 
@@ -5215,26 +5227,27 @@ namespace UsurperRemake.Systems
                 StringComparison.OrdinalIgnoreCase);
         }
 
-        public async Task<(bool success, string message)> AutoProvisionPlayer(string username)
+        public async Task<(bool success, string message)> AutoProvisionPlayer(string username, string? lang = null)
         {
+            string T(string key, params object[] args) => AuthText(lang, key, args);
             try
             {
                 if (string.IsNullOrWhiteSpace(username) || username.Length < 2 || username.Length > 20)
-                    return (false, "Username must be 2-20 characters.");
+                    return (false, T("auth.err_username_len"));
 
                 // Block reserved alt character suffix
                 if (username.Contains(GameConfig.AltCharacterSuffix, StringComparison.OrdinalIgnoreCase))
-                    return (false, "Username contains reserved characters.");
+                    return (false, T("auth.err_username_reserved_chars"));
 
                 // Block the Implementor account (security audit F1, v0.65.14)
                 if (IsReservedUsername(username))
-                    return (false, "That username is reserved.");
+                    return (false, T("auth.err_username_reserved"));
 
                 // Check for valid characters (alphanumeric, spaces, hyphens, underscores)
                 foreach (char c in username)
                 {
                     if (!char.IsLetterOrDigit(c) && c != ' ' && c != '-' && c != '_')
-                        return (false, "Username can only contain letters, numbers, spaces, hyphens, and underscores.");
+                        return (false, T("auth.err_username_chars"));
                 }
 
                 using var connection = OpenConnection();
@@ -5246,7 +5259,7 @@ namespace UsurperRemake.Systems
                     checkCmd.Parameters.AddWithValue("@username", username);
                     var count = Convert.ToInt64(await checkCmd.ExecuteScalarAsync());
                     if (count > 0)
-                        return (true, "Account already exists."); // Not an error — just means no provisioning needed
+                        return (true, T("auth.account_exists")); // Not an error: just means no provisioning needed
                 }
 
                 // Check if banned
@@ -5258,7 +5271,7 @@ namespace UsurperRemake.Systems
                     {
                         var count = Convert.ToInt64(await banCmd.ExecuteScalarAsync());
                         if (count > 0)
-                            return (false, "That username is not available.");
+                            return (false, T("auth.err_username_unavailable"));
                     }
                     catch { /* banned_names table may not exist yet, that's fine */ }
                 }
@@ -5274,12 +5287,12 @@ namespace UsurperRemake.Systems
                 await insertCmd.ExecuteNonQueryAsync();
 
                 DebugLogger.Instance.LogInfo("SQL", $"Auto-provisioned account: '{username}'");
-                return (true, "Account auto-provisioned.");
+                return (true, T("auth.account_provisioned"));
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to auto-provision player: {ex.Message}");
-                return (false, "Account creation failed. Please try again.");
+                return (false, T("auth.err_create_failed"));
             }
         }
 
@@ -5309,8 +5322,9 @@ namespace UsurperRemake.Systems
             }
         }
 
-        public async Task<(bool success, string displayName, string message, bool screenReader, string language)> AuthenticatePlayer(string username, string password, string? ipAddress = null)
+        public async Task<(bool success, string displayName, string message, bool screenReader, string language)> AuthenticatePlayer(string username, string password, string? ipAddress = null, string? lang = null)
         {
+            string T(string key, params object[] args) => AuthText(lang, key, args);
             // v0.60.5: defense-in-depth IP check. The MudServer accept-time check
             // should already drop banned-IP connections before they reach this
             // method, but adding it here protects any future code path that
@@ -5318,7 +5332,7 @@ namespace UsurperRemake.Systems
             // gate (e.g., a new SSH gateway, an HTTP login endpoint).
             if (!string.IsNullOrWhiteSpace(ipAddress) && IsIpBanned(ipAddress))
             {
-                return (false, "", "Login refused: this address is banned from the server.", false, "en");
+                return (false, "", T("auth.err_login_ip_banned"), false, "en");
             }
 
             try
@@ -5330,7 +5344,7 @@ namespace UsurperRemake.Systems
 
                 using var reader = await cmd.ExecuteReaderAsync();
                 if (!await reader.ReadAsync())
-                    return (false, "", "Unknown username. Type 'R' to register a new account.", false, "en");
+                    return (false, "", T("auth.err_unknown_username"), false, "en");
 
                 string displayName = reader.GetString(0);
                 string storedHash = reader.GetString(1);
@@ -5341,40 +5355,41 @@ namespace UsurperRemake.Systems
 
                 if (isBanned)
                 {
-                    string msg = "Your account has been banned.";
+                    string msg = T("auth.err_account_banned");
                     if (!string.IsNullOrEmpty(banReason))
-                        msg += $" Reason: {banReason}";
+                        msg += " " + T("auth.err_ban_reason", banReason); // the reason is the admin's own text
                     return (false, "", msg, false, "en");
                 }
 
                 if (!VerifyPassword(password, storedHash))
-                    return (false, "", "Incorrect password.", false, "en");
+                    return (false, "", T("auth.err_wrong_password"), false, "en");
 
-                return (true, displayName, "Login successful!", screenReader, language);
+                return (true, displayName, T("auth.login_ok"), screenReader, language);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to authenticate player: {ex.Message}");
-                return (false, "", "Authentication failed. Please try again.", false, "en");
+                return (false, "", T("auth.err_auth_failed"), false, "en");
             }
         }
 
         /// <summary>
         /// Change a player's password. Returns true if successful.
         /// </summary>
-        public async Task<(bool success, string message)> ChangePassword(string username, string oldPassword, string newPassword)
+        public async Task<(bool success, string message)> ChangePassword(string username, string oldPassword, string newPassword, string? lang = null)
         {
+            string T(string key, params object[] args) => AuthText(lang, key, args);
             try
             {
                 if (newPassword != null && newPassword.Contains(':'))
-                    return (false, "Password cannot contain ':'."); // v1.1.1: the relay/desktop AUTH line splits on ':'
+                    return (false, T("auth.err_password_colon")); // v1.1.1: the relay/desktop AUTH line splits on ':'
                 // Verify old password first
-                var (authenticated, _, _, _, _) = await AuthenticatePlayer(username, oldPassword);
+                var (authenticated, _, _, _, _) = await AuthenticatePlayer(username, oldPassword, null, lang);
                 if (!authenticated)
-                    return (false, "Current password is incorrect.");
+                    return (false, T("auth.err_current_password"));
 
                 if (newPassword.Length < 4)
-                    return (false, "New password must be at least 4 characters.");
+                    return (false, T("auth.err_new_password_len"));
 
                 string newHash = HashPassword(newPassword);
                 using var connection = OpenConnection();
@@ -5385,12 +5400,12 @@ namespace UsurperRemake.Systems
                 await cmd.ExecuteNonQueryAsync();
 
                 DebugLogger.Instance.LogInfo("SQL", $"Password changed for: '{username}'");
-                return (true, "Password changed successfully!");
+                return (true, T("auth.password_changed"));
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to change password: {ex.Message}");
-                return (false, "Password change failed. Please try again.");
+                return (false, T("auth.err_password_change_failed"));
             }
         }
 
@@ -5645,8 +5660,8 @@ namespace UsurperRemake.Systems
                 {
                     entries.Add(new PvPLogEntry
                     {
-                        AttackerName = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0),
-                        DefenderName = reader.IsDBNull(1) ? "Unknown" : reader.GetString(1),
+                        AttackerName = reader.IsDBNull(0) ? Loc.Get("combat.unknown_name") : reader.GetString(0),
+                        DefenderName = reader.IsDBNull(1) ? Loc.Get("combat.unknown_name") : reader.GetString(1),
                         WinnerUsername = reader.GetString(2),
                         GoldStolen = reader.GetInt64(3),
                         AttackerLevel = reader.GetInt32(4),
@@ -6010,8 +6025,8 @@ namespace UsurperRemake.Systems
                 {
                     entries.Add(new PvPLogEntry
                     {
-                        AttackerName = reader.IsDBNull(0) ? "Unknown" : reader.GetString(0),
-                        DefenderName = reader.IsDBNull(1) ? "Unknown" : reader.GetString(1),
+                        AttackerName = reader.IsDBNull(0) ? Loc.Get("combat.unknown_name") : reader.GetString(0),
+                        DefenderName = reader.IsDBNull(1) ? Loc.Get("combat.unknown_name") : reader.GetString(1),
                         WinnerUsername = reader.GetString(2),
                         GoldStolen = reader.GetInt64(3),
                         AttackerLevel = reader.GetInt32(4),
@@ -7602,6 +7617,10 @@ namespace UsurperRemake.Systems
         catch { return 0; }
     }
 
+    /// <summary>v1.2.5: the mail a sender gets when an unclaimed trade package expires, in <paramref name="lang"/>.</summary>
+    internal static string TradeExpiredMail(string lang, long gold, bool hasItems) =>
+        Loc.GetIn(lang, hasItems ? "mail.trade_expired_items" : "mail.trade_expired_gold", $"{gold:N0}");
+
     public async Task ExpireOldTradeOffers()
     {
         try
@@ -7635,10 +7654,8 @@ namespace UsurperRemake.Systems
                 if (!string.IsNullOrEmpty(itemsJson) && itemsJson != "[]")
                     await AddItemsToPlayerSave(fromPlayer, itemsJson);
                 bool hasItems = !string.IsNullOrEmpty(itemsJson) && itemsJson != "[]";
-                string returnMsg = hasItems
-                    ? $"Your trade package expired. {gold:N0} gold and items returned."
-                    : $"Your trade package expired and {gold:N0} gold was returned.";
-                await SendMessage("System", fromPlayer, "trade", returnMsg);
+                // v1.2.5: from_player is the sender's save key; the mail is written in that player's language
+                await SendMessageToKeyLocalized("System", fromPlayer, "trade", lang => TradeExpiredMail(lang, gold, hasItems));
             }
         }
         catch (Exception ex)

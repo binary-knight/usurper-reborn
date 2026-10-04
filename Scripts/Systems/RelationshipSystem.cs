@@ -362,19 +362,19 @@ public partial class RelationshipSystem
         // Can't marry yourself
         if (character1 == character2 || character1.Name == character2.Name)
         {
-            message = "You cannot marry yourself!";
+            message = Loc.Get("relationship.marry_self");
             return false;
         }
 
         // Check if either character is permanently dead (IsDead is on NPC/Player, not base Character)
         if (character1 is NPC deadCheck1 && deadCheck1.IsDead)
         {
-            message = $"{character1.Name} has passed away and cannot marry.";
+            message = Loc.Get("relationship.marry_dead", character1.Name);
             return false;
         }
         if (character2 is NPC deadCheck2 && deadCheck2.IsDead)
         {
-            message = $"{character2.Name} has passed away and cannot marry.";
+            message = Loc.Get("relationship.marry_dead", character2.Name);
             return false;
         }
 
@@ -399,13 +399,13 @@ public partial class RelationshipSystem
         // Check marriage prerequisites
         if (character1.Age < GameConfig.MinimumAgeToMarry || character2.Age < GameConfig.MinimumAgeToMarry)
         {
-            message = "Both parties must be at least 18 years old to marry!";
+            message = Loc.Get("relationship.marry_age", GameConfig.MinimumAgeToMarry);
             return false;
         }
 
         if (GetSpouseName(character1) != "" || GetSpouseName(character2) != "")
         {
-            message = "One or both parties are already married!";
+            message = Loc.Get("relationship.marry_already");
             return false;
         }
 
@@ -420,14 +420,14 @@ public partial class RelationshipSystem
         // Both must be in love to marry
         if (relation.Relation1 != GameConfig.RelationLove || relation.Relation2 != GameConfig.RelationLove)
         {
-            message = "You both need to be in love with each other to marry!";
+            message = Loc.Get("relationship.marry_not_in_love");
             return false;
         }
 
         // Check if marriage is banned
         if (relation.BannedMarry)
         {
-            message = "Marriage between these characters has been banned by the King!";
+            message = Loc.Get("relationship.marry_banned");
             return false;
         }
 
@@ -440,7 +440,7 @@ public partial class RelationshipSystem
         if (daysSinceRelationshipStart < GameConfig.MinDaysBeforeMarriage)
         {
             int daysRemaining = GameConfig.MinDaysBeforeMarriage - daysSinceRelationshipStart;
-            message = $"Your relationship is too new! Wait {daysRemaining} more day{(daysRemaining > 1 ? "s" : "")} before proposing.";
+            message = Loc.Get(daysRemaining > 1 ? "relationship.marry_too_new_days" : "relationship.marry_too_new_day", daysRemaining);
             return false;
         }
 
@@ -510,24 +510,24 @@ public partial class RelationshipSystem
         if (OnlineStateManager.IsActive)
         {
             _ = OnlineStateManager.Instance!.AddNews(
-                $"{character1.Name} and {character2.Name} have been wed! Congratulations!", "romance");
+                Loc.Get("family.news_wed", character1.Name, character2.Name), "romance");
         }
 
         // Generate wedding announcement
         var weddingMsgs = GameConfig.GetWeddingCeremonyMessages(); var ceremonyMessage = weddingMsgs[_random.Next(weddingMsgs.Length)];
 
-        message = $"Wedding Ceremony Complete!\n" +
-                 $"{character1.Name} and {character2.Name} are now married!\n" +
-                 $"{ceremonyMessage}";
+        message = Loc.Get("relationship.wedding_complete") + "\n" +
+                 Loc.Get("relationship.now_married", character1.Name, character2.Name) + "\n" +
+                 ceremonyMessage;
 
         // Handle different-sex vs same-sex marriages
         if (character1.Sex != character2.Sex)
         {
-            message += "\nCongratulations! (go home and make babies)";
+            message += "\n" + Loc.Get("relationship.congrats_make_babies");
         }
         else
         {
-            message += "\nCongratulations! (go home and adopt babies)";
+            message += "\n" + Loc.Get("relationship.congrats_adopt_babies");
         }
 
         // Generate marriage news for the realm
@@ -549,14 +549,14 @@ public partial class RelationshipSystem
         
         if (!AreMarried(character1, character2))
         {
-            message = "You are not married to this person!";
+            message = Loc.Get("relationship.divorce_not_married");
             return false;
         }
         
         var relation = GetRelationship(character1, character2);
         if (relation == null)
         {
-            message = "No relationship record found!";
+            message = Loc.Get("relationship.divorce_no_record");
             return false;
         }
         
@@ -564,15 +564,15 @@ public partial class RelationshipSystem
         string durationMessage;
         if (relation.MarriedDays < 1)
         {
-            durationMessage = "Their marriage lasted only a couple of hours!";
+            durationMessage = Loc.Get("relationship.lasted_hours");
         }
         else if (relation.MarriedDays < 30)
         {
-            durationMessage = $"Their marriage lasted only {relation.MarriedDays} days.";
+            durationMessage = Loc.Get("relationship.lasted_only_days", relation.MarriedDays);
         }
         else
         {
-            durationMessage = $"Their marriage lasted {relation.MarriedDays} days.";
+            durationMessage = Loc.Get("relationship.lasted_days", relation.MarriedDays);
         }
         
         // Update relationship status — both parties are hurt by divorce
@@ -606,10 +606,10 @@ public partial class RelationshipSystem
         // Handle child custody (children go to character2 - the spouse)
         HandleChildCustodyAfterDivorce(character1, character2);
         
-        message = $"Divorce Finalized!\n" +
-                 $"{character1.Name} divorced {character2.Name}!\n" +
-                 $"{durationMessage}\n" +
-                 $"You have lost custody of your children!";
+        message = Loc.Get("relationship.divorce_finalized") + "\n" +
+                 Loc.Get("relationship.divorced", character1.Name, character2.Name) + "\n" +
+                 durationMessage + "\n" +
+                 Loc.Get("relationship.lost_custody");
 
         // Generate divorce news for the realm
         NewsSystem.Instance?.WriteDivorceNews(character1.Name, character2.Name);
@@ -652,8 +652,8 @@ public partial class RelationshipSystem
                 if (relation.Relation1 == GameConfig.RelationMarried &&
                     relation.Relation2 == GameConfig.RelationMarried)
                 {
-                    string duration = relation.MarriedDays == 1 ? "day" : "days";
-                    couples.Add($"{relation.Name1} and {relation.Name2} have been married for {relation.MarriedDays} {duration}.");
+                    couples.Add(Loc.Get(relation.MarriedDays == 1 ? "relationship.couple_married_day" : "relationship.couple_married_days",
+                        relation.Name1, relation.Name2, relation.MarriedDays));   // v1.2.5: shown at once (Love Corner), not stored
                 }
             }
         }
@@ -988,7 +988,8 @@ public partial class RelationshipSystem
         int totalChildren = parent1Kids + parent2Kids;
         if (totalChildren > 0)
         {
-            NewsSystem.Instance?.Newsy(true, $"{parent1.Name} was awarded custody of {parent1Kids} child{(parent1Kids != 1 ? "ren" : "")} in the divorce from {parent2.Name}.");
+            NewsSystem.Instance?.Newsy(true, Loc.Get(parent1Kids == 1 ? "family.news_custody_awarded_one" : "family.news_custody_awarded_many",
+                parent1.Name, parent1Kids, parent2.Name));
         }
     }
     
@@ -1054,31 +1055,20 @@ public partial class RelationshipSystem
     /// </summary>
     private static string GetProposalRejectionMessage(NPC npc, int acceptanceChance)
     {
-        string name = npc.Name2 ?? npc.Name ?? "They";
-        string pronoun = npc.Sex == CharacterSex.Female ? "she" : "he";
+        string name = npc.Name2 ?? npc.Name ?? Loc.Get("relationship.they");
+        string sex = npc.Sex == CharacterSex.Female ? "f" : "m";
 
-        // Low acceptance = strong rejection
-        if (acceptanceChance < 30)
-        {
-            return $"{name} looks uncomfortable and steps back.\n" +
-                   $"\"I... I'm sorry, but I'm not ready for that kind of commitment.\"\n" +
-                   $"{GameConfig.CapitalizeFirst(pronoun)} needs more time.";
-        }
-        // Medium acceptance = hesitant rejection
-        else if (acceptanceChance < 50)
-        {
-            return $"{name} takes your hands gently but {pronoun} eyes are uncertain.\n" +
-                   $"\"I care about you deeply, but... not yet. Let's give it more time.\"\n" +
-                   $"Perhaps try again when your bond is stronger.";
-        }
-        // High acceptance = close call rejection
-        else
-        {
-            return $"{name} hesitates, clearly tempted.\n" +
-                   $"\"Ask me again soon... I just need a little more time.\"\n" +
-                   $"You sense {pronoun}'s close to saying yes.";
-        }
+        // Low acceptance = strong rejection; medium = hesitant; high = a close call.
+        // v1.2.5: one key per line and gender (the English medium line read "but she eyes"; it is "her eyes" now)
+        string level = acceptanceChance < 30 ? "low" : acceptanceChance < 50 ? "mid" : "high";
+        return Loc.Get($"relationship.reject_{level}_1.{sex}", name) + "\n" +
+               Loc.Get($"relationship.reject_{level}_2") + "\n" +
+               Loc.Get($"relationship.reject_{level}_3.{sex}");
     }
+
+    /// <summary>v1.2.5: a marriage or divorce message as screen rows of at most `width` columns.</summary>
+    public static List<string> MessageRows(string message, int width = 79) =>
+        UsurperRemake.UI.UIHelper.WordWrap(message, width);
 
     #region Serialization
 
