@@ -48,20 +48,18 @@ An immortal main character keeps slot 1 and is marked [IMMORTAL] on the characte
 
 After you log in, the character screen lists your characters with level, class and the time last played, then these keys:
 
-| Key | Action |
-| --- | --- |
-| 1 | Play your main character |
-| 2 | Play your alt character |
-| M | Create Alt Character, when the slot is open |
-| D | Delete Alt Character |
-| N | Create your main character, or replace it |
-| I, H, B, C | The story so far, Usurper history, the BBS and server list, credits |
-| A | Screen reader mode on or off |
-| Z | Compact mode on or off |
-| S | Spectate a player |
-| G | Language |
-| P | Change password |
-| Q | Quit |
+- **1**: Play your main character
+- **2**: Play your alt character
+- **M**: Create Alt Character, when the slot is open
+- **D**: Delete Alt Character
+- **N**: Create your main character, or replace it
+- **I, H, B, C**: The story so far, Usurper history, the BBS and server list, credits
+- **A**: Screen reader mode on or off
+- **Z**: Compact mode on or off
+- **S**: Spectate a player
+- **G**: Language
+- **P**: Change password
+- **Q**: Quit
 
 Keys appear only when they apply: 2 and D need an alt, M needs an open slot, S and P need a connection to a game server. Pressing Enter alone plays your main character, or your alt if you only have an alt, or starts creation if you have neither.
 
@@ -75,16 +73,14 @@ Screen reader, compact mode and language chosen here apply to the session. A new
 
 A local game has no account and no login. The main menu offers:
 
-| Key | Action |
-| --- | --- |
-| S | Single-player: choose or create a character |
-| O | Online Multiplayer |
-| G | Game editor |
-| I, H, B, C | The story so far, Usurper history, the BBS and server list, credits |
-| A | Screen reader mode on or off |
-| Z | Compact mode on or off |
-| L | Language |
-| Q | Quit |
+- **S**: Single-player, to choose or create a character
+- **O**: Online Multiplayer
+- **G**: Game editor
+- **I, H, B, C**: The story so far, Usurper history, the BBS and server list, credits
+- **A**: Screen reader mode on or off
+- **Z**: Compact mode on or off
+- **L**: Language
+- **Q**: Quit
 
 There is no fixed number of characters. S lists every character saved on this computer, and N creates another under any name not already used (capitalization does not matter). With no saves at all, S goes straight to creation. Choosing a character lists its saves, autosaves and manual saves, up to 10, and loads the one you pick. A save the game cannot read is marked and opens a recovery menu instead.
 
@@ -102,35 +98,31 @@ This section is for people who run their own game: a BBS sysop, a private server
 
 Command line flags:
 
-| Flag | Effect | Default |
-| --- | --- | --- |
-| `--local` | Local session with no BBS | |
-| `--door`, `--door32`, `--doorsys`, `--node` | Run as a BBS door from a drop file; turns on online mode | |
-| `--online` | Online mode with the shared database | off |
-| `--user <name>` | Account name for the session, for an SSH ForceCommand setup | in-game login |
-| `--db <path>` | Database file | `usurper_online.db` next to the program |
-| `--mud-server` | Run the multiplayer game server | |
-| `--mud-port <port>` | Game server port | 4000 |
-| `--mud-relay` | Relay used as the SSH gateway command | |
-| `--admin <name>` | Gives a username full admin rights on the game server; repeatable | none |
-| `--auto-provision` | Creates accounts for password-less logins from the local machine | off |
-| `--sysop-level <n>` | BBS security level that opens the SysOp console | 100 |
-| `--idle-timeout <min>` | Idle disconnect, 1 to 60 minutes | 15 |
-| `--screen-reader` | Start in screen reader mode | off |
-| `--worldsim`, `--no-worldsim`, `--sim-interval`, `--npc-xp`, `--save-interval` | Background world simulation | |
-| `--editor` | Open the game editor | |
+- `--local`: Local session with no BBS
+- `--door`, `--door32`, `--doorsys`, `--node`: Run as a BBS door from a drop file; turns on online mode
+- `--online`: Online mode with the shared database (default off)
+- `--user <name>`: Account name for the session, for an SSH ForceCommand setup (default in-game login)
+- `--db <path>`: Database file (default `usurper_online.db` next to the program)
+- `--mud-server`: Run the multiplayer game server
+- `--mud-port <port>`: Game server port (default 4000)
+- `--mud-relay`: Relay used as the SSH gateway command
+- `--admin <name>`: Gives a username full admin rights on the game server; repeatable (default none)
+- `--auto-provision`: Creates accounts for password-less logins from the local machine (default off)
+- `--sysop-level <n>`: BBS security level that opens the SysOp console (default 100)
+- `--idle-timeout <min>`: Idle disconnect, 1 to 60 minutes (default 15)
+- `--screen-reader`: Start in screen reader mode (default off)
+- `--worldsim`, `--no-worldsim`, `--sim-interval`, `--npc-xp`, `--save-interval`: Background world simulation
+- `--editor`: Open the game editor
 
 The built-in help, `--help`, lists the door and online flags. Password-less logins are accepted only from the same machine.
 
-A multiplayer server keeps its settings in the game database and the admin dashboard edits them. The keys and defaults:
+A multiplayer server keeps its settings in the game database and the admin dashboard edits them. The settings and defaults:
 
-| Setting | Default | Range |
-| --- | --- | --- |
-| Starting resurrections for new characters | 3 | 0 to 99 |
-| Online permadeath | on | |
-| XP, gold, monster HP and monster damage multipliers | 1.0 | 0.1 to 10.0 |
-| Disable online play | off | |
-| Idle timeout in minutes | 15 | 1 to 60 |
-| Message of the day | the default greeting | up to 500 characters |
+- Starting resurrections for new characters: default 3, 0 to 99
+- Online permadeath: default on
+- XP, gold, monster HP and monster damage multipliers: default 1.0, 0.1 to 10.0
+- Disable online play: default off
+- Idle timeout in minutes: default 15, 1 to 60
+- Message of the day: the default greeting, up to 500 characters
 
 A local game that is not in online mode reads `sysop_config.json` from its save folder. Its fields and defaults: message of the day, daily turns 325 (1 to 9999), the four multipliers at 1.0 (0.1 to 10.0), maximum dungeon level 100 (1 to 100), SysOp security level 100 (1 to 255), idle timeout 15, default color theme, disable online play off, screen reader off, and the online server address and port that O offers first. Online and BBS door games skip this file and use the database settings.
