@@ -656,10 +656,10 @@ namespace UsurperRemake.Systems
                 // Prune old news with per-category caps (NPC news doesn't evict player news)
                 await sqlBackend.PruneAllNews(hoursToKeep: 48, maxNpcNews: 500, maxPlayerNews: 200);
 
-                // Prune combat telemetry. v0.65.3: non-deaths kept 14 days / 5000 rows; deaths kept
+                // Prune combat telemetry. 1.2.6: non-deaths kept 30 days / 15000 rows; deaths kept
                 // 90 days and exempt from the row cap so victories can't evict them (the bug that
                 // made the table report 3 deaths when saves had 63).
-                await sqlBackend.PruneCombatEvents(daysToKeep: 14, maxRows: 5000, deathDaysToKeep: 90);
+                await sqlBackend.PruneCombatEvents();
 
                 // Clean up orphaned data from deleted players
                 await sqlBackend.PruneOrphanedPlayerData();
