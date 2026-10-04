@@ -1705,7 +1705,7 @@ namespace UsurperRemake.Systems
                 if (result.Success)
                 {
                     terminal.SetColor("bright_cyan");
-                    terminal.WriteLine($"  {result.Message}");
+                    foreach (var row in SpellSystem.MessageRows(result.Message, 77)) terminal.WriteLine($"  {row}");   // v1.2.5: fits 79 columns
 
                     long spellDamage = result.Damage;
 
@@ -1749,7 +1749,7 @@ namespace UsurperRemake.Systems
                 else
                 {
                     terminal.SetColor("red");
-                    terminal.WriteLine($"  {result.Message}");
+                    foreach (var row in SpellSystem.MessageRows(result.Message, 77)) terminal.WriteLine($"  {row}");   // v1.2.5: fits 79 columns
                     return 0;
                 }
             }
@@ -1925,7 +1925,7 @@ namespace UsurperRemake.Systems
                     if (result.Success)
                     {
                         terminal.SetColor("bright_yellow");
-                        terminal.WriteLine($"  {result.Message}");
+                        foreach (var row in SpellSystem.MessageRows(result.Message, 77)) terminal.WriteLine($"  {row}");   // v1.2.5: fits 79 columns
 
                         if (result.CooldownApplied > 0)
                             cooldowns[selected.ability.Id] = result.CooldownApplied;
@@ -1950,7 +1950,7 @@ namespace UsurperRemake.Systems
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine($"  {result.Message}");
+                        foreach (var row in SpellSystem.MessageRows(result.Message, 77)) terminal.WriteLine($"  {row}");   // v1.2.5: fits 79 columns
                     }
                 }
             }

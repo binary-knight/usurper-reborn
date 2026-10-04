@@ -17629,28 +17629,19 @@ public partial class CombatEngine
                 || (action.HealTargetOverride != null && action.HealTargetOverride != player))
             && (spellInfo.SpellType == "Heal" || spellInfo.SpellType == "Buff"))
         {
-            // Keep incantation + CRITICAL CAST, strip spell-specific effect message
-            int critIdx = displayMsg.IndexOf("CRITICAL CAST!");
-            if (critIdx >= 0)
-            {
-                displayMsg = displayMsg.Substring(0, critIdx + "CRITICAL CAST!".Length);
-            }
-            else
-            {
-                // Cut after magic words: "'!" marks end of incantation
-                int magicEnd = displayMsg.IndexOf("'!");
-                if (magicEnd >= 0)
-                    displayMsg = displayMsg.Substring(0, magicEnd + 2);
-            }
+            // Keep the incantation and the critical tag, strip the spell-specific effect message
+            // (v1.2.5: from the result's CastLine, not by searching the shown text)
+            if (spellResult.Success && spellResult.CastLine.Length > 0)
+                displayMsg = spellResult.CastLine;
         }
-        terminal.WriteLine(displayMsg);
+        foreach (var row in SpellSystem.MessageRows(displayMsg)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
         await Pacing.Wait(GetCombatDelay(1000));
 
         // Only apply effects if spell succeeded (not fumbled/failed)
         if (!spellResult.Success)
         {
             // Don't show training advice for cooldown blocks — the player knows why it failed
-            if (spellResult.SpecialEffect != "fail" || !spellResult.Message.Contains("recovered"))
+            if (!spellResult.CooldownBlocked)
             {
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("combat.spell_no_effect"));
@@ -18791,7 +18782,7 @@ public partial class CombatEngine
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("combat.cast_spell_on_ally", selectedSpell.DisplayName, targetAlly.DisplayName));
-            terminal.WriteLine(spellResult.Message);
+            foreach (var row in SpellSystem.MessageRows(spellResult.Message)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
             if (spellResult.Success && spellResult.Healing > 0)
             {
@@ -26666,7 +26657,7 @@ public partial class CombatEngine
         }
 
         var spellResult = SpellSystem.CastSpell(attacker, chosen.Level, defender);
-        terminal.WriteLine(spellResult.Message, "magenta");
+        foreach (var row in SpellSystem.MessageRows(spellResult.Message)) terminal.WriteLine(row, "magenta");   // v1.2.5: fits 79 columns
 
         if (spellResult.Success)
         {
@@ -27019,7 +27010,7 @@ public partial class CombatEngine
             {
                 var chosen = spells[random.Next(spells.Count)];
                 var spellResult = SpellSystem.CastSpell(computer, chosen.Level, opponent);
-                terminal.WriteLine(spellResult.Message, "magenta");
+                foreach (var row in SpellSystem.MessageRows(spellResult.Message)) terminal.WriteLine(row, "magenta");   // v1.2.5: fits 79 columns
                 // Apply healing/self-buffs via the Monster path (null target = no damage
                 // lands there), then PvP special effects on the opponent. Attack damage
                 // must be applied here directly -- ApplySpellEffects only damages Monster

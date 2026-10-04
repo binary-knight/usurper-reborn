@@ -359,8 +359,6 @@ names|Scripts/Systems/NPCSpawnSystem.cs|=npc.CurrentLocation|place name, also a 
 table|Scripts/Systems/RelationshipSystem.cs|decl:name|fallback in proposal text
 table|Scripts/Systems/RelationshipSystem.cs|=durationMessage|divorce message
 table|Scripts/Systems/RelationshipSystem.cs|=message|relationship result message, LoveCornerLocation
-table|Scripts/Systems/SpellSystem.cs|=result.Message|spell result message
-table|Scripts/Systems/SpellSystem.cs|=result.RollInfo|spell roll info
 keyed|Scripts/Systems/SpellSystem.cs|new:SpellInfo#1|spell.{class}.{level}.name
 keyed|Scripts/Systems/SpellSystem.cs|new:SpellInfo#2|spell.{class}.{level}.desc
 names|Scripts/Systems/SpellSystem.cs|new:SpellInfo#5|invented incantation words
