@@ -519,6 +519,7 @@ public class OpeningStranger125Tests
             await EnterTemple(low);
             (await EnterTemple(low, "")).Text.Should().NotContain(PriestMark, "level 9");
 
+            await EnterTemple(hero);   // the hero's own first entry after the other character's
             Story.CollectedSeals.Add(SealType.Creation);
             (await EnterTemple(hero, "")).Text.Should().NotContain(PriestMark, "the Seal he speaks of is already found");
             Story.CollectedSeals.Remove(SealType.Creation);
@@ -620,28 +621,29 @@ public class OpeningStranger125Tests
     [Fact]
     public async Task TheFollowUps_AreKeptPerSession()
     {
+        // A and B take turns entering the Temple. With one shared instance, B's entry would make A's next
+        // entry look like a first entry (and B's flags would be A's).
         var ctxA = Session("priesta");
         var ctxB = Session("priestb");
-        await Task.Run(async () =>
+        var heroA = Hero("Alderan", 10);
+        var heroB = Hero("Brisane", 10);
+        ctxA.Story.SetStoryFlag("met_mysterious_stranger", true);
+        ctxB.Story.SetStoryFlag("met_mysterious_stranger", true);
+
+        Task<(string Text, Exception? End)> In(SessionContext ctx, Character hero, params string[] lines) => Task.Run(async () =>
         {
-            SessionContext.Current = ctxA;
-            ctxA.Story.SetStoryFlag("met_mysterious_stranger", true);
-            ctxA.OpeningSequence.Roll = () => 0.0;
-            var hero = Hero(level: 10);
-            await EnterTemple(hero);
-            (await EnterTemple(hero, "")).Text.Should().Contain(PriestMark);
+            SessionContext.Current = ctx;
+            OpeningSequenceSystem.Instance.Should().BeSameAs(ctx.OpeningSequence);
+            return await EnterTemple(hero, lines);
         });
-        await Task.Run(async () =>
-        {
-            SessionContext.Current = ctxB;
-            ctxB.Story.SetStoryFlag("met_mysterious_stranger", true);
-            var hero = Hero(level: 10);
-            (await EnterTemple(hero)).Text.Should().NotContain(PriestMark, "B's first entry, whatever A did");
-            (await EnterTemple(hero, "")).Text.Should().Contain(PriestMark, "A's flag is not B's");
-        });
+
+        (await In(ctxA, heroA)).Text.Should().NotContain(PriestMark, "A's first entry");
+        (await In(ctxB, heroB)).Text.Should().NotContain(PriestMark, "B's first entry");
+        (await In(ctxA, heroA, "")).Text.Should().Contain(PriestMark, "B's entry is not A's");
         ctxA.Story.HasStoryFlag("first_seal_hint").Should().BeTrue();
+        ctxB.Story.HasStoryFlag("first_seal_hint").Should().BeFalse("A's flag is not B's");
+        (await In(ctxB, heroB, "")).Text.Should().Contain(PriestMark);
         ctxB.Story.HasStoryFlag("first_seal_hint").Should().BeTrue();
-        ctxA.OpeningSequence.Should().NotBeSameAs(ctxB.OpeningSequence);
     }
 
     private static string FollowUpIn(string lang, bool priest)
