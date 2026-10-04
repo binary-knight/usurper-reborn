@@ -455,6 +455,239 @@ public class OpeningStranger125Tests
         ((System.Collections.IDictionary)trees.GetValue(a)!).Contains(Tree).Should().BeTrue();
     }
 
+    // ---------- the follow-up scenes: the Temple priest and the Maelketh warning ----------
+
+    private static string PriestMark => Loc.Get("opening.priest_approaches");
+    private static string WarningMark => Loc.Get("opening.veteran_god_awakens", "Maelketh");
+
+    /// <summary>One real entry into the Temple (TempleLocation.EnterLocation, its own loop).</summary>
+    private static async Task<(string Text, Exception? End)> EnterTemple(Character hero, params string[] lines)
+    {
+        var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(lines), output);
+        var temple = new TempleLocation();
+        var entry = temple.EnterLocation(hero, term);
+        (await Task.WhenAny(entry, Task.Delay(30000))).Should().BeSameAs(entry, "the entry ends when the answers run out");
+        Exception? end = null;
+        try { await entry; } catch (Exception e) { end = e; }
+        term.StreamWriterInternal?.Flush();
+        return (Plain(output), end);
+    }
+
+    private static void MetTheStranger() => Story.SetStoryFlag("met_mysterious_stranger", true);
+
+    [Fact]
+    public async Task ThePriest_IsReachedFromARealTempleEntry_Once_AndMarkedAfterTheKeyPress()
+    {
+        FreshWorld();
+        try
+        {
+            MetTheStranger();
+            var hero = Hero(level: 10);
+            long xp = hero.Experience, gold = hero.Gold;
+            (await EnterTemple(hero)).Text.Should().NotContain(PriestMark, "the first entry of a session never shows it");
+
+            var cut = await EnterTemple(hero);
+            cut.Text.Should().Contain(PriestMark);
+            cut.End.Should().BeOfType<ConnectionClosedException>("the connection dropped at the closing key press");
+            Story.HasStoryFlag("first_seal_hint").Should().BeFalse("it is marked only after the key press");
+
+            var seen = await EnterTemple(hero, "");
+            seen.Text.Should().Contain(PriestMark, "a scene cut off is shown again");
+            seen.Text.Should().Contain(Loc.Get("opening.priest_first_seal"));
+            Story.HasStoryFlag("first_seal_hint").Should().BeTrue();
+
+            (await EnterTemple(hero, "")).Text.Should().NotContain(PriestMark, "once only");
+            hero.Experience.Should().Be(xp, "the priest gives nothing");
+            hero.Gold.Should().Be(gold);
+        }
+        finally { RestoreWorld(); }
+    }
+
+    [Fact]
+    public async Task ThePriest_NeedsTheStranger_Level10_AndTheTempleSealUnfound()
+    {
+        FreshWorld();
+        try
+        {
+            var hero = Hero(level: 10);
+            await EnterTemple(hero);
+            (await EnterTemple(hero, "")).Text.Should().NotContain(PriestMark, "never met the Stranger");
+
+            MetTheStranger();
+            var low = Hero("Low", 9);
+            await EnterTemple(low);
+            (await EnterTemple(low, "")).Text.Should().NotContain(PriestMark, "level 9");
+
+            Story.CollectedSeals.Add(SealType.Creation);
+            (await EnterTemple(hero, "")).Text.Should().NotContain(PriestMark, "the Seal he speaks of is already found");
+            Story.CollectedSeals.Remove(SealType.Creation);
+            (await EnterTemple(hero, "")).Text.Should().Contain(PriestMark);
+
+            OpeningSequenceSystem.PriestEligible(hero, GameLocation.MainStreet).Should().BeFalse("only in the Temple");
+        }
+        finally { RestoreWorld(); }
+    }
+
+    [Fact]
+    public void TheTempleCall_ComesOncePerEntry_BeforeTheMenuLoop()
+    {
+        var src = File.ReadAllText(Path.Combine(UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot(), "Scripts", "Locations", "TempleLocation.cs"));
+        Regex.Matches(src, Regex.Escape("OpeningSequenceSystem.Instance.CheckOpeningSequenceTriggers(")).Count.Should().Be(1);
+        var body = MentalBands1115Tests.Method(src, "ProcessLocation");
+        int call = body.IndexOf("OpeningSequenceSystem.Instance.CheckOpeningSequenceTriggers(player, GameLocation.Temple, terminal);", StringComparison.Ordinal);
+        call.Should().BeGreaterThan(body.IndexOf("await DisplayWelcomeMessage();", StringComparison.Ordinal));
+        call.Should().BeLessThan(body.IndexOf("while (!exitLocation)", StringComparison.Ordinal), "never inside the menu loop");
+    }
+
+    [Fact]
+    public async Task TheMaelkethWarning_IsReachedFromARealInnEntry_Once_AndMarkedAfterTheKeyPress()
+    {
+        FreshWorld();
+        try
+        {
+            MetTheStranger();
+            var inn = new InnLocation();
+            var hero = Hero(level: 25);
+            long xp = hero.Experience;
+            (await Enter(inn, hero)).Text.Should().NotContain(WarningMark, "first entry");
+
+            var cut = await Enter(inn, hero);
+            cut.Text.Should().Contain(WarningMark);
+            Story.HasStoryFlag("maelketh_stirring_warning").Should().BeFalse("it is marked only after the key press");
+
+            (await Enter(inn, hero, "")).Text.Should().Contain(WarningMark, "a scene cut off is shown again");
+            Story.HasStoryFlag("maelketh_stirring_warning").Should().BeTrue();
+            (await Enter(inn, hero, "")).Text.Should().NotContain(WarningMark, "once only");
+            hero.Experience.Should().Be(xp, "the warning gives nothing");
+        }
+        finally { RestoreWorld(); }
+    }
+
+    [Fact]
+    public async Task TheMaelkethWarning_NeedsTheStranger_Level25_AndMaelkethUnmet()
+    {
+        FreshWorld();
+        try
+        {
+            var inn = new InnLocation();
+            var hero = Hero(level: 25);
+            await Enter(inn, hero);
+            (await Enter(inn, hero, "")).Text.Should().NotContain(WarningMark, "never met the Stranger");
+
+            MetTheStranger();
+            var low = Hero("Low", 24);
+            await Enter(inn, low);
+            (await Enter(inn, low, "")).Text.Should().NotContain(WarningMark, "level 24");
+
+            foreach (var done in new[] { GodStatus.Defeated, GodStatus.Saved, GodStatus.Allied, GodStatus.Consumed, GodStatus.Awakened })
+            {
+                Story.OldGodStates[OldGodType.Maelketh].Status = done;
+                (await Enter(inn, hero, "")).Text.Should().NotContain(WarningMark, $"Maelketh is {done}");
+            }
+            Story.OldGodStates[OldGodType.Maelketh].Status = GodStatus.Corrupted;   // as a character starts
+            (await Enter(inn, hero, "")).Text.Should().Contain(WarningMark);
+
+            OpeningSequenceSystem.MaelkethWarningEligible(Hero(level: 30), GameLocation.MainStreet).Should().BeFalse("only in the Inn");
+        }
+        finally { RestoreWorld(); }
+    }
+
+    [Fact]
+    public void AnOldSave_HasNeitherFollowUpFlag_AndKeepsThemOnceSet()
+    {
+        FreshWorld();
+        try
+        {
+            MetTheStranger();
+            var data = SaveSystem.Instance.SerializeStorySystemsPublic();
+            Story.FullReset();
+            SaveSystem.Instance.RestoreStorySystems(data);
+            OpeningSequenceSystem.PriestEligible(Hero(level: 10), GameLocation.Temple).Should().BeTrue();
+            OpeningSequenceSystem.MaelkethWarningEligible(Hero(level: 25), GameLocation.TheInn).Should().BeTrue();
+
+            Story.SetStoryFlag("first_seal_hint", true);
+            Story.SetStoryFlag("maelketh_stirring_warning", true);
+            data = SaveSystem.Instance.SerializeStorySystemsPublic();
+            Story.FullReset();
+            SaveSystem.Instance.RestoreStorySystems(data);
+            OpeningSequenceSystem.PriestEligible(Hero(level: 10), GameLocation.Temple).Should().BeFalse();
+            OpeningSequenceSystem.MaelkethWarningEligible(Hero(level: 25), GameLocation.TheInn).Should().BeFalse();
+        }
+        finally { RestoreWorld(); }
+    }
+
+    [Fact]
+    public async Task TheFollowUps_AreKeptPerSession()
+    {
+        var ctxA = Session("priesta");
+        var ctxB = Session("priestb");
+        await Task.Run(async () =>
+        {
+            SessionContext.Current = ctxA;
+            ctxA.Story.SetStoryFlag("met_mysterious_stranger", true);
+            ctxA.OpeningSequence.Roll = () => 0.0;
+            var hero = Hero(level: 10);
+            await EnterTemple(hero);
+            (await EnterTemple(hero, "")).Text.Should().Contain(PriestMark);
+        });
+        await Task.Run(async () =>
+        {
+            SessionContext.Current = ctxB;
+            ctxB.Story.SetStoryFlag("met_mysterious_stranger", true);
+            var hero = Hero(level: 10);
+            (await EnterTemple(hero)).Text.Should().NotContain(PriestMark, "B's first entry, whatever A did");
+            (await EnterTemple(hero, "")).Text.Should().Contain(PriestMark, "A's flag is not B's");
+        });
+        ctxA.Story.HasStoryFlag("first_seal_hint").Should().BeTrue();
+        ctxB.Story.HasStoryFlag("first_seal_hint").Should().BeTrue();
+        ctxA.OpeningSequence.Should().NotBeSameAs(ctxB.OpeningSequence);
+    }
+
+    private static string FollowUpIn(string lang, bool priest)
+    {
+        var prevLang = GameConfig.Language;
+        FreshWorld();
+        try
+        {
+            GameConfig.Language = lang;
+            var output = new MemoryStream();
+            var term = new TerminalEmulator(new LineStream(new[] { "" }), output);
+            var name = priest ? "ShowFirstSealHint" : "ShowGodStirringWarning";
+            var args = priest ? new object[] { Hero(Name30), term } : new object[] { Hero(Name30), term, "Maelketh" };
+            ((Task)typeof(OpeningSequenceSystem).GetMethod(name, F)!.Invoke(OpeningSequenceSystem.Instance, args)!).GetAwaiter().GetResult();
+            term.StreamWriterInternal?.Flush();
+            return Plain(output);
+        }
+        finally { GameConfig.Language = prevLang; RestoreWorld(); }
+    }
+
+    [Fact]
+    public void TheFollowUps_AreInEveryLanguage_AndFitIn79Columns()
+    {
+        foreach (var lang in AllLanguages)
+            foreach (var priest in new[] { true, false })
+            {
+                var text = FollowUpIn(lang, priest);
+                text.Should().Contain(priest ? Loc.GetIn(lang, "opening.priest_first_seal") : Loc.GetIn(lang, "opening.veteran_god_awakens", "Maelketh"));
+                foreach (var row in text.Split('\n').Select(r => r.TrimEnd('\r')))
+                    row.Length.Should().BeLessThanOrEqualTo(79, $"[{lang}] \"{row}\"");
+            }
+    }
+
+    [Fact]
+    public void ThePriest_PointsToTheTemple_WhereTheFirstSealIs()
+    {
+        Loc.GetIn("en", "opening.priest_first_seal").Should().Be("\"The first Seal lies here, in this very Temple, among the ancient stones.\"");
+        foreach (var lang in AllLanguages)
+        {
+            Loc.GetIn(lang, "opening.priest_first_seal").Should().NotContain("15", $"{lang}: the first Seal is not on floor 15");
+            if (lang != "en")
+                Loc.GetIn(lang, "opening.priest_first_seal").Should().NotBe(Loc.GetIn("en", "opening.priest_first_seal"), lang);
+        }
+        new SevenSealsSystem().GetSeal(SealType.Creation)!.DungeonFloor.Should().Be(0, "the Seal of Creation is found in town, in the Temple");
+    }
+
     // ---------- text ----------
 
     private static string SceneIn(string lang, bool screenReader, params string[] lines)

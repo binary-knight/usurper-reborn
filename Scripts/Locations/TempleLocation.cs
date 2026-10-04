@@ -93,6 +93,10 @@ public partial class TempleLocation : BaseLocation
         await VerifyPlayerGodExists();
         // 1.2.0 Temple gods piece 2: a player-god follower's boon follows the god's current standing
         await GodBoonSystem.RefreshPlayerGodBoonAsync(currentPlayer);
+
+        // v1.2.5: the Temple never reaches BaseLocation.LocationLoop, so the Stranger's follow-up (the
+        // priest's word on the first Seal) is offered here, once per entry, before the menu loop
+        await OpeningSequenceSystem.Instance.CheckOpeningSequenceTriggers(player, GameLocation.Temple, terminal);
         
         bool exitLocation = false;
         refreshMenu = true;

@@ -47,13 +47,16 @@ namespace UsurperRemake.Systems
         {
             bool firstEntry = !ReferenceEquals(_enteredAs, player);
             _enteredAs = player;
-            if (firstEntry || otherSceneShown || !IsEligible(player) || !CanTriggerHere(location))
-                return false;
-            if (Roll() >= GetTriggerChance(location, player))
+            if (firstEntry || otherSceneShown || !player.IsAlive)
                 return false;
 
-            await TriggerStrangerEncounter(player, terminal);
-            return true;
+            if (IsEligible(player) && CanTriggerHere(location) && Roll() < GetTriggerChance(location, player))
+            {
+                await TriggerStrangerEncounter(player, terminal);
+                return true;
+            }
+
+            return await CheckFollowUpHooks(player, location, terminal);
         }
 
         /// <summary>
@@ -146,32 +149,52 @@ namespace UsurperRemake.Systems
             await terminal.PressAnyKey();
         }
 
+        internal const string PriestFlag = "first_seal_hint";
+        internal const string MaelkethWarningFlag = "maelketh_stirring_warning";
+
         /// <summary>
-        /// Check for follow-up story hooks after the initial encounter
+        /// v1.2.5: the two follow-up scenes, for a character who has seen the Stranger's scene. Each is shown
+        /// once; its flag is set after the closing key press. Neither gives anything but its flag.
+        /// The Temple priest (Temple, level 10+) while the Seal of Creation, which lies in the Temple, is
+        /// not yet found. The Maelketh warning (Inn, level 25+) while Maelketh has not been met: his state is
+        /// still the one a character starts with, not Defeated, Saved, Allied, Consumed or Awakened.
         /// </summary>
-        private async Task<bool> CheckFollowUpHooks(Character player, string locationId, TerminalEmulator terminal)
+        internal static bool PriestEligible(Character player, GameLocation location)
         {
             var story = StoryProgressionSystem.Instance;
+            return location == GameLocation.Temple
+                && player.Level >= 10
+                && story.HasStoryFlag(MetFlag)
+                && !story.HasStoryFlag(PriestFlag)
+                && !story.CollectedSeals.Contains(SealType.Creation);
+        }
 
-            // Check for dungeon hints at specific levels
-            if (player.Level >= 10 && !story.HasStoryFlag("first_seal_hint"))
+        internal static bool MaelkethWarningEligible(Character player, GameLocation location)
+        {
+            var story = StoryProgressionSystem.Instance;
+            return location == GameLocation.TheInn
+                && player.Level >= 25
+                && story.HasStoryFlag(MetFlag)
+                && !story.HasStoryFlag(MaelkethWarningFlag)
+                && MaelkethUnmet(story);
+        }
+
+        internal static bool MaelkethUnmet(StoryProgressionSystem story) =>
+            !story.OldGodStates.TryGetValue(OldGodType.Maelketh, out var state)
+            || state.Status is GodStatus.Unknown or GodStatus.Imprisoned or GodStatus.Dormant or GodStatus.Corrupted;
+
+        private async Task<bool> CheckFollowUpHooks(Character player, GameLocation location, TerminalEmulator terminal)
+        {
+            if (PriestEligible(player, location))
             {
-                if (locationId.Equals("temple", StringComparison.OrdinalIgnoreCase))
-                {
-                    await ShowFirstSealHint(player, terminal);
-                    return true;
-                }
+                await ShowFirstSealHint(player, terminal);
+                return true;
             }
 
-            // Check for god awakening warnings
-            if (player.Level >= 25 && !story.HasStoryFlag("maelketh_stirring_warning"))
+            if (MaelkethWarningEligible(player, location))
             {
-                if (locationId.Equals("tavern", StringComparison.OrdinalIgnoreCase) ||
-                    locationId.Equals("inn", StringComparison.OrdinalIgnoreCase))
-                {
-                    await ShowGodStirringWarning(player, terminal, "Maelketh");
-                    return true;
-                }
+                await ShowGodStirringWarning(player, terminal, "Maelketh");
+                return true;
             }
 
             return false;
@@ -209,9 +232,10 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("opening.priest_fades"), "gray");
             terminal.WriteLine("");
 
-            StoryProgressionSystem.Instance.SetStoryFlag("first_seal_hint", true);
-
             await terminal.PressAnyKey();
+
+            // v1.2.5: seen once the closing key is pressed; a disconnect before it shows it again
+            StoryProgressionSystem.Instance.SetStoryFlag(PriestFlag, true);
         }
 
         /// <summary>
@@ -237,9 +261,10 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(Loc.Get("opening.veteran_do_it_soon"), "white");
             terminal.WriteLine("");
 
-            StoryProgressionSystem.Instance.SetStoryFlag($"{godName.ToLower()}_stirring_warning", true);
-
             await terminal.PressAnyKey();
+
+            // v1.2.5: seen once the closing key is pressed; a disconnect before it shows it again
+            StoryProgressionSystem.Instance.SetStoryFlag($"{godName.ToLower()}_stirring_warning", true);
         }
 
         /// <summary>
