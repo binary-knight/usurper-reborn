@@ -5,7 +5,7 @@ checked: 1.2.4
 sources: Scripts/Locations/CharacterCreationLocation.cs, DOCS/BBS_DOOR_SETUP.md
 history: 1.2.4 | Closing the connection during character creation no longer shows a "try again" prompt.
 ---
-Begin with the [ways to connect](/wiki/en/getting-started/connections/), then create a character and take a short [first expedition](/wiki/en/getting-started/first-hour/). If something goes wrong, see [reporting bugs](/wiki/en/getting-started/reporting-bugs/).
+Begin with the [ways to connect](/wiki/en/getting-started/connections/) and [accounts and character slots](/wiki/en/getting-started/accounts/), then create a character and take a short [first expedition](/wiki/en/getting-started/first-hour/). If something goes wrong, see [reporting bugs](/wiki/en/getting-started/reporting-bugs/).
 
 ## Create a character
 
