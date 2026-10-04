@@ -51,7 +51,7 @@ French, Hungarian, Italian):
 - NPC speech: generated lines, greetings, shop moods, small talk,
   reactions, farewells and memory lines. The same line is chosen whatever
   your language.
-- Items and monsters: weapon, armour and accessory names and descriptions,
+- Items and monsters: weapon, armor and accessory names and descriptions,
   loot, monster and Old God names, artifacts and the combat tables.
 - Achievements, quests, factions, founder statue inscriptions, spell cast
   messages, divine boons and blessings, specializations and the remaining
@@ -63,7 +63,7 @@ Mail is written in the recipient's language: royal, divine, maintenance
 and world mail, Inn murder mail, the declined package mail and expired
 trade mail. Broadcasts such as the blood moon, the eulogy, achievements
 and castle announcements reach each player in their own language. News is
-written in the writer's language.
+stored in the language of the session that wrote it.
 
 ### Still in English on purpose
 
@@ -78,8 +78,8 @@ written in the writer's language.
   "Dungeon (Group: ...)".
 - Enchant parts in item names (such as " +4 Dex" and " (Blessed)"), so
   saved items keep matching their gear sets.
-- God names, and the "Unknown" and "Unknown Ruler" fallback names, which
-  are stored and shared.
+- The "Unknown" and "Unknown Ruler" fallback names, which are stored and
+  shared.
 
 Some names are stored in English inside the save and shown in your
 language wherever a screen shows them: noble titles (King, Queen, Sir,
@@ -125,7 +125,7 @@ names and guild ranks.
   (7 PM to 7 PM Eastern) that counts that day's sales. Mail previews show
   a mail of several lines on one line.
 - **PvP salvage.** After a PvP win, players in every language salvage gold
-  from the loser's worn weapon (30% chance) and armour (25% chance) at half
+  from the loser's worn weapon (30% chance) and armor (25% chance) at half
   their value. English players never did before.
 - **Dialogue effects.** In the Old Gods' and story conversations, a step
   you pass through now applies its effects, not only the step a
@@ -284,7 +284,7 @@ its scenes reachable in play and its state saved.
 
 ## Known and unchanged
 
-- News is stored in the language of the player who wrote it, and every
+- News is stored in the language of the session that wrote it, and every
   reader sees that text.
 - In group combat, a combat or spell message long enough to wrap onto a
   second row reaches a follower in the leader's language.

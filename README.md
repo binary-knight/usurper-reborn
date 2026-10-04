@@ -368,7 +368,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 - Steam features only work when the game is launched through the Steam client.
 - The Electron graphical client is optional and still incomplete; the terminal client is the supported way to play.
 - The Electron client has no party menu: ally stances and the shared potion belt are set from the terminal client.
-- All game text is translated into the five languages as of 1.2.5. A short list stays in English on purpose (slash commands, BBS listings, admin lines, words drawn into ASCII art, god rank titles in news, online locations on /who), and news shows in the language of the player who wrote it; both are listed in the 1.2.5 release notes. A test keeps the untranslated count from growing.
+- All game text is translated into the five languages as of 1.2.5. A short list stays in English on purpose (slash commands, BBS listings, admin lines, words drawn into ASCII art, god rank titles in news, online locations on /who), and news shows in the language of the session that wrote it; both are listed in the 1.2.5 release notes. A test keeps the untranslated count from growing.
 - Auto-updater for Linux x64 BBS deployments doesn't currently apply the update (under investigation).
 
 **Report bugs:** Press `!` in-game, or [Discord](https://discord.gg/EZhwgDT6Ta), or [GitHub Issues](https://github.com/binary-knight/usurper-reborn/issues).
