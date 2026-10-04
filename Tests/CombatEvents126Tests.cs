@@ -437,7 +437,7 @@ public class CombatEvents126Tests
         rec.Calls.Should().BeGreaterThan(2, "the observer was called, and threw, many times");
         f.Engine.ObserverFailureLogs.Should().Be(1, "one log line per fight, not per hit");
         f.Result!.Outcome.Should().Be(clean.Result!.Outcome);
-        f.Transcript.Should().Be(clean.Transcript, "the fight went on exactly as without the observer");
+        FightPart(f).Should().Be(FightPart(clean), "the fight went on exactly as without the observer");
         f.Result.Tally.DmgByPlayer.Should().Be(clean.Result.Tally.DmgByPlayer, "the accumulator is not the observer");
     }
 

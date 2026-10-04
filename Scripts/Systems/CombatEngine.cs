@@ -2318,11 +2318,11 @@ public partial class CombatEngine
         }
         finally
         {
-            EndFightEvents(player);   // 1.2.6: no-op after the normal end; closes a fight left by a throw
-            _eventTally = null;
             ConsumeCombatBuffs(player);
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
             player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
+            EndFightEvents(player);   // 1.2.6: no-op after the normal end; closes a fight left by a throw
+            _eventTally = null;
         }
 
         return result;
