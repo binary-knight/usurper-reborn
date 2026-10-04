@@ -4191,7 +4191,7 @@ public class InnLocation : BaseLocation
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(message);
+                    UIHelper.WriteRow(terminal, message);
                 }
             }
             else
@@ -4199,7 +4199,7 @@ public class InnLocation : BaseLocation
                 // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
                 currentPlayer.Inventory.Add(sourceItem ?? CompanionConvertEquipmentToItem(selectedItem));
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("inn.failed_equip", message));
+                UIHelper.WriteRow(terminal, Loc.Get("inn.failed_equip", message));
             }
 
             await Pacing.Wait(2000);

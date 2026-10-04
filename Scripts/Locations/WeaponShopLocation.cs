@@ -17,6 +17,7 @@ public class WeaponShopLocation : BaseLocation
     private WeaponCategory? currentCategory = null;
     private int currentPage = 0;
     private const int ItemsPerPage = 15;
+    private List<int> pageStarts = new() { 0 };   // v1.2.5: the first item of each page of the list last shown
 
     private enum WeaponCategory
     {
@@ -415,27 +416,27 @@ public class WeaponShopLocation : BaseLocation
             terminal.WriteLine("");
         }
 
-        // Paginate
-        int startIndex = currentPage * ItemsPerPage;
-        var pageItems = items.Skip(startIndex).Take(ItemsPerPage).ToList();
-        int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
+        // v1.2.5: compact columns, one space apart, each as wide as its widest value or header word; a row
+        // whose tail does not fit 79 wraps it under the bonus column, and a BBS page holds what fits 24 lines
+        int valueWidth = Math.Max(7, items.Select(i => FormatNumber(i.Value).Length).DefaultIfEmpty(0).Max());
+        int typeWidth = items.Select(i => WeaponTypeLabel(i.WeaponType).Length).DefaultIfEmpty(0).Max();
+        var cols = category == WeaponCategory.Shields
+            ? UsurperRemake.UI.ShopColumns.From(Loc.Get("weapon_shop.shield_header"), 3, 4, 4, valueWidth)
+            : UsurperRemake.UI.ShopColumns.From(Loc.Get("weapon_shop.weapon_header"), 3, 4, -typeWidth, valueWidth);
+        pageStarts = PageStarts(items.Select(i => UsurperRemake.UI.UIHelper.TailRows(cols.BonusColumn, cols.BonusColumn,
+            RowTail(i, true, true)).Count).ToList(), ItemsPerPage, ShopLineBudget(terminal));
+        currentPage = Math.Clamp(currentPage, 0, pageStarts.Count - 1);
+        int startIndex = pageStarts[currentPage];
+        var pageItems = items.Skip(startIndex).Take((currentPage + 1 < pageStarts.Count ? pageStarts[currentPage + 1] : items.Count) - startIndex).ToList();
+        int totalPages = pageStarts.Count;
 
         terminal.SetColor("gray");
         terminal.WriteLine(Loc.Get("weapon_shop.page_info", currentPage + 1, totalPages, items.Count));
         terminal.WriteLine("");
 
-        if (category == WeaponCategory.Shields)
-        {
-            terminal.SetColor("bright_blue");
-            terminal.WriteLine(Loc.Get("weapon_shop.shield_header"));
-            WriteDivider(67);
-        }
-        else
-        {
-            terminal.SetColor("bright_blue");
-            terminal.WriteLine(Loc.Get("weapon_shop.weapon_header"));
-            WriteDivider(74);
-        }
+        terminal.SetColor("bright_blue");
+        terminal.WriteLine(cols.Header);
+        WriteDivider(category == WeaponCategory.Shields ? 67 : 74);
 
         int num = 1;
         foreach (var item in pageItems)
@@ -457,46 +458,32 @@ public class WeaponShopLocation : BaseLocation
             if (item.MinLevel > 1)
             {
                 terminal.SetColor(!meetsLevel ? "red" : (canBuy ? "bright_cyan" : "darkgray"));
-                terminal.Write($"{item.MinLevel,3}  ");
+                terminal.Write(cols.Cell(0, $"{item.MinLevel}"));
             }
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{"--",3}  ");
+                terminal.Write(cols.Cell(0, "--"));
             }
 
             if (category == WeaponCategory.Shields)
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{item.ShieldBonus,4}  ");
-                terminal.Write($"{item.BlockChance,3}%   ");
+                terminal.Write(cols.Cell(1, $"{item.ShieldBonus}"));
+                terminal.Write(cols.Cell(2, $"{item.BlockChance}%"));
             }
             else
             {
                 terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
-                terminal.Write($"{item.WeaponPower,4}  ");
-                terminal.Write($"{item.WeaponType.ToString().Substring(0, Math.Min(8, item.WeaponType.ToString().Length)),-8}  ");
+                terminal.Write(cols.Cell(1, $"{item.WeaponPower}"));
+                terminal.Write(cols.Cell(2, WeaponTypeLabel(item.WeaponType)));
             }
 
             terminal.SetColor(canBuy ? "yellow" : "darkgray");
-            terminal.Write($"{FormatNumber(item.Value),10}  ");
+            terminal.Write(cols.Cell(3, FormatNumber(item.Value)));
 
-            // Show bonus stats
-            var bonuses = GetBonusDescription(item);
-            if (!string.IsNullOrEmpty(bonuses))
-            {
-                terminal.SetColor(canBuy ? "green" : "darkgray");
-                terminal.Write(bonuses);
-            }
-
-            // Show class restriction tag
-            var classTag = GetClassTag(item);
-            if (!string.IsNullOrEmpty(classTag))
-            {
-                terminal.SetColor(!meetsClass ? "red" : "gray");
-                terminal.Write($" [{classTag}]");
-            }
-
+            // bonus stats and class restriction, wrapped under the bonus column
+            UsurperRemake.UI.UIHelper.WriteTail(terminal, cols.BonusColumn, RowTail(item, canBuy, meetsClass));
             terminal.WriteLine("");
             num++;
         }
@@ -572,28 +559,19 @@ public class WeaponShopLocation : BaseLocation
         return string.Join(" ", bonuses);
     }
 
-    private static string GetClassTag(Equipment item)
+    /// <summary>v1.2.5: a list row's tail: bonuses and the class tag, each in its colour.</summary>
+    private (string? Color, string Text)[] RowTail(Equipment item, bool canBuy, bool meetsClass)
     {
-        if (item.ClassRestrictions == null || item.ClassRestrictions.Count == 0)
-            return "";
-        var abbrevs = item.ClassRestrictions.Select(c => c switch
-        {
-            CharacterClass.Warrior => "War",
-            CharacterClass.Paladin => "Pal",
-            CharacterClass.Barbarian => "Bar",
-            CharacterClass.Ranger => "Rng",
-            CharacterClass.Assassin => "Asn",
-            CharacterClass.Magician => "Mag",
-            CharacterClass.Sage => "Sag",
-            CharacterClass.Cleric => "Clr",
-            CharacterClass.Bard => "Brd",
-            CharacterClass.Alchemist => "Alc",
-            CharacterClass.Jester => "Jst",
-            CharacterClass.MysticShaman => "Sha",
-            _ => c.ToString().Substring(0, 3),
-        });
-        return string.Join("/", abbrevs);
+        var tail = new List<(string? Color, string Text)>();
+        var bonuses = GetBonusDescription(item);
+        if (!string.IsNullOrEmpty(bonuses)) tail.Add((canBuy ? "green" : "darkgray", bonuses));
+        var classTag = GetClassTag(item);
+        if (!string.IsNullOrEmpty(classTag)) tail.Add((!meetsClass ? "red" : "gray", $" [{classTag}]"));
+        return tail.ToArray();
     }
+
+    // v1.2.5: the class tag is shown through keys (ClassRestrictionTag); the restriction itself stays the enum list
+    private static string GetClassTag(Equipment item) => ClassRestrictionTag(item);
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
@@ -695,7 +673,8 @@ public class WeaponShopLocation : BaseLocation
 
             case "N":
                 List<Equipment> items = GetShopItemsForCategory(currentCategory.Value);
-                int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
+                // v1.2.5: the text list pages by pageStarts; the Electron list keeps fixed pages
+                int totalPages = GameConfig.ElectronMode ? (items.Count + ItemsPerPage - 1) / ItemsPerPage : pageStarts.Count;
                 if (currentPage < totalPages - 1) currentPage++;
                 RequestRedisplay();
                 return false;
@@ -717,7 +696,8 @@ public class WeaponShopLocation : BaseLocation
     {
         List<Equipment> items = GetShopItemsForCategory(category);
 
-        int actualIndex = currentPage * ItemsPerPage + itemIndex - 1;
+        int pageStart = !GameConfig.ElectronMode && currentPage < pageStarts.Count ? pageStarts[currentPage] : currentPage * ItemsPerPage;
+        int actualIndex = pageStart + itemIndex - 1;
         if (actualIndex < 0 || actualIndex >= items.Count)
         {
             terminal.WriteLine(Loc.Get("weapon_shop.invalid_item"), "red");
@@ -900,7 +880,7 @@ public class WeaponShopLocation : BaseLocation
                 var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                 currentPlayer.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
             }
             else
             {
@@ -915,7 +895,7 @@ public class WeaponShopLocation : BaseLocation
                         var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                         currentPlayer.Inventory.Add(invItem);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
                         await SaveSystem.Instance.AutoSave(currentPlayer);
                         await Pause();
                         return;
@@ -930,7 +910,7 @@ public class WeaponShopLocation : BaseLocation
                     if (!string.IsNullOrEmpty(message))
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(message);
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                     }
                     currentPlayer.RecalculateStats();
                 }
@@ -941,7 +921,7 @@ public class WeaponShopLocation : BaseLocation
                     currentPlayer.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.couldnt_equip", ItemNames.Display(item)));
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.couldnt_equip", ItemNames.Display(item)));
                 }
             }
         }
@@ -952,7 +932,7 @@ public class WeaponShopLocation : BaseLocation
             currentPlayer.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
         }
 
         QuestSystem.OnEquipmentPurchased(currentPlayer, item);
@@ -1458,7 +1438,7 @@ public class WeaponShopLocation : BaseLocation
             if (currentWeapon != null)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("weapon_shop.autobuy_already_best", ItemNames.Display(currentWeapon), currentPow));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("weapon_shop.autobuy_already_best", ItemNames.Display(currentWeapon), currentPow));
                 terminal.WriteLine(Loc.Get("weapon_shop.autobuy_best_afford", FormatNumber(currentPlayer.Gold)));
             }
             else
@@ -1562,7 +1542,7 @@ public class WeaponShopLocation : BaseLocation
                         if (!string.IsNullOrEmpty(message))
                         {
                             terminal.SetColor("gray");
-                            terminal.WriteLine(message);
+                            UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                         }
                         purchased = true;
                         currentPlayer.RecalculateStats();
@@ -1574,7 +1554,7 @@ public class WeaponShopLocation : BaseLocation
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_failed", message));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("weapon_shop.autobuy_failed", message));
                         currentPlayer.Gold += abTotal;
                     }
 

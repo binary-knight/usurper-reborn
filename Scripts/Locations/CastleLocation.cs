@@ -2832,7 +2832,7 @@ public class CastleLocation : BaseLocation
             {
                 terminal.SetColor("bright_green");
                 // v0.62.1 article fix.
-                terminal.WriteLine(Loc.Get("castle.monster_added", GameConfig.ArticulateForLanguage(MonsterNames.Display(name))));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("castle.monster_added", GameConfig.ArticulateForLanguage(MonsterNames.Display(name))));
                 terminal.WriteLine(Loc.Get("castle.beast_lurks"));
                 NewsSystem.Instance.Newsy(true, Loc.Get("castle.news_monster_guard", KingTitle(), currentKing.Name, MonsterNames.Display(name)));
             }
@@ -9170,7 +9170,7 @@ public class CastleLocation : BaseLocation
             if (!string.IsNullOrEmpty(equipMsg))
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine($"  {equipMsg}");
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, $"  {equipMsg}");
             }
         }
 
@@ -9533,7 +9533,7 @@ public class CastleLocation : BaseLocation
         foreach (var monster in currentKing.MonsterGuards.ToList())
         {
             terminal.SetColor("bright_red");
-            terminal.WriteLine(Loc.Get("castle.siege_monster_blocks", MonsterNames.Display(monster.Name), monster.Level));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("castle.siege_monster_blocks", MonsterNames.Display(monster.Name), monster.Level));
             terminal.WriteLine("");
 
             long monsterHP = monster.HP;
@@ -9552,7 +9552,7 @@ public class CastleLocation : BaseLocation
                 monsterHP -= teamDmg;
 
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("castle.team_strikes_monster", MonsterNames.Display(monster.Name), teamDmg, Math.Max(0, monsterHP)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("castle.team_strikes_monster", MonsterNames.Display(monster.Name), teamDmg, Math.Max(0, monsterHP)));
 
                 if (monsterHP <= 0) break;
 
@@ -9563,7 +9563,7 @@ public class CastleLocation : BaseLocation
                 teamHP -= monsterDmg;
 
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.siege_monster_strikes", MonsterNames.Display(monster.Name), monsterDmg, Math.Max(0, teamHP)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("castle.siege_monster_strikes", MonsterNames.Display(monster.Name), monsterDmg, Math.Max(0, teamHP)));
 
                 await Pacing.Wait(250);
             }
@@ -9571,7 +9571,7 @@ public class CastleLocation : BaseLocation
             if (teamHP <= 0)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("castle.siege_overwhelmed", MonsterNames.Display(monster.Name)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("castle.siege_overwhelmed", MonsterNames.Display(monster.Name)));
                 siegeFailed = true;
                 break;
             }

@@ -1950,7 +1950,10 @@ public class LoveStreetLocation : BaseLocation
             terminal.SetColor("gray");
             foreach (var news in scandalous)
             {
-                terminal.WriteLine($" - {news}");
+                // v1.2.5: a long entry wraps at 79, its later rows under the text after the dash
+                var parts = UIHelper.WrapAfterPrefix(" - ", news);
+                for (int i = 0; i < parts.Count; i++)
+                    terminal.WriteLine((i == 0 ? " - " : "   ") + parts[i]);
                 count++;
             }
         }

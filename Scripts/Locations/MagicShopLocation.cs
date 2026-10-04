@@ -857,7 +857,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm", ItemNames.Display(targetItem), $"{curseTotalWithTax:N0}")))
+        if (await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.curse_confirm", ItemNames.Display(targetItem), $"{curseTotalWithTax:N0}"))))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -963,7 +963,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, Loc.Get("magic_shop.curse_removal"), cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (await terminal.AskYesNoAsync(Loc.Get("magic_shop.curse_confirm_team", ownerName, ItemNames.Display(targetEquip), $"{curseTotalWithTax:N0}")))
+        if (await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.curse_confirm_team", ownerName, ItemNames.Display(targetEquip), $"{curseTotalWithTax:N0}"))))
         {
             player.Gold -= curseTotalWithTax;
             CityControlSystem.Instance.ProcessSaleTax(cost);
@@ -1188,7 +1188,7 @@ public partial class MagicShopLocation : BaseLocation
         DisplayMessage("");
         CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.old_enchant_confirm", ItemNames.Display(targetItem), $"{enchTotalWithTax:N0}")))
+        if (!await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.old_enchant_confirm", ItemNames.Display(targetItem), $"{enchTotalWithTax:N0}"))))
             return;
 
         player.Gold -= enchTotalWithTax;
@@ -2605,7 +2605,7 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(Loc.Get("magic_shop.remove_enchant_confirm", ItemNames.Display(rmEquip))))
+        if (!await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.remove_enchant_confirm", ItemNames.Display(rmEquip)))))
         {
             await terminal.WaitForKey();
             return;
@@ -3021,7 +3021,7 @@ public partial class MagicShopLocation : BaseLocation
                 var invItem = player.ConvertEquipmentToLegacyItem(item);
                 player.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
+                UIHelper.WriteRow(terminal, $"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
             }
             else
             {
@@ -3090,7 +3090,7 @@ public partial class MagicShopLocation : BaseLocation
                     var invItem = player.ConvertEquipmentToLegacyItem(item);
                     player.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
                 }
             }
         }
@@ -3100,7 +3100,7 @@ public partial class MagicShopLocation : BaseLocation
             var invItem = player.ConvertEquipmentToLegacyItem(item);
             player.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
-            terminal.WriteLine($"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
+            UIHelper.WriteRow(terminal, $"  {Loc.Get("shop.purchased_inventory", ItemNames.Display(item))}");
         }
 
         player.Statistics?.RecordPurchase(totalWithTax);

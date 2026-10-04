@@ -274,7 +274,7 @@ public class RoomRegistry
         if (!location.HasValue) return;
         Instance.BroadcastToRoomLocalized(
             location.Value,
-            lang => $"[90m  {buildMessage(lang)}[0m",
+            lang => UsurperRemake.UI.UIHelper.AnsiRows("[90m", $"  {buildMessage(lang)}"),   // v1.2.5: wrapped at 79
             excludeUsername: ctx.Username);
     }
 }

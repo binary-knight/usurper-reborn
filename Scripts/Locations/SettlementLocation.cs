@@ -719,13 +719,13 @@ public class SettlementLocation : BaseLocation
                 {
                     var m = room.Monsters[0];
                     string plural = room.Monsters.Count > 1 ? Loc.Get("settlement.settlers_more", room.Monsters.Count - 1) : "";
-                    terminal.WriteLine(Loc.Get("dungeon.scout_monster", MonsterNames.Display(m), m.Level, plural));
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("dungeon.scout_monster", MonsterNames.Display(m), m.Level, plural));
                 }
                 else
                 {
                     var sample = MonsterGenerator.GenerateMonster(floor);
                     if (sample != null)
-                        terminal.WriteLine(Loc.Get("dungeon.scout_monster", MonsterNames.Display(sample), sample.Level, ""));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("dungeon.scout_monster", MonsterNames.Display(sample), sample.Level, ""));
                 }
             }
         }
@@ -1115,7 +1115,7 @@ public class SettlementLocation : BaseLocation
             var monster = MonsterGenerator.GenerateMonster(f);
             if (monster != null)
             {
-                terminal.WriteLine(Loc.Get("settlement.scouts_floor", f, monster.Level, MonsterNames.Display(monster)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("settlement.scouts_floor", f, monster.Level, MonsterNames.Display(monster)));
             }
         }
 

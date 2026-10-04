@@ -608,14 +608,14 @@ public class MusicShopLocation : BaseLocation
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                 }
                 currentPlayer.RecalculateStats();
             }
             else
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine($"\n{Loc.Get("shop.purchased_inventory_alt", ItemNames.Display(item))}");
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, $"\n{Loc.Get("shop.purchased_inventory_alt", ItemNames.Display(item))}");
             }
         }
         else
@@ -635,7 +635,7 @@ public class MusicShopLocation : BaseLocation
                 MinLevel = item.MinLevel
             });
             terminal.SetColor("yellow");
-            terminal.WriteLine($"\n{Loc.Get("shop.purchased_inventory_alt", ItemNames.Display(item))}");
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, $"\n{Loc.Get("shop.purchased_inventory_alt", ItemNames.Display(item))}");
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("music_shop.bard_only"));
         }

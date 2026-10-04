@@ -2019,7 +2019,7 @@ namespace UsurperRemake.Systems
             if (state.DiscordStruck)
             {
                 state.DiscordStruck = false;
-                terminal.WriteLine($"  {Loc.Get("combat.discordia_first_action_fails", bossDef.Name)}", "magenta");
+                UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.discordia_first_action_fails", bossDef.Name)}", "magenta");
                 return;
             }
             int defendingRounds = state.DefendingRounds;
