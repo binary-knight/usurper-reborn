@@ -1,8 +1,9 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Systems/WikiDataExporter.cs
+history: 1.2.5 | Generated item, monster, specialization, achievement and Old God names are exported in all five languages.
 ---
 - [Balance rules](/wiki/en/reference/balance/)
 - [Achievements](/wiki/en/reference/achievements/)

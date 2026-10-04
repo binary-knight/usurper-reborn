@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, README.md
+history: 1.2.5 | The SSH login screen gains G to change its language, and the default message of the day and the idle warning show in your language.
 ---
 How you sign in, how many characters you can keep, and what you can set before you enter the game. Single-player, online and BBS play each handle this differently. For where to connect, see [ways to play](/wiki/en/getting-started/connections/).
 
@@ -11,7 +12,7 @@ How you sign in, how many characters you can keep, and what you can set before y
 An online account is a username and a password kept by the game server. The browser, MUD client and SSH paths end at the same login screen, with four choices: L to log in, R to register, G to change the language of the login screen, and Q to quit.
 
 - **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen.
-- **SSH.** The SSH gateway uses one shared gateway login, published with the connection instructions. It is not your account. After it, the in-game login screen asks for your own username and password.
+- **SSH.** The SSH gateway uses one shared gateway login, published with the connection instructions. It is not your account. After it, a login screen with the same L, R, G and Q choices asks for your own username and password. Its G changes the language of these login screens only; it is not saved to an account registered there.
 - **The standalone game.** O (Online Multiplayer) on the main menu offers the official server or a server address and port you type in. Its own login menu has L, R and Q, and uses the language the game is already set to. After you log in it offers to remember your login on this computer: Y, N, or D to stop asking.
 
 Registration rules:

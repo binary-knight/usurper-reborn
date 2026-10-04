@@ -1,8 +1,9 @@
 ---
 title: The Music Shop
 path: /wiki/en/world/music-shop/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/MusicShopLocation.cs, Scripts/Data/EquipmentData.cs
+history: 1.2.5 | Instrument names and the Electron menu labels are shown in the player's language, and long purchase messages wrap at 79 columns.
 ---
 The Music Shop specializes in instruments, performances and songs rather than general weapons. Instruments are equipment with their own weapon type and restrictions.
 

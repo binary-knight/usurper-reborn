@@ -1,8 +1,9 @@
 ---
 title: Wilderness exploration
 path: /wiki/en/world/wilderness/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Data/WildernessData.cs, Scripts/Locations/WildernessLocation.cs
+history: 1.2.5 | Wild beast and monster names are shown in the player's language, and beast and monster encounter rows wrap at 79 columns.
 history: 1.2.4 | The tame success text wraps at 79 columns.
 history: 1.2.3 | Wilderness scouting, beast species, the shrine list and discovery news are translated into all five languages.
 ---

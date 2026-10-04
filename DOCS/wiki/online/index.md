@@ -1,8 +1,9 @@
 ---
 title: The online world
 path: /wiki/en/online/
-checked: 1.2.4
+checked: 1.2.5
 sources: DOCS/MULTIPLAYER_ARCHITECTURE.md, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldEventSystem.cs
+history: 1.2.5 | Daily messages and the blood moon broadcast reach each player in their own language, and grief stages are shown translated.
 history: 1.2.4 | New: /history shows your last 50 chat lines, kept in server memory only.
 ---
 Online play shares a persistent world. NPCs and other players can change the town while you are away. A wiki page describes rules, not a snapshot of today's state.

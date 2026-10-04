@@ -1,8 +1,9 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs
+history: 1.2.5 | The Healer's treatment labels in the graphical client and the cursed item names at Remove Curse are shown in the player's language.
 ---
 A combat status, an addiction and a persistent affliction are not interchangeable. Read Status and the treatment menu to identify what is wrong.
 

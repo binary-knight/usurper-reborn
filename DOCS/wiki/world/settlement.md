@@ -1,8 +1,9 @@
 ---
 title: The Outskirts settlement
 path: /wiki/en/world/settlement/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/SettlementLocation.cs, Scripts/Systems/SettlementSystem.cs
+history: 1.2.5 | Watchtower scout reports name monsters in the player's language, and the Electron settlement menu labels are translated into all five languages.
 history: 1.2.4 | none
 history: 1.2.3 | The settlement workshop, the watchtower scout report and settlement news are translated into all five languages, and long scout report rows wrap.
 ---

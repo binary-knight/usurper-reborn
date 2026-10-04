@@ -1,8 +1,9 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.2.5 | Magic Shop enchant removal now returns an item to its base form, taking off every stat, effect, value and name tag its enchants added.
 history: 1.2.4 | The Magic Shop lets you haggle over rings and necklaces, 3 tries a day, and being thrown out bars you from it until the next day.
 history: 1.2.3 | The Magic Shop shows armor on rings and necklaces and counts it toward the upgrade marker, and sell all sells only the accessories it lists.
 ---
@@ -20,7 +21,7 @@ At the buy prompt in the Weapon and Armor shops, and for rings and necklaces in 
 
 ## Magic services
 
-The Magic Shop offers class-relevant magic and services such as identification, curse removal and enchanting. These have different target and cost rules. Removing a curse from an owned item is not the same action as replacing its base template.
+The Magic Shop offers class-relevant magic and services such as identification, curse removal and enchanting. These have different target and cost rules. Removing a curse from an owned item is not the same action as replacing its base template. Enchant removal (W) works on equipment you are wearing and returns the item to its base form: the stats, fire and frost effects, value and name tags its enchants added are taken off, and the enchant limit applies again from that form. If the item's base form is not on record, the shop refuses and charges nothing.
 
 Read the selected item and confirmation, especially when a service can act on teammate equipment.
 

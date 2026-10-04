@@ -1,8 +1,9 @@
 ---
 title: Crime, prison and the law
 path: /wiki/en/world/law/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs
+history: 1.2.5 | Prison activity effects now show what each one gives (for example "+1 Strength" for pushups), and a prisoner using a screen reader gets the screen reader prison menu.
 history: 1.2.4 | An enraged avenger in a murder grudge fight really has the extra HP the box shows, and the townsperson's own HP is no longer raised.
 history: 1.2.3 | none
 ---
