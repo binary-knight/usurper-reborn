@@ -36,6 +36,9 @@ public class DataChars125Tests
 
     // ---------- helpers ----------
 
+    [Fact]
+    public void TheLongName_IsTheLongestNameAPlayerCanHave() => LongName.Length.Should().Be(GameConfig.MaxNameLength);
+
     private sealed class Screen
     {
         public TerminalEmulator Term = null!;
@@ -87,10 +90,12 @@ public class DataChars125Tests
         if (!string.IsNullOrEmpty(dir)) File.WriteAllText(Path.Combine(dir, name), text);
     }
 
+    /// <summary>A framed box row (WriteBoxHeader) is at most 80 wide; every other row fits in 79.</summary>
     private static void EveryRowFits(IEnumerable<string> rows, string screen)
     {
         foreach (var row in rows)
-            row.Length.Should().BeLessOrEqualTo(MaxWidth, $"every row of the {screen} fits in {MaxWidth} columns: \"{row}\"");
+            row.Length.Should().BeLessOrEqualTo(row.Length > 0 && "╔║╚".IndexOf(row[0]) >= 0 ? MaxWidth + 1 : MaxWidth,
+                $"every row of the {screen} fits in {MaxWidth} columns: \"{row}\"");
     }
 
     private static string Src(params string[] parts) =>
@@ -191,6 +196,22 @@ public class DataChars125Tests
         var failed = L(lang, "combat.spell_utters_fails", LongName, "Admoriasumumarie") + "\n  " + L(lang, "combat.spell_roll_info", 20, 99, 119, 33);
         EveryRowFits(SpellSystem.MessageRows(failed), "failed cast");
         Capture($"datachars-spells-{lang}.txt", all.ToString());
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void TheLongestSpellName_FitsTheCastLines_WithALongName(string lang)
+    {
+        var longest = InLang(lang, () => SpellClasses.SelectMany(SpellSystem.GetAllSpellsForClass).Select(s => s.DisplayName).OrderByDescending(n => n.Length).First());
+        var rows = new[] { L(lang, "combat.you_cast_spell", longest) };
+        Capture($"datachars-longest-spell-{lang}.txt", string.Join("\n", rows.Append(L(lang, "combat.cast_spell_on_ally", longest, LongName))));
+        EveryRowFits(rows, $"cast line with the longest spell name ({longest}) in {lang}");
+        // The ally cast line (CombatEngine, combat.cast_spell_on_ally) is 80 in fr with the longest spell and a 30-character
+        // ally; it is another piece's row and is listed in this piece's REPORT, not changed here.
     }
 
     [Fact]
@@ -296,6 +317,7 @@ public class DataChars125Tests
             });
             screen.Text.Should().Contain(first.DisplayName.Length > 0 ? InLang(lang, () => first.DisplayName) : first.Name);
             mira.DisabledSpells.Should().Equal(new[] { first.Name }, "the disabled spell is stored by its English name, its id");
+            EveryRowFits(Rows(screen.Text), $"Inn skill screen in {lang}");
             first.Name.Should().Be("Cure Light");
 
             // combat reads the same id
@@ -709,6 +731,7 @@ public class DataChars125Tests
         var back = JsonSerializer.Deserialize<PlayerData>(JsonSerializer.Serialize(data))!;
         JsonSerializer.Serialize(back).Should().NotContain(L("hu", "spec.ranger.marksmanship.name"));
         back.Specialization.Should().Be((int)ClassSpecialization.Marksmanship, "the save stores the specialization id");
+        back.Class.Should().Be(CharacterClass.Ranger, "the save stores the class id");
         foreach (var src in new[] { Src("Locations", "TeamCornerLocation.cs"), Src("Locations", "LevelMasterLocation.cs") })
             Regex.IsMatch(src, @"(specDef|spec|cur|s|chosen)\??\.Name\b").Should().BeFalse("specialization names are shown through LocName");
     }

@@ -15673,7 +15673,7 @@
   "family.incest_refuse_adoptive_child": "Te nevelted fel: {0}. Annak az ajtónak zárva kell maradnia.",
   "family.incest_refuse_adoptive_sibling": "Egy fedél alatt nőttetek fel: {0}. A város soha nem bocsátaná meg.",
   "family.incest_refuse_generic": "Megremeg a kezed. Valami a véredben ellenáll: {0}.",
-  "relationship.marry_self": "Önmagadat nem veheted feleségül!",
+  "relationship.marry_self": "Nem házasodhatsz össze önmagaddal!",
   "relationship.marry_dead": "{0} elhunyt, így nem köthet házasságot.",
   "relationship.marry_age": "Mindkét félnek legalább {0} évesnek kell lennie a házassághoz!",
   "relationship.marry_already": "Az egyik vagy mindkét fél már házas!",
