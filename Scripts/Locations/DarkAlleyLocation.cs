@@ -1083,7 +1083,7 @@ namespace UsurperRemake.Locations
                     Faction.TheCrown => Loc.Get("faction.name_crown"),
                     Faction.TheShadows => Loc.Get("faction.name_shadows"),
                     Faction.TheFaith => Loc.Get("faction.name_faith"),
-                    _ => FactionSystem.Factions[currentFaction].Name
+                    _ => FactionSystem.NameLabel(currentFaction)
                 };
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("dark_alley.shadows_study"));

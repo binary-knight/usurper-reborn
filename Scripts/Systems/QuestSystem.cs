@@ -452,9 +452,15 @@ public partial class QuestSystem
     }
 
     /// <summary>
+    /// v1.2.5: the stored initiator of bounty board quests. It stays English (saved, compared here); Quest.GetDisplayInitiator
+    /// shows it through quest.initiator.bounty_board.
+    /// </summary>
+    public const string BountyBoardInitiator = "Bounty Board";
+
+    /// <summary>
     /// Create a dungeon quest (bounty board style)
     /// </summary>
-    public static Quest CreateDungeonQuest(QuestTarget target, byte difficulty, string dungeonName = "The Dungeon", int playerLevel = 10, int deepestFloor = 0)
+    public static Quest CreateDungeonQuest(QuestTarget target, byte difficulty, string? dungeonName = null, int playerLevel = 10, int deepestFloor = 0)
     {
         if (target < QuestTarget.ClearBoss || target > QuestTarget.SurviveDungeon)
         {
@@ -463,11 +469,11 @@ public partial class QuestSystem
 
         var quest = new Quest
         {
-            Initiator = "Bounty Board",  // English only — shared quest data
+            Initiator = BountyBoardInitiator,  // English only: shared quest data
             QuestType = QuestType.SingleQuest,
             QuestTarget = target,
             Difficulty = difficulty,
-            Comment = Loc.Get("quest.dungeon_quest_comment", dungeonName),
+            Comment = Loc.Get("quest.dungeon_quest_comment", dungeonName ?? Loc.Get("quest.dungeon_name")),
             Date = DateTime.Now,
             MinLevel = Math.Max(1, playerLevel - 5),
             MaxLevel = playerLevel + 15,
@@ -496,7 +502,7 @@ public partial class QuestSystem
         return questDatabase.Where(q =>
             !q.Deleted &&
             string.IsNullOrEmpty(q.Occupier) &&
-            q.Initiator == "Bounty Board" &&
+            q.Initiator == BountyBoardInitiator &&
             player.Level >= q.MinLevel &&
             player.Level <= q.MaxLevel
         ).ToList();
@@ -508,10 +514,10 @@ public partial class QuestSystem
     public static void RefreshBountyBoard(int playerLevel, int deepestFloor = 0)
     {
         // Remove old unclaimed bounty board quests
-        questDatabase.RemoveAll(q => q.Initiator == "Bounty Board" && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
+        questDatabase.RemoveAll(q => q.Initiator == BountyBoardInitiator && string.IsNullOrEmpty(q.Occupier) && q.Date < DateTime.Now.AddDays(-3));
 
         // Count existing bounty board quests
-        var existingCount = questDatabase.Count(q => q.Initiator == "Bounty Board" && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
+        var existingCount = questDatabase.Count(q => q.Initiator == BountyBoardInitiator && !q.Deleted && string.IsNullOrEmpty(q.Occupier));
 
         // Add quests until we have 5 available
         var targetCount = 5;

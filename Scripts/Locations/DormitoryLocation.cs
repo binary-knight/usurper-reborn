@@ -636,7 +636,7 @@ public class DormitoryLocation : BaseLocation
                 var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
                 factionSystem?.ModifyReputation(npc.NPCFaction.Value, -200);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("dormitory.faction_plummeted", UsurperRemake.Systems.FactionSystem.Factions[npc.NPCFaction.Value].Name));
+                terminal.WriteLine(Loc.Get("dormitory.faction_plummeted", UsurperRemake.Systems.FactionSystem.NameLabel(npc.NPCFaction.Value)));
             }
 
             // Witness memories for other NPCs at this location

@@ -49,6 +49,35 @@ public class Achievement
     public string? UnlockMessage { get; set; }
 
     /// <summary>
+    /// v1.2.5: the shown name, goal, unlock message and secret hint in the player's language, keyed
+    /// achievement.{Id}.name|desc|unlock|hint. The fields above stay the English data: the Id is what is saved
+    /// and sent to Steam, and achievements.json and the wiki's English read the fields. A field that is not the
+    /// English of its key (an edited achievements.json) is shown as written.
+    /// </summary>
+    public string LocName() => Shown("name", Name, null);
+    public string LocDescription() => Shown("desc", Description, null);
+    public string LocUnlockMessage() => Shown("unlock", UnlockMessage, null);
+    public string LocSecretHint() => Shown("hint", SecretHint, null);
+
+    /// <summary>v1.2.5: the shown name in a given language (a broadcast to another player).</summary>
+    public string NameIn(string lang) => Shown("name", Name, lang);
+
+    /// <summary>v1.2.5: the key of a shown field when the stored English is its English text, else null.</summary>
+    internal string? KeyOf(string field, string? stored)
+    {
+        if (string.IsNullOrEmpty(stored) || string.IsNullOrEmpty(Id)) return null;
+        string key = $"achievement.{Id}.{field}";
+        return Loc.HasIn("en", key) && Loc.GetIn("en", key) == stored ? key : null;
+    }
+
+    private string Shown(string field, string? stored, string? lang)
+    {
+        var key = KeyOf(field, stored);
+        if (key == null) return stored ?? "";
+        return lang == null ? Loc.Get(key) : Loc.GetIn(lang, key);
+    }
+
+    /// <summary>
     /// Get display color based on tier
     /// </summary>
     public string GetTierColor() => Tier switch
@@ -1175,8 +1204,8 @@ public static class AchievementSystem
             {
                 ElectronBridge.EmitAchievementToast(
                     id: achievementId,
-                    name: achievement.Name,
-                    description: achievement.Description ?? "",
+                    name: achievement.LocName(),
+                    description: achievement.LocDescription(),
                     tier: achievement.Tier.ToString(),
                     goldReward: achievement.GoldReward,
                     xpReward: achievement.ExperienceReward,
@@ -1215,7 +1244,7 @@ public static class AchievementSystem
             {
                 var displayName = player.Name2 ?? player.Name1;
                 _ = OnlineStateManager.Instance!.AddNews(
-                    Loc.Get("achievement.news_unlocked", displayName, achievement.Name), "quest");
+                    Loc.Get("achievement.news_unlocked", displayName, achievement.LocName()), "quest");
             }
 
             // Broadcast notable achievements to all online players (v0.52.0)
@@ -1235,12 +1264,10 @@ public static class AchievementSystem
 
                     if (isNotable)
                     {
-                        var broadcastName = player.Name2 ?? player.Name1 ?? "Someone";
-                        string achMsg = GameConfig.ScreenReaderMode
-                            ? $"\r\n  [Achievement] {broadcastName} has earned [{achievement.Name}]!\r\n"
-                            : $"\r\n\x1b[1;33m  ★ {broadcastName} has earned [{achievement.Name}]!\x1b[0m\r\n";
-                        UsurperRemake.Server.MudServer.Instance?.BroadcastToAll(
-                            achMsg,
+                        // v1.2.5: each reader gets the line in their own language, the name looked up by the id.
+                        bool screenReader = GameConfig.ScreenReaderMode;
+                        UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(
+                            lang => BroadcastLine(lang, player.Name2 ?? player.Name1, achievement, screenReader),
                             excludeUsername: player.Name1 ?? player.Name2);
                     }
                 }
@@ -1251,6 +1278,21 @@ public static class AchievementSystem
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// v1.2.5: the notable-unlock broadcast line in a reader's language; the achievement's name in that language,
+    /// looked up by its id. A line longer than 79 columns goes on in a second row, indented four.
+    /// </summary>
+    internal static string BroadcastLine(string lang, string? playerName, Achievement achievement, bool screenReader)
+    {
+        string who = string.IsNullOrEmpty(playerName) ? Loc.GetIn(lang, "achievement.broadcast_someone") : playerName;
+        string text = screenReader
+            ? Loc.GetIn(lang, "achievement.broadcast_sr", who, achievement.NameIn(lang))
+            : "★ " + Loc.GetIn(lang, "achievement.broadcast", who, achievement.NameIn(lang));
+        var rows = MainStreetLocation.WrapWords(text, ScreenReaderWidth - 2, ScreenReaderWidth - 4);
+        string body = string.Join("\r\n", rows.Select((r, i) => (i == 0 ? "  " : "    ") + r));
+        return screenReader ? "\r\n" + body + "\r\n" : "\r\n\x1b[1;33m" + body + "\x1b[0m\r\n";
     }
 
     /// <summary>
@@ -1421,6 +1463,45 @@ public static class AchievementSystem
         return string.Join(" ", parts);
     }
 
+    /// <summary>v1.2.5: the inside width of the unlock popup box, and the row width without the box.</summary>
+    internal const int BoxWidth = 58;
+    internal const int ScreenReaderWidth = 79;
+
+    /// <summary>
+    /// v1.2.5: a goal or an unlock message as popup rows of at most `width` columns, indented two; a message
+    /// is quoted, the quote marks on its first and last rows.
+    /// </summary>
+    internal static List<string> PopupRows(string text, bool quoted, int width)
+    {
+        int avail = width - 2 - (quoted ? 2 : 0);
+        var rows = MainStreetLocation.WrapWords(text, avail, avail);
+        var result = new List<string>();
+        for (int i = 0; i < rows.Count; i++)
+        {
+            string row = rows[i];
+            if (quoted)
+                row = (i == 0 ? "\"" : " ") + row + (i == rows.Count - 1 ? "\"" : "");
+            result.Add("  " + row);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// v1.2.5: the goal after an unlocked achievement's name in the home trophy list ("    [B] [X] Name"), as
+    /// rows of at most 79 columns: the first starts " - " after the name, the others are indented eight.
+    /// </summary>
+    internal static List<string> TrophyGoalRows(Achievement achievement)
+    {
+        int used = 4 + achievement.GetTierSymbol().Length + 1 + 4 + achievement.LocName().Length;
+        var rows = MainStreetLocation.WrapWords(achievement.LocDescription(), ScreenReaderWidth - used - 3, ScreenReaderWidth - 8);
+        var result = new List<string> { " - " + rows[0] };
+        result.AddRange(rows.Skip(1).Select(r => new string(' ', 8) + r));
+        return result;
+    }
+
+    /// <summary>v1.2.5: a name in the many-unlocks list, cut at 45 columns as before.</summary>
+    internal static string ShortName(string name) => name.Length > 45 ? name.Substring(0, 42) + "..." : name;
+
     /// <summary>
     /// Display a single achievement unlock notification
     /// </summary>
@@ -1432,9 +1513,10 @@ public static class AchievementSystem
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("achievement.unlocked_header"));
             terminal.SetColor(achievement.GetTierColor());
-            terminal.WriteLine($"  {achievement.GetTierSymbol()} {achievement.Name}");
+            terminal.WriteLine($"  {achievement.GetTierSymbol()} {achievement.LocName()}");
             terminal.SetColor("white");
-            terminal.WriteLine($"  {achievement.Description}");
+            foreach (var row in PopupRows(achievement.LocDescription(), false, ScreenReaderWidth))
+                terminal.WriteLine(row);
 
             if (achievement.GoldReward > 0 || achievement.ExperienceReward > 0)
             {
@@ -1445,7 +1527,8 @@ public static class AchievementSystem
             if (!string.IsNullOrEmpty(achievement.UnlockMessage))
             {
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  \"{achievement.UnlockMessage}\"");
+                foreach (var row in PopupRows(achievement.LocUnlockMessage(), true, ScreenReaderWidth))
+                    terminal.WriteLine(row);
             }
         }
         else
@@ -1459,19 +1542,22 @@ public static class AchievementSystem
             terminal.WriteLine("║");
             terminal.WriteLine("╠══════════════════════════════════════════════════════════╣");
 
-            string tierLine = $"  {achievement.GetTierSymbol()} {achievement.Name}";
+            string tierLine = $"  {achievement.GetTierSymbol()} {achievement.LocName()}";
             terminal.Write("║");
             terminal.SetColor(achievement.GetTierColor());
             terminal.Write($"{tierLine,-58}");
             terminal.SetColor("bright_yellow");
             terminal.WriteLine("║");
 
-            string descLine = $"  {achievement.Description}";
-            terminal.Write("║");
-            terminal.SetColor("white");
-            terminal.Write($"{descLine,-58}");
-            terminal.SetColor("bright_yellow");
-            terminal.WriteLine("║");
+            // v1.2.5: the goal and the unlock message wrap inside the box
+            foreach (var descLine in PopupRows(achievement.LocDescription(), false, BoxWidth))
+            {
+                terminal.Write("║");
+                terminal.SetColor("white");
+                terminal.Write($"{descLine,-58}");
+                terminal.SetColor("bright_yellow");
+                terminal.WriteLine("║");
+            }
 
             if (achievement.GoldReward > 0 || achievement.ExperienceReward > 0)
             {
@@ -1485,12 +1571,14 @@ public static class AchievementSystem
 
             if (!string.IsNullOrEmpty(achievement.UnlockMessage))
             {
-                string msgLine = $"  \"{achievement.UnlockMessage}\"";
-                terminal.Write("║");
-                terminal.SetColor("bright_magenta");
-                terminal.Write($"{msgLine,-58}");
-                terminal.SetColor("bright_yellow");
-                terminal.WriteLine("║");
+                foreach (var msgLine in PopupRows(achievement.LocUnlockMessage(), true, BoxWidth))
+                {
+                    terminal.Write("║");
+                    terminal.SetColor("bright_magenta");
+                    terminal.Write($"{msgLine,-58}");
+                    terminal.SetColor("bright_yellow");
+                    terminal.WriteLine("║");
+                }
             }
 
             terminal.WriteLine("╚══════════════════════════════════════════════════════════╝");
@@ -1516,7 +1604,7 @@ public static class AchievementSystem
 
             foreach (var achievement in achievements.OrderByDescending(a => a.Tier).Take(8))
             {
-                var name = achievement.Name.Length > 45 ? achievement.Name.Substring(0, 42) + "..." : achievement.Name;
+                var name = ShortName(achievement.LocName());
                 terminal.SetColor(achievement.GetTierColor());
                 terminal.WriteLine($"  {achievement.GetTierSymbol()} {name}");
             }
@@ -1550,7 +1638,7 @@ public static class AchievementSystem
             // Show up to 8 achievements, summarize if more
             foreach (var achievement in achievements.OrderByDescending(a => a.Tier).Take(8))
             {
-                var name = achievement.Name.Length > 45 ? achievement.Name.Substring(0, 42) + "..." : achievement.Name;
+                var name = ShortName(achievement.LocName());
                 string achLine = $"  {achievement.GetTierSymbol()} {name}";
                 terminal.Write("║");
                 terminal.SetColor(achievement.GetTierColor());
