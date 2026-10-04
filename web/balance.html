@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Usurper Reborn - Balance Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="/escape.js"></script>
 <style>
   :root {
     --bg: #0a0a0f;
@@ -313,7 +314,6 @@
         <div class="section-body" id="npc-recent-table"></div>
       </div>
     </div>
-    </div>
   </div>
 </div>
 
@@ -459,7 +459,7 @@ async function loadOverview() {
 }
 
 function card(label, value, cls = '') {
-  return `<div class="card"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
+  return `<div class="card"><div class="label">${escapeHtml(label)}</div><div class="value ${escapeHtml(cls)}">${escapeHtml(value)}</div></div>`;
 }
 
 // --- Class Performance Charts ---
@@ -600,7 +600,7 @@ async function loadOneHitKills() {
       r.monster_max_hp || '-',
       r.monster_str || '-',
       r.monster_def || '-',
-      r.is_boss ? '<span class="tag tag-boss">BOSS</span>' : '',
+      r.is_boss ? trustedHtml('<span class="tag tag-boss">BOSS</span>') : '',
       r.damage_dealt
     ]),
     data.map(r => r.outcome)
@@ -742,7 +742,7 @@ async function loadNPCBehavior() {
           r.living_npcs,
           fmtNum(r.actions),
           r.deaths,
-          r.death_pct > 5 ? `<span style="color:var(--red)">${r.death_pct}%</span>` : r.death_pct + '%',
+          r.death_pct > 5 ? trustedHtml(`<span style="color:var(--red)">${escapeHtml(r.death_pct)}%</span>`) : r.death_pct + '%',
           fmtNum(r.net_gold),
           fmtNum(r.net_xp),
           r.max_level
@@ -756,7 +756,7 @@ async function loadNPCBehavior() {
     ? makeTable(
         ['Outcome', 'Count', '% of dungeon runs'],
         dung.map(r => [
-          `<span class="tag" style="background:${outcomeColors[r.outcome] || '#888'};color:#000">${r.outcome}</span>`,
+          trustedHtml(`<span class="tag" style="background:${escapeHtml(outcomeColors[r.outcome] || '#888')};color:#000">${escapeHtml(r.outcome)}</span>`),
           fmtNum(r.total),
           r.pct + '%'
         ])
@@ -800,11 +800,11 @@ async function loadNPCBehavior() {
           r.npc_class,
           r.action,
           (r.location_before || '-') + ' → ' + (r.location_after || '-'),
-          `<span class="tag" style="background:${outcomeColors[r.outcome] || '#888'};color:#000">${r.outcome || '?'}</span>`,
-          r.gold_delta > 0 ? `<span style="color:var(--green)">+${fmtNum(r.gold_delta)}</span>` : r.gold_delta < 0 ? `<span style="color:var(--red)">${fmtNum(r.gold_delta)}</span>` : '0',
-          r.xp_delta > 0 ? `<span style="color:var(--green)">+${fmtNum(r.xp_delta)}</span>` : '0',
+          trustedHtml(`<span class="tag" style="background:${escapeHtml(outcomeColors[r.outcome] || '#888')};color:#000">${escapeHtml(r.outcome || '?')}</span>`),
+          r.gold_delta > 0 ? trustedHtml(`<span style="color:var(--green)">+${escapeHtml(fmtNum(r.gold_delta))}</span>`) : r.gold_delta < 0 ? trustedHtml(`<span style="color:var(--red)">${escapeHtml(fmtNum(r.gold_delta))}</span>`) : '0',
+          r.xp_delta > 0 ? trustedHtml(`<span style="color:var(--green)">+${escapeHtml(fmtNum(r.xp_delta))}</span>`) : '0',
           `${r.hp_before} → ${r.hp_after}`,
-          r.is_ai_driven ? '<span style="color:var(--cyan)">AI</span>' : '',
+          r.is_ai_driven ? trustedHtml('<span style="color:var(--cyan)">AI</span>') : '',
           fmtTime(r.created_at)
         ])
       )
@@ -826,14 +826,24 @@ function fmtNum(n) {
 
 function outcomeTag(o) {
   const cls = o === 'death' ? 'tag-death' : o === 'victory' ? 'tag-victory' : 'tag-fled';
-  return `<span class="tag ${cls}">${o.toUpperCase()}</span>`;
+  return trustedHtml(`<span class="tag ${cls}">${escapeHtml(String(o ?? '').toUpperCase())}</span>`);
+}
+
+// Marks markup this page builds itself (tags, coloured spans) so makeTable puts it in
+// as HTML. Every other cell is server data and is escaped (escapeHtml is /escape.js).
+function trustedHtml(html) {
+  return { trustedHtml: String(html) };
+}
+
+function cellHtml(c) {
+  return c && typeof c === 'object' && 'trustedHtml' in c ? c.trustedHtml : escapeHtml(c);
 }
 
 function makeTable(headers, rows, rowClasses) {
-  let h = '<table><thead><tr>' + headers.map(h => `<th>${h}</th>`).join('') + '</tr></thead><tbody>';
+  let h = '<table><thead><tr>' + headers.map(h => `<th>${escapeHtml(h)}</th>`).join('') + '</tr></thead><tbody>';
   rows.forEach((row, i) => {
     const cls = rowClasses && rowClasses[i] ? rowClasses[i] : '';
-    h += `<tr class="${cls}">` + row.map(c => `<td>${c}</td>`).join('') + '</tr>';
+    h += `<tr class="${escapeHtml(cls)}">` + row.map(c => `<td>${cellHtml(c)}</td>`).join('') + '</tr>';
   });
   return h + '</tbody></table>';
 }
@@ -857,10 +867,7 @@ function updateChart(id, config) {
   charts[id] = new Chart(document.getElementById(id), config);
 }
 
-// renders overview cards (calls today, success rate, tokens, est cost) +
-// today's budget bar + per-moment-type breakdown + failure breakdown +
-// recent rendered output for spot-checking. Falls back to a "not yet ready"
-a// --- Tab Switching ---
+// --- Tab Switching ---
 document.querySelectorAll('.tab').forEach(tab => {
   tab.addEventListener('click', () => {
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
