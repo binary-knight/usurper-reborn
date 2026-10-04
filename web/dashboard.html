@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+    <script src="/escape.js"></script>
     <style>
         :root {
             --bg-dark: #0a0a0f;
@@ -1128,10 +1129,15 @@
 // Auth
 // ==========================================
 const API = '/api/dash';
-function escapeHtml(s) {
-    if (!s) return '';
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+// escapeHtml comes from /escape.js. NPC names rendered from server data travel in a
+// data-npc attribute and are read back here; no inline handler carries data.
+document.addEventListener('click', function(e) {
+    const el = e.target && e.target.closest ? e.target.closest('[data-action]') : null;
+    if (!el) return;
+    const action = el.getAttribute('data-action');
+    if (action === 'select-npc') selectNotableNpc(el.getAttribute('data-npc'));
+    else if (action === 'select-npc-list') selectNpcFromList(el.getAttribute('data-npc'));
+});
 
 async function apiGet(path) {
     const res = await fetch(API + path);
@@ -1301,6 +1307,7 @@ function updatePopBar() {
 }
 
 function formatGold(n) {
+    n = Number(n) || 0;
     if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
     if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
     return String(n);
@@ -1395,12 +1402,12 @@ function updateChildren() {
         const parents = [c.mother, c.father].filter(Boolean).join(' & ') || 'Unknown';
         const status = c.kidnapped ? '<span style="color:var(--red)">Kidnapped</span>' :
                        c.royal ? '<span class="child-royal">Royal</span>' :
-                       c.location || 'Home';
+                       escapeHtml(c.location || 'Home');
         const ageStr = c.age !== undefined ? c.age : '?';
         return `<div class="child-row">
             <span class="child-name">${escapeHtml(c.name || 'Unknown')}</span>
-            <span>${ageStr}</span>
-            <span class="${sexClass}">${sexIcon} ${c.sex || '?'}</span>
+            <span>${escapeHtml(ageStr)}</span>
+            <span class="${sexClass}">${sexIcon} ${escapeHtml(c.sex || '?')}</span>
             <span style="color:var(--text-dim);font-size:11px">${escapeHtml(parents)}</span>
             <span class="${soulClass}">${escapeHtml(soul)}</span>
             <span>${status}</span>
@@ -1633,7 +1640,7 @@ function updateWorldMap() {
                 + 'fill="' + dotColor + '" opacity="' + opacity + '" '
                 + 'stroke="' + (king ? '#ffaa00' : (pregnant ? '#ff66aa' : 'none')) + '" '
                 + 'stroke-width="' + (king ? 2 : (pregnant ? 1.5 : 0)) + '">'
-                + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title>'
+                + '<title>' + escapeHtml(name) + ' (Lv' + escapeHtml(lvl) + ')</title>'
                 + '</circle>';
         });
     });
@@ -1656,7 +1663,7 @@ function updateWorldMap() {
             svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
                 + 'cx="' + x + '" cy="' + y + '" r="' + r + '" '
                 + 'fill="' + (perma2 ? '#333' : color) + '" opacity="' + (perma2 ? 0.12 : dead ? 0.25 : 1) + '">'
-                + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
+                + '<title>' + escapeHtml(name) + ' (Lv' + escapeHtml(lvl) + ')</title></circle>';
         });
     });
     svg += '</g>';
@@ -1738,8 +1745,8 @@ function showNpcDetail(n) {
     const gold = n.gold || n.Gold || 0;
 
     let html = '<div class="detail-name">' + escapeHtml(name) + (dead ? ' <span style="color:var(--red)">[DEAD]</span>' : '') + '</div>';
-    html += '<div class="detail-sub">Level ' + lvl + ' ' + race + ' ' + cls;
-    if (age > 0) html += ' | Age ' + age;
+    html += '<div class="detail-sub">Level ' + escapeHtml(lvl) + ' ' + race + ' ' + cls;
+    if (age > 0) html += ' | Age ' + escapeHtml(age);
     html += ' | ' + faction;
     if (married && spouse) html += ' | Married to ' + escapeHtml(spouse);
     html += '</div>';
@@ -1749,7 +1756,7 @@ function showNpcDetail(n) {
     if (hp > 0) {
         const hpPct = Math.round((hp / maxHp) * 100);
         const hpColor = hpPct > 60 ? 'var(--green)' : hpPct > 30 ? 'var(--gold)' : 'var(--red)';
-        html += '<span style="color:' + hpColor + '">HP ' + hp + '/' + maxHp + '</span>';
+        html += '<span style="color:' + hpColor + '">HP ' + escapeHtml(hp) + '/' + escapeHtml(maxHp) + '</span>';
     }
     if (gold > 0) html += '<span style="color:var(--gold)">Gold ' + formatGold(gold) + '</span>';
     if (loc) html += '<span style="color:var(--text-dim)">@ ' + escapeHtml(loc) + '</span>';
@@ -2149,7 +2156,7 @@ function updateNetwork() {
         tooltip.style.left = (event.clientX + 10) + 'px';
         tooltip.style.top = (event.clientY - 10) + 'px';
         const fName = FACTION_NAMES[d.faction] || 'None';
-        tooltip.innerHTML = '<strong>' + escapeHtml(d.id) + '</strong><br>Level ' + d.level
+        tooltip.innerHTML = '<strong>' + escapeHtml(d.id) + '</strong><br>Level ' + escapeHtml(d.level)
             + '<br>Faction: ' + fName
             + (d.perma ? '<br><span style="color:#666">PERMADEAD</span>' : d.dead ? '<br><span style="color:var(--red)">DEAD</span>' : '')
             + (d.married ? '<br>Married to ' + escapeHtml(d.spouse) : '');
@@ -2430,10 +2437,10 @@ function updateNotableHighlights() {
 
     let html = '';
     highlights.forEach(h => {
-        html += '<div class="notable-chip" onclick="selectNotableNpc(\'' + escapeHtml(h.value) + '\')">'
+        html += '<div class="notable-chip" data-action="select-npc" data-npc="' + escapeHtml(h.value) + '">'
             + '<span class="nc-label">' + h.label + '</span> '
             + '<span class="nc-value">' + escapeHtml(h.value) + '</span>'
-            + ' <span style="color:var(--text-dim);font-size:10px">' + h.detail + '</span>'
+            + ' <span style="color:var(--text-dim);font-size:10px">' + escapeHtml(h.detail) + '</span>'
             + '</div>';
     });
     bar.innerHTML = html;
@@ -2574,14 +2581,14 @@ function renderNpcTable(npcs) {
         const selClass = (selectedNpc === name) ? ' selected' : '';
         const rowStyle = perma ? ' style="opacity:0.45"' : '';
 
-        html += '<tr class="' + selClass + '"' + rowStyle + ' onclick="selectNpcFromList(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">'
+        html += '<tr class="' + selClass + '"' + rowStyle + ' data-action="select-npc-list" data-npc="' + escapeHtml(name) + '">'
             + '<td style="color:' + (perma ? '#666' : 'var(--gold)') + '">' + escapeHtml(name) + '</td>'
-            + '<td>' + lvl + '</td>'
+            + '<td>' + escapeHtml(lvl) + '</td>'
             + '<td>' + cls + '</td>'
             + '<td>' + race + '</td>'
             + '<td style="color:' + fcolor + '">' + faction + '</td>'
             + '<td style="color:var(--text-dim)">' + loc + '</td>'
-            + '<td>' + (age > 0 ? age : '-') + '</td>'
+            + '<td>' + (age > 0 ? escapeHtml(age) : '-') + '</td>'
             + '<td style="color:var(--gold)">' + formatGold(gold) + '</td>'
             + '<td><span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></td>'
             + '</tr>';
@@ -2681,10 +2688,10 @@ function showLocationPopup(locKey, screenX, screenY) {
             const color = FACTION_COLORS[fid] || '#666677';
             const lvl = n.level || n.Level || 1;
             const status = computeNpcStatus(n);
-            html += '<div class="loc-popup-npc" onclick="selectNotableNpc(\'' + escapeHtml(name).replace(/'/g, "\\'") + '\')">'
+            html += '<div class="loc-popup-npc" data-action="select-npc" data-npc="' + escapeHtml(name) + '">'
                 + '<span class="loc-popup-dot" style="background:' + color + '"></span>'
                 + '<span>' + escapeHtml(name) + '</span>'
-                + '<span style="color:var(--text-dim);font-size:9px;margin-left:auto">Lv' + lvl + '</span>'
+                + '<span style="color:var(--text-dim);font-size:9px;margin-left:auto">Lv' + escapeHtml(lvl) + '</span>'
                 + '<span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + ';font-size:8px">' + status.label + '</span>'
                 + '</div>';
         });
@@ -2719,7 +2726,7 @@ function openComparison() {
     let opts = '<option value="">Select NPC...</option>';
     alive.forEach(n => {
         const name = n.name || n.Name || '?';
-        opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + ' (Lv' + (n.level || n.Level || 1) + ')</option>';
+        opts += '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + ' (Lv' + escapeHtml(n.level || n.Level || 1) + ')</option>';
     });
     selA.innerHTML = opts;
     selB.innerHTML = opts;
@@ -2771,7 +2778,7 @@ function renderCompareNpc(n, side) {
     const age = n.age || n.Age || 0;
 
     let html = '<div class="detail-name">' + escapeHtml(name) + ' <span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></div>';
-    html += '<div class="detail-sub">Lv' + lvl + ' ' + race + ' ' + cls + (age > 0 ? ' | Age ' + age : '') + ' | ' + faction + '</div>';
+    html += '<div class="detail-sub">Lv' + escapeHtml(lvl) + ' ' + race + ' ' + cls + (age > 0 ? ' | Age ' + escapeHtml(age) : '') + ' | ' + faction + '</div>';
 
     // Personality radar
     const pp = n.personalityProfile || n.PersonalityProfile;
@@ -3059,7 +3066,7 @@ updateWorldMap = function() {
                     + 'stroke="' + (selected ? '#fff' : (king ? '#ffaa00' : (pregnant ? '#ff66aa' : 'none'))) + '" '
                     + 'stroke-width="' + (selected ? 2.5 : (king ? 2 : (pregnant ? 1.5 : 0))) + '"'
                     + (selected ? ' filter="url(#glow)"' : '') + '>'
-                    + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
+                    + '<title>' + escapeHtml(name) + ' (Lv' + escapeHtml(lvl) + ')</title></circle>';
 
                 // Dominant trait badge (#9)
                 if (!dead) {
@@ -3090,7 +3097,7 @@ updateWorldMap = function() {
                 svg += '<circle class="map-npc-dot" data-npc="' + escapeHtml(name) + '" '
                     + 'cx="' + x + '" cy="' + y + '" r="' + r + '" '
                     + 'fill="' + (perma3 ? '#333' : color) + '" opacity="' + (perma3 ? 0.12 : dead ? 0.25 : 1) + '">'
-                    + '<title>' + escapeHtml(name) + ' (Lv' + lvl + ')</title></circle>';
+                    + '<title>' + escapeHtml(name) + ' (Lv' + escapeHtml(lvl) + ')</title></circle>';
             });
         });
         svg += '</g>';
@@ -3186,8 +3193,8 @@ showNpcDetail = function(n) {
     else if (dead) deathTag = ' <span style="color:var(--red)">[DEAD]</span>';
     let html = '<div class="detail-name">' + escapeHtml(name) + deathTag
         + ' <span class="npc-status-badge" style="color:' + status.color + ';background:' + status.bg + '">' + status.label + '</span></div>';
-    html += '<div class="detail-sub">Level ' + lvl + ' ' + race + ' ' + cls;
-    if (age > 0) html += ' | Age ' + age;
+    html += '<div class="detail-sub">Level ' + escapeHtml(lvl) + ' ' + race + ' ' + cls;
+    if (age > 0) html += ' | Age ' + escapeHtml(age);
     html += ' | ' + faction;
     if (married && spouse) html += ' | Married to ' + escapeHtml(spouse);
     html += '</div>';
@@ -3197,7 +3204,7 @@ showNpcDetail = function(n) {
     if (hp > 0) {
         const hpPct = Math.round((hp / maxHp) * 100);
         const hpColor = hpPct > 60 ? 'var(--green)' : hpPct > 30 ? 'var(--gold)' : 'var(--red)';
-        html += '<span style="color:' + hpColor + '">HP ' + hp + '/' + maxHp + '</span>';
+        html += '<span style="color:' + hpColor + '">HP ' + escapeHtml(hp) + '/' + escapeHtml(maxHp) + '</span>';
     }
     if (gold > 0) html += '<span style="color:var(--gold)">Gold ' + formatGold(gold) + '</span>';
     if (loc) html += '<span style="color:var(--text-dim)">@ ' + escapeHtml(loc) + '</span>';
@@ -3302,7 +3309,7 @@ showNpcDetail = function(n) {
             const pct = Math.max(0, Math.min(100, (val + 100) / 2));
             const color = val >= 0 ? '#00ff88' : '#ff4444';
             html += '<div class="rel-item">'
-                + '<span class="rel-name" title="' + escapeHtml(rname) + '" style="cursor:pointer" onclick="selectNotableNpc(\'' + escapeHtml(rname).replace(/'/g, "\\'") + '\')">' + escapeHtml(rname) + '</span>'
+                + '<span class="rel-name" title="' + escapeHtml(rname) + '" style="cursor:pointer" data-action="select-npc" data-npc="' + escapeHtml(rname) + '">' + escapeHtml(rname) + '</span>'
                 + '<div class="rel-bar-track"><div class="rel-bar-fill" style="width:' + pct + '%;background:' + color + '"></div></div>'
                 + '<span class="rel-val">' + val.toFixed(0) + '</span></div>';
         });
@@ -3555,9 +3562,9 @@ updateNetwork = function() {
 
         let html = '<strong>' + escapeHtml(d.id) + '</strong>';
         if (d.isChild) {
-            html += '<br><span style="color:#cc8800">Child, age ' + (d.childAge || '?') + '</span>';
+            html += '<br><span style="color:#cc8800">Child, age ' + escapeHtml(d.childAge || '?') + '</span>';
         } else {
-            html += '<br>Level ' + d.level + ' ' + d.cls + ' (' + d.race + ')';
+            html += '<br>Level ' + escapeHtml(d.level) + ' ' + d.cls + ' (' + d.race + ')';
             html += '<br>Faction: ' + (FACTION_NAMES[d.faction] || 'None');
             if (d.team) html += '<br>Team: ' + escapeHtml(d.team);
             if (d.perma) html += '<br><span style="color:#666">PERMADEAD</span>';
@@ -3574,7 +3581,7 @@ updateNetwork = function() {
                     html += '<br><span style="color:var(--text-dim);font-size:10px">';
                     sorted.forEach(([name, val]) => {
                         const color = val > 0 ? '#00ff88' : '#ff8844';
-                        html += '<br><span style="color:' + color + '">' + (val > 0 ? '+' : '') + val + '</span> ' + escapeHtml(name);
+                        html += '<br><span style="color:' + color + '">' + (val > 0 ? '+' : '') + escapeHtml(val) + '</span> ' + escapeHtml(name);
                     });
                     html += '</span>';
                 }

@@ -4,7 +4,8 @@
   "description": "WebSocket-to-SSH proxy for Usurper Reborn browser play",
   "main": "ssh-proxy.js",
   "scripts": {
-    "start": "node ssh-proxy.js"
+    "start": "node ssh-proxy.js",
+    "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.129.0",
