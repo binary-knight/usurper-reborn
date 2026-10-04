@@ -18,8 +18,7 @@ Registration rules:
 
 - The username is 2 to 20 characters: letters, numbers, spaces, hyphens and underscores. It must not already exist, in any capitalization.
 - The password is at least 4 characters and cannot contain a colon. You type it twice.
-- A server accepts at most 3 new accounts from one network address in 24 hours.
-- A login screen allows 5 attempts per connection, and repeated failures from one address are slowed down for a while.
+- The server limits how many accounts one network address can create and slows repeated failed logins.
 
 The language you chose on the login screen is saved to a new account. Online, your screen reader setting and language belong to the account and come back at your next login. Only one connection per account plays at a time: logging in again replaces the older session.
 
