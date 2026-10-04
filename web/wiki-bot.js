@@ -232,6 +232,17 @@ function formatLlmReply(answer, pages, origin, gameVersion, declined = false) {
   if (body.length > room) body = body.slice(0, Math.max(0, room - 3)).trimEnd() + "...";
   return body ? header + body + footer : "";
 }
+function parseRoleIds(value, logger) {
+  const parts = Array.isArray(value) ? value : String(value || "").split(",");
+  const ids = new Set();
+  parts.forEach((part, i) => {
+    const id = String(part).trim();
+    if (!id) return;
+    if (/^\d+$/.test(id)) ids.add(id);
+    else logger?.error?.(`[Wiki] Helper role entry ${i + 1} ignored: not numeric`);
+  });
+  return ids;
+}
 function createWikiBot({
   channels = [],
   roleId = "",
@@ -245,6 +256,7 @@ function createWikiBot({
   loadSdk = loadAnthropicSdk,
 } = {}) {
   const allowed = new Set(channels.filter(Boolean));
+  const roleIds = parseRoleIds(roleId, logger);
   const base = new URL(origin);
   if (
     base.protocol !== "https:" ||
@@ -264,7 +276,7 @@ function createWikiBot({
     }
   }
   let suggestionsReady = false;
-  if (allowed.size && roleId && db) {
+  if (allowed.size && roleIds.size && db) {
     try {
       ensureSuggestionSchema(db);
       suggestionsReady = true;
@@ -457,13 +469,14 @@ function createWikiBot({
       globalRequests++;
       const raw = (message.content || "").replace(mention, "").trim();
       if (SUGGEST_PREFIX.test(raw)) {
-        if (!roleId || !suggestionsReady) {
+        if (!roleIds.size || !suggestionsReady) {
           await send(
             "Wiki suggestions are not enabled. Ask the owner about the review queue.",
           );
           return true;
         }
-        if (!message.member?.roles?.cache?.has(roleId)) {
+        const memberRoles = message.member?.roles?.cache;
+        if (!memberRoles || ![...roleIds].some((id) => memberRoles.has(id))) {
           await send(
             "Wiki suggestions require the trusted helper role. Anyone can Ask.",
           );
