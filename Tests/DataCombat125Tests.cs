@@ -383,7 +383,11 @@ public class DataCombat125Tests
             InLang(lang, () => (bool)demon.Invoke(null, new object[] { new Monster { Name = "Greater Demon", TierName = "Greater Demon" } })!).Should().BeTrue(lang);
         }
         // no name check is ever handed a shown name
-        foreach (var file in new[] { Src("Systems", "CombatEngine.cs"), Src("Systems", "DivineBlessingSystem.cs"), Src("Systems", "MonsterAbilities.cs"), Src("Systems", "QuestSystem.cs") })
+        foreach (var file in new[] { Src("Systems", "CombatEngine.cs"), Src("Systems", "DivineBlessingSystem.cs"), Src("Systems", "MonsterAbilities.cs"),
+                     Src("Systems", "QuestSystem.cs"), Src("Systems", "OldGodBossSystem.cs"), Src("Systems", "PermadeathHelper.cs"),
+                     Src("Locations", "CastleLocation.cs"), Src("Locations", "DungeonLocation.cs"), Src("Locations", "WildernessLocation.cs"),
+                     Src("Locations", "HomeLocation.cs"), Src("Locations", "SettlementLocation.cs"), Src("Locations", "QuestHallLocation.cs"),
+                     Src("Core", "King.cs"), Src("Core", "Quest.cs"), Src("Server", "GroupFollowerDeath.cs") })
             foreach (var row in Rows(file).Where(r => r.Contains("MonsterNames.")))
             {
                 row.Should().NotContain(".Contains(\"");
@@ -451,7 +455,7 @@ public class DataCombat125Tests
     public void StoredNames_StayEnglish_ThroughASaveAndReload_AndShowInTheReadersLanguage(string lang)
     {
         var hero = Hero();
-        hero.Name2 = "DcSave" + lang;
+        hero.Name1 = hero.Name2 = "DcSave" + lang;
         hero.PetRoster.Add(new Pet { Id = "dire_wolf", Name = BeastData.GetById("dire_wolf")!.Name, Level = 2 });
         var quest = new Quest { Occupier = hero.Name2, Title = "save test", QuestTarget = QuestTarget.Monster };
         quest.Objectives.Add(QuestObjective.Localized(QuestObjectiveType.KillSpecificMonster, "quest.objective.kill_count", new object[] { 4, "Wraiths" }, 4, "wraith", "Wraith"));
@@ -459,24 +463,37 @@ public class DataCombat125Tests
         QuestSystem.AddQuestToDatabase(quest);
         try
         {
+            // saved and restored in the reader's language, through the game's own save and reload
             var data = InLang(lang, () => (PlayerData)typeof(SaveSystem).GetMethod("SerializePlayer", F)!.Invoke(SaveSystem.Instance, new object[] { hero })!);
-            var back = JsonSerializer.Deserialize<PlayerData>(JsonSerializer.Serialize(data))!;
-            back.PetRoster.Should().ContainSingle(p => p.Name == "Dire Wolf");
-            var q = back.ActiveQuests.First(x => x.Title == "save test");
-            q.Objectives.Single().TargetName.Should().Be("Wraith");
-            q.Objectives.Single().DescriptionArgs.Should().Contain("Wraiths");
-            q.Monsters.Single().MonsterName.Should().Be("Wraith");
+            var json = JsonSerializer.Deserialize<PlayerData>(JsonSerializer.Serialize(data))!;
+            json.PetRoster.Should().ContainSingle(p => p.Name == "Dire Wolf");
+            json.ActiveQuests.First(x => x.Title == "save test").Objectives.Single().TargetName.Should().Be("Wraith");
+            var back = InLang(lang, () =>
+            {
+                var restore = typeof(GameEngine).GetMethod("RestorePlayerFromSaveData", F)!;
+                try { return (Character)restore.Invoke(GameEngine.Instance, new object[] { json })!; }
+                catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+            });
+            back.PetRoster.Should().ContainSingle(p => p.Name == "Dire Wolf", "the pet keeps its English name");
+            var restored = QuestSystem.GetPlayerQuests(back.Name2).Single(q => q.Title == "save test");
+            restored.Objectives.Single().TargetName.Should().Be("Wraith");
+            restored.Objectives.Single().TargetId.Should().Be("wraith");
+            restored.Objectives.Single().DescriptionArgs.Should().Contain("Wraiths");
+            restored.Monsters.Single().MonsterName.Should().Be("Wraith");
+            // shown in the reader's language after the reload
+            InLang(lang, () => MonsterNames.Display(back.PetRoster[0].Name)).Should().Be(L(lang, "monster.name.dire_wolf"));
+            InLang(lang, restored.Objectives[0].GetDisplayDescription).Should().Be(L(lang, "quest.objective.kill_count", 4,
+                lang == "en" ? "Wraiths" : L(lang, "monster.plural.wraith")));
+            restored.Deleted = true;
         }
         finally { quest.Deleted = true; }
-        InLang(lang, () => MonsterNames.Display("Dire Wolf")).Should().Be(L(lang, "monster.name.dire_wolf"));
-        InLang(lang, quest.Objectives[0].GetDisplayDescription).Should().Be(L(lang, "quest.objective.kill_count", 4,
-            lang == "en" ? "Wraiths" : L(lang, "monster.plural.wraith")));
 
         // the castle's monster guards: bought in the reader's language, kept in English through the court's JSON
         var court = new RoyalCourtSaveData { Treasury = 1_000_000 };
         InLang(lang, () => King.AddMonsterGuard(court, "Hellhound", 12, 6000L)).Should().BeTrue();
         var reloaded = JsonSerializer.Deserialize<RoyalCourtSaveData>(JsonSerializer.Serialize(court))!;
         reloaded.MonsterGuards.Should().ContainSingle(m => m.Name == "Hellhound");
+        InLang(lang, () => MonsterNames.Display(reloaded.MonsterGuards[0].Name)).Should().Be(L(lang, "monster.name.hellhound"));
     }
 
     // ---------- 4. a party of mixed languages ----------
