@@ -169,14 +169,6 @@ public static class CombatMessages
     }
 
     /// <summary>
-    /// Get spell cast message with appropriate color
-    /// </summary>
-    public static string GetSpellCastMessage(string casterName, string spellName, string casterColor = "white")
-    {
-        return $"[{casterColor}]{casterName}[/] casts [bright_magenta]{spellName}[/]!";
-    }
-
-    /// <summary>
     /// Get death message
     /// </summary>
     public static string GetDeathMessage(string name, string color = "white", Random? random = null)

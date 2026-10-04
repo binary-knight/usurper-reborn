@@ -774,4 +774,20 @@ public class Leftovers125Tests
         m.GetParameters().Select(p => p.ParameterType == typeof(SecretBossType) ? type
             : p.ParameterType == typeof(int) ? 50 : p.ParameterType == typeof(float) ? 1f : p.ParameterType == typeof(double) ? 1.0
             : p.HasDefaultValue ? p.DefaultValue : null).ToArray();
+
+    // ====================================================================================================
+    // C. dead code removed (no reader in Scripts, Tests, tools or electron-client)
+    // ====================================================================================================
+
+    [Fact]
+    public void TheDeadMonsterSpellAndTerrainCode_IsGone()
+    {
+        typeof(Monster).GetMethod("CastSpell", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance).Should().BeNull();
+        typeof(Monster).GetMethod("CastSpellByIndex", F).Should().BeNull();
+        typeof(Monster).Assembly.GetType("MonsterSpellResult").Should().BeNull();
+        typeof(CombatMessages).GetMethod("GetSpellCastMessage").Should().BeNull();
+        foreach (var name in new[] { "CreateDungeonMonster", "GetMonsterNamesForTerrain", "GetWeaponArmorForTerrain", "GetLeaderName" })
+            typeof(DungeonLocation).GetMethod(name, F).Should().BeNull(name);
+        typeof(DungeonLocation).GetMethods(F).Where(m => m.Name == "GetMonsterPhrase").Should().BeEmpty();
+    }
 }
