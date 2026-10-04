@@ -1,8 +1,9 @@
 ---
 title: The Sanctum
 path: /wiki/en/world/sanctum/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/SanctumLocation.cs
+history: 1.2.5 | Honor tournament champions and their drops are shown in each player's language, and the daily cost row is translated into all five languages.
 ---
 The Sanctum offers charitable and honor-oriented activities. It is separate from the Temple and the Castle's political menu.
 

@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs
+history: 1.2.5 | Monster names in combat are shown in the player's language, and long attack, miss and spell rows wrap inside 79 columns.
 history: 1.2.4 | In group combat each player reads the turn screen, menus and round status in their own language.
 ---
 ## Before choosing an action

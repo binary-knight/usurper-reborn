@@ -1,8 +1,9 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs
+history: 1.2.5 | After an online sleep, attacks by NPCs now appear in the wake-up report, and NPC attackers fight your surviving hired Inn guards.
 history: 1.2.4 | none
 ---
 The Inn and Home provide different rest and social actions. Recovering HP, recovering Mental and starting a new day are distinct effects.

@@ -1,8 +1,9 @@
 ---
 title: Gods and faith
 path: /wiki/en/gods/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Systems/GodSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/FaithSystem.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.2.5 | Temple screens are shown in all five languages, and the sacrifice notice reaches a player-god in that god's language.
 history: 1.2.4 | The notice a player-god gets when you sacrifice gold at its altar now reaches its mailbox.
 ---
 You worship one god at a time. The Temple's canonical gods and player-gods compete for followers. Your personal Favor controls how much of your god's boon you receive.

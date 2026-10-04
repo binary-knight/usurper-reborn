@@ -1,8 +1,9 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/TempleLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.5 | Temple screens are shown in all five languages, and a player god's prayer, new worshipper and sacrifice notices arrive in that god's own language.
 history: 1.2.4 | The notice a player-god gets when you sacrifice gold at its altar now reaches its mailbox.
 ---
 The Temple is organized into rooms. Legacy shortcuts can point you to the new location for an action.

@@ -1,8 +1,9 @@
 ---
 title: Getting started
 path: /wiki/en/getting-started/
-checked: 1.2.4
+checked: 1.2.5
 sources: Scripts/Locations/CharacterCreationLocation.cs, DOCS/BBS_DOOR_SETUP.md
+history: 1.2.5 | The end of character creation names your race and class in your language.
 history: 1.2.4 | Closing the connection during character creation no longer shows a "try again" prompt.
 ---
 Begin with the [ways to connect](/wiki/en/getting-started/connections/) and [accounts and character slots](/wiki/en/getting-started/accounts/), then create a character and take a short [first expedition](/wiki/en/getting-started/first-hour/). If something goes wrong, see [reporting bugs](/wiki/en/getting-started/reporting-bugs/).
