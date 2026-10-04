@@ -215,6 +215,39 @@ public class GuardNames125Tests
         WorldSimulator.GetGuardName("royal_guard").Should().Be("Guard");
     }
 
+    // ---------- sleep guards: maxHp (v125-bugs 16) ----------
+
+    [Fact]
+    public void AfterAPlayersAttack_TheWorldSimulationStillSeesTheSurvivingGuards()
+    {
+        string hired = InnLocation.HiredGuardsJson(new[] { ("rookie_npc", 80), ("troll", 200), ("drake", 300) });
+        var guards = InnLocation.ParseAttackGuards(hired);
+        guards.RemoveAt(0);                                   // the attacker cut down the first guard
+        guards[0] = (guards[0].type, guards[0].name, 40, guards[0].maxHp);   // the second repelled them, hurt
+        string back = InnLocation.AttackedGuardsJson(guards);
+
+        var row = JsonNode.Parse(back)!.AsArray();
+        row.Should().OnlyContain(g => g!["maxHp"] != null && g["max_hp"] == null, "the attack writes the key the hire writes");
+
+        var sim = WorldSimulator.ParseGuards(back);
+        sim.Select(g => (g.Type, g.Hp, g.MaxHp)).Should().Equal(("troll", 40, 200), ("drake", 300, 300));
+        InnLocation.ParseAttackGuards(back).Select(g => (g.type, g.hp, g.maxHp)).Should().Equal(("troll", 40, 200), ("drake", 300, 300));
+    }
+
+    [Fact]
+    public void AnOldMaxUnderscoreRow_AndAMaxHpRow_LoadInBothReaders()
+    {
+        foreach (var key in new[] { "max_hp", "maxHp" })
+        {
+            string json = "[{\"type\":\"elite_npc\",\"name\":\"Guard\",\"hp\":70,\"" + key + "\":250}]";
+            WorldSimulator.ParseGuards(json).Select(g => (g.Type, g.Hp, g.MaxHp)).Should().Equal(new[] { ("elite_npc", 70, 250) }, key);
+            InnLocation.ParseAttackGuards(json).Select(g => (g.type, g.hp, g.maxHp)).Should().Equal(new[] { ("elite_npc", 70, 250) }, key);
+        }
+        // neither key: the maximum is the current HP, as before
+        WorldSimulator.ParseGuards("[{\"type\":\"hound\",\"hp\":60}]").Single().MaxHp.Should().Be(60);
+        InnLocation.ParseAttackGuards("[{\"type\":\"hound\",\"hp\":60}]").Single().maxHp.Should().Be(60);
+    }
+
     // ---------- the sleep report ----------
 
     [Fact]

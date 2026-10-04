@@ -7829,11 +7829,15 @@ public class WorldSimulator
             {
                 string type = elem.GetProperty("type").GetString() ?? "rookie_npc";
                 string? stored = elem.TryGetProperty("name", out var nameElem) && nameElem.ValueKind == JsonValueKind.String ? nameElem.GetString() : null;
+                int hp = elem.GetProperty("hp").GetInt32();
+                // v1.2.5: maxHp (the hire, this simulation) or max_hp (a row a player's attack wrote before 1.2.5)
+                int maxHp = elem.TryGetProperty("maxHp", out var mx) ? mx.GetInt32()
+                    : elem.TryGetProperty("max_hp", out var mxOld) ? mxOld.GetInt32() : hp;
                 guards.Add(new GuardData(
                     type,
                     string.IsNullOrEmpty(stored) ? GetGuardName(type) : stored,
-                    elem.GetProperty("hp").GetInt32(),
-                    elem.GetProperty("maxHp").GetInt32()
+                    hp,
+                    maxHp
                 ));
             }
             return guards;

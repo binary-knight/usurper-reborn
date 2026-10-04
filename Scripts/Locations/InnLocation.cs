@@ -5565,7 +5565,7 @@ public class InnLocation : BaseLocation
                     string gType = g["type"]?.GetValue<string>() ?? "rookie_npc";
                     string? gName = g["name"]?.GetValue<string>();
                     int gHp = g["hp"]?.GetValue<int>() ?? 50;
-                    int gMaxHp = g["max_hp"]?.GetValue<int>() ?? gHp;
+                    int gMaxHp = (g["maxHp"] ?? g["max_hp"])?.GetValue<int>() ?? gHp;   // v1.2.5: the hire writes maxHp, an older attack max_hp
                     guards.Add((gType, gName, gHp, gMaxHp));
                 }
             }
@@ -5574,9 +5574,13 @@ public class InnLocation : BaseLocation
         return guards;
     }
 
-    /// <summary>v1.2.5: the guards left after a player's attack, written back with the stored name (English when the row had none).</summary>
+    /// <summary>
+    /// v1.2.5: the guards left after a player's attack, written back with the stored name (English when the row
+    /// had none) and maxHp, the key the hire and the world simulation use (before, max_hp, which the world
+    /// simulation could not read, so its NPC attacks skipped the surviving guards).
+    /// </summary>
     internal static string AttackedGuardsJson(IEnumerable<(string type, string? name, int hp, int maxHp)> guards) =>
-        JsonSerializer.Serialize(guards.Select(g => new { type = g.type, name = g.name ?? GuardStoredName(g.type), hp = g.hp, max_hp = g.maxHp }));
+        JsonSerializer.Serialize(guards.Select(g => new { type = g.type, name = g.name ?? GuardStoredName(g.type), hp = g.hp, maxHp = g.maxHp }));
 
     private static (string type, string name, int baseCost, int baseHp)[] GetGuardOptions() => new[]
     {
