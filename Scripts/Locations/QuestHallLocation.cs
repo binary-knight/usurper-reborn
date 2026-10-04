@@ -600,7 +600,7 @@ public class QuestHallLocation : BaseLocation
             terminal.WriteLine($"  {Loc.Get("quest_hall.targets")}", "cyan");
             foreach (var monster in quest.Monsters)
             {
-                terminal.WriteLine($"    - {monster.MonsterName} x{monster.Count}");
+                terminal.WriteLine($"    - {MonsterNames.Display(monster.MonsterName)} x{monster.Count}");
             }
         }
 
@@ -701,7 +701,7 @@ public class QuestHallLocation : BaseLocation
         {
             foreach (var m in quest.Monsters)
             {
-                objectives.Add(Loc.Get("quest_hall.objective_defeat", m.MonsterName, m.Count));
+                objectives.Add(Loc.Get("quest_hall.objective_defeat", MonsterNames.Display(m.MonsterName), m.Count));
             }
         }
 

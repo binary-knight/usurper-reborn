@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using UsurperRemake.Systems;
 
 namespace UsurperRemake.Data
 {
@@ -114,6 +115,15 @@ namespace UsurperRemake.Data
     /// </summary>
     public static class WorldBossDatabase
     {
+        /// <summary>v1.2.5: a boss's element in the reader's language (worldboss.element.{element}). Element stays
+        /// English in the data: it is the boss monster's family and the loot generator's element word.</summary>
+        public static string ElementLabel(string? element)
+        {
+            if (string.IsNullOrEmpty(element)) return element ?? "";
+            string key = "worldboss.element." + element.ToLowerInvariant();
+            return Loc.HasIn("en", key) && Loc.GetIn("en", key) == element ? Loc.Get(key) : element;
+        }
+
         private static readonly List<WorldBossDefinition> AllBosses = new()
         {
             GetAbyssalLeviathan(),

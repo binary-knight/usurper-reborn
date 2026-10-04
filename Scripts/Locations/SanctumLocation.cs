@@ -727,12 +727,12 @@ namespace UsurperRemake.Locations
                         {
                             currentPlayer.Inventory.Add(drop);
                             terminal.SetColor("cyan");
-                            terminal.WriteLine($"  {Loc.Get("tournament.drop_claimed", drop.Name, championData.LocDropFlavor())}");
+                            terminal.WriteLine($"  {Loc.Get("tournament.drop_claimed", ItemNames.Display(drop), championData.LocDropFlavor())}");
                         }
                         else
                         {
                             terminal.SetColor("dark_gray");
-                            terminal.WriteLine($"  {Loc.Get("tournament.drop_inventory_full", drop.Name)}");
+                            terminal.WriteLine($"  {Loc.Get("tournament.drop_inventory_full", ItemNames.Display(drop))}");
                         }
                     }
                 }

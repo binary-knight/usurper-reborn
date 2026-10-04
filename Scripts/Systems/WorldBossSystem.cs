@@ -885,7 +885,7 @@ namespace UsurperRemake.Systems
             if (bossDef != null)
             {
                 terminal.SetColor("darkgray");
-                terminal.WriteLine($"  {Loc.Get("world_boss.element")}: {bossDef.Element}  |  {Loc.Get("world_boss.attacks_per_round")}: {bossDef.AttacksPerRound}");
+                terminal.WriteLine($"  {Loc.Get("world_boss.element")}: {WorldBossDatabase.ElementLabel(bossDef.Element)}  |  {Loc.Get("world_boss.attacks_per_round")}: {bossDef.AttacksPerRound}");
             }
             terminal.WriteLine("");
         }

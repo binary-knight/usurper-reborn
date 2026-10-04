@@ -108,7 +108,7 @@ public partial class Quest
         if (!string.IsNullOrEmpty(TitleKey))
         {
             return TitleArgs.Count > 0
-                ? Loc.Get(TitleKey, ResolveLocArgs(TitleArgs))
+                ? Loc.Get(TitleKey, QuestSystem.ShowMonsterArgs(ResolveLocArgs(TitleArgs), Objectives.FirstOrDefault(o => o.ObjectiveType == QuestObjectiveType.KillBoss)))   // v1.2.5
                 : Loc.Get(TitleKey);
         }
         return Title;
@@ -561,7 +561,7 @@ public class QuestObjective
         if (!string.IsNullOrEmpty(DescriptionKey))
         {
             return DescriptionArgs.Count > 0
-                ? Loc.Get(DescriptionKey, ResolveLocArgs(DescriptionArgs))
+                ? Loc.Get(DescriptionKey, QuestSystem.ShowMonsterArgs(ResolveLocArgs(DescriptionArgs), this))   // v1.2.5: monster names shown
                 : Loc.Get(DescriptionKey);
         }
         return Description;

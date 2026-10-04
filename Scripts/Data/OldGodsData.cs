@@ -10,6 +10,33 @@ namespace UsurperRemake.Data
     /// </summary>
     public static class OldGodsData
     {
+        /// <summary>v1.2.5: every Old God fight, the Noctura betrayal variant included, for the name display.</summary>
+        public static List<OldGodBossData> GetAllOldGodsWithVariants()
+        {
+            var all = GetAllOldGods();
+            all.Add(GetNocturaBetrayal());
+            return all;
+        }
+
+        /// <summary>
+        /// v1.2.5: the key an Old God ability name shows through (oldgod.ability.{id}), or null. The ability
+        /// names stay English in the data: the combat engine picks each ability's effect by its English name.
+        /// </summary>
+        public static string? AbilityKeyOf(string? abilityName)
+        {
+            if (string.IsNullOrEmpty(abilityName)) return null;
+            string key = "oldgod.ability." + MonsterNames.IdOf(abilityName);
+            return Loc.HasIn("en", key) && Loc.GetIn("en", key) == abilityName ? key : null;
+        }
+
+        /// <summary>v1.2.5: an Old God ability name in the reader's language (as stored when it has no key).</summary>
+        public static string AbilityLabel(string abilityName) =>
+            AbilityKeyOf(abilityName) is string key ? Loc.Get(key) : abilityName;
+
+        /// <summary>v1.2.5: an Old God ability name in the given language.</summary>
+        public static string AbilityLabelIn(string lang, string abilityName) =>
+            AbilityKeyOf(abilityName) is string key ? Loc.GetIn(lang, key) : abilityName;
+
         /// <summary>
         /// Get all Old God boss data
         /// </summary>
@@ -943,7 +970,8 @@ namespace UsurperRemake.Data
         // lowercased OldGodType; the Noctura betrayal variant sets it to "noctura_betrayal"
         // so it doesn't collide with the regular Noctura fight. The English arrays above are
         // the source/fallback; the Loc* accessors below resolve translated dialogue at display
-        // time so boss fights read in the player's language. Boss Name/Title stay English.
+        // time so boss fights read in the player's language. Name and Title stay English in the data and show
+        // through LocName and LocTitle (v1.2.5).
         public string LocKey { get; set; } = "";
         private string DialogueKey => string.IsNullOrEmpty(LocKey) ? Type.ToString().ToLowerInvariant() : LocKey;
         private string[] LocArray(string section, string[] fallback)
@@ -964,6 +992,22 @@ namespace UsurperRemake.Data
         public string[] LocDefeat() => LocArray("defeat", DefeatDialogue);
         public string[] LocLoss() => LocArray("loss", LossDialogue);
         public string[] LocSave() => SaveDialogue == null ? Array.Empty<string>() : LocArray("save", SaveDialogue);
+
+        /// <summary>v1.2.5: the key part of this fight's oldgod.{key}.* keys.</summary>
+        public string NameKeyPart => DialogueKey;
+
+        /// <summary>v1.2.5: the god's name with its epithet in the reader's language (oldgod.{key}.name; the
+        /// proper name is the same in every language). Name stays English: it is the boss monster's stored name.</summary>
+        public string LocName() => LocField("name", Name);
+
+        /// <summary>v1.2.5: the god's title in the reader's language (oldgod.{key}.title).</summary>
+        public string LocTitle() => LocField("title", Title);
+
+        private string LocField(string field, string english)
+        {
+            string key = $"oldgod.{DialogueKey}.{field}";
+            return Loc.HasIn("en", key) && Loc.GetIn("en", key) == english ? Loc.Get(key) : english;
+        }
 
         // Phase thresholds (percentage of HP)
         public float Phase1Threshold { get; set; }

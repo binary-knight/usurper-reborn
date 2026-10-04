@@ -146,13 +146,13 @@ public static class WikiDataExporter
         .OrderBy(f => f.FamilyName).Select(family => new
         {
             id = KeyPart(family.FamilyName),
-            name = Names(null, family.FamilyName),
+            name = Names(MonsterNames.FamilyKeyOf(family.FamilyName), family.FamilyName),   // v1.2.5: monster.family.*
             description = family.Description,
             attackType = family.AttackType,
             tiers = family.Tiers.Select(tier => new
             {
                 id = KeyPart(tier.Name),
-                name = Names(null, tier.Name),
+                name = Names(MonsterNames.KeyOf(tier.Name), tier.Name),   // v1.2.5: monster.name.*; en is the stored name
                 tier.MinLevel, tier.MaxLevel, tier.PowerMultiplier,
                 abilities = tier.SpecialAbilities,
                 normalStatsAtMinLevel = MonsterStats(tier.MinLevel, tier.PowerMultiplier),
@@ -344,7 +344,7 @@ public static class WikiDataExporter
         var oldGods = OldGodsData.GetAllOldGods().Select(b => new
         {
             id = b.Type.ToString(), kind = "oldGod", spoiler = true,
-            name = Names(null, b.Name), b.Title, baseLevel = b.Level, b.DungeonFloor,
+            name = Names(MonsterNames.KeyOf(b.Name), b.Name), b.Title, baseLevel = b.Level, b.DungeonFloor,   // v1.2.5: oldgod.{key}.name
             baseHP = b.HP, baseStrength = b.Strength, baseDefence = b.Defence,
             baseAgility = b.Agility, b.AttacksPerRound,
             phases = new[] { b.Phase1Abilities, b.Phase2Abilities, b.Phase3Abilities }

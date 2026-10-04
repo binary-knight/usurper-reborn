@@ -124,7 +124,7 @@ public class CombatLocA122Tests
             src.Should().Contain($"\"combat.{key}\"");
         Regex.Matches(src, "BroadcastGroupDeathLine\\(result, \"combat\\.group_(slain|fallen)\"").Count.Should().Be(2);
         src.Should().Contain("BroadcastGroupLocalized(result, GroupRetreatLine)");
-        src.Should().Contain("GroupLine(lang, \"\\u001b[36m\", \"combat.boss_confused\", monster.Name)");
+        src.Should().Contain("GroupLine(lang, \"\\u001b[36m\", \"combat.boss_confused\", MonsterNames.DisplayIn(lang, monster))");
     }
 
     // ---------- 2. the compact BBS menus ----------
@@ -328,8 +328,8 @@ public class CombatLocA122Tests
         text.Should().Contain("Kobold").And.Contain("12%").And.Contain("Maelketh");
         text.Should().NotContain("% dodge").And.NotContain("defeated the boss");
         string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
-        src.Should().Contain("Loc.Get(\"combat.you_dodge_chance\", monster.Name, StatEffectsSystem.GetDodgeChance(player.Agility))");
-        src.Should().Contain("Loc.Get(\"combat.news_boss_defeated\", bossKillerName, result.Monster.Name)");
+        src.Should().Contain("Loc.Get(\"combat.you_dodge_chance\", MonsterNames.Display(monster), StatEffectsSystem.GetDodgeChance(player.Agility))");
+        src.Should().Contain("Loc.Get(\"combat.news_boss_defeated\", bossKillerName, MonsterNames.Display(result.Monster))");
     }
 
     // ---------- 6. a teammate's elemental procs ----------
@@ -581,7 +581,7 @@ public class CombatLocA122Tests
             return Shown(term, output);
         });
         Capture($"combat-a-holy-corrode-{lang}.txt", text);
-        text.Should().Contain(Loc.GetIn(lang, "combat.ability_purified", "Ghoul"));
+        text.Should().Contain(Loc.GetIn(lang, "combat.ability_purified", MonsterNames.DisplayIn(lang, "Ghoul")));
         text.Should().Contain(Loc.GetIn(lang, "combat.hp_loss_holy", 0).Split(' ')[1]);
         text.Should().NotContain("(HOLY!)").And.NotContain("is purified!").And.NotContain("Corrosive cloud hits");
     }
@@ -596,7 +596,7 @@ public class CombatLocA122Tests
         CombatEngine.GroupLine("en", "\u001b[1;32m", "combat.group_slays", "Tester", "Kobold")
             .Should().Be("\u001b[1;32m  Tester slays the Kobold!\u001b[0m");
         string src = File.ReadAllText(Path.Combine(RepoRoot(), "Scripts", "Systems", "CombatEngine.cs"));
-        src.Should().Contain("killerName ?? Loc.GetIn(lang, \"combat.group_someone\"), target.Name));");
+        src.Should().Contain("killerName ?? Loc.GetIn(lang, \"combat.group_someone\"), MonsterNames.DisplayIn(lang, target)));");
     }
 
     [Theory]

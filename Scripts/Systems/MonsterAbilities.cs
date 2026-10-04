@@ -285,7 +285,7 @@ public static class MonsterAbilities
         {
             case AbilityType.Multiattack:
                 result.ExtraAttacks = _rnd.Next(1, 3); // 1-2 extra attacks
-                result.Message = Loc.Get("mability.multiattack", monster.Name);
+                result.Message = Loc.Get("mability.multiattack", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;
 
@@ -294,7 +294,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 25;
-                result.Message = Loc.Get("mability.crushing_blow", monster.Name);
+                result.Message = Loc.Get("mability.crushing_blow", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -303,7 +303,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 5;
                 result.StatusChance = 60;
-                result.Message = Loc.Get("mability.venomous_bite", monster.Name);
+                result.Message = Loc.Get("mability.venomous_bite", MonsterNames.Display(monster));
                 result.MessageColor = "green";
                 break;
 
@@ -312,7 +312,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Bleeding;
                 result.StatusDuration = 4;
                 result.StatusChance = 50;
-                result.Message = Loc.Get("mability.bleeding_wound", monster.Name);
+                result.Message = Loc.Get("mability.bleeding_wound", MonsterNames.Display(monster));
                 result.MessageColor = "red";
                 break;
 
@@ -322,7 +322,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.fire_breath", monster.Name);
+                result.Message = Loc.Get("mability.fire_breath", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -332,7 +332,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.frost_breath", monster.Name);
+                result.Message = Loc.Get("mability.frost_breath", MonsterNames.Display(monster));
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -342,21 +342,21 @@ public static class MonsterAbilities
                 result.StatusDuration = 6;
                 result.StatusChance = 70;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.poison_cloud", monster.Name);
+                result.Message = Loc.Get("mability.poison_cloud", MonsterNames.Display(monster));
                 result.MessageColor = "green";
                 break;
 
             case AbilityType.LifeDrain:
                 result.DamageMultiplier = 0.7f;
                 result.LifeStealPercent = 50;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.life_drain.you", monster.Name) : Loc.Get("mability.life_drain.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.life_drain.you", MonsterNames.Display(monster)) : Loc.Get("mability.life_drain.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "magenta";
                 break;
 
             case AbilityType.ManaDrain:
                 result.ManaDrain = Math.Min(target.Mana, monster.Level * 5 + _rnd.Next(5, 15));
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.mana_drain", monster.Name, result.ManaDrain);
+                result.Message = Loc.Get("mability.mana_drain", MonsterNames.Display(monster), result.ManaDrain);
                 result.MessageColor = "bright_blue";
                 break;
 
@@ -366,14 +366,14 @@ public static class MonsterAbilities
                 result.DamageMultiplier = 0; // Heal only — no damage to target
                 result.SkipNormalAttack = false; // Can still attack normally
                 result.IsSelfOnly = true; // No "attacks!" message needed
-                result.Message = Loc.Get("mability.regeneration", monster.Name, healAmount);
+                result.Message = Loc.Get("mability.regeneration", MonsterNames.Display(monster), healAmount);
                 result.MessageColor = "bright_green";
                 break;
 
             case AbilityType.Thorns:
                 result.DamageMultiplier = 0; // Passive reflect — no direct damage
                 result.ReflectDamagePercent = 25;
-                result.Message = Loc.Get("mability.thorns", monster.Name);
+                result.Message = Loc.Get("mability.thorns", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;
 
@@ -383,12 +383,12 @@ public static class MonsterAbilities
                 {
                     monster.ArmPow += monster.Level / 2;
                     monster.HasHardenedArmor = true;
-                    result.Message = Loc.Get("mability.armor_harden", monster.Name);
+                    result.Message = Loc.Get("mability.armor_harden", MonsterNames.Display(monster));
                     result.MessageColor = "gray";
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.armor_harden_already", monster.Name);
+                    result.Message = Loc.Get("mability.armor_harden_already", MonsterNames.Display(monster));
                     result.MessageColor = "darkgray";
                 }
                 result.DamageMultiplier = 0; // Buff only — no damage
@@ -402,7 +402,7 @@ public static class MonsterAbilities
                 // during the buff window actually have a chance to miss.
                 monster.EvasionRounds = 2;
                 monster.EvasionMissChance = 30;
-                result.Message = Loc.Get("mability.vanish", monster.Name);
+                result.Message = Loc.Get("mability.vanish", MonsterNames.Display(monster));
                 result.MessageColor = "darkgray";
                 break;
 
@@ -413,7 +413,7 @@ public static class MonsterAbilities
                     result.AvoidAllDamage = true;
                     monster.EvasionRounds = 2;
                     monster.EvasionMissChance = 50;
-                    result.Message = Loc.Get("mability.phase", monster.Name);
+                    result.Message = Loc.Get("mability.phase", MonsterNames.Display(monster));
                     result.MessageColor = "bright_cyan";
                 }
                 break;
@@ -423,7 +423,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.petrifying_gaze.you", monster.Name) : Loc.Get("mability.petrifying_gaze.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.petrifying_gaze.you", MonsterNames.Display(monster)) : Loc.Get("mability.petrifying_gaze.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "gray";
                 break;
 
@@ -432,7 +432,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.horrifying_scream", monster.Name);
+                result.Message = Loc.Get("mability.horrifying_scream", MonsterNames.Display(monster));
                 result.MessageColor = "magenta";
                 break;
 
@@ -441,7 +441,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.blinding_flash", monster.Name);
+                result.Message = Loc.Get("mability.blinding_flash", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -450,7 +450,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 5;
                 result.StatusChance = 45;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.curse", monster.Name);
+                result.Message = Loc.Get("mability.curse", MonsterNames.Display(monster));
                 result.MessageColor = "magenta";
                 break;
 
@@ -459,7 +459,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.silence.you", monster.Name) : Loc.Get("mability.silence.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.silence.you", MonsterNames.Display(monster)) : Loc.Get("mability.silence.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_blue";
                 break;
 
@@ -468,7 +468,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.enfeeble.you", monster.Name) : Loc.Get("mability.enfeeble.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.enfeeble.you", MonsterNames.Display(monster)) : Loc.Get("mability.enfeeble.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "yellow";
                 break;
 
@@ -477,13 +477,13 @@ public static class MonsterAbilities
                 if (target.HP < target.MaxHP / 5)
                 {
                     result.DirectDamage = (int)target.HP; // Instant kill
-                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_kill.you", monster.Name) : Loc.Get("mability.devour_kill.ally", monster.Name, target.Name));
+                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_kill.you", MonsterNames.Display(monster)) : Loc.Get("mability.devour_kill.ally", MonsterNames.Display(monster), target.Name));
                     result.MessageColor = "bright_red";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.3f;
-                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_try.you", monster.Name) : Loc.Get("mability.devour_try.ally", monster.Name, target.Name));
+                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_try.you", MonsterNames.Display(monster)) : Loc.Get("mability.devour_try.ally", MonsterNames.Display(monster), target.Name));
                     result.MessageColor = "red";
                 }
                 break;
@@ -494,7 +494,7 @@ public static class MonsterAbilities
                 {
                     result.DamageMultiplier = 2.0f;
                     result.ExtraAttacks = 1;
-                    result.Message = Loc.Get("mability.berserk", monster.Name);
+                    result.Message = Loc.Get("mability.berserk", MonsterNames.Display(monster));
                     result.MessageColor = "bright_red";
                 }
                 break;
@@ -503,14 +503,14 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = _rnd.Next(1, 3);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.summon_minions", monster.Name);
+                result.Message = Loc.Get("mability.summon_minions", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;
 
             case AbilityType.Explosion:
                 // Death explosion - handled when monster dies
                 result.OnDeathDamage = (int)(monster.MaxHP / 2);
-                result.Message = Loc.Get("mability.explosion", monster.Name);
+                result.Message = Loc.Get("mability.explosion", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -519,13 +519,13 @@ public static class MonsterAbilities
                 if (_rnd.Next(100) < 5) // 5% chance
                 {
                     result.DirectDamage = (int)target.HP;
-                    result.Message = (isPlayerTarget ? Loc.Get("mability.soul_reap_kill.you", monster.Name) : Loc.Get("mability.soul_reap_kill.ally", monster.Name, target.Name));
+                    result.Message = (isPlayerTarget ? Loc.Get("mability.soul_reap_kill.you", MonsterNames.Display(monster)) : Loc.Get("mability.soul_reap_kill.ally", MonsterNames.Display(monster), target.Name));
                     result.MessageColor = "bright_red";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.5f;
-                    result.Message = (isPlayerTarget ? Loc.Get("mability.soul_reap_reach.you", monster.Name) : Loc.Get("mability.soul_reap_reach.ally", monster.Name, target.Name));
+                    result.Message = (isPlayerTarget ? Loc.Get("mability.soul_reap_reach.you", MonsterNames.Display(monster)) : Loc.Get("mability.soul_reap_reach.ally", MonsterNames.Display(monster), target.Name));
                     result.MessageColor = "magenta";
                 }
                 break;
@@ -536,14 +536,14 @@ public static class MonsterAbilities
                 {
                     monster.HasUsedBackstab = true;
                     result.DamageMultiplier = 2.5f;
-                    result.Message = Loc.Get("mability.backstab_shadows", monster.Name);
+                    result.Message = Loc.Get("mability.backstab_shadows", MonsterNames.Display(monster));
                     result.MessageColor = "darkgray";
                 }
                 else
                 {
                     // Normal attack after the element of surprise is gone
                     result.DamageMultiplier = 1.0f;
-                    result.Message = Loc.Get("mability.backstab_plain", monster.Name);
+                    result.Message = Loc.Get("mability.backstab_plain", MonsterNames.Display(monster));
                     result.MessageColor = "white";
                 }
                 break;
@@ -552,7 +552,7 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = 1;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.call_for_help", monster.Name);
+                result.Message = Loc.Get("mability.call_for_help", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;
 
@@ -563,11 +563,11 @@ public static class MonsterAbilities
                 {
                     monster.Strength += 5;
                     monster.HasEnraged = true;
-                    result.Message = Loc.Get("mability.enrage_becomes", monster.Name);
+                    result.Message = Loc.Get("mability.enrage_becomes", MonsterNames.Display(monster));
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.enrage_rages", monster.Name);
+                    result.Message = Loc.Get("mability.enrage_rages", MonsterNames.Display(monster));
                 }
                 result.MessageColor = "red";
                 break;
@@ -578,14 +578,14 @@ public static class MonsterAbilities
                 result.DamageMultiplier = 0; // Heal only — no damage to target
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
-                result.Message = Loc.Get("mability.heal", monster.Name, bigHeal);
+                result.Message = Loc.Get("mability.heal", MonsterNames.Display(monster), bigHeal);
                 result.MessageColor = "bright_green";
                 break;
 
             case AbilityType.Flee:
                 result.MonsterFlees = true;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.flee", monster.Name);
+                result.Message = Loc.Get("mability.flee", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;
 
@@ -595,7 +595,7 @@ public static class MonsterAbilities
             case AbilityType.CriticalStrike:
                 monster.HasUsedCriticalStrike = true; // v1.1.14: once per fight for a goblin (FallsBackToNormalAttack)
                 result.DamageMultiplier = 2.0f;
-                result.Message = Loc.Get("mability.critical_strike", monster.Name);
+                result.Message = Loc.Get("mability.critical_strike", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -604,11 +604,11 @@ public static class MonsterAbilities
                 {
                     monster.Strength += monster.Level / 3;
                     monster.HasEnraged = true;
-                    result.Message = Loc.Get("mability.rally", monster.Name);
+                    result.Message = Loc.Get("mability.rally", MonsterNames.Display(monster));
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.rally_alt", monster.Name);
+                    result.Message = Loc.Get("mability.rally_alt", MonsterNames.Display(monster));
                 }
                 result.DamageMultiplier = 1.3f;
                 result.MessageColor = "yellow";
@@ -618,7 +618,7 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = _rnd.Next(2, 4);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.command_army", monster.Name);
+                result.Message = Loc.Get("mability.command_army", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -628,7 +628,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 35;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.paralyze.you", monster.Name) : Loc.Get("mability.paralyze.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.paralyze.you", MonsterNames.Display(monster)) : Loc.Get("mability.paralyze.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "cyan";
                 break;
 
@@ -641,10 +641,10 @@ public static class MonsterAbilities
                     // so the player's next 2 swings can actually pass through.
                     monster.EvasionRounds = 2;
                     monster.EvasionMissChance = 50;
-                    result.Message = Loc.Get("mability.incorporeal", monster.Name);
+                    result.Message = Loc.Get("mability.incorporeal", MonsterNames.Display(monster));
                 }
                 else
-                    result.Message = Loc.Get("mability.incorporeal_alt", monster.Name);
+                    result.Message = Loc.Get("mability.incorporeal_alt", MonsterNames.Display(monster));
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -654,7 +654,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.spellcasting", monster.Name);
+                result.Message = Loc.Get("mability.spellcasting", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -666,13 +666,13 @@ public static class MonsterAbilities
                     result.DamageMultiplier = 0;
                     result.SkipNormalAttack = true;
                     result.IsSelfOnly = true;
-                    result.Message = Loc.Get("mability.phylactery", monster.Name, phylHeal);
+                    result.Message = Loc.Get("mability.phylactery", MonsterNames.Display(monster), phylHeal);
                     result.MessageColor = "bright_magenta";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.2f;
-                    result.Message = Loc.Get("mability.phylactery_alt", monster.Name);
+                    result.Message = Loc.Get("mability.phylactery_alt", MonsterNames.Display(monster));
                     result.MessageColor = "magenta";
                 }
                 break;
@@ -683,11 +683,11 @@ public static class MonsterAbilities
                 {
                     monster.Strength += 5;
                     monster.HasEnraged = true;
-                    result.Message = Loc.Get("mability.rage_flies", monster.Name);
+                    result.Message = Loc.Get("mability.rage_flies", MonsterNames.Display(monster));
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.rage_attacks", monster.Name);
+                    result.Message = Loc.Get("mability.rage_attacks", MonsterNames.Display(monster));
                 }
                 result.DamageMultiplier = 1.5f;
                 result.MessageColor = "bright_red";
@@ -696,7 +696,7 @@ public static class MonsterAbilities
             case AbilityType.Frenzy:
                 result.DamageMultiplier = 1.3f;
                 result.ExtraAttacks = _rnd.Next(1, 3);
-                result.Message = Loc.Get("mability.frenzy", monster.Name);
+                result.Message = Loc.Get("mability.frenzy", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -705,13 +705,13 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 45;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.warcry", monster.Name);
+                result.Message = Loc.Get("mability.warcry", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
             case AbilityType.Cleave:
                 result.DamageMultiplier = 2.2f;
-                result.Message = Loc.Get("mability.cleave", monster.Name);
+                result.Message = Loc.Get("mability.cleave", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -722,7 +722,7 @@ public static class MonsterAbilities
                 // v0.61.2: persist evasion onto the monster (2 rounds at 25% miss chance).
                 monster.EvasionRounds = 2;
                 monster.EvasionMissChance = 25;
-                result.Message = Loc.Get("mability.flight", monster.Name);
+                result.Message = Loc.Get("mability.flight", MonsterNames.Display(monster));
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -731,14 +731,14 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.dragon_fear.you", monster.Name) : Loc.Get("mability.dragon_fear.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.dragon_fear.you", MonsterNames.Display(monster)) : Loc.Get("mability.dragon_fear.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_yellow";
                 break;
 
             case AbilityType.AncientMagic:
                 result.DirectDamage = CalculateBreathDamage(monster, 2.0f);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.dragon_magic", monster.Name);
+                result.Message = Loc.Get("mability.dragon_magic", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -749,7 +749,7 @@ public static class MonsterAbilities
                 // v0.61.2: persist evasion onto the monster (2 rounds at 35% miss chance).
                 monster.EvasionRounds = 2;
                 monster.EvasionMissChance = 35;
-                result.Message = Loc.Get("mability.fades_from_sight", monster.Name);
+                result.Message = Loc.Get("mability.fades_from_sight", MonsterNames.Display(monster));
                 result.MessageColor = "gray";
                 break;
 
@@ -760,7 +760,7 @@ public static class MonsterAbilities
                 // v0.61.2: persist evasion onto the monster (2 rounds at 40% miss chance).
                 monster.EvasionRounds = 2;
                 monster.EvasionMissChance = 40;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.teleport.you", monster.Name) : Loc.Get("mability.teleport.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.teleport.you", MonsterNames.Display(monster)) : Loc.Get("mability.teleport.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -770,7 +770,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 60;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.hellfire.you", monster.Name) : Loc.Get("mability.hellfire.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.hellfire.you", MonsterNames.Display(monster)) : Loc.Get("mability.hellfire.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -779,7 +779,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 5;
                 result.StatusChance = 50;
                 result.DamageMultiplier = 1.2f;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.corruption.you", monster.Name) : Loc.Get("mability.corruption.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.corruption.you", MonsterNames.Display(monster)) : Loc.Get("mability.corruption.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "magenta";
                 break;
 
@@ -788,7 +788,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.dominate.you", monster.Name) : Loc.Get("mability.dominate.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.dominate.you", MonsterNames.Display(monster)) : Loc.Get("mability.dominate.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -799,7 +799,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.boulder", monster.Name);
+                result.Message = Loc.Get("mability.boulder", MonsterNames.Display(monster));
                 result.MessageColor = "gray";
                 break;
 
@@ -808,11 +808,11 @@ public static class MonsterAbilities
                 {
                     monster.ArmPow += monster.Level;
                     monster.HasHardenedArmor = true;
-                    result.Message = Loc.Get("mability.stoneskin", monster.Name);
+                    result.Message = Loc.Get("mability.stoneskin", MonsterNames.Display(monster));
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.stoneskin_holds", monster.Name);
+                    result.Message = Loc.Get("mability.stoneskin_holds", MonsterNames.Display(monster));
                 }
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
@@ -825,7 +825,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.lightning", monster.Name);
+                result.Message = Loc.Get("mability.lightning", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -835,7 +835,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.earthquake", monster.Name);
+                result.Message = Loc.Get("mability.earthquake", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -843,7 +843,7 @@ public static class MonsterAbilities
             case AbilityType.PackTactics:
                 result.ExtraAttacks = 1;
                 result.DamageMultiplier = 1.1f;
-                result.Message = Loc.Get("mability.pack_coordinate", monster.Name);
+                result.Message = Loc.Get("mability.pack_coordinate", MonsterNames.Display(monster));
                 result.MessageColor = "white";
                 break;
 
@@ -852,7 +852,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Bleeding;
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
-                result.Message = Loc.Get("mability.bite_hard", monster.Name);
+                result.Message = Loc.Get("mability.bite_hard", MonsterNames.Display(monster));
                 result.MessageColor = "red";
                 break;
 
@@ -861,7 +861,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Cursed;
                 result.StatusDuration = 4;
                 result.StatusChance = 25;
-                result.Message = Loc.Get("mability.ferocity", monster.Name);
+                result.Message = Loc.Get("mability.ferocity", MonsterNames.Display(monster));
                 result.MessageColor = "bright_white";
                 break;
 
@@ -870,7 +870,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.howl", monster.Name);
+                result.Message = Loc.Get("mability.howl", MonsterNames.Display(monster));
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -878,7 +878,7 @@ public static class MonsterAbilities
                 var moonHeal = Math.Max(5, monster.MaxHP / 8);
                 monster.HP = Math.Min(monster.HP + moonHeal, monster.MaxHP);
                 result.DamageMultiplier = 1.3f;
-                result.Message = Loc.Get("mability.moonlight_heal", monster.Name, moonHeal);
+                result.Message = Loc.Get("mability.moonlight_heal", MonsterNames.Display(monster), moonHeal);
                 result.MessageColor = "bright_white";
                 break;
 
@@ -888,7 +888,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 3;
                 result.StatusChance = 60;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.burn_scorch.you", monster.Name) : Loc.Get("mability.burn_scorch.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.burn_scorch.you", MonsterNames.Display(monster)) : Loc.Get("mability.burn_scorch.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -898,14 +898,14 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 70;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.immolate.you", monster.Name) : Loc.Get("mability.immolate.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.immolate.you", MonsterNames.Display(monster)) : Loc.Get("mability.immolate.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_red";
                 break;
 
             case AbilityType.Fireball:
                 result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.fireball", monster.Name);
+                result.Message = Loc.Get("mability.fireball", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -917,13 +917,13 @@ public static class MonsterAbilities
                     result.DamageMultiplier = 0;
                     result.SkipNormalAttack = true;
                     result.IsSelfOnly = true;
-                    result.Message = Loc.Get("mability.phoenix_rebirth", monster.Name);
+                    result.Message = Loc.Get("mability.phoenix_rebirth", MonsterNames.Display(monster));
                     result.MessageColor = "bright_yellow";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.5f;
-                    result.Message = Loc.Get("mability.blazing_fury", monster.Name);
+                    result.Message = Loc.Get("mability.blazing_fury", MonsterNames.Display(monster));
                     result.MessageColor = "bright_red";
                 }
                 break;
@@ -934,7 +934,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 5;
                 result.StatusChance = 80;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.inferno", monster.Name);
+                result.Message = Loc.Get("mability.inferno", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
 
@@ -944,7 +944,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 55;
                 result.DamageMultiplier = 0.8f;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.corrosion.you", monster.Name) : Loc.Get("mability.corrosion.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.corrosion.you", MonsterNames.Display(monster)) : Loc.Get("mability.corrosion.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "green";
                 break;
 
@@ -952,7 +952,7 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = 1;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.splits", monster.Name);
+                result.Message = Loc.Get("mability.splits", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
                 break;
 
@@ -961,14 +961,14 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 45;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.engulf.you", monster.Name) : Loc.Get("mability.engulf.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.engulf.you", MonsterNames.Display(monster)) : Loc.Get("mability.engulf.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_green";
                 break;
 
             case AbilityType.Absorb:
                 result.DamageMultiplier = 1.0f;
                 result.LifeStealPercent = 75;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.absorb.you", monster.Name) : Loc.Get("mability.absorb.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.absorb.you", MonsterNames.Display(monster)) : Loc.Get("mability.absorb.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_green";
                 break;
 
@@ -976,7 +976,7 @@ public static class MonsterAbilities
                 monster.Strength += _rnd.Next(-3, 8);
                 monster.ArmPow += _rnd.Next(-3, 8);
                 result.DamageMultiplier = 1.2f;
-                result.Message = Loc.Get("mability.shifts_form", monster.Name);
+                result.Message = Loc.Get("mability.shifts_form", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -986,7 +986,7 @@ public static class MonsterAbilities
                 result.StatusChance = 35;
                 result.DirectDamage = CalculateBreathDamage(monster, 0.8f);
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.madness.you", monster.Name) : Loc.Get("mability.madness.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.madness.you", MonsterNames.Display(monster)) : Loc.Get("mability.madness.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -1001,7 +1001,7 @@ public static class MonsterAbilities
                 // free-hit frequency without removing the threat entirely.
                 result.StatusChance = 30;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.web_trap.you", monster.Name) : Loc.Get("mability.web_trap.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.web_trap.you", MonsterNames.Display(monster)) : Loc.Get("mability.web_trap.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "white";
                 break;
 
@@ -1015,8 +1015,8 @@ public static class MonsterAbilities
                     monster.EvasionMissChance = 50;
                 }
                 result.Message = result.AvoidAllDamage
-                    ? Loc.Get("mability.phase_shift_avoid", monster.Name)
-                    : Loc.Get("mability.phase_shift_flicker", monster.Name);
+                    ? Loc.Get("mability.phase_shift_avoid", MonsterNames.Display(monster))
+                    : Loc.Get("mability.phase_shift_flicker", MonsterNames.Display(monster));
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -1025,7 +1025,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 5;
                 result.StatusChance = 65;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.poison_inject.you", monster.Name) : Loc.Get("mability.poison_inject.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.poison_inject.you", MonsterNames.Display(monster)) : Loc.Get("mability.poison_inject.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "green";
                 break;
 
@@ -1033,7 +1033,7 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = _rnd.Next(2, 4);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.summon_spiders", monster.Name);
+                result.Message = Loc.Get("mability.summon_spiders", MonsterNames.Display(monster));
                 result.MessageColor = "white";
                 break;
 
@@ -1042,14 +1042,14 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 6;
                 result.StatusChance = 80;
-                result.Message = Loc.Get("mability.deadly_venom", monster.Name);
+                result.Message = Loc.Get("mability.deadly_venom", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
                 break;
 
             case AbilityType.Swarm:
                 result.ExtraAttacks = _rnd.Next(2, 5);
                 result.DamageMultiplier = 0.6f;
-                result.Message = Loc.Get("mability.spiderlings", monster.Name);
+                result.Message = Loc.Get("mability.spiderlings", MonsterNames.Display(monster));
                 result.MessageColor = "white";
                 break;
 
@@ -1064,7 +1064,7 @@ public static class MonsterAbilities
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
-                result.Message = Loc.Get("mability.cocoon", monster.Name, cocoonHeal);
+                result.Message = Loc.Get("mability.cocoon", MonsterNames.Display(monster), cocoonHeal);
                 result.MessageColor = "white";
                 break;
 
@@ -1075,11 +1075,11 @@ public static class MonsterAbilities
                 {
                     monster.ArmPow += monster.Level / 2;
                     monster.HasHardenedArmor = true;
-                    result.Message = Loc.Get("mability.magic_resist", monster.Name);
+                    result.Message = Loc.Get("mability.magic_resist", MonsterNames.Display(monster));
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.magic_resist_alt", monster.Name);
+                    result.Message = Loc.Get("mability.magic_resist_alt", MonsterNames.Display(monster));
                 }
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
@@ -1092,7 +1092,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 5;
                 result.StatusChance = 65;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.toxic_gas", monster.Name);
+                result.Message = Loc.Get("mability.toxic_gas", MonsterNames.Display(monster));
                 result.MessageColor = "green";
                 break;
 
@@ -1101,11 +1101,11 @@ public static class MonsterAbilities
                 {
                     monster.ArmPow += monster.Level;
                     monster.HasHardenedArmor = true;
-                    result.Message = Loc.Get("mability.indestructible", monster.Name);
+                    result.Message = Loc.Get("mability.indestructible", MonsterNames.Display(monster));
                 }
                 else
                 {
-                    result.Message = Loc.Get("mability.armor_holds", monster.Name);
+                    result.Message = Loc.Get("mability.armor_holds", MonsterNames.Display(monster));
                 }
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
@@ -1118,7 +1118,7 @@ public static class MonsterAbilities
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
-                result.Message = Loc.Get("mability.self_repair", monster.Name, repairAmount);
+                result.Message = Loc.Get("mability.self_repair", MonsterNames.Display(monster), repairAmount);
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -1126,7 +1126,7 @@ public static class MonsterAbilities
                 result.DirectDamage = CalculateBreathDamage(monster, 2.5f);
                 monster.HP = Math.Max(1, monster.HP - monster.MaxHP / 5); // Self-damage
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.overload", monster.Name);
+                result.Message = Loc.Get("mability.overload", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -1136,7 +1136,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.sleep_dust.you", monster.Name) : Loc.Get("mability.sleep_dust.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.sleep_dust.you", MonsterNames.Display(monster)) : Loc.Get("mability.sleep_dust.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_cyan";
                 break;
 
@@ -1151,8 +1151,8 @@ public static class MonsterAbilities
                     monster.EvasionMissChance = 55;
                 }
                 result.Message = result.AvoidAllDamage
-                    ? Loc.Get("mability.tree_meld_avoid", monster.Name)
-                    : Loc.Get("mability.tree_meld_partial", monster.Name);
+                    ? Loc.Get("mability.tree_meld_avoid", MonsterNames.Display(monster))
+                    : Loc.Get("mability.tree_meld_partial", MonsterNames.Display(monster));
                 result.MessageColor = "green";
                 break;
 
@@ -1161,7 +1161,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 35;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.charm.you", monster.Name) : Loc.Get("mability.charm.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.charm.you", MonsterNames.Display(monster)) : Loc.Get("mability.charm.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -1169,7 +1169,7 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = _rnd.Next(1, 3);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.animate_trees", monster.Name);
+                result.Message = Loc.Get("mability.animate_trees", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
                 break;
 
@@ -1179,14 +1179,14 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.root_entangle.you", monster.Name) : Loc.Get("mability.root_entangle.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.root_entangle.you", MonsterNames.Display(monster)) : Loc.Get("mability.root_entangle.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "green";
                 break;
 
             case AbilityType.TimeStop:
                 result.ExtraAttacks = _rnd.Next(2, 4);
                 result.DamageMultiplier = 1.0f;
-                result.Message = Loc.Get("mability.stops_time", monster.Name);
+                result.Message = Loc.Get("mability.stops_time", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -1195,7 +1195,7 @@ public static class MonsterAbilities
                 var wsHeal = monster.MaxHP / 6;
                 monster.HP = Math.Min(monster.HP + wsHeal, monster.MaxHP);
                 result.DamageMultiplier = 1.4f;
-                result.Message = Loc.Get("mability.wild_shape", monster.Name);
+                result.Message = Loc.Get("mability.wild_shape", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
                 break;
 
@@ -1206,7 +1206,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 25;
-                result.Message = Loc.Get("mability.tentacles", monster.Name);
+                result.Message = Loc.Get("mability.tentacles", MonsterNames.Display(monster));
                 result.MessageColor = "bright_blue";
                 break;
 
@@ -1220,7 +1220,7 @@ public static class MonsterAbilities
                 // matching the 3-round Blinded duration the ability applies).
                 monster.EvasionRounds = 3;
                 monster.EvasionMissChance = 30;
-                result.Message = Loc.Get("mability.ink_cloud", monster.Name);
+                result.Message = Loc.Get("mability.ink_cloud", MonsterNames.Display(monster));
                 result.MessageColor = "gray";
                 break;
 
@@ -1230,14 +1230,14 @@ public static class MonsterAbilities
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.whirlpool", monster.Name);
+                result.Message = Loc.Get("mability.whirlpool", MonsterNames.Display(monster));
                 result.MessageColor = "bright_blue";
                 break;
 
             case AbilityType.TidalWave:
                 result.DirectDamage = CalculateBreathDamage(monster, 2.0f);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.tidal_wave", monster.Name);
+                result.Message = Loc.Get("mability.tidal_wave", MonsterNames.Display(monster));
                 result.MessageColor = "bright_blue";
                 break;
 
@@ -1245,7 +1245,7 @@ public static class MonsterAbilities
             case AbilityType.HolySmite:
                 result.DirectDamage = CalculateBreathDamage(monster, 1.6f);
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.holy_smite", monster.Name);
+                result.Message = Loc.Get("mability.holy_smite", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -1255,14 +1255,14 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 60;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.purify", monster.Name);
+                result.Message = Loc.Get("mability.purify", MonsterNames.Display(monster));
                 result.MessageColor = "bright_white";
                 break;
 
             case AbilityType.DivineJudgment:
                 result.DirectDamage = CalculateBreathDamage(monster, 2.2f);
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.divine_judgment.you", monster.Name) : Loc.Get("mability.divine_judgment.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.divine_judgment.you", MonsterNames.Display(monster)) : Loc.Get("mability.divine_judgment.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_yellow";
                 break;
 
@@ -1277,7 +1277,7 @@ public static class MonsterAbilities
                 result.DamageMultiplier = 0;
                 result.SkipNormalAttack = true;
                 result.IsSelfOnly = true;
-                result.Message = Loc.Get("mability.sanctuary", monster.Name, sancHeal);
+                result.Message = Loc.Get("mability.sanctuary", MonsterNames.Display(monster), sancHeal);
                 result.MessageColor = "bright_white";
                 break;
 
@@ -1286,7 +1286,7 @@ public static class MonsterAbilities
                 result.SummonMonsters = true;
                 result.SummonCount = 1;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.resurrect", monster.Name);
+                result.Message = Loc.Get("mability.resurrect", MonsterNames.Display(monster));
                 result.MessageColor = "bright_white";
                 break;
 
@@ -1296,7 +1296,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 4;
                 result.StatusChance = 55;
                 result.DamageMultiplier = 0.8f;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.strength_drain.you", monster.Name) : Loc.Get("mability.strength_drain.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.strength_drain.you", MonsterNames.Display(monster)) : Loc.Get("mability.strength_drain.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "gray";
                 break;
 
@@ -1306,7 +1306,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 45;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.terror.you", monster.Name) : Loc.Get("mability.terror.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.terror.you", MonsterNames.Display(monster)) : Loc.Get("mability.terror.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "magenta";
                 break;
 
@@ -1315,8 +1315,8 @@ public static class MonsterAbilities
                 result.DirectDamage = (int)Math.Max(1, target.Strength / 2);
                 result.SkipNormalAttack = true;
                 result.Message = isPlayerTarget
-                    ? Loc.Get("mability.possess.you", monster.Name)
-                    : Loc.Get("mability.possess.ally", monster.Name, target.Name);
+                    ? Loc.Get("mability.possess.you", MonsterNames.Display(monster))
+                    : Loc.Get("mability.possess.ally", MonsterNames.Display(monster), target.Name);
                 result.MessageColor = "bright_magenta";
                 break;
 
@@ -1326,7 +1326,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = (isPlayerTarget ? Loc.Get("mability.nightmare.you", monster.Name) : Loc.Get("mability.nightmare.ally", monster.Name, target.Name));
+                result.Message = (isPlayerTarget ? Loc.Get("mability.nightmare.you", MonsterNames.Display(monster)) : Loc.Get("mability.nightmare.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "magenta";
                 break;
 
@@ -1334,14 +1334,14 @@ public static class MonsterAbilities
                 if (_rnd.Next(100) < 5)
                 {
                     result.DirectDamage = (int)target.HP;
-                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_soul_kill.you", monster.Name) : Loc.Get("mability.devour_soul_kill.ally", monster.Name, target.Name));
+                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_soul_kill.you", MonsterNames.Display(monster)) : Loc.Get("mability.devour_soul_kill.ally", MonsterNames.Display(monster), target.Name));
                     result.MessageColor = "bright_red";
                 }
                 else
                 {
                     result.DamageMultiplier = 1.5f;
                     result.LifeStealPercent = 40;
-                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_soul_tear.you", monster.Name) : Loc.Get("mability.devour_soul_tear.ally", monster.Name, target.Name));
+                    result.Message = (isPlayerTarget ? Loc.Get("mability.devour_soul_tear.you", MonsterNames.Display(monster)) : Loc.Get("mability.devour_soul_tear.ally", MonsterNames.Display(monster), target.Name));
                     result.MessageColor = "magenta";
                 }
                 break;
@@ -1358,7 +1358,7 @@ public static class MonsterAbilities
                 result.StatusDuration = 3;
                 result.StatusChance = 50;
                 result.SkipNormalAttack = true;
-                result.Message = Loc.Get("mability.reality_break", monster.Name);
+                result.Message = Loc.Get("mability.reality_break", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
                 break;
         }

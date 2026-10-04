@@ -273,7 +273,7 @@ public class WildernessLocation : BaseLocation
         {
             terminal.WriteLine("");
             terminal.SetColor("dark_gray");
-            terminal.WriteLine(Loc.Get("wilderness.beast_roster_full", beast.Name));
+            terminal.WriteLine(Loc.Get("wilderness.beast_roster_full", MonsterNames.Display(beast.Name)));
             await terminal.PressAnyKey();
             return;
         }
@@ -281,7 +281,7 @@ public class WildernessLocation : BaseLocation
         // Encounter flavor.
         terminal.WriteLine("");
         terminal.SetColor("bright_yellow");
-        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", beast.Name, beast.LocSpecies()));
+        terminal.WriteLine(Loc.Get("wilderness.beast_encounter_header", MonsterNames.Display(beast.Name), beast.LocSpecies()));
         terminal.SetColor("white");
         // v1.2.3: one wrapped paragraph; the source breaks lines for a wider screen.
         UsurperRemake.UI.UIHelper.WriteWrapped(terminal, beast.LocEncounterFlavor().Replace('\n', ' '), "  ");
@@ -297,7 +297,7 @@ public class WildernessLocation : BaseLocation
         if (choice.ToUpper() != "T")
         {
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("wilderness.beast_walk_away", beast.Name));
+            terminal.WriteLine(Loc.Get("wilderness.beast_walk_away", MonsterNames.Display(beast.Name)));
             await terminal.PressAnyKey();
             return;
         }
@@ -345,7 +345,7 @@ public class WildernessLocation : BaseLocation
                     terminal.WriteLine(row);
                 terminal.WriteLine("");
                 terminal.SetColor("bright_cyan");
-                terminal.WriteLine(Loc.Get("wilderness.beast_tame_success", beast.Name, currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize));
+                terminal.WriteLine(Loc.Get("wilderness.beast_tame_success", MonsterNames.Display(beast.Name), currentPlayer.PetRoster.Count, UsurperRemake.Data.BeastData.MaxRosterSize));
                 if (string.Equals(currentPlayer.ActivePetId, beast.Id, StringComparison.OrdinalIgnoreCase))
                     terminal.WriteLine(Loc.Get("wilderness.beast_auto_active"));
                 else
@@ -359,7 +359,7 @@ public class WildernessLocation : BaseLocation
         // All 3 attempts failed.
         terminal.WriteLine("");
         terminal.SetColor("dark_red");
-        terminal.WriteLine(Loc.Get("wilderness.beast_flees", beast.Name));
+        terminal.WriteLine(Loc.Get("wilderness.beast_flees", MonsterNames.Display(beast.Name)));
         await terminal.PressAnyKey();
     }
 
@@ -388,7 +388,7 @@ public class WildernessLocation : BaseLocation
 
         terminal.SetColor("red");
         // v0.62.1 article fix: "An Owl-Bear" / "An Elemental" instead of "A".
-        terminal.WriteLine(Loc.Get("wilderness.monster_emerges", GameConfig.ArticulateForLanguage(monsterName), WildernessData.GetRegionName(region).ToLower()));
+        terminal.WriteLine(Loc.Get("wilderness.monster_emerges", GameConfig.ArticulateForLanguage(MonsterNames.Display(monsterName)), WildernessData.GetRegionName(region).ToLower()));
         terminal.WriteLine("");
         await Pacing.Wait(1500);
 

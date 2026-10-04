@@ -120,7 +120,7 @@ public class GodOldGodsLink1115Tests
         int dialogue = src.IndexOf("DialogueSystem.Instance.StartDialogue(", StringComparison.Ordinal);
         echo.Should().BeGreaterThan(react).And.BeLessThan(dialogue);
         int defeated = src.IndexOf("private async Task<BossEncounterResult> HandleBossDefeated(", StringComparison.Ordinal);
-        int fall = src.IndexOf("OldGodEchoSystem.FallLine(player, boss.Type, boss.Name)", StringComparison.Ordinal);
+        int fall = src.IndexOf("OldGodEchoSystem.FallLine(player, boss.Type, boss.LocName())", StringComparison.Ordinal);
         fall.Should().BeGreaterThan(defeated).And.BeLessThan(src.IndexOf("private async Task<bool> HandleNocturaBetrayal(", StringComparison.Ordinal));
         Source("Systems", "DivineBlessingSystem.cs").Should().Contain("OldGodEchoSystem.BonusDamage(attacker, defender, baseDamage, gods)");
     }

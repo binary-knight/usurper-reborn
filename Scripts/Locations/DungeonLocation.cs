@@ -716,7 +716,7 @@ public class DungeonLocation : BaseLocation
 
         // Generate the guardian as a regular monster scaled for floor 5 (not mini-boss — too hard for support classes)
         var guardian = MonsterGenerator.GenerateMonster(5, isBoss: false, isMiniBoss: false);
-        guardian.Name = Loc.Get("dungeon.guardian_name");
+        guardian.Name = MonsterNames.FromKey("dungeon.guardian_name");   // v1.2.5: stored English, shown by MonsterNames
         guardian.MonsterColor = "bright_red";
         guardian.CanSpeak = true;
         guardian.Phrase = Loc.Get("dungeon.guardian_phrase");
@@ -2148,17 +2148,25 @@ public class DungeonLocation : BaseLocation
         var godData = OldGodsData.GetGodBossData(result.God);
         var playerName = player.Name2 ?? player.Name1;
 
+        // v1.2.5: a line longer than the row wraps under its own indent, so no row is wider than 79 columns
+        void WriteRows(string text, string color)
+        {
+            string indent = new string(' ', text.Length - text.TrimStart(' ').Length);
+            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(text.TrimStart(' '), 79 - indent.Length))
+                term.WriteLine(indent + row, color);
+        }
+
         term.Clear();
         term.WriteLine("");
 
         // Beat 1: Emergence from the dungeon
-        term.WriteLine(Loc.Get("dungeon.emerge_steps"), "white");
+        WriteRows(Loc.Get("dungeon.emerge_steps"), "white");
         await Pacing.Wait(1500);
-        term.WriteLine(Loc.Get("dungeon.emerge_sunlight"), "bright_yellow");
+        WriteRows(Loc.Get("dungeon.emerge_sunlight"), "bright_yellow");
         await Pacing.Wait(1500);
         term.WriteLine("");
 
-        term.WriteLine(Loc.Get("dungeon.word_spread"), "gray");
+        WriteRows(Loc.Get("dungeon.word_spread"), "gray");
         await Pacing.Wait(1200);
 
         string outcomeWord = result.Outcome switch
@@ -2170,8 +2178,8 @@ public class DungeonLocation : BaseLocation
             _ => Loc.Get("dungeon.outcome_faced")
         };
         // 1.2.3: two lines, so the longest outcome and god name fit in 79 columns
-        term.WriteLine(Loc.Get("dungeon.they_know_what_you_did"), "gray");
-        term.WriteLine(Loc.Get("dungeon.they_know_you_outcome", outcomeWord, godData.Name), "gray");
+        WriteRows(Loc.Get("dungeon.they_know_what_you_did"), "gray");
+        WriteRows(Loc.Get("dungeon.they_know_you_outcome", outcomeWord, godData.LocName()), "gray");
         await Pacing.Wait(2000);
         term.WriteLine("");
 
@@ -2179,7 +2187,9 @@ public class DungeonLocation : BaseLocation
         var reactions = GetTownReactionLines(result.God, result.Outcome, result.ApproachType, godData);
         foreach (var (line, color) in reactions)
         {
-            term.WriteLine($"  {line}", color);
+            // v1.2.5: a reaction longer than the row wraps, so no row is wider than 79 columns
+            foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(line, 77))
+                term.WriteLine($"  {row}", color);
             await Pacing.Wait(1800);
         }
 
@@ -2195,7 +2205,8 @@ public class DungeonLocation : BaseLocation
             BossOutcome.Spared => Loc.Get("dungeon.closing_spared"),
             _ => Loc.Get("dungeon.closing_default")
         };
-        term.WriteLine($"  {closing}", "white");
+        foreach (var row in UsurperRemake.UI.UIHelper.WordWrap(closing, 77))
+            term.WriteLine($"  {row}", "white");
         await Pacing.Wait(2000);
 
         // Next god breadcrumb — hint at what lies deeper (v0.49.3)
@@ -3387,6 +3398,10 @@ public class DungeonLocation : BaseLocation
     /// Helper: emit a choice prompt for the Electron graphical client before a GetInput call.
     /// No-op if not in Electron mode.
     /// </summary>
+    /// <summary>v1.2.5: the theme id sent when there is no floor; the client picks its default art by it, so it
+    /// stays this English id in every language.</summary>
+    private const string UnknownThemeId = "Unknown";
+
     private void EmitChoices(string context, string title, params (string key, string label, string style)[] options)
     {
         if (!GameConfig.ElectronMode) return;
@@ -3417,7 +3432,7 @@ public class DungeonLocation : BaseLocation
         ElectronBridge.Emit("dungeon_room", new
         {
             floor = currentDungeonLevel,
-            theme = currentFloor?.Theme.ToString() ?? "Unknown",
+            theme = currentFloor?.Theme.ToString() ?? UnknownThemeId,
             roomName = room.Name,
             description = room.Description,
             atmosphere = room.AtmosphereText,
@@ -5682,13 +5697,13 @@ public class DungeonLocation : BaseLocation
             // v0.62.1 article fix: route the monster name through ArticulateForLanguage
             // so English emits "An Ooze attacks!" / "A Wolf attacks!" instead of "A Ooze".
             // Non-English templates carry their own locale-appropriate article unchanged.
-            terminal.WriteLine(Loc.Get("dungeon.monster_attacks", GameConfig.ArticulateForLanguage(monster.Name)));
+            terminal.WriteLine(Loc.Get("dungeon.monster_attacks", GameConfig.ArticulateForLanguage(MonsterNames.Display(monster))));
         }
         else
         {
             // Group monsters by name to handle mixed encounters
             var monsterGroups = monsters.GroupBy(m => m.Name)
-                .Select(g => new { Name = g.Key, Count = g.Count(), Color = g.First().MonsterColor })
+                .Select(g => new { Name = g.Key, Count = g.Count(), Color = g.First().MonsterColor, Sample = g.First() })
                 .ToList();
 
             terminal.SetColor("yellow");
@@ -5696,7 +5711,7 @@ public class DungeonLocation : BaseLocation
             {
                 // All same type
                 var group = monsterGroups[0];
-                string plural = group.Count > 1 ? GetPluralName(group.Name) : group.Name;
+                string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);   // v1.2.5: the reader's language
                 terminal.WriteLine(Loc.Get("dungeon.face_monsters", group.Count, plural));
             }
             else
@@ -5706,7 +5721,7 @@ public class DungeonLocation : BaseLocation
                 for (int i = 0; i < monsterGroups.Count; i++)
                 {
                     var group = monsterGroups[i];
-                    string plural = group.Count > 1 ? GetPluralName(group.Name) : group.Name;
+                    string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);
 
                     if (i > 0 && i == monsterGroups.Count - 1)
                         terminal.Write(Loc.Get("dungeon.and_separator"));
@@ -5723,12 +5738,14 @@ public class DungeonLocation : BaseLocation
 
         // Broadcast combat encounter to group followers
         {
-            var monsterSummary = string.Join(", ", monsters.GroupBy(m => m.Name)
-                .Select(g => g.Count() > 1 ? $"{g.Count()} {GetPluralName(g.Key)}" : g.Key));
+            // v1.2.5: each follower reads the monster names in their own language
+            var summaryGroups = monsters.GroupBy(m => m.Name).Select(g => (Count: g.Count(), Sample: g.First())).ToList();
+            string MonsterSummary(string lang) => string.Join(", ", summaryGroups
+                .Select(g => g.Count > 1 ? $"{g.Count} {MonsterNames.CountIn(lang, g.Count, g.Sample, GetPluralName)}" : MonsterNames.DisplayIn(lang, g.Sample)));
             bool bossRoom = room.IsBossRoom;
             BroadcastDungeonEvent(lang => bossRoom
-                ? $"\u001b[1;31m  *** {Loc.GetIn(lang, "dungeon.bc_boss_encounter", monsterSummary)} ***\u001b[0m"
-                : $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.bc_combat", monsterSummary)}\u001b[0m");
+                ? $"\u001b[1;31m  *** {Loc.GetIn(lang, "dungeon.bc_boss_encounter", MonsterSummary(lang))} ***\u001b[0m"
+                : $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.bc_combat", MonsterSummary(lang))}\u001b[0m");
         }
 
         await Pacing.Wait(1500);
@@ -7608,8 +7625,8 @@ public class DungeonLocation : BaseLocation
                 // Dragon" stays as-is via the helper's silent-h/yu-sound exception list;
                 // "An Archfiend" comes out correctly.
                 string bossNameWithArticle = GameConfig.Language == "en"
-                    ? $"{GameConfig.GetIndefiniteArticle(monster.Name)} {Loc.Get("dungeon.boss_powerful")} [{monster.MonsterColor}]{monster.Name}[/]"
-                    : $"[{monster.MonsterColor}]{monster.Name}[/]";
+                    ? $"{GameConfig.GetIndefiniteArticle(MonsterNames.Display(monster))} {Loc.Get("dungeon.boss_powerful")} [{monster.MonsterColor}]{MonsterNames.Display(monster)}[/]"
+                    : $"[{monster.MonsterColor}]{MonsterNames.Display(monster)}[/]";
                 terminal.WriteLine(GameConfig.ScreenReaderMode
                     ? Loc.Get("dungeon.boss_blocks_path_sr", bossNameWithArticle)
                     : Loc.Get("dungeon.boss_blocks_path_visual", bossNameWithArticle));
@@ -7620,7 +7637,7 @@ public class DungeonLocation : BaseLocation
                 // v0.62.1 article fix: see dungeon.monster_attacks comment above.
                 string monsterNameWithArticle = GameConfig.Language == "en"
                     ? $"{GameConfig.GetIndefiniteArticle(monster.Name)} [{monster.MonsterColor}]{monster.Name}[/]"
-                    : $"[{monster.MonsterColor}]{monster.Name}[/]";
+                    : $"[{monster.MonsterColor}]{MonsterNames.Display(monster)}[/]";
                 terminal.WriteLine(Loc.Get("dungeon.monster_appears", monsterNameWithArticle));
             }
         }
@@ -7628,7 +7645,7 @@ public class DungeonLocation : BaseLocation
         {
             // Group monsters by name to handle mixed encounters properly
             var monsterGroups = monsters.GroupBy(m => m.Name)
-                .Select(g => new { Name = g.Key, Count = g.Count(), Color = g.First().MonsterColor })
+                .Select(g => new { Name = g.Key, Count = g.Count(), Color = g.First().MonsterColor, Sample = g.First() })
                 .ToList();
 
             terminal.SetColor("yellow");
@@ -7636,10 +7653,10 @@ public class DungeonLocation : BaseLocation
             {
                 // All monsters are the same type
                 var group = monsterGroups[0];
-                string plural = group.Count > 1 ? GetPluralName(group.Name) : group.Name;
+                string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);   // v1.2.5: the reader's language
                 if (monsters[0].FamilyName != "")
                 {
-                    terminal.Write(Loc.Get("dungeon.encounter_group_family", $"[{group.Color}]{group.Count} {plural}[/]", monsters[0].FamilyName));
+                    terminal.Write(Loc.Get("dungeon.encounter_group_family", $"[{group.Color}]{group.Count} {plural}[/]", MonsterNames.Family(monsters[0].FamilyName)));
                 }
                 else
                 {
@@ -7653,7 +7670,7 @@ public class DungeonLocation : BaseLocation
                 for (int i = 0; i < monsterGroups.Count; i++)
                 {
                     var group = monsterGroups[i];
-                    string plural = group.Count > 1 ? GetPluralName(group.Name) : group.Name;
+                    string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);
 
                     if (i > 0 && i == monsterGroups.Count - 1)
                         terminal.Write(Loc.Get("dungeon.and_separator"));
@@ -7855,7 +7872,7 @@ public class DungeonLocation : BaseLocation
 
                     // Create undead monster
                     var undead = CreateUndeadMonster();
-                    terminal.WriteLine(Loc.Get("dungeon.scroll_summoned_undead", undead.Name));
+                    terminal.WriteLine(Loc.Get("dungeon.scroll_summoned_undead", MonsterNames.Display(undead)));
                     GodDeedSystem.Record(player, GodAct.UndeadRaised, terminal);   // 1.2.0 Temple gods: Death taboo
                     
                     // Fight the undead
@@ -7967,7 +7984,7 @@ public class DungeonLocation : BaseLocation
         var adventurerClass = adventurerClasses[dungeonRandom.Next(adventurerClasses.Length)];
 
         terminal.SetColor("white");
-        terminal.WriteLine(Loc.Get("dungeon.fallen_adventurer_remains", adventurerClass));
+        terminal.WriteLine(Loc.Get("dungeon.fallen_adventurer_remains", Loc.Get($"dungeon.fallen_class.{adventurerClass}")));
         terminal.WriteLine(Loc.Get("dungeon.fallen_adventurer_journal"));
         terminal.WriteLine("");
 
@@ -8009,9 +8026,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         // Chance to find supplies
-        EmitChoices("fallen_adventurer", "Fallen Adventurer",
-            ("S", "Search Remains", "treasure"),
-            ("P", "Pray for the Fallen", "info"));
+        EmitChoices("fallen_adventurer", Loc.Get("dungeon.choice.fallen_adventurer.title"),
+            ("S", Loc.Get("dungeon.choice.fallen_adventurer.search_remains"), "treasure"),
+            ("P", Loc.Get("dungeon.choice.fallen_adventurer.pray_for_the_fallen"), "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.fallen_adventurer_choice"));
 
         if (choice.ToUpper() == "S")
@@ -8180,9 +8197,9 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.portal_description_2"));
         terminal.WriteLine("");
 
-        EmitChoices("portal", "Mysterious Portal",
-            ("E", "Enter the Portal", "event"),
-            ("S", "Study it Carefully", "info"));
+        EmitChoices("portal", Loc.Get("dungeon.choice.portal.title"),
+            ("E", Loc.Get("dungeon.choice.portal.enter_the_portal"), "event"),
+            ("S", Loc.Get("dungeon.choice.portal.study_it_carefully"), "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.portal_choice"));
         var currentPlayer = GetCurrentPlayer();
 
@@ -8344,9 +8361,9 @@ public class DungeonLocation : BaseLocation
         }
 
         terminal.WriteLine("");
-        EmitChoices("duelist", "A Challenger Approaches",
-            ("A", "Accept Challenge", "danger"),
-            ("D", "Decline", "info"));
+        EmitChoices("duelist", Loc.Get("dungeon.choice.duelist.title"),
+            ("A", Loc.Get("dungeon.choice.duelist.accept_challenge"), "danger"),
+            ("D", Loc.Get("dungeon.choice.duelist.decline"), "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.duelist_choice"));
 
         if (choice.ToUpper() == "A")
@@ -8490,7 +8507,7 @@ public class DungeonLocation : BaseLocation
             // Enraged duelist is much stronger
             int rageLevel = currentPlayer.Level + 3 + (duelist.TimesEncountered / 2);
             var angryDuelist = Monster.CreateMonster(
-                rageLevel, Loc.Get("dungeon.duelist_enraged_name", duelist.Name),
+                rageLevel, MonsterNames.FromKey("dungeon.duelist_enraged_name", duelist.Name),   // v1.2.5: stored English, shown by MonsterNames
                 (long)(currentPlayer.MaxHP * 1.3), (long)(currentPlayer.Strength * 1.3), 0,
                 Loc.Get("dungeon.cry.die_enraged"), false, false, ShownDuelistWeapon(duelist.Weapon), Loc.Get("dungeon.gear.duelist_garb"),
                 false, false, currentPlayer.Dexterity, currentPlayer.Wisdom, 0
@@ -8681,12 +8698,12 @@ public class DungeonLocation : BaseLocation
         while (true)
         {
             if (searched)
-                EmitChoices("treasure_chest", "Treasure Chest", ("O", "Open", "treasure"), ("L", "Leave It", "info"));
+                EmitChoices("treasure_chest", Loc.Get("dungeon.choice.treasure_chest.title"), ("O", Loc.Get("dungeon.choice.treasure_chest.open"), "treasure"), ("L", Loc.Get("dungeon.choice.treasure_chest.leave_it"), "info"));
             else
-                EmitChoices("treasure_chest", "Treasure Chest",
-                    ("O", "Open", "treasure"),
-                    ("S", "Search for Traps", "info"),
-                    ("L", "Leave It", "info"));
+                EmitChoices("treasure_chest", Loc.Get("dungeon.choice.treasure_chest.title"),
+                    ("O", Loc.Get("dungeon.choice.treasure_chest.open"), "treasure"),
+                    ("S", Loc.Get("dungeon.choice.treasure_chest.search_for_traps"), "info"),
+                    ("L", Loc.Get("dungeon.choice.treasure_chest.leave_it"), "info"));
             choice = await terminal.GetValidChoice(
                 Loc.Get(searched ? "dungeon.treasure_chest_choice_searched" : "dungeon.treasure_chest_choice"),
                 searched ? new[] { "O", "L" } : new[] { "O", "S", "L" }, "L");
@@ -8849,30 +8866,35 @@ public class DungeonLocation : BaseLocation
         var currentPlayer = GetCurrentPlayer();
         var groupType = dungeonRandom.Next(4);
         string groupName;
+        string groupKey;   // v1.2.5: the leader's stored name is built from the English group word
         string[] memberTypes;
 
         switch (groupType)
         {
             case 0:
                 groupName = Loc.Get("dungeon.strangers_orcs");
+                groupKey = "dungeon.strangers_orcs";
                 memberTypes = new[] { "Orc", "Half-Orc", "Orc Raider" };
                 terminal.WriteLine(Loc.Get("dungeon.strangers_orcs_desc"), "gray");
                 terminal.WriteLine(Loc.Get("dungeon.strangers_orcs_arms"), "gray");
                 break;
             case 1:
                 groupName = Loc.Get("dungeon.strangers_trolls");
+                groupKey = "dungeon.strangers_trolls";
                 memberTypes = new[] { "Troll", "Half-Troll", "Lumber-Troll" };
                 terminal.WriteLine(Loc.Get("dungeon.strangers_trolls_desc"), "green");
                 terminal.WriteLine(Loc.Get("dungeon.strangers_trolls_arms"), "gray");
                 break;
             case 2:
                 groupName = Loc.Get("dungeon.strangers_rogues");
+                groupKey = "dungeon.strangers_rogues";
                 memberTypes = new[] { "Rogue", "Thief", "Pirate" };
                 terminal.WriteLine(Loc.Get("dungeon.strangers_rogues_desc"), "cyan");
                 terminal.WriteLine(Loc.Get("dungeon.strangers_rogues_arms"), "gray");
                 break;
             default:
                 groupName = Loc.Get("dungeon.strangers_dwarves");
+                groupKey = "dungeon.strangers_dwarves";
                 memberTypes = new[] { "Dwarf", "Dwarf Warrior", "Dwarf Scout" };
                 terminal.WriteLine(Loc.Get("dungeon.strangers_dwarves_desc"), "yellow");
                 terminal.WriteLine(Loc.Get("dungeon.strangers_dwarves_arms"), "gray");
@@ -8941,7 +8963,7 @@ public class DungeonLocation : BaseLocation
                 await Pacing.Wait(1500);
                 // Trigger simplified combat
                 var monster = Monster.CreateMonster(
-                    currentDungeonLevel, $"{groupName.Substring(0, 1).ToUpper()}{groupName.Substring(1)} Leader",
+                    currentDungeonLevel, $"{Loc.GetIn("en", groupKey).Substring(0, 1).ToUpper()}{Loc.GetIn("en", groupKey).Substring(1)} Leader",   // v1.2.5: English, shown by MonsterNames
                     currentDungeonLevel * 10, currentDungeonLevel * 3, 0,
                     Loc.Get("dungeon.cry.no_gold_death"), false, false, Loc.Get("item.slot.weapon"), Loc.Get("item.slot.armor"),
                     false, false, currentDungeonLevel * 3, currentDungeonLevel * 2, currentDungeonLevel * 2
@@ -9084,10 +9106,10 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.wounded_begs"), "yellow");
         terminal.WriteLine("");
 
-        EmitChoices("wounded_man", "Wounded Man",
-            ("H", "Heal Him", "info"),
-            ("R", "Rob Him", "danger"),
-            ("I", "Ignore", "info"));
+        EmitChoices("wounded_man", Loc.Get("dungeon.choice.wounded_man.title"),
+            ("H", Loc.Get("dungeon.choice.wounded_man.heal_him"), "info"),
+            ("R", Loc.Get("dungeon.choice.wounded_man.rob_him"), "danger"),
+            ("I", Loc.Get("dungeon.choice.wounded_man.ignore"), "info"));
         var choice = await terminal.GetInput(Loc.Get("dungeon.wounded_choice"));
 
         var currentPlayer = GetCurrentPlayer();
@@ -9172,10 +9194,10 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.shrine_offerings"), "gray");
         terminal.WriteLine("");
 
-        EmitChoices("shrine", "Mysterious Shrine",
-            ("P", "Pray", "info"),
-            ("D", "Desecrate", "danger"),
-            ("L", "Leave", "info"));
+        EmitChoices("shrine", Loc.Get("dungeon.choice.shrine.title"),
+            ("P", Loc.Get("dungeon.choice.shrine.pray"), "info"),
+            ("D", Loc.Get("dungeon.choice.shrine.desecrate"), "danger"),
+            ("L", Loc.Get("dungeon.choice.shrine.leave"), "info"));
         var choice = await terminal.GetValidChoice(Loc.Get("dungeon.shrine_choice"), new[] { "P", "D", "L" }, "L"); // v1.1.13: a typo asks again
         SpendRoomEvent();
 
@@ -13465,7 +13487,7 @@ public class DungeonLocation : BaseLocation
                     cleared = mapCleared,
                     total = mapTotal,
                     bossDefeated = currentFloor.BossDefeated,
-                    currentRoomName = currentFloor.GetCurrentRoom()?.Name ?? "Unknown"
+                    currentRoomName = currentFloor.GetCurrentRoom()?.Name ?? Loc.Get("dungeon.electron_room_unknown")
                 });
 
                 // In Electron mode, skip text rendering — graphical overlay handles it
@@ -16733,7 +16755,7 @@ public class DungeonLocation : BaseLocation
             // Plain level-appropriate monster (no champion/boss multipliers) -- the scene is the
             // occasion, the fight is ordinary. Real CombatEngine combat per the v0.47.4 house rule.
             var monster = MonsterGenerator.GenerateMonster(currentDungeonLevel, approachScale: MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
-            monster.Name = fightName;
+            monster.Name = MonsterNames.FromKey($"{k}.fight");   // v1.2.5: stored English, shown by MonsterNames
             var beatCombatEngine = new CombatEngine(terminal);
             var result = await beatCombatEngine.PlayerVsMonster(currentPlayer, monster, teammates);
             if (result.Outcome != CombatOutcome.Victory)

@@ -4375,7 +4375,7 @@ public class HomeLocation : BaseLocation
             var pet = currentPlayer.PetRoster[i];
             var def = pet.GetDefinition();
             bool isActive = string.Equals(currentPlayer.ActivePetId, pet.Id, StringComparison.OrdinalIgnoreCase);
-            string number = $"  [{i + 1}] ", petName = $"{pet.Name,-22}", levelRole = "";
+            string number = $"  [{i + 1}] ", petName = $"{MonsterNames.Display(pet.Name),-22}", levelRole = "";
             if (def != null)
             {
                 string roleLabel = $"[{Loc.Get(def.Role == UsurperRemake.Data.BeastData.BeastRole.Combat ? "home.pet_role_combat" : "home.pet_role_passive")}]";
@@ -4424,7 +4424,7 @@ public class HomeLocation : BaseLocation
         var selected = currentPlayer.PetRoster[choice - 1];
         currentPlayer.ActivePetId = selected.Id;
         terminal.SetColor("bright_green");
-        terminal.WriteLine(Loc.Get("home.pet_roster_set_active", selected.Name));
+        terminal.WriteLine(Loc.Get("home.pet_roster_set_active", MonsterNames.Display(selected.Name)));
         await terminal.PressAnyKey();
     }
 
