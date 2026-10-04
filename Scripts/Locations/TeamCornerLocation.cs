@@ -3341,7 +3341,7 @@ public class TeamCornerLocation : BaseLocation
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                 }
             }
             else
@@ -3350,7 +3350,7 @@ public class TeamCornerLocation : BaseLocation
                 var legacyItem = sourceItem ?? ConvertEquipmentToItem(selectedItem);
                 currentPlayer.Inventory.Add(legacyItem);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("team.equip_failed", message));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("team.equip_failed", message));
             }
 
             await Pacing.Wait(2000);

@@ -1007,7 +1007,7 @@ namespace UsurperRemake.Systems
                     if (item.IsCursed)
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", ItemNames.Display(item)));
+                        UIHelper.WriteRow(terminal, Loc.Get("inventory.cursed_cant_drop", ItemNames.Display(item)));
                         terminal.SetColor("gray");
                         terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"));
                         await Pacing.Wait(2000);
@@ -1298,13 +1298,13 @@ namespace UsurperRemake.Systems
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(message);
+                    UIHelper.WriteRow(terminal, message);
                 }
             }
             else
             {
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("inventory.cannot_equip", message));
+                UIHelper.WriteRow(terminal, Loc.Get("inventory.cannot_equip", message));
             }
 
             player.RecalculateStats();
@@ -1458,7 +1458,7 @@ namespace UsurperRemake.Systems
                     var item = player.Inventory[index - 1];
                     if (item.IsCursed)
                     {
-                        terminal.WriteLine(Loc.Get("inventory.cursed_cant_drop", ItemNames.Display(item)), "red");
+                        UIHelper.WriteRow(terminal, Loc.Get("inventory.cursed_cant_drop", ItemNames.Display(item)), "red");
                         terminal.WriteLine(Loc.Get("inventory.visit_healer_curse"), "gray");
                         await Pacing.Wait(2000);
                         return;

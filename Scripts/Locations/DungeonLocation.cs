@@ -11437,7 +11437,7 @@ public class DungeonLocation : BaseLocation
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine($"  {message}");
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, $"  {message}");
                 }
             }
             else
@@ -11445,7 +11445,7 @@ public class DungeonLocation : BaseLocation
                 // Failed - return item to player (v1.1.13: the pack item itself when it came from the pack)
                 currentPlayer.Inventory.Add(sourceItem ?? currentPlayer.ConvertEquipmentToLegacyItem(selectedItem));
                 terminal.SetColor("red");
-                terminal.WriteLine($"  {Loc.Get("dungeon.equip_failed", message)}");
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, $"  {Loc.Get("dungeon.equip_failed", message)}");
             }
 
             await Pacing.Wait(2000);
@@ -16205,7 +16205,7 @@ public class DungeonLocation : BaseLocation
         if (mate.AutoLevelUp)
             LevelMasterLocation.CheckAutoLevelUp(mate);
 
-        session?.EnqueueMessage($"\u001b[1;33m  {Loc.Get("secretboss.group_share", MonsterNames.Display(boss.Name), xp, boss.RewardGold)}\u001b[0m");
+        session?.EnqueueMessage(UsurperRemake.UI.UIHelper.AnsiRows("\u001b[1;33m", $"  {Loc.Get("secretboss.group_share", MonsterNames.Display(boss.Name), xp, boss.RewardGold)}"));   // v1.2.5: wrapped at 79
     }
 
     /// <summary>
@@ -19142,13 +19142,13 @@ public class DungeonLocation : BaseLocation
                         if (!string.IsNullOrEmpty(equipMsg))
                         {
                             term.SetColor("gray");
-                            term.WriteLine($"  {equipMsg}");
+                            UsurperRemake.UI.UIHelper.WriteRow(term, $"  {equipMsg}");
                         }
                     }
                     else
                     {
                         term.SetColor("red");
-                        term.WriteLine($"  {Loc.Get("inventory.cannot_equip", equipMsg)}");
+                        UsurperRemake.UI.UIHelper.WriteRow(term, $"  {Loc.Get("inventory.cannot_equip", equipMsg)}");
                     }
                 }
                 else

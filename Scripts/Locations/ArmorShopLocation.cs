@@ -802,7 +802,7 @@ public class ArmorShopLocation : BaseLocation
                 var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                 currentPlayer.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
             }
             else
             {
@@ -813,7 +813,7 @@ public class ArmorShopLocation : BaseLocation
                     terminal.WriteLine("");
                     terminal.WriteLine(Loc.Get("shop.purchased_equipped", ItemNames.Display(item)));
                     terminal.SetColor("gray");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
 
                     // Recalculate combat stats
                     currentPlayer.RecalculateStats();
@@ -837,7 +837,7 @@ public class ArmorShopLocation : BaseLocation
             currentPlayer.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
         }
 
         QuestSystem.OnEquipmentPurchased(currentPlayer, item);
@@ -1071,7 +1071,7 @@ public class ArmorShopLocation : BaseLocation
                 if (currentItem != null)
                 {
                     terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("armor_shop.autobuy_already_best", slot.GetDisplayName(), ItemNames.Display(currentItem)));
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("armor_shop.autobuy_already_best", slot.GetDisplayName(), ItemNames.Display(currentItem)));
                 }
                 else
                 {
@@ -1170,7 +1170,7 @@ public class ArmorShopLocation : BaseLocation
                             currentPlayer.Gold += abItemTotal;
                             totalSpent -= abItemTotal;
                             terminal.SetColor("red");
-                            terminal.WriteLine(Loc.Get("armor_shop.autobuy_cant_equip", equipMsg));
+                            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("armor_shop.autobuy_cant_equip", equipMsg));
                         }
                         slotHandled = true;
                         break;

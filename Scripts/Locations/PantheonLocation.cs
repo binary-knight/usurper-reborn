@@ -33,6 +33,18 @@ public class PantheonLocation : BaseLocation
     internal static string DivineNews(string text) => DivineNewsTag + " " + text;
 
     /// <summary>
+    /// v1.2.5: the favor budget row: label, value and breakdown on one row when it fits 79 columns; otherwise
+    /// the breakdown moves to its own row (or rows) under the label.
+    /// </summary>
+    internal static (string Label, string Value, List<string> Breakdown, bool OwnRow) BudgetRows(string label, string value, string breakdown)
+    {
+        if (UIHelper.VisibleLength(label + value + breakdown) <= UIHelper.WrapWidth)
+            return (label, value, new List<string> { breakdown }, false);
+        string indent = new string(' ', label.Length - label.TrimStart(' ').Length);
+        return (label, value, UIHelper.MessageRows(indent + breakdown.TrimStart(' ')), true);
+    }
+
+    /// <summary>
     /// v1.2.5: a boon's alignment tag in the player's language ("[Light/Balance]", "[Any]"). The boon keeps its
     /// English alignment words (IsAvailableForAlignment compares them with the stored GodAlignment).
     /// </summary>
@@ -413,12 +425,20 @@ public class PantheonLocation : BaseLocation
             int baseBudget = Math.Max(1, currentPlayer.GodLevel) * GameConfig.GodBoonBudgetPerLevel;
             int concentration = Math.Max(0, GameConfig.GodBoonConcentrationMax - believers * GameConfig.GodBoonConcentrationPerBeliever);
 
+            var budgetRows = BudgetRows(Loc.Get("pantheon.budget_label"), Loc.Get("pantheon.budget_value", spent, totalBudget),
+                Loc.Get("pantheon.budget_breakdown", baseBudget, currentPlayer.GodLevel, concentration, believers));
             terminal.SetColor("cyan");
-            terminal.Write(Loc.Get("pantheon.budget_label"));
+            terminal.Write(budgetRows.Label);
             terminal.SetColor("white");
-            terminal.Write(Loc.Get("pantheon.budget_value", spent, totalBudget));
+            terminal.Write(budgetRows.Value);
             terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("pantheon.budget_breakdown", baseBudget, currentPlayer.GodLevel, concentration, believers));
+            if (!budgetRows.OwnRow)
+                terminal.WriteLine(budgetRows.Breakdown[0]);
+            else
+            {
+                terminal.WriteLine("");
+                foreach (var row in budgetRows.Breakdown) terminal.WriteLine(row);
+            }
             terminal.SetColor("cyan");
             terminal.Write(Loc.Get("pantheon.alignment_label"));
             terminal.SetColor("white");
@@ -1229,7 +1249,7 @@ public class PantheonLocation : BaseLocation
             {
                 bool isDivine = item.Contains(DivineNewsTag);
                 terminal.SetColor(isDivine ? "bright_yellow" : "white");
-                terminal.WriteLine($"  {item}");
+                UIHelper.WriteRow(terminal, $"  {item}");   // v1.2.5: wrapped at 79
             }
         }
 

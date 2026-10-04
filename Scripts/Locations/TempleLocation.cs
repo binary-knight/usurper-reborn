@@ -1565,7 +1565,7 @@ public partial class TempleLocation : BaseLocation
         }
         if (item.IsCursed || item.IsUnique)
         {
-            terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", ItemNames.Display(item), godName), "red");
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("temple.sacrifice_refused_item", ItemNames.Display(item), godName), "red");
             await Pacing.Wait(1500);
             return;
         }
@@ -1577,7 +1577,7 @@ public partial class TempleLocation : BaseLocation
         var (outcome, _, favor) = FavorSystem.SacrificeEquipped(currentPlayer, slot, godSystem);
         if (outcome != ItemSacrificeOutcome.Done)
         {
-            terminal.WriteLine(Loc.Get("temple.sacrifice_refused_item", ItemNames.Display(item), godName), "red");
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("temple.sacrifice_refused_item", ItemNames.Display(item), godName), "red");
             await Pacing.Wait(1500);
             return;
         }

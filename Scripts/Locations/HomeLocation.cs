@@ -1633,13 +1633,13 @@ public class HomeLocation : BaseLocation
             if (!string.IsNullOrEmpty(message))
             {
                 terminal.SetColor("gray");
-                terminal.WriteLine(message);
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
             }
         }
         else
         {
             terminal.SetColor("red");
-            terminal.WriteLine(Loc.Get("home.equip_cannot", message));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("home.equip_cannot", message));
         }
     }
 
@@ -4923,7 +4923,7 @@ public class HomeLocation : BaseLocation
                 if (!string.IsNullOrEmpty(message))
                 {
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(message);
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                 }
             }
             else
@@ -4932,7 +4932,7 @@ public class HomeLocation : BaseLocation
                 var legacyItem = sourceItem ?? ConvertEquipmentToItem(selectedItem);
                 currentPlayer.Inventory.Add(legacyItem);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("home.equip_failed", message));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("home.equip_failed", message));
             }
 
             await Pacing.Wait(2000);
@@ -5028,7 +5028,7 @@ public class HomeLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("home.took_item", ItemNames.Display(unequipped), target.DisplayName));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("home.took_item", ItemNames.Display(unequipped), target.DisplayName));
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("home.item_to_inventory"));
         }

@@ -5185,7 +5185,7 @@ public abstract class BaseLocation
             string takenName = chosenItem.IsIdentified
                 ? ItemNames.Display(chosenItem)
                 : LootGenerator.GetUnidentifiedName(chosenItem);
-            terminal.WriteLine(Loc.Get("party_inv.taken", takenName, member.DisplayName));
+            UIHelper.WriteRow(terminal, Loc.Get("party_inv.taken", takenName, member.DisplayName));
 
             // Persist the change — NPC inventories live on the canonical NPC (world_state in online mode)
             // so take-back needs to flush both save paths, mirroring the equip/unequip patterns.
@@ -8396,14 +8396,14 @@ public abstract class BaseLocation
         if (item.DefenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_def")}:{item.DefenceBonus:+#;-#;0}");
         if (item.StrengthBonus != 0) stats.Add($"{Loc.Get("ui.stat_str")}:{item.StrengthBonus:+#;-#;0}");
         if (item.DexterityBonus != 0) stats.Add($"{Loc.Get("ui.stat_dex")}:{item.DexterityBonus:+#;-#;0}");
-        if (item.AgilityBonus != 0) stats.Add($"Agi:{item.AgilityBonus:+#;-#;0}");
+        if (item.AgilityBonus != 0) stats.Add($"{Loc.Get("ui.stat_agi")}:{item.AgilityBonus:+#;-#;0}");
         if (item.ConstitutionBonus != 0) stats.Add($"{Loc.Get("ui.stat_con")}:{item.ConstitutionBonus:+#;-#;0}");
         if (item.IntelligenceBonus != 0) stats.Add($"{Loc.Get("ui.stat_int")}:{item.IntelligenceBonus:+#;-#;0}");
-        if (item.WisdomBonus != 0) stats.Add($"Wis:{item.WisdomBonus:+#;-#;0}");
-        if (item.CharismaBonus != 0) stats.Add($"Cha:{item.CharismaBonus:+#;-#;0}");
+        if (item.WisdomBonus != 0) stats.Add($"{Loc.Get("ui.stat_wis")}:{item.WisdomBonus:+#;-#;0}");
+        if (item.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}:{item.CharismaBonus:+#;-#;0}");
         if (item.MaxHPBonus != 0) stats.Add($"{Loc.Get("ui.stat_hp")}:{item.MaxHPBonus:+#;-#;0}");
         if (item.MaxManaBonus != 0) stats.Add($"{Loc.Get("ui.stat_mp")}:{item.MaxManaBonus:+#;-#;0}");
-        if (item.StaminaBonus != 0) stats.Add($"Sta:{item.StaminaBonus:+#;-#;0}");
+        if (item.StaminaBonus != 0) stats.Add($"{Loc.Get("ui.stat_sta")}:{item.StaminaBonus:+#;-#;0}");
 
         // Limit to 4 stats for concise display
         return string.Join(", ", stats.Take(4));
@@ -10490,7 +10490,7 @@ public abstract class BaseLocation
 
         // Confirm
         terminal.SetColor("yellow");
-        terminal.Write(Loc.Get("base.auction_list_confirm", ItemNames.Display(item), price.ToString("N0"), chosenLabel, listingFee.ToString("N0")));
+        terminal.Write(UIHelper.PromptRows(terminal, Loc.Get("base.auction_list_confirm", ItemNames.Display(item), price.ToString("N0"), chosenLabel, listingFee.ToString("N0"))));   // v1.2.5: fits 79
         if (!await terminal.AskYesNoAsync("")) return;
 
         string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
@@ -10504,13 +10504,13 @@ public abstract class BaseLocation
             CityControlSystem.Instance.ProcessSaleTax(listingFee);
 
             terminal.SetColor("bright_green");
-            terminal.WriteLine(Loc.Get("base.auction_listed", ItemNames.Display(item), price.ToString("N0"), listingFee.ToString("N0"), chosenLabel));
+            UIHelper.WriteRow(terminal, Loc.Get("base.auction_listed", ItemNames.Display(item), price.ToString("N0"), listingFee.ToString("N0"), chosenLabel));
 
             // Global announcement
             // v1.2.5: each player reads the announcement in their own language
             string lister = currentPlayer.DisplayName, listedItem = item.Name, listedPrice = price.ToString("N0");
             UsurperRemake.Server.MudServer.Instance?.BroadcastLocalized(
-                lang => $"\u001b[93m  {Loc.GetIn(lang, "base.auction_push_listed", lister, ItemNames.DisplayIn(lang, listedItem), listedPrice, AuctionDurationLabel(chosenHours, lang))}\u001b[0m",
+                lang => UIHelper.AnsiRows("\u001b[93m", $"  {Loc.GetIn(lang, "base.auction_push_listed", lister, ItemNames.DisplayIn(lang, listedItem), listedPrice, AuctionDurationLabel(chosenHours, lang))}"),   // v1.2.5: wrapped at 79
                 excludeUsername: UsurperRemake.Server.SessionContext.Current?.Username);
         }
         else

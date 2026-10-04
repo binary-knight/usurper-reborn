@@ -358,6 +358,76 @@ namespace UsurperRemake.UI
         }
 
         /// <summary>
+        /// v1.2.5: the rows a message row is written as. A row whose lines all fit width is itself, unchanged;
+        /// otherwise each line is word-wrapped, its later rows under that line's own leading indent.
+        /// </summary>
+        public static List<string> MessageRows(string? row, int width = WrapWidth)
+        {
+            row ??= "";
+            var lines = row.Replace("\r\n", "\n").Split('\n');
+            bool fits = true;
+            foreach (var line in lines)
+                if (VisibleLength(line) > width) { fits = false; break; }
+            if (fits) return new List<string> { row };
+            var rows = new List<string>();
+            foreach (var line in lines)
+            {
+                string body = line.TrimStart(' ');
+                string indent = line.Substring(0, line.Length - body.Length);
+                foreach (var r in WordWrap(body, width - indent.Length))
+                    rows.Add(indent + r);
+            }
+            return rows;
+        }
+
+        /// <summary>
+        /// v1.2.5: a row for another player's terminal, each of its MessageRows in the given ANSI colour and
+        /// reset, joined by newlines. A row that fits is one coloured row, as before.
+        /// </summary>
+        public static string AnsiRows(string ansi, string? row)
+        {
+            var sb = new StringBuilder();
+            foreach (var r in MessageRows(row))
+            {
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(ansi).Append(r).Append("\u001b[0m");
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// v1.2.5: a prompt wider than 79 columns. Every wrapped row but the last is written; the last row,
+        /// with the prompt's trailing spaces, is returned to be shown as the prompt. A prompt that fits is
+        /// returned unchanged and nothing is written.
+        /// </summary>
+        public static string PromptRows(TerminalEmulator terminal, string? prompt)
+        {
+            prompt ??= "";
+            string body = prompt.TrimEnd(' ');
+            var rows = MessageRows(body);
+            if (rows.Count == 1) return prompt;
+            for (int i = 0; i < rows.Count - 1; i++)
+                terminal.WriteLine(rows[i]);
+            return rows[rows.Count - 1] + prompt.Substring(body.Length);
+        }
+
+        /// <summary>v1.2.5: a message row written in the current colour, wrapped at 79 columns (MessageRows).</summary>
+        public static void WriteRow(TerminalEmulator? terminal, string? row)
+        {
+            if (terminal == null) return;
+            foreach (var r in MessageRows(row))
+                terminal.WriteLine(r);
+        }
+
+        /// <summary>v1.2.5: a message row written in color, wrapped at 79 columns (MessageRows).</summary>
+        public static void WriteRow(TerminalEmulator? terminal, string? row, string color)
+        {
+            if (terminal == null) return;
+            foreach (var r in MessageRows(row))
+                terminal.WriteLine(r, color);
+        }
+
+        /// <summary>
         /// Write a centered box header (╔═══╗ / ║ TITLE ║ / ╚═══╝).
         /// In screen reader mode, outputs plain text title only.
         /// Usable from any class (Systems, etc.) that has a TerminalEmulator reference.

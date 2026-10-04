@@ -900,7 +900,7 @@ public class WeaponShopLocation : BaseLocation
                 var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                 currentPlayer.Inventory.Add(invItem);
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
             }
             else
             {
@@ -915,7 +915,7 @@ public class WeaponShopLocation : BaseLocation
                         var invItem = currentPlayer.ConvertEquipmentToLegacyItem(item);
                         currentPlayer.Inventory.Add(invItem);
                         terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
                         await SaveSystem.Instance.AutoSave(currentPlayer);
                         await Pause();
                         return;
@@ -930,7 +930,7 @@ public class WeaponShopLocation : BaseLocation
                     if (!string.IsNullOrEmpty(message))
                     {
                         terminal.SetColor("gray");
-                        terminal.WriteLine(message);
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                     }
                     currentPlayer.RecalculateStats();
                 }
@@ -941,7 +941,7 @@ public class WeaponShopLocation : BaseLocation
                     currentPlayer.Inventory.Add(invItem);
                     terminal.SetColor("yellow");
                     terminal.WriteLine("");
-                    terminal.WriteLine(Loc.Get("shop.couldnt_equip", ItemNames.Display(item)));
+                    UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.couldnt_equip", ItemNames.Display(item)));
                 }
             }
         }
@@ -952,7 +952,7 @@ public class WeaponShopLocation : BaseLocation
             currentPlayer.Inventory.Add(invItem);
             terminal.SetColor("bright_green");
             terminal.WriteLine("");
-            terminal.WriteLine(Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
+            UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("shop.purchased_inventory", ItemNames.Display(item)));
         }
 
         QuestSystem.OnEquipmentPurchased(currentPlayer, item);
@@ -1458,7 +1458,7 @@ public class WeaponShopLocation : BaseLocation
             if (currentWeapon != null)
             {
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("weapon_shop.autobuy_already_best", ItemNames.Display(currentWeapon), currentPow));
+                UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("weapon_shop.autobuy_already_best", ItemNames.Display(currentWeapon), currentPow));
                 terminal.WriteLine(Loc.Get("weapon_shop.autobuy_best_afford", FormatNumber(currentPlayer.Gold)));
             }
             else
@@ -1562,7 +1562,7 @@ public class WeaponShopLocation : BaseLocation
                         if (!string.IsNullOrEmpty(message))
                         {
                             terminal.SetColor("gray");
-                            terminal.WriteLine(message);
+                            UsurperRemake.UI.UIHelper.WriteRow(terminal, message);
                         }
                         purchased = true;
                         currentPlayer.RecalculateStats();
@@ -1574,7 +1574,7 @@ public class WeaponShopLocation : BaseLocation
                     else
                     {
                         terminal.SetColor("red");
-                        terminal.WriteLine(Loc.Get("weapon_shop.autobuy_failed", message));
+                        UsurperRemake.UI.UIHelper.WriteRow(terminal, Loc.Get("weapon_shop.autobuy_failed", message));
                         currentPlayer.Gold += abTotal;
                     }
 
