@@ -5504,6 +5504,84 @@ public class InnLocation : BaseLocation
             terminal.WriteLine(new string(' ', SkillLayout.ContinuationIndent) + row);
     }
 
+    /// <summary>v1.2.5: the Loc key of a sleep guard type's name; an unknown type (the castle's royal guards) is a Guard.</summary>
+    internal static string GuardNameKey(string? type) => type switch
+    {
+        "rookie_npc" => "inn.guard_rookie",
+        "veteran_npc" => "inn.guard_veteran",
+        "elite_npc" => "inn.guard_elite",
+        "hound" => "inn.guard_hound",
+        "troll" => "inn.guard_troll",
+        "drake" => "inn.guard_drake",
+        _ => "inn.guard_default"
+    };
+
+    private static readonly string[] GuardNameKeys =
+        { "inn.guard_rookie", "inn.guard_veteran", "inn.guard_elite", "inn.guard_hound", "inn.guard_troll", "inn.guard_drake", "inn.guard_default" };
+
+    /// <summary>
+    /// v1.2.5: the name stored for a sleep guard in sleeping_players.GuardsJson: English, whatever the hirer's
+    /// language. The row is read by another player's attack and by the world simulation.
+    /// </summary>
+    internal static string GuardStoredName(string? type) => Loc.GetIn("en", GuardNameKey(type));
+
+    /// <summary>
+    /// v1.2.5: a sleep guard's name in the given language. A stored name that is the English of a guard key,
+    /// or no stored name, shows through that key (the type's key when there is no name); any other stored name
+    /// (a row saved before 1.2.5 in its writer's language) shows as stored.
+    /// </summary>
+    internal static string GuardNameIn(string lang, string? type, string? storedName)
+    {
+        if (string.IsNullOrEmpty(storedName)) return Loc.GetIn(lang, GuardNameKey(type));
+        foreach (var key in GuardNameKeys)
+            if (Loc.GetIn("en", key) == storedName) return Loc.GetIn(lang, key);
+        return storedName;
+    }
+
+    /// <summary>GuardNameIn in the reader's language.</summary>
+    internal static string GuardName(string? type, string? storedName) => GuardNameIn(GameConfig.Language, type, storedName);
+
+    /// <summary>v1.2.5: the GuardsJson of a new room's hired guards: type, English name and HP ("[]" for none).</summary>
+    internal static string HiredGuardsJson(IEnumerable<(string type, int hp)> guards)
+    {
+        var list = guards.Select(g => new { type = g.type, name = GuardStoredName(g.type), hp = g.hp, maxHp = g.hp }).ToList();
+        return list.Count == 0 ? "[]" : JsonSerializer.Serialize(list);
+    }
+
+    /// <summary>
+    /// v1.2.5: the guards of a GuardsJson row as a player's attack reads them, the stored name kept as it is
+    /// (null when the row has none). A row that does not parse has no guards, as before.
+    /// </summary>
+    internal static List<(string type, string? name, int hp, int maxHp)> ParseAttackGuards(string? json)
+    {
+        var guards = new List<(string type, string? name, int hp, int maxHp)>();
+        try
+        {
+            if (JsonNode.Parse(json ?? "[]") is JsonArray guardArray)
+            {
+                foreach (var g in guardArray)
+                {
+                    if (g == null) continue;
+                    string gType = g["type"]?.GetValue<string>() ?? "rookie_npc";
+                    string? gName = g["name"]?.GetValue<string>();
+                    int gHp = g["hp"]?.GetValue<int>() ?? 50;
+                    int gMaxHp = (g["maxHp"] ?? g["max_hp"])?.GetValue<int>() ?? gHp;   // v1.2.5: the hire writes maxHp, an older attack max_hp
+                    guards.Add((gType, gName, gHp, gMaxHp));
+                }
+            }
+        }
+        catch { }
+        return guards;
+    }
+
+    /// <summary>
+    /// v1.2.5: the guards left after a player's attack, written back with the stored name (English when the row
+    /// had none) and maxHp, the key the hire and the world simulation use (before, max_hp, which the world
+    /// simulation could not read, so its NPC attacks skipped the surviving guards).
+    /// </summary>
+    internal static string AttackedGuardsJson(IEnumerable<(string type, string? name, int hp, int maxHp)> guards) =>
+        JsonSerializer.Serialize(guards.Select(g => new { type = g.type, name = g.name ?? GuardStoredName(g.type), hp = g.hp, maxHp = g.maxHp }));
+
     private static (string type, string name, int baseCost, int baseHp)[] GetGuardOptions() => new[]
     {
         ("rookie_npc",  Loc.Get("inn.guard_rookie"),  GameConfig.GuardRookieBaseCost,  80),
@@ -5654,12 +5732,7 @@ public class InnLocation : BaseLocation
         await GameEngine.Instance.SaveCurrentGame();
 
         // Build guards JSON
-        var guardsJson = "[]";
-        if (hiredGuards.Count > 0)
-        {
-            var guardsList = hiredGuards.Select(g => new { type = g.type, hp = g.hp, maxHp = g.hp }).ToList();
-            guardsJson = System.Text.Json.JsonSerializer.Serialize(guardsList);
-        }
+        var guardsJson = HiredGuardsJson(hiredGuards.Select(g => (g.type, g.hp)));   // v1.2.5: English names
 
         // Register as sleeping at the Inn (protected)
         var backend = SaveSystem.Instance.Backend as SqlSaveBackend;
@@ -5921,36 +5994,21 @@ public class InnLocation : BaseLocation
 
         // Fight through guards
         bool guardsRepelled = false;
-        var guards = new List<(string type, string name, int hp, int maxHp)>();
-        try
-        {
-            var guardArray = JsonNode.Parse(target.GuardsJson) as JsonArray;
-            if (guardArray != null)
-            {
-                foreach (var g in guardArray)
-                {
-                    if (g == null) continue;
-                    string gType = g["type"]?.GetValue<string>() ?? "rookie_npc";
-                    string gName = g["name"]?.GetValue<string>() ?? Loc.Get("inn.guard_default");
-                    int gHp = g["hp"]?.GetValue<int>() ?? 50;
-                    int gMaxHp = g["max_hp"]?.GetValue<int>() ?? gHp;
-                    guards.Add((gType, gName, gHp, gMaxHp));
-                }
-            }
-        }
-        catch { }
+        var guards = ParseAttackGuards(target.GuardsJson);   // v1.2.5: stored names kept, shown per reader
 
         int victimLevel = victimSave.Player.Level;
 
         for (int gi = 0; gi < guards.Count; gi++)
         {
-            var (gType, gName, gHp, gMaxHp) = guards[gi];
+            var (gType, gStoredName, gHp, gMaxHp) = guards[gi];
+            string gName = GuardName(gType, gStoredName);   // v1.2.5: shown only
             terminal.SetColor("yellow");
             // v0.62.1 article fix.
             terminal.WriteLine(Loc.Get("inn.atk_guard_blocks", GameConfig.ArticulateForLanguage(gName)));
             await Pacing.Wait(1000);
 
             var guardChar = HeadlessCombatResolver.CreateGuardCharacter(gType, gHp, victimLevel, rng);
+            if (!string.IsNullOrEmpty(gStoredName)) guardChar.Name2 = gStoredName;   // v1.2.5: a saved name fights under that name
             var guardCombat = new CombatEngine(terminal);
             var guardResult = await guardCombat.PlayerVsPlayer(currentPlayer, guardChar);
 
@@ -5967,7 +6025,7 @@ public class InnLocation : BaseLocation
                 terminal.SetColor("red");
                 terminal.WriteLine(Loc.Get("inn.atk_guard_repels", gName));
                 int remainingHp = (int)Math.Max(1, guardChar.HP);
-                guards[gi] = (gType, gName, remainingHp, gMaxHp);
+                guards[gi] = (gType, gStoredName, remainingHp, gMaxHp);
                 guardsRepelled = true;
                 await Pacing.Wait(2000);
                 break;
@@ -5975,8 +6033,7 @@ public class InnLocation : BaseLocation
         }
 
         // Update guards in DB
-        var updatedGuards = guards.Select(g => new { type = g.type, name = g.name, hp = g.hp, max_hp = g.maxHp });
-        await backend.UpdateSleeperGuards(target.Username, JsonSerializer.Serialize(updatedGuards));
+        await backend.UpdateSleeperGuards(target.Username, AttackedGuardsJson(guards));
 
         if (guardsRepelled)
         {

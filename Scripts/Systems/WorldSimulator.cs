@@ -7809,12 +7809,16 @@ public class WorldSimulator
         catch { return 10; }
     }
 
-    private record GuardData(string Type, string Name, int Hp, int MaxHp)
+    internal record GuardData(string Type, string Name, int Hp, int MaxHp)
     {
         public int Hp { get; set; } = Hp;
     }
 
-    private List<GuardData> ParseGuards(string json)
+    /// <summary>
+    /// The guards of a GuardsJson row. v1.2.5: a stored name is kept (a new hire's is English, an older row's
+    /// as its writer saved it); a row without one is named in English by its type.
+    /// </summary>
+    internal static List<GuardData> ParseGuards(string json)
     {
         try
         {
@@ -7823,11 +7827,17 @@ public class WorldSimulator
             var guards = new List<GuardData>();
             foreach (var elem in doc.RootElement.EnumerateArray())
             {
+                string type = elem.GetProperty("type").GetString() ?? "rookie_npc";
+                string? stored = elem.TryGetProperty("name", out var nameElem) && nameElem.ValueKind == JsonValueKind.String ? nameElem.GetString() : null;
+                int hp = elem.GetProperty("hp").GetInt32();
+                // v1.2.5: maxHp (the hire, this simulation) or max_hp (a row a player's attack wrote before 1.2.5)
+                int maxHp = elem.TryGetProperty("maxHp", out var mx) ? mx.GetInt32()
+                    : elem.TryGetProperty("max_hp", out var mxOld) ? mxOld.GetInt32() : hp;
                 guards.Add(new GuardData(
-                    elem.GetProperty("type").GetString() ?? "rookie_npc",
-                    GetGuardName(elem.GetProperty("type").GetString() ?? "rookie_npc"),
-                    elem.GetProperty("hp").GetInt32(),
-                    elem.GetProperty("maxHp").GetInt32()
+                    type,
+                    string.IsNullOrEmpty(stored) ? GetGuardName(type) : stored,
+                    hp,
+                    maxHp
                 ));
             }
             return guards;
@@ -7835,22 +7845,15 @@ public class WorldSimulator
         catch { return new List<GuardData>(); }
     }
 
-    private string SerializeGuards(List<GuardData> guards)
+    /// <summary>v1.2.5: the guards written back with their names, so a saved name stays as it was.</summary>
+    internal static string SerializeGuards(List<GuardData> guards)
     {
-        var list = guards.Select(g => new { type = g.Type, hp = g.Hp, maxHp = g.MaxHp }).ToList();
+        var list = guards.Select(g => new { type = g.Type, name = g.Name, hp = g.Hp, maxHp = g.MaxHp }).ToList();
         return JsonSerializer.Serialize(list);
     }
 
-    private static string GetGuardName(string type) => type switch
-    {
-        "rookie_npc" => "Rookie Guard",
-        "veteran_npc" => "Veteran Guard",
-        "elite_npc" => "Elite Guard",
-        "hound" => "Guard Hound",
-        "troll" => "Guard Troll",
-        "drake" => "Guard Drake",
-        _ => "Guard"
-    };
+    /// <summary>v1.2.5: a guard type's English name, the one the Inn stores (InnLocation.GuardStoredName).</summary>
+    internal static string GetGuardName(string type) => InnLocation.GuardStoredName(type);
 }
 
 /// <summary>
