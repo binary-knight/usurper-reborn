@@ -1327,16 +1327,19 @@ public class HomeLocation : BaseLocation
                 if (categoryAchievements.Any())
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  === {category} ===");
+                    terminal.WriteLine($"  === {MainStreetLocation.AchievementCategoryLabel(category)} ===");
 
                     foreach (var achievement in categoryAchievements)
                     {
                         terminal.SetColor(achievement.GetTierColor());
                         terminal.Write($"    {achievement.GetTierSymbol()} ");
                         terminal.SetColor("bright_green");
-                        terminal.Write($"[X] {achievement.Name}");
+                        terminal.Write($"[X] {achievement.LocName()}");
                         terminal.SetColor("gray");
-                        terminal.WriteLine($" - {achievement.Description}");
+                        // v1.2.5: the goal wraps at 79 columns
+                        var goal = AchievementSystem.TrophyGoalRows(achievement);
+                        terminal.WriteLine(goal[0]);
+                        foreach (var row in goal.Skip(1)) terminal.WriteLine(row);
                     }
                     terminal.WriteLine();
                 }

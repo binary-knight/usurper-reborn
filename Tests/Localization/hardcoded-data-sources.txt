@@ -62,23 +62,23 @@ keyed|Scripts/Data/DungeonSettlementData.cs|init.NPCTitle|dungeon.settlement.{id
 keyed|Scripts/Data/DungeonSettlementData.cs|init.ReturnGreeting|dungeon.settlement.{id}.greeting_return
 names|Scripts/Data/DungeonSettlementData.cs|init.Name|settlement place names
 names|Scripts/Data/DungeonSettlementData.cs|init.NPCName|settlement NPC names
-table|Scripts/Data/FounderStatueData.cs|decl:ART_AMARANTH|statue art with words, FounderStatueSystem
-table|Scripts/Data/FounderStatueData.cs|decl:ART_AURA|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_BIAXIN|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_COOSH_CRACKED|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_FASTFINGE|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_LUELDORA|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_MYSTIC|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_QUENT|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_SANDOVAL|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_SEDZ|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_SPUDMAN|statue art with words
-table|Scripts/Data/FounderStatueData.cs|decl:ART_ZENGAZU_CRACKED|statue art with words
-table|Scripts/Data/FounderStatueData.cs|init.AchievementTag|statue plaque, FounderStatueSystem
-nouns|Scripts/Data/FounderStatueData.cs|init.ClassName|statue plaque class
-table|Scripts/Data/FounderStatueData.cs|init.EndingTag|statue plaque ending
-table|Scripts/Data/FounderStatueData.cs|init.Inscription|statue plaque inscription
-nouns|Scripts/Data/FounderStatueData.cs|init.RaceName|statue plaque race
+table|Scripts/Data/FounderStatueData.cs|decl:ART_AMARANTH|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_AURA|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_BIAXIN|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_COOSH_CRACKED|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_FASTFINGE|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_LUELDORA|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_MYSTIC|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_QUENT|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_SANDOVAL|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_SEDZ|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_SPUDMAN|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+table|Scripts/Data/FounderStatueData.cs|decl:ART_ZENGAZU_CRACKED|kept English: words drawn into fixed-width statue art (FounderStatueSystem.RenderStatueArt)
+keyed|Scripts/Data/FounderStatueData.cs|init.AchievementTag|founder.tag_* (FounderStatueSystem.TagLabel); the record stays English
+keyed|Scripts/Data/FounderStatueData.cs|init.ClassName|class names and founder.unknown (FounderStatueSystem.ClassLabel); the record stays English
+keyed|Scripts/Data/FounderStatueData.cs|init.EndingTag|founder.ending_* (FounderStatueSystem.EndingLabel); the record stays English
+keyed|Scripts/Data/FounderStatueData.cs|init.Inscription|founder.inscription_{n} (FounderStatueSystem.InscriptionText); the record stays English
+keyed|Scripts/Data/FounderStatueData.cs|init.RaceName|race names and founder.unknown (FounderStatueSystem.RaceLabel); the record stays English
 names|Scripts/Data/FounderStatueData.cs|init.DisplayName|founder character names
 names|Scripts/Data/FounderStatueData.cs|init.DivineName|god names
 keyed|Scripts/Data/OldGodsData.cs|init.DefeatDialogue|oldgod.{key}.defeat.N
@@ -148,7 +148,6 @@ names|Scripts/Locations/LoveStreetLocation.cs|BaseConstructorInitializer#1|place
 names|Scripts/Locations/LoveStreetLocation.cs|new:Courtesan#0|courtesan names
 names|Scripts/Locations/LoveStreetLocation.cs|new:Gigolo#0|gigolo names
 names|Scripts/Locations/PrisonLocation.cs|decl:vexName|NPC name
-table|Scripts/Locations/QuestHallLocation.cs|decl:status|quest status in the Electron quest list
 names|Scripts/Locations/TempleLocation.cs|=LocationName|place name, also a location.name.{id} key; raw only in the who list and NPC location labels
 
 # --- Scripts/Systems ----------------------------------------------------------------------------
@@ -164,8 +163,8 @@ table|Scripts/Systems/CharacterCreationSystem.cs|switcharm/tuple#0|starter weapo
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Description|ability.{id}.desc
 keyed|Scripts/Systems/ClassAbilitySystem.cs|init.Name|ability.{id}.name
 names|Scripts/Systems/DialogueSystem.cs|init.Speaker|speaker names: god names stay as they are; the stored English picks the colour and the Electron portrait; the Mysterious Stranger title shows through dialogue.speaker.mysterious_stranger
-nouns|Scripts/Systems/FactionSystem.cs|init.Name|faction names printed raw, InnLocation
-table|Scripts/Systems/FactionSystem.cs|init.Ranks|faction rank titles
+keyed|Scripts/Systems/FactionSystem.cs|init.Name|faction.name_* (FactionSystem.NameLabel); the English data name is not shown
+keyed|Scripts/Systems/FactionSystem.cs|init.Ranks|faction.rank_{faction}_{n} (FactionSystem.RankLabel); FactionRank, the number, is saved
 keyed|Scripts/Systems/FeatureInteractionSystem.cs|init.Text|feature.lore.{hash}
 names|Scripts/Systems/FeatureInteractionSystem.cs|init.RevealsOldGod|Old God names
 table|Scripts/Systems/FileSaveBackend.cs|init.SaveType|save type in the save list
@@ -180,15 +179,14 @@ keyed|Scripts/Systems/NPCItemGenerator.cs|init.Name|stored English fallback name
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#0|prison.activity_{id}_name
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#1|prison.activity_{id}_desc
 keyed|Scripts/Systems/PrisonActivitySystem.cs|dictpair#1/tuple#2|prison.activity_{id}_effect
-table|Scripts/Systems/QuestSystem.cs|call:CreateStarterQuest#7/tuple#0|starter quest monster names
-nouns|Scripts/Systems/QuestSystem.cs|decl:bossName|boss label fallback in quest.objective.defeat_boss
-table|Scripts/Systems/QuestSystem.cs|decl:highLevel|quest target monster names
-table|Scripts/Systems/QuestSystem.cs|decl:lowLevel|quest target monster names
-table|Scripts/Systems/QuestSystem.cs|decl:midLevel|quest target monster names
-table|Scripts/Systems/QuestSystem.cs|EqualsValueClause|default dungeon name in quest.dungeon_quest_comment
-table|Scripts/Systems/QuestSystem.cs|init.Initiator|quest giver fallback
-table|Scripts/Systems/QuestSystem.cs|init.TargetId|quest target in the description
-nouns|Scripts/Systems/QuestSystem.cs|=targetName|quest target in castle.quest_target
+table|Scripts/Systems/QuestSystem.cs|call:CreateStarterQuest#7/tuple#0|kept English: starter quest monster names, saved as QuestMonster names and objective targets (SaveSystem, OnlineStateManager) and matched against killed monsters; monster names have no keys yet
+nouns|Scripts/Systems/QuestSystem.cs|decl:bossName|kept English: boss fallback in quest.objective.defeat_boss on a path no starter quest takes (no ClearBoss starter)
+table|Scripts/Systems/QuestSystem.cs|decl:highLevel|kept English: royal quest target monster, saved as QuestMonster and objective TargetName and matched against killed monsters; monster names have no keys yet
+table|Scripts/Systems/QuestSystem.cs|decl:lowLevel|kept English: royal quest target monster, saved as QuestMonster and objective TargetName and matched against killed monsters; monster names have no keys yet
+table|Scripts/Systems/QuestSystem.cs|decl:midLevel|kept English: royal quest target monster, saved as QuestMonster and objective TargetName and matched against killed monsters; monster names have no keys yet
+keyed|Scripts/Systems/QuestSystem.cs|decl:BountyBoardInitiator|quest.initiator.bounty_board (Quest.GetDisplayInitiator); stored and compared in English (QuestSystem GetBountyBoardQuests, RefreshBountyBoard)
+table|Scripts/Systems/QuestSystem.cs|init.TargetId|kept English: merc contract target id, a monster name or a GameLocation enum name matched in UpdateObjectiveProgress and OnLocationVisited
+keyed|Scripts/Systems/QuestSystem.cs|=targetName|dungeon.floor (CastleLocation.QuestTargetLabel at Castle and GameEngine); saved as objective TargetName in English
 keyed|Scripts/Systems/QuestSystem.cs|init.Comment|merc.contract.{id}.comment
 keyed|Scripts/Systems/QuestSystem.cs|init.Title|merc.contract.{id}.title
 names|Scripts/Systems/RareEncounters.cs|decl:godNames|god names
@@ -309,12 +307,10 @@ keyed|Scripts/Locations/MusicShopLocation.cs|decl:WarMarchSongs/tuple#3|music.so
 names|Scripts/Locations/MusicShopLocation.cs|decl:performer|NPC names
 names|Scripts/Locations/MusicShopLocation.cs|decl:seller|NPC names
 names|Scripts/Locations/WeaponShopLocation.cs|decl:shopkeeperName|shopkeeper name
-table|Scripts/Systems/AchievementSystem.cs|decl:achMsg|achievement broadcast
-nouns|Scripts/Systems/AchievementSystem.cs|decl:broadcastName|fallback name in broadcast
-table|Scripts/Systems/AchievementSystem.cs|init.Description|achievement descriptions
-nouns|Scripts/Systems/AchievementSystem.cs|init.Name|achievement names
-table|Scripts/Systems/AchievementSystem.cs|init.SecretHint|achievement hint
-table|Scripts/Systems/AchievementSystem.cs|init.UnlockMessage|achievement unlock message
+keyed|Scripts/Systems/AchievementSystem.cs|init.Description|achievement.{id}.desc (Achievement.LocDescription); the English stays for achievements.json and the wiki en
+keyed|Scripts/Systems/AchievementSystem.cs|init.Name|achievement.{id}.name (Achievement.LocName, NameIn); the id, not the name, is saved and sent to Steam
+keyed|Scripts/Systems/AchievementSystem.cs|init.SecretHint|achievement.{id}.hint (Achievement.LocSecretHint); the wiki export keeps the English field
+keyed|Scripts/Systems/AchievementSystem.cs|init.UnlockMessage|achievement.{id}.unlock (Achievement.LocUnlockMessage)
 names|Scripts/Systems/CombatEngine.cs|init.Name|unique boss name
 table|Scripts/Systems/CombatMessages.cs|init.[k]=|attack verbs
 table|Scripts/Systems/CompanionSystem.cs|decl:drop|companion drop line

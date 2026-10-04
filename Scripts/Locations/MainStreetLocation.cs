@@ -1307,7 +1307,7 @@ public partial class MainStreetLocation : BaseLocation
             : AchievementSystem.GetAllAchievements();
 
         int displayCount = 0;
-        foreach (var achievement in achievementsToShow.OrderBy(a => a.Tier).ThenBy(a => a.Name))
+        foreach (var achievement in achievementsToShow.OrderBy(a => a.Tier).ThenBy(a => a.LocName()))
         {
             bool isUnlocked = achievements.IsUnlocked(achievement.Id);
 
@@ -1321,9 +1321,9 @@ public partial class MainStreetLocation : BaseLocation
                 terminal.SetColor("bright_green");
                 terminal.Write("+ ");
                 terminal.SetColor("white");
-                terminal.Write(achievement.Name);
+                terminal.Write(achievement.LocName());
                 terminal.SetColor("gray");
-                WriteAchievementTail(2 + tierSymbol.Length + 2 + achievement.Name.Length, achievement.Description);
+                WriteAchievementTail(2 + tierSymbol.Length + 2 + achievement.LocName().Length, achievement.LocDescription());
 
                 // Show unlock date
                 var unlockDate = achievements.GetUnlockDate(achievement.Id);
@@ -1343,14 +1343,14 @@ public partial class MainStreetLocation : BaseLocation
                     terminal.SetColor("gray");
                     terminal.Write("???");
                     terminal.SetColor("darkgray");
-                    WriteAchievementTail(2 + tierSymbol.Length + 4 + 3, achievement.SecretHint);
+                    WriteAchievementTail(2 + tierSymbol.Length + 4 + 3, achievement.LocSecretHint());
                 }
                 else
                 {
                     terminal.SetColor("gray");
-                    terminal.Write(achievement.Name);
+                    terminal.Write(achievement.LocName());
                     terminal.SetColor("darkgray");
-                    WriteAchievementTail(2 + tierSymbol.Length + 4 + achievement.Name.Length, achievement.Description);
+                    WriteAchievementTail(2 + tierSymbol.Length + 4 + achievement.LocName().Length, achievement.LocDescription());
                 }
             }
 

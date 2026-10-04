@@ -3724,8 +3724,8 @@ public partial class GameEngine
         {
             string targetDisplay = !string.IsNullOrEmpty(quest.TargetNPCName)
                 ? quest.TargetNPCName
-                : quest.Objectives.FirstOrDefault(o =>
-                    !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? Loc.Get("combat.unknown_name");
+                : CastleLocation.QuestTargetLabel(quest.Objectives.FirstOrDefault(o =>
+                    !string.IsNullOrEmpty(o.TargetName))?.TargetName ?? Loc.Get("combat.unknown_name"));   // v1.2.5: "Floor N" shown as dungeon.floor
 
             // v1.1.14: paid only under the quest's claim, as the bounty payouts are
             if (SettleDeadNpcQuest(player, quest, out long rewardAmount) != true) continue;

@@ -9195,7 +9195,7 @@ public class CastleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("castle.crown_expression_hardens"));
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("castle.crown_sworn_allegiance", UsurperRemake.Systems.FactionSystem.Factions[factionSystem.PlayerFaction.Value].Name));
+            terminal.WriteLine(Loc.Get("castle.crown_sworn_allegiance", UsurperRemake.Systems.FactionSystem.NameLabel(factionSystem.PlayerFaction.Value)));
             terminal.WriteLine(Loc.Get("castle.crown_divided_loyalties"));
             terminal.WriteLine(Loc.Get("castle.crown_renounce_return"));
             terminal.WriteLine("");

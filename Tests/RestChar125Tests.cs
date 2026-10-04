@@ -710,7 +710,8 @@ public class RestChar125Tests : IDisposable
         InLang("hu", () => FounderStatueSystem.ClassLabel("Mystic Shaman")).Should().Be(L("hu", "class.mystic_shaman"));
         InLang("hu", () => FounderStatueSystem.RaceLabel("Half-Elf")).Should().Be(L("hu", "race.half_elf"));
         InLang("hu", () => FounderStatueSystem.EndingLabel("Usurper")).Should().Be(L("hu", "founder.ending_usurper"));
-        InLang("hu", () => FounderStatueSystem.ClassLabel("Unknown")).Should().Be("Unknown");
+        InLang("hu", () => FounderStatueSystem.ClassLabel("Unknown")).Should().Be(L("hu", "founder.unknown"));   // v1.2.5 (data D6): "Unknown" is keyed
+        InLang("hu", () => FounderStatueSystem.ClassLabel("Not A Class")).Should().Be("Not A Class");
         InLang("en", () => FounderStatueSystem.ClassLabel("Mystic Shaman")).Should().Be("Mystic Shaman");
         InLang("en", () => FounderStatueSystem.RaceLabel("Half-Elf")).Should().Be("Half-Elf");
         Source("Scripts/Systems/FounderStatueSystem.cs").Should().Contain("statue.ClassName != \"Unknown\"");
@@ -855,8 +856,8 @@ public class RestChar125Tests : IDisposable
         foreach (var f in OwnedFiles)
             (output.TryGetValue(f, out var n) ? n : 0).Should().Be(kept.TryGetValue(f, out var k) ? k : 0, $"{f} output sites");
         var data = Counts("hardcoded-data-baseline.json", data: true);
-        data["Scripts/Systems/AchievementSystem.cs"].Should().Be(197, "the 12 popup rows are keyed");
-        data["Scripts/Systems/FactionSystem.cs"].Should().Be(30, "the 9 join refusals are keyed");
+        data.Should().NotContainKey("Scripts/Systems/AchievementSystem.cs", "the 12 popup rows are keyed; v1.2.5: the achievement table too (DataAchieve125Tests)");
+        data.Should().NotContainKey("Scripts/Systems/FactionSystem.cs", "the 9 join refusals are keyed; v1.2.5: the names and ranks too (DataAchieve125Tests)");
         data["Scripts/Systems/VisualNovelDialogueSystem.cs"].Should().Be(2, "the two pronouns are keyed");
         data["Scripts/Systems/CompanionSystem.cs"].Should().Be(94);
         data.Should().NotContainKey("Scripts/Systems/DialogueSystem.cs", "v1.2.5: the dialogue trees are keyed (DataDialogue125Tests)");

@@ -131,6 +131,9 @@ public partial class Quest
     {
         if (!string.IsNullOrEmpty(InitiatorKey))
             return Loc.Get(InitiatorKey);
+        // v1.2.5: the bounty board's stored English initiator (compared in QuestSystem) shown in the player's language
+        if (Initiator == QuestSystem.BountyBoardInitiator)
+            return Loc.Get("quest.initiator.bounty_board");
         return Initiator;
     }
 

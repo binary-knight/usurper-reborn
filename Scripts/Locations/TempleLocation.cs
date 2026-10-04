@@ -2400,7 +2400,7 @@ public partial class TempleLocation : BaseLocation
             terminal.WriteLine(Loc.Get("temple.mirael_studies"));
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("temple.already_serve", UsurperRemake.Systems.FactionSystem.Factions[factionSystem.PlayerFaction.Value].Name));
+            terminal.WriteLine(Loc.Get("temple.already_serve", UsurperRemake.Systems.FactionSystem.NameLabel(factionSystem.PlayerFaction.Value)));
             terminal.WriteLine(Loc.Get("temple.no_divided_loyalties"));
             terminal.WriteLine(Loc.Get("temple.renounce_seek_again"));
             terminal.WriteLine("");

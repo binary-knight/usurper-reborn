@@ -334,7 +334,7 @@ public static class WikiDataExporter
     private static object Achievements() => AchievementSystem.GetBuiltInAchievements()
         .OrderBy(a => a.Id).Select(a => new
         {
-            id = a.Id, name = Names(null, a.Name), description = Names(null, a.Description),
+            id = a.Id, name = Names(a.KeyOf("name", a.Name), a.Name), description = Names(a.KeyOf("desc", a.Description), a.Description),   // v1.2.5: es fr hu it through achievement.{id}.*
             a.Category, a.Tier, a.IsSecret, spoiler = a.IsSecret, a.SecretHint, a.PointValue,
             a.GoldReward, a.ExperienceReward
         }).ToArray();

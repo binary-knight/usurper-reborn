@@ -7672,12 +7672,11 @@ public abstract class BaseLocation
         if (factionSystem.PlayerFaction != null)
         {
             var faction = factionSystem.PlayerFaction.Value;
-            var factionData = UsurperRemake.Systems.FactionSystem.Factions[faction];
 
             terminal.SetColor("white");
             terminal.Write(Loc.Get("base.stat_allegiance"));
             terminal.SetColor(GetFactionColor(faction));
-            terminal.WriteLine(factionData.Name);
+            terminal.WriteLine(UsurperRemake.Systems.FactionSystem.NameLabel(faction));
 
             terminal.SetColor("white");
             terminal.Write(Loc.Get("base.stat_rank"));
@@ -7724,12 +7723,11 @@ public abstract class BaseLocation
                                          UsurperRemake.Systems.Faction.TheShadows })
         {
             var standing = factionSystem.FactionStanding[faction];
-            var factionData = UsurperRemake.Systems.FactionSystem.Factions[faction];
 
             terminal.SetColor("gray");
             terminal.Write("  ");
             terminal.SetColor(GetFactionColor(faction));
-            terminal.Write($"{factionData.Name,-15}");
+            terminal.Write($"{UsurperRemake.Systems.FactionSystem.NameLabel(faction),-15}");
             terminal.SetColor("white");
             terminal.Write(": ");
 

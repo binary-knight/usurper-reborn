@@ -5844,7 +5844,7 @@ public class InnLocation : BaseLocation
                 var factionSystem = UsurperRemake.Systems.FactionSystem.Instance;
                 factionSystem?.ModifyReputation(npc.NPCFaction.Value, -250);
                 terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("inn.atk_faction_plummet", UsurperRemake.Systems.FactionSystem.Factions[npc.NPCFaction.Value].Name));
+                terminal.WriteLine(Loc.Get("inn.atk_faction_plummet", UsurperRemake.Systems.FactionSystem.NameLabel(npc.NPCFaction.Value)));
             }
 
             // Witness memories for NPCs at the Inn

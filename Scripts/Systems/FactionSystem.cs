@@ -462,47 +462,49 @@ namespace UsurperRemake.Systems
         /// </summary>
         public string GetCurrentRankTitle()
         {
-            if (PlayerFaction == null) return "Unaffiliated";
-            return Factions[PlayerFaction.Value].Ranks[FactionRank];
+            // v1.2.5: in the player's language; FactionRank (the number) is what is saved
+            if (PlayerFaction == null) return Loc.Get("faction.unaffiliated");
+            return RankLabel(PlayerFaction.Value, FactionRank);
         }
+
+        /// <summary>
+        /// v1.2.5: a rank title in the player's language, keyed faction.rank_{crown|shadows|faith}_{rank};
+        /// Factions[..].Ranks stays the English data.
+        /// </summary>
+        internal static string RankLabel(Faction faction, int rank)
+        {
+            var ranks = Factions[faction].Ranks;
+            if (rank < 0 || rank >= ranks.Length) return "";
+            string key = $"faction.rank_{KeyPart(faction)}_{rank}";
+            return Loc.HasIn("en", key) && Loc.GetIn("en", key) == ranks[rank] ? Loc.Get(key) : ranks[rank];
+        }
+
+        /// <summary>v1.2.5: the word of a faction in its keys (faction.name_crown).</summary>
+        private static string KeyPart(Faction faction) => faction switch
+        {
+            Faction.TheCrown => "crown",
+            Faction.TheShadows => "shadows",
+            Faction.TheFaith => "faith",
+            _ => faction.ToString().ToLowerInvariant()
+        };
 
         /// <summary>
         /// Get faction-appropriate greeting
         /// </summary>
         public string GetFactionGreeting(Faction npcFaction, Character player)
         {
+            // v1.2.5: in the player's language, keyed faction.greet_*
+            bool known = npcFaction == Faction.TheCrown || npcFaction == Faction.TheShadows || npcFaction == Faction.TheFaith;
             if (PlayerFaction == null)
-            {
-                return npcFaction switch
-                {
-                    Faction.TheCrown => "Citizen. Mind your business and obey the laws.",
-                    Faction.TheShadows => "Another face in the crowd. That's smart.",
-                    Faction.TheFaith => "May the Seven guide your path, stranger.",
-                    _ => "Greetings."
-                };
-            }
+                return Loc.Get(known ? $"faction.greet_none_{KeyPart(npcFaction)}" : "faction.greet_none_other");
 
             if (PlayerFaction == npcFaction)
-            {
-                return npcFaction switch
-                {
-                    Faction.TheCrown => $"Hail, {GetCurrentRankTitle()}. The Crown endures.",
-                    Faction.TheShadows => $"Shadow guide you, {GetCurrentRankTitle()}. What needs doing?",
-                    Faction.TheFaith => $"Blessings upon you, {GetCurrentRankTitle()}. The Light persists.",
-                    _ => "Brother/Sister."
-                };
-            }
+                return known ? Loc.Get($"faction.greet_same_{KeyPart(npcFaction)}", GetCurrentRankTitle()) : Loc.Get("faction.greet_same_other");
 
-            // Hostile faction
-            return npcFaction switch
-            {
-                // v0.62.1: faction names already carry "The " (e.g. "The Crown"),
-                // so the original "A The Crown sympathizer" was double-determiner-broken.
-                Faction.TheCrown => $"{Factions[PlayerFaction.Value].Name} sympathizer. Watch yourself.",
-                Faction.TheShadows => $"One of the {Factions[PlayerFaction.Value].Name}? Interesting...",
-                Faction.TheFaith => $"Even those who follow {Factions[PlayerFaction.Value].Name} may find redemption.",
-                _ => "I know who you serve."
-            };
+            // Hostile faction: one line per pair, so each language words the other faction's name as it needs
+            // (v1.2.5: the Shadows line read "One of the The Crown?")
+            string pairKey = $"faction.greet_rival_{KeyPart(npcFaction)}_{KeyPart(PlayerFaction.Value)}";
+            return Loc.HasIn("en", pairKey) ? Loc.Get(pairKey) : Loc.Get("faction.greet_rival_other");
         }
 
         /// <summary>
