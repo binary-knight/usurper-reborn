@@ -633,6 +633,24 @@ namespace UsurperRemake.Systems
             return madeChoices.TryGetValue(paradoxId, out var choice) ? choice : null;
         }
 
+        /// <summary>1.2.5: the ids of the paradoxes already answered, as the save writes them.</summary>
+        public IEnumerable<string> CompletedParadoxIds => madeChoices.Keys;
+
+        /// <summary>
+        /// 1.2.5: load step. Replaces the answered paradoxes with the saved ids, so a paradox never
+        /// comes back after a reload. Its effects are not applied again; they are in the saved stats.
+        /// </summary>
+        public void RestoreFromSave(IEnumerable<string>? completedIds)
+        {
+            madeChoices.Clear();
+            if (completedIds == null) return;
+            foreach (var id in completedIds)
+            {
+                if (string.IsNullOrEmpty(id)) continue;
+                madeChoices[id] = new ParadoxChoice { ParadoxId = id };
+            }
+        }
+
         /// <summary>
         /// Save state for serialization
         /// </summary>
