@@ -1097,6 +1097,15 @@ public class TeamCornerLocation : BaseLocation
             return;
         }
 
+        // v1.2.6: team names reach web pages, so markup characters are refused
+        if (NameRules.HasMarkupChars(teamName))
+        {
+            terminal.SetColor("red");
+            terminal.WriteLine(NameRules.MarkupCharsMessage);
+            await Pacing.Wait(2000);
+            return;
+        }
+
         // Check if team name already exists (NPC teams + player teams). v1.1.12: ignoring case, as the
         // protection list does (WorldSimulator._playerTeamNames)
         if (IsNpcTeamName(teamName))

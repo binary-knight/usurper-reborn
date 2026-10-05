@@ -603,6 +603,13 @@ public class CharacterCreationSystem
 
             name = name.Trim();
 
+            // v1.2.6: names reach web pages, so a new name may not hold markup characters
+            if (NameRules.HasMarkupChars(name))
+            {
+                terminal.WriteLine(NameRules.MarkupCharsMessage, "red");
+                continue;
+            }
+
             // Pascal validation: Check for forbidden names
             var upperName = name.ToUpper();
             if (GameConfig.ForbiddenNames.Contains(upperName))

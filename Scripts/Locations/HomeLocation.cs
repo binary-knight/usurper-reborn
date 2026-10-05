@@ -2031,7 +2031,13 @@ public class HomeLocation : BaseLocation
 
             terminal.SetColor("white");
             string newFirst = (await terminal.GetInput("  " + Loc.Get("home.child_new_name_prompt"))).Trim();
-            if (!string.IsNullOrEmpty(newFirst) && newFirst.Length <= 20)
+            // v1.2.6: a name with markup characters is refused and the child keeps its name
+            if (NameRules.HasMarkupChars(newFirst))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  {NameRules.MarkupCharsMessage}");
+            }
+            else if (!string.IsNullOrEmpty(newFirst) && newFirst.Length <= 20)
             {
                 string oldName = selectedChild.Name;
                 selectedChild.Name = newFirst + surname;

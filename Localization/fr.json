@@ -4625,6 +4625,7 @@
   "creation.name_required": "Vous devez entrer un nom!",
   "creation.name_taken": "Ce nom est déjà pris! Choisissez-en un autre.",
   "creation.name_forbidden": "Désolé, ce nom est déjà utilisé.",
+  "creation.name_bad_chars": "Les noms ne peuvent pas contenir les caractères < > & \"",
   "creation.name_confirm": "{0}, c’est bien ce que vous voulez? (Y/n)",
   "creation.choose_display_name": "Choisissez un nom pour votre personnage alternatif :",
   "creation.choose_display_online": "Choisissez un nom de personnage (ou appuyez Entrée pour utiliser le nom du compte) :",
