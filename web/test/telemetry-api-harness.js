@@ -146,7 +146,14 @@ async function send(t, opts = {}) {
     if (req.listenerCount('end') > 0) req.emit('end');
   }
   if (opts.beforeAwait) opts.beforeAwait(req, res);
-  await p;
+  // a handler that never replies (a broken timer, say) fails the test in 5 s instead of hanging it
+  let guard;
+  const noReply = new Promise((resolve, reject) => { guard = setTimeout(() => reject(new Error('the endpoint never replied')), 5000); });
+  try {
+    await Promise.race([p, noReply]);
+  } finally {
+    clearTimeout(guard);
+  }
   return { status: out.status, headers: out.headers, body: out.body, ended: out.ended, socketDestroyed: req.socket.destroyed, dataListened: req.dataListened, req };
 }
 
