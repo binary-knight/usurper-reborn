@@ -294,6 +294,7 @@ namespace UsurperRemake.Systems
 
         public bool DeleteGameData(string playerName)
         {
+            TelemetryConsent.RemoveAnswer(SaveDirectory, playerName, null);   // 1.2.7: a BBS player's answer goes with the character
             // v0.57.18: take the write lock so a delete can't race with an
             // in-flight save and produce a half-written file with no primary.
             _writeLock.Wait();
