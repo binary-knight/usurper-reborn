@@ -284,6 +284,10 @@ test('NPC tab: blank for a missing outcome, negative deltas shown, NPCs seen in 
   p.click(tabEl(p, 'npc'));
   await p.settle();
   assert.deepStrictEqual(cells(p, 'npc-dungeon-table'), [['Solo', '', '1', '50%'], ['Team', 'won', '1', '100%']]);
+  // a missing outcome is an empty cell, not an empty coloured tag
+  const outcomeCells = p.el('npc-dungeon-table').querySelectorAll('tbody tr').map((tr) => tr.querySelectorAll('td')[1]);
+  assert.deepStrictEqual(outcomeCells.map((td) => !!td.querySelector('.tag')), [false, true]);
+  assert.strictEqual(p.el('npc-recent-table').querySelectorAll('tbody tr')[0].querySelectorAll('td')[headers(p, 'npc-recent-table').indexOf('Outcome')].querySelector('.tag'), null);
   const r = cells(p, 'npc-recent-table')[0];
   const rh = headers(p, 'npc-recent-table');
   assert.strictEqual(r[rh.indexOf('Outcome')], '');

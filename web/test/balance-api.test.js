@@ -196,6 +196,18 @@ test('one-hit kills are victories in round 1 only: no deaths, no round 0', async
   });
 });
 
+test('death hotspots: each floor_actual its own point (dungeon_floor is the monster level), monster level range', async () => {
+  await withApi((w) => {
+    insertFight(w, { outcome: 'death', monster_name: 'Imp', monster_level: 4, dungeon_floor: 4, tally: tallyOf({ floor_actual: 3 }) });
+    insertFight(w, { outcome: 'death', monster_name: 'Imp', monster_level: 4, dungeon_floor: 4, tally: tallyOf({ floor_actual: 9 }) });
+    insertFight(w, { outcome: 'death', monster_name: 'Imp', monster_level: 6, dungeon_floor: 6, tally: tallyOf({ floor_actual: 9 }) });
+  }, async (a) => {
+    const r = (await a.call('/api/balance/death-hotspots')).body;
+    assert.deepStrictEqual(r.byFloor.map((x) => [x.floor_actual, x.deaths]), [[3, 1], [9, 2]]);
+    assert.deepStrictEqual(r.byMonster.map((x) => [x.monster_name, x.min_level, x.max_level, x.deaths]), [['Imp', 4, 6, 3]]);
+  });
+});
+
 test('death hotspots: floors from floor_actual, old deaths on the no-floor line, damage split null on old rows', async () => {
   await withApi(fillMixed, async (a) => {
     const r = (await a.call('/api/balance/death-hotspots?window=30d')).body;
@@ -227,7 +239,7 @@ test('boss fights carry the damage split, null on old rows', async () => {
 
 test('player activity and suspects take the class from the latest row', async () => {
   await withApi((w) => {
-    for (let i = 0; i < 6; i++) insertFight(w, { player_name: 'Switcher', player_class: 'Mage', ago: `-${20 - i} hours`, tally: tallyOf() });
+    for (let i = 0; i < 6; i++) insertFight(w, { player_name: 'Switcher', player_class: 'Cleric', ago: `-${20 - i} hours`, tally: tallyOf() });
     for (let i = 0; i < 6; i++) insertFight(w, { player_name: 'Switcher', player_class: 'Warrior', ago: `-${10 - i} hours`, tally: tallyOf() });
     // the newest row is a Mage again
     insertFight(w, { player_name: 'Switcher', player_class: 'Mage', ago: '-1 hours', tally: tallyOf() });
