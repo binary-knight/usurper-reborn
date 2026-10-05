@@ -273,9 +273,27 @@ public class CombatEvents126Tests
 
     private static readonly System.Reflection.FieldInfo EngineRandom =
         typeof(CombatEngine).GetField("random", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+    private static readonly System.Reflection.MethodInfo QueueHook =
+        typeof(CombatEngine).GetMethod("QueueTelemetryRow", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+    /// <summary>A Random that counts every draw.</summary>
+    private sealed class CountingRandom : Random
+    {
+        public int Draws;
+        public override int Next() { Draws++; return base.Next(); }
+        public override int Next(int maxValue) { Draws++; return base.Next(maxValue); }
+        public override int Next(int minValue, int maxValue) { Draws++; return base.Next(minValue, maxValue); }
+        public override long NextInt64() { Draws++; return base.NextInt64(); }
+        public override long NextInt64(long maxValue) { Draws++; return base.NextInt64(maxValue); }
+        public override long NextInt64(long minValue, long maxValue) { Draws++; return base.NextInt64(minValue, maxValue); }
+        public override double NextDouble() { Draws++; return base.NextDouble(); }
+        public override float NextSingle() { Draws++; return base.NextSingle(); }
+        public override void NextBytes(byte[] buffer) { Draws++; base.NextBytes(buffer); }
+        public override void NextBytes(Span<byte> buffer) { Draws++; base.NextBytes(buffer); }
+    }
 
     /// <summary>The same seeded fight three times: twice with no consent state, once with a stored yes.
-    /// The screen, the HP trail, the result and the engine's next random draw are the same.</summary>
+    /// The screen, the HP trail and the result are the same, and the hook draws nothing from the engine's random.</summary>
     private static async Task SameFightWithTelemetryOnAndOff(Func<TelemetryStore, Task<Fight>> run)
     {
         var dirs = new List<string>();
@@ -307,15 +325,20 @@ public class CombatEvents126Tests
             yes.Result.TotalDamageTaken.Should().Be(absent1.Result.TotalDamageTaken);
             yes.Result.Tally.DmgByPlayer.Should().Be(absent1.Result.Tally.DmgByPlayer);
             yes.Result.Tally.PlayerHpEnd.Should().Be(absent1.Result.Tally.PlayerHpEnd);
-            int Next(Fight f) => ((Random)EngineRandom.GetValue(f.Engine)!).Next();
-            int n1 = Next(absent1);
-            Next(absent2).Should().Be(n1, "the engine's random is in the same place after the same fight");
-            Next(yes).Should().Be(n1, "queueing the row draws nothing from the engine's random");
             // the row was really queued in one run and not in the others
             absent1.Engine.LastTelemetryAppend.Should().BeNull();
             yes.Engine.LastTelemetryAppend.Should().NotBeNull();
             await yes.Engine.LastTelemetryAppend!;
             yesStore.ReadQueue().Should().HaveCount(1);
+            // queueing the row draws nothing from the engine's random: the hook run again on the finished
+            // fight with a counting random (after the fight, loot from Random.Shared can change how often
+            // the engine's random is drawn, so the draws are counted around the hook itself)
+            var counting = new CountingRandom();
+            EngineRandom.SetValue(yes.Engine, counting);
+            QueueHook.Invoke(yes.Engine, new object[] { yes.Result, "victory", 0L, 0L });
+            counting.Draws.Should().Be(0, "queueing the row draws nothing from the engine's random");
+            await yes.Engine.LastTelemetryAppend!;
+            yesStore.ReadQueue().Should().HaveCount(2, "the hook queued the row again");
         }
         finally
         {

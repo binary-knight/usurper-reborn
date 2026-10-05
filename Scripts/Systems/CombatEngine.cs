@@ -305,7 +305,7 @@ public partial class CombatEngine
                 DebugLogger.Instance.LogDebug("TELEMETRY", "combat row outside the bounds, not queued");
                 return;
             }
-            LastTelemetryAppend = Task.Run(() => store.Append(row));
+            LastTelemetryAppend = TelemetryBackground(() => store.Append(row));
         }
         catch (Exception ex)
         {
@@ -318,6 +318,10 @@ public partial class CombatEngine
 
     /// <summary>1.2.7: test seam. A store used instead of the active save directory's.</summary>
     internal TelemetryStore? TelemetryStoreOverride { get; set; }
+
+    /// <summary>1.2.7: runs the telemetry append off the combat thread. Test seam: a test can hold the
+    /// append back until it has changed the fight's objects.</summary>
+    internal Func<Action, Task> TelemetryBackground { get; set; } = work => Task.Run(work);
 
     /// <summary>1.2.6: every value of the combat_events row, read now from the fight's objects.</summary>
     internal static CombatEventRow BuildCombatEventRow(CombatResult result, string outcome, long xpGained, long goldGained)

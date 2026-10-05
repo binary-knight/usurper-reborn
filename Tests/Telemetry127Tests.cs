@@ -199,11 +199,13 @@ public class Telemetry127Tests : IDisposable
         public string Transcript => Encoding.UTF8.GetString(Output.ToArray());
     }
 
-    private static async Task<Fight> RunFight(TelemetryStore? store, Character? hero = null, List<Monster>? monsters = null, string? script = null)
+    private static async Task<Fight> RunFight(TelemetryStore? store, Character? hero = null, List<Monster>? monsters = null, string? script = null,
+        Action<CombatEngine>? prepare = null)
     {
         var f = new Fight { Hero = hero ?? Hero(), Monsters = monsters ?? new List<Monster> { Brute("Brute A"), Brute("Brute B") } };
         var term = new TerminalEmulator(new ScriptedStream(script ?? Attacks()), f.Output);
         f.Engine = new CombatEngine(term) { TelemetryStoreOverride = store };
+        prepare?.Invoke(f.Engine);
         f.Engine.SeedRandomForTests(127);
         var sw = Stopwatch.StartNew();
         try
@@ -572,25 +574,21 @@ public class Telemetry127Tests : IDisposable
     public async Task Row11_Snapshot_ChangingTheCharacterAfterTheCall_DoesNotChangeTheRow()
     {
         var store = YesStore();
-        store.LockTimeout = TimeSpan.FromSeconds(20);
-        Fight f;
-        (long Level, long Str, long MaxHP, long MLevel, long MMaxHP) expected;
-        using (var holder = new LockHolder(Store()))
-        {
-            f = await RunFight(store, script: Retreats());
-            f.Error.Should().BeNull("{0}", f.Transcript);
-            f.Engine.LastTelemetryAppend!.IsCompleted.Should().BeFalse();
-            expected = (f.Hero.Level, f.Hero.Strength, f.Hero.MaxHP, f.Result!.Monster!.Level, f.Result.Monster.MaxHP);
-            f.Hero.Level = 77;
-            f.Hero.Strength = 999;
-            f.Hero.MaxHP = 12345;
-            foreach (var m in f.Monsters) { m.Level = 66; m.MaxHP = 4321; }
-            holder.Release();
-            await Appended(f);
-        }
+        var hold = new TaskCompletionSource();
+        var f = await RunFight(store, script: Retreats(),
+            prepare: e => e.TelemetryBackground = work => hold.Task.ContinueWith(_ => work(), TaskScheduler.Default));
+        f.Error.Should().BeNull("{0}", f.Transcript);
+        f.Engine.LastTelemetryAppend!.IsCompleted.Should().BeFalse("the append is held back");
+        (long Level, long Strength, long MaxHP, long MLevel, long MMaxHP) expected = (f.Hero.Level, f.Hero.Strength, f.Hero.MaxHP, f.Result!.Monster!.Level, f.Result.Monster.MaxHP);
+        f.Hero.Level = 77;
+        f.Hero.Strength = 999;
+        f.Hero.MaxHP = 12345;
+        foreach (var m in f.Monsters) { m.Level = 66; m.MaxHP = 4321; }
+        hold.SetResult();
+        await Appended(f);
         var row = RowOf(Lines().Single());
         row["player_level"].GetInt64().Should().Be(expected.Level);
-        row["player_str"].GetInt64().Should().Be(expected.Str);
+        row["player_str"].GetInt64().Should().Be(expected.Strength);
         row["player_max_hp"].GetInt64().Should().Be(expected.MaxHP);
         row["monster_level"].GetInt64().Should().Be(expected.MLevel);
         row["monster_max_hp"].GetInt64().Should().Be(expected.MMaxHP);
