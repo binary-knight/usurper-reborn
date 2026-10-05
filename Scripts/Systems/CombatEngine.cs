@@ -297,7 +297,9 @@ public partial class CombatEngine
         {
             var store = TelemetryStoreOverride ?? TelemetryConsent.CurrentStore();
             if (store == null || result.Player == null) return;
-            if (!store.ShouldQueue(TelemetryConsent.CurrentLoginName())) return;
+            string? login = TelemetryConsent.CurrentLoginName();
+            if (!store.ShouldQueue(login)) return;
+            string? playerKey = TelemetryConsent.PlayerKey(login);    // checked again by the append, never stored
             var row = TelemetryRow.From(BuildCombatEventRow(result, outcome, xpGained, goldGained), result.Player.Class, result.Monster?.FamilyName);
             if (row == null) return;
             if (!row.IsValid())
@@ -305,7 +307,7 @@ public partial class CombatEngine
                 DebugLogger.Instance.LogDebug("TELEMETRY", "combat row outside the bounds, not queued");
                 return;
             }
-            LastTelemetryAppend = TelemetryBackground(() => store.Append(row));
+            LastTelemetryAppend = TelemetryBackground(() => store.Append(row, playerKey));
         }
         catch (Exception ex)
         {

@@ -64,6 +64,11 @@ public class Telemetry127Tests : IDisposable
     private string QueueFile => Path.Combine(Tel, "queue.jsonl");
     private string StateFile => Path.Combine(Tel, "state.json");
     private string[] Lines() => File.Exists(QueueFile) ? File.ReadAllLines(QueueFile) : Array.Empty<string>();
+    private static string[] LinesIn(TelemetryStore store) => File.Exists(store.QueuePath) ? File.ReadAllLines(store.QueuePath) : Array.Empty<string>();
+
+    /// <summary>The folder a save directory's store uses in this test run: under the run's temp root
+    /// (TelemetryTestRoot), never the directory itself.</summary>
+    private static string MappedTel(string saveDirectory) => Path.Combine(TelemetryConsent.FullSaveDirectory(saveDirectory), "telemetry");
 
     private SqlSaveBackend Db => _db ??= new SqlSaveBackend(Path.Combine(_dir, "game.db"));
 
@@ -200,13 +205,13 @@ public class Telemetry127Tests : IDisposable
     }
 
     private static async Task<Fight> RunFight(TelemetryStore? store, Character? hero = null, List<Monster>? monsters = null, string? script = null,
-        Action<CombatEngine>? prepare = null)
+        Action<CombatEngine>? prepare = null, int seed = 127)
     {
         var f = new Fight { Hero = hero ?? Hero(), Monsters = monsters ?? new List<Monster> { Brute("Brute A"), Brute("Brute B") } };
         var term = new TerminalEmulator(new ScriptedStream(script ?? Attacks()), f.Output);
         f.Engine = new CombatEngine(term) { TelemetryStoreOverride = store };
         prepare?.Invoke(f.Engine);
-        f.Engine.SeedRandomForTests(127);
+        f.Engine.SeedRandomForTests(seed);
         var sw = Stopwatch.StartNew();
         try
         {
@@ -251,20 +256,22 @@ public class Telemetry127Tests : IDisposable
     public async Task Row1_NeverAsked_RealFight_QueuesNothing()
     {
         SaveSystem.InitializeWithBackend(FileBackend(_dir));
-        TelemetryConsent.CurrentStore()!.Folder.Should().Be(Path.Combine(Path.GetFullPath(_dir), "telemetry"));
+        var store = TelemetryConsent.CurrentStore()!;
+        store.Folder.Should().Be(MappedTel(_dir)).And.StartWith(TelemetryTestRoot.Root);
         var f = await RunFight(null);
         f.Error.Should().BeNull("{0}", f.Transcript);
         f.Result!.Tally.Ended.Should().BeTrue();
         f.Engine.LastTelemetryAppend.Should().BeNull();
-        File.Exists(QueueFile).Should().BeFalse();
-        Directory.Exists(Tel).Should().BeFalse("a never asked install creates nothing");
+        File.Exists(store.QueuePath).Should().BeFalse();
+        Directory.Exists(store.Folder).Should().BeFalse("a never asked install creates nothing");
 
         // the same path with a stored yes queues the fight
-        TelemetryConsent.StoreFor(_dir).SetInstallAnswer(true);
+        TelemetryConsent.StoreFor(_dir).SetInstallAnswer(true).Should().BeTrue();
         var g = await RunFight(null);
         g.Error.Should().BeNull("{0}", g.Transcript);
         await Appended(g);
-        Lines().Should().HaveCount(1);
+        LinesIn(store).Should().HaveCount(1);
+        Directory.Exists(Tel).Should().BeFalse("the save directory itself is never touched in a test run");
     }
 
     // ======================================================================
@@ -551,7 +558,7 @@ public class Telemetry127Tests : IDisposable
     private sealed class ThrowingStore : TelemetryStore
     {
         public ThrowingStore(string dir) : base(dir, () => TelemetrySource.Single) { }
-        public override void Append(TelemetryRow row) => throw new IOException("appender fails");
+        public override void Append(TelemetryRow row, string? playerKey = null) => throw new IOException("appender fails");
     }
 
     [Fact]
@@ -807,10 +814,11 @@ public class Telemetry127Tests : IDisposable
         OperatorOn();
         var store = Store(TelemetrySource.BbsDoor);
         store.SetPlayerAnswer("alice", true);
+        string alice = TelemetryConsent.PlayerKey("alice")!;
         string id = store.State.InstallId!;
         id.Should().MatchRegex("^[0-9a-f]{32}$");
-        store.Append(RowWithRounds(1));
-        store.Append(RowWithRounds(2));
+        store.Append(RowWithRounds(1), alice);
+        store.Append(RowWithRounds(2), alice);
         Lines().Should().HaveCount(2);
 
         store.SetPlayerAnswer("bob", false);
@@ -818,7 +826,8 @@ public class Telemetry127Tests : IDisposable
         Store(TelemetrySource.BbsDoor).State.InstallId.Should().Be(id, "the id belongs to the operator setting");
         store.ShouldQueue("alice").Should().BeTrue("alice's own yes stands");
 
-        store.Append(RowWithRounds(3));
+        store.Append(RowWithRounds(3), alice);
+        Lines().Should().HaveCount(1, "alice's row after bob's No is queued");
         TelemetryConsent.OperatorResolver = () => false;
         store.OperatorTurnedOff();
         File.Exists(QueueFile).Should().BeFalse();
@@ -837,12 +846,13 @@ public class Telemetry127Tests : IDisposable
         OperatorOn();
         SaveSystem.InitializeWithBackend(Db);
         var store = TelemetryConsent.StoreFor(_dir);
-        string players = Path.Combine(Tel, "players");
+        store.Folder.Should().Be(MappedTel(_dir));
+        string players = Path.Combine(store.Folder, "players");
 
         store.SetPlayerAnswer("../../Escaper", true);
         store.SetPlayerAnswer("Keeper", true);
         Directory.GetFiles(players).Should().HaveCount(2, "a name with path characters stays inside players/");
-        Directory.GetFiles(_dir, "*", SearchOption.AllDirectories)
+        Directory.GetFiles(Path.GetDirectoryName(store.Folder)!, "*", SearchOption.AllDirectories)
             .Where(p => p.EndsWith(".json") && !p.EndsWith("state.json"))
             .Should().OnlyContain(p => Path.GetDirectoryName(p) == players);
 
@@ -862,7 +872,8 @@ public class Telemetry127Tests : IDisposable
         var files = FileBackend(Path.Combine(_dir, "files"));
         var fileStore = TelemetryConsent.StoreFor(files.GetSaveDirectory());
         fileStore.SetPlayerAnswer("Filer", true);
-        string filePlayers = Path.Combine(files.GetSaveDirectory(), "telemetry", "players");
+        fileStore.Folder.Should().Be(MappedTel(files.GetSaveDirectory()));
+        string filePlayers = Path.Combine(fileStore.Folder, "players");
         Directory.GetFiles(filePlayers).Should().HaveCount(1);
         files.DeleteGameData("Filer");
         Directory.GetFiles(filePlayers).Should().BeEmpty("FileSaveBackend.DeleteGameData removes the answer too");
@@ -889,7 +900,7 @@ public class Telemetry127Tests : IDisposable
             store.LoadPlayerAnswer(n);
             store.ShouldQueue(n).Should().BeFalse(n + " reads as not asked");
         }
-        Directory.Exists(Path.Combine(Tel, "players")).Should().BeFalse("a server keeps answers in the table");
+        Directory.Exists(Path.Combine(store.Folder, "players")).Should().BeFalse("a server keeps answers in the table");
     }
 
     /// <summary>A database given by a bare file name has "" as its save directory: the answer is still
@@ -904,7 +915,7 @@ public class Telemetry127Tests : IDisposable
         Rows("SELECT * FROM telemetry_consent;").Should().HaveCount(1);
         TelemetryConsent.RemoveAnswer("", "relative", Db);
         Rows("SELECT * FROM telemetry_consent;").Should().BeEmpty();
-        TelemetryConsent.StoreFor("").Folder.Should().Be(Path.Combine(Path.GetFullPath("."), "telemetry"));
+        TelemetryConsent.StoreFor("").Folder.Should().Be(MappedTel(Path.GetFullPath(".")), "an empty save directory is the current directory");
     }
 
     // ======================================================================
@@ -928,9 +939,10 @@ public class Telemetry127Tests : IDisposable
         var f = await RunFight(null);
         f.Error.Should().BeNull("{0}", f.Transcript);
         f.Engine.LastTelemetryAppend.Should().BeNull();
-        store.Append(RowWithRounds(1));
+        store.Append(RowWithRounds(1), TelemetryConsent.PlayerKey(login));
         store.OperatorTurnedOff();
-        Directory.Exists(Tel).Should().BeFalse("nothing is created while the operator switch is off");
+        store.Folder.Should().Be(MappedTel(_dir));
+        Directory.Exists(store.Folder).Should().BeFalse("nothing is created while the operator switch is off");
     }
 
     // ======================================================================
@@ -1150,5 +1162,256 @@ public class Telemetry127Tests : IDisposable
         Lines().Should().HaveCount(3, "the damaged lines are dropped at the next append");
         store.ReadQueue().Select(r => r.Row["rounds"]).Should().Equal(1L, 2L, 3L);
         store.AppendFailures.Should().Be(0);
+    }
+
+    // ======================================================================
+    // T1a2 P1: a test run never touches a real save folder
+    // ======================================================================
+
+    [Fact]
+    public async Task P1_WithNoOverride_TheStoreAFightResolves_LiesUnderTheTestRunsTempFolder()
+    {
+        TelemetryConsent.RootOverride.Should().NotBeNull("the Tests module initializer sets it for the whole run");
+        TelemetryConsent.RootOverride.Should().Be(TelemetryTestRoot.Root);
+        string root = Path.GetFullPath(TelemetryTestRoot.Root) + Path.DirectorySeparatorChar;
+        root.Should().StartWith(Path.GetFullPath(Path.GetTempPath()));
+
+        // the game's own backend: its save directory is the developer's real saves
+        var real = new FileSaveBackend();
+        SaveSystem.InitializeWithBackend(real);
+        string saves = Path.GetFullPath(real.GetSaveDirectory());
+        var store = TelemetryConsent.CurrentStore()!;
+        store.Folder.Should().StartWith(root, "checked before anything is written");
+        store.Folder.Should().NotStartWith(saves + Path.DirectorySeparatorChar);
+        TelemetryConsent.StoreFor(saves).Should().BeSameAs(store);
+        try
+        {
+            store.SetInstallAnswer(true).Should().BeTrue();
+            var f = await RunFight(null);    // no TelemetryStoreOverride: the engine resolves the store itself
+            f.Error.Should().BeNull("{0}", f.Transcript);
+            await Appended(f);
+            LinesIn(store).Should().NotBeEmpty("the fight queued its row in the temp folder");
+            store.QueuePath.Should().StartWith(root);
+        }
+        finally
+        {
+            store.SetInstallAnswer(false);
+            try { Directory.Delete(Path.GetDirectoryName(store.Folder)!, true); } catch { }
+        }
+    }
+
+    // ======================================================================
+    // T1a2 P2: player_hp_end is clamped at 0 in the row; real fights of every outcome all queue
+    // ======================================================================
+
+    private static Monster Drainer(long hp = 5000, long str = 400) => new Monster
+    {
+        Name = "Drainer", Level = 200, HP = hp, MaxHP = hp, Strength = str, Defence = 5, Experience = 1, Gold = 0,
+        IsActive = true, FamilyName = "Undead", SpecialAbilities = new List<string> { "LifeDrain" },
+    };
+
+    /// <summary>Online, as Row 3: a death there resurrects without a menu (the single player Veil of Death
+    /// menu waits for input).</summary>
+    [Fact]
+    public async Task P2_ASeededBatchOfRealFights_EveryOutcome_NoRowIsDropped_AndADrainDeathEndsAtZero()
+    {
+        GoOnline();
+        ServerMode();
+        OperatorOn();
+        var store = Store(TelemetrySource.Server);
+        store.SetPlayerAnswer(TelemetryConsent.CurrentLoginName(), true).Should().BeTrue();
+        Character Mortal(long hp) { var h = Hero(hp: hp); h.Resurrections = 3; return h; }
+        var outcomes = new List<long>();
+        int drainDeaths = 0;
+        async Task One(Fight f, long outcome, string what)
+        {
+            f.Error.Should().BeNull("{0}", f.Transcript);
+            f.Result!.Tally.Ended.Should().BeTrue(what);
+            await Appended(f);
+            outcomes.Add(outcome);
+            var lines = Lines();
+            lines.Should().HaveCount(outcomes.Count, "{0}: no row is dropped", what);
+            var row = RowOf(lines[^1]);
+            row["outcome"].GetInt64().Should().Be(outcome, what);
+            row["player_hp_end"].GetInt64().Should().Be(Math.Max(0, f.Result.Tally.PlayerHpEnd), what);
+        }
+
+        for (int seed = 1; seed <= 4; seed++)
+        {
+            var win = await RunFight(store, seed: seed);
+            win.Result!.Outcome.Should().Be(CombatOutcome.Victory, win.Transcript);
+            await One(win, 0, $"victory seed {seed}");
+
+            var fled = await RunFight(store, script: Retreats(), seed: seed);
+            fled.Result!.Outcome.Should().Be(CombatOutcome.PlayerEscaped, fled.Transcript);
+            await One(fled, 1, $"fled seed {seed}");
+
+            var died = await RunFight(store, Mortal(20), new List<Monster> { Brute("Brute A", 5000, 400) }, seed: seed);
+            await One(died, 2, $"death seed {seed}");
+
+            var drained = await RunFight(store, Mortal(300), new List<Monster> { Drainer() }, seed: seed);
+            await One(drained, 2, $"drain death seed {seed}");
+            if (drained.Result!.Tally.PlayerHpEnd < 0)
+            {
+                drained.Transcript.Should().Contain("drain", "the killing blow was the life drain");
+                drainDeaths++;
+            }
+        }
+        drainDeaths.Should().BeGreaterThan(0, "a life drain death leaves HP below 0 in the fight, and its row still queues");
+        outcomes.Should().HaveCount(16);
+        store.AppendFailures.Should().Be(0);
+    }
+
+    // ======================================================================
+    // T1a2 M1: a No closes the gate even when its disk work fails
+    // ======================================================================
+
+    [Fact]
+    public async Task M1_ANoWhileTheLockIsHeld_ClosesTheGate_Install()
+    {
+        var store = YesStore();
+        store.LockTimeout = TimeSpan.FromMilliseconds(300);
+        using (new LockHolder(Store()))
+            store.SetInstallAnswer(false).Should().BeFalse("the lock is held: the No is not written, and the caller learns it");
+        store.ShouldQueue(null).Should().BeFalse("the No holds in memory at once");
+        Store().State.Yes.Should().BeTrue("the old yes is still on disk");
+
+        var f = await RunFight(store);
+        f.Error.Should().BeNull("{0}", f.Transcript);
+        f.Engine.LastTelemetryAppend.Should().BeNull("the next fight queues nothing");
+        File.Exists(QueueFile).Should().BeFalse();
+
+        // a row that reached the append anyway: the disk's old yes never turns this process's No back
+        store.Append(RowWithRounds(1));
+        File.Exists(QueueFile).Should().BeFalse();
+        store.ShouldQueue(null).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task M1_AnInterruptedAskWhileTheLockIsHeld_ClosesTheGate_Install()
+    {
+        var store = YesStore();
+        store.LockTimeout = TimeSpan.FromMilliseconds(300);
+        using (new LockHolder(Store()))
+            store.InstallAskInterrupted().Should().BeFalse();
+        store.ShouldQueue(null).Should().BeFalse();
+        var f = await RunFight(store);
+        f.Error.Should().BeNull("{0}", f.Transcript);
+        f.Engine.LastTelemetryAppend.Should().BeNull();
+        File.Exists(QueueFile).Should().BeFalse();
+    }
+
+    [Theory]
+    [InlineData(TelemetrySource.BbsDoor)]
+    [InlineData(TelemetrySource.Server)]
+    public async Task M1_ANoWhileTheLockIsHeld_ClosesTheGate_Player(TelemetrySource source)
+    {
+        _ = Db;
+        OperatorOn();
+        if (source == TelemetrySource.BbsDoor) Door(); else ServerMode();
+        string login = TelemetryConsent.CurrentLoginName()!;
+        var store = Store(source);
+        store.SetPlayerAnswer(login, true).Should().BeTrue();
+        store.LockTimeout = TimeSpan.FromMilliseconds(300);
+        using (new LockHolder(Store(source)))
+            store.SetPlayerAnswer(login, false).Should().BeFalse("the lock is held: the No is not written, and the caller learns it");
+        store.ShouldQueue(login).Should().BeFalse("the No holds in the cache at once");
+        var later = Store(source);
+        later.LoadPlayerAnswer(login);
+        later.ShouldQueue(login).Should().BeTrue("the old yes is still stored");
+
+        var f = await RunFight(store);
+        f.Error.Should().BeNull("{0}", f.Transcript);
+        f.Engine.LastTelemetryAppend.Should().BeNull("the next fight queues nothing");
+        File.Exists(QueueFile).Should().BeFalse();
+    }
+
+    // ======================================================================
+    // T1a2 M2: a row scheduled before a No never lands after it
+    // ======================================================================
+
+    private static Action<CombatEngine> HoldAppend(TaskCompletionSource hold) =>
+        e => e.TelemetryBackground = work => hold.Task.ContinueWith(_ => work(), TaskScheduler.Default);
+
+    [Theory]
+    [InlineData(TelemetrySource.Single)]
+    [InlineData(TelemetrySource.BbsDoor)]
+    [InlineData(TelemetrySource.Server)]
+    public async Task M2_ARowHeldBackBeforeANo_DoesNotLandAfterIt(TelemetrySource source)
+    {
+        _ = Db;
+        string? login = null;
+        TelemetryStore store;
+        if (source == TelemetrySource.Single) store = YesStore();
+        else
+        {
+            OperatorOn();
+            if (source == TelemetrySource.BbsDoor) Door(); else ServerMode();
+            login = TelemetryConsent.CurrentLoginName()!;
+            store = Store(source);
+            store.SetPlayerAnswer(login, true).Should().BeTrue();
+        }
+        var hold = new TaskCompletionSource();
+        var f = await RunFight(store, script: Retreats(), prepare: HoldAppend(hold));
+        f.Error.Should().BeNull("{0}", f.Transcript);
+        f.Engine.LastTelemetryAppend!.IsCompleted.Should().BeFalse("the append is held back");
+
+        (source == TelemetrySource.Single ? store.SetInstallAnswer(false) : store.SetPlayerAnswer(login, false)).Should().BeTrue();
+        hold.SetResult();
+        await Appended(f);
+        File.Exists(QueueFile).Should().BeFalse("the row was scheduled before the No");
+        store.AppendFailures.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task M2_ARowHeldBackBeforeASecondCopysNo_DoesNotLandAfterIt_Single()
+    {
+        var store = YesStore();
+        var hold = new TaskCompletionSource();
+        var f = await RunFight(store, script: Retreats(), prepare: HoldAppend(hold));
+        f.Error.Should().BeNull("{0}", f.Transcript);
+        f.Engine.LastTelemetryAppend!.IsCompleted.Should().BeFalse("the append is held back");
+
+        Store().SetInstallAnswer(false).Should().BeTrue("another running copy of the game says No");
+        store.ShouldQueue(null).Should().BeTrue("this copy has not read the other copy's No yet");
+        hold.SetResult();
+        await Appended(f);
+        File.Exists(QueueFile).Should().BeFalse("the append read state.json again under the lock");
+        store.ShouldQueue(null).Should().BeFalse("and the cache follows what it read");
+        store.AppendFailures.Should().Be(0);
+    }
+
+    /// <summary>The other columns real play can push past a bound (the T1a2 audit in REPORT): held at the
+    /// bound, so the fight is still queued. player_level 101 (admin only) is still refused.</summary>
+    [Fact]
+    public void P2_ColumnsPlayCanPushPastABound_AreHeldAtTheBound_PlayerLevelIsNot()
+    {
+        TelemetryRow.Saturating.Should().BeEquivalentTo(new[]
+        {
+            "player_str", "player_dex", "monster_str", "monster_level", "monster_count",
+            "rounds", "potions_used", "abilities_used", "spells_used",
+        });
+        var tally = new CombatRowTally(8, 1, 3, 2, 0, 120, 20, 0, 0, 80, 520, 200, 40, 10001, 10002, 10003, 0, -75);
+        var wild = SampleRow(tally: tally) with
+        {
+            PlayerSTR = -12, PlayerDEX = -4, MonsterSTR = -15, MonsterLevel = 260, MonsterCount = 61, Rounds = 12000,
+        };
+        var row = TelemetryRow.From(wild, CharacterClass.Warrior, "Undead")!;
+        row.IsValid().Should().BeTrue("a fight real play can produce is never dropped");
+        row["player_str"].Should().Be(0);
+        row["player_dex"].Should().Be(0);
+        row["monster_str"].Should().Be(0);
+        row["monster_level"].Should().Be(200);
+        row["monster_count"].Should().Be(50);
+        row["rounds"].Should().Be(10000);
+        row["potions_used"].Should().Be(10000);
+        row["abilities_used"].Should().Be(10000);
+        row["spells_used"].Should().Be(10000);
+        row["player_hp_end"].Should().Be(0);
+        foreach (var key in RowKeys.Except(TelemetryRow.Saturating).Except(new[] { "player_hp_end" }))
+            row[key].Should().Be(TelemetryRow.From(SampleRow(), CharacterClass.Warrior, "Undead")![key], key);
+
+        TelemetryRow.From(SampleRow() with { PlayerLevel = 101 }, CharacterClass.Warrior, "Undead")!.IsValid()
+            .Should().BeFalse("player_level is not held: only the admin command takes it past 100");
     }
 }

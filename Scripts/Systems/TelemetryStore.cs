@@ -80,10 +80,21 @@ namespace UsurperRemake.Systems
 
         private static readonly ConcurrentDictionary<string, TelemetryStore> _stores = new(StringComparer.Ordinal);
 
+        /// <summary>Tests only: a folder that takes the place of every save directory, so a test run never
+        /// touches a real save folder. Null in the game. Each save directory maps to its own subfolder.</summary>
+        internal static string? RootOverride { get; set; }
+
         /// <summary>A save directory as a full path. An empty one (a database given by a bare file name, see
-        /// SqlSaveBackend.GetSaveDirectory) is the current directory, as sysop_config.json resolves it.</summary>
-        internal static string FullSaveDirectory(string? saveDirectory) =>
-            Path.GetFullPath(string.IsNullOrEmpty(saveDirectory) ? "." : saveDirectory);
+        /// SqlSaveBackend.GetSaveDirectory) is the current directory, as sysop_config.json resolves it. With
+        /// <see cref="RootOverride"/> set, the subfolder of the override that stands for that directory.</summary>
+        internal static string FullSaveDirectory(string? saveDirectory)
+        {
+            string full = Path.GetFullPath(string.IsNullOrEmpty(saveDirectory) ? "." : saveDirectory);
+            string? root = RootOverride;
+            if (root == null) return full;
+            string hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(full))).ToLowerInvariant();
+            return Path.Combine(Path.GetFullPath(root), hash[..32]);
+        }
 
         /// <summary>The store of one save directory (one per directory in a process, so the answers it
         /// caches are shared by every session of that directory).</summary>
@@ -131,7 +142,8 @@ namespace UsurperRemake.Systems
             catch (Exception ex) { DebugLogger.Instance.LogWarning("TELEMETRY", $"consent answer row not removed: {ex.Message}"); }
         }
 
-        /// <summary>Tests: forget every store and the operator resolver.</summary>
+        /// <summary>Tests: forget every store and the operator resolver (not <see cref="RootOverride"/>, which
+        /// the test run sets once).</summary>
         internal static void ResetForTests()
         {
             _stores.Clear();
@@ -164,6 +176,9 @@ namespace UsurperRemake.Systems
         private readonly ConcurrentDictionary<string, bool> _answers = new(StringComparer.Ordinal);
         private readonly object _stateGate = new();
         private TelemetryState? _state;
+        // A No (or an interrupted ask) of this process: it holds even when its write to state.json failed,
+        // so a later read of an old yes on disk never turns it back. A stored yes of this process clears it.
+        private bool _localNo;
 
         internal TelemetryStore(string saveDirectory, Func<TelemetrySource>? source = null,
             Func<SqlSaveBackend?>? database = null, Func<DateTime>? clock = null)
@@ -244,8 +259,23 @@ namespace UsurperRemake.Systems
             {
                 lock (_stateGate)
                 {
-                    return _state ??= ReadStateFile();
+                    return _state ??= Masked(ReadStateFile());
                 }
+            }
+        }
+
+        /// <summary>The state as this process may use it: after a No of this process, never a yes.</summary>
+        private TelemetryState Masked(TelemetryState s) =>
+            _localNo && (s.Yes || s.InstallId != null) ? s with { Yes = false, InstallId = null } : s;
+
+        /// <summary>A No of this process, before any disk work: the cached state says no at once, so the next
+        /// fight queues nothing even if the write that follows fails.</summary>
+        private void NoInMemory(Func<TelemetryState, TelemetryState> change)
+        {
+            lock (_stateGate)
+            {
+                _localNo = true;
+                _state = change(_state ?? Masked(ReadStateFile()));
             }
         }
 
@@ -305,10 +335,14 @@ namespace UsurperRemake.Systems
                 var s = change(State);
                 WriteStateLocked(s);
                 if (deleteQueue && File.Exists(QueuePath)) File.Delete(QueuePath);
+                if (s.Asked && s.Yes) lock (_stateGate) _localNo = false;
                 result = s;
             });
             return result;
         }
+
+        private static void AnswerNotStored(Exception ex) =>
+            DebugLogger.Instance.LogWarning("TELEMETRY", $"telemetry answer not written: {ex.Message}");
 
         private static string NewId()
         {
@@ -320,21 +354,46 @@ namespace UsurperRemake.Systems
         // ---------- the install's answer (single, Steam) ----------
 
         /// <summary>The player's answer on a single or Steam install. Yes makes the install_id if there is
-        /// none; No deletes the queue and the install_id.</summary>
-        public void SetInstallAnswer(bool yes)
+        /// none; No deletes the queue and the install_id. A No holds in this process at once, before the
+        /// disk work. Returns false when the answer could not be written (the queue lock was not had, or
+        /// the disk failed); a failed Yes leaves the answer as it was.</summary>
+        public bool SetInstallAnswer(bool yes)
         {
-            if (Shared) return;
-            UpdateState(s => yes
-                ? s with { Asked = true, Yes = true, InstallId = s.InstallId ?? NewId() }
-                : s with { Asked = true, Yes = false, InstallId = null }, deleteQueue: !yes);
+            if (Shared) return false;
+            Func<TelemetryState, TelemetryState> change = yes
+                ? s => s with { Asked = true, Yes = true, InstallId = s.InstallId ?? NewId() }
+                : s => s with { Asked = true, Yes = false, InstallId = null };
+            if (!yes) NoInMemory(change);
+            try
+            {
+                UpdateState(change, deleteQueue: !yes);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AnswerNotStored(ex);
+                return false;
+            }
         }
 
         /// <summary>The prompt got no answer (disconnect, end of input, a non interactive run): stored as not
-        /// asked, never a yes. Nothing from an earlier yes is kept.</summary>
-        public void InstallAskInterrupted()
+        /// asked, never a yes. Nothing from an earlier yes is kept, in this process even when the write
+        /// fails (then false is returned).</summary>
+        public bool InstallAskInterrupted()
         {
-            if (Shared) return;
-            UpdateState(s => s with { Asked = false, Yes = false, InstallId = null }, deleteQueue: true);
+            if (Shared) return false;
+            Func<TelemetryState, TelemetryState> change = s => s with { Asked = false, Yes = false, InstallId = null };
+            NoInMemory(change);
+            try
+            {
+                UpdateState(change, deleteQueue: true);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AnswerNotStored(ex);
+                return false;
+            }
         }
 
         /// <summary>The "new id" setting: a fresh install_id. Only while an id exists (a yes on single or
@@ -411,34 +470,56 @@ namespace UsurperRemake.Systems
 
         /// <summary>A player's answer on a shared install (the prompt or the settings line). Yes makes the
         /// install's id if there is none; No deletes the whole local queue (every player's rows not yet
-        /// sent) and keeps the id, which belongs to the operator setting. Refused while the switch is off.</summary>
-        public void SetPlayerAnswer(string? loginName, bool yes)
+        /// sent) and keeps the id, which belongs to the operator setting. Refused while the switch is off.
+        /// A No holds in the cache at once, before the disk work. Returns false when the answer was not
+        /// written (switch off, the queue lock not had, or the disk failed); a failed Yes caches nothing.</summary>
+        public bool SetPlayerAnswer(string? loginName, bool yes)
         {
             string? key = TelemetryConsent.PlayerKey(loginName);
-            if (key == null || !Shared) return;
-            if (!TelemetryConsent.OperatorAllows()) { _answers.TryRemove(key, out _); return; }
-            WithQueueLock(() =>
+            if (key == null || !Shared) return false;
+            if (!TelemetryConsent.OperatorAllows()) { _answers.TryRemove(key, out _); return false; }
+            if (!yes) _answers[key] = false;
+            try
             {
-                WriteAnswer(key, true, yes);
-                if (yes)
+                WithQueueLock(() =>
                 {
-                    lock (_stateGate) _state = null;
-                    var s = State;
-                    if (s.InstallId == null || !File.Exists(StatePath)) WriteStateLocked(s with { InstallId = s.InstallId ?? NewId() });
-                }
-                else if (File.Exists(QueuePath)) File.Delete(QueuePath);
-            });
-            _answers[key] = yes;
+                    WriteAnswer(key, true, yes);
+                    if (yes)
+                    {
+                        lock (_stateGate) _state = null;
+                        var s = State;
+                        if (s.InstallId == null || !File.Exists(StatePath)) WriteStateLocked(s with { InstallId = s.InstallId ?? NewId() });
+                    }
+                    else if (File.Exists(QueuePath)) File.Delete(QueuePath);
+                    _answers[key] = yes;    // under the lock, so the last answer written is the one cached
+                });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AnswerNotStored(ex);
+                return false;
+            }
         }
 
-        /// <summary>A player's prompt got no answer: stored as not asked, never a yes.</summary>
-        public void PlayerAskInterrupted(string? loginName)
+        /// <summary>A player's prompt got no answer: stored as not asked, never a yes. Returns false when
+        /// the answer was not written.</summary>
+        public bool PlayerAskInterrupted(string? loginName)
         {
             string? key = TelemetryConsent.PlayerKey(loginName);
-            if (key == null || !Shared) return;
+            if (key == null || !Shared) return false;
             _answers[key] = false;
-            if (!TelemetryConsent.OperatorAllows()) return;
-            WithQueueLock(() => WriteAnswer(key, false, false));
+            if (!TelemetryConsent.OperatorAllows()) return false;
+            try
+            {
+                WithQueueLock(() => { WriteAnswer(key, false, false); _answers[key] = false; });
+                return true;
+            }
+            catch (Exception ex)
+            {
+                AnswerNotStored(ex);
+                return false;
+            }
         }
 
         // ---------- the fight's gate ----------
@@ -506,14 +587,18 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Add one row under the queue lock. Damaged lines and lines older than <see cref="MaxAgeDays"/>
         /// days are dropped, and only the newest <see cref="MaxRows"/> rows are kept. Runs off the combat
-        /// thread; a failure is logged (at most once a window) and never thrown.
+        /// thread; a failure is logged (at most once a window) and never thrown. The answer is checked again
+        /// under the lock, so a row scheduled before a No never lands after it: single and Steam read
+        /// state.json again (another running copy's No counts), a shared install checks the fight's own
+        /// player by <paramref name="playerKey"/>, which is never written anywhere.
         /// </summary>
-        public virtual void Append(TelemetryRow row)
+        public virtual void Append(TelemetryRow row, string? playerKey = null)
         {
             try
             {
                 if (!WritesAllowed) return;
                 using var held = AcquireLock();
+                if (!StillYesLocked(playerKey)) return;
                 long today = DayNumber(Clock());
                 string[] existing = File.Exists(QueuePath) ? File.ReadAllLines(QueuePath) : Array.Empty<string>();
                 var kept = new List<string>(existing.Length + 1);
@@ -538,6 +623,21 @@ namespace UsurperRemake.Systems
             {
                 AppendFailed(ex);
             }
+        }
+
+        /// <summary>The answer at append time, read while the queue lock is held. Single and Steam: state.json
+        /// again (the cache follows it), and a No of this process still wins over an old yes on disk.</summary>
+        private bool StillYesLocked(string? playerKey)
+        {
+            if (Shared)
+                return TelemetryConsent.OperatorAllows() && playerKey != null && _answers.TryGetValue(playerKey, out bool yes) && yes;
+            TelemetryState s;
+            lock (_stateGate)
+            {
+                _state = null;
+                s = State;
+            }
+            return s.Asked && s.Yes && s.InstallId != null;
         }
 
         private void AppendFailed(Exception ex)
