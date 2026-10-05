@@ -326,6 +326,7 @@ public partial class GameEngine
     public static async Task RunConsoleAsync()
     {
         var engine = Instance;
+        TelemetryUploader.StartInBackground();   // 1.2.7: one upload of queued telemetry rows, once a process, in the background
 
         // Check if we're in BBS door mode or online mode (both have pre-set player names)
         if (UsurperRemake.BBS.DoorMode.IsInDoorMode || UsurperRemake.BBS.DoorMode.IsOnlineMode)
