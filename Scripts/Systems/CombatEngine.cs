@@ -5445,7 +5445,7 @@ public partial class CombatEngine
         // Show critical hit message
         if (monsterRoll.IsCriticalSuccess)
         {
-            UIHelper.WriteRow(terminal, Loc.Get("combat.monster_critical", MonsterNames.Display(monster), ""), "bright_red");
+            UIHelper.WriteRow(terminal, Loc.Get("combat.monster_critical", MonsterNames.Display(monster)), "bright_red");
         }
 
         // Use colored combat message

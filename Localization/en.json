@@ -755,7 +755,7 @@
   "combat.monster_attacks": "{0} attacks you!",
   "combat.monster_hits": "{1} damage gets through your defenses!",
   "combat.monster_misses": "{0} misses you!",
-  "combat.monster_critical": "{0} lands a CRITICAL HIT for {1} damage!",
+  "combat.monster_critical": "{0} lands a CRITICAL HIT!",
   "combat.you_dodge": "You dodge {0}'s attack!",
   "combat.you_block": "You block {0}'s attack with your shield!",
   "combat.you_flee": "You flee from combat!",
