@@ -90,9 +90,8 @@ without it and compare the screen and every HP value.
 ## Logins
 
 - An unknown name and a wrong password now show the same message: "Player
-  doesn't exist or wrong password." On screens where R registers, a second
-  row follows: "Type 'R' to register a new account." Both are in all five
-  languages.
+  doesn't exist or wrong password." Some login screens add a second row:
+  "Type 'R' to register a new account." Both are in all five languages.
 - An unknown name costs the same password check as a real account, so the
   answer takes as long either way.
 - A banned account that types a wrong password gets the same general
