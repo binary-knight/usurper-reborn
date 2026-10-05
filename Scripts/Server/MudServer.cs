@@ -178,6 +178,13 @@ public class MudServer
             });
     }
 
+    /// <summary>
+    /// v1.2.6: the operator log line for a failed login: the account name and the real reason
+    /// (players see one generic message). Never the password.
+    /// </summary>
+    internal static string AuthFailedLogLine(string username, SqlSaveBackend.LoginFailure reason) =>
+        $"[MUD] Auth failed for '{username}': {reason}";
+
     private static void ClearFailedLogins(string? ip)
     {
         if (!string.IsNullOrWhiteSpace(ip)) _failedLogins.TryRemove(ip, out _);
@@ -730,12 +737,23 @@ public class MudServer
                     return;
                 }
 
+                // v0.65.0: per-IP brute-force throttle (see _failedLogins). v1.2.6: checked
+                // before registration too, since registration attempts count in it.
+                if (password != null && IsLoginThrottled(effectiveIp, out int throttleWait))
+                {
+                    Console.Error.WriteLine($"[MUD] SECURITY: throttled AUTH attempt from {effectiveIp} ({throttleWait}s remaining)");
+                    await WriteLineAsync(stream, $"ERR:Too many failed logins. Try again in {throttleWait} seconds.");
+                    client.Close();
+                    return;
+                }
+
                 // Handle registration
                 if (isRegistration && password != null)
                 {
                     var (regSuccess, regMessage) = await sqlBackend.RegisterPlayer(username, password, effectiveIp);
                     if (!regSuccess)
                     {
+                        RecordFailedLogin(effectiveIp); // v1.2.6: a refused registration (a taken name too) counts
                         Console.Error.WriteLine($"[MUD] Registration failed for '{username}': {regMessage}");
                         await WriteLineAsync(stream, $"ERR:{regMessage}");
                         client.Close();
@@ -747,20 +765,11 @@ public class MudServer
                 // If password was provided, verify it against the database
                 if (password != null)
                 {
-                    // v0.65.0: per-IP brute-force throttle (see _failedLogins)
-                    if (IsLoginThrottled(effectiveIp, out int throttleWait))
-                    {
-                        Console.Error.WriteLine($"[MUD] SECURITY: throttled AUTH attempt from {effectiveIp} ({throttleWait}s remaining)");
-                        await WriteLineAsync(stream, $"ERR:Too many failed logins. Try again in {throttleWait} seconds.");
-                        client.Close();
-                        return;
-                    }
-
-                    var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username, password, effectiveIp);
+                    var (success, displayName, message, screenReader, language, reason) = await sqlBackend.AuthenticatePlayer(username, password, effectiveIp);
                     if (!success)
                     {
                         RecordFailedLogin(effectiveIp);
-                        Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
+                        Console.Error.WriteLine(AuthFailedLogLine(username, reason));
                         await WriteLineAsync(stream, $"ERR:{message}");
                         client.Close();
                         return;
@@ -1023,12 +1032,27 @@ public class MudServer
                 continue;
             }
 
+            // v0.65.0: per-IP brute-force throttle (see _failedLogins). The
+            // per-connection 5-attempt loop alone reset on reconnect. v1.2.6:
+            // checked before registration too, since registration attempts count in it.
+            if (IsLoginThrottled(effectiveIp, out int interactiveWait))
+            {
+                Console.Error.WriteLine($"[MUD] SECURITY: throttled interactive login from {effectiveIp} ({interactiveWait}s remaining)");
+                string throttleMsg = L("auth.err_throttled", interactiveWait);
+                if (isPlainText)
+                    await WriteAnsiAsync(stream, $"{L("auth.err_prefix", throttleMsg)}\r\n\r\n", isCp437);
+                else
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {throttleMsg}\u001b[0m\r\n\r\n", isCp437);
+                break; // end the attempt loop; connection closes below
+            }
+
             // Process registration
             if (isRegistration)
             {
                 var (regSuccess, regMessage) = await sqlBackend.RegisterPlayer(username!, password!, effectiveIp, authLang);
                 if (!regSuccess)
                 {
+                    RecordFailedLogin(effectiveIp); // v1.2.6: a refused registration (a taken name too) counts
                     Console.Error.WriteLine($"[MUD] Registration failed for '{username}': {regMessage}");
                     if (isPlainText)
                         await WriteAnsiAsync(stream, $"{L("auth.err_prefix", regMessage)}\r\n\r\n", isCp437);
@@ -1044,28 +1068,27 @@ public class MudServer
             }
 
             // Authenticate
-            // v0.65.0: per-IP brute-force throttle (see _failedLogins). The
-            // per-connection 5-attempt loop alone reset on reconnect.
-            if (IsLoginThrottled(effectiveIp, out int interactiveWait))
-            {
-                Console.Error.WriteLine($"[MUD] SECURITY: throttled interactive login from {effectiveIp} ({interactiveWait}s remaining)");
-                string throttleMsg = L("auth.err_throttled", interactiveWait);
-                if (isPlainText)
-                    await WriteAnsiAsync(stream, $"{L("auth.err_prefix", throttleMsg)}\r\n\r\n", isCp437);
-                else
-                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {throttleMsg}\u001b[0m\r\n\r\n", isCp437);
-                break; // end the attempt loop; connection closes below
-            }
-
-            var (success, displayName, message, screenReader, language) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp, authLang);
+            var (success, displayName, message, screenReader, language, reason) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp, authLang);
             if (!success)
             {
                 RecordFailedLogin(effectiveIp);
-                Console.Error.WriteLine($"[MUD] Auth failed for '{username}': {message}");
+                Console.Error.WriteLine(AuthFailedLogLine(username!, reason));
+                // v1.2.6: the generic message, then the register hint on its own row ([R] is on this menu)
+                var failRows = SqlSaveBackend.LoginFailureRows(authLang, message, reason);
                 if (isPlainText)
-                    await WriteAnsiAsync(stream, $"{L("auth.err_prefix", message)}\r\n\r\n", isCp437);
+                {
+                    await WriteAnsiAsync(stream, $"{L("auth.err_prefix", failRows[0])}\r\n", isCp437);
+                    foreach (var row in failRows.Skip(1))
+                        await WriteAnsiAsync(stream, $"{row}\r\n", isCp437);
+                    await WriteAnsiAsync(stream, "\r\n", isCp437);
+                }
                 else
-                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {message}\u001b[0m\r\n\r\n", isCp437);
+                {
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {failRows[0]}\u001b[0m\r\n", isCp437);
+                    foreach (var row in failRows.Skip(1))
+                        await WriteAnsiAsync(stream, $"\u001b[1;33m  {row}\u001b[0m\r\n", isCp437);
+                    await WriteAnsiAsync(stream, "\r\n", isCp437);
+                }
                 continue;
             }
 

@@ -735,32 +735,32 @@ public class OnlineSystems125Tests : IDisposable
         var created = await Db.RegisterPlayer("Fresh Name", "secret", null, "hu");
         created.success.Should().BeTrue();
         created.message.Should().Be(L("hu", "auth.account_created"));
-        (await Db.AuthenticatePlayer("nobody", "x", null, "hu")).message.Should().Be(L("hu", "auth.err_unknown_username"));
-        (await Db.AuthenticatePlayer("Fresh Name", "wrong", null, "hu")).message.Should().Be(L("hu", "auth.err_wrong_password"));
+        (await Db.AuthenticatePlayer("nobody", "x", null, "hu")).message.Should().Be(L("hu", "auth.err_bad_login"));
+        (await Db.AuthenticatePlayer("Fresh Name", "wrong", null, "hu")).message.Should().Be(L("hu", "auth.err_bad_login"));
         (await Db.AuthenticatePlayer("Fresh Name", "secret", null, "hu")).message.Should().Be(L("hu", "auth.login_ok"));
-        (await Db.AuthenticatePlayer("banned", "x", null, "hu")).message.Should()
-            .Be(L("hu", "auth.err_account_banned") + " " + L("hu", "auth.err_ban_reason", "griefing the newbies"), "the reason is the admin's own text");
+        // v1.2.6: the ban shows only after the right password (LoginGeneric126Tests); this hash is unusable
+        (await Db.AuthenticatePlayer("banned", "x", null, "hu")).message.Should().Be(L("hu", "auth.err_bad_login"));
 
         // no gate language: the session's
         await InLanguage("hu", async () =>
         {
             (await Db.ChangePassword("Fresh Name", "wrong", "newer")).message.Should().Be(L("hu", "auth.err_current_password"));
             (await Db.ChangePassword("Fresh Name", "secret", "abc")).message.Should().Be(L("hu", "auth.err_new_password_len"));
-            (await Db.AuthenticatePlayer("nobody", "x")).message.Should().Be(L("hu", "auth.err_unknown_username"));
+            (await Db.AuthenticatePlayer("nobody", "x")).message.Should().Be(L("hu", "auth.err_bad_login"));
             return 0;
         });
 
         // English reads as before
         await InLanguage("en", async () =>
         {
-            (await Db.AuthenticatePlayer("nobody", "x")).message.Should().Be("Unknown username. Type 'R' to register a new account.");
-            (await Db.AuthenticatePlayer("banned", "x")).message.Should().Be("Your account has been banned. Reason: griefing the newbies");
+            (await Db.AuthenticatePlayer("nobody", "x")).message.Should().Be("Player doesn't exist or wrong password.");
+            (await Db.AuthenticatePlayer("banned", "x")).message.Should().Be("Player doesn't exist or wrong password.");
             (await Db.RegisterPlayer("a", "pass")).message.Should().Be("Username must be 2-20 characters.");
             (await Db.AutoProvisionPlayer("Fresh Name")).message.Should().Be("Account already exists.");
             return 0;
         });
-        NoEnglishLeft(string.Join("\n", new[] { "auth.err_unknown_username", "auth.err_wrong_password", "auth.err_account_banned", "auth.account_created" }.Select(k => L("hu", k))),
-            new[] { "auth.err_unknown_username", "auth.err_wrong_password", "auth.err_account_banned", "auth.account_created" });
+        NoEnglishLeft(string.Join("\n", new[] { "auth.err_bad_login", "auth.err_bad_login_hint", "auth.err_account_banned", "auth.account_created" }.Select(k => L("hu", k))),
+            new[] { "auth.err_bad_login", "auth.err_bad_login_hint", "auth.err_account_banned", "auth.account_created" });
 
         string gate = Src("Server", "MudServer.cs");
         gate.Should().Contain("RegisterPlayer(username!, password!, effectiveIp, authLang)")

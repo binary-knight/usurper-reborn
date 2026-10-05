@@ -145,7 +145,7 @@ namespace UsurperRemake.Systems
             // even if this code path were ever called outside the MudServer
             // accept-time gate (e.g., from a future direct-HTTP login flow).
             var sessionIp = UsurperRemake.Server.SessionContext.Current?.RemoteIP;
-            var (success, displayName, message, _, _) = await backend.AuthenticatePlayer(username.Trim(), password, sessionIp);
+            var (success, displayName, message, _, _, reason) = await backend.AuthenticatePlayer(username.Trim(), password, sessionIp);
 
             if (success)
             {
@@ -169,8 +169,13 @@ namespace UsurperRemake.Systems
             }
             else
             {
+                // v1.2.6: the generic message, then the register hint on its own row ([R] is on this menu)
+                var rows = SqlSaveBackend.LoginFailureRows(null, message, reason);
                 terminal.SetColor("bright_red");
-                terminal.WriteLine($"  {message}");
+                terminal.WriteLine($"  {rows[0]}");
+                terminal.SetColor("yellow");
+                for (int i = 1; i < rows.Count; i++)
+                    terminal.WriteLine($"  {rows[i]}");
                 terminal.WriteLine("");
                 await Pacing.Wait(1500);
                 return null;
