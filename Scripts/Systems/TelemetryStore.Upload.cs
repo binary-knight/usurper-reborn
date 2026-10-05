@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace UsurperRemake.Systems
 {
@@ -11,14 +12,18 @@ namespace UsurperRemake.Systems
     /// A batch file nobody holds was left by a crash and is sent by the next upload.</summary>
     internal sealed class TelemetryBatch
     {
-        internal TelemetryBatch(string path, FileStream handle, List<string> lines)
+        internal TelemetryBatch(string path, FileStream handle, List<string> lines, long generation)
         {
             Path = path;
             Handle = handle;
             Lines = lines;
+            Generation = generation;
         }
 
         internal string Path { get; }
+        /// <summary>The queue generation the batch was taken under. Its rows go back to the queue only while
+        /// state.json still holds this generation.</summary>
+        internal long Generation { get; }
         internal FileStream Handle { get; }
         /// <summary>The queue lines of the batch, every one checked (no damaged line, none too old).</summary>
         internal List<string> Lines { get; }
@@ -31,6 +36,19 @@ namespace UsurperRemake.Systems
     public partial class TelemetryStore
     {
         internal const string BatchPattern = "batch-*.jsonl";
+
+        private static readonly Regex BatchName = new(@"^batch-g(\d{1,18})-[0-9a-f]{32}\.jsonl$", RegexOptions.Compiled);
+
+        /// <summary>A new batch file name. It carries the queue generation the batch is taken under (the name
+        /// stays local, it is never sent), so a batch left by a crash shows which generation it belongs to.</summary>
+        internal static string NewBatchFileName(long generation) => $"batch-g{generation}-{Guid.NewGuid():N}.jsonl";
+
+        /// <summary>The queue generation in a batch file's name, or null when the name has none.</summary>
+        internal static long? BatchFileGeneration(string path)
+        {
+            var m = BatchName.Match(System.IO.Path.GetFileName(path));
+            return m.Success && long.TryParse(m.Groups[1].Value, out long g) ? g : null;
+        }
 
         // A server stop this process received: it holds even when its write to state.json failed.
         private volatile bool _stoppedHere;
@@ -101,7 +119,7 @@ namespace UsurperRemake.Systems
                 ok = false;
                 DebugLogger.Instance.LogWarning("TELEMETRY", $"telemetry queue not deleted on the server's stop: {ex.Message}");
             }
-            try { WriteStateLocked(ReReadStateLocked() with { StoppedVersion = GameConfig.Version }); }
+            try { WriteStateLocked(Withdrawn(ReReadStateLocked()) with { StoppedVersion = GameConfig.Version }); }
             catch (Exception ex)
             {
                 ok = false;
@@ -109,6 +127,10 @@ namespace UsurperRemake.Systems
             }
             return ok;
         }
+
+        /// <summary>How a withdrawal deletes a batch file. Tests replace it to stand for a batch another node
+        /// holds open on Windows, which cannot be deleted.</summary>
+        internal Action<string> DeleteBatchFile { get; set; } = File.Delete;
 
         private string[] BatchFiles() => Directory.Exists(Folder) ? Directory.GetFiles(Folder, BatchPattern) : Array.Empty<string>();
 
@@ -119,7 +141,7 @@ namespace UsurperRemake.Systems
             if (File.Exists(QueuePath)) File.Delete(QueuePath);
             foreach (var batch in BatchFiles())
             {
-                try { File.Delete(batch); }
+                try { DeleteBatchFile(batch); }
                 catch (Exception ex) { DebugLogger.Instance.LogWarning("TELEMETRY", $"telemetry batch in flight not deleted, its uploader drops it: {ex.Message}"); }
             }
         }
@@ -158,11 +180,12 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// The next batch, at most <paramref name="max"/> rows: a batch file nobody holds (left by a crash)
-        /// first, else the oldest rows of the queue moved to a new batch file. Damaged lines and lines older
+        /// first, unless its name is not of <paramref name="generation"/> (then it is deleted unsent), else the oldest rows of the queue moved to a new batch file. Damaged lines and lines older
         /// than <see cref="MaxAgeDays"/> days are dropped on the way and never sent. Null when nothing is
-        /// queued. The batch file stays open with no sharing until <see cref="ReturnBatchLocked"/>.
+        /// queued. The batch file stays open with no sharing until <see cref="ReturnBatchLocked"/>. The batch
+        /// records <paramref name="generation"/>, the queue generation of the state read under this lock.
         /// </summary>
-        internal TelemetryBatch? TakeBatchLocked(int max)
+        internal TelemetryBatch? TakeBatchLocked(int max, long generation)
         {
             long today = DayNumber(Clock());
             foreach (var path in BatchFiles().OrderBy(p => p, StringComparer.Ordinal))
@@ -171,6 +194,15 @@ namespace UsurperRemake.Systems
                 try { handle = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
                 catch (IOException) { continue; }    // another uploader is sending it
                 catch (UnauthorizedAccessException) { continue; }
+                if (BatchFileGeneration(path) != generation)
+                {
+                    // taken before a withdrawal (a No, the switch off, a stop) whose delete failed, then left
+                    // by a crash; or a name with no generation: dropped unsent
+                    handle.Dispose();
+                    File.Delete(path);
+                    DebugLogger.Instance.LogWarning("TELEMETRY", "telemetry batch left from before a withdrawal dropped unsent");
+                    continue;
+                }
                 try
                 {
                     var lines = ReadLines(handle);
@@ -188,7 +220,7 @@ namespace UsurperRemake.Systems
                         good = good.Take(max).ToList();
                     }
                     if (good.Count != lines.Count) Rewrite(handle, good);
-                    return new TelemetryBatch(path, handle, good);
+                    return new TelemetryBatch(path, handle, good, generation);
                 }
                 catch
                 {
@@ -212,7 +244,7 @@ namespace UsurperRemake.Systems
                 if (dropped) WriteQueueLocked(rest);
                 return null;
             }
-            string newPath = Path.Combine(Folder, $"batch-{Guid.NewGuid():N}.jsonl");
+            string newPath = Path.Combine(Folder, NewBatchFileName(generation));
             var created = new FileStream(newPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
             try
             {
@@ -225,13 +257,14 @@ namespace UsurperRemake.Systems
                 try { File.Delete(newPath); } catch { }
                 throw;
             }
-            return new TelemetryBatch(newPath, created, batch);
+            return new TelemetryBatch(newPath, created, batch, generation);
         }
 
         /// <summary>
         /// After the reply. <paramref name="keep"/>: the rows go back to the head of the queue, but only while
-        /// the batch file still exists (a No or a stop since deletes it) and the answer, read again, still
-        /// allows sending. Then the batch file is closed and deleted. When the queue cannot be written the
+        /// the batch file still exists (a No or a stop since deletes it), the answer, read again, still allows
+        /// sending, and the queue generation is the one the batch was taken under (a withdrawal since advanced
+        /// it, also when the batch file could not be deleted, as on Windows while this node held it). Then the batch file is closed and deleted. When the queue cannot be written the
         /// batch file stays, so its rows are sent by a later upload instead of being lost.
         /// </summary>
         internal void ReturnBatchLocked(TelemetryBatch batch, bool keep)
@@ -239,7 +272,8 @@ namespace UsurperRemake.Systems
             bool deleteBatch = true;
             try
             {
-                if (keep && File.Exists(batch.Path) && MayUploadLocked(ReReadStateLocked()))
+                if (keep && File.Exists(batch.Path) && ReReadStateLocked() is var now && MayUploadLocked(now)
+                    && now.Generation == batch.Generation)
                 {
                     try
                     {
