@@ -649,12 +649,17 @@ test('row 20: replies fixed: {"ok":true}, {"stop":true} or {"error":"<word>"}; n
 
 // ---------------------------------------------------------------- row 21
 
-test('row 21: no other route reads the remote file; the section is the only place that names it', () => {
+// 1.2.7 T4: the balance Difficulty tab's remote view (its own marked block) is the one reader;
+// balance-remote.test.js row 9 tests that block and its read-only handle.
+test('row 21: no other route reads the remote file; the section and the Difficulty remote view are the only places that name it', () => {
   const src = H.proxySourceText();
   const sec = H.section();
-  const outside = src.replace(sec, '');
+  const view = require('./balance-api-harness').slice(src, '// --- Balance Remote View (1.2.7) ---', '// --- End Balance Remote View ---');
+  const outside = src.replace(sec, '').replace(view, '');
   assert.doesNotMatch(outside, /remote_combat_events|remote_telemetry|REMOTE_TELEMETRY/);
   assert.strictEqual((outside.match(/telemetryEndpoint\b/g) || []).length, 3, 'built once, routed once, closed once');
+  assert.deepStrictEqual(view.match(/telemetryEndpoint\.?\w*/g), ['telemetryEndpoint.reader', 'telemetryEndpoint.reader'],
+    'the view only reads, through reader() (named once in its comment, called once)');
 });
 
 // ---------------------------------------------------------------- A to E

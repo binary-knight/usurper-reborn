@@ -887,6 +887,7 @@ function createTelemetryEndpoint(options) {
   const byAddress = makeTelemetryLimiter(TELEMETRY_ADDRESS_PER_HOUR, mapMax);
   const byInstall = makeTelemetryLimiter(TELEMETRY_ID_PER_DAY, mapMax);
   let remote = null;
+  let reader = null;
   let storeBatch = null;
   let stopCache = { at: 0, present: false, fresh: false };
 
@@ -921,6 +922,20 @@ function createTelemetryEndpoint(options) {
     remote = handle;
     prune();
     return remote;
+  }
+
+  // 1.2.7: the balance dashboard's own handle on the same file (its Difficulty tab, Remote
+  // sources): a separate connection, read-only, opened on first use and retried while the file
+  // is missing (null until then). Never the writer above, and it never creates the file.
+  function openReader() {
+    if (reader) return reader;
+    if (!o.Database) return null;
+    try {
+      reader = new o.Database(o.dbPath, { readonly: true, fileMustExist: true });
+    } catch (e) {
+      reader = null;
+    }
+    return reader;
   }
 
   // Rows older than 30 days go, then all but the newest 200000.
@@ -1051,10 +1066,13 @@ function createTelemetryEndpoint(options) {
       }
     },
     prune,
+    reader: openReader,
     close() {
       o.clearInterval(pruneTimer);
       if (remote) { try { remote.close(); } catch (e) { /* closed */ } }
+      if (reader) { try { reader.close(); } catch (e) { /* closed */ } }
       remote = null;
+      reader = null;
       storeBatch = null;
     },
     sizes() { return { addresses: byAddress.size(), installs: byInstall.size() }; },
@@ -1980,6 +1998,170 @@ function balancePct(part, whole) {
 const BALANCE_CLASS_RE = /^[A-Za-z][A-Za-z ]{0,39}$/;
 const BALANCE_DIFFICULTIES = ['0', '1', '2', '3'];
 
+// --- Balance Remote View (1.2.7) ---
+// The Difficulty tab's Source filter. Official (the default) is this server's own combat_events,
+// counted further down exactly as before. The Remote sources read only remote_combat_events, the
+// opt-in rows sent by copies of the game, through the telemetry endpoint's read-only handle
+// (telemetryEndpoint.reader(), never its writer). The two tables are never joined, unioned or
+// attached, no source mixes them, and nothing else reads the remote table: its figures feed no
+// automatic tuning. Remote rows are unverified, carry no player name (one install id per copy,
+// shared by every player of a BBS or a server) and only the UTC day they arrived. No install id
+// leaves this section: the views hold counts only.
+const BALANCE_SOURCES = {
+  official: null,
+  remote: { label: 'Remote all', from: 1, to: 4 },
+  1: { label: 'Remote single player', from: 1, to: 1 },
+  2: { label: 'Remote Steam', from: 2, to: 2 },
+  3: { label: 'Remote BBS', from: 3, to: 3 },
+  4: { label: 'Remote server', from: 4, to: 4 },
+};
+const BALANCE_UNVERIFIED = "Unverified: sent by players' copies, not checked by the server";
+// CharacterClass (Scripts/Core/Character.cs) in order: a remote row's player_class is the index.
+const BALANCE_CLASS_NAMES = ['Alchemist', 'Assassin', 'Barbarian', 'Bard', 'Cleric', 'Jester', 'Magician',
+  'Paladin', 'Ranger', 'Sage', 'Warrior', 'Tidesworn', 'Wavecaller', 'Cyclebreaker', 'Abysswarden', 'Voidreaver',
+  'MysticShaman'];
+// The columns a copy holds at a bound instead of dropping the fight (TelemetryRow.Saturating): a
+// value at a floor reads "that or less", at a ceiling "that or more". Averages count it as the bound.
+const BALANCE_REMOTE_HELD = [
+  ['player_str', 0, 'floor'], ['player_dex', 0, 'floor'], ['monster_str', 0, 'floor'],
+  ['monster_level', 200, 'ceiling'], ['monster_count', 50, 'ceiling'], ['rounds', 10000, 'ceiling'],
+  ['potions_used', 10000, 'ceiling'], ['abilities_used', 10000, 'ceiling'], ['spells_used', 10000, 'ceiling'],
+];
+// better-sqlite3 has no time limit for a statement, so a remote view is one statement that reads
+// at most this many rows, newest day first, through the received_day index (idx_rce_day). 50000
+// is one full day at the endpoint's daily cap.
+const BALANCE_REMOTE_ROW_CEILING = 50000;
+const BALANCE_DAY_MS = 24 * 60 * 60 * 1000;
+// How far back each window reaches; a remote window starts at the start of that UTC day.
+const BALANCE_REMOTE_WINDOW_MS = { since126: null, '24h': BALANCE_DAY_MS, '7d': 7 * BALANCE_DAY_MS, '30d': 30 * BALANCE_DAY_MS };
+
+// Every column name below is a constant of this section; the filters are bound as parameters.
+const BALANCE_REMOTE_SQL = `
+  WITH w AS MATERIALIZED (
+    SELECT outcome, player_class, difficulty, install_id, floor_actual, is_boss, rounds, player_max_hp,
+      dmg_to_player_basic, dmg_to_player_ability, dmg_to_player_spell, dmg_to_player_dot, dmg_to_team,
+      dmg_by_player, dmg_by_team, heal_player, potions_used, abilities_used, spells_used, party_size,
+      encounter_size, first_actor, teammates_lost, player_str, player_dex, monster_str, monster_level, monster_count
+    FROM remote_combat_events
+    WHERE received_day >= ? AND source BETWEEN ? AND ?
+    ORDER BY received_day DESC
+    LIMIT ?
+  ),
+  f AS MATERIALIZED (
+    SELECT *, CASE WHEN floor_actual <= 0 THEN 0 ELSE (floor_actual - 1) / 5 + 1 END AS band,
+      CASE WHEN is_boss = 1 THEN 1 ELSE 0 END AS boss
+    FROM w WHERE (? IS NULL OR player_class = ?) AND (? IS NULL OR difficulty = ?)
+  )
+  SELECT 'band' AS part, json_object(
+    'band', band, 'boss', boss,
+    'fights', COUNT(*),
+    'installs', COUNT(DISTINCT install_id),
+    'win_pct', ROUND(100.0 * SUM(CASE WHEN outcome = 0 THEN 1 ELSE 0 END) / COUNT(*), 1),
+    'death_pct', ROUND(100.0 * SUM(CASE WHEN outcome = 2 THEN 1 ELSE 0 END) / COUNT(*), 1),
+    'flee_pct', ROUND(100.0 * SUM(CASE WHEN outcome = 1 THEN 1 ELSE 0 END) / COUNT(*), 1),
+    'avg_rounds', ROUND(AVG(rounds), 1),
+    'one_round_win_pct', ROUND(100.0 * SUM(CASE WHEN outcome = 0 AND rounds = 1 THEN 1 ELSE 0 END) / COUNT(*), 1),
+    'hp_lost_pct', ROUND(AVG(100.0 * (dmg_to_player_basic + dmg_to_player_ability + dmg_to_player_spell + dmg_to_player_dot) / NULLIF(player_max_hp, 0)), 1),
+    'dmg_to_player_basic', ROUND(AVG(dmg_to_player_basic), 1),
+    'dmg_to_player_ability', ROUND(AVG(dmg_to_player_ability), 1),
+    'dmg_to_player_spell', ROUND(AVG(dmg_to_player_spell), 1),
+    'dmg_to_player_dot', ROUND(AVG(dmg_to_player_dot), 1),
+    'dmg_to_team', ROUND(AVG(dmg_to_team), 1),
+    'dmg_by_player', ROUND(AVG(dmg_by_player), 1),
+    'dmg_by_team', ROUND(AVG(dmg_by_team), 1),
+    'heal_player', ROUND(AVG(heal_player), 1),
+    'potions_used', ROUND(AVG(potions_used), 2),
+    'abilities_used', ROUND(AVG(abilities_used), 2),
+    'spells_used', ROUND(AVG(spells_used), 2),
+    'party_size', ROUND(AVG(party_size), 2),
+    'encounter_size', ROUND(AVG(encounter_size), 2),
+    'monster_first_pct', ROUND(100.0 * AVG(first_actor), 1),
+    'teammates_lost', ROUND(AVG(teammates_lost), 2)) AS data
+  FROM f GROUP BY band, boss
+  UNION ALL
+  SELECT 'class', json_object('value', player_class) FROM w GROUP BY player_class
+  UNION ALL
+  SELECT 'difficulty', json_object('value', difficulty) FROM w GROUP BY difficulty
+  UNION ALL
+  SELECT 'view', json_object(
+    'read', (SELECT COUNT(*) FROM w),
+    'fights', COUNT(*),
+    'largest_install', (SELECT MAX(n) FROM (SELECT COUNT(*) AS n FROM f GROUP BY install_id)),
+    'held', SUM(CASE WHEN ${BALANCE_REMOTE_HELD.map(([c, at]) => `${c} = ${at}`).join(' OR ')} THEN 1 ELSE 0 END),
+    ${BALANCE_REMOTE_HELD.map(([c, at]) => `'${c}', SUM(CASE WHEN ${c} = ${at} THEN 1 ELSE 0 END)`).join(',\n    ')})
+  FROM f`;
+
+// The window's first UTC day (received_day >= it), or null for an unknown key. Since 1.2.6 is
+// every kept remote row: every remote row was sent by 1.2.7 or later.
+function balanceRemoteWindow(key) {
+  if (!Object.prototype.hasOwnProperty.call(BALANCE_REMOTE_WINDOW_MS, key)) return null;
+  const back = BALANCE_REMOTE_WINDOW_MS[key];
+  const fromDay = back === null ? 0 : Math.floor((Date.now() - back) / BALANCE_DAY_MS);
+  const from = back === null ? null : new Date(fromDay * BALANCE_DAY_MS).toISOString().slice(0, 10);
+  return { key, label: BALANCE_WINDOWS[key].label, from, fromDay, byDay: true };
+}
+
+// One remote view: sourceKey a key of BALANCE_SOURCES other than official, win from
+// balanceRemoteWindow, cls one of BALANCE_CLASS_NAMES or null, diff 0..3 or null.
+function balanceRemoteDifficulty(sourceKey, win, cls, diff) {
+  const src = BALANCE_SOURCES[sourceKey];
+  const classIndex = cls === null ? null : BALANCE_CLASS_NAMES.indexOf(cls);
+  const view = {
+    source: sourceKey,
+    sourceLabel: src.label,
+    unverified: true,
+    unverifiedText: BALANCE_UNVERIFIED,
+    window: win,
+    filters: { class: cls, difficulty: diff, source: sourceKey },
+    missing: false,
+    bands: [],
+    classes: [],
+    difficulties: [],
+    fights: 0,
+    rowsRead: 0,
+    ceiling: BALANCE_REMOTE_ROW_CEILING,
+    truncated: false,
+    largestInstallPct: null,
+    held: { fights: 0, columns: BALANCE_REMOTE_HELD.map(([column, at, bound]) => ({ column, at, bound, fights: 0 })) },
+  };
+  const reader = telemetryEndpoint.reader();
+  if (!reader) { view.missing = true; return view; }
+  let rows;
+  try {
+    rows = reader.prepare(BALANCE_REMOTE_SQL).all(win.fromDay, src.from, src.to, BALANCE_REMOTE_ROW_CEILING,
+      classIndex, classIndex, diff, diff);
+  } catch (e) {
+    // a file the writer has not opened yet holds no table
+    if (/no such table: remote_combat_events/.test(e.message)) { view.missing = true; return view; }
+    throw e;
+  }
+  const classIndexes = [];
+  for (const r of rows) {
+    const d = JSON.parse(r.data);
+    if (r.part === 'band') {
+      view.bands.push(Object.assign(d, { floor_from: d.band === 0 ? 0 : d.band * 5 - 4, floor_to: d.band === 0 ? 0 : d.band * 5 }));
+    } else if (r.part === 'class') {
+      classIndexes.push(d.value);
+    } else if (r.part === 'difficulty') {
+      view.difficulties.push(d.value);
+    } else if (r.part === 'view') {
+      view.fights = d.fights;
+      view.rowsRead = d.read;
+      view.truncated = d.read >= BALANCE_REMOTE_ROW_CEILING;
+      view.largestInstallPct = balancePct(d.largest_install || 0, d.fights);
+      view.held.fights = d.held || 0;
+      for (const c of view.held.columns) c.fights = d[c.column] || 0;
+    }
+  }
+  view.bands.sort((a, b) => a.band - b.band || a.boss - b.boss);
+  view.difficulties.sort((a, b) => a - b);
+  // the name from this section's table, never from the row
+  view.classes = classIndexes.sort((a, b) => a - b).filter((i) => Number.isInteger(i) && i >= 0 && i < BALANCE_CLASS_NAMES.length)
+    .map((i) => BALANCE_CLASS_NAMES[i]);
+  return view;
+}
+// --- End Balance Remote View ---
+
 async function handleBalanceRequest(req, res) {
   const url = req.url.split('?')[0];
   const method = req.method;
@@ -2069,8 +2251,20 @@ async function handleBalanceRequest(req, res) {
   const BALANCE_COMBAT_VIEWS = ['/api/balance/overview', '/api/balance/class-performance', '/api/balance/one-hit-kills',
     '/api/balance/death-hotspots', '/api/balance/boss-fights', '/api/balance/player-activity', '/api/balance/xp-economy',
     '/api/balance/recent', '/api/balance/suspects', '/api/balance/difficulty'];
+  // 1.2.7: the Difficulty tab's ?source= (BALANCE_SOURCES). None or official keeps the official
+  // view below as it was; a remote source never reaches balanceWindow or combat_events.
+  let remoteSource = null;
+  if (method === 'GET' && url === '/api/balance/difficulty' && query.get('source') !== null) {
+    const s = query.get('source');
+    if (!Object.prototype.hasOwnProperty.call(BALANCE_SOURCES, s)) {
+      sendJson(res, 400, { error: 'Unknown source filter. Use one of: ' + Object.keys(BALANCE_SOURCES).join(', ') });
+      return true;
+    }
+    if (BALANCE_SOURCES[s] !== null) remoteSource = s;
+  }
+
   let win = null;
-  if (method === 'GET' && BALANCE_COMBAT_VIEWS.includes(url)) {
+  if (method === 'GET' && BALANCE_COMBAT_VIEWS.includes(url) && remoteSource === null) {
     try {
       win = balanceWindow(query.get('window') || 'since126');
     } catch (e) {
@@ -2340,10 +2534,12 @@ async function handleBalanceRequest(req, res) {
     return true;
   }
 
-  // GET /api/balance/difficulty?window=&class=&difficulty=
+  // GET /api/balance/difficulty?window=&class=&difficulty=&source=
   // 1.2.6 Difficulty tab: aggregates per 5-floor band of floor_actual (band 0 is a fight outside
   // the dungeon), boss fights in their own row. Averages of the 1.2.6 columns are NULL when no
   // row of the group has them, never 0. Rows without floor_actual are only counted in noFloor.
+  // 1.2.7: a remote ?source= answers balanceRemoteDifficulty instead (the same bands, Installs in
+  // place of Players), after the same login and default password lock.
   if (method === 'GET' && url === '/api/balance/difficulty') {
     const clsParam = query.get('class') || null;
     const diffParam = query.get('difficulty') || null;
@@ -2356,6 +2552,24 @@ async function handleBalanceRequest(req, res) {
       return true;
     }
     const diff = diffParam === null ? null : Number(diffParam);
+    if (remoteSource !== null) {
+      if (clsParam !== null && !BALANCE_CLASS_NAMES.includes(clsParam)) {
+        sendJson(res, 400, { error: 'Unknown class filter' });
+        return true;
+      }
+      const rwin = balanceRemoteWindow(query.get('window') || 'since126');
+      if (!rwin) {
+        sendJson(res, 400, { error: 'Unknown window. Use one of: ' + Object.keys(BALANCE_WINDOWS).join(', ') });
+        return true;
+      }
+      try {
+        sendJson(res, 200, balanceRemoteDifficulty(remoteSource, rwin, clsParam, diff));
+      } catch (e) {
+        console.error(`[balance] remote view failed: ${e.message}`);
+        sendJson(res, 500, { error: 'Remote telemetry could not be read' });
+      }
+      return true;
+    }
     try {
       const bands = db.prepare(`
         SELECT CASE WHEN floor_actual <= 0 THEN 0 ELSE (floor_actual - 1) / 5 + 1 END as band,
