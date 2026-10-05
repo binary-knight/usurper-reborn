@@ -193,7 +193,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// The bounds check the server applies (DESIGN.md sections 1 and 4): an object with exactly the
-        /// column keys, each value a JSON integer inside its bounds. Anything else refuses the row.
+        /// column keys, each value a JSON integer written plainly (no fraction, exponent or sign) inside its
+        /// bounds. Anything else refuses the row.
         /// </summary>
         internal static bool IsValid(JsonElement e) => Read(e) != null;
 
@@ -208,6 +209,7 @@ namespace UsurperRemake.Systems
             {
                 if (!ColumnIndex.TryGetValue(p.Name, out int i) || seen[i]) return null;
                 if (p.Value.ValueKind != JsonValueKind.Number || !p.Value.TryGetInt64(out long v)) return null;
+                if (p.Value.GetRawText()[0] == '-') return null;    // "-0": the server takes plain integers only
                 if (v < Columns[i].Min || v > Columns[i].Max) return null;
                 seen[i] = true;
                 values[i] = v;
