@@ -213,6 +213,9 @@ namespace UsurperRemake.Systems
 
         private async Task<TelemetryUploadOutcome> UploadCoreAsync()
         {
+            // T3: a deletion still owed since the operator switch went off (the queue lock was busy then) is
+            // done first, at this upload or at the start upload. Nothing is created when none is owed.
+            if (_store.IsSharedInstall && !_store.RetryOperatorOff()) return TelemetryUploadOutcome.Failed;
             // The operator switch before anything else: the queue lock creates the folder.
             if (_store.IsSharedInstall && !TelemetryConsent.OperatorAllows()) return TelemetryUploadOutcome.NotAllowed;
             if (!System.IO.Directory.Exists(_store.Folder)) return TelemetryUploadOutcome.NothingQueued;

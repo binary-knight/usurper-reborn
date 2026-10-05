@@ -30,6 +30,7 @@
   <ItemGroup>
     <None Include="Fixtures/telemetry-rows.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Fixtures/telemetry-body-max.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/telemetry-approved-en.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

@@ -1650,7 +1650,18 @@ public partial class TerminalEmulator
     /// </summary>
     public async Task<bool> AskYesNoAsync(string prompt, bool? enterDefault = null)
     {
-        return await AskYesNoCore(() => GetInput(prompt), enterDefault);
+        return await AskYesNoCore(() => GetInput(prompt), enterDefault) ?? false;
+    }
+
+    /// <summary>
+    /// 1.2.7: AskYesNoAsync with no Enter default and three outcomes, for a question whose missing answer
+    /// must not read as No (the telemetry consent prompt): true for a localized yes, false for a localized
+    /// no, null after MaxInvalidChoiceAttempts invalid answers (Enter alone included) or when the
+    /// connection is gone. A MUD peer that closes throws ConnectionClosedException, as GetInput does.
+    /// </summary>
+    public async Task<bool?> AskYesNoOrNoAnswerAsync(string prompt)
+    {
+        return await AskYesNoCore(() => GetInput(prompt), null);
     }
 
     /// <summary>
@@ -1660,11 +1671,12 @@ public partial class TerminalEmulator
     /// </summary>
     public async Task<bool> AskYesNoKeyAsync(bool? enterDefault = null)
     {
-        return await AskYesNoCore(GetKeyInput, enterDefault);
+        return await AskYesNoCore(GetKeyInput, enterDefault) ?? false;
     }
 
-    /// <summary>v1.1.15: shared strict yes/no loop behind AskYesNoAsync and AskYesNoKeyAsync.</summary>
-    private async Task<bool> AskYesNoCore(Func<Task<string>> read, bool? enterDefault)
+    /// <summary>v1.1.15: shared strict yes/no loop behind AskYesNoAsync and AskYesNoKeyAsync. 1.2.7: null
+    /// when no answer came (the invalid answers ran out or the connection is gone); those two map it to No.</summary>
+    private async Task<bool?> AskYesNoCore(Func<Task<string>> read, bool? enterDefault)
     {
         for (int attempt = 0; attempt < MaxInvalidChoiceAttempts; attempt++)
         {
@@ -1675,7 +1687,7 @@ public partial class TerminalEmulator
             if (DoorMode.IsDisconnected) break;
             WriteLine(UsurperRemake.Systems.Loc.Get("ui.answer_yes_no"), "red");
         }
-        return false;
+        return null;
     }
 
     /// <summary>v1.1.13: MUD stream (MUD, telnet, web, relay) and BBS socket modes read a whole line at a pause.</summary>

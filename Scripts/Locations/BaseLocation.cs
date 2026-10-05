@@ -4406,6 +4406,11 @@ public abstract class BaseLocation
         {
             terminal.ClearScreen();
 
+            // 1.2.7: the telemetry line, hidden on a BBS door or server while the operator switch is off
+            var telemetryStore = TelemetryPrompt.CurrentStore();
+            string? telemetryLogin = TelemetryConsent.CurrentLoginName();
+            bool telemetryShown = TelemetryPrompt.PreferenceShown(telemetryStore);
+
             if (currentPlayer.ScreenReaderMode)
             {
                 // Screen reader friendly: plain text, no box-drawing, no color switching
@@ -4470,6 +4475,8 @@ public abstract class BaseLocation
                 terminal.WriteLine($"  3. {Loc.Get("prefs.toggle", Loc.Get("prefs.skip_intimate"))}");
                 terminal.WriteLine($"  O. {Loc.Get("prefs.orientation")}");
                 terminal.WriteLine($"  T. {Loc.Get("base.prefs_title")}");
+                if (telemetryShown)
+                    terminal.WriteLine($"  U. {TelemetryPrompt.PreferenceLabel(telemetryStore!, telemetryLogin)}"); // 1.2.7
                 terminal.WriteLine($"0. {Loc.Get("prefs.back")}");
                 terminal.WriteLine("");
             }
@@ -4557,6 +4564,8 @@ public abstract class BaseLocation
                 WriteMenuOption("3", $"{Loc.Get("prefs.skip_intimate")}: {(currentPlayer.SkipIntimateScenes ? Loc.Get("prefs.skip_intimate.on") : Loc.Get("prefs.skip_intimate.off"))}");
                 WriteMenuOption("O", $"{Loc.Get("prefs.orientation")}: {GetOrientationLabel(currentPlayer.Orientation)}");
                 WriteMenuOption("T", $"{Loc.Get("base.prefs_title")}: {currentPlayer.NobleTitle ?? Loc.Get("ui.none")}");
+                if (telemetryShown)
+                    WriteMenuOption("U", TelemetryPrompt.PreferenceLabel(telemetryStore!, telemetryLogin)); // 1.2.7
                 terminal.WriteLine("");
 
                 WriteMenuOption("0", Loc.Get("prefs.back"));
@@ -4689,6 +4698,11 @@ public abstract class BaseLocation
                     }
                     await GameEngine.Instance.SaveCurrentGame();
                     await Pacing.Wait(1000);
+                    break;
+
+                case "U" when telemetryShown:
+                    // 1.2.7: opt-in telemetry (the question again to turn it on; off, or a new id)
+                    await TelemetryPrompt.PreferenceChosenAsync(terminal, telemetryStore!, telemetryLogin, currentPlayer.ScreenReaderMode);
                     break;
 
                 case "S":

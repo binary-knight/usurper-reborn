@@ -1,0 +1,37 @@
+Prompt, single player and Steam:
+
+ Share combat data to help balance the game?
+
+ If you say yes, this copy of the game sends numbers about each monster
+ fight to usurper-reborn.net, including your class, level, stats and
+ gear power, the monster's family and level, rounds, damage, potions,
+ abilities and spells used, and XP and gold gained. No names, no chat,
+ no save files. Uploads carry a random id that is not tied to your
+ account. This is not anonymous: the id and your exact stats can link
+ your fights. The answer covers every character on this copy of the
+ game. You can change it at any time under Preferences. Rows already
+ sent are kept for up to 30 days.
+
+ Share combat data? (Y/N):
+
+Prompt, BBS door and server:
+
+ Share combat data to help balance the game?
+
+ The operator of this BBS or server allows sharing combat data. If you
+ say yes, numbers about each of your monster fights go to
+ usurper-reborn.net, including your class, level, stats and gear power,
+ the monster's family and level, rounds, damage, potions, abilities and
+ spells used, and XP and gold gained. No names, no chat, no save files.
+ Uploads carry a random id that belongs to this BBS or server and is
+ shared by its players. This is not anonymous: the id and your exact
+ stats can link your fights. The answer is for your account. You can
+ change it at any time under Preferences. Rows already sent are kept
+ for up to 30 days.
+
+ Share combat data? (Y/N):
+
+Preferences row: Share combat data: On / Off
+Preferences sub choices (single and Steam only): Turn off / New random id
+Not saved line: Your choice could not be saved. Please try again.
+
