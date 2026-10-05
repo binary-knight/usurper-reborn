@@ -224,6 +224,16 @@ function headers(p, id) {
   return p.el(id).querySelectorAll('th').map((th) => th.textContent);
 }
 
+test('the page never requests one player\'s rows (player-activity?player= has no view, so no render to escape)', async () => {
+  const src = require('./harness').readPage('balance.html');
+  assert.doesNotMatch(src, /player=/);
+  const p = await page(HOSTILE, { balance_token: 'tok' });
+  await p.settle();
+  for (const name of TABS) { p.click(tabEl(p, name)); await p.settle(); }
+  assert.ok(p.calls.fetch.length > 10);
+  assert.ok(p.calls.fetch.every((c) => !/[?&]player=/.test(c.url)), p.calls.fetch.map((c) => c.url).join(' '));
+});
+
 test('a NULL from the server renders blank, never 0', async () => {
   const nulls = {
     difficulty: { window: { key: 'since126', label: 'Since 1.2.6', from: FROM, clipped: false }, bands: [{ band: 2, boss: 0, floor_from: 6, floor_to: 10, fights: 3, players: 1, win_pct: 0, death_pct: 100, flee_pct: 0, avg_rounds: 2, one_round_win_pct: 0, hp_lost_pct: null, dmg_to_player_basic: null, dmg_to_player_ability: null, dmg_to_player_spell: null, dmg_to_player_dot: null, dmg_to_team: null, dmg_by_player: null, dmg_by_team: null, heal_player: null, potions_used: null, abilities_used: null, spells_used: null, party_size: null, encounter_size: null, monster_first_pct: null, teammates_lost: null }], noFloorFights: 7, classes: [], difficulties: [] },

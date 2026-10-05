@@ -8,6 +8,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const nodeCrypto = require('node:crypto');
 const { makeDb, insertFight, insertNpc, tallyOf, loadApi, planOf, proxySource, slice } = require('./balance-api-harness');
+const HOSTILE_NAME = `Bob'"<img src=x onerror=alert(1)>&amp;`;
 
 // Old rows: 50 to 100 hours ago, no 1.2.6 columns. 1.2.6 rows: the last 48 hours.
 function fillMixed(w) {
@@ -267,6 +268,29 @@ test('player activity and suspects take the class from the latest row', async ()
     assert.deepStrictEqual(p.map((x) => [x.player_name, x.player_class, x.total_combats]), [['Switcher', 'Mage', 13]]);
     const s = (await a.call('/api/balance/suspects')).body.rows;
     assert.deepStrictEqual(s.map((x) => [x.player_name, x.player_class, x.total]), [['Switcher', 'Mage', 13]]);
+  });
+});
+
+test('player-activity?player=: that player\'s rows only, newest first, in the window, at most 200, as JSON data', async () => {
+  const name = HOSTILE_NAME;
+  await withApi((w) => {
+    insertFight(w, { player_name: name, outcome: 'victory', ago: '-100 hours' });
+    for (let i = 0; i < 205; i++) insertFight(w, { player_name: name, rounds: i, ago: `-${10 + i} minutes`, tally: tallyOf() });
+    insertFight(w, { player_name: name + 'x', ago: '-1 minutes', tally: tallyOf() });
+    insertFight(w, { player_name: 'Other', ago: '-1 minutes', tally: tallyOf() });
+  }, async (a) => {
+    const r = await a.call('/api/balance/player-activity?player=' + encodeURIComponent(name));
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(r.headers['content-type'], 'application/json');
+    assert.strictEqual(r.body.window.key, 'since126');
+    assert.strictEqual(r.body.rows.length, 200);
+    assert.ok(r.body.rows.every((x) => x.player_name === name), 'only that player, the name returned as plain data');
+    assert.deepStrictEqual(r.body.rows.slice(0, 3).map((x) => x.rounds), [0, 1, 2], 'newest first');
+    assert.ok(r.body.rows.every((x) => x.floor_actual !== null), 'the old row is outside Since 1.2.6');
+    const r30 = await a.call('/api/balance/player-activity?window=30d&player=' + encodeURIComponent(name));
+    assert.strictEqual(r30.body.rows.length, 200);
+    const none = await a.call('/api/balance/player-activity?player=Nobody');
+    assert.deepStrictEqual(none.body.rows, []);
   });
 });
 

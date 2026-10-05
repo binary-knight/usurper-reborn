@@ -164,7 +164,7 @@ function loadApi(options = {}) {
       headersSent: false,
     };
     await api.handleBalanceRequest(req, res);
-    return { status: out.status, body: out.body ? JSON.parse(out.body) : null };
+    return { status: out.status, headers: out.headers, body: out.body ? JSON.parse(out.body) : null };
   }
   return { api, call, token, prepared, state, ctx };
 }
