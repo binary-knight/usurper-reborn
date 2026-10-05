@@ -80,18 +80,23 @@ namespace UsurperRemake.Systems
 
         private static readonly ConcurrentDictionary<string, TelemetryStore> _stores = new(StringComparer.Ordinal);
 
+        /// <summary>A save directory as a full path. An empty one (a database given by a bare file name, see
+        /// SqlSaveBackend.GetSaveDirectory) is the current directory, as sysop_config.json resolves it.</summary>
+        internal static string FullSaveDirectory(string? saveDirectory) =>
+            Path.GetFullPath(string.IsNullOrEmpty(saveDirectory) ? "." : saveDirectory);
+
         /// <summary>The store of one save directory (one per directory in a process, so the answers it
         /// caches are shared by every session of that directory).</summary>
         internal static TelemetryStore StoreFor(string saveDirectory) =>
-            _stores.GetOrAdd(Path.GetFullPath(saveDirectory), d => new TelemetryStore(d));
+            _stores.GetOrAdd(FullSaveDirectory(saveDirectory), d => new TelemetryStore(d));
 
         /// <summary>The store of the active save directory, or null when there is none.</summary>
         internal static TelemetryStore? CurrentStore()
         {
             try
             {
-                var dir = SaveSystem.Instance?.GetSaveDirectory();
-                return string.IsNullOrEmpty(dir) ? null : StoreFor(dir);
+                var save = SaveSystem.Instance;
+                return save == null ? null : StoreFor(save.GetSaveDirectory());
             }
             catch { return null; }
         }
@@ -110,18 +115,20 @@ namespace UsurperRemake.Systems
 
         /// <summary>A character was deleted: remove its answer (the BBS file, the server row) and its cached
         /// value, so the same name reads as not asked. Called from the save backends' delete methods.</summary>
-        internal static void RemoveAnswer(string saveDirectory, string? playerName, SqlSaveBackend? database)
+        internal static void RemoveAnswer(string? saveDirectory, string? playerName, SqlSaveBackend? database)
         {
             string? key = PlayerKey(playerName);
             if (key == null) return;
             try
             {
-                if (_stores.TryGetValue(Path.GetFullPath(saveDirectory), out var store)) store.ForgetCached(key);
-                string file = TelemetryStore.PlayerFilePath(saveDirectory, key);
+                string dir = FullSaveDirectory(saveDirectory);
+                if (_stores.TryGetValue(dir, out var store)) store.ForgetCached(key);
+                string file = TelemetryStore.PlayerFilePath(dir, key);
                 if (File.Exists(file)) File.Delete(file);
-                database?.DeleteTelemetryAnswer(key);
             }
-            catch (Exception ex) { DebugLogger.Instance.LogWarning("TELEMETRY", $"consent answer not removed: {ex.Message}"); }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("TELEMETRY", $"consent answer file not removed: {ex.Message}"); }
+            try { database?.DeleteTelemetryAnswer(key); }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("TELEMETRY", $"consent answer row not removed: {ex.Message}"); }
         }
 
         /// <summary>Tests: forget every store and the operator resolver.</summary>

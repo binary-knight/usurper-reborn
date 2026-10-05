@@ -892,6 +892,21 @@ public class Telemetry127Tests : IDisposable
         Directory.Exists(Path.Combine(Tel, "players")).Should().BeFalse("a server keeps answers in the table");
     }
 
+    /// <summary>A database given by a bare file name has "" as its save directory: the answer is still
+    /// removed, and the store is the current directory's (as sysop_config.json resolves it).</summary>
+    [Fact]
+    public void Row17_ARelativeDatabase_EmptySaveDirectory_StillRemovesTheAnswer()
+    {
+        ServerMode();
+        OperatorOn();
+        _ = Db;
+        Store(TelemetrySource.Server).SetPlayerAnswer("relative", true);
+        Rows("SELECT * FROM telemetry_consent;").Should().HaveCount(1);
+        TelemetryConsent.RemoveAnswer("", "relative", Db);
+        Rows("SELECT * FROM telemetry_consent;").Should().BeEmpty();
+        TelemetryConsent.StoreFor("").Folder.Should().Be(Path.Combine(Path.GetFullPath("."), "telemetry"));
+    }
+
     // ======================================================================
     // Row 18: the operator switch defaults off
     // ======================================================================
