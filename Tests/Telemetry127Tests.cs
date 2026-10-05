@@ -451,9 +451,27 @@ public class Telemetry127Tests : IDisposable
         bad.Should().HaveCountGreaterThan(80, "each bound is tried on both sides");
         foreach (var g in good) TelemetryRow.IsValid(g).Should().BeTrue(g.GetRawText());
         foreach (var b in bad) TelemetryRow.IsValid(b.GetProperty("row")).Should().BeFalse(b.GetProperty("why").GetString());
+        // T2: whole bodies whose first row is not written as plain integers; the server refuses them with 400
+        var badRaw = root.GetProperty("bad_raw").EnumerateArray().ToList();
+        badRaw.Should().HaveCountGreaterThan(10);
+        foreach (var b in badRaw) RawBodyRowRefused(b.GetProperty("body").GetString()!).Should().BeTrue(b.GetProperty("why").GetString());
         // a row the builder makes reads back the same
         var built = TelemetryRow.From(SampleRow(), CharacterClass.Warrior, "Undead")!;
         built.IsValid().Should().BeTrue();
+    }
+
+    /// <summary>True when the body's first row is refused: the JSON does not parse, or IsValid fails.</summary>
+    private static bool RawBodyRowRefused(string body)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(body);
+            return !TelemetryRow.IsValid(doc.RootElement.GetProperty("rows")[0]);
+        }
+        catch (JsonException)
+        {
+            return true;
+        }
     }
 
     [Fact]

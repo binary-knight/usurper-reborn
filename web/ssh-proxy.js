@@ -616,6 +616,455 @@ async function handleBugReport(req, res) {
   }
 }
 
+// --- Remote Telemetry Endpoint (1.2.7) ---
+// POST /api/telemetry/v1/combat: opt-in combat rows sent by copies of the game (DESIGN.md
+// section 4). The rows go to their own SQLite file, never to the game database, and this code
+// never creates that file (the operator does, at deploy). Stored per row: the row's integers,
+// schema, version, source, install_id and the UTC day number; no address and no time finer than
+// the day. Every reply is one of a few fixed bodies; nothing from the request is echoed, and no
+// log line holds an address or an install_id. The tests cut this section out by its markers and
+// run it in a vm: everything it touches (database class, fs, clock, timers, console) is passed
+// to createTelemetryEndpoint.
+const TELEMETRY_URL = '/api/telemetry/v1/combat';
+const TELEMETRY_MAX_BODY_BYTES = 65536;
+const TELEMETRY_BODY_TIMEOUT_MS = 10000;
+const TELEMETRY_MAX_ROWS = 100;
+const TELEMETRY_ADDRESS_PER_HOUR = 12;
+const TELEMETRY_ID_PER_DAY = 24;
+const TELEMETRY_ROWS_PER_DAY = 50000;
+const TELEMETRY_KEEP_DAYS = 30;
+const TELEMETRY_KEEP_ROWS = 200000;
+const TELEMETRY_PRUNE_MS = 24 * 60 * 60 * 1000;
+const TELEMETRY_STOP_CACHE_MS = 5000;
+const TELEMETRY_MAP_MAX = 10000;
+const TELEMETRY_HOUR_MS = 60 * 60 * 1000;
+const TELEMETRY_DAY_MS = 24 * TELEMETRY_HOUR_MS;
+const TELEMETRY_MAX_SAFE = 9007199254740991;
+const TELEMETRY_DEFAULT_DB_PATH = '/var/usurper/remote_telemetry.db';
+const TELEMETRY_STOP_FILE_NAME = 'remote_telemetry.stop';
+
+// Every key of a row, in order, with its bounds: the same table as TelemetryRow.Columns
+// (Scripts/Systems/TelemetryRow.cs). A web test parses the C# and compares the two.
+const TELEMETRY_COLUMNS = [
+  ['outcome', 0, 2],
+  ['player_class', 0, 16],
+  ['monster_family', 0, 15],
+  ['is_boss', 0, 1],
+  ['has_teammates', 0, 1],
+  ['player_level', 1, 100],
+  ['player_max_hp', 0, TELEMETRY_MAX_SAFE],
+  ['player_str', 0, TELEMETRY_MAX_SAFE],
+  ['player_dex', 0, TELEMETRY_MAX_SAFE],
+  ['player_weap_pow', 0, TELEMETRY_MAX_SAFE],
+  ['player_arm_pow', 0, TELEMETRY_MAX_SAFE],
+  ['monster_level', 0, 200],
+  ['monster_max_hp', 0, TELEMETRY_MAX_SAFE],
+  ['monster_str', 0, TELEMETRY_MAX_SAFE],
+  ['monster_def', 0, TELEMETRY_MAX_SAFE],
+  ['rounds', 0, 10000],
+  ['damage_dealt', 0, TELEMETRY_MAX_SAFE],
+  ['damage_taken', 0, TELEMETRY_MAX_SAFE],
+  ['xp_gained', 0, TELEMETRY_MAX_SAFE],
+  ['gold_gained', 0, TELEMETRY_MAX_SAFE],
+  ['monster_count', 0, 50],
+  ['floor_actual', 0, 100],
+  ['difficulty', 0, 3],
+  ['party_size', 0, 8],
+  ['encounter_size', 0, 50],
+  ['first_actor', 0, 1],
+  ['dmg_to_player_basic', 0, TELEMETRY_MAX_SAFE],
+  ['dmg_to_player_ability', 0, TELEMETRY_MAX_SAFE],
+  ['dmg_to_player_spell', 0, TELEMETRY_MAX_SAFE],
+  ['dmg_to_player_dot', 0, TELEMETRY_MAX_SAFE],
+  ['dmg_to_team', 0, TELEMETRY_MAX_SAFE],
+  ['dmg_by_player', 0, TELEMETRY_MAX_SAFE],
+  ['dmg_by_team', 0, TELEMETRY_MAX_SAFE],
+  ['heal_player', 0, TELEMETRY_MAX_SAFE],
+  ['potions_used', 0, 10000],
+  ['abilities_used', 0, 10000],
+  ['spells_used', 0, 10000],
+  ['teammates_lost', 0, 10000],
+  ['player_hp_end', 0, TELEMETRY_MAX_SAFE],
+];
+const TELEMETRY_COLUMN_INDEX = new Map(TELEMETRY_COLUMNS.map((c, i) => [c[0], i]));
+
+// The stored table: batch fields, the day, then the row keys. No address, no id column, no time.
+const TELEMETRY_BATCH_COLUMNS = ['schema', 'version_major', 'version_minor', 'version_patch', 'source', 'install_id', 'received_day'];
+const TELEMETRY_TABLE_SQL =
+  'CREATE TABLE IF NOT EXISTS remote_combat_events (\n' +
+  '  schema INTEGER NOT NULL,\n  version_major INTEGER NOT NULL,\n  version_minor INTEGER NOT NULL,\n' +
+  '  version_patch INTEGER NOT NULL,\n  source INTEGER NOT NULL,\n  install_id TEXT NOT NULL,\n' +
+  '  received_day INTEGER NOT NULL,\n' +
+  TELEMETRY_COLUMNS.map((c) => '  ' + c[0] + ' INTEGER NOT NULL').join(',\n') + '\n);\n' +
+  'CREATE INDEX IF NOT EXISTS idx_rce_day ON remote_combat_events(received_day);';
+const TELEMETRY_INSERT_SQL =
+  'INSERT INTO remote_combat_events (' + TELEMETRY_BATCH_COLUMNS.concat(TELEMETRY_COLUMNS.map((c) => c[0])).join(', ') +
+  ') VALUES (' + TELEMETRY_BATCH_COLUMNS.concat(TELEMETRY_COLUMNS).map(() => '?').join(', ') + ')';
+
+// The only reply bodies this route sends.
+const TELEMETRY_OK = '{"ok":true}';
+const TELEMETRY_STOP = '{"stop":true}';
+const TELEMETRY_ERROR_WORDS = ['not_found', 'method', 'media_type', 'encoding', 'too_large', 'timeout', 'invalid',
+  'rate_limited', 'unavailable', 'internal'];
+
+// The peers a reverse proxy on this machine connects from. Only from these is X-Real-IP believed.
+const TELEMETRY_LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
+
+// The database and stop file paths from the environment.
+function telemetryPaths(env) {
+  const dbPath = env.REMOTE_TELEMETRY_DB_PATH || TELEMETRY_DEFAULT_DB_PATH;
+  const stopPath = env.REMOTE_TELEMETRY_STOP_FILE || path.join(path.dirname(dbPath), TELEMETRY_STOP_FILE_NAME);
+  return { dbPath, stopPath };
+}
+
+// True for every path this section answers (anything under /api/telemetry).
+function isTelemetryUrl(url) {
+  const p = String(url).split('?')[0];
+  return p === '/api/telemetry' || p.startsWith('/api/telemetry/');
+}
+
+// The address a batch is counted against: the socket peer, or X-Real-IP when the peer is the
+// local reverse proxy. A header from any other peer is ignored, so it cannot pick its own bucket.
+function telemetryAddress(req, isIP) {
+  const peer = (req.socket && req.socket.remoteAddress) || '';
+  if (TELEMETRY_LOOPBACK.has(peer)) {
+    const h = req.headers['x-real-ip'];
+    if (typeof h === 'string' && isIP(h.trim())) return h.trim();
+  }
+  return peer;
+}
+
+// application/json, with at most a charset=utf-8 parameter.
+function isTelemetryJsonType(value) {
+  if (typeof value !== 'string') return false;
+  const parts = value.split(';').map((s) => s.trim().toLowerCase());
+  if (parts[0] !== 'application/json') return false;
+  return parts.length === 1 || (parts.length === 2 && parts[1].replace(/\s+/g, '') === 'charset=utf-8');
+}
+
+// Strict reader of one batch body, written by hand: JSON.parse would accept a duplicate key,
+// "1.0", "1e2" and "-0", and read 9007199254740993 as 9007199254740992. Accepts only the batch
+// shape: exactly the five top level keys, rows of exactly the column keys, every number a plain
+// non-negative integer literal (no ".", "e", "+", "-" or leading zero) inside its bound, strings
+// of printable ASCII without escapes. Returns { version, source, installId, rows } or null.
+function parseTelemetryBatch(text) {
+  const FAIL = {};
+  let i = 0;
+  const n = text.length;
+  const ws = () => {
+    while (i < n) {
+      const c = text.charCodeAt(i);
+      if (c === 32 || c === 9 || c === 10 || c === 13) i++; else break;
+    }
+  };
+  const eat = (ch) => { ws(); if (text[i] !== ch) throw FAIL; i++; };
+  const str = () => {
+    ws();
+    if (text[i] !== '"') throw FAIL;
+    const start = ++i;
+    while (i < n && text[i] !== '"') {
+      const c = text.charCodeAt(i);
+      if (c < 0x20 || c > 0x7e || c === 0x5c) throw FAIL;
+      i++;
+    }
+    if (i >= n) throw FAIL;
+    return text.slice(start, i++);
+  };
+  const int = (min, max) => {
+    ws();
+    const start = i;
+    while (i < n && /[0-9+\-.eE]/.test(text[i])) i++;
+    const tok = text.slice(start, i);
+    if (!/^(0|[1-9][0-9]*)$/.test(tok) || tok.length > 16) throw FAIL;
+    const v = BigInt(tok);
+    if (v < BigInt(min) || v > BigInt(max)) throw FAIL;
+    return Number(v);
+  };
+  const object = (onKey) => {
+    eat('{');
+    ws();
+    if (text[i] === '}') { i++; return; }
+    for (;;) {
+      const key = str();
+      eat(':');
+      onKey(key);
+      ws();
+      if (text[i] === ',') { i++; continue; }
+      if (text[i] === '}') { i++; return; }
+      throw FAIL;
+    }
+  };
+  const array = (item, min, max) => {
+    const out = [];
+    eat('[');
+    ws();
+    if (text[i] === ']') i++;
+    else {
+      for (;;) {
+        if (out.length >= max) throw FAIL;
+        out.push(item());
+        ws();
+        if (text[i] === ',') { i++; continue; }
+        if (text[i] === ']') { i++; break; }
+        throw FAIL;
+      }
+    }
+    if (out.length < min) throw FAIL;
+    return out;
+  };
+  const row = () => {
+    const values = new Array(TELEMETRY_COLUMNS.length);
+    let count = 0;
+    object((key) => {
+      const k = TELEMETRY_COLUMN_INDEX.get(key);
+      if (k === undefined || values[k] !== undefined) throw FAIL;
+      values[k] = int(TELEMETRY_COLUMNS[k][1], TELEMETRY_COLUMNS[k][2]);
+      count++;
+    });
+    if (count !== TELEMETRY_COLUMNS.length) throw FAIL;
+    return values;
+  };
+  try {
+    const seen = new Set();
+    let version, source, installId, rows;
+    object((key) => {
+      if (seen.has(key)) throw FAIL;
+      seen.add(key);
+      switch (key) {
+        case 'schema': int(1, 1); break;
+        case 'version': version = array(() => int(0, 1000), 3, 3); break;
+        case 'source': source = int(1, 4); break;
+        case 'install_id':
+          installId = str();
+          if (!/^[0-9a-f]{32}$/.test(installId)) throw FAIL;
+          break;
+        case 'rows': rows = array(row, 1, TELEMETRY_MAX_ROWS); break;
+        default: throw FAIL;
+      }
+    });
+    ws();
+    if (i !== n || seen.size !== 5) return null;
+    return { version, source, installId, rows };
+  } catch (e) {
+    if (e === FAIL) return null;
+    throw e;
+  }
+}
+
+// A counter per key for fixed windows (the hour or the UTC day number). Keys of a past window
+// are dropped when the window turns and whenever the map is full; a full map of the current
+// window refuses new keys, so the map never holds more than max entries.
+function makeTelemetryLimiter(limit, max) {
+  const map = new Map();
+  let windowSeen = null;
+  const sweep = (w) => { for (const [k, e] of map) if (e.w !== w) map.delete(k); };
+  return {
+    take(key, w) {
+      if (w !== windowSeen) { sweep(w); windowSeen = w; }
+      let e = map.get(key);
+      if (!e) {
+        if (map.size >= max) sweep(w);
+        if (map.size >= max) return false;
+        e = { w, n: 0 };
+        map.set(key, e);
+      }
+      if (e.n >= limit) return false;
+      e.n++;
+      return true;
+    },
+    size() { return map.size; },
+  };
+}
+
+// options: dbPath, stopPath, Database (better-sqlite3), fs, isIP, now, setTimeout, clearTimeout,
+// setInterval, clearInterval, console; mapMax only in tests.
+function createTelemetryEndpoint(options) {
+  const o = options;
+  const log = o.console;
+  const now = o.now;
+  const mapMax = o.mapMax || TELEMETRY_MAP_MAX;
+  const byAddress = makeTelemetryLimiter(TELEMETRY_ADDRESS_PER_HOUR, mapMax);
+  const byInstall = makeTelemetryLimiter(TELEMETRY_ID_PER_DAY, mapMax);
+  let remote = null;
+  let storeBatch = null;
+  let stopCache = { at: 0, present: false, fresh: false };
+
+  // Opens the remote file only if it exists (fileMustExist: the code never creates it).
+  function openRemote() {
+    if (remote) return remote;
+    if (!o.Database) return null;
+    let handle;
+    try {
+      handle = new o.Database(o.dbPath, { fileMustExist: true });
+    } catch (e) {
+      return null;
+    }
+    try {
+      handle.exec(TELEMETRY_TABLE_SQL);
+      const insert = handle.prepare(TELEMETRY_INSERT_SQL);
+      const count = handle.prepare('SELECT COUNT(*) AS n FROM remote_combat_events WHERE received_day = ?');
+      // One transaction per batch: the day's count read from the table (so a restart keeps
+      // the cap) and every row inserted, or nothing.
+      storeBatch = handle.transaction((batch, day) => {
+        if (count.get(day).n + batch.rows.length > TELEMETRY_ROWS_PER_DAY) return false;
+        const head = [1, batch.version[0], batch.version[1], batch.version[2], batch.source, batch.installId, day];
+        for (const values of batch.rows) insert.run(...head, ...values);
+        return true;
+      });
+    } catch (e) {
+      log.error(`[telemetry] remote database not usable: ${e.message}`);
+      try { handle.close(); } catch (e2) { /* already closed */ }
+      storeBatch = null;
+      return null;
+    }
+    remote = handle;
+    prune();
+    return remote;
+  }
+
+  // Rows older than 30 days go, then all but the newest 200000.
+  function prune() {
+    if (!remote) return;
+    try {
+      const today = Math.floor(now() / TELEMETRY_DAY_MS);
+      remote.prepare('DELETE FROM remote_combat_events WHERE received_day < ?').run(today - TELEMETRY_KEEP_DAYS);
+      remote.prepare('DELETE FROM remote_combat_events WHERE rowid IN (SELECT rowid FROM remote_combat_events ' +
+        'ORDER BY received_day DESC, rowid DESC LIMIT -1 OFFSET ?)').run(TELEMETRY_KEEP_ROWS);
+    } catch (e) {
+      log.error(`[telemetry] prune failed: ${e.message}`);
+    }
+  }
+
+  // The operator's stop: a file whose presence answers every valid batch with {"stop":true}.
+  // Looked up at most once every few seconds, so adding or removing it needs no restart.
+  function stopped() {
+    const t = now();
+    if (!stopCache.fresh || t - stopCache.at >= TELEMETRY_STOP_CACHE_MS || t < stopCache.at) {
+      let present = false;
+      try { present = o.fs.existsSync(o.stopPath); } catch (e) { present = false; }
+      stopCache = { at: t, present, fresh: true };
+    }
+    return stopCache.present;
+  }
+
+  // Sends one fixed body. close: the request body was not (fully) read, so the connection is
+  // closed once the reply is out instead of draining whatever else the client sends.
+  function reply(req, res, status, body, close) {
+    if (res.headersSent) return;
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Cache-Control', 'no-store');
+    if (close) res.setHeader('Connection', 'close');
+    res.writeHead(status);
+    if (close) {
+      res.end(body, () => { try { req.socket.destroy(); } catch (e) { /* already gone */ } });
+    } else {
+      res.end(body);
+    }
+  }
+  const fail = (req, res, status, word, close) => reply(req, res, status, '{"error":"' + word + '"}', close);
+
+  // Reads the body counting bytes, at most 64 KB and 10 seconds. Resolves to a Buffer, or to
+  // null after it has replied (413, 408) or the client went away.
+  function readBody(req, res) {
+    return new Promise((resolve) => {
+      const chunks = [];
+      let size = 0;
+      let done = false;
+      let timer = null;
+      const finish = (value) => {
+        if (done) return false;
+        done = true;
+        if (timer !== null) o.clearTimeout(timer);
+        req.removeListener('data', onData);
+        req.removeListener('end', onEnd);
+        req.removeListener('error', onGone);
+        req.removeListener('close', onGone);
+        resolve(value);
+        return true;
+      };
+      const onData = (chunk) => {
+        size += chunk.length;
+        if (size > TELEMETRY_MAX_BODY_BYTES) {
+          if (finish(null)) fail(req, res, 413, 'too_large', true);
+          return;
+        }
+        chunks.push(chunk);
+      };
+      const onEnd = () => { finish(Buffer.concat(chunks, size)); };
+      const onGone = () => { finish(null); };
+      timer = o.setTimeout(() => {
+        if (finish(null)) fail(req, res, 408, 'timeout', true);
+      }, TELEMETRY_BODY_TIMEOUT_MS);
+      req.on('data', onData);
+      req.on('end', onEnd);
+      req.on('error', onGone);
+      req.on('close', onGone);
+    });
+  }
+
+  async function handleRequest(req, res) {
+    if (req.url !== TELEMETRY_URL) return fail(req, res, 404, 'not_found', true);
+    if (req.method !== 'POST') return fail(req, res, 405, 'method', true);
+    // Decided before the body: every POST counts, refused ones too.
+    const hour = Math.floor(now() / TELEMETRY_HOUR_MS);
+    if (!byAddress.take(telemetryAddress(req, o.isIP), hour)) return fail(req, res, 429, 'rate_limited', true);
+    const h = req.headers;
+    if (h['content-encoding'] !== undefined) return fail(req, res, 415, 'encoding', true);
+    if (!isTelemetryJsonType(h['content-type'])) return fail(req, res, 415, 'media_type', true);
+    const length = h['content-length'];
+    if (length !== undefined) {
+      if (!/^[0-9]{1,12}$/.test(length)) return fail(req, res, 400, 'invalid', true);
+      if (Number(length) > TELEMETRY_MAX_BODY_BYTES) return fail(req, res, 413, 'too_large', true);
+    }
+    const body = await readBody(req, res);
+    if (body === null) return undefined;
+    const batch = parseTelemetryBatch(body.toString('latin1'));
+    if (!batch) return fail(req, res, 400, 'invalid');
+    if (stopped()) return reply(req, res, 200, TELEMETRY_STOP);
+    if (!openRemote()) return fail(req, res, 503, 'unavailable');
+    const day = Math.floor(now() / TELEMETRY_DAY_MS);
+    if (!byInstall.take(batch.installId, day)) {
+      log.warn('[telemetry] refused a batch: install limit');
+      return fail(req, res, 429, 'rate_limited');
+    }
+    if (!storeBatch(batch, day)) {
+      log.warn('[telemetry] refused a batch: daily row cap');
+      return fail(req, res, 429, 'rate_limited');
+    }
+    return reply(req, res, 200, TELEMETRY_OK);
+  }
+
+  // Prune at start (when the file is there) and every 24 hours.
+  if (!openRemote()) log.warn('[telemetry] remote telemetry database not found or not usable; the endpoint answers 503 until it is');
+  const pruneTimer = o.setInterval(() => { if (remote) prune(); else openRemote(); }, TELEMETRY_PRUNE_MS);
+  if (pruneTimer && typeof pruneTimer.unref === 'function') pruneTimer.unref();
+
+  return {
+    // Never rejects: any error is a fixed 500.
+    async handle(req, res) {
+      try {
+        await handleRequest(req, res);
+      } catch (e) {
+        log.error(`[telemetry] request failed: ${e.message}`);
+        fail(req, res, 500, 'internal', true);
+      }
+    },
+    prune,
+    close() {
+      o.clearInterval(pruneTimer);
+      if (remote) { try { remote.close(); } catch (e) { /* closed */ } }
+      remote = null;
+      storeBatch = null;
+    },
+    sizes() { return { addresses: byAddress.size(), installs: byInstall.size() }; },
+  };
+}
+// --- End Remote Telemetry Endpoint ---
+
+const telemetryEndpoint = createTelemetryEndpoint(Object.assign(telemetryPaths(process.env), {
+  Database, fs, isIP: net.isIP, now: () => Date.now(), setTimeout, clearTimeout, setInterval, clearInterval, console,
+}));
+
 // --- Dashboard NPC Data Cache ---
 let dashNpcCache = null;
 let dashNpcCacheTime = 0;
@@ -3648,6 +4097,13 @@ async function handleAdminRequest(req, res) {
 
 // --- HTTP Handler ---
 function handleHttpRequest(req, res) {
+  // 1.2.7: opt-in telemetry from copies of the game. First, so no header of another route
+  // (CORS above all) can reach its replies; handle() never rejects.
+  if (req.url && isTelemetryUrl(req.url)) {
+    telemetryEndpoint.handle(req, res);
+    return;
+  }
+
   // Admin dashboard routes
   if (req.url && req.url.startsWith('/api/admin/')) {
     handleAdminRequest(req, res).catch(err => {
@@ -4528,6 +4984,7 @@ function gracefulShutdown() {
   dashSseClients.clear();
   if (db) db.close();
   if (dbWrite) dbWrite.close();
+  telemetryEndpoint.close();
   wss.close(() => httpServer.close(() => process.exit(0)));
 }
 process.on('SIGTERM', gracefulShutdown);
