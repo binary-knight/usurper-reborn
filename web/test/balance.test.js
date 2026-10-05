@@ -362,3 +362,28 @@ test('the page against the real routes: every tab renders, nothing fails, old ro
     f.close();
   }
 });
+
+test('a server value shaped like a page-marked cell is still escaped: the mark is a Symbol JSON cannot carry', async () => {
+  // Every field the routes send is set to an object with a plain trustedHtml key. Only markup
+  // the page builds itself may go into a table as HTML.
+  const forged = { trustedHtml: HOSTILE + '<b class="forged">x</b>' };
+  const benign = { trustedHtml: 'Alice' };
+  const h = await page(forged, { balance_token: 'tok' });
+  const b = await page(benign, { balance_token: 'tok' });
+  for (const p of [h, b]) {
+    await p.settle();
+    for (const name of TABS) { p.click(tabEl(p, name)); await p.settle(); }
+    assert.deepStrictEqual(p.errors, []);
+  }
+  for (const id of TABLES) {
+    const html = h.el(id).innerHTML;
+    assertSafe(assert, html, b.el(id).innerHTML, id);
+    assert.strictEqual(h.el(id).querySelectorAll('.forged').length, 0, id + ': forged markup rendered');
+    assert.ok(!html.includes('<img'), id + ': forged img rendered');
+  }
+  assert.ok(h.el('recent-table').textContent.includes('[object Object]'), 'the forged value is shown as text');
+  // markup the page builds itself still renders as markup
+  assert.ok(h.el('onehit-table').querySelector('.tag-boss'));
+  assert.ok(h.el('difficulty-table').querySelector('.tag-boss'));
+  assert.ok(h.el('npc-recent-table').querySelector('.tag'));
+});

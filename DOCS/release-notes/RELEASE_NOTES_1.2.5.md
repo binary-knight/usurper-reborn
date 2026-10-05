@@ -298,7 +298,7 @@ rows. The mailbox key bar uses whole word labels.
   packaging jobs authenticates with the workflow token, so it no longer
   hits the GitHub API rate limit.
 
-## Coming in 1.2.6
+## Coming in 1.2.7
 
 A difficulty pass: smarter monsters, mixed encounters, elite monsters and
 potions that scale with you. Also planned is the betrayal feature, with
