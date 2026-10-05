@@ -41,7 +41,8 @@ function loadSection(game) {
   const names = vm.runInContext(section() + `
 ;({ createTelemetryEndpoint, telemetryPaths, isTelemetryUrl, telemetryAddress, parseTelemetryBatch,
    makeTelemetryLimiter, isTelemetryJsonType, TELEMETRY_COLUMNS, TELEMETRY_BATCH_COLUMNS, TELEMETRY_URL,
-   TELEMETRY_MAP_MAX, TELEMETRY_STOP_CACHE_MS, TELEMETRY_PRUNE_MS, TELEMETRY_BODY_TIMEOUT_MS, TELEMETRY_ERROR_WORDS });`,
+   TELEMETRY_MAP_MAX, TELEMETRY_STOP_CACHE_MS, TELEMETRY_PRUNE_MS, TELEMETRY_BODY_TIMEOUT_MS, TELEMETRY_ERROR_WORDS,
+   TELEMETRY_MAX_BODY_BYTES });`,
   ctx, { filename: 'ssh-proxy.js (telemetry section)' });
   return { names, logs, ctx };
 }
@@ -165,6 +166,12 @@ function fixture() {
 
 function goodRow(over) { return Object.assign({}, fixture().good[0], over || {}); }
 
+// A row with every key at its upper bound, from the C# column table.
+function maxRow() { return Object.fromEntries(csharpColumns().map(([k, , max]) => [k, max])); }
+
+// The body the C# TelemetryUploader.BuildBody writes for 100 rows at every maximum (T2b), as bytes.
+function fixtureBodyMax() { return fs.readFileSync(path.join(ROOT, 'Tests', 'Fixtures', 'telemetry-body-max.json')); }
+
 function batch(over) {
   return Object.assign({ schema: 1, version: [1, 2, 7], source: 1, install_id: ID, rows: [goodRow()] }, over || {});
 }
@@ -210,5 +217,5 @@ function fillRemote(dbPath, day, count, seqStart) {
 module.exports = {
   START, END, DAY_MS, HOUR_MS, T0, ID, MARKER_ADDRESS,
   section, proxySourceText: proxySource, loadSection, makeDir, makeGame, makeEndpoint, fakeReq, fakeRes, send, freshPeer,
-  fixture, goodRow, batch, bodyOf, csharpColumns, remoteRows, remoteCount, fillRemote,
+  fixture, goodRow, maxRow, fixtureBodyMax, batch, bodyOf, csharpColumns, remoteRows, remoteCount, fillRemote,
 };

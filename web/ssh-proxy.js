@@ -626,7 +626,7 @@ async function handleBugReport(req, res) {
 // run it in a vm: everything it touches (database class, fs, clock, timers, console) is passed
 // to createTelemetryEndpoint.
 const TELEMETRY_URL = '/api/telemetry/v1/combat';
-const TELEMETRY_MAX_BODY_BYTES = 65536;
+const TELEMETRY_MAX_BODY_BYTES = 131072;  // 128 KB: the largest 100 row batch (every value at its maximum) is 102,507 bytes
 const TELEMETRY_BODY_TIMEOUT_MS = 10000;
 const TELEMETRY_MAX_ROWS = 100;
 const TELEMETRY_ADDRESS_PER_HOUR = 12;
@@ -640,7 +640,7 @@ const TELEMETRY_MAP_MAX = 10000;
 const TELEMETRY_HOUR_MS = 60 * 60 * 1000;
 const TELEMETRY_DAY_MS = 24 * TELEMETRY_HOUR_MS;
 const TELEMETRY_MAX_SAFE = 9007199254740991;
-const TELEMETRY_DEFAULT_DB_PATH = '/var/usurper/remote_telemetry.db';
+const TELEMETRY_DEFAULT_DB_PATH = '/var/usurper/telemetry/remote_telemetry.db';  // its own directory, beside the game's
 const TELEMETRY_STOP_FILE_NAME = 'remote_telemetry.stop';
 
 // Every key of a row, in order, with its bounds: the same table as TelemetryRow.Columns
@@ -877,12 +877,13 @@ function makeTelemetryLimiter(limit, max) {
 }
 
 // options: dbPath, stopPath, Database (better-sqlite3), fs, isIP, now, setTimeout, clearTimeout,
-// setInterval, clearInterval, console; mapMax only in tests.
+// setInterval, clearInterval, console; mapMax and bodyTimeoutMs only in tests.
 function createTelemetryEndpoint(options) {
   const o = options;
   const log = o.console;
   const now = o.now;
   const mapMax = o.mapMax || TELEMETRY_MAP_MAX;
+  const bodyTimeoutMs = o.bodyTimeoutMs || TELEMETRY_BODY_TIMEOUT_MS;
   const byAddress = makeTelemetryLimiter(TELEMETRY_ADDRESS_PER_HOUR, mapMax);
   const byInstall = makeTelemetryLimiter(TELEMETRY_ID_PER_DAY, mapMax);
   let remote = null;
@@ -963,7 +964,7 @@ function createTelemetryEndpoint(options) {
   }
   const fail = (req, res, status, word, close) => reply(req, res, status, '{"error":"' + word + '"}', close);
 
-  // Reads the body counting bytes, at most 64 KB and 10 seconds. Resolves to a Buffer, or to
+  // Reads the body counting bytes, at most 128 KB and 10 seconds. Resolves to a Buffer, or to
   // null after it has replied (413, 408) or the client went away.
   function readBody(req, res) {
     return new Promise((resolve) => {
@@ -994,7 +995,7 @@ function createTelemetryEndpoint(options) {
       const onGone = () => { finish(null); };
       timer = o.setTimeout(() => {
         if (finish(null)) fail(req, res, 408, 'timeout', true);
-      }, TELEMETRY_BODY_TIMEOUT_MS);
+      }, bodyTimeoutMs);
       req.on('data', onData);
       req.on('end', onEnd);
       req.on('error', onGone);
