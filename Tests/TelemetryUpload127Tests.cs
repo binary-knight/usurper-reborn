@@ -398,7 +398,13 @@ public class TelemetryUpload127Tests : IDisposable
         var fake = new FakeSender();
         (await Uploader(store, fake).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.Sent);
         Ids(fake.Bodies.Single()).Should().Equal(1, 4);
-        Encoding.UTF8.GetString(fake.Bodies[0]).Should().NotContain("500").And.NotContain("who");
+        using var doc = JsonDocument.Parse(fake.Bodies[0]);    // by structure: the random install_id may hold any digits
+        foreach (var row in doc.RootElement.GetProperty("rows").EnumerateArray())
+        {
+            row.GetProperty("player_level").GetInt64().Should().Be(1, "the out of bounds row is not sent");
+            row.EnumerateObject().Select(p => p.Name).Should().Equal(RowKeys);
+        }
+        Encoding.UTF8.GetString(fake.Bodies[0]).Should().NotContain("\"who\"");
         Lines().Should().BeEmpty("damaged lines are dropped, not kept for later");
     }
 
