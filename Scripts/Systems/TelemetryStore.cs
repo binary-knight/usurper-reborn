@@ -162,7 +162,7 @@ namespace UsurperRemake.Systems
     /// shared install, and the local row queue. Every file lives under telemetry/, never in the save
     /// folder itself. On a BBS or server nothing is created while the operator switch is off.
     /// </summary>
-    public class TelemetryStore
+    public partial class TelemetryStore
     {
         internal const int MaxRows = 2000;
         internal const int MaxAgeDays = 30;
@@ -334,7 +334,7 @@ namespace UsurperRemake.Systems
                 lock (_stateGate) _state = null;
                 var s = change(State);
                 WriteStateLocked(s);
-                if (deleteQueue && File.Exists(QueuePath)) File.Delete(QueuePath);
+                if (deleteQueue) DeleteQueueFilesLocked();
                 if (s.Asked && s.Yes) lock (_stateGate) _localNo = false;
                 result = s;
             });
@@ -411,7 +411,7 @@ namespace UsurperRemake.Systems
             if (!Directory.Exists(Folder)) return;
             WithQueueLock(() =>
             {
-                if (File.Exists(QueuePath)) File.Delete(QueuePath);
+                DeleteQueueFilesLocked();
                 lock (_stateGate) _state = null;
                 var s = State;
                 if (File.Exists(StatePath)) WriteStateLocked(s with { InstallId = null });
@@ -490,7 +490,7 @@ namespace UsurperRemake.Systems
                         var s = State;
                         if (s.InstallId == null || !File.Exists(StatePath)) WriteStateLocked(s with { InstallId = s.InstallId ?? NewId() });
                     }
-                    else if (File.Exists(QueuePath)) File.Delete(QueuePath);
+                    else DeleteQueueFilesLocked();
                     _answers[key] = yes;    // under the lock, so the last answer written is the one cached
                 });
                 return true;
@@ -590,53 +590,61 @@ namespace UsurperRemake.Systems
         /// thread; a failure is logged (at most once a window) and never thrown. The answer is checked again
         /// under the lock, so a row scheduled before a No never lands after it: single and Steam read
         /// state.json again (another running copy's No counts), a shared install checks the fight's own
-        /// player by <paramref name="playerKey"/>, which is never written anywhere.
+        /// player by <paramref name="playerKey"/>, which is never written anywhere. A server stop for this
+        /// game version refuses every row. When the queue reaches the upload size, the attached uploader
+        /// is told after the lock is released.
         /// </summary>
         public virtual void Append(TelemetryRow row, string? playerKey = null)
         {
+            int queued = 0;
             try
             {
                 if (!WritesAllowed) return;
-                using var held = AcquireLock();
-                if (!StillYesLocked(playerKey)) return;
-                long today = DayNumber(Clock());
-                string[] existing = File.Exists(QueuePath) ? File.ReadAllLines(QueuePath) : Array.Empty<string>();
-                var kept = new List<string>(existing.Length + 1);
-                bool dropped = false;
-                foreach (var line in existing)
+                using (AcquireLock())
                 {
-                    var parsed = ParseLine(line);
-                    if (parsed == null || today - parsed.Value.Day > MaxAgeDays) { dropped = true; continue; }
-                    kept.Add(line);
+                    if (!StillYesLocked(playerKey)) return;
+                    long today = DayNumber(Clock());
+                    string[] existing = File.Exists(QueuePath) ? File.ReadAllLines(QueuePath) : Array.Empty<string>();
+                    var kept = new List<string>(existing.Length + 1);
+                    bool dropped = false;
+                    foreach (var line in existing)
+                    {
+                        var parsed = ParseLine(line);
+                        if (parsed == null || today - parsed.Value.Day > MaxAgeDays) { dropped = true; continue; }
+                        kept.Add(line);
+                    }
+                    string add = Line(today, row);
+                    if (!dropped && kept.Count + 1 <= MaxRows)
+                    {
+                        File.AppendAllText(QueuePath, add + "\n");
+                        queued = kept.Count + 1;
+                    }
+                    else
+                    {
+                        kept.Add(add);
+                        if (kept.Count > MaxRows) kept.RemoveRange(0, kept.Count - MaxRows);
+                        WriteAtomic(QueuePath, string.Concat(kept.Select(l => l + "\n")));
+                        queued = kept.Count;
+                    }
                 }
-                string add = Line(today, row);
-                if (!dropped && kept.Count + 1 <= MaxRows)
-                {
-                    File.AppendAllText(QueuePath, add + "\n");
-                    return;
-                }
-                kept.Add(add);
-                if (kept.Count > MaxRows) kept.RemoveRange(0, kept.Count - MaxRows);
-                WriteAtomic(QueuePath, string.Concat(kept.Select(l => l + "\n")));
             }
             catch (Exception ex)
             {
                 AppendFailed(ex);
+                return;
             }
+            QueueGrew(queued);    // after the lock is released: the uploader takes it itself
         }
 
         /// <summary>The answer at append time, read while the queue lock is held. Single and Steam: state.json
-        /// again (the cache follows it), and a No of this process still wins over an old yes on disk.</summary>
+        /// again (the cache follows it), and a No of this process still wins over an old yes on disk. Every
+        /// mode: a server stop for this game version (state.json, or this process's own stop) refuses the row.</summary>
         private bool StillYesLocked(string? playerKey)
         {
+            TelemetryState s = ReReadStateLocked();
+            if (IsStopped(s)) return false;    // the server's stop holds until the game version changes
             if (Shared)
                 return TelemetryConsent.OperatorAllows() && playerKey != null && _answers.TryGetValue(playerKey, out bool yes) && yes;
-            TelemetryState s;
-            lock (_stateGate)
-            {
-                _state = null;
-                s = State;
-            }
             return s.Asked && s.Yes && s.InstallId != null;
         }
 
