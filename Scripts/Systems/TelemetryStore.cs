@@ -35,6 +35,24 @@ namespace UsurperRemake.Systems
             catch { return false; }
         }
 
+        /// <summary>1.2.7 (T3): the resolver reads the server_config switch telemetry_prompt
+        /// (<see cref="GameConfig.TelemetryPromptEnabled"/>). Called before the start upload on a MUD server
+        /// and in RunConsoleAsync (BBS doors and online sessions), after server_config is loaded.</summary>
+        public static void UseServerSwitch() => OperatorResolver = () => GameConfig.TelemetryPromptEnabled;
+
+        /// <summary>1.2.7 (T3): the registry's Apply of telemetry_prompt (startup load, web admin, SysOp
+        /// console). Going from on to off on a shared install clears the queue and the id of the active save
+        /// directory (<see cref="TelemetryStore.OperatorTurnedOff"/>, which never throws and retries later
+        /// when the queue lock is busy).</summary>
+        internal static void ApplyOperatorSwitch(bool on)
+        {
+            bool was = GameConfig.TelemetryPromptEnabled;
+            GameConfig.TelemetryPromptEnabled = on;
+            if (!was || on || !IsShared(ConsentSource())) return;
+            try { CurrentStore()?.OperatorTurnedOff(); }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("TELEMETRY", $"telemetry not cleared after the operator switch went off: {ex.Message}"); }
+        }
+
         /// <summary>The source sent with a batch: BBS door 3, else self hosted server 4, else Steam 2,
         /// else single 1. BBS doors set the online flag too, so the door check comes first.</summary>
         internal static TelemetrySource CurrentSource()
@@ -414,19 +432,76 @@ namespace UsurperRemake.Systems
             return UpdateState(s => s.InstallId == null ? s : s with { InstallId = NewId() }, deleteQueue: false).InstallId;
         }
 
+        /// <summary>Times the deletion after the operator switch went off could not be done (each logged).</summary>
+        internal int OperatorOffFailures { get; private set; }
+        /// <summary>Times a deletion owed since the switch went off was done later (each logged).</summary>
+        internal int OperatorOffRetries { get; private set; }
+
+        /// <summary>telemetry/operator_off: written when the switch went off and its deletion could not be
+        /// done, so the next start of any node does it. Removed with the deletion.</summary>
+        internal string OperatorOffMarkerPath => Path.Combine(Folder, "operator_off");
+
+        // the deletion is owed in this process (also when the marker could not be written)
+        private volatile bool _operatorOffOwed;
+
         /// <summary>The operator switched telemetry off on a shared install: the queue and the install_id go.
-        /// Nothing is created when there is no telemetry folder.</summary>
-        public void OperatorTurnedOff()
+        /// The cached answers are cleared first, before any disk work, so no session keeps a yes. Nothing is
+        /// created when there is no telemetry folder. Never throws: when the queue lock is not had (another
+        /// node, an upload) or the disk fails, it is logged, the deletion is owed (in this process and in
+        /// telemetry/operator_off) and done at the next upload or start (<see cref="RetryOperatorOff"/>), and
+        /// false is returned. Nothing is queued meanwhile: the switch is read before every append.</summary>
+        public bool OperatorTurnedOff()
         {
-            if (!Directory.Exists(Folder)) return;
-            WithQueueLock(() =>
-            {
-                DeleteQueueFilesLocked();
-                lock (_stateGate) _state = null;
-                var s = State;
-                if (File.Exists(StatePath)) WriteStateLocked(Withdrawn(s) with { InstallId = null });
-            });
             _answers.Clear();
+            if (!Directory.Exists(Folder)) return true;
+            try
+            {
+                WithQueueLock(DeleteForOperatorOffLocked);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _operatorOffOwed = true;
+                OperatorOffFailures++;
+                string marker = "";
+                try { File.WriteAllText(OperatorOffMarkerPath, "1"); }
+                catch (Exception mex) { marker = $" (marker not written: {mex.Message})"; }
+                DebugLogger.Instance.LogWarning("TELEMETRY", $"telemetry queue and id not deleted after the operator switch went off, retried at the next upload or start: {ex.Message}{marker}");
+                return false;
+            }
+        }
+
+        private void DeleteForOperatorOffLocked()
+        {
+            DeleteQueueFilesLocked();
+            lock (_stateGate) _state = null;
+            var s = State;
+            if (File.Exists(StatePath)) WriteStateLocked(Withdrawn(s) with { InstallId = null });
+            if (File.Exists(OperatorOffMarkerPath)) File.Delete(OperatorOffMarkerPath);
+            _operatorOffOwed = false;
+        }
+
+        /// <summary>True while the deletion of a switch that went off is owed. Creates nothing.</summary>
+        internal bool OperatorOffOwed => _operatorOffOwed || File.Exists(OperatorOffMarkerPath);
+
+        /// <summary>At an upload or start: the deletion the operator switch going off still owes, if any,
+        /// under the queue lock. Logged; never throws. True when nothing is owed any more.</summary>
+        internal bool RetryOperatorOff()
+        {
+            if (!OperatorOffOwed) return true;
+            try
+            {
+                WithQueueLock(DeleteForOperatorOffLocked);
+                OperatorOffRetries++;
+                DebugLogger.Instance.LogInfo("TELEMETRY", "telemetry queue and id deleted, owed since the operator switch went off");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                OperatorOffFailures++;
+                DebugLogger.Instance.LogWarning("TELEMETRY", $"telemetry queue and id still not deleted since the operator switch went off, retried at the next upload or start: {ex.Message}");
+                return false;
+            }
         }
 
         // ---------- per player answers (BBS file, server table) ----------
@@ -439,24 +514,38 @@ namespace UsurperRemake.Systems
         private bool ReadAnswer(string key)
         {
             AnswerReads++;
+            return ReadStored(key) is { Asked: true, Yes: true };
+        }
+
+        /// <summary>One stored answer from its file or row, or null when there is none or it is damaged.</summary>
+        private (bool Asked, bool Yes)? ReadStored(string key)
+        {
             try
             {
-                if (UsesTable)
-                {
-                    var row = _database()?.ReadTelemetryAnswer(key);
-                    return row is { Asked: true, Yes: true };
-                }
+                if (UsesTable) return _database()?.ReadTelemetryAnswer(key);
                 string file = PlayerFilePath(_saveDirectory, key);
-                if (!File.Exists(file)) return false;
+                if (!File.Exists(file)) return null;
                 using var doc = JsonDocument.Parse(File.ReadAllText(file));
                 var e = doc.RootElement;
-                return e.ValueKind == JsonValueKind.Object && TryFlag(e, "asked", out bool asked) && TryFlag(e, "yes", out bool yes) && asked && yes;
+                if (e.ValueKind == JsonValueKind.Object && TryFlag(e, "asked", out bool asked) && TryFlag(e, "yes", out bool yes))
+                    return (asked, asked && yes);
+                return null;
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogWarning("TELEMETRY", $"consent answer unreadable, read as not asked: {ex.Message}");
-                return false;
+                return null;
             }
+        }
+
+        /// <summary>1.2.7 (T3): true when this player has answered the question (yes or no) on this shared
+        /// install. Read from the file or table each time (at login and in Preferences, never in a fight),
+        /// so a deleted character's name reads as not asked again. False on single and Steam.</summary>
+        internal bool PlayerWasAsked(string? loginName)
+        {
+            string? key = TelemetryConsent.PlayerKey(loginName);
+            if (key == null || !Shared) return false;
+            return ReadStored(key) is { Asked: true };
         }
 
         private void WriteAnswer(string key, bool asked, bool yes)

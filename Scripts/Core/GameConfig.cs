@@ -194,6 +194,14 @@ public static partial class GameConfig
     /// </summary>
     public static bool OnlinePermadeathEnabled { get; set; } = true;
 
+    /// <summary>
+    /// 1.2.7: the operator switch of opt-in telemetry on a BBS door or a self hosted server
+    /// (server_config key telemetry_prompt, edited in the web admin and the SysOp console). Off by
+    /// default: while it is off no player is asked and nothing is queued or sent. Set only through
+    /// TelemetryConsent.ApplyOperatorSwitch, which also clears the queue and id when it goes off.
+    /// </summary>
+    public static bool TelemetryPromptEnabled { get; set; } = false;
+
     // ============================================================
     // v0.65.6 Renewable resurrections (player-experience analysis:
     // 3 lifetime lives vs a ~900-fight 20->40 grind at ~1% death

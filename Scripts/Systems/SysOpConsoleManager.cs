@@ -201,6 +201,9 @@ namespace UsurperRemake.Systems
                 case "W":
                     await admin.FullGameReset();
                     break;
+                case "E":
+                    await ToggleTelemetryPrompt(sqlBackend);
+                    break;
                 case "I":
                     await SetIdleTimeout();
                     break;
@@ -331,7 +334,8 @@ namespace UsurperRemake.Systems
             SysOpMenuRow(("1", "List/Edit"), ("2", "Ban"), ("3", "Unban"), ("4", "Delete"), ("P", "Pardon"));
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(" Settings:");
-            SysOpMenuRow(("5", "Difficulty"), ("6", "MOTD"), ("I", $"Idle:{DoorMode.IdleTimeoutMinutes}m"), ("T", "Theme"));
+            SysOpMenuRow(("5", "Difficulty"), ("6", "MOTD"), ("I", $"Idle:{DoorMode.IdleTimeoutMinutes}m"), ("T", "Theme"),
+                ("E", GameConfig.TelemetryPromptEnabled ? "Telemetry:ON" : "Telemetry:OFF")); // 1.2.7
             terminal.Write(" ");
             terminal.SetColor("darkgray"); terminal.Write("[");
             terminal.SetColor("bright_yellow"); terminal.Write("O");
@@ -1430,6 +1434,29 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(" Online Multiplayer ENABLED -- players can connect to the online server.");
             }
             DebugLogger.Instance.LogInfo("SYSOP", $"Online multiplayer {(GameConfig.DisableOnlinePlay ? "disabled" : "enabled")}");
+            await terminal.PressAnyKey();
+        }
+
+        /// <summary>1.2.7: the telemetry operator switch (server_config telemetry_prompt), the same setting the
+        /// web admin edits. Saved and applied through the registry, so turning it off clears the queue and id.</summary>
+        private async Task ToggleTelemetryPrompt(SqlSaveBackend sqlBackend)
+        {
+            bool on = !GameConfig.TelemetryPromptEnabled;
+            sqlBackend.SetServerConfig(ServerSettingsRegistry.TelemetryPromptKey, on ? "true" : "false", DoorMode.SessionInfo?.UserName ?? "sysop");
+            terminal.WriteLine("");
+            if (GameConfig.TelemetryPromptEnabled)
+            {
+                terminal.SetColor("bright_green");
+                terminal.WriteLine(" Combat data sharing ON. Each player is asked once whether to send combat data");
+                terminal.WriteLine(" to usurper-reborn.net; only the fights of players who say yes are sent.");
+            }
+            else
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine(" Combat data sharing OFF. Nobody is asked and nothing is sent; rows not yet");
+                terminal.WriteLine(" sent and this BBS's id are deleted.");
+            }
+            DebugLogger.Instance.LogInfo("SYSOP", $"Telemetry prompt {(GameConfig.TelemetryPromptEnabled ? "enabled" : "disabled")}");
             await terminal.PressAnyKey();
         }
 
