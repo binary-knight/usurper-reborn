@@ -755,7 +755,7 @@
   "combat.monster_attacks": "{0} vous attaque!",
   "combat.monster_hits": "{1} dégâts passent vos défenses!",
   "combat.monster_misses": "{0} vous manque!",
-  "combat.monster_critical": "{0} réussit un COUP CRITIQUE et vous inflige {1} dégâts!",
+  "combat.monster_critical": "{0} réussit un COUP CRITIQUE!",
   "combat.you_dodge": "Vous esquivez l’attaque de {0}!",
   "combat.you_block": "Tu bloques l'attaque de {0} avec ton bouclier !",
   "combat.you_flee": "Tu fuis le combat !",

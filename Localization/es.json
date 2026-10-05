@@ -755,7 +755,7 @@
   "combat.monster_attacks": "¡{0} te ataca!",
   "combat.monster_hits": "¡{1} de daño atraviesa tus defensas!",
   "combat.monster_misses": "¡{0} falla su ataque!",
-  "combat.monster_critical": "¡{0} te asesta un GOLPE CRÍTICO por {1} de daño!",
+  "combat.monster_critical": "¡{0} te asesta un GOLPE CRÍTICO!",
   "combat.you_dodge": "¡Esquivas el ataque de {0}!",
   "combat.you_block": "¡Bloqueas el ataque de {0} con tu escudo!",
   "combat.you_flee": "¡Huyes del combate!",

@@ -755,7 +755,7 @@
   "combat.monster_attacks": "{0} megtámad téged!",
   "combat.monster_hits": "{1} sebzés átjut a védelmeden!",
   "combat.monster_misses": "{0} elvét téged!",
-  "combat.monster_critical": "KRITIKUS TALÁLAT! {0} eltalál, {1} sebzést okozva!",
+  "combat.monster_critical": "KRITIKUS TALÁLAT! {0} eltalál!",
   "combat.you_dodge": "Kitértél {0} támadása elől!",
   "combat.you_block": "Blokkoltad {0} támadását a pajzsoddal!",
   "combat.you_flee": "Elmenekülsz a harcból!",
