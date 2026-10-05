@@ -1076,6 +1076,8 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"world_edits not ensured: {ex.Message}"); }
 
+            MigrateCombatEventColumns(connection); // 1.2.6: accumulator columns and indexes, after the table exists
+
             MigrateWorldBossTables(connection); // v1.1.4
 
             EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
@@ -3059,66 +3061,6 @@ namespace UsurperRemake.Systems
             }
         }
 
-        // --- Combat Events (Balance Dashboard) ---
-
-        public async Task LogCombatEvent(
-            string playerName, int playerLevel, string playerClass,
-            long playerMaxHP, long playerSTR, long playerDEX, long playerWeapPow, long playerArmPow,
-            string? monsterName, int monsterLevel, long monsterMaxHP, long monsterSTR, long monsterDEF,
-            bool isBoss, string outcome, int rounds,
-            long damageDealt, long damageTaken, long xpGained, long goldGained,
-            int dungeonFloor, int monsterCount, bool hasTeammates)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    INSERT INTO combat_events (
-                        player_name, player_level, player_class,
-                        player_max_hp, player_str, player_dex, player_weap_pow, player_arm_pow,
-                        monster_name, monster_level, monster_max_hp, monster_str, monster_def,
-                        is_boss, outcome, rounds, damage_dealt, damage_taken,
-                        xp_gained, gold_gained, dungeon_floor, monster_count, has_teammates
-                    ) VALUES (
-                        @pName, @pLevel, @pClass,
-                        @pMaxHP, @pSTR, @pDEX, @pWeapPow, @pArmPow,
-                        @mName, @mLevel, @mMaxHP, @mSTR, @mDEF,
-                        @isBoss, @outcome, @rounds, @dmgDealt, @dmgTaken,
-                        @xpGained, @goldGained, @floor, @mCount, @hasTeam
-                    );
-                ";
-                cmd.Parameters.AddWithValue("@pName", playerName);
-                cmd.Parameters.AddWithValue("@pLevel", playerLevel);
-                cmd.Parameters.AddWithValue("@pClass", playerClass);
-                cmd.Parameters.AddWithValue("@pMaxHP", playerMaxHP);
-                cmd.Parameters.AddWithValue("@pSTR", playerSTR);
-                cmd.Parameters.AddWithValue("@pDEX", playerDEX);
-                cmd.Parameters.AddWithValue("@pWeapPow", playerWeapPow);
-                cmd.Parameters.AddWithValue("@pArmPow", playerArmPow);
-                cmd.Parameters.AddWithValue("@mName", (object?)monsterName ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@mLevel", monsterLevel);
-                cmd.Parameters.AddWithValue("@mMaxHP", monsterMaxHP);
-                cmd.Parameters.AddWithValue("@mSTR", monsterSTR);
-                cmd.Parameters.AddWithValue("@mDEF", monsterDEF);
-                cmd.Parameters.AddWithValue("@isBoss", isBoss ? 1 : 0);
-                cmd.Parameters.AddWithValue("@outcome", outcome);
-                cmd.Parameters.AddWithValue("@rounds", rounds);
-                cmd.Parameters.AddWithValue("@dmgDealt", damageDealt);
-                cmd.Parameters.AddWithValue("@dmgTaken", damageTaken);
-                cmd.Parameters.AddWithValue("@xpGained", xpGained);
-                cmd.Parameters.AddWithValue("@goldGained", goldGained);
-                cmd.Parameters.AddWithValue("@floor", dungeonFloor);
-                cmd.Parameters.AddWithValue("@mCount", monsterCount);
-                cmd.Parameters.AddWithValue("@hasTeam", hasTeammates ? 1 : 0);
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to log combat event: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// v0.61.2 Phase 1 of NPC AI project: log every world-sim NPC decision so
         /// we can measure baseline behavior (survival rates by class, gold delta
@@ -3268,8 +3210,9 @@ namespace UsurperRemake.Systems
         /// showed 3 deaths when saves recorded 63. Fix: the row cap now applies ONLY to non-death
         /// outcomes (victory/fled), so deaths are never crowded out; deaths are kept for a long
         /// window (deathDaysToKeep) and non-deaths for a shorter one. Net table size stays tiny.
+        /// 1.2.6: non-deaths 30 days or 15000 rows, deaths 90 days (about 6 MB at the cap).
         /// </summary>
-        public async Task PruneCombatEvents(int daysToKeep = 14, int maxRows = 5000, int deathDaysToKeep = 90)
+        public async Task PruneCombatEvents(int daysToKeep = CombatEventKeepDays, int maxRows = CombatEventMaxRows, int deathDaysToKeep = CombatDeathKeepDays)
         {
             try
             {

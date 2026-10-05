@@ -263,8 +263,9 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Log a combat event to the balance dashboard database table.
-    /// Fire-and-forget — only active in online mode.
+    /// Log a combat event to the balance dashboard database table, online mode only.
+    /// 1.2.6: the row's values are copied here on the combat thread and the insert runs in the background,
+    /// so a locked or failing database never holds up the fight (SqlSaveBackend.LogCombatEvent).
     /// </summary>
     private void LogCombatEventToDb(CombatResult result, string outcome, long xpGained = 0, long goldGained = 0)
     {
@@ -272,36 +273,52 @@ public partial class CombatEngine
         var backend = SaveSystem.Instance?.Backend as SqlSaveBackend;
         if (backend == null) return;
 
+        CombatEventRow row;
+        try { row = BuildCombatEventRow(result, outcome, xpGained, goldGained); }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogError("SQL", $"Failed to build combat event row: {ex.Message}");
+            return;
+        }
+        LastCombatRowWrite = Task.Run(() => backend.LogCombatEvent(row));
+    }
+
+    /// <summary>1.2.6: the background insert of the last row this engine logged (tests await it).</summary>
+    internal Task? LastCombatRowWrite { get; private set; }
+
+    /// <summary>1.2.6: every value of the combat_events row, read now from the fight's objects.</summary>
+    internal static CombatEventRow BuildCombatEventRow(CombatResult result, string outcome, long xpGained, long goldGained)
+    {
         var p = result.Player;
         var m = result.Monster;
         int mCount = result.DefeatedMonsters?.Count > 0 ? result.DefeatedMonsters.Count : (m != null ? 1 : 0);
         bool hasTeam = result.Teammates != null && result.Teammates.Count > 0;
 
-        _ = backend.LogCombatEvent(
-            playerName: p?.DisplayName ?? "Unknown",
-            playerLevel: p?.Level ?? 0,
-            playerClass: p?.Class.ToString() ?? "Unknown",
-            playerMaxHP: p?.MaxHP ?? 0,
-            playerSTR: p?.Strength ?? 0,
-            playerDEX: p?.Dexterity ?? 0,
-            playerWeapPow: p?.WeapPow ?? 0,
-            playerArmPow: p?.ArmPow ?? 0,
-            monsterName: m?.Name,
-            monsterLevel: m?.Level ?? 0,
-            monsterMaxHP: m?.MaxHP ?? 0,
-            monsterSTR: m?.Strength ?? 0,
-            monsterDEF: m?.Defence ?? 0,
-            isBoss: m?.IsBoss ?? false,
-            outcome: outcome,
-            rounds: result.CurrentRound,
-            damageDealt: result.TotalDamageDealt,
-            damageTaken: result.TotalDamageTaken,
-            xpGained: xpGained,
-            goldGained: goldGained,
-            dungeonFloor: m?.Level ?? 0,
-            monsterCount: mCount,
-            hasTeammates: hasTeam
-        );
+        return new CombatEventRow(
+            PlayerName: p?.DisplayName ?? "Unknown",
+            PlayerLevel: p?.Level ?? 0,
+            PlayerClass: p?.Class.ToString() ?? "Unknown",
+            PlayerMaxHP: p?.MaxHP ?? 0,
+            PlayerSTR: p?.Strength ?? 0,
+            PlayerDEX: p?.Dexterity ?? 0,
+            PlayerWeapPow: p?.WeapPow ?? 0,
+            PlayerArmPow: p?.ArmPow ?? 0,
+            MonsterName: m?.Name,
+            MonsterLevel: m?.Level ?? 0,
+            MonsterMaxHP: m?.MaxHP ?? 0,
+            MonsterSTR: m?.Strength ?? 0,
+            MonsterDEF: m?.Defence ?? 0,
+            IsBoss: m?.IsBoss ?? false,
+            Outcome: outcome,
+            Rounds: result.CurrentRound,
+            DamageDealt: result.TotalDamageDealt,
+            DamageTaken: result.TotalDamageTaken,
+            XpGained: xpGained,
+            GoldGained: goldGained,
+            DungeonFloor: m?.Level ?? 0,
+            MonsterCount: mCount,
+            HasTeammates: hasTeam,
+            Tally: CombatRowTally.From(result.Tally));
     }
 
     public CombatEngine(TerminalEmulator? term = null)

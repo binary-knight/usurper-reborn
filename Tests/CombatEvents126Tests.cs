@@ -450,7 +450,7 @@ public class CombatEvents126Tests
         var writers = Directory.GetFiles(Path.Combine(root, "Scripts"), "*.cs", SearchOption.AllDirectories)
             .Where(p => File.ReadAllText(p).Contains("LogCombatEvent("))
             .Select(p => Path.GetFileName(p)).OrderBy(n => n).ToList();
-        writers.Should().Equal("CombatEngine.cs", "SqlSaveBackend.cs");
+        writers.Should().Equal("CombatEngine.cs", "SqlSaveBackend.CombatEvents.cs");
         string events = File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "CombatEvents.cs"));
         events.Should().NotContain("File.").And.NotContain("Backend").And.NotContain("Random");
     }
