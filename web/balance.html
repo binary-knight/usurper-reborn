@@ -1104,12 +1104,16 @@ function outcomeTag(o) {
 
 // Marks markup this page builds itself (tags, coloured spans) so makeTable puts it in
 // as HTML. Every other cell is server data and is escaped (escapeHtml is /escape.js).
+// The mark is a Symbol: JSON from a route can never carry one, so a server value
+// shaped like a marked cell is still escaped.
+const TRUSTED_HTML = Symbol('trustedHtml');
+
 function trustedHtml(html) {
-  return { trustedHtml: String(html) };
+  return { [TRUSTED_HTML]: String(html) };
 }
 
 function cellHtml(c) {
-  return c && typeof c === 'object' && 'trustedHtml' in c ? c.trustedHtml : escapeHtml(c);
+  return c && typeof c === 'object' && Object.prototype.hasOwnProperty.call(c, TRUSTED_HTML) ? c[TRUSTED_HTML] : escapeHtml(c);
 }
 
 function makeTable(headers, rows, rowClasses) {
