@@ -72,16 +72,16 @@ test('row 1: one route, POST only; other paths under /api/telemetry 404; Content
 
 // ---------------------------------------------------------------- row 2
 
-test('row 2: body cap 64 KB in bytes: Content-Length over 65536 refused before reading; a body crossing it refused and the socket closed', async () => {
+test('row 2: body cap 128 KB in bytes: Content-Length over 131072 refused before reading; a body crossing it refused and the socket closed', async () => {
   await withEndpoint(async (t, dir) => {
-    // exactly 65536 bytes is accepted (padding is JSON whitespace)
+    // exactly 131072 bytes is accepted (padding is JSON whitespace)
     const base = bodyOf();
-    const exact = base + ' '.repeat(65536 - Buffer.byteLength(base));
-    assert.strictEqual(Buffer.byteLength(exact), 65536);
-    let r = await post(t, exact, { headers: { 'content-length': '65536' } });
+    const exact = base + ' '.repeat(131072 - Buffer.byteLength(base));
+    assert.strictEqual(Buffer.byteLength(exact), 131072);
+    let r = await post(t, exact, { headers: { 'content-length': '131072' } });
     assert.strictEqual(r.status, 200, r.body);
     // Content-Length over the cap: 413, no data listener ever attached, socket closed
-    r = await post(t, exact + ' ', { headers: { 'content-length': '65537' } });
+    r = await post(t, exact + ' ', { headers: { 'content-length': '131073' } });
     assert.strictEqual(r.status, 413);
     assert.strictEqual(r.body, '{"error":"too_large"}');
     assert.strictEqual(r.dataListened, false, 'refused before reading');
@@ -89,13 +89,13 @@ test('row 2: body cap 64 KB in bytes: Content-Length over 65536 refused before r
     assert.strictEqual(r.headers.connection, 'close');
     // no Content-Length (chunked): the bytes are counted as they come
     const chunks = [];
-    for (let i = 0; i < 70; i++) chunks.push(' '.repeat(1000));
+    for (let i = 0; i < 140; i++) chunks.push(' '.repeat(1000));
     r = await post(t, [base].concat(chunks));
     assert.strictEqual(r.status, 413);
     assert.strictEqual(r.socketDestroyed, true);
-    // multi byte characters: 40000 characters are 80000 bytes
-    const wide = 'é'.repeat(40000);
-    assert.ok(wide.length < 65536 && Buffer.byteLength(wide) > 65536);
+    // multi byte characters: 70000 characters are 140000 bytes
+    const wide = 'é'.repeat(70000);
+    assert.ok(wide.length < 131072 && Buffer.byteLength(wide) > 131072);
     r = await post(t, wide);
     assert.strictEqual(r.status, 413, 'counted in bytes');
     assert.strictEqual(r.socketDestroyed, true);
@@ -169,8 +169,17 @@ test('row 4: top level keys exactly schema, version, source, install_id, rows; v
     }
     assert.strictEqual(H.remoteCount(dir.dbPath), 54);
   });
-  // 1 to 100 rows, on the reader itself: 100 rows of the smallest row are over 64 KB, so the
-  // bound cannot be reached through the body path (see REPORT: cap and batch size)
+  // 1 to 100 rows through the body path (T2b: the 128 KB cap holds 100 rows at every maximum),
+  // and on the reader itself
+  await withEndpoint(async (t, dir) => {
+    const maxRows = (n) => bodyOf({ rows: Array.from({ length: n }, () => H.maxRow()) });
+    let r = await post(t, maxRows(101));
+    assert.strictEqual(r.status, 400, '101 rows');
+    assert.strictEqual(r.body, '{"error":"invalid"}');
+    r = await post(t, maxRows(100));
+    assert.strictEqual(r.status, 200, '100 rows');
+    assert.strictEqual(H.remoteCount(dir.dbPath), 100);
+  });
   const { parseTelemetryBatch } = H.loadSection().names;
   const rowsOf = (n) => bodyOf({ rows: Array.from({ length: n }, () => goodRow()) });
   assert.strictEqual(parseTelemetryBatch(rowsOf(100)).rows.length, 100);
@@ -395,11 +404,7 @@ test('row 12: rows go only to the remote file, opened with fileMustExist; the ga
       assert.ok(!o.opts.readonly);
     }
   }, { withGame: true });
-  // the paths: REMOTE_TELEMETRY_DB_PATH, default /var/usurper/remote_telemetry.db; stop file beside it
-  const { telemetryPaths } = H.loadSection().names;
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(telemetryPaths({}))), { dbPath: '/var/usurper/remote_telemetry.db', stopPath: '/var/usurper/remote_telemetry.stop' });
-  assert.deepStrictEqual(JSON.parse(JSON.stringify(telemetryPaths({ REMOTE_TELEMETRY_DB_PATH: '/srv/t/r.db' }))), { dbPath: '/srv/t/r.db', stopPath: '/srv/t/remote_telemetry.stop' });
-  assert.strictEqual(telemetryPaths({ REMOTE_TELEMETRY_STOP_FILE: '/etc/x.stop' }).stopPath, '/etc/x.stop');
+  // the paths are tested in 'T2b item 4'
   // the server builds the endpoint from those paths, and the section never names the game database
   const src = H.proxySourceText();
   assert.match(src, /createTelemetryEndpoint\(Object\.assign\(telemetryPaths\(process\.env\)/);
@@ -475,7 +480,7 @@ async function everyOutcome(fn, options) {
     add('OPTIONS', await send(t, ok({ method: 'OPTIONS', headers: { 'x-real-ip': MARKER_ADDRESS, origin: 'https://evil.example', 'access-control-request-method': 'POST' } })), 405);
     add('404', await send(t, ok({ url: '/api/telemetry/v9' })), 404);
     add('408', await send(t, Object.assign(ok(), { end: false, beforeAwait: () => t.timers.filter((x) => !x.cleared).forEach((x) => x.fn()) })), 408);
-    add('413', await post(t, bodyOf(), ok({ headers: { 'x-real-ip': MARKER_ADDRESS, 'content-length': '70000' } })), 413);
+    add('413', await post(t, bodyOf(), ok({ headers: { 'x-real-ip': MARKER_ADDRESS, 'content-length': '140000' } })), 413);
     add('415 type', await post(t, bodyOf(), ok({ headers: { 'x-real-ip': MARKER_ADDRESS, 'content-type': 'text/plain' } })), 415);
     add('415 encoding', await post(t, zlib.gzipSync(bodyOf()), ok({ headers: { 'x-real-ip': MARKER_ADDRESS, 'content-encoding': 'gzip' } })), 415);
     // seven POSTs so far count against the marker address (404, 405 and OPTIONS are refused before
@@ -659,7 +664,7 @@ test('row A: the address limit is decided before the body; refused batches (400,
     const peer = '198.51.100.40';
     const refused = [
       () => post(t, bodyOf({ schema: 9 }), { peer }),
-      () => post(t, bodyOf(), { peer, headers: { 'content-length': '99999' } }),
+      () => post(t, bodyOf(), { peer, headers: { 'content-length': '199999' } }),
       () => post(t, bodyOf(), { peer, headers: { 'content-type': 'text/plain' } }),
     ];
     for (let i = 0; i < 12; i++) {
@@ -741,4 +746,71 @@ test('row E: OPTIONS gets no allow headers; no Access-Control header on any repl
     }
   }
   assert.doesNotMatch(H.section(), /Access-Control/i);
+});
+
+// ---------------------------------------------------------------- T2b (cap, joined fixture, paths)
+
+test('T2b item 1: the cap is 131072 bytes; a 100 row batch with every value at its maximum is accepted, 101 rows refused', async () => {
+  const { TELEMETRY_MAX_BODY_BYTES } = H.loadSection().names;
+  assert.strictEqual(TELEMETRY_MAX_BODY_BYTES, 131072);
+  await withEndpoint(async (t, dir) => {
+    const maxBatch = (n) => batch({ version: [1000, 1000, 1000], source: 4, rows: Array.from({ length: n }, () => H.maxRow()) });
+    // the largest body a client builds, padded to the cap with JSON whitespace: still taken whole
+    const full = JSON.stringify(maxBatch(100));
+    const padded = full + ' '.repeat(131072 - Buffer.byteLength(full));
+    let r = await post(t, padded, { headers: { 'content-length': String(Buffer.byteLength(padded)) } });
+    assert.strictEqual(r.status, 200, r.body);
+    assert.strictEqual(r.body, OK);
+    assert.strictEqual(H.remoteCount(dir.dbPath), 100);
+    // one row more is refused whole, and nothing of it is stored
+    r = await post(t, JSON.stringify(maxBatch(101)));
+    assert.strictEqual(r.status, 400);
+    assert.strictEqual(r.body, '{"error":"invalid"}');
+    assert.strictEqual(H.remoteCount(dir.dbPath), 100);
+    // every stored value is the maximum, read back exactly (2^53 minus 1 included)
+    for (const row of H.remoteRows(dir.dbPath)) for (const [k, , max] of H.csharpColumns()) assert.strictEqual(row[k], max, k);
+  });
+});
+
+test('T2b item 2: the body the C# BuildBody wrote (Tests/Fixtures/telemetry-body-max.json) is read, parsed and stored as 100 rows', async () => {
+  const body = H.fixtureBodyMax();
+  assert.ok(body.length > 65536 && body.length <= 131072, 'between the old and the new cap: ' + body.length);
+  const { parseTelemetryBatch } = H.loadSection().names;
+  const parsed = parseTelemetryBatch(body.toString('latin1'));
+  assert.ok(parsed, 'the parser takes it');
+  assert.strictEqual(parsed.rows.length, 100);
+  assert.deepStrictEqual(Array.from(parsed.version), [1000, 1000, 1000]);
+  assert.strictEqual(parsed.source, 4);
+  await withEndpoint(async (t, dir) => {
+    // whole, with its Content-Length, as the client sends it
+    let r = await post(t, body, { headers: { 'content-length': String(body.length) } });
+    assert.strictEqual(r.status, 200, r.body);
+    assert.strictEqual(r.body, OK);
+    // and in small pieces with no Content-Length (the reader counts as the bytes come)
+    const pieces = [];
+    for (let i = 0; i < body.length; i += 1460) pieces.push(body.subarray(i, i + 1460));
+    r = await post(t, pieces);
+    assert.strictEqual(r.status, 200, r.body);
+    const rows = H.remoteRows(dir.dbPath);
+    assert.strictEqual(rows.length, 200);
+    for (const row of rows) {
+      assert.strictEqual(row.install_id, '0123456789abcdef0123456789abcdef');
+      assert.deepStrictEqual([row.schema, row.version_major, row.version_minor, row.version_patch, row.source], [1, 1000, 1000, 1000, 4]);
+      for (const [k, , max] of H.csharpColumns()) assert.strictEqual(row[k], max, k);
+    }
+  });
+});
+
+test('T2b item 4: the remote database and the stop file default to their own directory, /var/usurper/telemetry', () => {
+  const { telemetryPaths } = H.loadSection().names;
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(telemetryPaths({}))),
+    { dbPath: '/var/usurper/telemetry/remote_telemetry.db', stopPath: '/var/usurper/telemetry/remote_telemetry.stop' });
+  // the environment still moves them; the stop file follows the database unless named itself
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(telemetryPaths({ REMOTE_TELEMETRY_DB_PATH: '/srv/t/r.db' }))), { dbPath: '/srv/t/r.db', stopPath: '/srv/t/remote_telemetry.stop' });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(telemetryPaths({ REMOTE_TELEMETRY_STOP_FILE: '/etc/x.stop' }))),
+    { dbPath: '/var/usurper/telemetry/remote_telemetry.db', stopPath: '/etc/x.stop' });
+  // not the game database's directory itself: nothing else of the game lives in /var/usurper/telemetry
+  const dir = telemetryPaths({}).dbPath.split('/').slice(0, -1).join('/');
+  assert.strictEqual(dir, '/var/usurper/telemetry');
+  assert.strictEqual(telemetryPaths({}).stopPath.split('/').slice(0, -1).join('/'), dir);
 });

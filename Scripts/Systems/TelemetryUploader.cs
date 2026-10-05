@@ -350,9 +350,14 @@ namespace UsurperRemake.Systems
         /// of the line's wrapper stay local, and there is no client time and no player key. A damaged line
         /// is never sent.
         /// </summary>
-        internal static byte[] BuildBody(IReadOnlyList<string> lines, string installId, TelemetrySource source)
+        internal static byte[] BuildBody(IReadOnlyList<string> lines, string installId, TelemetrySource source) =>
+            BuildBody(lines, installId, source, GameConfig.Version);
+
+        /// <summary>The same body with the game version given (the shared fixture fixes it, so the bytes do
+        /// not change with each release).</summary>
+        internal static byte[] BuildBody(IReadOnlyList<string> lines, string installId, TelemetrySource source, string gameVersion)
         {
-            var version = VersionTriple(GameConfig.Version)
+            var version = VersionTriple(gameVersion)
                 ?? throw new InvalidOperationException("the game version is not three numbers");
             var rows = new JsonArray();
             foreach (var line in lines)
