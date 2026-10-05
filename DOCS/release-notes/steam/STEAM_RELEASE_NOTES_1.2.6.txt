@@ -1,0 +1,14 @@
+[h1]Usurper Reborn 1.2.6[/h1]
+
+[list]
+[*]Detailed combat logging for the coming difficulty pass: each online fight now records the floor, the difficulty mode, party and encounter size, who acted first, damage by kind and target, heals, potions, abilities and spells used, teammates lost and the HP left at the end. The row is written in the background, so a fight never waits for the database, and combat plays exactly as before.
+[*]Combat rows are kept 30 days or the newest 15000 for fights other than deaths, and 90 days for deaths.
+[*]Logins no longer show whether an account exists: an unknown name and a wrong password get the same message after the same password check, and a banned account sees its ban only after the right password. Refused sign-ups count toward the per-address login throttle.
+[*]New character, child, team, guild and divine names can no longer contain < > & or a double quote. Existing names are kept.
+[*]The website escapes all player and sponsor text on every page, and its tests now run in the release build.
+[*]The balance dashboard gains Difficulty and Onboarding tabs, and every rate is counted over one stated window, so its numbers are not comparable with those from before 1.2.6.
+[*]Known: after a victory online, the autosave can wait up to 30 seconds when the database is locked. This is looked at in 1.2.7.
+[*]Coming in 1.2.7: a difficulty pass with smarter monsters, mixed encounters, elites and potions that scale, plus the betrayal feature.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.6.md
