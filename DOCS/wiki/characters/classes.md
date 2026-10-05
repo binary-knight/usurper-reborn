@@ -1,8 +1,9 @@
 ---
 title: Classes
 path: /wiki/en/characters/classes/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.2.6 | none
 history: 1.2.5 | The class help screen at character creation and the Level Master screens are shown in all five languages.
 history: 1.2.4 | none
 history: 1.2.3 | none

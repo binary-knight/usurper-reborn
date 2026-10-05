@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, README.md
+history: 1.2.6 | An unknown username and a wrong password get the same login message, a banned account sees its ban only after the right password, a refused registration counts toward the login throttle, and new character names cannot contain < > & or a double quote.
 history: 1.2.5 | The SSH login screen gains G to change its language, and the default message of the day and the idle warning show in your language.
 ---
 How you sign in, how many characters you can keep, and what you can set before you enter the game. Single-player, online and BBS play each handle this differently. For where to connect, see [ways to play](/wiki/en/getting-started/connections/).
@@ -19,7 +20,9 @@ Registration rules:
 
 - The username is 2 to 20 characters: letters, numbers, spaces, hyphens and underscores. It must not already exist, in any capitalization.
 - The password is at least 4 characters and cannot contain a colon. You type it twice.
-- The server limits how many accounts one network address can create and slows repeated failed logins.
+- The server limits how many accounts one network address can create and slows repeated failed logins. A refused registration (a taken name or a rejected password) counts as a failed login, and an address that is being slowed cannot register until the wait is over.
+
+A login with an unknown username and a login with a wrong password get the same message: "Player doesn't exist or wrong password." Some login screens add a row saying that R registers a new account. A banned account sees its ban notice only after the right password.
 
 The language you chose on the login screen is saved to a new account. Online, your screen reader setting and language belong to the account and come back at your next login. Only one connection per account plays at a time: logging in again replaces the older session.
 
@@ -27,7 +30,7 @@ P on the character screen changes your password. It asks for the current one fir
 
 ## Character slots online
 
-Each online account has one main character. Your account name is the main character's save key; during creation you may choose a different display name, or press Enter to use the account name.
+Each online account has one main character. Your account name is the main character's save key; during creation you may choose a different display name, or press Enter to use the account name. A new name cannot contain < > & or a double quote; apostrophes are allowed. Names made before 1.2.6 are kept as they are.
 
 An account can also hold one alt character, a second mortal character with its own name, class and progress. The character screen offers M (Create Alt Character) when all of these are true:
 
@@ -82,7 +85,7 @@ A local game has no account and no login. The main menu offers:
 - **L**: Language
 - **Q**: Quit
 
-There is no fixed number of characters. S lists every character saved on this computer, and N creates another under any name not already used (capitalization does not matter). With no saves at all, S goes straight to creation. Choosing a character lists its saves, autosaves and manual saves, up to 10, and loads the one you pick. A save the game cannot read is marked and opens a recovery menu instead.
+There is no fixed number of characters. S lists every character saved on this computer, and N creates another under any name not already used (capitalization does not matter) that does not contain < > & or a double quote. With no saves at all, S goes straight to creation. Choosing a character lists its saves, autosaves and manual saves, up to 10, and loads the one you pick. A save the game cannot read is marked and opens a recovery menu instead.
 
 D on a character's save list deletes all of that character's save files after you type DELETE. The game keeps no copy to restore.
 

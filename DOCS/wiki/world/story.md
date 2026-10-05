@@ -1,8 +1,9 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.2.6 | none
 history: 1.2.5 | The Mysterious Stranger now meets characters from level 3 in town, and the answer you give carries into the Manwe fight; the story is shown in all five languages.
 history: 1.2.4 | In group combat, an Old God's opening line is shown in each player's own language.
 ---

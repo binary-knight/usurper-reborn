@@ -1,8 +1,9 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.2.6 | A child's name given at birth or at Home cannot contain < > & or a double quote; the child keeps its name instead.
 history: 1.2.5 | The Home screens are shown in all five languages, and long upgrade, trophy and pet rows wrap at 79 columns.
 history: 1.2.4 | Online your Home is private, and a spouse left alone for 21 days you were present writes you a letter.
 ---
@@ -31,7 +32,7 @@ A living spouse adds combat experience and can join your dungeon party. The part
 
 ## Children
 
-A child can be conceived with a spouse or a lover, up to a limit of living children. Children grow up in real time and become adults after several real days. Until then each child gives you small bonuses to experience, HP, attributes and daily gold. Use C at Home to parent a child; your choices shape the child's character. An adult child becomes a townsperson and can join your team at a discount.
+A child can be conceived with a spouse or a lover, up to a limit of living children. Children grow up in real time and become adults after several real days. Until then each child gives you small bonuses to experience, HP, attributes and daily gold. Use C at Home to parent a child; your choices shape the child's character. You name a child when it is born and can rename it from C at Home. A name with < > & or a double quote is refused: a newborn keeps the name the game gave it, and a renamed child keeps its old name. An adult child becomes a townsperson and can join your team at a discount.
 
 A child whose parents are both gone goes to the royal orphanage. Only the ruler adopts orphans.
 

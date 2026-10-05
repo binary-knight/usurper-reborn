@@ -1,8 +1,9 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Systems/CombatEngine.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.6 | none
 history: 1.2.5 | After a PvP win, players in every language now salvage gold from the loser's worn weapon (30% chance) and armor (25% chance) at half their value.
 history: 1.2.4 | none
 ---
