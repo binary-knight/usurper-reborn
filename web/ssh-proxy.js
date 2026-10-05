@@ -1645,7 +1645,8 @@ async function handleBalanceRequest(req, res) {
           AVG(CASE WHEN outcome = 'victory' THEN rounds END) AS avg_rounds,
           AVG(CASE WHEN outcome = 'victory' THEN damage_dealt END) AS avg_damage,
           COUNT(DISTINCT player_name) AS players,
-          SUM(CASE WHEN outcome = 'victory' AND rounds = 1 THEN 1 ELSE 0 END) AS one_hit_kills
+          SUM(CASE WHEN outcome = 'victory' AND rounds = 1 THEN 1 ELSE 0 END) AS one_hit_kills,
+          SUM(CASE WHEN outcome = 'death' AND rounds = 1 THEN 1 ELSE 0 END) AS one_hit_deaths
         FROM combat_events
         WHERE created_at >= ?
       `).get(win.bound);
@@ -1661,7 +1662,8 @@ async function handleBalanceRequest(req, res) {
         avgRounds: r.avg_rounds === null ? null : Math.round(r.avg_rounds * 10) / 10,
         avgDamage: r.avg_damage === null ? null : Math.round(r.avg_damage),
         players: r.players,
-        oneHitKills: r.one_hit_kills || 0
+        oneHitKills: r.one_hit_kills || 0,
+        oneHitDeaths: r.one_hit_deaths || 0
       });
     } catch (e) {
       sendJson(res, 500, { error: e.message });

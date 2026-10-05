@@ -14,7 +14,7 @@ function balanceData(v) {
   const fight = { created_at: null, player_name: v, player_class: v, player_level: v, outcome: v, monster_name: v, monster_level: v, rounds: v, damage_dealt: v, damage_taken: v, xp_gained: v, gold_gained: v, player_str: v, player_weap_pow: v, player_max_hp: v, monster_max_hp: v, monster_str: v, monster_def: v, is_boss: 1, floor_actual: v, dmg_to_player_basic: v, dmg_to_player_ability: v, dmg_to_player_spell: v, dmg_to_player_dot: v, dmg_to_team: v };
   const band = { band: 1, boss: 1, floor_from: 1, floor_to: 5, fights: v, players: v, win_pct: v, death_pct: v, flee_pct: v, avg_rounds: v, one_round_win_pct: v, hp_lost_pct: v, dmg_to_player_basic: v, dmg_to_player_ability: v, dmg_to_player_spell: v, dmg_to_player_dot: v, dmg_to_team: v, dmg_by_player: v, dmg_by_team: v, heal_player: v, potions_used: v, abilities_used: v, spells_used: v, party_size: v, encounter_size: v, monster_first_pct: v, teammates_lost: v };
   return {
-    overview: { window: win, totalCombats: v, winRate: v, deathRate: v, fleeRate: v, avgRounds: v, avgDamage: v, players: v, oneHitKills: v },
+    overview: { window: win, totalCombats: v, winRate: v, deathRate: v, fleeRate: v, avgRounds: v, avgDamage: v, players: v, oneHitKills: v, oneHitDeaths: v },
     'class-performance': { window: win, rows: [] },
     'xp-economy': { window: win, rows: [] },
     'death-hotspots': { window: win, byFloor: [], noFloorDeaths: v, byMonster: [{ monster_name: v, min_level: v, max_level: 9, deaths: v, avg_player_level: 1, avg_basic_hits: 1, avg_damage_taken: 1 }] },
@@ -229,7 +229,7 @@ test('a NULL from the server renders blank, never 0', async () => {
     difficulty: { window: { key: 'since126', label: 'Since 1.2.6', from: FROM, clipped: false }, bands: [{ band: 2, boss: 0, floor_from: 6, floor_to: 10, fights: 3, players: 1, win_pct: 0, death_pct: 100, flee_pct: 0, avg_rounds: 2, one_round_win_pct: 0, hp_lost_pct: null, dmg_to_player_basic: null, dmg_to_player_ability: null, dmg_to_player_spell: null, dmg_to_player_dot: null, dmg_to_team: null, dmg_by_player: null, dmg_by_team: null, heal_player: null, potions_used: null, abilities_used: null, spells_used: null, party_size: null, encounter_size: null, monster_first_pct: null, teammates_lost: null }], noFloorFights: 7, classes: [], difficulties: [] },
     'boss-fights': { window: { key: '30d', label: 'Last 30 d', from: FROM, clipped: false }, rows: [{ created_at: FROM, player_name: 'A', player_class: 'Mage', player_level: 3, outcome: 'victory', monster_name: 'B', monster_level: 4, floor_actual: null, rounds: 2, damage_dealt: 9, damage_taken: 5, dmg_to_player_basic: null, dmg_to_player_ability: null, dmg_to_player_spell: null, dmg_to_player_dot: null, dmg_to_team: null }] },
     'death-hotspots': { window: { key: '30d', label: 'Last 30 d', from: FROM, clipped: false }, byFloor: [], noFloorDeaths: 4, byMonster: [{ monster_name: 'Old Rat', min_level: 4, max_level: 6, deaths: 1, avg_player_level: 3, avg_basic_hits: 30, avg_damage_taken: null }] },
-    overview: { window: { key: 'since126', label: 'Since 1.2.6', from: null, clipped: false }, totalCombats: 0, winRate: null, deathRate: null, fleeRate: null, avgRounds: null, avgDamage: null, players: 0, oneHitKills: 0 },
+    overview: { window: { key: 'since126', label: 'Since 1.2.6', from: null, clipped: false }, totalCombats: 0, winRate: null, deathRate: null, fleeRate: null, avgRounds: null, avgDamage: null, players: 0, oneHitKills: 0, oneHitDeaths: null },
   };
   const p = await page('Alice', { balance_token: 'tok' }, (url) => nulls[endpoint(url)]);
   await p.settle();
@@ -252,6 +252,7 @@ test('a NULL from the server renders blank, never 0', async () => {
   assert.match(p.el('deathFloorChart-nofloor').textContent, /: 4 deaths$/);
   const cardVals = p.el('overview-cards').querySelectorAll('.card').map((c) => [c.querySelector('.label').textContent, c.querySelector('.value').textContent]);
   assert.deepStrictEqual(cardVals.filter(([l]) => /Rate|Avg/.test(l)).map(([, v]) => v), ['', '', '', '', '']);
+  assert.deepStrictEqual(cardVals.find(([l]) => l === '1-Hit Deaths'), ['1-Hit Deaths', '']);
 });
 
 test('every card and table states its window', async () => {
@@ -259,8 +260,10 @@ test('every card and table states its window', async () => {
   await p.settle();
   for (const name of TABS) { p.click(tabEl(p, name)); await p.settle(); }
   const cardsEl = p.el('overview-cards').querySelectorAll('.card');
-  assert.strictEqual(cardsEl.length, 8);
+  assert.strictEqual(cardsEl.length, 9);
   for (const c of cardsEl) assert.match(c.querySelector('.note').textContent, /^Alice, from /);
+  const ohd = cardsEl.find((c) => c.querySelector('.label').textContent === '1-Hit Deaths');
+  assert.strictEqual(ohd.querySelector('.note').textContent, 'Alice, from ' + p.run(`fmtTime('${FROM}')`) + '; deaths in round 1');
   for (const id of ['difficulty-table', 'recent-table', 'onehit-table', 'bosses-table', 'deaths-table', 'players-table', 'suspects-table']) {
     assert.match(p.el(id).querySelector('.table-note').textContent, /^Alice, from /, id);
   }

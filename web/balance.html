@@ -564,6 +564,7 @@ async function loadOverview() {
     card('Avg Damage (wins)', d.avgDamage, '', note),
     card('Players', d.players, 'good', note),
     card('1-Hit Kills', d.oneHitKills, d.oneHitKills > 10 ? 'warn' : '', note + '; wins in round 1'),
+    card('1-Hit Deaths', d.oneHitDeaths, d.oneHitDeaths > 0 ? 'danger' : '', note + '; deaths in round 1'),
   ].join('');
 }
 

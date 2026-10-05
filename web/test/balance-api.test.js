@@ -196,6 +196,25 @@ test('one-hit kills are victories in round 1 only: no deaths, no round 0', async
   });
 });
 
+test('1-hit deaths: deaths in round 1 inside the window only, 0 (not null) for an empty window', async () => {
+  await withApi((w) => {
+    insertFight(w, { player_name: 'Old', outcome: 'death', rounds: 1, ago: '-100 hours' });
+    insertFight(w, { player_name: 'Old', outcome: 'victory', rounds: 2, ago: '-101 hours' });
+    insertFight(w, { player_name: 'A', outcome: 'death', rounds: 1, ago: '-5 hours', tally: tallyOf() });
+    insertFight(w, { player_name: 'B', outcome: 'death', rounds: 0, ago: '-4 hours', tally: tallyOf() });
+    insertFight(w, { player_name: 'C', outcome: 'death', rounds: 2, ago: '-3 hours', tally: tallyOf() });
+    insertFight(w, { player_name: 'D', outcome: 'victory', rounds: 1, ago: '-2 hours', tally: tallyOf() });
+  }, async (a) => {
+    assert.strictEqual((await a.call('/api/balance/overview')).body.oneHitDeaths, 1);
+    assert.strictEqual((await a.call('/api/balance/overview?window=30d')).body.oneHitDeaths, 2);
+  });
+  await withApi((w) => insertFight(w, { outcome: 'death', rounds: 1, ago: '-3 hours' }), async (a) => {
+    const r = (await a.call('/api/balance/overview')).body;
+    assert.strictEqual(r.totalCombats, 0);
+    assert.strictEqual(r.oneHitDeaths, 0);
+  });
+});
+
 test('death hotspots: each floor_actual its own point (dungeon_floor is the monster level), monster level range', async () => {
   await withApi((w) => {
     insertFight(w, { outcome: 'death', monster_name: 'Imp', monster_level: 4, dungeon_floor: 4, tally: tallyOf({ floor_actual: 3 }) });
