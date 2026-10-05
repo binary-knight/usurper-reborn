@@ -71,6 +71,18 @@ namespace UsurperRemake.Systems
             ("player_hp_end", 0, MaxSafe),
         };
 
+        /// <summary>Columns that real play can push past a bound, held at that bound in the row so the fight
+        /// is not dropped (T1a2 audit): cursed gear can make Strength or Dexterity negative, and the enraged
+        /// duelist copies the player's Strength; the enraged duelist's level grows past 200 with encounters;
+        /// summoners can push the kills of one fight past 50; a fight has no round limit, and the use counts
+        /// grow with rounds. A value at the bound reads "that or more" (or "that or less"). player_level is not
+        /// here: only the admin set level command takes it past 100, and such a row is dropped.</summary>
+        internal static readonly string[] Saturating =
+        {
+            "player_str", "player_dex", "monster_str", "monster_level", "monster_count",
+            "rounds", "potions_used", "abilities_used", "spells_used",
+        };
+
         /// <summary>The 15 built in monster families (MonsterFamilies.cs), numbered 1 to 15 in this order.
         /// Any other family name (modded, Summoned, Divine, OldGod, wilderness) is 0.</summary>
         internal static readonly string[] Families =
@@ -114,7 +126,7 @@ namespace UsurperRemake.Systems
         {
             var t = row.Tally;
             if (t == null || t.PlayerHpEnd == null) return null;
-            return new TelemetryRow(new long[]
+            var values = new long[]
             {
                 OutcomeNumber(row.Outcome),
                 (int)playerClass,
@@ -154,8 +166,14 @@ namespace UsurperRemake.Systems
                 t.AbilitiesUsed,
                 t.SpellsUsed,
                 t.TeammatesLost,
-                t.PlayerHpEnd.Value,
-            });
+                Math.Max(0, t.PlayerHpEnd.Value),    // a killing blow can leave HP below 0 (life drain); the fight's own value is unchanged
+            };
+            foreach (var key in Saturating)
+            {
+                int i = ColumnIndex[key];
+                values[i] = Math.Clamp(values[i], Columns[i].Min, Columns[i].Max);
+            }
+            return new TelemetryRow(values);
         }
 
         /// <summary>The row as a JSON object, keys in column order.</summary>
