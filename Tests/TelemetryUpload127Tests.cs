@@ -179,6 +179,22 @@ public class TelemetryUpload127Tests : IDisposable
         Lines().Should().HaveCount(3, "nothing was taken");
     }
 
+    [Fact]
+    public async Task Row22_ARealSenderMadeWithoutTheFactory_RefusesToSend()
+    {
+        HttpTelemetrySender.Blocked.Should().NotBeNull("the test run's module initializer blocked the real sender");
+        // a loopback target with nothing listening (the discard port): even if the block were gone, nothing
+        // would leave the machine
+        var sender = new HttpTelemetrySender(new Uri("http://127.0.0.1:9/"));
+        try
+        {
+            Func<Task> send = () => sender.SendAsync(Encoding.UTF8.GetBytes("{}"));
+            await send.Should().ThrowAsync<TelemetryNoNetwork.NetworkInTestException>();
+        }
+        finally { sender.Client.Dispose(); }
+        new HttpTelemetrySender().Target.Should().Be(new Uri(HttpTelemetrySender.Endpoint), "the game's sender has the one fixed target");
+    }
+
     // ======================================================================
     // Row 23: the real sender's settings, built without sending
     // ======================================================================

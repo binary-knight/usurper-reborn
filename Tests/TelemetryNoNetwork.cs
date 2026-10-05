@@ -7,7 +7,8 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// 1.2.7: no test may touch the network. The telemetry sender is only ever made by
 /// TelemetrySenderFactory; for the whole test run it throws, so an uploader built without its own fake
-/// fails at once instead of posting.
+/// fails at once instead of posting. Behind it, the real sender itself refuses to send in the test run,
+/// so a sender made without the factory cannot post either.
 /// </summary>
 internal static class TelemetryNoNetwork
 {
@@ -19,5 +20,9 @@ internal static class TelemetryNoNetwork
     internal static readonly Func<ITelemetrySender> Guard = () => throw new NetworkInTestException();
 
     [ModuleInitializer]
-    internal static void InstallGuard() => TelemetrySenderFactory.Create = Guard;
+    internal static void InstallGuard()
+    {
+        TelemetrySenderFactory.Create = Guard;
+        HttpTelemetrySender.Blocked = () => new NetworkInTestException();    // even a sender made directly never sends
+    }
 }

@@ -41,9 +41,19 @@ namespace UsurperRemake.Systems
 
         internal HttpClientHandler Handler { get; }
         internal HttpClient Client { get; }
+        /// <summary>Where the request goes: always <see cref="Endpoint"/> in the game.</summary>
+        internal Uri Target { get; }
 
-        internal HttpTelemetrySender()
+        /// <summary>Set once by the test run: every real sender throws this instead of sending, a second
+        /// guard behind the factory's. Null in the game.</summary>
+        internal static Func<Exception>? Blocked { get; set; }
+
+        internal HttpTelemetrySender() : this(new Uri(Endpoint)) { }
+
+        /// <summary>Tests only give another target (a loopback address), to prove the block holds.</summary>
+        internal HttpTelemetrySender(Uri target)
         {
+            Target = target;
             Handler = new HttpClientHandler
             {
                 SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
@@ -58,9 +68,11 @@ namespace UsurperRemake.Systems
 
         public async Task<TelemetryReply> SendAsync(byte[] body)
         {
+            var blocked = Blocked;
+            if (blocked != null) throw blocked();
             using var content = new ByteArrayContent(body);
             content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
-            using var response = await Client.PostAsync(Endpoint, content).ConfigureAwait(false);
+            using var response = await Client.PostAsync(Target, content).ConfigureAwait(false);
             string text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
             return new TelemetryReply((int)response.StatusCode, text);
         }
