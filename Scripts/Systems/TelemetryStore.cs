@@ -151,10 +151,13 @@ namespace UsurperRemake.Systems
         }
     }
 
-    /// <summary>1.2.7: telemetry/state.json. Asked and Yes are 0 or 1 on disk.</summary>
-    internal sealed record TelemetryState(bool Asked, bool Yes, string? InstallId, string? StoppedVersion, long LastUpload)
+    /// <summary>1.2.7: telemetry/state.json. Asked and Yes are 0 or 1 on disk. Generation is the queue
+    /// generation: every withdrawal (a No, an interrupted ask, the operator switch off, the server's stop)
+    /// advances it, and a batch taken under an older generation is never put back.</summary>
+    internal sealed record TelemetryState(bool Asked, bool Yes, string? InstallId, string? StoppedVersion, long LastUpload,
+        long Generation = 0)
     {
-        internal static readonly TelemetryState NotAsked = new(false, false, null, null, 0);
+        internal static readonly TelemetryState NotAsked = new(false, false, null, null, 0, 0);
     }
 
     /// <summary>
@@ -293,7 +296,8 @@ namespace UsurperRemake.Systems
                     && InstallIdPattern.IsMatch(idEl.GetString()!) ? idEl.GetString() : null;
                 string? stopped = e.TryGetProperty("stopped_version", out var sv) && sv.ValueKind == JsonValueKind.String ? sv.GetString() : null;
                 long last = e.TryGetProperty("last_upload", out var lu) && lu.ValueKind == JsonValueKind.Number && lu.TryGetInt64(out long l) && l >= 0 ? l : 0;
-                return new TelemetryState(asked, asked && yes, id, stopped, last);
+                long generation = e.TryGetProperty("generation", out var g) && g.ValueKind == JsonValueKind.Number && g.TryGetInt64(out long gv) && gv >= 0 ? gv : 0;
+                return new TelemetryState(asked, asked && yes, id, stopped, last, generation);
             }
             catch (Exception ex)
             {
@@ -321,11 +325,16 @@ namespace UsurperRemake.Systems
             if (s.InstallId != null) o["install_id"] = s.InstallId;
             if (s.StoppedVersion != null) o["stopped_version"] = s.StoppedVersion;
             o["last_upload"] = s.LastUpload;
+            o["generation"] = s.Generation;
             WriteAtomic(StatePath, o.ToJsonString());
             lock (_stateGate) _state = s;
         }
 
-        /// <summary>Read, change and write state.json under the queue lock (another node may write it too).</summary>
+        /// <summary>A withdrawal: the queue generation one further, so a batch in flight is not put back.</summary>
+        internal static TelemetryState Withdrawn(TelemetryState s) => s with { Generation = s.Generation + 1 };
+
+        /// <summary>Read, change and write state.json under the queue lock (another node may write it too).
+        /// A change that deletes the queue also advances the queue generation, in the same write.</summary>
         private TelemetryState UpdateState(Func<TelemetryState, TelemetryState> change, bool deleteQueue)
         {
             TelemetryState result = TelemetryState.NotAsked;
@@ -333,6 +342,7 @@ namespace UsurperRemake.Systems
             {
                 lock (_stateGate) _state = null;
                 var s = change(State);
+                if (deleteQueue) s = Withdrawn(s);
                 WriteStateLocked(s);
                 if (deleteQueue) DeleteQueueFilesLocked();
                 if (s.Asked && s.Yes) lock (_stateGate) _localNo = false;
@@ -414,7 +424,7 @@ namespace UsurperRemake.Systems
                 DeleteQueueFilesLocked();
                 lock (_stateGate) _state = null;
                 var s = State;
-                if (File.Exists(StatePath)) WriteStateLocked(s with { InstallId = null });
+                if (File.Exists(StatePath)) WriteStateLocked(Withdrawn(s) with { InstallId = null });
             });
             _answers.Clear();
         }
@@ -490,7 +500,17 @@ namespace UsurperRemake.Systems
                         var s = State;
                         if (s.InstallId == null || !File.Exists(StatePath)) WriteStateLocked(s with { InstallId = s.InstallId ?? NewId() });
                     }
-                    else DeleteQueueFilesLocked();
+                    else
+                    {
+                        // the queue generation first: a batch another node is sending is then not put back,
+                        // even when its file cannot be deleted below. No state.json means no id, so no batch.
+                        if (File.Exists(StatePath))
+                        {
+                            lock (_stateGate) _state = null;
+                            WriteStateLocked(Withdrawn(State));
+                        }
+                        DeleteQueueFilesLocked();
+                    }
                     _answers[key] = yes;    // under the lock, so the last answer written is the one cached
                 });
                 return true;

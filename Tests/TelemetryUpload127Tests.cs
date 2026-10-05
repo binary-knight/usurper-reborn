@@ -217,6 +217,17 @@ public class TelemetryUpload127Tests : IDisposable
         finally { sender.Client.Dispose(); }
     }
 
+    [Fact]
+    public void N2_TheRealSender_KeepsNoCookies_SoAReplyCannotPlantAnIdentifier()
+    {
+        var sender = new HttpTelemetrySender();    // built, never sent
+        try
+        {
+            sender.Handler.UseCookies.Should().BeFalse();
+        }
+        finally { sender.Client.Dispose(); }
+    }
+
     // ======================================================================
     // Rows 24 and E: the batch and the body
     // ======================================================================
@@ -377,6 +388,76 @@ public class TelemetryUpload127Tests : IDisposable
         var later = new FakeSender();
         (await Uploader(Store(), later, hoursLater: 2).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.NotAllowed);
         later.Calls.Should().Be(0);
+    }
+
+    // ======================================================================
+    // T1b2 N1: a withdrawn player's rows never return, even when the batch in flight cannot be deleted
+    // ======================================================================
+
+    private long GenerationOf(string dir) =>
+        new TelemetryStore(dir, () => TelemetrySource.Single, () => null, () => _local).State.Generation;
+
+    [Fact]
+    public async Task N1_APlayerNoDuringTheSend_ABatchThatCannotBeDeleted_IsNotPutBack_AndNeverSent()
+    {
+        OperatorOn();
+        var store = Store(TelemetrySource.BbsDoor);
+        store.SetPlayerAnswer("Player", true).Should().BeTrue();
+        Append(store, 1, 5, TelemetryConsent.PlayerKey("Player"));
+        long before = GenerationOf(_dir);
+        var fake = new FakeSender(new HttpRequestException("network down"));
+        fake.DuringSend = () =>
+        {
+            // on Windows the sending node holds its batch open, so the No cannot delete it
+            store.DeleteBatchFile = _ => throw new IOException("held open by another node");
+            store.SetPlayerAnswer("Player", false).Should().BeTrue();
+            Batches().Should().ContainSingle("the batch in flight could not be deleted");
+        };
+        (await Uploader(store, fake, source: TelemetrySource.BbsDoor).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.Kept);
+        store.DeleteBatchFile = File.Delete;
+
+        GenerationOf(_dir).Should().Be(before + 1, "the No advanced the queue generation");
+        Lines().Should().BeEmpty("the batch was taken under the old generation, so its rows are not put back");
+        Batches().Should().BeEmpty("the sending node deleted its batch once it let go of it");
+
+        // the switch is still on and another player says yes: the withdrawn rows are never sent
+        store.SetPlayerAnswer("Other", true).Should().BeTrue();
+        var later = new FakeSender();
+        (await Uploader(store, later, hoursLater: 2, source: TelemetrySource.BbsDoor).UploadOnceAsync())
+            .Should().Be(TelemetryUploadOutcome.NothingQueued);
+        later.Calls.Should().Be(0);
+        fake.Calls.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task N1_EveryWithdrawal_AdvancesTheQueueGeneration_AYesDoesNot()
+    {
+        var store = YesStore();
+        GenerationOf(_dir).Should().Be(0);
+        store.SetInstallAnswer(true).Should().BeTrue();
+        GenerationOf(_dir).Should().Be(0, "a yes is not a withdrawal");
+        store.SetInstallAnswer(false).Should().BeTrue();
+        GenerationOf(_dir).Should().Be(1, "an install No");
+        store.SetInstallAnswer(true).Should().BeTrue();
+        store.InstallAskInterrupted().Should().BeTrue();
+        GenerationOf(_dir).Should().Be(2, "an interrupted ask deletes the queue too");
+        store.SetInstallAnswer(true).Should().BeTrue();
+        Append(store, 1, 3);
+        (await Uploader(store, new FakeSender(new TelemetryReply(200, "{\"stop\":true}"))).UploadOnceAsync())
+            .Should().Be(TelemetryUploadOutcome.Stopped);
+        GenerationOf(_dir).Should().Be(3, "the server's stop");
+        JsonNode.Parse(File.ReadAllText(StateFile))!["generation"]!.GetValue<long>().Should().Be(3);
+
+        OperatorOn();
+        string shared = Path.Combine(_dir, "bbs");
+        Directory.CreateDirectory(shared);
+        var bbs = new TelemetryStore(shared, () => TelemetrySource.BbsDoor, () => null, () => _local);
+        bbs.SetPlayerAnswer("Player", true).Should().BeTrue();
+        GenerationOf(shared).Should().Be(0);
+        bbs.SetPlayerAnswer("Player", false).Should().BeTrue();
+        GenerationOf(shared).Should().Be(1, "a shared player's No");
+        bbs.OperatorTurnedOff();
+        GenerationOf(shared).Should().Be(2, "the operator switch off");
     }
 
     // ======================================================================

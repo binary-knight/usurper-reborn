@@ -31,7 +31,7 @@ namespace UsurperRemake.Systems
 
     /// <summary>
     /// 1.2.7: the real sender (pattern BugReportSystem.CreateTlsClient): one fixed HTTPS host, TLS 1.2 and
-    /// 1.3 with the normal certificate checks, a 10 second timeout, redirects not followed.
+    /// 1.3 with the normal certificate checks, a 10 second timeout, redirects not followed, no cookies.
     /// </summary>
     internal sealed class HttpTelemetrySender : ITelemetrySender
     {
@@ -58,6 +58,7 @@ namespace UsurperRemake.Systems
             {
                 SslProtocols = SslProtocols.Tls12 | SslProtocols.Tls13,
                 AllowAutoRedirect = false,
+                UseCookies = false,    // a reply can never plant an identifier
             };
             Client = new HttpClient(Handler)
             {
@@ -231,7 +232,7 @@ namespace UsurperRemake.Systems
                     outcome = TelemetryUploadOutcome.TooSoon;
                     return;
                 }
-                batch = _store.TakeBatchLocked(MaxBatchRows);
+                batch = _store.TakeBatchLocked(MaxBatchRows, s.Generation);
                 if (batch == null) return;
                 installId = s.InstallId;
                 Interlocked.Exchange(ref _notBefore, now + MinIntervalSeconds);
