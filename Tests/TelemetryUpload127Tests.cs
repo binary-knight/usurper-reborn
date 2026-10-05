@@ -430,6 +430,44 @@ public class TelemetryUpload127Tests : IDisposable
     }
 
     [Fact]
+    public async Task N1_ALeftoverBatchFromBeforeAWithdrawal_IsDroppedUnsent_AtTheNextUpload()
+    {
+        var store = YesStore();
+        long g0 = GenerationOf(_dir);
+        // a batch taken under the current generation is named with it
+        var seen = new FakeSender(new HttpRequestException("network down"));
+        string? inFlight = null;
+        seen.DuringSend = () => inFlight = Path.GetFileName(Batches().Single());
+        Append(store, 1, 1);
+        (await Uploader(store, seen).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.Kept);
+        inFlight.Should().MatchRegex($"^batch-g{g0}-[0-9a-f]{{32}}\\.jsonl$");
+
+        // a node took a batch, the No could not delete it, the node crashed: the file stays on disk
+        string stale = Path.Combine(Tel, $"batch-g{g0}-0123456789abcdef0123456789abcdef.jsonl");
+        File.WriteAllLines(stale, new[] { QueueLine(101), QueueLine(102) });
+        store.DeleteBatchFile = _ => throw new IOException("held open by another node");
+        store.SetInstallAnswer(false).Should().BeTrue();
+        store.DeleteBatchFile = File.Delete;
+        File.Exists(stale).Should().BeTrue("the delete failed");
+        GenerationOf(_dir).Should().Be(g0 + 1);
+        // a leftover with no generation in its name (a file from before this change)
+        string unnamed = Path.Combine(Tel, "batch-fedcba9876543210fedcba9876543210.jsonl");
+        File.WriteAllLines(unnamed, new[] { QueueLine(201) });
+
+        // the player says yes again later; new rows queue under the new generation
+        store.SetInstallAnswer(true).Should().BeTrue();
+        Append(store, 10, 11);
+        var fake = new FakeSender();
+        (await Uploader(store, fake, hoursLater: 2).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.Sent);
+        Ids(fake.Bodies.Single()).Should().Equal(10, 11);
+        File.Exists(stale).Should().BeFalse("dropped unsent at the next upload");
+        File.Exists(unnamed).Should().BeFalse();
+        Batches().Should().BeEmpty();
+        (await Uploader(store, fake, hoursLater: 4).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.NothingQueued);
+        fake.Bodies.SelectMany(Ids).Should().NotContain(new long[] { 1, 101, 102, 201 });
+    }
+
+    [Fact]
     public async Task N1_EveryWithdrawal_AdvancesTheQueueGeneration_AYesDoesNot()
     {
         var store = YesStore();
@@ -731,7 +769,7 @@ public class TelemetryUpload127Tests : IDisposable
     {
         var store = YesStore();
         Append(store, 10, 11);
-        File.WriteAllLines(Path.Combine(Tel, "batch-0123456789abcdef0123456789abcdef.jsonl"), new[] { QueueLine(1), QueueLine(2), QueueLine(3) });
+        File.WriteAllLines(Path.Combine(Tel, "batch-g0-0123456789abcdef0123456789abcdef.jsonl"), new[] { QueueLine(1), QueueLine(2), QueueLine(3) });
         var fake = new FakeSender();
         (await Uploader(Store(), fake).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.Sent);
         Ids(fake.Bodies.Single()).Should().Equal(1, 2, 3);

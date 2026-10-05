@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace UsurperRemake.Systems
 {
@@ -35,6 +36,19 @@ namespace UsurperRemake.Systems
     public partial class TelemetryStore
     {
         internal const string BatchPattern = "batch-*.jsonl";
+
+        private static readonly Regex BatchName = new(@"^batch-g(\d{1,18})-[0-9a-f]{32}\.jsonl$", RegexOptions.Compiled);
+
+        /// <summary>A new batch file name. It carries the queue generation the batch is taken under (the name
+        /// stays local, it is never sent), so a batch left by a crash shows which generation it belongs to.</summary>
+        internal static string NewBatchFileName(long generation) => $"batch-g{generation}-{Guid.NewGuid():N}.jsonl";
+
+        /// <summary>The queue generation in a batch file's name, or null when the name has none.</summary>
+        internal static long? BatchFileGeneration(string path)
+        {
+            var m = BatchName.Match(System.IO.Path.GetFileName(path));
+            return m.Success && long.TryParse(m.Groups[1].Value, out long g) ? g : null;
+        }
 
         // A server stop this process received: it holds even when its write to state.json failed.
         private volatile bool _stoppedHere;
@@ -166,7 +180,7 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// The next batch, at most <paramref name="max"/> rows: a batch file nobody holds (left by a crash)
-        /// first, else the oldest rows of the queue moved to a new batch file. Damaged lines and lines older
+        /// first, unless its name is not of <paramref name="generation"/> (then it is deleted unsent), else the oldest rows of the queue moved to a new batch file. Damaged lines and lines older
         /// than <see cref="MaxAgeDays"/> days are dropped on the way and never sent. Null when nothing is
         /// queued. The batch file stays open with no sharing until <see cref="ReturnBatchLocked"/>. The batch
         /// records <paramref name="generation"/>, the queue generation of the state read under this lock.
@@ -180,6 +194,15 @@ namespace UsurperRemake.Systems
                 try { handle = new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.None); }
                 catch (IOException) { continue; }    // another uploader is sending it
                 catch (UnauthorizedAccessException) { continue; }
+                if (BatchFileGeneration(path) != generation)
+                {
+                    // taken before a withdrawal (a No, the switch off, a stop) whose delete failed, then left
+                    // by a crash; or a name with no generation: dropped unsent
+                    handle.Dispose();
+                    File.Delete(path);
+                    DebugLogger.Instance.LogWarning("TELEMETRY", "telemetry batch left from before a withdrawal dropped unsent");
+                    continue;
+                }
                 try
                 {
                     var lines = ReadLines(handle);
@@ -221,7 +244,7 @@ namespace UsurperRemake.Systems
                 if (dropped) WriteQueueLocked(rest);
                 return null;
             }
-            string newPath = Path.Combine(Folder, $"batch-{Guid.NewGuid():N}.jsonl");
+            string newPath = Path.Combine(Folder, NewBatchFileName(generation));
             var created = new FileStream(newPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
             try
             {
