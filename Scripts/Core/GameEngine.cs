@@ -392,6 +392,7 @@ public partial class GameEngine
             ? ctx0.Username
             : UsurperRemake.BBS.DoorMode.GetPlayerName();
         UsurperRemake.BBS.DoorMode.Log(UsurperRemake.BBS.DoorMode.SaveLookupLogMessage(playerName));
+        TelemetryConsent.OnLogin(playerName);   // 1.2.7: this player's answer, read once for the session's fights
 
         // Show the title screen (once per session)
         if (!_splashScreenShown)

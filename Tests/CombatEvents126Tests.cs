@@ -221,7 +221,7 @@ public class CombatEvents126Tests
 
     /// <summary>A group fight on the leader's engine: the follower's keystrokes ("A") are fed to the
     /// combat input channel whenever the engine waits for them, as GroupFollowerLoop does.</summary>
-    private static async Task<(Fight f, Character follower)> GroupFight(bool events, ICombatObserver? rec)
+    private static async Task<(Fight f, Character follower)> GroupFight(bool events, ICombatObserver? rec, TelemetryStore? telemetry = null)
     {
         var prevSink = CombatEngine.GroupBroadcastSink;
         var prevLang = CombatEngine.LanguageOf;
@@ -231,6 +231,7 @@ public class CombatEvents126Tests
         {
             var follower = Follower("Grouped Friend", "p126follower");
             var f = NewFight(Attacks(), events, rec);
+            f.Engine.TelemetryStoreOverride = telemetry;
             using var stop = new CancellationTokenSource();
             var feeder = Task.Run(async () =>
             {
@@ -266,6 +267,88 @@ public class CombatEvents126Tests
         on.Result.Tally.PartySize.Should().Be(2);
         rec.Events.Where(e => e.Actor == CombatSide.Team && e.Target == CombatSide.Monster).Sum(e => e.Amount)
             .Should().Be(on.Result.Tally.DmgByTeam);
+    }
+
+    // ---------- 1.2.7: the telemetry row does not change combat (T1-tests row 9) ----------
+
+    private static readonly System.Reflection.FieldInfo EngineRandom =
+        typeof(CombatEngine).GetField("random", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
+
+    /// <summary>The same seeded fight three times: twice with no consent state, once with a stored yes.
+    /// The screen, the HP trail, the result and the engine's next random draw are the same.</summary>
+    private static async Task SameFightWithTelemetryOnAndOff(Func<TelemetryStore, Task<Fight>> run)
+    {
+        var dirs = new List<string>();
+        TelemetryStore NewStore(bool yes)
+        {
+            string dir = Path.Combine(Path.GetTempPath(), $"usurper-telemetry126-{Guid.NewGuid():N}");
+            dirs.Add(dir);
+            Directory.CreateDirectory(dir);
+            var store = new TelemetryStore(dir, () => TelemetrySource.Single);
+            if (yes) store.SetInstallAnswer(true);
+            return store;
+        }
+        try
+        {
+            var absent1 = await run(NewStore(false));
+            var absent2 = await run(NewStore(false));
+            var yesStore = NewStore(true);
+            var yes = await run(yesStore);
+            absent1.Error.Should().BeNull("{0}", absent1.Transcript);
+            absent2.Error.Should().BeNull();
+            yes.Error.Should().BeNull("{0}", yes.Transcript);
+            FightPart(absent1).Should().Contain(Loc.Get("combat.round_label", 2), "the comparison covers the rounds of the fight");
+            FightPart(absent2).Should().Be(FightPart(absent1), "the seeded fight with no consent repeats exactly");
+            FightPart(yes).Should().Be(FightPart(absent1), "the same seeded fight reads the same with a stored yes");
+            HpTrail(yes).Should().Be(HpTrail(absent1));
+            yes.Result!.Outcome.Should().Be(absent1.Result!.Outcome);
+            yes.Result.CurrentRound.Should().Be(absent1.Result.CurrentRound);
+            yes.Result.TotalDamageDealt.Should().Be(absent1.Result.TotalDamageDealt);
+            yes.Result.TotalDamageTaken.Should().Be(absent1.Result.TotalDamageTaken);
+            yes.Result.Tally.DmgByPlayer.Should().Be(absent1.Result.Tally.DmgByPlayer);
+            yes.Result.Tally.PlayerHpEnd.Should().Be(absent1.Result.Tally.PlayerHpEnd);
+            int Next(Fight f) => ((Random)EngineRandom.GetValue(f.Engine)!).Next();
+            int n1 = Next(absent1);
+            Next(absent2).Should().Be(n1, "the engine's random is in the same place after the same fight");
+            Next(yes).Should().Be(n1, "queueing the row draws nothing from the engine's random");
+            // the row was really queued in one run and not in the others
+            absent1.Engine.LastTelemetryAppend.Should().BeNull();
+            yes.Engine.LastTelemetryAppend.Should().NotBeNull();
+            await yes.Engine.LastTelemetryAppend!;
+            yesStore.ReadQueue().Should().HaveCount(1);
+        }
+        finally
+        {
+            foreach (var d in dirs) try { Directory.Delete(d, true); } catch { }
+        }
+    }
+
+    [Fact]
+    public async Task EventsOnAndOff_TelemetryYesAndAbsent_SameSeededSoloFight_SameResultAndHpTrail()
+    {
+        await SameFightWithTelemetryOnAndOff(store =>
+        {
+            var f = NewFight(Attacks());
+            f.Engine.TelemetryStoreOverride = store;
+            return Run(f, e => e.PlayerVsMonsters(Hero(), Two(), offerMonkEncounter: false));
+        });
+    }
+
+    [Fact]
+    public async Task EventsOnAndOff_TelemetryYesAndAbsent_SameSeededFightWithTeammates_SameResultAndHpTrail()
+    {
+        await SameFightWithTelemetryOnAndOff(store =>
+        {
+            var f = NewFight(Attacks());
+            f.Engine.TelemetryStoreOverride = store;
+            return Run(f, e => e.PlayerVsMonsters(Hero(), Two(), new List<Character> { Mate("Ally One"), Mate("Ally Two") }, offerMonkEncounter: false));
+        });
+    }
+
+    [Fact]
+    public async Task EventsOnAndOff_TelemetryYesAndAbsent_SameSeededGroupFight_SameResultAndHpTrail()
+    {
+        await SameFightWithTelemetryOnAndOff(async store => (await GroupFight(true, null, store)).f);
     }
 
     // ---------- 2. the values, from a real fight (supervisor condition 2) ----------

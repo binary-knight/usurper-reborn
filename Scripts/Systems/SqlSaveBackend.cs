@@ -1755,6 +1755,7 @@ namespace UsurperRemake.Systems
         /// </summary>
         public bool DeleteGameData(string playerName, bool bypassArchive)
         {
+            TelemetryConsent.RemoveAnswer(GetSaveDirectory(), playerName, this);   // 1.2.7: the name is asked again
             try
             {
                 using var connection = OpenConnection();
@@ -1884,6 +1885,7 @@ namespace UsurperRemake.Systems
             // checks this set and refuses to save for any matching username, so
             // a save in flight from another thread can't beat us to the row.
             RageEventErasedUsernames[username.ToLower()] = 1;
+            TelemetryConsent.RemoveAnswer(GetSaveDirectory(), username, this);   // 1.2.7: the name is asked again
 
             try
             {
