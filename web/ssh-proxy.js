@@ -626,7 +626,7 @@ async function handleBugReport(req, res) {
 // run it in a vm: everything it touches (database class, fs, clock, timers, console) is passed
 // to createTelemetryEndpoint.
 const TELEMETRY_URL = '/api/telemetry/v1/combat';
-const TELEMETRY_MAX_BODY_BYTES = 131072;  // 128 KB: a 100 row batch at every maximum is about 126.5 KB
+const TELEMETRY_MAX_BODY_BYTES = 131072;  // 128 KB: the largest 100 row batch (every value at its maximum) is 102,507 bytes
 const TELEMETRY_BODY_TIMEOUT_MS = 10000;
 const TELEMETRY_MAX_ROWS = 100;
 const TELEMETRY_ADDRESS_PER_HOUR = 12;
