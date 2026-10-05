@@ -1337,6 +1337,12 @@ namespace UsurperRemake.Systems
             while (true)
             {
                 divineName = (await terminal.GetInputAsync(Loc.Get("ending.immortal_name_prompt"))).Trim();
+                // v1.2.6: a divine name with markup characters is refused and asked again
+                if (NameRules.HasMarkupChars(divineName))
+                {
+                    Row(terminal, $"  {NameRules.MarkupCharsMessage}", "red");
+                    continue;
+                }
                 if (divineName.Length >= 3 && divineName.Length <= 30)
                     break;
                 Row(terminal, $"  {Loc.Get("ending.immortal_name_invalid")}", "red");

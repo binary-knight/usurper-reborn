@@ -4633,6 +4633,7 @@
   "creation.name_required": "Meg kell adnod egy nevet!",
   "creation.name_taken": "Ez a név már foglalt! Válassz másikat.",
   "creation.name_forbidden": "Sajnálom, de ezt a nevet már használják.",
+  "creation.name_bad_chars": "A nevek nem tartalmazhatják a következő karaktereket: < > & \"",
   "creation.name_confirm": "Biztosan a(z) {0} nevet választod? (Y = Igen/N = Nem)",
   "creation.choose_display_name": "Válassz nevet a másodlagos karakterednek:",
   "creation.choose_display_online": "Válassz egy karakternevet (vagy nyomj Entert a felhasználóneved használatához):",

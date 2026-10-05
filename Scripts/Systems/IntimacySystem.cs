@@ -478,7 +478,13 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {GameConfig.CleanFormat(Get("intimacy.name_prompt", babyPronoun, child.Name))}");
             terminal.SetColor("white");
             string nameInput = (await terminal.GetInput(Loc.Get("intimacy.child_name_input"))).Trim();
-            if (!string.IsNullOrEmpty(nameInput) && nameInput.Length <= 20)
+            // v1.2.6: a name with markup characters is refused; the child keeps the generated name
+            if (NameRules.HasMarkupChars(nameInput))
+            {
+                terminal.SetColor("red");
+                terminal.WriteLine($"  {NameRules.MarkupCharsMessage}");
+            }
+            else if (!string.IsNullOrEmpty(nameInput) && nameInput.Length <= 20)
             {
                 // Extract surname from auto-generated name (everything after first space)
                 string surname = "";

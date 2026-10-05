@@ -226,11 +226,23 @@ internal static class PlayerSaveEditor
 
     #region Character Info
 
+    /// <summary>v1.2.6: a typed name with markup characters is refused and the current name kept;
+    /// an unchanged name (already saved that way) passes.</summary>
+    private static string KeepNameUnlessValid(string entered, string current)
+    {
+        if (entered == current || !NameRules.HasMarkupChars(entered)) return entered;
+        EditorIO.Error(NameRules.MarkupCharsMessage);
+        return current;
+    }
+
     private static void EditCharacterInfo(PlayerData p)
     {
         EditorIO.Section("Character Info");
+        string savedName2 = p.Name2, savedName1 = p.Name1;
         p.Name2 = EditorIO.PromptString("Display name", p.Name2);
         p.Name1 = EditorIO.PromptString("Internal name (rarely used — match display name if unsure)", p.Name1);
+        p.Name2 = KeepNameUnlessValid(p.Name2, savedName2);
+        p.Name1 = KeepNameUnlessValid(p.Name1, savedName1);
         p.RealName = EditorIO.PromptString("Real name (narrative, can be blank)", p.RealName);
 
         EditorIO.Info("Class and race are USUALLY risky to change — stats tied to class-per-level won't re-apply.");

@@ -1518,6 +1518,14 @@ namespace UsurperRemake.Systems
             while (true)
             {
                 divineName = await ReadInput("  Divine Name (3-30 chars): ");
+                // v1.2.6: the same name rule as the player's own ascension
+                if (NameRules.HasMarkupChars(divineName))
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine($"  {NameRules.MarkupCharsMessage}");
+                    terminal.SetColor("white");
+                    continue;
+                }
                 if (divineName.Length >= 3 && divineName.Length <= 30)
                     break;
                 terminal.SetColor("red");
