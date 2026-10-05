@@ -235,6 +235,16 @@ function verifyBalancePassword(password) {
   return false;
 }
 
+// 1.2.6: the token signature is compared in constant time. timingSafeEqual needs two buffers of
+// the same length, so a signature of another length is refused before the compare (a real
+// signature is always 64 hex characters, so its length tells an attacker nothing).
+function balanceSigMatches(expected, given) {
+  const a = Buffer.from(String(expected), 'utf8');
+  const b = Buffer.from(String(given), 'utf8');
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
 function createBalanceToken() {
   const payload = JSON.stringify({ user: BALANCE_USER, exp: Date.now() + BALANCE_TOKEN_TTL });
   const sig = crypto.createHmac('sha256', BALANCE_SECRET).update(payload).digest('hex');
@@ -248,7 +258,7 @@ function verifyBalanceToken(token) {
   try {
     const payload = Buffer.from(parts[0], 'base64').toString();
     const sig = crypto.createHmac('sha256', BALANCE_SECRET).update(payload).digest('hex');
-    if (sig !== parts[1]) return false;
+    if (!balanceSigMatches(sig, parts[1])) return false;
     const data = JSON.parse(payload);
     return data.exp > Date.now();
   } catch { return false; }
@@ -1467,6 +1477,59 @@ const dashHeartbeatTimer = setInterval(dashHeartbeat, 15000);
 
 // --- Dashboard Route Handler ---
 // --- Balance Dashboard API ---
+// 1.2.6: every combat_events view counts one time window, chosen by ?window= from this list
+// (default since126). "Since 1.2.6" starts at the first row 1.2.6 wrote: the first row with
+// floor_actual set (older builds never set it). Whatever the window, it never starts before the
+// oldest victory or fled row still kept (non-deaths are pruned at 30 days or 15000 rows, deaths
+// at 90 days), so win, death and flee rates never mix two retention windows.
+// A '+' before a grouped column (GROUP BY +player_class) keeps SQLite on the created_at index,
+// which the window bounds, instead of a walk of a whole index in group order.
+const BALANCE_WINDOWS = {
+  since126: { label: 'Since 1.2.6', modifier: null },
+  '24h': { label: 'Last 24 h', modifier: '-24 hours' },
+  '7d': { label: 'Last 7 d', modifier: '-7 days' },
+  '30d': { label: 'Last 30 d', modifier: '-30 days' },
+};
+// Rows before the first 1.2.6 row can only age out, so the start is kept once it is found.
+let balanceSince126Start = null;
+// Matches no row: used when the window holds no row at all (no 1.2.6 row written yet).
+const BALANCE_NO_ROWS = '9999-12-31 23:59:59';
+
+// Returns { key, label, from, clipped, bound } for a window key, or null for an unknown key.
+// bound is the created_at lower bound every windowed query binds; from is null when the
+// window is empty; clipped is true when the oldest kept non-death row moved the start.
+function balanceWindow(key) {
+  if (!Object.prototype.hasOwnProperty.call(BALANCE_WINDOWS, key)) return null;
+  const def = BALANCE_WINDOWS[key];
+  let start;
+  if (def.modifier) {
+    start = db.prepare("SELECT datetime('now', ?) AS t").get(def.modifier).t;
+  } else {
+    if (balanceSince126Start === null) {
+      balanceSince126Start = db.prepare('SELECT MIN(created_at) AS t FROM combat_events WHERE floor_actual IS NOT NULL').get().t || null;
+    }
+    start = balanceSince126Start;
+  }
+  if (start === null) return { key, label: def.label, from: null, clipped: false, bound: BALANCE_NO_ROWS };
+  const kept = db.prepare("SELECT MIN(created_at) AS t FROM combat_events WHERE outcome <> 'death'").get().t;
+  const clipped = !!kept && kept > start;
+  const from = clipped ? kept : start;
+  return { key, label: def.label, from, clipped, bound: from };
+}
+
+function balanceWindowJson(w) {
+  return { key: w.key, label: w.label, from: w.from, clipped: w.clipped };
+}
+
+// Percentage with one decimal, or null when there is nothing to divide by.
+function balancePct(part, whole) {
+  return whole > 0 ? Math.round(part / whole * 1000) / 10 : null;
+}
+
+// Difficulty tab filters: a class name (letters and spaces) and a DifficultyMode value 0..3.
+const BALANCE_CLASS_RE = /^[A-Za-z][A-Za-z ]{0,39}$/;
+const BALANCE_DIFFICULTIES = ['0', '1', '2', '3'];
+
 async function handleBalanceRequest(req, res) {
   const url = req.url.split('?')[0];
   const method = req.method;
@@ -1551,29 +1614,56 @@ async function handleBalanceRequest(req, res) {
     return true;
   }
 
+  // 1.2.6: the combat views below count only rows inside one window (see balanceWindow); an
+  // unknown ?window= is refused. Every response carries the window it counted.
+  const BALANCE_COMBAT_VIEWS = ['/api/balance/overview', '/api/balance/class-performance', '/api/balance/one-hit-kills',
+    '/api/balance/death-hotspots', '/api/balance/boss-fights', '/api/balance/player-activity', '/api/balance/xp-economy',
+    '/api/balance/recent', '/api/balance/suspects', '/api/balance/difficulty'];
+  let win = null;
+  if (method === 'GET' && BALANCE_COMBAT_VIEWS.includes(url)) {
+    try {
+      win = balanceWindow(query.get('window') || 'since126');
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+      return true;
+    }
+    if (!win) {
+      sendJson(res, 400, { error: 'Unknown window. Use one of: ' + Object.keys(BALANCE_WINDOWS).join(', ') });
+      return true;
+    }
+  }
+
   // GET /api/balance/overview
   if (method === 'GET' && url === '/api/balance/overview') {
     try {
-      const total = db.prepare('SELECT COUNT(*) as c FROM combat_events').get();
-      const victories = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE outcome = 'victory'").get();
-      const deaths = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE outcome = 'death'").get();
-      const fled = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE outcome = 'fled'").get();
-      const avgRounds = db.prepare("SELECT AVG(rounds) as v FROM combat_events WHERE outcome = 'victory'").get();
-      const avgDmg = db.prepare("SELECT AVG(damage_dealt) as v FROM combat_events WHERE outcome = 'victory'").get();
-      const today = db.prepare("SELECT COUNT(DISTINCT player_name) as c FROM combat_events WHERE created_at >= datetime('now', '-24 hours')").get();
-      const oneHitKills = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE rounds <= 1 AND outcome = 'victory'").get();
-      const oneHitDeaths = db.prepare("SELECT COUNT(*) as c FROM combat_events WHERE rounds <= 1 AND outcome = 'death'").get();
+      // one statement, one window: every count and rate below is over the same rows
+      const r = db.prepare(`
+        SELECT COUNT(*) AS total,
+          SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) AS victories,
+          SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) AS deaths,
+          SUM(CASE WHEN outcome = 'fled' THEN 1 ELSE 0 END) AS fled,
+          AVG(CASE WHEN outcome = 'victory' THEN rounds END) AS avg_rounds,
+          AVG(CASE WHEN outcome = 'victory' THEN damage_dealt END) AS avg_damage,
+          COUNT(DISTINCT player_name) AS players,
+          SUM(CASE WHEN outcome = 'victory' AND rounds = 1 THEN 1 ELSE 0 END) AS one_hit_kills,
+          SUM(CASE WHEN outcome = 'death' AND rounds = 1 THEN 1 ELSE 0 END) AS one_hit_deaths
+        FROM combat_events
+        WHERE created_at >= ?
+      `).get(win.bound);
       sendJson(res, 200, {
-        totalCombats: total.c,
-        victories: victories.c,
-        deaths: deaths.c,
-        fled: fled.c,
-        winRate: total.c > 0 ? (victories.c / total.c * 100).toFixed(1) : 0,
-        avgRounds: avgRounds.v ? avgRounds.v.toFixed(1) : 0,
-        avgDamage: avgDmg.v ? Math.round(avgDmg.v) : 0,
-        activePlayers24h: today.c,
-        oneHitKills: oneHitKills.c,
-        oneHitDeaths: oneHitDeaths.c
+        window: balanceWindowJson(win),
+        totalCombats: r.total,
+        victories: r.victories || 0,
+        deaths: r.deaths || 0,
+        fled: r.fled || 0,
+        winRate: balancePct(r.victories, r.total),
+        deathRate: balancePct(r.deaths, r.total),
+        fleeRate: balancePct(r.fled, r.total),
+        avgRounds: r.avg_rounds === null ? null : Math.round(r.avg_rounds * 10) / 10,
+        avgDamage: r.avg_damage === null ? null : Math.round(r.avg_damage),
+        players: r.players,
+        oneHitKills: r.one_hit_kills || 0,
+        oneHitDeaths: r.one_hit_deaths || 0
       });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
@@ -1585,7 +1675,7 @@ async function handleBalanceRequest(req, res) {
   if (method === 'GET' && url === '/api/balance/class-performance') {
     try {
       const rows = db.prepare(`
-        SELECT player_class,
+        SELECT +player_class as player_class,
           COUNT(*) as total,
           SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
           SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
@@ -1596,34 +1686,42 @@ async function handleBalanceRequest(req, res) {
           AVG(CASE WHEN outcome = 'victory' THEN rounds END) as avg_rounds,
           MAX(damage_dealt) as max_damage
         FROM combat_events
-        GROUP BY player_class
-        ORDER BY total DESC
-      `).all();
-      sendJson(res, 200, rows.map(r => ({
-        ...r,
-        winRate: r.total > 0 ? (r.wins / r.total * 100).toFixed(1) : 0,
-        deathRate: r.total > 0 ? (r.deaths / r.total * 100).toFixed(1) : 0,
-        avg_damage: r.avg_damage ? Math.round(r.avg_damage) : 0,
-        avg_xp: r.avg_xp ? Math.round(r.avg_xp) : 0,
-        avg_gold: r.avg_gold ? Math.round(r.avg_gold) : 0,
-        avg_rounds: r.avg_rounds ? r.avg_rounds.toFixed(1) : 0,
-      })));
+        WHERE created_at >= ?
+        GROUP BY +player_class
+        ORDER BY total DESC, player_class
+      `).all(win.bound);
+      sendJson(res, 200, {
+        window: balanceWindowJson(win),
+        rows: rows.map(r => ({
+          ...r,
+          winRate: balancePct(r.wins, r.total),
+          deathRate: balancePct(r.deaths, r.total),
+          fleeRate: balancePct(r.fled, r.total),
+          avg_damage: r.avg_damage === null ? null : Math.round(r.avg_damage),
+          avg_xp: r.avg_xp === null ? null : Math.round(r.avg_xp),
+          avg_gold: r.avg_gold === null ? null : Math.round(r.avg_gold),
+          avg_rounds: r.avg_rounds === null ? null : Math.round(r.avg_rounds * 10) / 10,
+        }))
+      });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
     return true;
   }
 
-  // GET /api/balance/one-hit-kills
+  // GET /api/balance/one-hit-kills: victories that ended in the first round (no deaths, no 0)
   if (method === 'GET' && url === '/api/balance/one-hit-kills') {
     try {
       const rows = db.prepare(`
-        SELECT * FROM combat_events
-        WHERE rounds <= 1 AND (outcome = 'victory' OR outcome = 'death')
+        SELECT created_at, outcome, player_name, player_class, player_level, player_str, player_weap_pow,
+          player_max_hp, monster_name, monster_level, monster_max_hp, monster_str, monster_def, is_boss,
+          damage_dealt, floor_actual
+        FROM combat_events
+        WHERE outcome = 'victory' AND rounds = 1 AND created_at >= ?
         ORDER BY created_at DESC
         LIMIT 200
-      `).all();
-      sendJson(res, 200, rows);
+      `).all(win.bound);
+      sendJson(res, 200, { window: balanceWindowJson(win), rows });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -1633,25 +1731,33 @@ async function handleBalanceRequest(req, res) {
   // GET /api/balance/death-hotspots
   if (method === 'GET' && url === '/api/balance/death-hotspots') {
     try {
+      // damage_taken counts basic monster hits only; the four dmg_to_player columns (1.2.6 rows)
+      // hold every kind, so their average is NULL when no row in the group has them
       const byMonster = db.prepare(`
-        SELECT monster_name, monster_level, COUNT(*) as deaths,
+        SELECT monster_name, MIN(monster_level) as min_level, MAX(monster_level) as max_level,
+          COUNT(*) as deaths,
           AVG(player_level) as avg_player_level,
-          AVG(damage_taken) as avg_damage_taken
-        FROM combat_events WHERE outcome = 'death' AND monster_name IS NOT NULL
-        GROUP BY monster_name ORDER BY deaths DESC LIMIT 30
-      `).all();
+          AVG(damage_taken) as avg_basic_hits,
+          AVG(dmg_to_player_basic + dmg_to_player_ability + dmg_to_player_spell + dmg_to_player_dot) as avg_damage_taken
+        FROM combat_events WHERE outcome = 'death' AND monster_name IS NOT NULL AND created_at >= ?
+        GROUP BY monster_name ORDER BY deaths DESC, monster_name LIMIT 30
+      `).all(win.bound);
       const byFloor = db.prepare(`
-        SELECT dungeon_floor, COUNT(*) as deaths,
+        SELECT floor_actual, COUNT(*) as deaths,
           AVG(player_level) as avg_player_level
-        FROM combat_events WHERE outcome = 'death' AND dungeon_floor > 0
-        GROUP BY dungeon_floor ORDER BY dungeon_floor
-      `).all();
+        FROM combat_events WHERE outcome = 'death' AND floor_actual IS NOT NULL AND created_at >= ?
+        GROUP BY floor_actual ORDER BY floor_actual
+      `).all(win.bound);
+      const noFloor = db.prepare(`
+        SELECT COUNT(*) as deaths
+        FROM combat_events WHERE outcome = 'death' AND floor_actual IS NULL AND created_at >= ?
+      `).get(win.bound);
       const byClass = db.prepare(`
         SELECT player_class, COUNT(*) as deaths
-        FROM combat_events WHERE outcome = 'death'
-        GROUP BY player_class ORDER BY deaths DESC
-      `).all();
-      sendJson(res, 200, { byMonster, byFloor, byClass });
+        FROM combat_events WHERE outcome = 'death' AND created_at >= ?
+        GROUP BY player_class ORDER BY deaths DESC, player_class
+      `).all(win.bound);
+      sendJson(res, 200, { window: balanceWindowJson(win), byMonster, byFloor, noFloorDeaths: noFloor.deaths, byClass });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -1662,10 +1768,13 @@ async function handleBalanceRequest(req, res) {
   if (method === 'GET' && url === '/api/balance/boss-fights') {
     try {
       const rows = db.prepare(`
-        SELECT * FROM combat_events WHERE is_boss = 1
+        SELECT created_at, player_name, player_class, player_level, outcome, monster_name, monster_level,
+          rounds, damage_dealt, damage_taken, floor_actual, dmg_to_player_basic, dmg_to_player_ability,
+          dmg_to_player_spell, dmg_to_player_dot, dmg_to_team
+        FROM combat_events WHERE is_boss = 1 AND created_at >= ?
         ORDER BY created_at DESC LIMIT 100
-      `).all();
-      sendJson(res, 200, rows);
+      `).all(win.bound);
+      sendJson(res, 200, { window: balanceWindowJson(win), rows });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -1676,31 +1785,38 @@ async function handleBalanceRequest(req, res) {
   if (method === 'GET' && url === '/api/balance/player-activity') {
     const player = query.get('player');
     if (!player) {
-      // Return player summary list
+      // Return player summary list; the class is the one on the player's latest row
       try {
         const rows = db.prepare(`
-          SELECT player_name, player_class, MAX(player_level) as max_level,
-            COUNT(*) as total_combats,
-            SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
-            SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
-            SUM(xp_gained) as total_xp,
-            SUM(gold_gained) as total_gold,
-            MAX(created_at) as last_combat
-          FROM combat_events
-          GROUP BY player_name
-          ORDER BY total_combats DESC
-        `).all();
-        sendJson(res, 200, rows);
+          SELECT a.player_name, l.player_class, a.max_level, a.total_combats, a.wins, a.deaths,
+            a.total_xp, a.total_gold, a.last_combat
+          FROM (
+            SELECT +player_name as player_name, MAX(id) as last_id, MAX(player_level) as max_level,
+              COUNT(*) as total_combats,
+              SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
+              SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
+              SUM(xp_gained) as total_xp,
+              SUM(gold_gained) as total_gold,
+              MAX(created_at) as last_combat
+            FROM combat_events
+            WHERE created_at >= ?
+            GROUP BY +player_name
+          ) a
+          JOIN combat_events l ON l.id = a.last_id
+          ORDER BY a.total_combats DESC, a.player_name
+          LIMIT 500
+        `).all(win.bound);
+        sendJson(res, 200, { window: balanceWindowJson(win), rows });
       } catch (e) {
         sendJson(res, 500, { error: e.message });
       }
     } else {
       try {
         const rows = db.prepare(`
-          SELECT * FROM combat_events WHERE player_name = ?
+          SELECT * FROM combat_events WHERE player_name = ? AND created_at >= ?
           ORDER BY created_at DESC LIMIT 200
-        `).all(player);
-        sendJson(res, 200, rows);
+        `).all(player, win.bound);
+        sendJson(res, 200, { window: balanceWindowJson(win), rows });
       } catch (e) {
         sendJson(res, 500, { error: e.message });
       }
@@ -1717,10 +1833,10 @@ async function handleBalanceRequest(req, res) {
           AVG(gold_gained) as avg_gold,
           COUNT(*) as combats,
           AVG(rounds) as avg_rounds
-        FROM combat_events WHERE outcome = 'victory'
+        FROM combat_events WHERE outcome = 'victory' AND created_at >= ?
         GROUP BY player_level ORDER BY player_level
-      `).all();
-      sendJson(res, 200, rows);
+      `).all(win.bound);
+      sendJson(res, 200, { window: balanceWindowJson(win), rows });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -1731,9 +1847,12 @@ async function handleBalanceRequest(req, res) {
   if (method === 'GET' && url === '/api/balance/recent') {
     try {
       const rows = db.prepare(`
-        SELECT * FROM combat_events ORDER BY created_at DESC LIMIT 100
-      `).all();
-      sendJson(res, 200, rows);
+        SELECT created_at, player_name, player_class, player_level, outcome, monster_name, monster_level,
+          rounds, damage_dealt, xp_gained, gold_gained, floor_actual
+        FROM combat_events WHERE created_at >= ?
+        ORDER BY created_at DESC, id DESC LIMIT 100
+      `).all(win.bound);
+      sendJson(res, 200, { window: balanceWindowJson(win), rows });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -1744,20 +1863,106 @@ async function handleBalanceRequest(req, res) {
   if (method === 'GET' && url === '/api/balance/suspects') {
     try {
       const rows = db.prepare(`
-        SELECT player_name, player_class, MAX(player_level) as max_level,
-          COUNT(*) as total,
-          SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
-          ROUND(SUM(CASE WHEN outcome = 'victory' THEN 1.0 ELSE 0 END) / COUNT(*) * 100, 1) as win_pct,
-          MAX(damage_dealt) as max_damage,
-          AVG(CASE WHEN outcome = 'victory' THEN damage_dealt END) as avg_damage,
-          AVG(CASE WHEN outcome = 'victory' THEN xp_gained END) as avg_xp,
-          SUM(CASE WHEN rounds <= 1 AND outcome = 'victory' THEN 1 ELSE 0 END) as one_hit_kills
+        SELECT a.player_name, l.player_class, a.max_level, a.total, a.wins, a.win_pct, a.max_damage,
+          a.avg_damage, a.avg_xp, a.one_hit_kills
+        FROM (
+          SELECT +player_name as player_name, MAX(id) as last_id, MAX(player_level) as max_level,
+            COUNT(*) as total,
+            SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
+            ROUND(SUM(CASE WHEN outcome = 'victory' THEN 1.0 ELSE 0 END) / COUNT(*) * 100, 1) as win_pct,
+            MAX(damage_dealt) as max_damage,
+            AVG(CASE WHEN outcome = 'victory' THEN damage_dealt END) as avg_damage,
+            AVG(CASE WHEN outcome = 'victory' THEN xp_gained END) as avg_xp,
+            SUM(CASE WHEN rounds = 1 AND outcome = 'victory' THEN 1 ELSE 0 END) as one_hit_kills
+          FROM combat_events
+          WHERE created_at >= ?
+          GROUP BY +player_name
+          HAVING COUNT(*) >= 10
+        ) a
+        JOIN combat_events l ON l.id = a.last_id
+        ORDER BY a.win_pct DESC, a.avg_damage DESC, a.player_name
+        LIMIT 200
+      `).all(win.bound);
+      sendJson(res, 200, { window: balanceWindowJson(win), rows });
+    } catch (e) {
+      sendJson(res, 500, { error: e.message });
+    }
+    return true;
+  }
+
+  // GET /api/balance/difficulty?window=&class=&difficulty=
+  // 1.2.6 Difficulty tab: aggregates per 5-floor band of floor_actual (band 0 is a fight outside
+  // the dungeon), boss fights in their own row. Averages of the 1.2.6 columns are NULL when no
+  // row of the group has them, never 0. Rows without floor_actual are only counted in noFloor.
+  if (method === 'GET' && url === '/api/balance/difficulty') {
+    const clsParam = query.get('class') || null;
+    const diffParam = query.get('difficulty') || null;
+    if (clsParam !== null && !BALANCE_CLASS_RE.test(clsParam)) {
+      sendJson(res, 400, { error: 'Unknown class filter' });
+      return true;
+    }
+    if (diffParam !== null && !BALANCE_DIFFICULTIES.includes(diffParam)) {
+      sendJson(res, 400, { error: 'Unknown difficulty filter' });
+      return true;
+    }
+    const diff = diffParam === null ? null : Number(diffParam);
+    try {
+      const bands = db.prepare(`
+        SELECT CASE WHEN floor_actual <= 0 THEN 0 ELSE (floor_actual - 1) / 5 + 1 END as band,
+          CASE WHEN is_boss = 1 THEN 1 ELSE 0 END as boss,
+          COUNT(*) as fights,
+          COUNT(DISTINCT player_name) as players,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) / COUNT(*), 1) as win_pct,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) / COUNT(*), 1) as death_pct,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'fled' THEN 1 ELSE 0 END) / COUNT(*), 1) as flee_pct,
+          ROUND(AVG(rounds), 1) as avg_rounds,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'victory' AND rounds = 1 THEN 1 ELSE 0 END) / COUNT(*), 1) as one_round_win_pct,
+          ROUND(AVG(100.0 * (dmg_to_player_basic + dmg_to_player_ability + dmg_to_player_spell + dmg_to_player_dot) / NULLIF(player_max_hp, 0)), 1) as hp_lost_pct,
+          ROUND(AVG(dmg_to_player_basic), 1) as dmg_to_player_basic,
+          ROUND(AVG(dmg_to_player_ability), 1) as dmg_to_player_ability,
+          ROUND(AVG(dmg_to_player_spell), 1) as dmg_to_player_spell,
+          ROUND(AVG(dmg_to_player_dot), 1) as dmg_to_player_dot,
+          ROUND(AVG(dmg_to_team), 1) as dmg_to_team,
+          ROUND(AVG(dmg_by_player), 1) as dmg_by_player,
+          ROUND(AVG(dmg_by_team), 1) as dmg_by_team,
+          ROUND(AVG(heal_player), 1) as heal_player,
+          ROUND(AVG(potions_used), 2) as potions_used,
+          ROUND(AVG(abilities_used), 2) as abilities_used,
+          ROUND(AVG(spells_used), 2) as spells_used,
+          ROUND(AVG(party_size), 2) as party_size,
+          ROUND(AVG(encounter_size), 2) as encounter_size,
+          ROUND(100.0 * AVG(first_actor), 1) as monster_first_pct,
+          ROUND(AVG(teammates_lost), 2) as teammates_lost
         FROM combat_events
-        GROUP BY player_name
-        HAVING total >= 10
-        ORDER BY win_pct DESC, avg_damage DESC
-      `).all();
-      sendJson(res, 200, rows);
+        WHERE floor_actual IS NOT NULL AND created_at >= ?
+          AND (? IS NULL OR player_class = ?) AND (? IS NULL OR difficulty = ?)
+        GROUP BY band, boss
+        ORDER BY band, boss
+      `).all(win.bound, clsParam, clsParam, diff, diff);
+      const noFloor = db.prepare(`
+        SELECT COUNT(*) as fights
+        FROM combat_events
+        WHERE floor_actual IS NULL AND created_at >= ?
+          AND (? IS NULL OR player_class = ?) AND (? IS NULL OR difficulty = ?)
+      `).get(win.bound, clsParam, clsParam, diff, diff);
+      const classes = db.prepare(`
+        SELECT +player_class as player_class, COUNT(*) as fights
+        FROM combat_events WHERE floor_actual IS NOT NULL AND created_at >= ?
+        GROUP BY +player_class ORDER BY player_class
+      `).all(win.bound);
+      const difficulties = db.prepare(`
+        SELECT difficulty, COUNT(*) as fights
+        FROM combat_events WHERE floor_actual IS NOT NULL AND difficulty IS NOT NULL AND created_at >= ?
+        GROUP BY difficulty ORDER BY difficulty
+      `).all(win.bound);
+      sendJson(res, 200, {
+        window: balanceWindowJson(win),
+        filters: { class: clsParam, difficulty: diff },
+        bands: bands.map(b => ({ ...b, floor_from: b.band === 0 ? 0 : b.band * 5 - 4, floor_to: b.band === 0 ? 0 : b.band * 5 })),
+        noFloorFights: noFloor.fights,
+        classes: classes.map(c => c.player_class),
+        difficulties: difficulties.map(d => d.difficulty)
+      });
     } catch (e) {
       sendJson(res, 500, { error: e.message });
     }
@@ -1768,67 +1973,79 @@ async function handleBalanceRequest(req, res) {
   // v0.61.2 Phase 1 NPC AI telemetry surface. Returns aggregates from
   // npc_decision_log so we can measure baseline behavior of the heuristic
   // NPCs before the AI subset lands.
+  // 1.2.6: every query counts the last 30 days (the log's retention). The aggregates leave out
+  // the target_steer rows whose outcome is 'goal:<type>' (a chosen goal, not a result); the
+  // live feed still shows them. Percentages divide by the rows of the same filter (NULL if none).
   if (method === 'GET' && url === '/api/balance/npc-behavior') {
     try {
       // Overview cards
-      const total = db.prepare('SELECT COUNT(*) as c FROM npc_decision_log').get();
-      const totalUnique = db.prepare('SELECT COUNT(DISTINCT npc_name) as c FROM npc_decision_log').get();
-      const totalDeaths = db.prepare("SELECT COUNT(*) as c FROM npc_decision_log WHERE outcome = 'died'").get();
-      const totalLevels = db.prepare("SELECT COUNT(*) as c FROM npc_decision_log WHERE outcome = 'leveled_up'").get();
-      const last24h = db.prepare(`SELECT COUNT(*) as c FROM npc_decision_log WHERE created_at >= datetime('now', '-24 hours')`).get();
+      const ov = db.prepare(`
+        SELECT COUNT(*) as total,
+          COUNT(DISTINCT npc_name) as unique_npcs,
+          SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) as deaths,
+          SUM(CASE WHEN outcome = 'leveled_up' THEN 1 ELSE 0 END) as level_ups,
+          SUM(CASE WHEN created_at >= datetime('now', '-24 hours') THEN 1 ELSE 0 END) as last24h
+        FROM npc_decision_log
+        WHERE created_at >= datetime('now', '-30 days') AND (outcome IS NULL OR outcome NOT LIKE 'goal:%')
+      `).get();
 
       // Action distribution (which actions NPCs spend time on)
       const actionDist = db.prepare(`
-        SELECT action, COUNT(*) as total,
+        SELECT +action as action, COUNT(*) as total,
           SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) as deaths,
           SUM(CASE WHEN outcome = 'leveled_up' THEN 1 ELSE 0 END) as level_ups,
           ROUND(AVG(gold_delta), 1) as avg_gold_delta,
           ROUND(AVG(xp_delta), 1) as avg_xp_delta
         FROM npc_decision_log
-        GROUP BY action
-        ORDER BY total DESC
+        WHERE created_at >= datetime('now', '-30 days') AND (outcome IS NULL OR outcome NOT LIKE 'goal:%')
+        GROUP BY +action
+        ORDER BY total DESC, action
       `).all();
 
-      // Outcome distribution overall
+      // Outcome distribution overall (rows with an outcome; the percentages add up to 100)
       const outcomeDist = db.prepare(`
         SELECT outcome, COUNT(*) as total,
-          ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM npc_decision_log), 2) as pct
+          ROUND(100.0 * COUNT(*) / NULLIF((SELECT COUNT(*) FROM npc_decision_log
+            WHERE created_at >= datetime('now', '-30 days') AND outcome IS NOT NULL AND outcome NOT LIKE 'goal:%'), 0), 2) as pct
         FROM npc_decision_log
-        WHERE outcome IS NOT NULL
+        WHERE created_at >= datetime('now', '-30 days') AND outcome IS NOT NULL AND outcome NOT LIKE 'goal:%'
         GROUP BY outcome
-        ORDER BY total DESC
+        ORDER BY total DESC, outcome
       `).all();
 
-      // Class performance: survival rate, gold accumulation, level progression
+      // Class performance: deaths per logged action, gold accumulation, level progression
       const classPerf = db.prepare(`
         SELECT npc_class,
-          COUNT(DISTINCT npc_name) as living_npcs,
+          COUNT(DISTINCT npc_name) as npcs_seen,
           COUNT(*) as actions,
           SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) as deaths,
-          ROUND(100.0 * SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) / COUNT(*), 2) as death_pct,
+          ROUND(100.0 * SUM(CASE WHEN outcome = 'died' THEN 1 ELSE 0 END) / NULLIF(COUNT(*), 0), 2) as death_pct,
           SUM(gold_delta) as net_gold,
           SUM(xp_delta) as net_xp,
           MAX(npc_level) as max_level
         FROM npc_decision_log
+        WHERE created_at >= datetime('now', '-30 days') AND (outcome IS NULL OR outcome NOT LIKE 'goal:%')
         GROUP BY npc_class
-        ORDER BY actions DESC
+        ORDER BY actions DESC, npc_class
       `).all();
 
-      // Dungeon-specific breakdown (rich outcomes from NPCExploreDungeon)
+      // Dungeon breakdown: solo ('dungeon') and team ('team_dungeon') runs, each outcome as a
+      // share of that action's runs (a run with no outcome recorded is its own row)
       const dungeonBreakdown = db.prepare(`
-        SELECT outcome, COUNT(*) as total,
-          ROUND(100.0 * COUNT(*) / (SELECT COUNT(*) FROM npc_decision_log WHERE action = 'dungeon'), 2) as pct
-        FROM npc_decision_log
-        WHERE action = 'dungeon'
-        GROUP BY outcome
-        ORDER BY total DESC
+        SELECT d.action, d.outcome, COUNT(*) as total,
+          ROUND(100.0 * COUNT(*) / NULLIF((SELECT COUNT(*) FROM npc_decision_log t
+            WHERE t.action = d.action AND t.created_at >= datetime('now', '-30 days')), 0), 2) as pct
+        FROM npc_decision_log d
+        WHERE d.action IN ('dungeon', 'team_dungeon') AND d.created_at >= datetime('now', '-30 days')
+        GROUP BY d.action, d.outcome
+        ORDER BY d.action, total DESC, d.outcome
       `).all();
 
       // Recent deaths (who died doing what)
       const recentDeaths = db.prepare(`
         SELECT npc_name, npc_level, npc_class, action, location_before, hp_before, created_at
         FROM npc_decision_log
-        WHERE outcome = 'died'
+        WHERE outcome = 'died' AND created_at >= datetime('now', '-30 days')
         ORDER BY created_at DESC
         LIMIT 30
       `).all();
@@ -1842,26 +2059,33 @@ async function handleBalanceRequest(req, res) {
         LIMIT 50
       `).all();
 
-      // Wealth leaderboard - top NPCs by net gold accumulated
+      // Wealth leaderboard - top NPCs by net gold in the 30 days; the class is the one on the
+      // NPC's latest row
       const wealthBoard = db.prepare(`
-        SELECT npc_name, npc_class, MAX(npc_level) as level,
-          SUM(gold_delta) as net_gold,
-          SUM(xp_delta) as net_xp,
-          COUNT(*) as actions
-        FROM npc_decision_log
-        GROUP BY npc_name
-        HAVING net_gold > 0
-        ORDER BY net_gold DESC
+        SELECT a.npc_name, l.npc_class, a.level, a.net_gold, a.net_xp, a.actions
+        FROM (
+          SELECT +npc_name as npc_name, MAX(id) as last_id, MAX(npc_level) as level,
+            SUM(gold_delta) as net_gold,
+            SUM(xp_delta) as net_xp,
+            COUNT(*) as actions
+          FROM npc_decision_log
+          WHERE created_at >= datetime('now', '-30 days') AND (outcome IS NULL OR outcome NOT LIKE 'goal:%')
+          GROUP BY +npc_name
+          HAVING SUM(gold_delta) > 0
+        ) a
+        JOIN npc_decision_log l ON l.id = a.last_id
+        ORDER BY a.net_gold DESC, a.npc_name
         LIMIT 20
       `).all();
 
       sendJson(res, 200, {
+        window: { label: 'Last 30 d' },
         overview: {
-          total: total.c,
-          uniqueNpcs: totalUnique.c,
-          deaths: totalDeaths.c,
-          levelUps: totalLevels.c,
-          last24h: last24h.c
+          total: ov.total,
+          uniqueNpcs: ov.unique_npcs,
+          deaths: ov.deaths || 0,
+          levelUps: ov.level_ups || 0,
+          last24h: ov.last24h || 0
         },
         actionDist,
         outcomeDist,

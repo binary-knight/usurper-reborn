@@ -409,7 +409,7 @@ async function loadPage(name, options = {}) {
   const doc = new FakeDocument(bodyStart === -1 ? html : html.slice(bodyStart));
   const errors = [];
   const storage = Object.assign({}, options.storage || {});
-  const calls = { fetch: [], alert: [], confirm: [], open: [] };
+  const calls = { fetch: [], alert: [], confirm: [], open: [], interval: [] };
   const d3Handlers = [];
   const ctx = {
     console: { log() {}, warn() {}, info() {}, error: (...a) => errors.push(a.map(String).join(' ')) },
@@ -423,7 +423,7 @@ async function loadPage(name, options = {}) {
     navigator: { clipboard: { writeText: async () => {} }, language: 'en' },
     fetch: async (url, init) => {
       calls.fetch.push({ url: String(url), init });
-      let r = options.fetch ? options.fetch(String(url), init) : {};
+      let r = options.fetch ? await options.fetch(String(url), init) : {};
       if (r && r.__raw) r = r.__raw;
       const status = r && typeof r === 'object' && 'status' in r && 'body' in r ? r.status : 200;
       const body = r && typeof r === 'object' && 'status' in r && 'body' in r ? r.body : r;
@@ -436,7 +436,7 @@ async function loadPage(name, options = {}) {
     Terminal: makeAny(),
     FitAddon: makeAny(),
     requestAnimationFrame: () => 0,
-    setInterval: () => 0,
+    setInterval: (fn, ms) => { calls.interval.push({ fn, ms }); return calls.interval.length; },
     clearInterval: () => {},
     setTimeout: () => 0,
     clearTimeout: () => {},
