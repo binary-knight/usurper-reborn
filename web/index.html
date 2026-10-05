@@ -1949,8 +1949,12 @@
                 <p data-i18n="r1.road_12x_d">Steady patches: fixes and loose ends closed. As of 1.2.5 the whole game is translated into all five languages.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_126_t">1.2.6 -- Difficulty and betrayal</h3>
-                <p data-i18n="r1.road_126_d">A difficulty pass: smarter monsters, mixed encounters, elite monsters and potions that scale with you. And betrayal: those you trust can turn on you.</p>
+                <h3 data-i18n="r1.road_126_t">1.2.6 -- Combat logging and web security</h3>
+                <p data-i18n="r1.road_126_d">Shipped: every online fight records detailed combat data for the coming difficulty pass, logins no longer reveal whether an account exists, new names refuse markup characters, and the website shows all player text safely.</p>
+            </div>
+            <div class="history-entry">
+                <h3 data-i18n="r1.road_127_t">1.2.7 -- Difficulty and betrayal</h3>
+                <p data-i18n="r1.road_127_d">A difficulty pass: smarter monsters, mixed encounters, elite monsters and potions that scale with you. And betrayal: those you trust can turn on you.</p>
             </div>
             <div class="history-entry">
                 <h3 data-i18n="r1.road_13_t">1.3 -- The Player District</h3>
@@ -2101,6 +2105,7 @@
     </div>
 </footer>
 
+<script src="/escape.js"></script>
 <script>
     // --- i18n Engine ---
     var i18nStrings = {};
@@ -2334,19 +2339,17 @@
     }
 
     // --- Live Stats Dashboard ---
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+    // escapeHtml and safeHttpsUrl come from /escape.js.
 
     function formatNumber(n) {
+        n = Number(n) || 0;
         if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
         if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
         return String(n);
     }
 
     function formatGold(n) {
+        n = Number(n) || 0;
         if (n >= 1000000000) return (n / 1000000000).toFixed(1) + 'B';
         if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
         if (n >= 1000) return (n / 1000).toFixed(1) + 'K';
@@ -2419,7 +2422,7 @@
         html += '<span class="online-count' + countClass + '">';
         if (onlineCount === 0) html += t('stats.online_none');
         else if (onlineCount === 1) html += t('stats.online_one');
-        else html += t('stats.online_many').replace('{0}', onlineCount);
+        else html += t('stats.online_many').replace('{0}', escapeHtml(onlineCount));
         html += '</span></div>';
 
         if (data.online && data.online.length > 0) {
@@ -2432,11 +2435,11 @@
                 if (p.isImmortal && p.divineName) {
                     html += '<td class="player-name immortal-name">' + escapeHtml(p.divineName) + '</td>';
                     html += '<td class="player-class immortal-class">' + t('stats.immortal') + '</td>';
-                    html += '<td>' + p.godLevel + '</td>';
+                    html += '<td>' + escapeHtml(p.godLevel) + '</td>';
                 } else {
                     html += '<td class="player-name">' + escapeHtml(p.name) + '</td>';
                     html += '<td class="player-class">' + escapeHtml(p.className) + '</td>';
-                    html += '<td>' + p.level + '</td>';
+                    html += '<td>' + escapeHtml(p.level) + '</td>';
                 }
                 if (isSpectating) {
                     html += '<td style="color:#c084fc;font-style:italic">' + escapeHtml(p.location) + '</td>';
@@ -2473,7 +2476,7 @@
             html += '<div class="highlight-card">';
             html += '<div class="highlight-label">' + t('stats.top_adventurer') + '</div>';
             html += '<div class="highlight-value">' + escapeHtml(h.topPlayer.name) + '</div>';
-            html += '<div class="highlight-detail">Level ' + h.topPlayer.level + ' ' + escapeHtml(h.topPlayer.className) + '</div>';
+            html += '<div class="highlight-detail">Level ' + escapeHtml(h.topPlayer.level) + ' ' + escapeHtml(h.topPlayer.className) + '</div>';
             html += '</div>';
         }
         if (h.king) {
@@ -2494,7 +2497,7 @@
             html += '<div class="highlight-card" style="border-color: #8b0000;">';
             html += '<div class="highlight-label" style="color: #ff4444;">' + t('stats.most_wanted') + '</div>';
             html += '<div class="highlight-value">' + escapeHtml(h.mostWanted.name) + '</div>';
-            html += '<div class="highlight-detail">' + t('stats.blood_price') + ': ' + h.mostWanted.murderWeight + ' | Level ' + h.mostWanted.level + ' ' + escapeHtml(h.mostWanted.className) + '</div>';
+            html += '<div class="highlight-detail">' + t('stats.blood_price') + ': ' + escapeHtml(h.mostWanted.murderWeight) + ' | Level ' + escapeHtml(h.mostWanted.level) + ' ' + escapeHtml(h.mostWanted.className) + '</div>';
             html += '</div>';
         }
         html += '</div>';
@@ -2509,9 +2512,9 @@
                 const onlineDot = g.isOnline ? '<span class="online-indicator">&#9679;</span>' : '';
                 html += '<tr>';
                 html += '<td class="lb-divine">' + onlineDot + escapeHtml(g.divineName) + '</td>';
-                html += '<td class="lb-title">' + escapeHtml(g.godTitle) + ' (Lv ' + g.godLevel + ')</td>';
+                html += '<td class="lb-title">' + escapeHtml(g.godTitle) + ' (Lv ' + escapeHtml(g.godLevel) + ')</td>';
                 html += '<td class="lb-alignment">' + escapeHtml(g.godAlignment) + '</td>';
-                html += '<td class="lb-believers">' + g.believers + '</td>';
+                html += '<td class="lb-believers">' + escapeHtml(g.believers) + '</td>';
                 html += '<td class="lb-status ' + (g.isOnline ? 'online' : 'offline') + '">' + (g.isOnline ? t('stats.online') : t('stats.offline')) + '</td>';
                 html += '</tr>';
             }
@@ -2525,14 +2528,14 @@
             html += '<th class="rank-col">' + t('stats.th_rank') + '</th><th>' + t('stats.th_player') + '</th><th>' + t('stats.th_class') + '</th><th class="lb-level">' + t('stats.th_lv') + '</th><th class="lb-xp">' + t('stats.th_xp') + '</th>';
             html += '</tr></thead><tbody>';
             for (const p of data.leaderboard.slice(0, 25)) {
-                const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
+                const rankClass = p.rank <= 3 ? ' rank-' + escapeHtml(p.rank) : '';
                 const onlineClass = p.isOnline ? ' is-online' : '';
                 const onlineDot = p.isOnline ? '<span class="online-indicator">&#9679;</span>' : '';
                 html += '<tr>';
-                html += '<td class="rank-col' + rankClass + '">#' + p.rank + '</td>';
+                html += '<td class="rank-col' + rankClass + '">#' + escapeHtml(p.rank) + '</td>';
                 html += '<td class="lb-name' + onlineClass + '">' + onlineDot + escapeHtml(p.name) + '</td>';
                 html += '<td class="lb-class">' + escapeHtml(p.className) + '</td>';
-                html += '<td class="lb-level">' + p.level + '</td>';
+                html += '<td class="lb-level">' + escapeHtml(p.level) + '</td>';
                 html += '<td class="lb-xp">' + formatNumber(p.experience) + '</td>';
                 html += '</tr>';
             }
@@ -2546,14 +2549,14 @@
             html += '<th class="rank-col">' + t('stats.th_rank') + '</th><th>' + t('stats.th_player') + '</th><th>' + t('stats.th_class') + '</th><th class="lb-level">' + t('stats.th_lv') + '</th><th class="lb-wins">' + t('stats.th_wins') + '</th><th class="lb-losses">' + t('stats.th_losses') + '</th><th class="lb-gold">' + t('stats.th_gold_stolen') + '</th>';
             html += '</tr></thead><tbody>';
             for (const p of data.pvpLeaderboard) {
-                const rankClass = p.rank <= 3 ? ' rank-' + p.rank : '';
+                const rankClass = p.rank <= 3 ? ' rank-' + escapeHtml(p.rank) : '';
                 html += '<tr>';
-                html += '<td class="rank-col' + rankClass + '">#' + p.rank + '</td>';
+                html += '<td class="rank-col' + rankClass + '">#' + escapeHtml(p.rank) + '</td>';
                 html += '<td class="lb-name">' + escapeHtml(p.name) + '</td>';
                 html += '<td class="lb-class">' + escapeHtml(p.className) + '</td>';
-                html += '<td class="lb-level">' + p.level + '</td>';
-                html += '<td class="lb-wins">' + p.wins + '</td>';
-                html += '<td class="lb-losses">' + p.losses + '</td>';
+                html += '<td class="lb-level">' + escapeHtml(p.level) + '</td>';
+                html += '<td class="lb-wins">' + escapeHtml(p.wins) + '</td>';
+                html += '<td class="lb-losses">' + escapeHtml(p.losses) + '</td>';
                 html += '<td class="lb-gold">' + formatGold(p.goldStolen) + '</td>';
                 html += '</tr>';
             }
@@ -2630,7 +2633,7 @@
     }
 
     function renderStatCard(value, label) {
-        return '<div class="stat-card"><div class="stat-value">' + value + '</div><div class="stat-label">' + label + '</div></div>';
+        return '<div class="stat-card"><div class="stat-value">' + escapeHtml(value) + '</div><div class="stat-label">' + label + '</div></div>';
     }
 
     // --- SSE Live Feed ---
@@ -2755,13 +2758,19 @@
                     grid.innerHTML = '<div class="sponsors-empty">' + t('sponsors.empty') + '</div>';
                     return;
                 }
-                grid.innerHTML = data.sponsors.map(s => `
-                    <a class="sponsor-card" href="${s.url}" target="_blank" rel="noopener" title="${s.name || s.login}">
-                        <img class="sponsor-avatar" src="${s.avatarUrl}" alt="${s.login}" loading="lazy">
-                        <span class="sponsor-name">${s.name || s.login}</span>
-                        ${s.tier ? `<span class="sponsor-tier">${s.tier}</span>` : ''}
-                    </a>
-                `).join('');
+                // Sponsor data comes from GitHub: every field is escaped, and url and
+                // avatarUrl are used only when they are https URLs (no link or image otherwise).
+                grid.innerHTML = data.sponsors.map(s => {
+                    const label = s.name || s.login;
+                    const href = safeHttpsUrl(s.url);
+                    const avatar = safeHttpsUrl(s.avatarUrl);
+                    const inner = (avatar ? `<img class="sponsor-avatar" src="${escapeHtml(avatar)}" alt="${escapeHtml(s.login)}" loading="lazy">` : '')
+                        + `<span class="sponsor-name">${escapeHtml(label)}</span>`
+                        + (s.tier ? `<span class="sponsor-tier">${escapeHtml(s.tier)}</span>` : '');
+                    return href
+                        ? `<a class="sponsor-card" href="${escapeHtml(href)}" target="_blank" rel="noopener" title="${escapeHtml(label)}">${inner}</a>`
+                        : `<span class="sponsor-card" title="${escapeHtml(label)}">${inner}</span>`;
+                }).join('');
             })
             .catch(() => {
                 document.getElementById('sponsors-grid').innerHTML =

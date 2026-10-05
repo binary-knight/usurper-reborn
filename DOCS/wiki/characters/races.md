@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Core/GameConfig.cs
+history: 1.2.6 | none
 history: 1.2.5 | Race descriptions, class restriction reasons and the race help screen are shown in all five languages.
 history: 1.2.4 | none
 history: 1.2.3 | none

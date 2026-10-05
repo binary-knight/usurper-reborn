@@ -319,6 +319,10 @@ public class GuildSystem
         if (string.IsNullOrWhiteSpace(guildName) || guildName.Length < 2 || guildName.Length > 30)
             return Loc.Get("guild.err_name_length");
 
+        // v1.2.6: guild names reach web pages, so markup characters are refused
+        if (NameRules.HasMarkupChars(guildName) || NameRules.HasMarkupChars(displayName))
+            return NameRules.MarkupCharsMessage;
+
         if (GetPlayerGuild(leaderUsername) != null)
             return Loc.Get("guild.err_already_in_guild");
 

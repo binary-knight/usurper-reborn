@@ -20,7 +20,7 @@ env:
   DOTNET_VERSION: '8.0.x'
 
 # ═══════════════════════════════════════════════════════════════════
-# Job dependency graph:
+# Job dependency graph (web-test, the web/ node tests, also gates build and deploy-server):
 #
 #   test ──┬── build (matrix: 6 platforms) ──┬── smoke-test (matrix: 4 platforms)
 #          │                                  ├── bundle-desktop (WezTerm, release only)
@@ -80,6 +80,28 @@ jobs:
           path: web/wiki/
           if-no-files-found: error
 
+  # ─── WEB TESTS ───────────────────────────────────────────────────
+  # The page and server tests under web/test. The build and the server deploy both
+  # wait for this job, so a failing web test stops every run that builds.
+  web-test:
+    name: Web tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web packages
+        working-directory: web
+        run: npm ci
+      - name: Run web tests
+        working-directory: web
+        run: npm test
+
   # ─── TEST ────────────────────────────────────────────────────────
   test:
     name: Test
@@ -109,7 +131,7 @@ jobs:
   build:
     name: Build ${{ matrix.name }}
     runs-on: ubuntu-latest
-    needs: [test]
+    needs: [test, web-test]
     strategy:
       fail-fast: false
       matrix:
@@ -780,7 +802,7 @@ jobs:
   deploy-server:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    needs: [build, smoke-test, wiki]
+    needs: [build, smoke-test, wiki, web-test]
     if: >-
       (github.event_name == 'release') ||
       (github.event_name == 'workflow_dispatch' && inputs.deploy_server == 'true')
@@ -832,8 +854,9 @@ jobs:
       # weeks behind this repository and missing a committed fix. Secrets and installed
       # packages live in that directory too, so .env and node_modules are excluded and the
       # archive is unpacked over the top rather than replacing the directory.
+      # web/test holds the page tests and is not served, so it stays out of the archive.
       - name: Create web assets tarball
-        run: tar -czf web.tar.gz -C web --exclude=node_modules --exclude=.env --exclude='*.bak' .
+        run: tar -czf web.tar.gz -C web --exclude=node_modules --exclude=.env --exclude='*.bak' --exclude=./test .
 
       - name: Deploy to production
         env:

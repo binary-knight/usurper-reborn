@@ -1,8 +1,9 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs
+history: 1.2.6 | none
 history: 1.2.5 | After an online sleep, attacks by NPCs now appear in the wake-up report, and NPC attackers fight your surviving hired Inn guards.
 history: 1.2.4 | none
 ---

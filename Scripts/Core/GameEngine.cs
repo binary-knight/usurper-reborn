@@ -2401,7 +2401,13 @@ public partial class GameEngine
             {
                 case "N":
                     var newName = await terminal.GetInput(Loc.Get("engine.enter_name_prompt"));
-                    if (!string.IsNullOrWhiteSpace(newName))
+                    // v1.2.6: this name becomes the character's name directly, so the name rule applies here
+                    if (NameRules.HasMarkupChars(newName))
+                    {
+                        terminal.WriteLine(NameRules.MarkupCharsMessage, "red");
+                        await Pacing.Wait(2000);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(newName))
                     {
                         // Refresh player names list in case characters were deleted
                         var currentPlayerNames = SaveSystem.Instance.GetAllPlayerNames();

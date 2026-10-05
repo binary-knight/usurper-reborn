@@ -237,6 +237,8 @@ sudo apt install -y python3 make g++
 cd /opt/usurper/web && sudo -u usurper npm install
 
 # Install nginx config
+sudo mkdir -p /etc/nginx/snippets
+sudo cp scripts-server/nginx-csp.conf /etc/nginx/snippets/usurper-csp.conf
 sudo cp scripts-server/nginx-usurper.conf /etc/nginx/sites-available/usurper
 sudo ln -sf /etc/nginx/sites-available/usurper /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx

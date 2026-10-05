@@ -1076,6 +1076,8 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"world_edits not ensured: {ex.Message}"); }
 
+            MigrateCombatEventColumns(connection); // 1.2.6: accumulator columns and indexes, after the table exists
+
             MigrateWorldBossTables(connection); // v1.1.4
 
             EnsureDisplayNameUniqueIndex(connection);   // v1.1.14
@@ -3059,66 +3061,6 @@ namespace UsurperRemake.Systems
             }
         }
 
-        // --- Combat Events (Balance Dashboard) ---
-
-        public async Task LogCombatEvent(
-            string playerName, int playerLevel, string playerClass,
-            long playerMaxHP, long playerSTR, long playerDEX, long playerWeapPow, long playerArmPow,
-            string? monsterName, int monsterLevel, long monsterMaxHP, long monsterSTR, long monsterDEF,
-            bool isBoss, string outcome, int rounds,
-            long damageDealt, long damageTaken, long xpGained, long goldGained,
-            int dungeonFloor, int monsterCount, bool hasTeammates)
-        {
-            try
-            {
-                using var connection = OpenConnection();
-                using var cmd = connection.CreateCommand();
-                cmd.CommandText = @"
-                    INSERT INTO combat_events (
-                        player_name, player_level, player_class,
-                        player_max_hp, player_str, player_dex, player_weap_pow, player_arm_pow,
-                        monster_name, monster_level, monster_max_hp, monster_str, monster_def,
-                        is_boss, outcome, rounds, damage_dealt, damage_taken,
-                        xp_gained, gold_gained, dungeon_floor, monster_count, has_teammates
-                    ) VALUES (
-                        @pName, @pLevel, @pClass,
-                        @pMaxHP, @pSTR, @pDEX, @pWeapPow, @pArmPow,
-                        @mName, @mLevel, @mMaxHP, @mSTR, @mDEF,
-                        @isBoss, @outcome, @rounds, @dmgDealt, @dmgTaken,
-                        @xpGained, @goldGained, @floor, @mCount, @hasTeam
-                    );
-                ";
-                cmd.Parameters.AddWithValue("@pName", playerName);
-                cmd.Parameters.AddWithValue("@pLevel", playerLevel);
-                cmd.Parameters.AddWithValue("@pClass", playerClass);
-                cmd.Parameters.AddWithValue("@pMaxHP", playerMaxHP);
-                cmd.Parameters.AddWithValue("@pSTR", playerSTR);
-                cmd.Parameters.AddWithValue("@pDEX", playerDEX);
-                cmd.Parameters.AddWithValue("@pWeapPow", playerWeapPow);
-                cmd.Parameters.AddWithValue("@pArmPow", playerArmPow);
-                cmd.Parameters.AddWithValue("@mName", (object?)monsterName ?? DBNull.Value);
-                cmd.Parameters.AddWithValue("@mLevel", monsterLevel);
-                cmd.Parameters.AddWithValue("@mMaxHP", monsterMaxHP);
-                cmd.Parameters.AddWithValue("@mSTR", monsterSTR);
-                cmd.Parameters.AddWithValue("@mDEF", monsterDEF);
-                cmd.Parameters.AddWithValue("@isBoss", isBoss ? 1 : 0);
-                cmd.Parameters.AddWithValue("@outcome", outcome);
-                cmd.Parameters.AddWithValue("@rounds", rounds);
-                cmd.Parameters.AddWithValue("@dmgDealt", damageDealt);
-                cmd.Parameters.AddWithValue("@dmgTaken", damageTaken);
-                cmd.Parameters.AddWithValue("@xpGained", xpGained);
-                cmd.Parameters.AddWithValue("@goldGained", goldGained);
-                cmd.Parameters.AddWithValue("@floor", dungeonFloor);
-                cmd.Parameters.AddWithValue("@mCount", monsterCount);
-                cmd.Parameters.AddWithValue("@hasTeam", hasTeammates ? 1 : 0);
-                await cmd.ExecuteNonQueryAsync();
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("SQL", $"Failed to log combat event: {ex.Message}");
-            }
-        }
-
         /// <summary>
         /// v0.61.2 Phase 1 of NPC AI project: log every world-sim NPC decision so
         /// we can measure baseline behavior (survival rates by class, gold delta
@@ -3268,8 +3210,9 @@ namespace UsurperRemake.Systems
         /// showed 3 deaths when saves recorded 63. Fix: the row cap now applies ONLY to non-death
         /// outcomes (victory/fled), so deaths are never crowded out; deaths are kept for a long
         /// window (deathDaysToKeep) and non-deaths for a shorter one. Net table size stays tiny.
+        /// 1.2.6: non-deaths 30 days or 15000 rows, deaths 90 days (about 6 MB at the cap).
         /// </summary>
-        public async Task PruneCombatEvents(int daysToKeep = 14, int maxRows = 5000, int deathDaysToKeep = 90)
+        public async Task PruneCombatEvents(int daysToKeep = CombatEventKeepDays, int maxRows = CombatEventMaxRows, int deathDaysToKeep = CombatDeathKeepDays)
         {
             try
             {
@@ -4874,6 +4817,33 @@ namespace UsurperRemake.Systems
         /// Hash a password using PBKDF2 with a random salt.
         /// Returns "salt:hash" as a base64 string pair.
         /// </summary>
+        /// <summary>v1.2.6: the PBKDF2 work factor, shared by hashing, verifying and the login dummy verify.</summary>
+        internal const int Pbkdf2Iterations = 100000;
+
+        /// <summary>
+        /// v1.2.6: a fixed hash in the stored "salt:hash" format. A login with no usable hash (no such
+        /// account, or an empty or malformed stored hash) verifies the typed password against this, so
+        /// it costs the same PBKDF2 work as a real wrong password; the result is always discarded.
+        /// </summary>
+        internal const string DummyPasswordHash = "EBESExQVFhcYGRobHB0eHw==:cp3ZNMXkVxqxLyGrfqdOHLonRn9oO4msXohkNHGE0Gg=";
+
+        /// <summary>v1.2.6: password verifies run by <see cref="AuthenticatePlayer"/> on this backend (tests).</summary>
+        internal int LoginVerifies;
+        /// <summary>v1.2.6: of those, the ones against <see cref="DummyPasswordHash"/> (tests).</summary>
+        internal int LoginDummyVerifies;
+
+        /// <summary>v1.2.6: true when <paramref name="storedHash"/> is a well formed "salt:hash" pair.</summary>
+        internal static bool IsUsableHash(string? storedHash)
+        {
+            if (string.IsNullOrEmpty(storedHash)) return false;
+            var parts = storedHash.Split(':');
+            if (parts.Length != 2 || parts[0].Length == 0 || parts[1].Length == 0) return false;
+            var buffer = new byte[storedHash.Length];
+            // PBKDF2 needs a salt of at least 8 bytes; anything shorter would throw rather than verify
+            return Convert.TryFromBase64String(parts[0], buffer, out int saltBytes) && saltBytes >= 8
+                && Convert.TryFromBase64String(parts[1], buffer, out int hashBytes) && hashBytes > 0;
+        }
+
         private static string HashPassword(string password)
         {
             byte[] salt = new byte[16];
@@ -4883,7 +4853,7 @@ namespace UsurperRemake.Systems
             }
 
             using var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(
-                password, salt, iterations: 100000, System.Security.Cryptography.HashAlgorithmName.SHA256);
+                password, salt, iterations: Pbkdf2Iterations, System.Security.Cryptography.HashAlgorithmName.SHA256);
             byte[] hash = pbkdf2.GetBytes(32);
 
             return Convert.ToBase64String(salt) + ":" + Convert.ToBase64String(hash);
@@ -4903,7 +4873,7 @@ namespace UsurperRemake.Systems
             byte[] expectedHash = Convert.FromBase64String(parts[1]);
 
             using var pbkdf2 = new System.Security.Cryptography.Rfc2898DeriveBytes(
-                password, salt, iterations: 100000, System.Security.Cryptography.HashAlgorithmName.SHA256);
+                password, salt, iterations: Pbkdf2Iterations, System.Security.Cryptography.HashAlgorithmName.SHA256);
             byte[] actualHash = pbkdf2.GetBytes(32);
 
             // Constant-time comparison to prevent timing attacks
@@ -5297,9 +5267,6 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Authenticate a player. Returns (success, displayName, message).
-        /// </summary>
-        /// <summary>
         /// v0.65.12 (loc audit): persist the language chosen at the login gate
         /// so a fresh registration's first session runs in the player's language
         /// (the column otherwise only updates from the first character save).
@@ -5322,7 +5289,34 @@ namespace UsurperRemake.Systems
             }
         }
 
-        public async Task<(bool success, string displayName, string message, bool screenReader, string language)> AuthenticatePlayer(string username, string password, string? ipAddress = null, string? lang = null)
+        /// <summary>
+        /// v1.2.6: why a login failed, for operator logs only. Players see one message for every
+        /// <see cref="IsGenericLoginFailure"/> reason, so a login never shows whether an account exists.
+        /// </summary>
+        public enum LoginFailure { None, IpBanned, UnknownName, NoUsableHash, WrongPassword, BannedWrongPassword, Banned, Error }
+
+        /// <summary>v1.2.6: the reasons that show the player the one generic message.</summary>
+        public static bool IsGenericLoginFailure(LoginFailure reason) =>
+            reason is LoginFailure.UnknownName or LoginFailure.NoUsableHash
+                or LoginFailure.WrongPassword or LoginFailure.BannedWrongPassword;
+
+        /// <summary>
+        /// v1.2.6: the rows a login screen with an [R] register key shows for a failed login: the
+        /// message, then the register hint on its own row after the generic message.
+        /// </summary>
+        public static List<string> LoginFailureRows(string? lang, string message, LoginFailure reason)
+        {
+            var rows = new List<string> { message };
+            if (IsGenericLoginFailure(reason)) rows.Add(AuthText(lang, "auth.err_bad_login_hint"));
+            return rows;
+        }
+
+        /// <summary>
+        /// Authenticate a player. v1.2.6: an unknown name, an account with no usable hash and a wrong
+        /// password all give the same message (auth.err_bad_login) after the same PBKDF2 work; a banned
+        /// account shows its ban notice only after the right password. <c>reason</c> is for operator logs.
+        /// </summary>
+        public async Task<(bool success, string displayName, string message, bool screenReader, string language, LoginFailure reason)> AuthenticatePlayer(string username, string password, string? ipAddress = null, string? lang = null)
         {
             string T(string key, params object[] args) => AuthText(lang, key, args);
             // v0.60.5: defense-in-depth IP check. The MudServer accept-time check
@@ -5332,7 +5326,7 @@ namespace UsurperRemake.Systems
             // gate (e.g., a new SSH gateway, an HTTP login endpoint).
             if (!string.IsNullOrWhiteSpace(ipAddress) && IsIpBanned(ipAddress))
             {
-                return (false, "", T("auth.err_login_ip_banned"), false, "en");
+                return (false, "", T("auth.err_login_ip_banned"), false, "en", LoginFailure.IpBanned);
             }
 
             try
@@ -5343,34 +5337,50 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@username", username);
 
                 using var reader = await cmd.ExecuteReaderAsync();
-                if (!await reader.ReadAsync())
-                    return (false, "", T("auth.err_unknown_username"), false, "en");
+                bool found = await reader.ReadAsync();
+                string displayName = found ? reader.GetString(0) : "";
+                string storedHash = found && !reader.IsDBNull(1) ? reader.GetString(1) : "";
+                bool isBanned = found && reader.GetInt32(2) != 0;
+                string? banReason = !found || reader.IsDBNull(3) ? null : reader.GetString(3);
+                bool screenReader = found && reader.GetInt32(4) != 0;
+                string language = !found || reader.IsDBNull(5) ? "en" : reader.GetString(5);
 
-                string displayName = reader.GetString(0);
-                string storedHash = reader.GetString(1);
-                bool isBanned = reader.GetInt32(2) != 0;
-                string? banReason = reader.IsDBNull(3) ? null : reader.GetString(3);
-                bool screenReader = reader.GetInt32(4) != 0;
-                string language = reader.IsDBNull(5) ? "en" : reader.GetString(5);
+                // No such account, or no usable hash: the same PBKDF2 work against the dummy hash,
+                // and the same message as a wrong password.
+                if (!found || !IsUsableHash(storedHash))
+                {
+                    LoginVerify(password, DummyPasswordHash, dummy: true);
+                    return (false, "", T("auth.err_bad_login"), false, "en", found ? LoginFailure.NoUsableHash : LoginFailure.UnknownName);
+                }
+
+                // A banned account is checked only after the right password.
+                if (!LoginVerify(password, storedHash, dummy: false))
+                    return (false, "", T("auth.err_bad_login"), false, "en", isBanned ? LoginFailure.BannedWrongPassword : LoginFailure.WrongPassword);
 
                 if (isBanned)
                 {
                     string msg = T("auth.err_account_banned");
                     if (!string.IsNullOrEmpty(banReason))
                         msg += " " + T("auth.err_ban_reason", banReason); // the reason is the admin's own text
-                    return (false, "", msg, false, "en");
+                    return (false, "", msg, false, "en", LoginFailure.Banned);
                 }
 
-                if (!VerifyPassword(password, storedHash))
-                    return (false, "", T("auth.err_wrong_password"), false, "en");
-
-                return (true, displayName, T("auth.login_ok"), screenReader, language);
+                return (true, displayName, T("auth.login_ok"), screenReader, language, LoginFailure.None);
             }
             catch (Exception ex)
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to authenticate player: {ex.Message}");
-                return (false, "", T("auth.err_auth_failed"), false, "en");
+                return (false, "", T("auth.err_auth_failed"), false, "en", LoginFailure.Error);
             }
+        }
+
+        /// <summary>v1.2.6: one counted PBKDF2 verify for <see cref="AuthenticatePlayer"/>.</summary>
+        private bool LoginVerify(string password, string storedHash, bool dummy)
+        {
+            System.Threading.Interlocked.Increment(ref LoginVerifies);
+            if (dummy) System.Threading.Interlocked.Increment(ref LoginDummyVerifies);
+            bool ok = VerifyPassword(password ?? "", storedHash);
+            return ok && !dummy;
         }
 
         /// <summary>
@@ -5384,7 +5394,7 @@ namespace UsurperRemake.Systems
                 if (newPassword != null && newPassword.Contains(':'))
                     return (false, T("auth.err_password_colon")); // v1.1.1: the relay/desktop AUTH line splits on ':'
                 // Verify old password first
-                var (authenticated, _, _, _, _) = await AuthenticatePlayer(username, oldPassword, null, lang);
+                var (authenticated, _, _, _, _, _) = await AuthenticatePlayer(username, oldPassword, null, lang);
                 if (!authenticated)
                     return (false, T("auth.err_current_password"));
 

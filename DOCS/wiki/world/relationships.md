@@ -1,8 +1,9 @@
 ---
 title: Relationships and Love Street
 path: /wiki/en/world/relationships/
-checked: 1.2.5
+checked: 1.2.6
 sources: Scripts/Locations/LoveStreetLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs
+history: 1.2.6 | none
 history: 1.2.5 | Love Street is shown in all five languages, including the courtesan and gigolo descriptions, gifts and gossip.
 history: 1.2.4 | none
 ---
