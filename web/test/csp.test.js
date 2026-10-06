@@ -1,12 +1,14 @@
 'use strict';
 // The Content-Security-Policy line in the nginx template, checked from the files:
-//  1. the header is Content-Security-Policy-Report-Only, set with "always", in one snippet file
-//     that the site template includes inside its main server block;
-//  2. it names no report endpoint (nothing is sent anywhere);
-//  3. no enforcing Content-Security-Policy header exists in the template, the snippet, the node
-//     server or a page meta tag (report-only must block nothing);
-//  4. every external host that the pages and the wiki stylesheet load from is allowed by the
+//  1. the header is Content-Security-Policy (enforcing, 1.2.8), set with "always", in one snippet
+//     file that the site template includes inside its main server block;
+//  2. the policy value is the one checked live in report-only mode (1.2.6 and 1.2.7), unchanged;
+//  3. it names no report endpoint (nothing is sent anywhere);
+//  4. no report-only header is left in the template or the snippet, and the node server and the
+//     pages set no policy of their own;
+//  5. every external host that the pages and the wiki stylesheet load from is allowed by the
 //     directive that governs it.
+// The tests read files only; nothing touches the network.
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('node:fs');
@@ -17,6 +19,14 @@ const read = (...p) => fs.readFileSync(path.join(ROOT, ...p), 'utf8');
 const TEMPLATE = read('scripts-server', 'nginx-usurper.conf');
 const SNIPPET = read('scripts-server', 'nginx-csp.conf');
 const PAGES = fs.readdirSync(path.join(ROOT, 'web')).filter((f) => f.endsWith('.html'));
+
+// The policy as it ran report-only on the live site, where every page showed no violation.
+const POLICY = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; " +
+  "font-src https://fonts.gstatic.com; img-src 'self' data: https://avatars.githubusercontent.com; " +
+  "connect-src 'self' wss://usurper-reborn.net wss://play.usurper-reborn.net; " +
+  "frame-src https://store.steampowered.com https://discord.com; object-src 'none'; base-uri 'self'; " +
+  "form-action 'self'; frame-ancestors 'none'";
 
 const code = (text) => text.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n');
 
@@ -37,11 +47,17 @@ function policy() {
   return map;
 }
 
-test('the header is Content-Security-Policy-Report-Only and applies to every response', () => {
+test('the header is Content-Security-Policy (enforcing) and applies to every response', () => {
   const h = headers(SNIPPET);
   assert.strictEqual(h.length, 1);
-  assert.strictEqual(h[0].name, 'Content-Security-Policy-Report-Only');
+  assert.strictEqual(h[0].name, 'Content-Security-Policy');
   assert.strictEqual(h[0].always, true, 'add_header needs "always" to cover error responses');
+});
+
+test('the policy value is unchanged from the report-only run', () => {
+  const h = headers(SNIPPET);
+  assert.strictEqual(h.length, 1);
+  assert.strictEqual(h[0].value, POLICY);
 });
 
 test('the site template includes the snippet inside its main server block', () => {
@@ -68,13 +84,13 @@ test('the policy names no report-to', () => {
   assert.doesNotMatch(SNIPPET + TEMPLATE, /report-to/i);
 });
 
-test('no enforcing Content-Security-Policy header in the template or the snippet', () => {
+test('no Content-Security-Policy-Report-Only left anywhere in the template or the snippet', () => {
   for (const [name, text] of [['template', TEMPLATE], ['snippet', SNIPPET]]) {
-    assert.doesNotMatch(code(text), /Content-Security-Policy(?!-Report-Only)/i, `${name} holds an enforcing header`);
+    assert.doesNotMatch(text, /Content-Security-Policy-Report-Only/i, `${name} still names the report-only header`);
   }
 });
 
-test('the node server and the pages set no enforcing policy either', () => {
+test('the node server and the pages set no policy of their own', () => {
   assert.doesNotMatch(read('web', 'ssh-proxy.js'), /Content-Security-Policy/i);
   for (const page of PAGES) {
     assert.doesNotMatch(read('web', page), /http-equiv\s*=\s*["']?Content-Security-Policy/i, `${page} has a CSP meta tag`);
