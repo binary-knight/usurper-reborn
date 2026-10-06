@@ -2,7 +2,7 @@
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.2.6 "Devotion"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.2.7 "Devotion"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -233,7 +233,7 @@ Total monsters killed, gold earned, time played, peak gold, deepest dungeon floo
 - CK-style parenting (24 scenarios with moral choices that shape your child's alignment).
 
 ### Game Preferences
-Quick settings via the Preferences menu (compact, screen-reader, language, font size, date format, character/monster art, hide intimate scenes, etc.). All preferences saved per character.
+Quick settings via the Preferences menu (compact, screen-reader, language, font size, date format, character/monster art, hide intimate scenes, etc.). All preferences saved per character. The Share combat data line (opt-in telemetry, see below) is there too; its answer covers the copy of the game, or the account on a BBS or server.
 
 ## Estimated Playtime
 
@@ -269,7 +269,7 @@ Run Usurper Reborn as a door game on modern BBS software:
 - **Multi-Node Support:** Each node gets isolated session handling.
 - **BBS-Isolated Saves:** Saves stored per-BBS so users on different BBSes don't conflict.
 - **CP437 Auto-Detection:** Synchronet stdio mode automatically switches output encoding to CP437 for correct box-drawing.
-- **SysOp Console:** In-game admin console for player management, difficulty settings, MOTD, online-play toggle, and auto-updates.
+- **SysOp Console:** In-game admin console for player management, difficulty settings, MOTD, online-play toggle, the combat data sharing switch, and auto-updates.
 - **In-Game Bug Reports:** Players press `!` to submit bug reports directly from a BBS session, posted to Discord with player context.
 - **Cross-Platform:** Windows x64/x86, Linux x64/ARM64, macOS.
 
@@ -284,6 +284,41 @@ For detailed BBS setup, see [DOCS/BBS_DOOR_SETUP.md](DOCS/BBS_DOOR_SETUP.md).
 
 **BBS Online Play:** A BBS player can pick `[O] Online Play` from the main menu to connect to the public game server (or any other Usurper Reborn server with a hostname they know). As of v0.60.8 the connection requires a normal username + password (the previous trusted-passthrough was removed for security; the BBS handle is pre-filled as the username default).
 
+## Telemetry
+
+Telemetry (opt in). From 1.2.7 the game asks once whether to share
+combat data. Nothing is sent unless you say yes. With sharing on, each
+monster fight adds one row of whole numbers with these values and no
+others: the outcome (victory, fled or death); your class, level,
+maximum HP, HP at the end of the fight, strength, dexterity, weapon
+power and armor power; the monster's family, level, maximum HP,
+strength and defence, and whether it was a boss; the number of
+monsters and the encounter size; who acted first; the dungeon floor
+and difficulty; whether you had teammates, the party size and
+teammates lost; rounds; total damage dealt and taken; damage to you by
+kind (basic, ability, spell, damage over time); damage to your team;
+damage by you and by your team; healing you received; potions,
+abilities and spells used; XP and gold gained. No player or monster
+names, no chat, no save contents, no hardware ids. Each upload also
+carries the game version, the kind of install (single player, Steam,
+BBS door or server) and a random id.
+
+On single player and Steam the id is made when you say yes, covers
+every character on that copy of the game, and you can replace it
+under Preferences. On a BBS or self hosted server the id belongs to
+that server and is shared by its players; no player can replace it.
+The operator must allow sharing there, each player is still asked,
+and the answer is for that player's account.
+
+The data is pseudonymous, not anonymous. Exact stat values can link
+one character's fights, even across a new id, and on a small BBS or
+server the rows can be told apart by anyone who knows it. Addresses
+are not stored with the rows.
+Rows are kept for up to 30 days, including rows sent before you turn
+sharing off. Turning it off deletes anything not yet sent.
+
+BBS sysops and server operators: the question is off by default. A sysop turns it on with E in the SysOp console, a server operator with the Privacy setting telemetry_prompt in the web admin. See `DOCS/release-notes/RELEASE_NOTES_1.2.7.md`.
+
 ## Recent Highlights
 
 The game ships small patches frequently. Each version has a dedicated release notes file under `DOCS/release-notes/` (Steam-formatted copies in `DOCS/release-notes/steam/`). Highlights of the recent arc:
@@ -292,6 +327,7 @@ The game ships small patches frequently. Each version has a dedicated release no
 - **v1.1.1:** a bug pass. Five review agents each took a domain of the codebase and about seventy findings were verified and fixed: NPCs losing their innate power on load, the world simulator editing the wrong player's relationships, a restored character unable to save, one player's autosave starving everyone else's, the Black Market re-rolling on relog, a closed connection spinning the server, bank and gambling exploits, buffs consumed a fight early, and raw placeholders in the text. See `DOCS/release-notes/RELEASE_NOTES_1.1.1.md`.
 - **v1.1.2:** seven of the eight open design items, each designed twice (Codex and Claude), reconciled against the code, and reviewed before implementation: grouped followers get their own cooldowns and a real death; haggling finally has a way in and its attempts persist; the bank vault is one persisted reserve per world, atomic online; relationships cool with neglect measured in days you were present; NPCs left to die while you held a heal remember it; ability and spell numbers are moddable from `GameData/`; the two intimacy lines that really dropped a name are fixed. Docker stack refreshed and verified. See `DOCS/release-notes/RELEASE_NOTES_1.1.2.md`.
 - **v1.1.3:** party survivability. Wounded allies shield up, brace (half damage on ordinary hits, specials, and life drain), and drink their own potion first; NPC allies who die in your party roll the 2 percent team permadeath rate they were always meant to; three stances per ally (Aggressive, Balanced, Cautious) set from the dungeon party menu or the Inn and saved with the character; monsters no longer prefer a wounded target and an ally's brace no longer pulls hits unless it is Aggressive; a shared potion belt (off by default, two loans per fight, never the player's last three), give-a-number, and the one-personal-potion rule; a fight summary per ally, a warning before a voluntary fight with an ally below 30 percent, and a floor guard that offers Cautious to an ally eleven levels behind. Planned by a council of Codex, a Claude design agent, and the supervisor session in `DOCS/PARTY_SURVIVABILITY_PLAN.md`; the downed state is the next release.
+- **v1.2.7:** Opt-in combat data sharing: the game asks once whether to share combat data for balancing (single player and Steam at start; on a BBS or a self hosted server each player after login, only when the operator turns the question on, off by default). Only a yes or a no answers, and Preferences has a Share combat data line to change it. What is sent and kept is in the Telemetry section above. A monster's critical hit line no longer leaves an empty gap where a damage number was. The balance dashboard gains a Source choice for the rows sent by copies of the game, marked Unverified. See `DOCS/release-notes/RELEASE_NOTES_1.2.7.md`.
 - **v1.2.6:** Online fights record detailed combat data for the coming difficulty pass: the floor, the difficulty mode, party and encounter size, who acted first, damage by kind and target, heals, potions, abilities and spells used, teammates lost and the HP left at the end, written in the background so a fight never waits for the database. Combat rows are kept 30 days or the newest 15000 for fights other than deaths, and 90 days for deaths. Logins no longer show whether an account exists, and refused sign-ups count toward the per-address login throttle. New character, child, team, guild and divine names can no longer contain < > & or a double quote; existing names are kept. The website escapes all player and sponsor text, its tests run in CI, and a report-only Content-Security-Policy template is in scripts-server. The balance dashboard gains Difficulty and Onboarding tabs and counts every rate over one stated window. See `DOCS/release-notes/RELEASE_NOTES_1.2.6.md`.
 - **v1.2.5:** The whole game is translated into Spanish, French, Hungarian and Italian: the town, the castle, the online server, NPC speech, items, monsters, quests, achievements, the story and the endings, and mail and broadcasts reach each player in their own language. Every message, shop, equipment and status row fits 79 columns in all five languages, and shop, equipment and backpack rows are tighter. The world boss notice is no longer mailed every night, old world boss mail is deleted once, and system mail older than 30 days is deleted. The Mysterious Stranger appears in play and the answer carries into the Manwe fight. English players salvage gold after a PvP win, answered moral paradoxes are saved, Magic Shop enchant removal returns an item to its base form, NPC attackers fight surviving Inn guards, and loot bonuses are the same in every language. The wiki adds a guide to accounts and character slots. See `DOCS/release-notes/RELEASE_NOTES_1.2.5.md`.
 - **v1.2.4:** Reconnecting no longer drops a player from /who, /tell, groups and broadcasts, and the old session no longer saves over the new one. /history shows the last 50 chat lines, kept in server memory only. Homes are private: room chat and notices no longer reach players at home. In group combat each follower reads the turn screen, menus, round status and group lines in their own language. The Magic Shop haggles over rings and necklaces, a spouse left alone for 21 days writes a letter, mail counts and system notices reach players whose account and character names differ, and immortal ascension and renouncing are fixed. Dungeon text left in English in 1.2.3 is translated, more screens fit 79 columns, and the wiki adds a guide to immortals. See `DOCS/release-notes/RELEASE_NOTES_1.2.4.md`.
@@ -362,7 +398,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.2.6)
+## Known Issues (v1.2.7)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -376,4 +412,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** v1.2.6 "Devotion". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.2.7 "Devotion". The world is running. [Watch it live.](https://usurper-reborn.net)
