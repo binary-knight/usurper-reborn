@@ -37,6 +37,11 @@ public class LocationManager
         }
     }
 
+    /// <summary>1.2.8: this session's manager, or the single-player one, without creating one
+    /// (a save asks it whether the player is in the dungeon; null when there is none yet).</summary>
+    internal static LocationManager? Existing
+        => UsurperRemake.Server.SessionContext.Current?.LocationManager ?? _fallbackInstance;
+
     // Ensure that any manually created manager becomes the global instance
     private void RegisterAsSingleton()
     {

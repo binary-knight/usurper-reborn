@@ -34,6 +34,11 @@ public class DungeonLocation : BaseLocation
     private DungeonFloor currentFloor = null!;
     private bool inRoomMode = false; // Are we exploring a room?
 
+    // 1.2.8: true while the player is on currentFloor in this visit (set once the floor is
+    // generated or resumed, cleared at the next entry and on leaving). currentFloor itself is
+    // kept as a cache after the player leaves, so a save may copy it only while this is true.
+    private bool floorActiveForSave;
+
     /// <summary>
     /// v0.60.3: public accessor for the currently-occupied dungeon room. Used by
     /// LocationManager when building the GMCP Room.Info exits map and by other
@@ -108,6 +113,7 @@ public class DungeonLocation : BaseLocation
         currentPlayer = player;
         terminal = term;
         _declinedCautious.Clear(); // v1.1.3: a new visit; the location object lives for the whole session
+        floorActiveForSave = false; // 1.2.8: a group follower or a blocked entry never owns currentFloor
 
         // Block entry if player is imprisoned
         if (player.DaysInPrison > 0)
@@ -303,6 +309,9 @@ public class DungeonLocation : BaseLocation
             term.SetColor("darkgray");
             await term.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
         }
+
+        // 1.2.8: the player now stands on currentFloor, so a save copies it first
+        floorActiveForSave = true;
 
         // Refresh bounty board quests based on player level
         QuestSystem.RefreshBountyBoard(player?.Level ?? 1, player?.Statistics?.DeepestDungeonLevel ?? 0);
@@ -4053,6 +4062,7 @@ public class DungeonLocation : BaseLocation
         {
             SaveFloorState(player);
         }
+        floorActiveForSave = false; // 1.2.8: left the floor; the cache is no longer live
 
         await base.NavigateToLocation(destination);
     }
@@ -5769,6 +5779,27 @@ public class DungeonLocation : BaseLocation
 
         // Combat
         var combatEngine = new CombatEngine(terminal);
+        // 1.2.8: the room's cleared state is set at the win, before the victory autosave and the loot
+        // screens, so a save there (or the disconnect save of a player who drops at them) keeps the
+        // room cleared; the check after the fight then sets nothing twice
+        // (a boss room's two BossDefeated flags too, so a reload keeps the boss dead; its rewards
+        // stay after the fight)
+        bool roomClearedAtVictory = false;
+        var fightFloor = currentFloor;
+        int fightLevel = currentDungeonLevel;
+        combatEngine.VictoryPreSaveHook = _ =>
+        {
+            if (player.HP <= 0) return;
+            room.IsCleared = true;
+            fightFloor.MonstersKilled += monsters.Count;
+            if (room.IsBossRoom)
+            {
+                fightFloor.BossDefeated = true;
+                if (player.DungeonFloorStates.TryGetValue(fightLevel, out var bossFloorState))
+                    bossFloorState.BossDefeated = true;
+            }
+            roomClearedAtVictory = true;
+        };
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
 
@@ -5792,8 +5823,11 @@ public class DungeonLocation : BaseLocation
         // Check if player survived AND won (fleeing doesn't clear the room)
         if (player.HP > 0 && combatResult.Outcome == CombatOutcome.Victory)
         {
-            room.IsCleared = true;
-            currentFloor.MonstersKilled += monsters.Count;
+            if (!roomClearedAtVictory)
+            {
+                room.IsCleared = true;
+                currentFloor.MonstersKilled += monsters.Count;
+            }
 
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.room_cleared"));
@@ -5801,12 +5835,15 @@ public class DungeonLocation : BaseLocation
 
             if (room.IsBossRoom)
             {
-                currentFloor.BossDefeated = true;
-
-                // Also set the persistent flag in floor state
-                if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                if (!roomClearedAtVictory)   // 1.2.8: else the win already set both flags
                 {
-                    floorState.BossDefeated = true;
+                    currentFloor.BossDefeated = true;
+
+                    // Also set the persistent flag in floor state
+                    if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                    {
+                        floorState.BossDefeated = true;
+                    }
                 }
 
                 terminal.SetColor("bright_yellow");
@@ -6805,10 +6842,51 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Save current floor state to player's persistent data
     /// Called when leaving dungeon or changing floors
+    /// 1.2.8: the copy step (CopyFloorState) and the clear step (RecordFloorClear), so a save
+    /// can copy the floor without the clear step's quest notice.
     /// </summary>
     private void SaveFloorState(Character player)
     {
-        if (currentFloor == null || player == null) return;
+        var floorState = CopyFloorState(player);
+        if (floorState == null) return;
+        RecordFloorClear(floorState, currentDungeonLevel);
+    }
+
+    /// <summary>
+    /// 1.2.8: before a save serializes DungeonFloorStates, copy the floor the player is standing
+    /// on into it (the copy step only: no clear flags, no OnDungeonFloorCleared). Without this a
+    /// save taken mid-floor (the disconnect save above all) wrote no room progress for the
+    /// current floor, and the reload rebuilt it fresh. Runs only when this session's location is
+    /// the dungeon, its floor is live (floorActiveForSave) and the saved character is the one in
+    /// it. Never throws: a failed copy must not stop the save.
+    /// </summary>
+    internal static void FlushActiveFloorForSave(Character player)
+    {
+        try
+        {
+            if (player == null) return;
+            var manager = LocationManager.Existing;
+            if (manager == null || manager.GetCurrentLocation() != GameLocation.Dungeons) return;
+            if (manager.GetLocation(GameLocation.Dungeons) is not DungeonLocation dungeon) return;
+            dungeon.FlushFloorForSave(player);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("SAVE", $"Dungeon floor copy before save failed: {ex.Message}");
+        }
+    }
+
+    private void FlushFloorForSave(Character player)
+    {
+        if (!floorActiveForSave || currentFloor == null || currentFloor.Level != currentDungeonLevel) return;
+        if (!ReferenceEquals(player, currentPlayer)) return;
+        CopyFloorState(player);
+    }
+
+    /// <summary>1.2.8: the copy step of SaveFloorState: visit time, current room and room states.</summary>
+    private DungeonFloorState? CopyFloorState(Character player)
+    {
+        if (currentFloor == null || player == null) return null;
 
         var floorLevel = currentDungeonLevel;
 
@@ -6822,6 +6900,32 @@ public class DungeonLocation : BaseLocation
         floorState.LastVisitedAt = DateTime.Now;
         floorState.CurrentRoomId = currentFloor.CurrentRoomId;
 
+        // Save room states
+        floorState.RoomStates.Clear();
+        foreach (var room in currentFloor.Rooms)
+        {
+            floorState.RoomStates[room.Id] = new DungeonRoomState
+            {
+                RoomId = room.Id,
+                IsExplored = room.IsExplored,
+                IsCleared = room.IsCleared,
+                TreasureLooted = room.TreasureLooted,
+                TrapTriggered = room.TrapTriggered,
+                EventCompleted = room.EventCompleted,
+                PuzzleSolved = room.PuzzleSolved,
+                RiddleAnswered = room.RiddleAnswered,
+                LoreCollected = room.LoreCollected,
+                InsightGranted = room.InsightGranted,
+                MemoryTriggered = room.MemoryTriggered,
+                SecretBossDefeated = room.SecretBossDefeated
+            };
+        }
+        return floorState;
+    }
+
+    /// <summary>1.2.8: the clear step of SaveFloorState: the cleared flags and the quest notice.</summary>
+    private void RecordFloorClear(DungeonFloorState floorState, int floorLevel)
+    {
         // Check if floor is now fully cleared
         bool isNowCleared = IsFloorCleared();
         if (isNowCleared)
@@ -6845,27 +6949,6 @@ public class DungeonLocation : BaseLocation
             {
                 QuestSystem.OnDungeonFloorCleared(questPlayer, floorLevel);
             }
-        }
-
-        // Save room states
-        floorState.RoomStates.Clear();
-        foreach (var room in currentFloor.Rooms)
-        {
-            floorState.RoomStates[room.Id] = new DungeonRoomState
-            {
-                RoomId = room.Id,
-                IsExplored = room.IsExplored,
-                IsCleared = room.IsCleared,
-                TreasureLooted = room.TreasureLooted,
-                TrapTriggered = room.TrapTriggered,
-                EventCompleted = room.EventCompleted,
-                PuzzleSolved = room.PuzzleSolved,
-                RiddleAnswered = room.RiddleAnswered,
-                LoreCollected = room.LoreCollected,
-                InsightGranted = room.InsightGranted,
-                MemoryTriggered = room.MemoryTriggered,
-                SecretBossDefeated = room.SecretBossDefeated
-            };
         }
     }
 

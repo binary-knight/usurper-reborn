@@ -1011,6 +1011,27 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// 1.2.8: set by a caller for its next fight (DungeonLocation's room fight sets the room's
+    /// cleared state with it). Runs at the start of the victory pipeline, before its rewards, loot
+    /// screens and the victory autosave, and only on a Victory with every monster dead, so a save
+    /// taken at any point after the win (the autosave, or the disconnect save of a player who drops
+    /// at a loot screen) already holds what the caller set. PlayerVsMonsters takes it at the start
+    /// of the fight, so a later fight on this engine never runs it.
+    /// </summary>
+    internal Action<CombatResult>? VictoryPreSaveHook { get; set; }
+    private Action<CombatResult>? _victoryPreSaveHookThisFight;
+
+    /// <summary>1.2.8: run this fight's pre-save hook if this is a Victory with every monster dead.</summary>
+    internal void RunVictoryPreSaveHook(CombatResult result)
+    {
+        var hook = _victoryPreSaveHookThisFight;
+        if (hook == null) return;
+        if (result.Outcome != CombatOutcome.Victory) return;
+        if (result.Monsters == null || result.Monsters.Any(m => m.IsAlive)) return;
+        hook(result);
+    }
+
+    /// <summary>
     /// Player vs Multiple Monsters - simultaneous turn-based combat
     /// NEW METHOD for group encounters where all monsters fight at once
     /// </summary>
@@ -1022,6 +1043,12 @@ public partial class CombatEngine
         bool isAmbush = false,
         bool storyFight = false)
     {
+        // 1.2.8: the victory pre-save hook belongs to this fight only. Taken here, so the engine
+        // holds none after the fight starts: a later fight never runs it, whether this one ends,
+        // returns early or throws.
+        _victoryPreSaveHookThisFight = VictoryPreSaveHook;
+        VictoryPreSaveHook = null;
+
         // v1.1.15: collapse happens after combat. A fight that ended at Mental 0 is the last one: an
         // action that chains fights (gauntlet waves, a save quest then an ambush) gets this empty
         // result for the next fight, which is not entered, and the location loop carries out the
@@ -21639,6 +21666,9 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleVictoryMultiMonster(CombatResult result, bool offerMonkEncounter)
     {
+        // 1.2.8: before any reward, loot screen or the victory autosave below
+        RunVictoryPreSaveHook(result);
+
         // MUD mode: broadcast boss kills only (regular kills too spammy)
         if (result.DefeatedMonsters.Count > 0)
         {

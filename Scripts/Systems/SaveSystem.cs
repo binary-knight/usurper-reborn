@@ -113,6 +113,10 @@ namespace UsurperRemake.Systems
                     return false;
                 }
 
+                // 1.2.8: copy the dungeon floor the player stands on into DungeonFloorStates first
+                // (the disconnect save, a quit, any manual save taken mid-floor)
+                DungeonLocation.FlushActiveFloorForSave(player);
+
                 // Create backup of existing save before overwriting
                 backend.CreateBackup(playerName);
 
@@ -281,6 +285,9 @@ namespace UsurperRemake.Systems
                     return true; // Pretend success, save will happen soon
             }
 
+            // 1.2.8: copy the dungeon floor the player stands on into DungeonFloorStates first
+            DungeonLocation.FlushActiveFloorForSave(player);
+
             // 1.2.8: time the build and the write apart, and name the slow one (a locked database
             // can hold the write for up to Microsoft.Data.Sqlite's 30 s default)
             var buildWatch = Stopwatch.StartNew();
@@ -352,6 +359,7 @@ namespace UsurperRemake.Systems
         public async Task<bool> SaveWithTeamVaultDeposit(Character player, string teamName, long amount)
         {
             if (player == null || backend is not SqlSaveBackend sql) return false;
+            DungeonLocation.FlushActiveFloorForSave(player);   // 1.2.8: as AutoSave
             var (playerName, saveData) = await BuildAutoSaveData(player);
             bool success = await sql.WriteGameDataWithVaultDeposit(playerName, saveData, teamName, amount);
             if (success) _lastAutoSaveByKey[AutoSaveThrottleKey(player)] = DateTime.UtcNow;
