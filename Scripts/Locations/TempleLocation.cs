@@ -2141,7 +2141,7 @@ public partial class TempleLocation : BaseLocation
         var mira = companionSystem.GetCompanion(UsurperRemake.Systems.CompanionId.Mira);
 
         // Check requirements
-        if (mira == null || mira.IsRecruited || mira.IsDead)
+        if (mira == null || mira.IsRecruited || mira.IsDead || companionSystem.IsDeparted(UsurperRemake.Systems.CompanionId.Mira))
             return false;
 
         // Level requirement
@@ -3138,6 +3138,9 @@ public partial class TempleLocation : BaseLocation
                         : Loc.Get("temple.faith_hall.cloister", GameConfig.InnerSanctumCost);
                     items.Add(new TempleMenuItem("C", cloister, cloister));
                 }
+                // 1.2.8: a betrayal to forgive (the Stranger's or a companion's) or to avenge (the Stranger, if she escaped)
+                if (BetrayalSystem.Instance.HasTempleAction)
+                    items.Add(Item("B", "temple.faith_hall.betrayals", "temple.faith_hall.betrayals"));
                 break;
             case TempleRoom.OldStones:
                 items.Add(Item("P", "temple.stones.prophecies", "temple.stones.prophecies"));
@@ -3182,6 +3185,7 @@ public partial class TempleLocation : BaseLocation
         (TempleRoom.Undercroft, "D") => ProcessDesecrateAltar,
         (TempleRoom.Faith, "M") => ShowFaithRecruitment,
         (TempleRoom.Faith, "C") => VisitInnerSanctum,
+        (TempleRoom.Faith, "B") => ShowBetrayals,
         (TempleRoom.OldStones, "P") => DisplayOldGodsProphecies,
         (TempleRoom.OldStones, "E") => ExamineAncientStones,
         (TempleRoom.Memory, "K") => ShowHallOfTheFallen,
@@ -3190,6 +3194,109 @@ public partial class TempleLocation : BaseLocation
         (TempleRoom.Memory, "A") => ShowAurelionMemory,
         _ => null
     };
+
+    /// <summary>
+    /// 1.2.8: the Faith room's betrayals: forgive the Stranger (and take revenge on her once, only if she
+    /// escaped her fight), forgive a companion who left, or make one act of atonement a day for them. Only
+    /// the actions that apply are listed; the beloved and Lyris never are.
+    /// </summary>
+    private async Task ShowBetrayals()
+    {
+        var betrayal = BetrayalSystem.Instance;
+        const string stranger = "TheStranger";
+        string team = BetrayalSystem.TeamId;
+        while (true)
+        {
+            // each action says whether the screen still waits for a key (revenge waits on its own)
+            var actions = new List<(TempleMenuItem Item, Func<Task<bool>> Run)>();
+            void Add(string label, Func<Task<bool>> run)
+            {
+                string key = (actions.Count + 1).ToString();
+                actions.Add((new TempleMenuItem(key, label, label), run));
+            }
+            if (betrayal.CanForgiveAtTemple(stranger))
+                Add(Loc.Get("betrayal.temple_forgive", betrayal.TempleName(stranger)), () => ForgiveBetrayer(stranger));
+            if (betrayal.CanTakeRevengeAtTemple())
+                Add(Loc.Get("betrayal.temple_revenge", betrayal.TempleName(stranger)), AvengeStranger);
+            if (betrayal.CanForgiveAtTemple(team))
+                Add(Loc.Get("betrayal.temple_forgive", betrayal.TempleName(team)), () => ForgiveBetrayer(team));
+            if (betrayal.CanAtone)
+                Add(Loc.Get("betrayal.temple_atone", betrayal.TempleName(team), BetrayalSystem.AtonementCost(currentPlayer)), Atone);
+
+            if (actions.Count == 0)
+            {
+                terminal.WriteLine("");
+                Say(Loc.Get("betrayal.temple_nothing"), "gray");
+                await terminal.PressAnyKey();
+                return;
+            }
+
+            terminal.ClearScreen();
+            UsurperRemake.UI.UIHelper.WriteBoxHeader(terminal, Loc.Get("betrayal.temple_header"), "bright_yellow", 64);
+            terminal.WriteLine("");
+            Say(Loc.Get("betrayal.temple_intro"), "white");
+            terminal.WriteLine("");
+            var items = actions.Select(a => a.Item).ToList();
+            string back = Loc.Get("temple.room.back");
+            items.Add(new TempleMenuItem("R", back, back));
+            WriteTempleMenu(items, bbsRows: false);
+            terminal.WriteLine("");
+
+            string key = ((await terminal.GetInputAsync(Loc.Get("ui.your_choice"))) ?? "").Trim().ToUpperInvariant();
+            if (key == "R" || key.Length == 0) return;
+            var pick = actions.FirstOrDefault(a => a.Item.Key == key);
+            if (pick.Run == null)
+            {
+                terminal.WriteLine(Loc.Get("temple.invalid_choice"), "red");
+                await Pacing.Wait(1000);
+                continue;
+            }
+            if (await pick.Run())
+                await terminal.PressAnyKey();
+        }
+    }
+
+    /// <summary>1.2.8: forgiveness at the Temple; unmet conditions say what is still needed and change nothing.</summary>
+    private async Task<bool> ForgiveBetrayer(string npcId)
+    {
+        terminal.WriteLine("");
+        await BetrayalSystem.Instance.AttemptForgiveness(npcId, currentPlayer, terminal);
+        return true;
+    }
+
+    /// <summary>1.2.8: revenge on the Stranger, after a yes; once.</summary>
+    private async Task<bool> AvengeStranger()
+    {
+        var betrayal = BetrayalSystem.Instance;
+        terminal.WriteLine("");
+        if (!await terminal.AskYesNoAsync(Loc.Get("betrayal.temple_revenge_confirm", betrayal.TempleName("TheStranger"))))
+            return false;
+        await betrayal.TakeRevenge("TheStranger", currentPlayer, terminal);
+        return false;
+    }
+
+    /// <summary>1.2.8: one act of atonement a game day for a companion who left; it counts as a kindness.</summary>
+    private Task<bool> Atone()
+    {
+        var betrayal = BetrayalSystem.Instance;
+        string name = betrayal.TempleName(BetrayalSystem.TeamId);
+        long cost = BetrayalSystem.AtonementCost(currentPlayer);
+        terminal.WriteLine("");
+        switch (betrayal.Atone(currentPlayer))
+        {
+            case BetrayalSystem.AtonementOutcome.Done:
+                Say(Loc.Get("betrayal.atone_done", cost, name), "bright_cyan");
+                Say(Loc.Get("betrayal.atone_counted"), "cyan");
+                break;
+            case BetrayalSystem.AtonementOutcome.AlreadyToday:
+                Say(Loc.Get("betrayal.atone_already"), "yellow");
+                break;
+            case BetrayalSystem.AtonementOutcome.NoGold:
+                Say(Loc.Get("betrayal.atone_no_gold", cost), "red");
+                break;
+        }
+        return Task.FromResult(true);
+    }
 
     /// <summary>
     /// A room's loop: its screen (skipped in Expert mode unless asked with ?), the global commands,

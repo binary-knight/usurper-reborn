@@ -962,12 +962,19 @@ public class WorldSimulator
         if (companionSystem != null)
         {
             int loyaltyLoss = isDeliberate ? GameConfig.CompanionLossPerMurder : 5;
+            bool witnessed = false;
             foreach (CompanionId id in Enum.GetValues(typeof(CompanionId)))
             {
                 var companion = companionSystem.GetCompanion(id);
                 if (companion != null && companion.IsActive)
+                {
                     companionSystem.ModifyLoyalty(id, -loyaltyLoss, $"witnessed the death of {victimName}");
+                    witnessed = true;
+                }
             }
+            // 1.2.8: one grievance of the team per murder the party witnessed, however many companions saw it
+            if (witnessed)
+                BetrayalSystem.Instance.AddTeamGrievance("witnessed a murder");
         }
 
         DebugLogger.Instance.LogInfo("BLOOD_PRICE",

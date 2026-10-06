@@ -9399,7 +9399,8 @@ public class DungeonLocation : BaseLocation
         var lyris = companionSystem.GetCompanion(UsurperRemake.Systems.CompanionId.Lyris);
 
         // Check if Lyris can be recruited
-        if (lyris == null || lyris.IsRecruited || lyris.IsDead || player.Level < lyris.RecruitLevel)
+        if (lyris == null || lyris.IsRecruited || lyris.IsDead || player.Level < lyris.RecruitLevel
+            || companionSystem.IsDeparted(UsurperRemake.Systems.CompanionId.Lyris))
         {
             return false;
         }
@@ -11981,7 +11982,7 @@ public class DungeonLocation : BaseLocation
         var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
         var companion = companionSystem.GetCompanion(companionId);
 
-        if (companion == null || companion.IsRecruited || companion.IsDead)
+        if (companion == null || companion.IsRecruited || companion.IsDead || companionSystem.IsDeparted(companionId))
             return false;
 
         // Count non-companion teammates (NPCs, spouse, etc.)

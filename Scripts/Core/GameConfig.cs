@@ -2313,6 +2313,18 @@ public static partial class GameConfig
     // v1.2 (design item G): an NPC left to die while the player could have helped
     public const int AbandonPenaltySteps = 2;
     public const int AbandonCompanionLoyaltyPenalty = 15;
+    // 1.2.8: team betrayal. Each murder a companion witnesses and each companion left to die adds
+    // the points once per event; a loyalty gain of the minimum or more (raw, before difficulty)
+    // takes off its amount and counts as a kindness. At the warning a companion grows cold; at the
+    // threshold the least loyal leaves. Forgiveness at the Temple brings them back at the rejoin loyalty.
+    public const int TeamBetrayalPointsPerEvent = 15;
+    public const int TeamBetrayalKindnessMinGain = 5;
+    public const int TeamBetrayalWarningPoints = 50;
+    public const int TeamBetrayalRejoinLoyalty = 50;
+    // 1.2.8: an act of atonement in the Temple's Faith room, once a game day while a companion is
+    // gone: costs Math.Max(BetrayalAtonementMinCost, BetrayalAtonementCostPerLevel * player level) gold.
+    public const int BetrayalAtonementMinCost = 100;
+    public const int BetrayalAtonementCostPerLevel = 100;
     // v1.2: teammate self-preservation. Below the first, a companion or NPC teammate with no
     // heal left prefers a defensive or evasive ability; below the second it braces (Defend,
     // half damage) instead of attacking.

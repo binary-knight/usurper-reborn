@@ -1,7 +1,7 @@
 ---
 title: The Music Shop
 path: /wiki/en/world/music-shop/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/MusicShopLocation.cs, Scripts/Data/EquipmentData.cs
 history: 1.2.5 | Instrument names and the Electron menu labels are shown in the player's language, and long purchase messages wrap at 79 columns.
 ---

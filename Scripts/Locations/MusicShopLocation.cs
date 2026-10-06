@@ -22,7 +22,8 @@ public class MusicShopLocation : BaseLocation
         var cs = CompanionSystem.Instance;
         if (cs == null) return MelodiaState.InShop;
         if (!cs.IsCompanionAlive(CompanionId.Melodia)) return MelodiaState.Dead;
-        if (cs.IsCompanionRecruited(CompanionId.Melodia)) return MelodiaState.Adventuring;
+        // 1.2.8: after a team betrayal she is away from the shop too
+        if (cs.IsCompanionRecruited(CompanionId.Melodia) || cs.IsDeparted(CompanionId.Melodia)) return MelodiaState.Adventuring;
         return MelodiaState.InShop;
     }
 
@@ -1014,6 +1015,17 @@ public class MusicShopLocation : BaseLocation
     private async Task RecruitMelodia()
     {
         var state = GetMelodiaState();
+
+        // 1.2.8: she left after a team betrayal; only forgiveness at the Temple brings her back
+        if (CompanionSystem.Instance?.IsDeparted(CompanionId.Melodia) == true)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine("");
+            foreach (var row in GameEngine.WrapRows(Loc.Get("betrayal.team_rejoin_hint", CompanionSystem.Instance.GetCompanion(CompanionId.Melodia)?.Name ?? "Melodia", GameConfig.TeamBetrayalRejoinLoyalty)))
+                terminal.WriteLine(row);
+            await terminal.PressAnyKey();
+            return;
+        }
 
         if (state == MelodiaState.Adventuring)
         {

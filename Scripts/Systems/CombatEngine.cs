@@ -21458,6 +21458,7 @@ public partial class CombatEngine
         if (result.Player != null && CouldHaveHelped(companion, result.Player))
         {
             companionSystem.ModifyLoyalty(companion.CompanionId.Value, -GameConfig.AbandonCompanionLoyaltyPenalty, "left to die with potions in hand");
+            companionSystem.RecordAbandonedGrievance("left a companion to die");   // 1.2.8: once per event
             terminal.WriteLine($"  {Loc.Get("combat.ally_death_could_have_helped", companion.DisplayName)}", "yellow");
             terminal.WriteLine($"  {Loc.Get("combat.companion_loyalty_drop", companion.DisplayName)}", "yellow");
         }
