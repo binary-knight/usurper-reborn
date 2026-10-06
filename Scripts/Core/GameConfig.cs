@@ -841,6 +841,7 @@ public static partial class GameConfig
     // NPC Murder/Assassination System (v0.40.2)
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
     public const int MurderDarknessGain = 250;                // 50 -> 250 (paired with -125 chivalry).
+    public const int MaxNpcDuelsPerDay = 3;                   // 1.2.8: one daily cap for NPC duels won, at the Inn and in town (Character.InnDuelsToday)
     public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
     public const int MaxAlignedSparesPerDay = 3;              // v0.64.1: cap the +10 paired-good alignment reward from sparing beaten PvP NPCs (mirror of the murder cap; sparing itself is never blocked).
 

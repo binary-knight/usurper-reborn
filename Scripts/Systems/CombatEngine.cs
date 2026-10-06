@@ -9748,6 +9748,7 @@ public partial class CombatEngine
         // Base 15% per monster, higher level monsters have better drop rates
         foreach (var monster in result.DefeatedMonsters)
         {
+            if (monster.CallerPaysReward) continue;   // 1.2.8: no loot roll; the caller pays a flat reward
             Item? loot = null;
 
             // Mini-bosses (Champions) — v0.56.1: guaranteed 2 items to justify new tuning
@@ -21713,6 +21714,13 @@ public partial class CombatEngine
             // Calculate gold reward
             long goldReward = monster.Gold + random.Next(0, (int)Math.Min(int.MaxValue - 1L, (long)(monster.Gold * 0.5))); // v1.1.1: no int overflow on huge purses
 
+            // 1.2.8: a fight whose caller pays a flat reward (Seth Able) pays nothing here
+            if (monster.CallerPaysReward)
+            {
+                expReward = 0;
+                goldReward = 0;
+            }
+
             totalExp += expReward;
             totalGold += goldReward;
 
@@ -21969,7 +21977,9 @@ public partial class CombatEngine
         // Display rewards
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("combat.defeated_count", result.DefeatedMonsters.Count.ToString()));
-        terminal.WriteLine(Loc.Get("combat.xp_label", playerXPmm.ToString()));
+        bool callerPaysAll = result.DefeatedMonsters.All(m => m.CallerPaysReward);   // 1.2.8: the caller shows its own reward
+        if (!callerPaysAll)
+            terminal.WriteLine(Loc.Get("combat.xp_label", playerXPmm.ToString()));
 
         // v0.65.5 (T1-2): surface the spouse + divine-blessing XP bonuses (ported from the dead
         // HandleVictory path) so the married/blessed player sees the perk they are now actually getting.
@@ -22004,7 +22014,8 @@ public partial class CombatEngine
         ShowXPModifiersAndShare(terminal, xpMods, xpSharesMM[0], totalXPPotMM,
             result.Teammates != null && result.Teammates.Count > 0 && xpSharesMM[0] < 100);
 
-        terminal.WriteLine(Loc.Get("combat.gold_label", $"{adjustedGold:N0}"));
+        if (!callerPaysAll)
+            terminal.WriteLine(Loc.Get("combat.gold_label", $"{adjustedGold:N0}"));
         PrintPartyFightSummary(result); // v1.1.3 (council ruling 5)
 
         // Show bonus from world events if any
@@ -22362,8 +22373,8 @@ public partial class CombatEngine
 
         foreach (var monster in result.DefeatedMonsters)
         {
-            long baseExp = monster.Experience / 2; // Half exp for retreat
-            long goldReward = monster.Gold;
+            long baseExp = monster.CallerPaysReward ? 0 : monster.Experience / 2; // Half exp for retreat; 1.2.8: none when the caller pays
+            long goldReward = monster.CallerPaysReward ? 0 : monster.Gold;
 
             totalExp += baseExp;
             totalGold += goldReward;

@@ -6149,6 +6149,16 @@ public abstract class BaseLocation
     private async Task ChallengeNPC(NPC npc)
     {
         terminal.WriteLine("");
+
+        // 1.2.8: town duels share the Inn's daily cap (one count of duels won, InnDuelsToday)
+        if (currentPlayer.InnDuelsToday >= GameConfig.MaxNpcDuelsPerDay)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("base.duel_daily_limit"));
+            await Pacing.Wait(2000);
+            return;
+        }
+
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("base.duel_challenge", npc.Name2));
         terminal.WriteLine("");
@@ -6193,13 +6203,14 @@ public abstract class BaseLocation
         // v0.61.2: pass isHonorDuel: true so the murder-cap counter / over-cap
         // reward clawback / +10 Darkness penalty all skip this path. A duel is
         // a consensual challenge, not an assault.
-        var result = await StreetEncounterSystem.Instance.AttackCharacter(currentPlayer, npc, terminal, isHonorDuel: true);
+        var result = await FightHonorDuel(npc);
 
         if (result.Victory)
         {
             terminal.SetColor("bright_green");
             terminal.WriteLine("\n  " + Loc.Get("base.duel_victory", npc.Name2));
             currentPlayer.PKills++;
+            currentPlayer.InnDuelsToday++;   // 1.2.8: a win counts toward the shared daily duel cap, as at the Inn
 
             // Small reputation boost for honorable duel — v0.57.12: paired movement
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "base.duel_honor");
@@ -6743,10 +6754,14 @@ public abstract class BaseLocation
         }
     }
 
+    /// <summary>The town honor duel's fight. Virtual so a test can stand in for the combat.</summary>
+    protected virtual Task<EncounterResult> FightHonorDuel(NPC npc) =>
+        StreetEncounterSystem.Instance.AttackCharacter(currentPlayer, npc, terminal, isHonorDuel: true);
+
     /// <summary>
-    /// Determine if NPC should accept a duel challenge
+    /// Determine if NPC should accept a duel challenge. Virtual so a test can fix the roll.
     /// </summary>
-    private bool ShouldNPCAcceptDuel(NPC npc)
+    protected virtual bool ShouldNPCAcceptDuel(NPC npc)
     {
         var random = Random.Shared;
 

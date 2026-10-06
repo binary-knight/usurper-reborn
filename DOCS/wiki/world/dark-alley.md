@@ -1,7 +1,7 @@
 ---
 title: The Dark Alley
 path: /wiki/en/world/dark-alley/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs
 history: 1.2.5 | The Pit monster, the street mugger and the Loan Shark enforcer are stored in English and shown in each player's language.
 history: 1.2.4 | In English, the Shadows standing line in the Dark Alley says "use" instead of "access".

@@ -908,15 +908,13 @@ public class InnLocation : BaseLocation
     }
 
     /// <summary>
-    /// Fight Seth Able using full combat engine.
-    /// Seth scales to player level so he's always a genuine challenge.
-    /// Uses nr:1 to prevent inflated XP from level-based formulas.
+    /// Build Seth Able for the fight. 1.2.8: he fights at the level the challenge screen shows
+    /// (GetSethLevel). nr:1 still feeds CreateMonster so his stats keep their old shape; Level is
+    /// set afterwards. CallerPaysReward keeps the engine from paying XP, gold or loot: the flat
+    /// reward in FightSethAble is all a win pays.
     /// </summary>
-    private async Task FightSethAble()
+    internal Monster CreateSethMonster()
     {
-        terminal.WriteLine(Loc.Get("inn.seth_inn_falls_silent"), "red");
-        await Pacing.Wait(2000);
-
         int sethLevel = GetSethLevel();
         long sethHP = GetSethHP(sethLevel);
         // Stats scale with level: always a tough brawler
@@ -926,8 +924,6 @@ public class InnLocation : BaseLocation
         long sethArmPow = 8 + sethLevel / 3;
         long sethWeapPow = 15 + sethLevel / 2;
 
-        // nr:1 keeps monster Level=1 so GetExperienceReward()/GetGoldReward() yield
-        // minimal base rewards. The real reward is the flat bonus below.
         var sethMonster = Monster.CreateMonster(
             nr: 1,
             name: "Seth Able",
@@ -946,11 +942,24 @@ public class InnLocation : BaseLocation
             weappow: sethWeapPow
         );
 
-        // Override display level (for UI) without affecting reward formulas
-        // Note: CreateMonster sets Level = Math.Max(1, nr), so Level=1 for rewards
+        sethMonster.Level = sethLevel;           // 1.2.8: the level the challenge screen shows, for to-hit and abilities too
+        sethMonster.CallerPaysReward = true;     // 1.2.8: the flat reward below is the whole reward, and no loot roll
         sethMonster.IsUnique = true;
         sethMonster.IsBoss = false;
         sethMonster.CanSpeak = true;
+        return sethMonster;
+    }
+
+    /// <summary>
+    /// Fight Seth Able using full combat engine.
+    /// Seth scales to player level so he's always a genuine challenge.
+    /// </summary>
+    private async Task FightSethAble()
+    {
+        terminal.WriteLine(Loc.Get("inn.seth_inn_falls_silent"), "red");
+        await Pacing.Wait(2000);
+
+        var sethMonster = CreateSethMonster();
 
         var combatEngine = new CombatEngine(terminal);
         var result = await combatEngine.PlayerVsMonster(currentPlayer, sethMonster);
@@ -995,8 +1004,7 @@ public class InnLocation : BaseLocation
                     currentPlayer.Fame += 1;
                 }
 
-                // Flat reward: modest XP and gold, NOT scaling with fake level
-                // This replaces the combat engine's level-based reward (which is tiny at nr=1)
+                // Flat reward: modest XP and gold. 1.2.8: the engine pays none (CallerPaysReward), so this is all of it
                 long xpReward = currentPlayer.Level * 200;
                 long goldReward = 50 + currentPlayer.Level * 5;
 
@@ -1288,9 +1296,9 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.challenging_npc", npc.Name2));
         terminal.WriteLine("");
 
-        // Daily duel limit — prevent XP farming by dueling the same NPCs repeatedly (separate from Seth fights)
-        const int maxDuelsPerDay = 3;
-        if (currentPlayer.InnDuelsToday >= maxDuelsPerDay)
+        // Daily duel limit: prevent XP farming by dueling the same NPCs repeatedly (separate from Seth fights).
+        // 1.2.8: one cap shared with town honor duels (BaseLocation.ChallengeNPC)
+        if (currentPlayer.InnDuelsToday >= GameConfig.MaxNpcDuelsPerDay)
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("inn.too_many_duels"));

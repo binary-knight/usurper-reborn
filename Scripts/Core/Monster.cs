@@ -75,6 +75,7 @@ public class Monster
     public bool IsUnique { get; set; } = false;
     public bool CanSpeak { get; set; } = false;         // From Pascal mon_talk setting
     public bool IsProperName { get; set; } = false;     // Named NPCs (no "The" prefix)
+    public bool CallerPaysReward { get; set; } = false; // 1.2.8: the caller pays a flat reward; the engine pays no XP, gold or loot
 
     /// <summary>
     /// Returns name with appropriate article: "The Drake" for generic monsters, "Dahlia Coldstream" for named NPCs
