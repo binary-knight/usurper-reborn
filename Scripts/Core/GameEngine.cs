@@ -4821,7 +4821,7 @@ public partial class GameEngine
     /// </summary>
     /// <summary>
     /// The narrative systems a new character starts without. 1.2.5: the answered moral paradoxes too,
-    /// so a new character in the same process is offered them again.
+    /// so a new character in the same process is offered them again. 1.2.8: the betrayal state too.
     /// </summary>
     internal static void ResetNarrativeSystemsForNewGame()
     {
@@ -4831,6 +4831,7 @@ public partial class GameEngine
         UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
         UsurperRemake.Systems.GriefSystem.Instance.Reset();
         UsurperRemake.Systems.MoralParadoxSystem.Instance.Reset();
+        UsurperRemake.Systems.BetrayalSystem.Instance.Reset();
     }
 
     public static int ClearLeftoversForNewCharacter(string? name2)
