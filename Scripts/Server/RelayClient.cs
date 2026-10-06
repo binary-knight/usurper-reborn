@@ -28,6 +28,9 @@ public static class RelayClient
 {
     private const int MAX_AUTH_ATTEMPTS = 5;
 
+    /// <summary>Test seam: the stream the auth reply lines go to. Default is the real stdout.</summary>
+    internal static Func<Stream> OpenStdout = Console.OpenStandardOutput;
+
     public static async Task RunAsync(string username, int port, string connectionType, CancellationToken ct)
     {
         // If the user is pre-authenticated (e.g. --user flag), connect directly
@@ -285,9 +288,11 @@ public static class RelayClient
             if (response.StartsWith("ERR:"))
             {
                 Console.Error.WriteLine($"[RELAY] Auth failed: {response}");
-                var stdout = Console.OpenStandardOutput();
-                // Echo raw ERR response for programmatic clients (OnlinePlaySystem)
-                await WriteAnsi(stdout, $"{response}\r\n");
+                var stdout = OpenStdout();
+                // Echo raw ERR response for programmatic clients (OnlinePlaySystem) only;
+                // a person typing sees the red message below, not the protocol line.
+                if (!rawTerminal)
+                    await WriteAnsi(stdout, $"{response}\r\n");
                 await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {response.Substring(4)}\u001b[0m\r\n\r\n");
                 await stdout.FlushAsync(ct);
                 client.Close();
@@ -300,9 +305,11 @@ public static class RelayClient
                 return false;
             }
 
-            // Echo OK back to stdout for programmatic clients (OnlinePlaySystem reads this through SSH)
+            // Echo OK back to stdout for programmatic clients (OnlinePlaySystem reads this through SSH);
+            // a person typing does not see the bare protocol line.
+            if (!rawTerminal)
             {
-                var stdout = Console.OpenStandardOutput();
+                var stdout = OpenStdout();
                 await WriteAnsi(stdout, "OK\r\n");
                 await stdout.FlushAsync(ct);
             }
