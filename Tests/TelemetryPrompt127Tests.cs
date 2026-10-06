@@ -581,7 +581,7 @@ public class TelemetryPrompt127Tests : IDisposable
                 foreach (bool shared in new[] { false, true })
                 {
                     GameConfig.ScreenReaderMode = sr;
-                    var (term, output) = Term("Y");
+                    var (term, output) = Term("N");    // T3b: N answers in every language; Y is not offered in es or it
                     await TelemetryPrompt.AskAsync(term, shared);
                     var lines = Plain(term, output).Split('\n');
                     lines.Should().OnlyContain(l => l.Length <= 79, $"{lang} sr={sr} shared={shared}");
