@@ -25,6 +25,9 @@ namespace UsurperRemake.Systems
     {
         public enum SettingType { Bool, Int, Float, String }
 
+        /// <summary>1.2.7: the server_config key of the telemetry operator switch.</summary>
+        public const string TelemetryPromptKey = "telemetry_prompt";
+
         public class ServerSettingDescriptor
         {
             public string Key { get; init; } = "";
@@ -157,6 +160,21 @@ namespace UsurperRemake.Systems
                 ChangeImpact = "Live, takes effect on the next session.",
                 CurrentValue = () => UsurperRemake.BBS.DoorMode.IdleTimeoutMinutes.ToString(),
                 Apply = v => { if (int.TryParse(v, out int n)) UsurperRemake.BBS.DoorMode.IdleTimeoutMinutes = Math.Clamp(n, GameConfig.MinBBSIdleTimeoutMinutes, GameConfig.MaxBBSIdleTimeoutMinutes); }
+            },
+
+            // ============= PRIVACY =============
+            // 1.2.7: the one operator switch of opt-in telemetry, for BBS doors and self hosted servers.
+            new ServerSettingDescriptor
+            {
+                Key = TelemetryPromptKey,
+                Label = "Combat Data Sharing (telemetry)",
+                Category = "Privacy",
+                Type = SettingType.Bool,
+                DefaultValue = "false",
+                Description = "When ON, each player is asked once whether to send combat data to usurper-reborn.net, and the fights of players who say yes are sent there (numbers only: no names, no chat, no save files). The uploads carry one random id that belongs to this server and is shared by its players. When OFF, nobody is asked and nothing is sent; turning it off deletes the rows not yet sent and the id.",
+                ChangeImpact = "Live. Players are asked at their next login. Turning it off deletes the rows not yet sent and the id at once (or at the next start if the queue is busy).",
+                CurrentValue = () => GameConfig.TelemetryPromptEnabled ? "true" : "false",
+                Apply = v => TelemetryConsent.ApplyOperatorSwitch(ParseBool(v))
             },
 
             // ============= COMMUNICATION =============

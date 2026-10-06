@@ -110,13 +110,19 @@ function proxySource() { return fs.readFileSync(path.join(WEB, 'ssh-proxy.js'), 
 
 // Loads the balance routes. options.db is the database (or null), options.locked makes the
 // default-password lock active, options.crypto replaces node:crypto (for a spy).
+// 1.2.7: options.endpoint stands for the server's telemetryEndpoint (the remote views call its
+// reader()); by default a stand-in with no remote file. Every reader() call is counted in
+// remoteCalls and every statement on the handle it returns is recorded in remotePrepared.
+// options.now fixes Date.now() inside the section (the remote windows count UTC days).
 function loadApi(options = {}) {
   const src = proxySource();
   const code = [
     slice(src, 'function sendJson(', '// --- Bug Report Proxy ---'),
     slice(src, '// 1.2.6: the token signature is compared in constant time', '// --- Admin Dashboard Auth'),
     slice(src, '// --- Balance Dashboard API ---', 'async function handleDashRequest'),
-    ';({ handleBalanceRequest, createBalanceToken, verifyBalanceToken, balanceSigMatches, balanceWindow });',
+    ';({ handleBalanceRequest, createBalanceToken, verifyBalanceToken, balanceSigMatches, balanceWindow,' +
+      ' BALANCE_SOURCES, BALANCE_CLASS_NAMES, BALANCE_REMOTE_HELD, BALANCE_REMOTE_ROW_CEILING, BALANCE_REMOTE_SQL,' +
+      ' BALANCE_REMOTE_WINDOW_MS, BALANCE_WINDOWS, BALANCE_UNVERIFIED });',
   ].join('\n');
   const prepared = [];
   const realDb = options.db === undefined ? null : options.db;
@@ -129,10 +135,31 @@ function loadApi(options = {}) {
     },
   };
   const state = { locked: !!options.locked };
+  const remotePrepared = [];
+  const remoteCalls = [];
+  const endpoint = options.endpoint || { reader: () => null };
+  const telemetryEndpoint = {
+    reader() {
+      const h = endpoint.reader();
+      remoteCalls.push(h);
+      return h && {
+        prepare(sql) {
+          const st = h.prepare(sql);
+          return { all: (...args) => { remotePrepared.push({ sql, args }); return st.all(...args); } };
+        },
+      };
+    },
+  };
+  let SectionDate = Date;
+  if (options.now !== undefined) {
+    const fixed = options.now;
+    SectionDate = class extends Date { static now() { return fixed; } };
+  }
   const ctx = {
     db,
+    telemetryEndpoint,
     crypto: options.crypto || nodeCrypto,
-    Buffer, URL, JSON, Math, Object, Number, String, Date,
+    Buffer, URL, JSON, Math, Object, Number, String, Date: SectionDate,
     console: { log() {}, warn() {}, info() {}, error() {} },
     BALANCE_USER: 'admin',
     BALANCE_DEFAULT_PASS: 'changeme',
@@ -166,7 +193,7 @@ function loadApi(options = {}) {
     await api.handleBalanceRequest(req, res);
     return { status: out.status, headers: out.headers, body: out.body ? JSON.parse(out.body) : null };
   }
-  return { api, call, token, prepared, state, ctx };
+  return { api, call, token, prepared, remotePrepared, remoteCalls, state, ctx };
 }
 
 // EXPLAIN QUERY PLAN of a recorded statement, as plan lines.

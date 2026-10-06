@@ -1,0 +1,14 @@
+[h1]Usurper Reborn 1.2.7[/h1]
+
+[list]
+[*]Opt-in combat data sharing (telemetry): the game asks once whether to share combat data for balancing. Single player and Steam ask at start, before the main menu. Only a yes or a no answers; with no answer the question comes back at the next start.
+[*]Preferences has a new line, Share combat data: On or Off, on the key U, to change the answer at any time.
+[*]On a BBS or a self hosted server the question is off by default. The sysop turns it on with E in the SysOp console, a server operator with the Privacy setting telemetry_prompt in the web admin. Each player is then asked once after login.
+[*]The full privacy note, with exactly what is sent and kept, is in the README and in the full notes.
+[*]A monster's critical hit line no longer leaves an empty gap where a damage number used to be, in all five languages.
+[*]The balance dashboard gains a Source choice on its Difficulty tab: the server's own fights, or the rows sent by copies of the game, shown apart and marked Unverified.
+[*]Known: after a victory online, the autosave can wait up to 30 seconds when the database is locked. This is looked at in 1.2.8.
+[*]Coming in 1.2.8: a difficulty pass with smarter monsters, mixed encounters, elites and potions that scale, plus the betrayal feature.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.2.7.md

@@ -1,8 +1,9 @@
 ---
 title: Ways to play
 path: /wiki/en/getting-started/connections/
-checked: 1.2.6
+checked: 1.2.7
 sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | The SSH login menu has G to change the language of its screens before you log in.
 history: 1.2.4 | A reconnect waits for the old session to finish saving, and you stay on /who, /tell, groups and broadcasts after it.

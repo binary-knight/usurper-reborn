@@ -195,17 +195,20 @@ rows.
   the migration can run more than once.
 - The web page tests run with `npm test --prefix web`.
 
-## Coming in 1.2.7
+## Coming in 1.2.7 and 1.2.8
 
-A difficulty pass: smarter monsters, mixed encounters, elite monsters and
-potions that scale with you. Also planned is the betrayal feature, with
-its scenes reachable in play and its state saved.
+1.2.7 is opt-in telemetry: the game asks once whether to share combat
+data to help balance the game.
+
+1.2.8 is a difficulty pass: smarter monsters, mixed encounters, elite
+monsters and potions that scale with you. Also planned for 1.2.8 is the
+betrayal feature, with its scenes reachable in play and its state saved.
 
 ## Known and unchanged
 
 - After a victory online, the autosave can wait up to 30 seconds when the
   database is locked. The combat row no longer waits. This is looked at in
-  1.2.7.
+  1.2.8.
 - News is stored in the language of the session that wrote it, and every
   reader sees that text.
 - In group combat, a combat or spell message long enough to wrap onto a

@@ -222,6 +222,8 @@ public class MudServer
         _sqlBackend = sqlBackend;
         SaveSystem.InitializeWithBackend(sqlBackend);
         Console.Error.WriteLine($"[MUD] SQLite backend initialized: {_databasePath}");
+        TelemetryConsent.UseServerSwitch();      // 1.2.7: the operator switch (server_config telemetry_prompt, loaded above), before the start upload
+        TelemetryUploader.StartInBackground();   // 1.2.7: one upload of queued telemetry rows at server start, in the background
 
         // the llm_usage telemetry so deploy-restarts no longer reset the cap.
 

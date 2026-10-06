@@ -26,4 +26,12 @@
     <ProjectReference Include="../usurper-reloaded.csproj" />
   </ItemGroup>
 
+  <!-- 1.2.7: the telemetry rows the C# and the server validators both check -->
+  <ItemGroup>
+    <None Include="Fixtures/telemetry-rows.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/telemetry-body-max.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/telemetry-approved-en.txt" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fixtures/telemetry-privacy-note-en.txt" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

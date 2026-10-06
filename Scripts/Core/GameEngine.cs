@@ -44,6 +44,7 @@ public partial class GameEngine
     }
     private static readonly Queue<string> _staticPendingNotifications = new();
     private bool _splashScreenShown = false;
+    private bool _telemetryAskedThisSession = false;   // 1.2.7: the telemetry question at most once a session
     private string? _sleepLocationOnLogin;
 
     /// <summary>
@@ -326,6 +327,8 @@ public partial class GameEngine
     public static async Task RunConsoleAsync()
     {
         var engine = Instance;
+        TelemetryConsent.UseServerSwitch();      // 1.2.7: the operator switch (server_config telemetry_prompt), before the start upload
+        TelemetryUploader.StartInBackground();   // 1.2.7: one upload of queued telemetry rows, once a process, in the background
 
         // Check if we're in BBS door mode or online mode (both have pre-set player names)
         if (UsurperRemake.BBS.DoorMode.IsInDoorMode || UsurperRemake.BBS.DoorMode.IsOnlineMode)
@@ -366,6 +369,9 @@ public partial class GameEngine
             }
         }
 
+        // 1.2.7: the telemetry question, once per copy of the game, before the main menu
+        await TelemetryPrompt.AskInstallIfNeededAsync(terminal);
+
         // Go directly to main menu (skip the redundant title screen)
         await MainMenu();
     }
@@ -392,6 +398,7 @@ public partial class GameEngine
             ? ctx0.Username
             : UsurperRemake.BBS.DoorMode.GetPlayerName();
         UsurperRemake.BBS.DoorMode.Log(UsurperRemake.BBS.DoorMode.SaveLookupLogMessage(playerName));
+        TelemetryConsent.OnLogin(playerName);   // 1.2.7: this player's answer, read once for the session's fights
 
         // Show the title screen (once per session)
         if (!_splashScreenShown)
@@ -408,6 +415,14 @@ public partial class GameEngine
             terminal.SetColor("bright_yellow");
             terminal.WriteLine($"  {GameConfig.MessageOfTheDayText()}");
             terminal.WriteLine("");
+        }
+
+        // 1.2.7: the telemetry question, once per player while the operator switch is on; once a session at
+        // most (this method runs again when the player comes back to this screen)
+        if (!_telemetryAskedThisSession)
+        {
+            _telemetryAskedThisSession = true;
+            await TelemetryPrompt.AskPlayerIfNeededAsync(terminal, playerName);
         }
 
         ShowLaunchBanner();

@@ -1,8 +1,9 @@
 ---
 title: Characters
 path: /wiki/en/characters/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Core/GameConfig.cs
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Race descriptions, class restriction reasons, appearance colours and the race and class help screens at character creation are shown in all five languages.
 history: 1.2.4 | none

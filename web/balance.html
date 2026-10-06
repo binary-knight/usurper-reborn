@@ -191,6 +191,7 @@
   .card .note, .win-note { color: var(--dim); font-size: 10px; font-weight: normal; }
   .card .note { margin-top: 0.15rem; }
   .table-note { color: var(--dim); font-size: 11px; margin-bottom: 0.5rem; }
+  .table-note.unverified { color: var(--gold); font-weight: bold; }
   .filters { display: flex; gap: 1rem; align-items: center; margin-bottom: 0.75rem; color: var(--dim); font-size: 11px; }
   .table-scroll { overflow-x: auto; }
   .table-scroll table { white-space: nowrap; }
@@ -306,6 +307,14 @@
     <div class="tab-content active" id="tab-difficulty">
       <div class="section-body">
         <div class="filters">
+          <label>Source <select id="diff-source">
+            <option value="official">Official</option>
+            <option value="remote">Remote all</option>
+            <option value="1">Remote single player</option>
+            <option value="2">Remote Steam</option>
+            <option value="3">Remote BBS</option>
+            <option value="4">Remote server</option>
+          </select></label>
           <label>Class <select id="diff-class"><option value="">All classes</option></select></label>
           <label>Difficulty <select id="diff-level">
             <option value="">All</option>
@@ -822,14 +831,42 @@ async function loadSuspects() {
 
 // --- Difficulty (1.2.6) ---
 const DIFFICULTY_NAMES = { 0: 'Easy', 1: 'Normal', 2: 'Hard', 3: 'Nightmare' };
+// 1.2.7 Source filter: Official is this server's own fights; the Remote sources are the opt-in
+// rows sent by copies of the game, never mixed with Official. The labels and the Unverified line
+// are the page's own, never text from the server.
+const SOURCE_LABELS = { official: 'Official', remote: 'Remote all', 1: 'Remote single player', 2: 'Remote Steam', 3: 'Remote BBS', 4: 'Remote server' };
+const UNVERIFIED_TEXT = "Unverified: sent by players' copies, not checked by the server";
+
+// The notes above a remote table: the Unverified line, the window by UTC day, what Installs
+// counts, the largest install's share, the fights with a value held at a bound, the row ceiling.
+function remoteDifficultyNotes(d, source, filterText) {
+  const w = d.window || {};
+  const winText = (w.label || '') + (w.from ? ', by UTC day from ' + w.from : ', every kept remote row');
+  const held = d.held || { fights: 0, columns: [] };
+  const named = (held.columns || []).filter(c => c.fights > 0)
+    .map(c => c.column + ' at ' + c.at + ' (' + (c.bound === 'floor' ? 'floor: that or less' : 'ceiling: that or more') + ') ' + fmtNum(c.fights));
+  return `<div class="table-note unverified">${escapeHtml(UNVERIFIED_TEXT)}</div>` +
+    tableNote(winText + '; ' + SOURCE_LABELS[source] + '; ' + filterText + '. Per fight averages. ' +
+      'HP lost counts damage taken of every kind, overkill included.') +
+    tableNote('Installs counts install ids, not players: a BBS or a server sends one id for all its players.') +
+    tableNote('Largest single install: ' + (d.largestInstallPct === null || d.largestInstallPct === undefined ? 'none' : fmtPct(d.largestInstallPct)) +
+      ' of these ' + fmtNum(d.fights) + ' fights.') +
+    tableNote('Held at a bound: ' + fmtNum(held.fights) + ' fights' + (named.length ? ' (' + named.join('; ') + ')' : '') +
+      '. Averages count a held value as the bound itself.') +
+    (d.truncated ? tableNote('Row ceiling reached: only the newest ' + fmtNum(d.ceiling) + ' rows of this window are counted.') : '') +
+    (d.missing ? tableNote('No remote telemetry on this server yet.') : '');
+}
 
 async function loadDifficulty() {
   const cls = document.getElementById('diff-class').value;
   const level = document.getElementById('diff-level').value;
+  const source = document.getElementById('diff-source').value || 'official';
+  const remote = source !== 'official';
   let path = '/difficulty';
   const params = [];
   if (cls) params.push('class=' + encodeURIComponent(cls));
   if (level) params.push('difficulty=' + encodeURIComponent(level));
+  if (remote) params.push('source=' + encodeURIComponent(source));
   if (params.length) path += '?' + params.join('&');
   const d = await apiFetch(withWindow(path));
 
@@ -843,20 +880,24 @@ async function loadDifficulty() {
 
   const el = document.getElementById('difficulty-table');
   const filterText = (cls ? cls : 'all classes') + ', ' + (level ? DIFFICULTY_NAMES[level] : 'all difficulties');
-  const note = tableNote(windowText(d.window) + '; ' + filterText + '. Per fight averages; blank means no 1.2.6 data. ' +
+  const note = remote ? remoteDifficultyNotes(d, source, filterText) :
+    tableNote(windowText(d.window) + '; ' + filterText + '. Per fight averages; blank means no 1.2.6 data. ' +
     'HP lost counts damage taken of every kind, overkill included.') +
     tableNote('No floor recorded (rows before 1.2.6, or no fight entered): ' + fmtNum(d.noFloorFights) + ' fights, not in the rows below');
   const bands = d.bands || [];
-  if (!bands.length) { el.innerHTML = note + '<p style="color:var(--dim)">No fights with a floor in this window</p>'; return; }
+  if (!bands.length) {
+    el.innerHTML = note + '<p style="color:var(--dim)">' + (remote ? 'No remote fights in this window' : 'No fights with a floor in this window') + '</p>';
+    return;
+  }
   el.innerHTML = note + '<div class="table-scroll">' + makeTable(
-    ['Floors', 'Kind', 'Fights', 'Players', 'Win %', 'Death %', 'Flee %', 'Avg Rounds', '1-Round Win %',
+    ['Floors', 'Kind', 'Fights', remote ? 'Installs' : 'Players', 'Win %', 'Death %', 'Flee %', 'Avg Rounds', '1-Round Win %',
       'HP Lost % Max', 'Taken Basic', 'Taken Ability', 'Taken Spell', 'Taken DoT', 'To Team', 'By Player', 'By Team',
       'Heals', 'Potions', 'Abilities', 'Spells', 'Party', 'Encounter', 'Monster First %', 'Teammates Lost'],
     bands.map(b => [
       b.band === 0 ? 'Outside dungeon' : b.floor_from + '-' + b.floor_to,
       b.boss ? trustedHtml('<span class="tag tag-boss">BOSS</span>') : '',
       b.fights,
-      b.players,
+      remote ? b.installs : b.players,
       fmtPct(b.win_pct),
       fmtPct(b.death_pct),
       fmtPct(b.flee_pct),
@@ -1158,6 +1199,11 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 // --- Filters ---
 document.getElementById('window-select').addEventListener('change', () => refreshVisible());
+// a class list belongs to one source, so a new source starts from all classes
+document.getElementById('diff-source').addEventListener('change', () => {
+  document.getElementById('diff-class').value = '';
+  runLoaders([loadDifficulty]);
+});
 document.getElementById('diff-class').addEventListener('change', () => runLoaders([loadDifficulty]));
 document.getElementById('diff-level').addEventListener('change', () => runLoaders([loadDifficulty]));
 

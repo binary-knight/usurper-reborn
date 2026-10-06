@@ -286,6 +286,45 @@ public partial class CombatEngine
     /// <summary>1.2.6: the background insert of the last row this engine logged (tests await it).</summary>
     internal Task? LastCombatRowWrite { get; private set; }
 
+    /// <summary>
+    /// 1.2.7: the opt-in telemetry row of this fight, in every mode. Queued only with a stored yes for the
+    /// fight's own player; built here on the combat thread from the same values as the combat_events row,
+    /// appended to the local queue in the background. Never throws into the fight.
+    /// </summary>
+    private void QueueTelemetryRow(CombatResult result, string outcome, long xpGained = 0, long goldGained = 0)
+    {
+        try
+        {
+            var store = TelemetryStoreOverride ?? TelemetryConsent.CurrentStore();
+            if (store == null || result.Player == null) return;
+            string? login = TelemetryConsent.CurrentLoginName();
+            if (!store.ShouldQueue(login)) return;
+            string? playerKey = TelemetryConsent.PlayerKey(login);    // checked again by the append, never stored
+            var row = TelemetryRow.From(BuildCombatEventRow(result, outcome, xpGained, goldGained), result.Player.Class, result.Monster?.FamilyName);
+            if (row == null) return;
+            if (!row.IsValid())
+            {
+                DebugLogger.Instance.LogDebug("TELEMETRY", "combat row outside the bounds, not queued");
+                return;
+            }
+            LastTelemetryAppend = TelemetryBackground(() => store.Append(row, playerKey));
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("TELEMETRY", $"combat row not built: {ex.Message}");
+        }
+    }
+
+    /// <summary>1.2.7: the background append of the last telemetry row this engine queued (tests await it).</summary>
+    internal Task? LastTelemetryAppend { get; private set; }
+
+    /// <summary>1.2.7: test seam. A store used instead of the active save directory's.</summary>
+    internal TelemetryStore? TelemetryStoreOverride { get; set; }
+
+    /// <summary>1.2.7: runs the telemetry append off the combat thread. Test seam: a test can hold the
+    /// append back until it has changed the fight's objects.</summary>
+    internal Func<Action, Task> TelemetryBackground { get; set; } = work => Task.Run(work);
+
     /// <summary>1.2.6: every value of the combat_events row, read now from the fight's objects.</summary>
     internal static CombatEventRow BuildCombatEventRow(CombatResult result, string outcome, long xpGained, long goldGained)
     {
@@ -2050,6 +2089,7 @@ public partial class CombatEngine
             }
 
             // Log to balance dashboard
+            QueueTelemetryRow(result, "fled");
             LogCombatEventToDb(result, "fled");
 
             // Calculate partial exp/gold from defeated monsters
@@ -5445,7 +5485,7 @@ public partial class CombatEngine
         // Show critical hit message
         if (monsterRoll.IsCriticalSuccess)
         {
-            UIHelper.WriteRow(terminal, Loc.Get("combat.monster_critical", MonsterNames.Display(monster), ""), "bright_red");
+            UIHelper.WriteRow(terminal, Loc.Get("combat.monster_critical", MonsterNames.Display(monster)), "bright_red");
         }
 
         // Use colored combat message
@@ -7644,6 +7684,7 @@ public partial class CombatEngine
         result.Player.Statistics.RecordGoldChange(result.Player.Gold);
 
         // Log to balance dashboard
+        QueueTelemetryRow(result, "victory", playerXP, goldReward);
         LogCombatEventToDb(result, "victory", playerXP, goldReward);
 
         // Track archetype (Hero for combat, with bonus for bosses and rare monsters)
@@ -21809,6 +21850,7 @@ public partial class CombatEngine
         GrantGodKillXP(result.Player, playerXPmm, lang => MonsterDescIn(lang, result.DefeatedMonsters));
 
         // Log to balance dashboard
+        QueueTelemetryRow(result, "victory", playerXPmm, adjustedGold);
         LogCombatEventToDb(result, "victory", playerXPmm, adjustedGold);
 
         // Award per-slot XP to teammates based on percentage allocation
@@ -22927,6 +22969,7 @@ public partial class CombatEngine
         result.Player.Statistics.RecordDeath(false);
 
         // Log to balance dashboard
+        QueueTelemetryRow(result, "death");
         LogCombatEventToDb(result, "death");
 
         // Queue Stranger encounter after first death
