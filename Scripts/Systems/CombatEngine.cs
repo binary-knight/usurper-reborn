@@ -2620,6 +2620,14 @@ public partial class CombatEngine
             if (TryShowQuickbarInfo(player, upperChoice))
                 continue;
 
+            // v1.2.8: [S] Stats is an information screen and does not spend the turn. The key is
+            // caught here, so the Status action type stays a spent turn for the stun skip above.
+            if (upperChoice == "S")
+            {
+                await ShowCombatStatus(player, result);
+                continue;
+            }
+
             // Handle quickbar slots [1]-[9] for spells and abilities
             if (upperChoice.Length == 1 && upperChoice[0] >= '1' && upperChoice[0] <= '9')
             {
