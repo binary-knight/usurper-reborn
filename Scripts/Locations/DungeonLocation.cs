@@ -5782,13 +5782,22 @@ public class DungeonLocation : BaseLocation
         // 1.2.8: the room's cleared state is set at the win, before the victory autosave and the loot
         // screens, so a save there (or the disconnect save of a player who drops at them) keeps the
         // room cleared; the check after the fight then sets nothing twice
+        // (a boss room's two BossDefeated flags too, so a reload keeps the boss dead; its rewards
+        // stay after the fight)
         bool roomClearedAtVictory = false;
         var fightFloor = currentFloor;
+        int fightLevel = currentDungeonLevel;
         combatEngine.VictoryPreSaveHook = _ =>
         {
             if (player.HP <= 0) return;
             room.IsCleared = true;
             fightFloor.MonstersKilled += monsters.Count;
+            if (room.IsBossRoom)
+            {
+                fightFloor.BossDefeated = true;
+                if (player.DungeonFloorStates.TryGetValue(fightLevel, out var bossFloorState))
+                    bossFloorState.BossDefeated = true;
+            }
             roomClearedAtVictory = true;
         };
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
@@ -5826,12 +5835,15 @@ public class DungeonLocation : BaseLocation
 
             if (room.IsBossRoom)
             {
-                currentFloor.BossDefeated = true;
-
-                // Also set the persistent flag in floor state
-                if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                if (!roomClearedAtVictory)   // 1.2.8: else the win already set both flags
                 {
-                    floorState.BossDefeated = true;
+                    currentFloor.BossDefeated = true;
+
+                    // Also set the persistent flag in floor state
+                    if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                    {
+                        floorState.BossDefeated = true;
+                    }
                 }
 
                 terminal.SetColor("bright_yellow");

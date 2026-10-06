@@ -92,14 +92,14 @@ public class FloorFlush128Tests : IDisposable
 
     /// <summary>The session's dungeon with the hero standing on a freshly generated floor, as
     /// EnterLocation leaves it (floor generated, the floor live, the location the dungeon).</summary>
-    private DungeonLocation InDungeon(Character hero)
+    private DungeonLocation InDungeon(Character hero, int level = Floor)
     {
         var dungeon = (DungeonLocation)_lm.GetLocation(GameLocation.Dungeons)!;
         var term = new TerminalEmulator(new MemoryStream(), new MemoryStream());
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(dungeon, term);
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(dungeon, hero);
-        typeof(DungeonLocation).GetField("currentDungeonLevel", F)!.SetValue(dungeon, Floor);
-        object result = typeof(DungeonLocation).GetMethod("GenerateOrRestoreFloor", F)!.Invoke(dungeon, new object[] { hero, Floor })!;
+        typeof(DungeonLocation).GetField("currentDungeonLevel", F)!.SetValue(dungeon, level);
+        object result = typeof(DungeonLocation).GetMethod("GenerateOrRestoreFloor", F)!.Invoke(dungeon, new object[] { hero, level })!;
         ((bool)result.GetType().GetField("WasRestored")!.GetValue(result)!).Should().BeFalse("a fresh floor");
         typeof(DungeonLocation).GetField("currentFloor", F)!.SetValue(dungeon, result.GetType().GetField("Floor")!.GetValue(result));
         SetFloorLive(dungeon, true);
@@ -552,5 +552,115 @@ public class FloorFlush128Tests : IDisposable
         // every monster dead, a Victory
         engine.RunVictoryPreSaveHook(new CombatResult { Outcome = CombatOutcome.Victory, Monsters = new List<Monster> { dead } });
         runs.Should().Be(1);
+    }
+
+    // ---------- 6: a boss room won keeps the boss defeated (follow-up 3) ----------
+
+    /// <summary>The hero in the floor's boss room with a scripted terminal; the transcript stream is returned.</summary>
+    private (DungeonLocation dungeon, DungeonRoom room, MemoryStream output) BossFight(Character hero, int level = Floor)
+    {
+        var dungeon = InDungeon(hero, level);
+        var output = new MemoryStream();
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(dungeon, new TerminalEmulator(new ScriptedStream(FightScript()), output));
+        typeof(DungeonLocation).GetField("dungeonRandom", F)!.SetValue(dungeon, new Random(11));
+        var floor = CurrentFloor(dungeon);
+        var room = floor.Rooms.Single(r => r.IsBossRoom);
+        room.IsExplored = true;
+        floor.CurrentRoomId = room.Id;
+        return (dungeon, room, output);
+    }
+
+    private static int Occurrences(string text, string part)
+    {
+        int n = 0;
+        for (int i = text.IndexOf(part, StringComparison.Ordinal); i >= 0; i = text.IndexOf(part, i + part.Length, StringComparison.Ordinal)) n++;
+        return n;
+    }
+
+    [Fact]
+    public async Task ADisconnectAtTheVictorySaveOfABossFight_KeepsTheBossDefeated_AndAReloadDoesNotRespawnIt()
+    {
+        var hero = Fighter("flushboss");
+        var (dungeon, room, _) = BossFight(hero);
+        var drop = new DropAtVictorySave(_db);
+        SaveSystem.InitializeWithBackend(drop);
+
+        await FluentActions.Awaiting(() => Fight(dungeon, room)).Should().ThrowAsync<IOException>("the session died at the victory autosave");
+        drop.AutoSaves.Should().Be(1);
+
+        var engine = (GameEngine)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(GameEngine));
+        engine.CurrentPlayer = hero;
+        var session = new PlayerSession("flushboss", "MUD", null!, new MemoryStream(), _db, NoServer(), CancellationToken.None);
+        await session.FinishDisconnectPersistAsync(engine);
+
+        var data = await ReadBack("flushboss");
+        data.Player.DungeonFloorStates[Floor].BossDefeated.Should().BeTrue("the save holds the boss defeated");
+        // a restore forces a boss room uncleared without BossDefeated; it stays cleared, the boss does not return
+        RoomStillCleared(data, "flushboss", room.Id);
+    }
+
+    [Fact]
+    public async Task ABossRoomWon_SetsBothBossFlags_AndStillPaysTheBossBonusOnce()
+    {
+        var hero = Fighter("flushbonus");
+        var (dungeon, room, output) = BossFight(hero);
+        long goldBefore = hero.Gold;
+
+        await Fight(dungeon, room);
+
+        room.IsCleared.Should().BeTrue();
+        CurrentFloor(dungeon).BossDefeated.Should().BeTrue();
+        hero.DungeonFloorStates[Floor].BossDefeated.Should().BeTrue();
+        hero.Gold.Should().BeGreaterThanOrEqualTo(goldBefore + Floor * 500L, "the boss bonus (floor x 500 and up) is paid after the fight as before");
+        string shown = Encoding.UTF8.GetString(output.ToArray());
+        Occurrences(shown, Loc.Get("dungeon.boss_defeated")).Should().Be(1, "the boss lines after the fight show once");
+    }
+
+    [Fact]
+    public async Task ABossRoomWonOnASealFloor_QuestAndSealMarksOnce_AndTheNextFloorOpensAsBefore()
+    {
+        const int SealFloor = 15;
+        var hero = Fighter("flushseal");
+        hero.ClearedSpecialFloors.Add(SealFloor);   // the floor's seal was found (TryDiscoverSeal marks it)
+        var quest = new Quest
+        {
+            Title = "Boss and floor test", Initiator = "Test", QuestTarget = QuestTarget.ClearFloor,
+            Occupier = hero.Name2, Date = DateTime.Now, DaysToComplete = 30
+        };
+        QuestSystem.AddQuestToDatabase(quest);
+        try
+        {
+            var (dungeon, room, _) = BossFight(hero, SealFloor);
+            // the floor's boss by name (an objective with no target also matches the boss's tier name,
+            // so it would count one kill twice; that is OnMonsterKilled's own rule, not this fight's)
+            string bossName = (string)typeof(DungeonLocation).GetMethod("GetBossName", F)!.Invoke(dungeon, new object[] { CurrentFloor(dungeon).Theme })!;
+            string bossId = bossName.ToLower().Replace(" ", "_");
+            quest.Objectives.Add(new QuestObjective(QuestObjectiveType.KillBoss, "Kill the boss", 5, bossId, bossName));
+            quest.Objectives.Add(new QuestObjective(QuestObjectiveType.ClearDungeonFloor, "Clear floor", 5, SealFloor.ToString(), $"Floor {SealFloor}"));
+            foreach (var r in CurrentFloor(dungeon).Rooms.Where(r => r.HasMonsters && r != room))
+                r.IsCleared = true;
+
+            await Fight(dungeon, room);
+
+            var state = hero.DungeonFloorStates[SealFloor];
+            state.BossDefeated.Should().BeTrue();
+            quest.Objectives[0].CurrentProgress.Should().Be(1, "the boss kill counts once");
+            quest.Objectives[1].CurrentProgress.Should().Be(0, "winning the room is not leaving the floor");
+            state.IsPermanentlyClear.Should().BeFalse("the seal floor's permanent clear waits for leaving the floor");
+            state.EverCleared.Should().BeFalse();
+            ((bool)typeof(DungeonLocation).GetMethod("IsFloorCleared", F)!.Invoke(dungeon, null)!).Should().BeTrue();
+            ((int)typeof(DungeonLocation).GetMethod("GetMaxAccessibleFloor", F)!.Invoke(dungeon, new object[] { hero, SealFloor + 1 })!)
+                .Should().Be(SealFloor + 1, "the next floor opens as before");
+
+            SaveFloorStateOnLeaving(dungeon, hero);
+            quest.Objectives[0].CurrentProgress.Should().Be(1);
+            quest.Objectives[1].CurrentProgress.Should().Be(1, "leaving the cleared floor notifies once");
+            state.IsPermanentlyClear.Should().BeTrue();
+            hero.ClearedSpecialFloors.Count(f => f == SealFloor).Should().Be(1);
+        }
+        finally
+        {
+            quest.Deleted = true;
+        }
     }
 }
