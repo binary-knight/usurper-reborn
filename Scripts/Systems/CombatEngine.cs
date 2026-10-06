@@ -321,6 +321,43 @@ public partial class CombatEngine
     /// <summary>1.2.7: test seam. A store used instead of the active save directory's.</summary>
     internal TelemetryStore? TelemetryStoreOverride { get; set; }
 
+    /// <summary>1.2.8: test seam. The Divine Favor chance PlayerVsMonsters uses in place of the faction's.</summary>
+    internal Func<float>? DivineFavorChanceOverride { get; set; }
+
+    /// <summary>
+    /// 1.2.8: the one row of a fight that ends outside the death row at the end of HandlePlayerDeath (an
+    /// online permadeath, an arrest or exhibition loss, a rescue): the telemetry row, then the combat_events
+    /// row, as every other fight end writes them. The label is one of victory, fled or death.
+    /// </summary>
+    private void WriteFightRow(CombatResult result, string outcome)
+    {
+        QueueTelemetryRow(result, outcome);
+        LogCombatEventToDb(result, outcome);
+    }
+
+    /// <summary>
+    /// 1.2.8: a rescue (Last Stand, Death's Door, Mortis's Miracle, Divine Favor) came after the fight's end
+    /// was taken with the player at 0 HP or less; the row's player_hp_end is the HP the rescue left. The
+    /// outside observer was told the fight's end once and is not told again.
+    /// </summary>
+    private static void TakeRescueHp(CombatResult result)
+    {
+        var t = result.Tally;
+        if (t != null && t.Ended && result.Player != null) t.OnFightEnd(result.Player.HP);
+    }
+
+    /// <summary>
+    /// 1.2.8: the row of a fight a rescue in HandlePlayerDeath ended. With a monster alive the fight ends as
+    /// an escape and the row says fled. When the rescue came on the killing round (every monster dead, the
+    /// outcome Victory) the victory pipeline the caller runs writes the fight's one row, so none is written here.
+    /// </summary>
+    private void WriteRescueRow(CombatResult result)
+    {
+        TakeRescueHp(result);
+        if (result.Outcome != CombatOutcome.PlayerEscaped) return;
+        WriteFightRow(result, "fled");
+    }
+
     /// <summary>1.2.7: runs the telemetry append off the combat thread. Test seam: a test can hold the
     /// append back until it has changed the fight's objects.</summary>
     internal Func<Action, Task> TelemetryBackground { get; set; } = work => Task.Run(work);
@@ -2171,7 +2208,7 @@ public partial class CombatEngine
                 bool divineSaved = false;
                 if (!player.DivineFavorTriggeredThisCombat)
                 {
-                    float divineFavorChance = FactionSystem.Instance?.GetDivineFavorChance() ?? 0f;
+                    float divineFavorChance = DivineFavorChanceOverride?.Invoke() ?? FactionSystem.Instance?.GetDivineFavorChance() ?? 0f;
                     if (divineFavorChance > 0 && random.NextDouble() < divineFavorChance)
                     {
                         player.DivineFavorTriggeredThisCombat = true;
@@ -2185,6 +2222,9 @@ public partial class CombatEngine
                         terminal.WriteLine("");
                         await Pacing.Wait(GetCombatDelay(2000));
                         divineSaved = true;
+                        // 1.2.8: the fight's row, at the HP the favor left (a monster is alive in this branch)
+                        TakeRescueHp(result);
+                        WriteFightRow(result, "fled");
                     }
                 }
 
@@ -22817,6 +22857,7 @@ public partial class CombatEngine
                 result.Outcome = CombatOutcome.Victory;
             else
                 result.Outcome = CombatOutcome.PlayerEscaped;
+            WriteRescueRow(result);   // 1.2.8: the fight's row (fled; a Victory's row is the victory pipeline's)
             return;
         }
 
@@ -22824,7 +22865,10 @@ public partial class CombatEngine
         // rescues (Last Stand, Death's Door) and before anything death-related runs. Not for a
         // fight with no real death (arrest, exhibition) or a Mental collapse.
         if (await TryMortisMiracle(result))
+        {
+            WriteRescueRow(result);   // 1.2.8: as after Last Stand
             return;
+        }
 
         // v0.61.2: Last-Stand rescue did NOT fire, so the player is genuinely
         // entering the death pipeline. Mark the result so the outer Char.Combat.End
@@ -22857,6 +22901,7 @@ public partial class CombatEngine
             result.Outcome = CombatOutcome.PlayerEscaped;
             DebugLogger.Instance.LogInfo("ARREST",
                 $"{result.Player.Name} subdued by guards (no resurrection consumed).");
+            WriteFightRow(result, "death");   // 1.2.8: the fight was lost; the row keeps the HP the fight left
             return;
         }
 
@@ -22872,6 +22917,7 @@ public partial class CombatEngine
             result.Outcome = CombatOutcome.PlayerDied;
             DebugLogger.Instance.LogInfo("EXHIBITION",
                 $"{result.Player.Name} dropped in exhibition combat (no resurrection consumed).");
+            WriteFightRow(result, "death");   // 1.2.8: as the arrest loss
             return;
         }
 
@@ -22902,6 +22948,12 @@ public partial class CombatEngine
         bool isOnlinePermadeathMode = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
         if (isOnlinePermadeathMode && result.Player.Resurrections <= 0)
         {
+            // 1.2.8: the fight's row, before the erase. The erase removes the player's telemetry answer
+            // (DeleteGameData, TelemetryConsent.RemoveAnswer), and the queue append checks that answer again,
+            // so the append is awaited here; it never throws and its lock wait is bounded (LockTimeout).
+            WriteFightRow(result, "death");
+            var append = LastTelemetryAppend;
+            if (append != null) await append;
             await HandleExcessiveDeathsPermadeath(result);
             return;
         }
