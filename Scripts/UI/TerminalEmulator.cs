@@ -1658,10 +1658,13 @@ public partial class TerminalEmulator
     /// must not read as No (the telemetry consent prompt): true for a localized yes, false for a localized
     /// no, null after MaxInvalidChoiceAttempts invalid answers (Enter alone included) or when the
     /// connection is gone. A MUD peer that closes throws ConnectionClosedException, as GetInput does.
+    /// 1.2.7 (T3b): with offeredYesOnly, only the yes this language's prompt offers is a yes
+    /// (GameConfig.IsOfferedYes); another language's yes letter or word is asked again like any junk.
+    /// The no side is unchanged.
     /// </summary>
-    public async Task<bool?> AskYesNoOrNoAnswerAsync(string prompt)
+    public async Task<bool?> AskYesNoOrNoAnswerAsync(string prompt, bool offeredYesOnly = false)
     {
-        return await AskYesNoCore(() => GetInput(prompt), null);
+        return await AskYesNoCore(() => GetInput(prompt), null, offeredYesOnly);
     }
 
     /// <summary>
@@ -1676,12 +1679,12 @@ public partial class TerminalEmulator
 
     /// <summary>v1.1.15: shared strict yes/no loop behind AskYesNoAsync and AskYesNoKeyAsync. 1.2.7: null
     /// when no answer came (the invalid answers ran out or the connection is gone); those two map it to No.</summary>
-    private async Task<bool?> AskYesNoCore(Func<Task<string>> read, bool? enterDefault)
+    private async Task<bool?> AskYesNoCore(Func<Task<string>> read, bool? enterDefault, bool offeredYesOnly = false)
     {
         for (int attempt = 0; attempt < MaxInvalidChoiceAttempts; attempt++)
         {
             string input = (await read()).Trim();
-            if (GameConfig.IsAffirmative(input)) return true;
+            if (offeredYesOnly ? GameConfig.IsOfferedYes(input) : GameConfig.IsAffirmative(input)) return true;
             if (GameConfig.IsNegative(input)) return false;
             if (input.Length == 0 && enterDefault.HasValue) return enterDefault.Value;
             if (DoorMode.IsDisconnected) break;

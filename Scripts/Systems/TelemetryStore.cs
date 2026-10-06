@@ -481,6 +481,15 @@ namespace UsurperRemake.Systems
             _operatorOffOwed = false;
         }
 
+        /// <summary>1.2.7 (T3b): something the switch being off must not leave on disk: the queue, a batch file,
+        /// or an install_id in state.json (read again, not the cache). Takes no lock and creates nothing, so a
+        /// switch set off in server_config while no process ran is seen at the next start.</summary>
+        internal bool HasDataToClear()
+        {
+            if (!Directory.Exists(Folder)) return false;
+            return File.Exists(QueuePath) || BatchFiles().Length > 0 || ReadStateFile().InstallId != null;
+        }
+
         /// <summary>True while the deletion of a switch that went off is owed. Creates nothing.</summary>
         internal bool OperatorOffOwed => _operatorOffOwed || File.Exists(OperatorOffMarkerPath);
 

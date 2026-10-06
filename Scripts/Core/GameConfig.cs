@@ -2752,6 +2752,60 @@ public static partial class GameConfig
     }
 
     /// <summary>
+    /// 1.2.7 (T3b): the yes this session's language offers, for a question where only that yes may
+    /// count (the telemetry consent prompt). Unlike IsAffirmative, another language's yes is not a yes
+    /// here. Read from the same Loc strings the prompt shows: the yes word of ui.yes and the yes side of
+    /// ui.yn_prompt (the part between "(" and "/"), each split at "=", every part taken whole, without
+    /// its accents, and by its first letter. That gives en Y and Yes; es S, Si and Sí; fr O, Oui and
+    /// the shown Y; hu I, Igen and the shown Y; it S, Si and Sì.
+    /// </summary>
+    public static bool IsOfferedYes(string? input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return false;
+        var c = input.Trim().ToUpperInvariant();
+        return OfferedYesWords().Contains(c);
+    }
+
+    /// <summary>1.2.7 (T3b): the upper case yes words and letters of IsOfferedYes in this session's language.</summary>
+    internal static HashSet<string> OfferedYesWords()
+    {
+        var words = new HashSet<string>(StringComparer.Ordinal);
+        string prompt = Loc.Get("ui.yn_prompt");
+        int open = prompt.IndexOf('(');
+        int slash = open >= 0 ? prompt.IndexOf('/', open + 1) : -1;
+        var sources = new List<string> { Loc.Get("ui.yes") };
+        if (slash > open) sources.Add(prompt.Substring(open + 1, slash - open - 1));
+        foreach (var source in sources)
+            foreach (var part in source.Split('='))
+            {
+                string word = part.Trim().ToUpperInvariant();
+                if (word.Length == 0) continue;
+                words.Add(word);
+                words.Add(WithoutAccents(word));
+                words.Add(word.Substring(0, 1));
+            }
+        return words;
+    }
+
+    /// <summary>An upper case word with its Latin-1 accented vowels made plain (SÍ and SÌ read SI). Done by
+    /// hand: the game runs with invariant globalization, where string normalization does not strip accents.</summary>
+    private static string WithoutAccents(string upper)
+    {
+        var chars = upper.ToCharArray();
+        for (int i = 0; i < chars.Length; i++)
+            chars[i] = chars[i] switch
+            {
+                >= '\u00C0' and <= '\u00C5' => 'A',
+                >= '\u00C8' and <= '\u00CB' => 'E',
+                >= '\u00CC' and <= '\u00CF' => 'I',
+                >= '\u00D2' and <= '\u00D6' => 'O',
+                >= '\u00D9' and <= '\u00DC' => 'U',
+                _ => chars[i],
+            };
+        return new string(chars);
+    }
+
+    /// <summary>
     /// v0.65.1: Short human-readable weapon-class tag (One-Handed / Two-Handed /
     /// Shield / Buckler / Tower Shield / Off-Hand) for item displays, so players
     /// can tell a weapon's handedness and spot shields WITHOUT equipping it

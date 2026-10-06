@@ -358,11 +358,15 @@ public class TelemetryUpload127Tests : IDisposable
         (await Uploader(store, fake, source: TelemetrySource.BbsDoor).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.NotAllowed);
         fake.Calls.Should().Be(0);
         Batches().Should().BeEmpty();
+        // T3b: an upload (the start upload) with the switch off deletes the rows and the id left from when it
+        // was on, so they no longer survive an off and on
+        Lines().Should().BeEmpty("the switch is off at the start upload: the queue is deleted");
+        store.ReReadStateLocked().InstallId.Should().BeNull("and the id");
 
-        // switch on again: the same rows go
+        // switch on again: nothing from before goes (the id went with the rows; a player's next yes makes one)
         OperatorOn();
-        (await Uploader(store, fake, source: TelemetrySource.BbsDoor).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.Sent);
-        Ids(fake.Bodies.Single()).Should().Equal(Range(1, 3));
+        (await Uploader(store, fake, source: TelemetrySource.BbsDoor).UploadOnceAsync()).Should().Be(TelemetryUploadOutcome.NotAllowed);
+        fake.Calls.Should().Be(0);
 
         // a server with the switch off and no telemetry folder: nothing is created
         TelemetryConsent.OperatorResolver = null;
@@ -372,7 +376,7 @@ public class TelemetryUpload127Tests : IDisposable
         (await new TelemetryUploader(server, fake, () => _utc, () => TelemetrySource.Server).UploadOnceAsync())
             .Should().Be(TelemetryUploadOutcome.NotAllowed);
         Directory.Exists(Path.Combine(other, "telemetry")).Should().BeFalse();
-        fake.Calls.Should().Be(1);
+        fake.Calls.Should().Be(0);
     }
 
     [Fact]

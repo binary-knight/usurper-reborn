@@ -45,7 +45,8 @@ namespace UsurperRemake.Systems
         internal static string Question() => $"{Loc.Get("telemetry.prompt_ask")} {Loc.Get("ui.yn_prompt")}";
 
         /// <summary>Draw the question and read the answer: true yes, false no, null no answer. Plain lines
-        /// in every mode, so a screen reader reads them as they are.</summary>
+        /// in every mode, so a screen reader reads them as they are. 1.2.7 (T3b): only the yes this
+        /// language offers counts; another language's yes is asked again, so it never stores a yes.</summary>
         internal static async Task<bool?> AskAsync(TerminalEmulator terminal, bool shared)
         {
             Drawn++;
@@ -55,7 +56,7 @@ namespace UsurperRemake.Systems
                 if (lines[i].Length == 0) terminal.WriteLine("");
                 else terminal.WriteLine(" " + lines[i], i == 0 ? "bright_yellow" : "white");
             }
-            return await terminal.AskYesNoOrNoAnswerAsync(" " + Question());
+            return await terminal.AskYesNoOrNoAnswerAsync(" " + Question(), offeredYesOnly: true);
         }
 
         /// <summary>The approved line shown when an answer could not be written.</summary>

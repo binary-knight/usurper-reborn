@@ -217,7 +217,14 @@ namespace UsurperRemake.Systems
             // done first, at this upload or at the start upload. Nothing is created when none is owed.
             if (_store.IsSharedInstall && !_store.RetryOperatorOff()) return TelemetryUploadOutcome.Failed;
             // The operator switch before anything else: the queue lock creates the folder.
-            if (_store.IsSharedInstall && !TelemetryConsent.OperatorAllows()) return TelemetryUploadOutcome.NotAllowed;
+            if (_store.IsSharedInstall && !TelemetryConsent.OperatorAllows())
+            {
+                // T3b: the switch was set off while no process ran (no on to off change was seen), so the
+                // queue, batches and id left from when it was on are deleted here, at the start upload. A busy
+                // lock is owed and retried as above. Nothing is created when there is nothing to delete.
+                if (_store.HasDataToClear()) _store.OperatorTurnedOff();
+                return TelemetryUploadOutcome.NotAllowed;
+            }
             if (!System.IO.Directory.Exists(_store.Folder)) return TelemetryUploadOutcome.NothingQueued;
 
             long now = Unix(_utcNow());
