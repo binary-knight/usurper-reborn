@@ -1022,6 +1022,39 @@ public partial class CombatEngine
         bool isAmbush = false,
         bool storyFight = false)
     {
+        // 1.2.8: the victory pre-save hook belongs to this fight only
+        try { return await PlayerVsMonstersCore(player, monsters, teammates, offerMonkEncounter, isAmbush, storyFight); }
+        finally { VictoryPreSaveHook = null; }
+    }
+
+    /// <summary>
+    /// 1.2.8: set by a caller for its next fight (DungeonLocation's room fight sets the room's
+    /// cleared state with it). Runs at the start of the victory pipeline, before its rewards, loot
+    /// screens and the victory autosave, and only on a Victory with every monster dead, so a save
+    /// taken at any point after the win (the autosave, or the disconnect save of a player who drops
+    /// at a loot screen) already holds what the caller set. PlayerVsMonsters clears it when the
+    /// fight ends, so a later fight on this engine never runs it.
+    /// </summary>
+    internal Action<CombatResult>? VictoryPreSaveHook { get; set; }
+
+    /// <summary>1.2.8: run the pre-save hook if this is a Victory with every monster dead.</summary>
+    internal void RunVictoryPreSaveHook(CombatResult result)
+    {
+        var hook = VictoryPreSaveHook;
+        if (hook == null) return;
+        if (result.Outcome != CombatOutcome.Victory) return;
+        if (result.Monsters == null || result.Monsters.Any(m => m.IsAlive)) return;
+        hook(result);
+    }
+
+    private async Task<CombatResult> PlayerVsMonstersCore(
+        Character player,
+        List<Monster> monsters,
+        List<Character>? teammates,
+        bool offerMonkEncounter,
+        bool isAmbush,
+        bool storyFight)
+    {
         // v1.1.15: collapse happens after combat. A fight that ended at Mental 0 is the last one: an
         // action that chains fights (gauntlet waves, a save quest then an ambush) gets this empty
         // result for the next fight, which is not entered, and the location loop carries out the
@@ -21577,6 +21610,9 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleVictoryMultiMonster(CombatResult result, bool offerMonkEncounter)
     {
+        // 1.2.8: before any reward, loot screen or the victory autosave below
+        RunVictoryPreSaveHook(result);
+
         // MUD mode: broadcast boss kills only (regular kills too spammy)
         if (result.DefeatedMonsters.Count > 0)
         {

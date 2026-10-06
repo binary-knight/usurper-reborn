@@ -321,4 +321,215 @@ public class FloorFlush128Tests : IDisposable
 
         RoomStillCleared(await ReadBack("flushvault"), "flushvault", roomId);
     }
+
+    // ---------- 5: the room fight sets the room cleared at the win (follow-up) ----------
+
+    private sealed class ScriptedStream : Stream
+    {
+        private readonly byte[] _data;
+        private int _pos;
+        public ScriptedStream(string script) { _data = Encoding.UTF8.GetBytes(script); }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            if (_pos >= _data.Length) return 0;
+            int n = Math.Min(count, _data.Length - _pos);
+            Array.Copy(_data, _pos, buffer, offset, n);
+            _pos += n;
+            return n;
+        }
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct)
+            => Task.FromResult(Read(buffer, offset, count));
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => _data.Length;
+        public override long Position { get => _pos; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    // attacks, then P (pass on a loot drop) and N (no thanks to the monk) for the screens after the
+    // win, which ask again on any other key, then plain keys for the closing prompts
+    private static string FightScript() =>
+        string.Concat(Enumerable.Repeat("A\n\n", 40)) + string.Concat(Enumerable.Repeat("P\nN\n", 40))
+        + string.Concat(Enumerable.Repeat("\n", 40));
+
+    private static Character Fighter(string name) => new()
+    {
+        Name1 = name, Name2 = name, AI = CharacterAI.Human,
+        Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 30,
+        HP = 9000, MaxHP = 9000, BaseMaxHP = 9000,
+        Strength = 900, BaseStrength = 900, Defence = 300, BaseDefence = 300,
+        Dexterity = 200, BaseDexterity = 200, Agility = 200, BaseAgility = 200,
+        Constitution = 200, BaseConstitution = 200, Intelligence = 20, BaseIntelligence = 20,
+        Wisdom = 20, BaseWisdom = 20, Stamina = 300, BaseStamina = 300,
+        Mental = 100, Gold = 0, Healing = 0, AutoHeal = false,
+        CombatSpeed = CombatSpeed.Instant,
+    };
+
+    /// <summary>The hero in the dungeon with a scripted terminal, the room to fight, and the number of
+    /// monsters the fight will meet (the dungeon's random seeded, the same group generated here).</summary>
+    private (DungeonLocation dungeon, DungeonRoom room, int monsterCount) RoomFight(Character hero, int seed = 11)
+    {
+        var dungeon = InDungeon(hero);
+        var term = new TerminalEmulator(new ScriptedStream(FightScript()), new MemoryStream());
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(dungeon, term);
+        typeof(DungeonLocation).GetField("dungeonRandom", F)!.SetValue(dungeon, new Random(seed));
+        int count = MonsterGenerator.GenerateMonsterGroup(Floor, new Random(seed), MonsterGenerator.OldGodApproachScale(Floor)).Count;
+        var floor = CurrentFloor(dungeon);
+        var room = floor.Rooms.First(r => r.HasMonsters && !r.IsBossRoom);
+        room.IsExplored = true;
+        floor.CurrentRoomId = room.Id;
+        return (dungeon, room, count);
+    }
+
+    private static Task Fight(DungeonLocation dungeon, DungeonRoom room) =>
+        (Task)typeof(DungeonLocation).GetMethod("FightRoomMonsters", F)!.Invoke(dungeon, new object[] { room, false })!;
+
+    /// <summary>The connection dies at the victory autosave: that write throws, as a dead socket
+    /// would end the session there. Every other call goes to the real database.</summary>
+    private sealed class DropAtVictorySave : ISaveBackend
+    {
+        private readonly SqlSaveBackend _inner;
+        public int AutoSaves;
+        public DropAtVictorySave(SqlSaveBackend inner) { _inner = inner; }
+        public Task<bool> WriteAutoSave(string playerName, SaveGameData data)
+        {
+            AutoSaves++;
+            throw new IOException("connection lost at the victory save");
+        }
+        public Task<bool> WriteGameData(string playerName, SaveGameData data) => _inner.WriteGameData(playerName, data);
+        public Task<SaveGameData?> ReadGameData(string playerName) => _inner.ReadGameData(playerName);
+        public Task<SaveGameData?> ReadGameDataByFileName(string fileName) => _inner.ReadGameDataByFileName(fileName);
+        public bool GameDataExists(string playerName) => _inner.GameDataExists(playerName);
+        public bool DeleteGameData(string playerName) => _inner.DeleteGameData(playerName);
+        public List<SaveInfo> GetAllSaves() => _inner.GetAllSaves();
+        public List<SaveInfo> GetPlayerSaves(string playerName) => _inner.GetPlayerSaves(playerName);
+        public SaveInfo? GetMostRecentSave(string playerName) => _inner.GetMostRecentSave(playerName);
+        public List<string> GetAllPlayerNames() => _inner.GetAllPlayerNames();
+        public bool IsDisplayNameTaken(string displayName, string excludeUsername) => _inner.IsDisplayNameTaken(displayName, excludeUsername);
+        public void CreateBackup(string playerName) => _inner.CreateBackup(playerName);
+        public string GetSaveDirectory() => _inner.GetSaveDirectory();
+    }
+
+    [Fact]
+    public async Task ADisconnectAtTheVictorySave_KeepsTheRoomCleared_AndAReloadDoesNotRespawnIt()
+    {
+        var hero = Fighter("flushwin");
+        var (dungeon, room, _) = RoomFight(hero);
+        var drop = new DropAtVictorySave(_db);
+        SaveSystem.InitializeWithBackend(drop);
+
+        await FluentActions.Awaiting(() => Fight(dungeon, room)).Should().ThrowAsync<IOException>("the session died at the victory autosave");
+        drop.AutoSaves.Should().Be(1, "the drop came at the victory autosave");
+
+        // the disconnect save of the dead session
+        var engine = (GameEngine)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(GameEngine));
+        engine.CurrentPlayer = hero;
+        var session = new PlayerSession("flushwin", "MUD", null!, new MemoryStream(), _db, NoServer(), CancellationToken.None);
+        await session.FinishDisconnectPersistAsync(engine);
+
+        RoomStillCleared(await ReadBack("flushwin"), "flushwin", room.Id);
+    }
+
+    [Fact]
+    public async Task ARoomFightWon_ClearsTheRoom_AndCountsItsMonstersOnce()
+    {
+        var hero = Fighter("flushcount");
+        var (dungeon, room, count) = RoomFight(hero);
+        count.Should().BeGreaterThan(0);
+        int killedBefore = CurrentFloor(dungeon).MonstersKilled;
+        long xpBefore = hero.Experience;
+
+        await Fight(dungeon, room);
+
+        room.IsCleared.Should().BeTrue();
+        CurrentFloor(dungeon).MonstersKilled.Should().Be(killedBefore + count, "the win counts the room's monsters once");
+        hero.Experience.Should().BeGreaterThan(xpBefore, "the fight's rewards are still paid");
+        // and the victory autosave already held the room cleared
+        RoomStillCleared(await ReadBack("flushcount"), "flushcount", room.Id);
+    }
+
+    [Fact]
+    public async Task TheLastRoomOfAFloorWon_NotifiesTheFloorClearQuestOnce()
+    {
+        var hero = Fighter("flushlast");
+        var quest = new Quest
+        {
+            Title = "Clear floor test", Initiator = "Test", QuestTarget = QuestTarget.ClearFloor,
+            Occupier = hero.Name2, Date = DateTime.Now, DaysToComplete = 30
+        };
+        quest.Objectives.Add(new QuestObjective(QuestObjectiveType.ClearDungeonFloor, "Clear floor", 5, Floor.ToString(), $"Floor {Floor}"));
+        QuestSystem.AddQuestToDatabase(quest);
+        try
+        {
+            var (dungeon, room, _) = RoomFight(hero);
+            foreach (var r in CurrentFloor(dungeon).Rooms.Where(r => r.HasMonsters && r != room))
+                r.IsCleared = true;
+
+            await Fight(dungeon, room);
+            room.IsCleared.Should().BeTrue();
+            quest.Objectives[0].CurrentProgress.Should().Be(0, "winning the room is not leaving the floor");
+
+            SaveFloorStateOnLeaving(dungeon, hero);
+            quest.Objectives[0].CurrentProgress.Should().Be(1);
+        }
+        finally
+        {
+            quest.Deleted = true;
+        }
+    }
+
+    private static Monster Rat(string name) => new()
+    {
+        Name = name, Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 1, Gold = 0, IsActive = true,
+    };
+
+    private static async Task<CombatResult> EngineFight(CombatEngine engine, Character hero)
+    {
+        var task = engine.PlayerVsMonsters(hero, new List<Monster> { Rat("Rat A") }, offerMonkEncounter: false);
+        var done = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(60)));
+        done.Should().BeSameAs(task, "the fight ends");
+        return await task;
+    }
+
+    [Fact]
+    public async Task TheVictoryPreSaveHook_IsClearedAfterItsFight_SoALaterFightNeverRunsIt()
+    {
+        var hero = Fighter("flushlater");
+        var engine = new CombatEngine(new TerminalEmulator(new ScriptedStream(FightScript() + FightScript()), new MemoryStream()));
+        engine.SeedRandomForTests(128);
+        int runs = 0;
+        engine.VictoryPreSaveHook = _ => runs++;
+
+        (await EngineFight(engine, hero)).Outcome.Should().Be(CombatOutcome.Victory);
+        runs.Should().Be(1, "the hook runs at its own fight's win");
+        engine.VictoryPreSaveHook.Should().BeNull("the fight cleared it");
+
+        // a later fight on the same engine (no dungeon room behind it)
+        (await EngineFight(engine, hero)).Outcome.Should().Be(CombatOutcome.Victory);
+        runs.Should().Be(1, "a later fight never runs the room's hook");
+    }
+
+    [Fact]
+    public void TheVictoryPreSaveHook_RunsOnlyOnAVictoryWithEveryMonsterDead()
+    {
+        var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
+        int runs = 0;
+        engine.VictoryPreSaveHook = _ => runs++;
+        var dead = Rat("Rat A"); dead.HP = 0;
+        var alive = Rat("Rat B");
+
+        // a Victory with a monster still standing (the wizard god mode rescue sets Victory so)
+        engine.RunVictoryPreSaveHook(new CombatResult { Outcome = CombatOutcome.Victory, Monsters = new List<Monster> { dead, alive } });
+        runs.Should().Be(0);
+        // not a Victory
+        engine.RunVictoryPreSaveHook(new CombatResult { Outcome = CombatOutcome.PlayerEscaped, Monsters = new List<Monster> { dead } });
+        runs.Should().Be(0);
+        // every monster dead, a Victory
+        engine.RunVictoryPreSaveHook(new CombatResult { Outcome = CombatOutcome.Victory, Monsters = new List<Monster> { dead } });
+        runs.Should().Be(1);
+    }
 }

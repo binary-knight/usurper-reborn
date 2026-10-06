@@ -5779,6 +5779,18 @@ public class DungeonLocation : BaseLocation
 
         // Combat
         var combatEngine = new CombatEngine(terminal);
+        // 1.2.8: the room's cleared state is set at the win, before the victory autosave and the loot
+        // screens, so a save there (or the disconnect save of a player who drops at them) keeps the
+        // room cleared; the check after the fight then sets nothing twice
+        bool roomClearedAtVictory = false;
+        var fightFloor = currentFloor;
+        combatEngine.VictoryPreSaveHook = _ =>
+        {
+            if (player.HP <= 0) return;
+            room.IsCleared = true;
+            fightFloor.MonstersKilled += monsters.Count;
+            roomClearedAtVictory = true;
+        };
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
 
@@ -5802,8 +5814,11 @@ public class DungeonLocation : BaseLocation
         // Check if player survived AND won (fleeing doesn't clear the room)
         if (player.HP > 0 && combatResult.Outcome == CombatOutcome.Victory)
         {
-            room.IsCleared = true;
-            currentFloor.MonstersKilled += monsters.Count;
+            if (!roomClearedAtVictory)
+            {
+                room.IsCleared = true;
+                currentFloor.MonstersKilled += monsters.Count;
+            }
 
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.room_cleared"));
