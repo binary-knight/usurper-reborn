@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using UsurperRemake.Data;
 
@@ -249,9 +251,19 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Auto-save the current game state with rotation (keeps 5 most recent autosaves)
+        /// 1.2.8: an autosave whose build or write takes longer than this (ms) logs one SAVE_SLOW warning.
+        /// An internal seam for tests, not config.
         /// </summary>
-        public async Task<bool> AutoSave(Character player, bool force = false)
+        internal static int SlowSaveThresholdMs = 2000;
+
+        /// <summary>
+        /// Auto-save the current game state with rotation (keeps 5 most recent autosaves).
+        /// The caller parameters are filled by the compiler and only name the caller in a SAVE_SLOW line.
+        /// </summary>
+        public async Task<bool> AutoSave(Character player, bool force = false,
+            [CallerMemberName] string callerMember = "",
+            [CallerFilePath] string callerFile = "",
+            [CallerLineNumber] int callerLine = 0)
         {
             if (player == null) return false;
 
@@ -269,9 +281,23 @@ namespace UsurperRemake.Systems
                     return true; // Pretend success, save will happen soon
             }
 
+            // 1.2.8: time the build and the write apart, and name the slow one (a locked database
+            // can hold the write for up to Microsoft.Data.Sqlite's 30 s default)
+            var buildWatch = Stopwatch.StartNew();
             var (playerName, saveData) = await BuildAutoSaveData(player);
+            long buildMs = buildWatch.ElapsedMilliseconds;
 
+            var writeWatch = Stopwatch.StartNew();
             var success = await backend.WriteAutoSave(playerName, saveData);
+            long writeMs = writeWatch.ElapsedMilliseconds;
+
+            int slowMs = SlowSaveThresholdMs;
+            if (buildMs > slowMs || writeMs > slowMs)
+            {
+                string callerName = System.IO.Path.GetFileName(callerFile.Replace('\\', '/'));
+                DebugLogger.Instance.LogWarning("SAVE_SLOW",
+                    $"key={playerName} build={buildMs}ms write={writeMs}ms caller={callerMember} {callerName}:{callerLine}");
+            }
 
             // Sync stats to Steam if available (blocked if dev menu was used)
             if (success && player is Player playerChar && playerChar.Statistics != null && !player.DevMenuUsed)
