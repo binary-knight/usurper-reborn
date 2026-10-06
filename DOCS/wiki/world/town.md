@@ -1,7 +1,7 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs
 history: 1.2.6 | A new team's name at Team Corner cannot contain < > & or a double quote.
 history: 1.2.5 | Main Street, the Dormitory, the Level Master, Team Corner and the Marketplace are shown in all five languages, and Dormitory murder mail reaches the victim in the victim's language.

@@ -1,7 +1,7 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs
 history: 1.2.5 | Monster names in rooms, merchant wares and crafting materials are shown in the player's language, and long merchant and material rows wrap at 79 columns.
 history: 1.2.4 | When the leader examines a feature, followers see it in their own language, and the merchant purchase confirm wraps at 79 columns.

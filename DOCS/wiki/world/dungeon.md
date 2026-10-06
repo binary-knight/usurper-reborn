@@ -1,7 +1,7 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs
 history: 1.2.5 | Monster names in rooms and group summaries and the dungeon merchant's wares are shown in each player's language, and long dungeon rows wrap at 79 columns.
 history: 1.2.4 | The follower room view, reward labels, skill toggle names, the descend message's theme, duelist cries and gear are translated into all five languages.

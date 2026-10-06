@@ -1,7 +1,7 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
 history: 1.2.5 | Level Master, Healer and dungeon screens are shown in all five languages, and long dungeon rows wrap inside 79 columns.
 history: 1.2.4 | none
