@@ -890,6 +890,14 @@ public abstract class BaseLocation
                 }
             }
 
+            // 1.2.8: a pending team or romantic betrayal, shown here between actions; never in a
+            // dungeon (this loop also runs there) or in prison
+            if (currentPlayer != null)
+            {
+                bool inPrison = currentPlayer.DaysInPrison > 0 || this is PrisonLocation || this is PrisonWalkLocation;
+                await BetrayalSystem.Instance.ShowPendingAtSafePoint(currentPlayer, terminal, isDungeon: this is DungeonLocation, inPrison: inPrison);
+            }
+
             // In MUD streaming mode: show the full location display only on the first iteration
             // (or after `look`/`l` resets the flag). Subsequent iterations just flow output
             // continuously without wiping the scroll buffer — real MUD behaviour.
