@@ -99,6 +99,34 @@ public class Bump127Tests
         DashOrEmoji.IsMatch(Note()).Should().BeFalse("the fixture");
     }
 
+    // ---------- 4. Website roadmap in five languages ----------
+
+    private static readonly string[] WebLanguages = { "en", "es", "fr", "hu", "it" };
+
+    [Fact]
+    public void Roadmap_127Shipped_128Next_InEveryLanguage()
+    {
+        string html = Repo("web/index.html");
+        var keys = Regex.Matches(html, "data-i18n=\"(r1\\.road_[a-z0-9_]+)\"").Select(m => m.Groups[1].Value).ToList();
+        keys.Should().Contain(new[] { "r1.road_127_t", "r1.road_127_d", "r1.road_128_t", "r1.road_128_d" });
+        foreach (string lang in WebLanguages)
+        {
+            var dict = JsonSerializer.Deserialize<Dictionary<string, string>>(Repo($"web/lang/{lang}.json"))!;
+            foreach (string key in keys)
+            {
+                dict.Should().ContainKey(key, lang);
+                dict[key].Should().NotBeNullOrWhiteSpace($"{lang} {key}");
+            }
+            dict["r1.road_127_t"].Should().StartWith("1.2.7 -- ", lang);
+            dict["r1.road_128_t"].Should().StartWith("1.2.8 -- ", lang);
+            foreach (string key in new[] { "r1.road_127_t", "r1.road_127_d", "r1.road_128_t", "r1.road_128_d" })
+                DashOrEmoji.IsMatch(dict[key]).Should().BeFalse($"{lang} {key}");
+            if (lang == "en")
+                foreach (string key in new[] { "r1.road_127_t", "r1.road_127_d", "r1.road_128_t", "r1.road_128_d" })
+                    html.Should().Contain($"data-i18n=\"{key}\">{dict[key]}<", "the page's own English matches en.json");
+        }
+    }
+
     // ---------- S4. The only sentence about addresses is the approved one ----------
 
     /// <summary>Words that say or imply something about addresses or logging.</summary>
