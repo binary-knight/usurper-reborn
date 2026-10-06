@@ -514,11 +514,32 @@ public class FloorFlush128Tests : IDisposable
     }
 
     [Fact]
+    public async Task TheVictoryPreSaveHook_OfAFightThatNeverStarted_IsNotRunByTheNextFight()
+    {
+        // a fight refused at Mental 0 returns before any round; its hook must not carry over
+        var hero = Fighter("flushrefused");
+        var engine = new CombatEngine(new TerminalEmulator(new ScriptedStream(FightScript()), new MemoryStream()));
+        engine.SeedRandomForTests(128);
+        int runs = 0;
+        engine.VictoryPreSaveHook = _ => runs++;
+        hero.Mental = 0;
+        MentalSystem.CollapseDue(hero).Should().BeTrue();
+        (await EngineFight(engine, hero)).MentalCollapseNotFought.Should().BeTrue();
+        engine.VictoryPreSaveHook.Should().BeNull();
+
+        hero.Mental = 100;
+        (await EngineFight(engine, hero)).Outcome.Should().Be(CombatOutcome.Victory);
+        runs.Should().Be(0, "the next fight is not the one the hook was set for");
+    }
+
+    [Fact]
     public void TheVictoryPreSaveHook_RunsOnlyOnAVictoryWithEveryMonsterDead()
     {
         var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
         int runs = 0;
-        engine.VictoryPreSaveHook = _ => runs++;
+        // the hook as PlayerVsMonsters holds it for the fight under way
+        Action<CombatResult> hook = _ => runs++;
+        typeof(CombatEngine).GetField("_victoryPreSaveHookThisFight", F)!.SetValue(engine, hook);
         var dead = Rat("Rat A"); dead.HP = 0;
         var alive = Rat("Rat B");
 
