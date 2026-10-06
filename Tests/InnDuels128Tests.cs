@@ -87,14 +87,18 @@ public class InnDuels128Tests
     public async Task Seth_Win_PaysTheFlatBonusOnly()
     {
         var hero = Hero(18);
+        // every achievement already held, so no unlock reward lands in the fight's XP or gold. The list is
+        // empty until some code initializes it, so initialize here: the test then reads the same in any order
+        AchievementSystem.Initialize();
+        foreach (var a in AchievementSystem.GetAllAchievements()) hero.Achievements.Unlock(a.Id);
         long xp0 = hero.Experience, gold0 = hero.Gold;
         string screen = await SethFight(hero);
 
         hero.SethDefeatsTotal.Should().Be(1, "the scripted hero beats Seth in one try: " + screen);
         long flatXp = TeamHQBonus.ApplyXP(hero, hero.Level * 200L);
         long flatGold = 50 + hero.Level * 5L;
-        (hero.Experience - xp0).Should().Be(flatXp, "the Inn's flat bonus is the whole XP reward");
-        (hero.Gold - gold0).Should().Be(flatGold, "the Inn's flat bonus is the whole gold reward");
+        (hero.Experience - xp0).Should().Be(flatXp, "the Inn's flat bonus is the whole XP reward: " + screen);
+        (hero.Gold - gold0).Should().Be(flatGold, "the Inn's flat bonus is the whole gold reward: " + screen);
         screen.Should().Contain(Loc.Get("inn.seth_earn_reward", $"{flatXp:N0}", $"{flatGold:N0}"));
         screen.Should().NotContain(Loc.Get("combat.xp_label", "0"), "the engine shows no reward of its own for Seth");
     }
