@@ -268,13 +268,20 @@ public class BetrayTeamTemple128Tests : IDisposable
     [Fact]
     public void NoSession_InAServerForManyPlayers_AddsNoTeamPoints()
     {
-        WorldSimField.SetValue(null, true);
-        B.AddTeamGrievance("world sim");
         Party((CompanionId.Aldric, 80));
-        Team.BetrayalPoints = 30;
-        C.ModifyLoyalty(CompanionId.Aldric, 10, "gift");
-        WorldSimField.SetValue(null, _worldSim);
-        Team.BetrayalPoints.Should().Be(30, "the world simulator thread has no player");
+        WorldSimField.SetValue(null, true);
+        int afterGrievance, afterGift;
+        try
+        {
+            B.AddTeamGrievance("world sim");
+            afterGrievance = Team.BetrayalPoints;
+            Team.BetrayalPoints = 30;
+            C.ModifyLoyalty(CompanionId.Aldric, 10, "gift");
+            afterGift = Team.BetrayalPoints;
+        }
+        finally { WorldSimField.SetValue(null, _worldSim); }
+        afterGrievance.Should().Be(0, "the world simulator thread has no player to hold a grievance");
+        afterGift.Should().Be(30, "nor a kindness");
         Team.ActsOfKindness.Should().BeEmpty();
     }
 

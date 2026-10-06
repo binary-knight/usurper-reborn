@@ -1,7 +1,7 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/TempleLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 history: 1.2.5 | From level 10, while the Seal of Creation is unfound, a priest points you to the first Seal in the Temple; Temple screens and player god notices are in each player's language.
 history: 1.2.4 | The notice a player-god gets when you sacrifice gold at its altar now reaches its mailbox.
@@ -14,7 +14,7 @@ The Nave holds the altars and worship, prayer, offerings and the Altars screen. 
 
 ## Faith and Old Stones
 
-The Faith handles its oath and cloister. Old Stones holds prophecies and visions. These are story-facing spaces, not a second Favor currency.
+The Faith handles its oath and cloister. While a betrayal can be settled, it also lists B: forgive a betrayer, take revenge on the Stranger once if she escaped her fight, or, for a companion who left you, make one act of atonement a day for gold. Old Stones holds prophecies and visions. These are story-facing spaces, not a second Favor currency.
 
 ## Memory and deeper rooms
 

@@ -1,7 +1,7 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs
 history: 1.2.5 | Companion descriptions, romance milestones, quest history and last words are shown in all five languages.
 history: 1.2.4 | none
