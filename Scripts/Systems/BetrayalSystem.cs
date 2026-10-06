@@ -141,20 +141,8 @@ namespace UsurperRemake.Systems
         /// </summary>
         public void AddBetrayalPoints(string npcId, int points, string reason)
         {
-            if (!betrayalProfiles.TryGetValue(npcId, out var profile))
-            {
-                // Create generic profile for this NPC
-                profile = new BetrayalProfile
-                {
-                    NPCId = npcId,
-                    NPCName = npcId,
-                    BetrayalPoints = 0,
-                    BetrayalType = BetrayalType.Resentment,
-                    TriggerCondition = BetrayalTrigger.AccumulatedGrievances,
-                    CanBeForgiven = true
-                };
-                betrayalProfiles[npcId] = profile;
-            }
+            // Create generic profile for this NPC if needed
+            var profile = GetOrCreateProfile(npcId);
 
             profile.BetrayalPoints += points;
             profile.Grievances.Add(new Grievance
@@ -179,7 +167,7 @@ namespace UsurperRemake.Systems
             if (betrayalProfiles.TryGetValue(npcId, out var profile))
             {
                 profile.BetrayalPoints = Math.Max(0, profile.BetrayalPoints - points);
-                profile.ActsOfKindness.Add(reason);
+                profile.ActsOfKindness.Add(new KindnessAct { Reason = reason, GameDay = StoryProgressionSystem.Instance.CurrentGameDay });
                 // GD.Print($"[Betrayal] {npcId} lost {points} betrayal points: {reason} (Total: {profile.BetrayalPoints})");
             }
         }
@@ -256,9 +244,8 @@ namespace UsurperRemake.Systems
             profile.HasBetrayed = true;
             profile.BetrayalDay = StoryProgressionSystem.Instance.CurrentGameDay;
 
-            // Display betrayal scene
-            await DisplayBetrayalScene(profile, player, terminal);
-
+            // 1.2.8: the record, the effects and the flags are written before the scene, so a
+            // disconnect during the scene cannot leave HasBetrayed saved without them.
             // Create active betrayal record
             var activeBetrayal = new ActiveBetrayal
             {
@@ -285,12 +272,18 @@ namespace UsurperRemake.Systems
             OnBetrayalTriggered?.Invoke(npcId, profile.BetrayalType);
 
             // Ocean philosophy insight - betrayal teaches about attachment
-            if (OceanPhilosophySystem.Instance.AwakeningLevel >= 3)
+            bool oceanInsight = OceanPhilosophySystem.Instance.AwakeningLevel >= 3;
+            if (oceanInsight)
+                OceanPhilosophySystem.Instance.GainInsight("betrayal:" + npcId); // v1.1.12
+
+            // Display betrayal scene
+            await DisplayBetrayalScene(profile, player, terminal);
+
+            if (oceanInsight)
             {
                 terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("betrayal.ocean_understanding"), "dark_cyan");
                 terminal.WriteLine(Loc.Get("betrayal.ocean_wave_crashes"), "cyan");
-                OceanPhilosophySystem.Instance.GainInsight("betrayal:" + npcId); // v1.1.12
             }
 
             return new BetrayalResult
@@ -389,8 +382,7 @@ namespace UsurperRemake.Systems
             switch (profile.BetrayalType)
             {
                 case BetrayalType.Manipulation:
-                    // Noctura's manipulation - player loses some resources
-                    player.Gold -= player.Gold / 4; // Lose 25% gold
+                    // Noctura's manipulation. 1.2.8: no gold loss; her fight already settles the account.
                     break;
 
                 case BetrayalType.Resentment:
@@ -409,9 +401,8 @@ namespace UsurperRemake.Systems
                     break;
 
                 case BetrayalType.Sacrifice:
-                    // Sacrifice - grief but also enlightenment
-                    player.GrantPermanentStat(StatKind.Wisdom, 5);
-                    OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.CompanionSacrifice);
+                    // Sacrifice. 1.2.8: no effect here; the paradox gives the Wisdom +5 and her death
+                    // records the CompanionSacrifice moment, so the scene grants nothing twice.
                     break;
             }
         }
@@ -422,7 +413,8 @@ namespace UsurperRemake.Systems
         public async Task<bool> AttemptForgiveness(string npcId, Character player, TerminalEmulator terminal)
         {
             var activeBetrayal = activeBetrays.FirstOrDefault(b => b.NPCId == npcId);
-            if (activeBetrayal == null || !activeBetrayal.CanBeResolved)
+            // 1.2.8: a resolved betrayal (forgiven or avenged) is not forgiven a second time
+            if (activeBetrayal == null || !activeBetrayal.CanBeResolved || activeBetrayal.IsResolved)
             {
                 terminal.WriteLine(Loc.Get("betrayal.cannot_forgive"), "red");
                 return false;
@@ -552,8 +544,15 @@ namespace UsurperRemake.Systems
         /// </summary>
         public async Task TakeRevenge(string npcId, Character player, TerminalEmulator terminal)
         {
+            // 1.2.8: revenge is only on the Stranger
+            if (npcId != "TheStranger")
+            {
+                return;
+            }
+
             var activeBetrayal = activeBetrays.FirstOrDefault(b => b.NPCId == npcId);
-            if (activeBetrayal == null)
+            // 1.2.8: once; a resolved betrayal (forgiven or avenged) takes no revenge
+            if (activeBetrayal == null || activeBetrayal.IsResolved)
             {
                 return;
             }
@@ -584,7 +583,7 @@ namespace UsurperRemake.Systems
 
             // Apply consequences — v0.57.12: paired movement
             AlignmentSystem.Instance.ChangeAlignment(player, 200, isGood: false, "betrayal.final");
-            player.MKills++; // Counts as a kill
+            // 1.2.8: not counted as a monster kill
 
             // Update state
             activeBetrayal.IsResolved = true;
@@ -650,30 +649,155 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Get betrayal summary for a save file
+        /// 1.2.8: the companion who left after a team betrayal, held until forgiveness lets them rejoin.
         /// </summary>
-        public Dictionary<string, object> SaveState()
+        public CompanionId? DepartedCompanionId { get; set; }
+
+        /// <summary>
+        /// 1.2.8: back to a new character's state: the five story betrayers untouched, no records, nobody departed.
+        /// </summary>
+        public void Reset()
         {
-            return new Dictionary<string, object>
+            betrayalProfiles = new Dictionary<string, BetrayalProfile>();
+            activeBetrays = new List<ActiveBetrayal>();
+            DepartedCompanionId = null;
+            InitializePotentialBetrayers();
+        }
+
+        /// <summary>1.2.8: the saved betrayal state (profiles, records, the departed companion).</summary>
+        public BetrayalSaveData Serialize()
+        {
+            return new BetrayalSaveData
             {
-                ["Profiles"] = betrayalProfiles.ToDictionary(
-                    k => k.Key,
-                    v => new Dictionary<string, object>
-                    {
-                        ["Points"] = v.Value.BetrayalPoints,
-                        ["HasBetrayed"] = v.Value.HasBetrayed,
-                        ["WasForgiven"] = v.Value.WasForgiven,
-                        ["BetrayalDay"] = v.Value.BetrayalDay
-                    }
-                ),
-                ["ActiveBetrays"] = activeBetrays.Select(b => new Dictionary<string, object>
+                Profiles = betrayalProfiles.Values.Select(p => new BetrayalProfileSaveData
                 {
-                    ["NPCId"] = b.NPCId,
-                    ["Type"] = (int)b.Type,
-                    ["IsResolved"] = b.IsResolved,
-                    ["Resolution"] = (int)b.Resolution
-                }).ToList()
+                    NPCId = p.NPCId,
+                    BetrayalPoints = p.BetrayalPoints,
+                    IsPendingBetrayal = p.IsPendingBetrayal,
+                    TriggerReason = p.TriggerReason,
+                    HasBetrayed = p.HasBetrayed,
+                    WasForgiven = p.WasForgiven,
+                    BetrayalDay = p.BetrayalDay,
+                    WarningShown = p.WarningShown,
+                    ActsOfKindness = p.ActsOfKindness.Select(k => new KindnessAct { Reason = k.Reason, GameDay = k.GameDay }).ToList()
+                }).ToList(),
+                Records = activeBetrays.Select(b => new ActiveBetrayalSaveData
+                {
+                    NPCId = b.NPCId,
+                    Type = (int)b.Type,
+                    Day = b.Day,
+                    IsSacrifice = b.IsSacrifice,
+                    CanBeResolved = b.CanBeResolved,
+                    IsResolved = b.IsResolved,
+                    Resolution = (int)b.Resolution
+                }).ToList(),
+                DepartedCompanionId = DepartedCompanionId.HasValue ? (int)DepartedCompanionId.Value : null
             };
+        }
+
+        /// <summary>
+        /// 1.2.8: restore from a save; a load replaces the state, it never merges with the one before.
+        /// A save written before 1.2.8 has no betrayal state (null): the state starts clean and only
+        /// finished story beats are taken from the story flags, so points and pending betrayals
+        /// count from the update forward. Call after the story flags are restored.
+        /// </summary>
+        public void RestoreFromSave(BetrayalSaveData? data)
+        {
+            Reset();
+            if (data == null)
+            {
+                SeedFromFlags(StoryProgressionSystem.Instance);
+                return;
+            }
+
+            foreach (var d in data.Profiles ?? new List<BetrayalProfileSaveData>())
+            {
+                if (string.IsNullOrEmpty(d.NPCId)) continue;
+                var profile = GetOrCreateProfile(d.NPCId);
+                profile.BetrayalPoints = d.BetrayalPoints;
+                profile.IsPendingBetrayal = d.IsPendingBetrayal;
+                profile.TriggerReason = d.TriggerReason ?? "";
+                profile.HasBetrayed = d.HasBetrayed;
+                profile.WasForgiven = d.WasForgiven;
+                profile.BetrayalDay = d.BetrayalDay;
+                profile.WarningShown = d.WarningShown;
+                profile.ActsOfKindness = (d.ActsOfKindness ?? new List<KindnessAct>())
+                    .Select(k => new KindnessAct { Reason = k.Reason ?? "", GameDay = k.GameDay }).ToList();
+            }
+
+            foreach (var r in data.Records ?? new List<ActiveBetrayalSaveData>())
+            {
+                if (string.IsNullOrEmpty(r.NPCId)) continue;
+                activeBetrays.Add(new ActiveBetrayal
+                {
+                    NPCId = r.NPCId,
+                    NPCName = betrayalProfiles.TryGetValue(r.NPCId, out var p) ? p.NPCName : r.NPCId,
+                    Type = (BetrayalType)r.Type,
+                    Day = r.Day,
+                    IsSacrifice = r.IsSacrifice,
+                    CanBeResolved = r.CanBeResolved,
+                    IsResolved = r.IsResolved,
+                    Resolution = (BetrayalResolution)r.Resolution
+                });
+            }
+
+            DepartedCompanionId = data.DepartedCompanionId.HasValue ? (CompanionId)data.DepartedCompanionId.Value : null;
+        }
+
+        /// <summary>
+        /// 1.2.8: an old save's finished betrayals, from its story flags, for the five story betrayers only.
+        /// Never sets points or a pending betrayal.
+        /// </summary>
+        internal void SeedFromFlags(StoryProgressionSystem story)
+        {
+            foreach (var profile in betrayalProfiles.Values.ToList())
+            {
+                string id = profile.NPCId;
+                bool betrayed = story.HasStoryFlag($"betrayed_by_{id}");
+                bool forgave = story.HasStoryFlag($"forgave_{id}");
+                bool killed = story.HasStoryFlag($"killed_{id}");
+                if (!betrayed && !forgave && !killed) continue;
+
+                profile.HasBetrayed = true;
+                if (!forgave && !killed) continue;
+
+                profile.WasForgiven = forgave;
+                activeBetrays.Add(new ActiveBetrayal
+                {
+                    NPCId = id,
+                    NPCName = profile.NPCName,
+                    Type = profile.BetrayalType,
+                    Day = 0,
+                    IsSacrifice = profile.IsSacrifice,
+                    CanBeResolved = profile.CanBeForgiven,
+                    IsResolved = true,
+                    Resolution = killed ? BetrayalResolution.Avenged : BetrayalResolution.Forgiven
+                });
+            }
+
+            // Finished story beats: Lyris gave her life in the paradox; Noctura turned in her fight (no record, Q10)
+            if (story.HasStoryFlag("lyris_sacrificed_for_veloura") && betrayalProfiles.TryGetValue("Lyris", out var lyris))
+                lyris.HasBetrayed = true;
+            if (story.HasStoryFlag("noctura_betrayed") && betrayalProfiles.TryGetValue("TheStranger", out var stranger))
+                stranger.HasBetrayed = true;
+        }
+
+        private BetrayalProfile GetOrCreateProfile(string npcId)
+        {
+            if (!betrayalProfiles.TryGetValue(npcId, out var profile))
+            {
+                profile = new BetrayalProfile
+                {
+                    NPCId = npcId,
+                    NPCName = npcId,
+                    BetrayalPoints = 0,
+                    BetrayalType = BetrayalType.Resentment,
+                    TriggerCondition = BetrayalTrigger.AccumulatedGrievances,
+                    CanBeForgiven = true
+                };
+                betrayalProfiles[npcId] = profile;
+            }
+            return profile;
         }
     }
 
@@ -725,7 +849,16 @@ namespace UsurperRemake.Systems
         /// <summary>v1.2.5: a story betrayer whose dialogue, motivations and redemption are shown from keys built from NPCId.</summary>
         public bool Keyed { get; set; }
         public List<Grievance> Grievances { get; set; } = new();
-        public List<string> ActsOfKindness { get; set; } = new();
+        public List<KindnessAct> ActsOfKindness { get; set; } = new();
+        /// <summary>1.2.8: the warning before this betrayer turns has been shown (saved).</summary>
+        public bool WarningShown { get; set; }
+    }
+
+    /// <summary>1.2.8: an act of kindness toward a betrayer, with the game day it happened.</summary>
+    public class KindnessAct
+    {
+        public string Reason { get; set; } = "";
+        public int GameDay { get; set; }
     }
 
     public class Grievance

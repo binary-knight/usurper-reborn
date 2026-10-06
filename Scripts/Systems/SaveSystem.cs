@@ -2472,6 +2472,16 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
             }
 
+            // 1.2.8: Betrayal System
+            try
+            {
+                data.Betrayal = BetrayalSystem.Instance.Serialize();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
+            }
+
             return data;
         }
 
@@ -3085,6 +3095,16 @@ namespace UsurperRemake.Systems
             catch (Exception ex)
             {
                 DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "SAVE", $"Subsystem serialization error: {ex.Message}");
+            }
+
+            // 1.2.8: Betrayal System, after the story flags (an old save without it is seeded from them)
+            try
+            {
+                BetrayalSystem.Instance.RestoreFromSave(data.Betrayal);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.Log(DebugLogger.LogLevel.Debug, "LOAD", $"Subsystem restore error: {ex.Message}");
             }
         }
 
