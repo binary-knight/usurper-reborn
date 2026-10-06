@@ -376,8 +376,14 @@ namespace UsurperRemake.Systems
         public IEnumerable<Companion> GetRecruitableCompanions(int playerLevel)
         {
             return companions.Values
-                .Where(c => !c.IsRecruited && !c.IsDead && playerLevel >= c.RecruitLevel);
+                .Where(c => !c.IsRecruited && !c.IsDead && playerLevel >= c.RecruitLevel && !IsDeparted(c.Id));
         }
+
+        /// <summary>
+        /// 1.2.8: the companion who left after a team betrayal. Not recruited, and not recruitable either:
+        /// only forgiveness at the Temple brings them back.
+        /// </summary>
+        public bool IsDeparted(CompanionId id) => BetrayalSystem.Instance.DepartedCompanionId == id;
 
         /// <summary>
         /// Get currently active companions
@@ -466,7 +472,7 @@ namespace UsurperRemake.Systems
             if (!companions.TryGetValue(id, out var companion))
                 return false;
 
-            if (companion.IsRecruited || companion.IsDead)
+            if (companion.IsRecruited || companion.IsDead || IsDeparted(id))
                 return false;
 
             if (player.Level < companion.RecruitLevel)
@@ -963,6 +969,11 @@ namespace UsurperRemake.Systems
             int previousLoyalty = companion.LoyaltyLevel;
             companion.LoyaltyLevel = Math.Clamp(companion.LoyaltyLevel + adjustedAmount, 0, 100);
 
+            // 1.2.8: a real gain to a companion still with the player eases the team's grievances; read
+            // from the raw amount, so the difficulty scaling and the +1 level trickle never count
+            if (amount >= GameConfig.TeamBetrayalKindnessMinGain && companion.IsRecruited && !companion.IsDead && !IsDeparted(id))
+                BetrayalSystem.Instance.RecordTeamKindness(amount, reason);
+
             if (!string.IsNullOrEmpty(reason))
             {
                 companion.AddHistory(new CompanionEvent
@@ -985,6 +996,66 @@ namespace UsurperRemake.Systems
                 // Queue a notification for the player
                 QueueQuestUnlockNotification(companion);
             }
+        }
+
+        /// <summary>
+        /// 1.2.8: a companion left to die in a fight: one grievance of the team, once per event.
+        /// </summary>
+        public void RecordAbandonedGrievance(string reason) => BetrayalSystem.Instance.AddTeamGrievance(reason);
+
+        /// <summary>
+        /// 1.2.8: a team betrayal: the companion leaves the party and is no longer recruited. Equipment and bag
+        /// go to the player's pack while it has room; what does not fit stays with the companion and comes back
+        /// with them. Level, experience, trust, romance, history and quest progress are kept.
+        /// Returns the items returned and the items kept.
+        /// </summary>
+        internal (int Returned, int Kept) DepartAfterBetrayal(CompanionId id, Character player)
+        {
+            if (!companions.TryGetValue(id, out var companion))
+                return (0, 0);
+
+            companion.IsActive = false;
+            companion.IsRecruited = false;
+            activeCompanions.Remove(id);
+            companionCurrentHP.Remove(id);
+
+            int returned = 0, kept = 0;
+            foreach (var kvp in companion.EquippedItems.ToList())
+            {
+                if (kvp.Value <= 0) { companion.EquippedItems.Remove(kvp.Key); continue; }
+                var equipment = EquipmentDatabase.GetById(kvp.Value);
+                if (equipment == null) continue;
+                if (player.Inventory.Count >= GameConfig.MaxInventoryItems) { kept++; continue; }
+                player.Inventory.Add(player.ConvertEquipmentToLegacyItem(equipment));
+                companion.EquippedItems.Remove(kvp.Key);
+                returned++;
+            }
+
+            companion.Inventory ??= new List<Item>();
+            foreach (var item in companion.Inventory.ToList())
+            {
+                if (item == null) { companion.Inventory.Remove(item!); continue; }
+                if (player.Inventory.Count >= GameConfig.MaxInventoryItems) { kept++; continue; }
+                player.Inventory.Add(item);
+                companion.Inventory.Remove(item);
+                returned++;
+            }
+            return (returned, kept);
+        }
+
+        /// <summary>
+        /// 1.2.8: forgiveness brings a departed companion back: recruited, out of the party (they wait at the
+        /// Inn), loyalty reset to the rejoin value, everything else as they left. Never through RecruitCompanion,
+        /// which would reset their level and gear.
+        /// </summary>
+        internal bool RejoinAfterForgiveness(CompanionId id)
+        {
+            if (!companions.TryGetValue(id, out var companion) || companion.IsDead || companion.IsRecruited)
+                return false;
+            companion.IsRecruited = true;
+            companion.IsActive = false;
+            companion.LoyaltyLevel = GameConfig.TeamBetrayalRejoinLoyalty;
+            return true;
         }
 
         /// <summary>

@@ -121,7 +121,7 @@ public class InnLocation : BaseLocation
         if (aldricBanditEventTriggered) return;
 
         var aldric = CompanionSystem.Instance.GetCompanion(CompanionId.Aldric);
-        if (aldric == null || aldric.IsRecruited || aldric.IsDead) return;
+        if (aldric == null || aldric.IsRecruited || aldric.IsDead || CompanionSystem.Instance.IsDeparted(CompanionId.Aldric)) return;
         if (currentPlayer.Level < aldric.RecruitLevel) return;
 
         // 20% chance to trigger the event
@@ -321,6 +321,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer != null && currentPlayer.Level >= 3 && CompanionSystem.Instance != null
             && !(CompanionSystem.Instance.GetCompanion(CompanionId.Aldric)?.IsRecruited ?? true)
             && !(CompanionSystem.Instance.GetCompanion(CompanionId.Aldric)?.IsDead ?? true)
+            && !CompanionSystem.Instance.IsDeparted(CompanionId.Aldric)
             && !currentPlayer.HintsShown.Contains(HintSystem.HINT_COMPANION_ALDRIC_TEASER))
         {
             currentPlayer.HintsShown.Add(HintSystem.HINT_COMPANION_ALDRIC_TEASER);

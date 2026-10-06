@@ -349,7 +349,7 @@ public partial class PrisonLocation : BaseLocation
         var companionSystem = CompanionSystem.Instance;
         var vex = companionSystem.GetCompanion(CompanionId.Vex);
 
-        if (vex == null || vex.IsRecruited || vex.IsDead)
+        if (vex == null || vex.IsRecruited || vex.IsDead || companionSystem.IsDeparted(CompanionId.Vex))
             return false;
 
         if (player.Level < vex.RecruitLevel)

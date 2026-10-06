@@ -261,6 +261,9 @@ namespace UsurperRemake.Systems
             // Apply betrayal effects
             ApplyBetrayalEffects(profile, player);
 
+            // 1.2.8: the team betrayal: the least loyal companion leaves, with the gear that fits in the pack
+            TeamDeparture? departure = npcId == TeamId ? DepartLeastLoyal(profile, player) : null;
+
             // Set story flags
             StoryProgressionSystem.Instance.SetStoryFlag($"betrayed_by_{npcId}", true);
             if (profile.IsSacrifice)
@@ -278,6 +281,8 @@ namespace UsurperRemake.Systems
 
             // Display betrayal scene
             await DisplayBetrayalScene(profile, player, terminal);
+            if (departure != null)
+                await ShowTeamDeparture(departure, terminal);
 
             if (oceanInsight)
             {
@@ -438,7 +443,7 @@ namespace UsurperRemake.Systems
             }
 
             // Display forgiveness scene
-            await DisplayForgivenessScene(profile, player, terminal);
+            await DisplayForgivenessScene(profile, player, terminal, npcId == TeamId ? DepartedName() : null);
 
             // Update state
             activeBetrayal.IsResolved = true;
@@ -447,6 +452,10 @@ namespace UsurperRemake.Systems
 
             // Story flag
             StoryProgressionSystem.Instance.SetStoryFlag($"forgave_{npcId}", true);
+
+            // 1.2.8: the companion who left comes back
+            if (npcId == TeamId)
+                RejoinDeparted(terminal);
 
             // Ocean philosophy - forgiveness is letting go
             OceanPhilosophySystem.Instance.ExperienceMoment(AwakeningMoment.ForgaveBetrayerMercy);
@@ -477,7 +486,9 @@ namespace UsurperRemake.Systems
                     // for forgiveness is the kindness record, not which scale is numerically higher.
                     bool netGoodOrBalanced = player.Chivalry > player.Darkness
                         || UsurperRemake.Systems.AlignmentSystem.Instance.IsBalanced(player);
-                    return netGoodOrBalanced && profile.ActsOfKindness.Count >= 5;
+                    // 1.2.8: only kindness from the day of the betrayal on counts (acts the same day before
+                    // the departure are dropped when it happens)
+                    return netGoodOrBalanced && profile.ActsOfKindness.Count(k => k.GameDay >= profile.BetrayalDay) >= 5;
 
                 case "KingsAdvisor":
                     // v0.57.12: was `> 2000` — unreachable with AlignmentCap=1000. Changed to Holy-tier threshold (>= 800)
@@ -496,8 +507,9 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Display the forgiveness scene
         /// </summary>
-        private async Task DisplayForgivenessScene(BetrayalProfile profile, Character player, TerminalEmulator terminal)
+        private async Task DisplayForgivenessScene(BetrayalProfile profile, Character player, TerminalEmulator terminal, string? name = null)
         {
+            string shown = name ?? DisplayName(profile);
             terminal.Clear();
             terminal.WriteLine("");
             UIHelper.WriteBoxHeader(terminal, Loc.Get("betrayal.header_forgiveness"), "bright_green", 64);
@@ -505,7 +517,7 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("betrayal.approach_npc", DisplayName(profile))}", "white");
+            terminal.WriteLine($"  {Loc.Get("betrayal.approach_npc", shown)}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.flinch_expecting")}", "gray");
             terminal.WriteLine("");
 
@@ -518,7 +530,7 @@ namespace UsurperRemake.Systems
 
             await Pacing.Wait(1000);
 
-            terminal.WriteLine($"  {Loc.Get("betrayal.eyes_widen", DisplayName(profile))}", "white");
+            terminal.WriteLine($"  {Loc.Get("betrayal.eyes_widen", shown)}", "white");
             terminal.WriteLine($"  {Loc.Get("betrayal.neither_speak")}", "gray");
             terminal.WriteLine("");
 
@@ -672,9 +684,14 @@ namespace UsurperRemake.Systems
             if (player == null || isDungeon || inPrison || !player.IsAlive || !InPlayerSession)
                 return false;
 
+            if (await ShowTeamWarning(terminal))
+                return true;
+
             foreach (var id in SafePointIds)
             {
                 if (!HasPendingBetrayal(id)) continue;
+                // 1.2.8: a team betrayal waits for a safe point with a companion in the party (Q4)
+                if (id == TeamId && LeastLoyalActive() == null) continue;
                 if ((await ExecuteBetrayal(id, player, terminal)).Occurred)
                     return true;
             }
@@ -729,6 +746,189 @@ namespace UsurperRemake.Systems
                 DebugLogger.Instance.LogError("BETRAYAL", $"Lyris sacrifice scene failed: {ex.GetType().Name}: {ex.Message}");
                 return false;
             }
+        }
+
+        /// <summary>1.2.8: the team betrayal's profile id.</summary>
+        internal const string TeamId = "TeamBetrayal";
+
+        /// <summary>1.2.8: the kindness an act of atonement in the Temple records on the team profile.</summary>
+        internal const string AtonementReason = "temple_atonement";
+
+        /// <summary>1.2.8: what a team departure moved: who left, the items returned to the pack and those they kept.</summary>
+        internal sealed class TeamDeparture
+        {
+            public Companion Companion = null!;
+            public int Returned;
+            public int Kept;
+        }
+
+        /// <summary>1.2.8: what an act of atonement came to.</summary>
+        internal enum AtonementOutcome { Done, NotOffered, AlreadyToday, NoGold }
+
+        /// <summary>
+        /// 1.2.8: one grievance of the team (a murder the party witnessed, a companion left to die): the
+        /// points once per event, however many companions saw it. Losses count from this update on.
+        /// </summary>
+        public void AddTeamGrievance(string reason)
+        {
+            if (!InPlayerSession) return;
+            AddBetrayalPoints(TeamId, GameConfig.TeamBetrayalPointsPerEvent, reason);
+        }
+
+        /// <summary>
+        /// 1.2.8: a loyalty gain to a companion still with the player, read before the difficulty scaling:
+        /// at the minimum or more it takes its amount off the team's points and counts as a kindness.
+        /// Recorded only while it matters: points to work off before a betrayal, or a departure to forgive.
+        /// </summary>
+        public void RecordTeamKindness(int rawGain, string reason)
+        {
+            if (!InPlayerSession || rawGain < GameConfig.TeamBetrayalKindnessMinGain) return;
+            if (!betrayalProfiles.TryGetValue(TeamId, out var team)) return;
+            bool pointsToWorkOff = !team.HasBetrayed && team.BetrayalPoints > 0;
+            if (!pointsToWorkOff && !HasUnresolvedTeamRecord()) return;
+            ReduceBetrayalPoints(TeamId, rawGain, reason);
+        }
+
+        private bool HasUnresolvedTeamRecord() =>
+            activeBetrays.Any(b => b.NPCId == TeamId && b.CanBeResolved && !b.IsResolved);
+
+        /// <summary>1.2.8: the companion a team betrayal takes: the least loyal in the party (ties by id). Never an NPC teammate.</summary>
+        internal static Companion? LeastLoyalActive() =>
+            CompanionSystem.Instance.GetActiveCompanions()
+                .Where(c => c != null && c.IsRecruited && !c.IsDead)
+                .OrderBy(c => c.LoyaltyLevel)
+                .ThenBy(c => (int)c.Id)
+                .FirstOrDefault();
+
+        /// <summary>
+        /// 1.2.8: the least loyal companion leaves: out of the party and no longer recruited, gear back to the
+        /// pack as far as it fits (the rest stays with them), level, experience, trust, romance and history kept.
+        /// </summary>
+        private TeamDeparture? DepartLeastLoyal(BetrayalProfile profile, Character player)
+        {
+            var leaver = LeastLoyalActive();
+            if (leaver == null) return null;
+            var (returned, kept) = CompanionSystem.Instance.DepartAfterBetrayal(leaver.Id, player);
+            DepartedCompanionId = leaver.Id;
+            // kindness earlier the same day went into lowering the points; it is not kindness after the betrayal
+            profile.ActsOfKindness.RemoveAll(k => k.GameDay >= profile.BetrayalDay);
+            return new TeamDeparture { Companion = leaver, Returned = returned, Kept = kept };
+        }
+
+        /// <summary>1.2.8: what the player lost and what comes back, after the team betrayal's scene.</summary>
+        private static async Task ShowTeamDeparture(TeamDeparture d, TerminalEmulator terminal)
+        {
+            string name = d.Companion.Name;
+            terminal.WriteLine("");
+            WriteRows(terminal, Loc.Get("betrayal.team_leaves", name), "white");
+            if (d.Returned > 0)
+                WriteRows(terminal, Loc.Get("companion.equipment_returned", name, d.Returned).TrimStart('\n'), "yellow");
+            if (d.Kept > 0)
+                WriteRows(terminal, Loc.Get("betrayal.team_items_kept", name, d.Kept), "gray");
+            WriteRows(terminal, Loc.Get("betrayal.team_keeps", name, d.Companion.Level), "cyan");
+            WriteRows(terminal, Loc.Get("betrayal.team_rejoin_hint", name, GameConfig.TeamBetrayalRejoinLoyalty), "dark_cyan");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+        }
+
+        /// <summary>1.2.8: a row of betrayal text, two columns in, wrapped to the screen.</summary>
+        private static void WriteRows(TerminalEmulator terminal, string text, string color)
+        {
+            foreach (var row in GameEngine.WrapRows("  " + text))
+                terminal.WriteLine(row, color);
+        }
+
+        /// <summary>
+        /// 1.2.8: once, at the town safe point, when the team's points reach the warning: the companion
+        /// who would leave has grown cold. Not once the betrayal is pending or done, and not with nobody in the party.
+        /// </summary>
+        private async Task<bool> ShowTeamWarning(TerminalEmulator terminal)
+        {
+            if (!betrayalProfiles.TryGetValue(TeamId, out var team)) return false;
+            if (team.WarningShown || team.HasBetrayed || team.IsPendingBetrayal
+                || team.BetrayalPoints < GameConfig.TeamBetrayalWarningPoints)
+                return false;
+            var cold = LeastLoyalActive();
+            if (cold == null) return false;
+
+            team.WarningShown = true;
+            terminal.WriteLine("");
+            WriteRows(terminal, Loc.Get("betrayal.team_warning", cold.Name), "yellow");
+            terminal.WriteLine("");
+            await terminal.PressAnyKey();
+            return true;
+        }
+
+        /// <summary>1.2.8: forgiveness brings the companion back: recruited, waiting at the Inn, loyalty reset.</summary>
+        private void RejoinDeparted(TerminalEmulator terminal)
+        {
+            if (!DepartedCompanionId.HasValue) return;
+            var id = DepartedCompanionId.Value;
+            if (!CompanionSystem.Instance.RejoinAfterForgiveness(id)) return;
+            DepartedCompanionId = null;
+            string name = CompanionSystem.Instance.GetCompanion(id)?.Name ?? id.ToString();
+            terminal.WriteLine("");
+            WriteRows(terminal, Loc.Get("betrayal.team_rejoins", name, GameConfig.TeamBetrayalRejoinLoyalty), "bright_green");
+        }
+
+        /// <summary>1.2.8: the name of the companion who left, or null.</summary>
+        internal string? DepartedName() =>
+            DepartedCompanionId.HasValue ? CompanionSystem.Instance.GetCompanion(DepartedCompanionId.Value)?.Name : null;
+
+        /// <summary>1.2.8: the name the Temple shows for a betrayer: the companion who left, or the story betrayer.</summary>
+        internal string TempleName(string npcId) =>
+            (npcId == TeamId ? DepartedName() : null)
+            ?? (betrayalProfiles.TryGetValue(npcId, out var p) ? DisplayName(p) : npcId);
+
+        /// <summary>
+        /// 1.2.8: a betrayal the Temple can forgive: the Stranger's or the team's, unresolved. The beloved
+        /// cannot be forgiven, Lyris's was a sacrifice and the King's advisor is deferred.
+        /// </summary>
+        internal bool CanForgiveAtTemple(string npcId) =>
+            (npcId == "TheStranger" || npcId == TeamId)
+            && activeBetrays.Any(b => b.NPCId == npcId && b.CanBeResolved && !b.IsResolved);
+
+        /// <summary>1.2.8: revenge on the Stranger, offered only when she escaped her fight (Q9), and once.</summary>
+        internal bool CanTakeRevengeAtTemple()
+        {
+            var story = StoryProgressionSystem.Instance;
+            return CanForgiveAtTemple("TheStranger")
+                && story.HasStoryFlag("noctura_escaped_with_power")
+                && !story.HasStoryFlag("noctura_betrayal_defeated");
+        }
+
+        /// <summary>1.2.8: atonement is offered while a companion's departure is unforgiven.</summary>
+        internal bool CanAtone => HasUnresolvedTeamRecord();
+
+        /// <summary>1.2.8: whether the Temple's Faith room has anything to settle.</summary>
+        internal bool HasTempleAction => CanForgiveAtTemple("TheStranger") || CanForgiveAtTemple(TeamId);
+
+        /// <summary>1.2.8: the gold an act of atonement costs: Math.Max(min cost, cost per level x level).</summary>
+        internal static long AtonementCost(Character player) =>
+            Math.Max(GameConfig.BetrayalAtonementMinCost, (long)GameConfig.BetrayalAtonementCostPerLevel * player.Level);
+
+        /// <summary>1.2.8: an act of atonement was made this game day.</summary>
+        internal bool AtonedToday()
+        {
+            int today = StoryProgressionSystem.Instance.CurrentGameDay;
+            return betrayalProfiles.TryGetValue(TeamId, out var team)
+                && team.ActsOfKindness.Any(k => k.Reason == AtonementReason && k.GameDay == today);
+        }
+
+        /// <summary>
+        /// 1.2.8: an act of atonement: once a game day while a departure is unforgiven, for its gold; it
+        /// counts as one kindness toward forgiveness. Refused with nothing changed otherwise.
+        /// </summary>
+        internal AtonementOutcome Atone(Character player)
+        {
+            if (!CanAtone || !betrayalProfiles.TryGetValue(TeamId, out var team)) return AtonementOutcome.NotOffered;
+            if (AtonedToday()) return AtonementOutcome.AlreadyToday;
+            long cost = AtonementCost(player);
+            if (player.Gold < cost) return AtonementOutcome.NoGold;
+
+            player.Gold -= cost;
+            team.ActsOfKindness.Add(new KindnessAct { Reason = AtonementReason, GameDay = StoryProgressionSystem.Instance.CurrentGameDay });
+            return AtonementOutcome.Done;
         }
 
         /// <summary>
