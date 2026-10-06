@@ -1,8 +1,9 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Equipment and backpack rows mark weapons [1H] or [2H] and armor weight as [Lgt], [Med] or [Hvy], with stats separated by spaces.
 history: 1.2.4 | none

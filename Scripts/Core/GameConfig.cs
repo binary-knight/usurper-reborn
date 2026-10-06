@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.2.6";
+    public const string Version = "1.2.7";
     public const string VersionName = "Devotion"; // 1.2 line: Mental Health, the Sage and the gods
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -2767,13 +2767,23 @@ public static partial class GameConfig
     }
 
     /// <summary>1.2.7 (T3b): the upper case yes words and letters of IsOfferedYes in this session's language.</summary>
-    internal static HashSet<string> OfferedYesWords()
+    internal static HashSet<string> OfferedYesWords() => OfferedYesWords(Loc.Get(YesKey), Loc.Get(YesNoPromptKey));
+
+    private const string YesKey = "ui.yes";
+    private const string YesNoPromptKey = "ui.yn_prompt";
+
+    /// <summary>1.2.7 (T5): the yes words and letters from the two texts Loc.Get gave for ui.yes and
+    /// ui.yn_prompt. A key missing in the session's language falls back to English; a key missing in every
+    /// language comes back as the key itself, and that text is skipped, so the key's own letters (the U
+    /// of "ui.yes") never become a yes. With both missing nothing is a yes.</summary>
+    internal static HashSet<string> OfferedYesWords(string yesText, string promptText)
     {
         var words = new HashSet<string>(StringComparer.Ordinal);
-        string prompt = Loc.Get("ui.yn_prompt");
+        string prompt = promptText == YesNoPromptKey ? "" : promptText;
         int open = prompt.IndexOf('(');
         int slash = open >= 0 ? prompt.IndexOf('/', open + 1) : -1;
-        var sources = new List<string> { Loc.Get("ui.yes") };
+        var sources = new List<string>();
+        if (yesText != YesKey) sources.Add(yesText);
         if (slash > open) sources.Add(prompt.Substring(open + 1, slash - open - 1));
         foreach (var source in sources)
             foreach (var part in source.Split('='))

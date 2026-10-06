@@ -1,0 +1,30 @@
+Telemetry (opt in). From 1.2.7 the game asks once whether to share
+combat data. Nothing is sent unless you say yes. With sharing on, each
+monster fight adds one row of whole numbers with these values and no
+others: the outcome (victory, fled or death); your class, level,
+maximum HP, HP at the end of the fight, strength, dexterity, weapon
+power and armor power; the monster's family, level, maximum HP,
+strength and defence, and whether it was a boss; the number of
+monsters and the encounter size; who acted first; the dungeon floor
+and difficulty; whether you had teammates, the party size and
+teammates lost; rounds; total damage dealt and taken; damage to you by
+kind (basic, ability, spell, damage over time); damage to your team;
+damage by you and by your team; healing you received; potions,
+abilities and spells used; XP and gold gained. No player or monster
+names, no chat, no save contents, no hardware ids. Each upload also
+carries the game version, the kind of install (single player, Steam,
+BBS door or server) and a random id.
+
+On single player and Steam the id is made when you say yes, covers
+every character on that copy of the game, and you can replace it
+under Preferences. On a BBS or self hosted server the id belongs to
+that server and is shared by its players; no player can replace it.
+The operator must allow sharing there, each player is still asked,
+and the answer is for that player's account.
+
+The data is pseudonymous, not anonymous. Exact stat values can link
+one character's fights, even across a new id, and on a small BBS or
+server the rows can be told apart by anyone who knows it. Addresses
+are not stored with the rows.
+Rows are kept for up to 30 days, including rows sent before you turn
+sharing off. Turning it off deletes anything not yet sent.

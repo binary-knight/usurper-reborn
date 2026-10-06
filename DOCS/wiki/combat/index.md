@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs
+history: 1.2.7 | A monster's critical hit line no longer leaves an empty gap where a damage number used to be.
 history: 1.2.6 | none
 history: 1.2.5 | Monster names in combat are shown in the player's language, and long attack, miss and spell rows wrap inside 79 columns.
 history: 1.2.4 | In group combat each player reads the turn screen, menus and round status in their own language.
