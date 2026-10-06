@@ -12004,6 +12004,55 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v1.2.8: a shield takes the off hand, and the main hand too while that holds a two-handed weapon.
+    /// Warns when the weapon it moves out is the one the class's spells or abilities need, and no
+    /// weapon left in hand meets the need.
+    /// </summary>
+    private static void ShowShieldRequirementWarnings(TerminalEmulator terminal, Character character, LocalizedLines? lootBroadcastSb)
+    {
+        var mainHand = character.GetEquipment(EquipmentSlot.MainHand);
+        var offHand = character.GetEquipment(EquipmentSlot.OffHand);
+        bool mainMovesOut = mainHand != null && character.IsTwoHanding;
+        var kept = mainMovesOut ? null : mainHand;
+        var movedOut = new List<Equipment>();
+        if (mainMovesOut) movedOut.Add(mainHand!);
+        if (offHand != null) movedOut.Add(offHand);
+
+        // Spells check the main hand only (SpellSystem.HasRequiredSpellWeapon)
+        var spellReq = SpellSystem.GetSpellWeaponRequirement(character.Class);
+        if (spellReq != null && mainMovesOut && mainHand!.WeaponType == spellReq.Value)
+        {
+            string label = BaseLocation.WeaponTypeLabel(spellReq.Value);
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", GameConfig.GetLocalizedClassName(character.Class), label));
+            terminal.WriteLine(Loc.Get("combat.loot_spell_req_block_shield", label));
+            terminal.WriteLine("");
+            lootBroadcastSb?.Add(lang => $"\u001b[31m  {Loc.GetIn(lang, "combat.loot_group_spell_req", spellReq)}\u001b[0m");
+        }
+
+        // Abilities accept the required weapon in either hand (ClassAbilitySystem.CanUseAbility)
+        var abilities = ClassAbilitySystem.GetClassAbilities(character.Class);
+        if (abilities == null) return;
+        foreach (var ability in abilities)
+        {
+            var req = ability.RequiredWeaponTypes;
+            if (req == null || req.Length == 0) continue;
+            if (kept != null && req.Contains(kept.WeaponType)) continue;
+            var lost = movedOut.FirstOrDefault(e => req.Contains(e.WeaponType));
+            if (lost == null) continue;
+
+            string label = BaseLocation.WeaponTypeLabel(lost.WeaponType);
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("combat.loot_ability_req_warning", character.DisplayName, label));
+            terminal.WriteLine(Loc.Get("combat.loot_ability_req_block_shield", label));
+            terminal.WriteLine("");
+            return;
+        }
+    }
+
+    /// <summary>
     /// Show comparison between dropped item and currently equipped item
     /// </summary>
     // v1.1.12: static and shared, so dungeon finds and the dungeon merchant show the same comparison.
@@ -12076,6 +12125,10 @@ public partial class CombatEngine
                     terminal.WriteLine("");
                 }
             }
+        }
+        else if (lootItem.Type == global::ObjType.Shield)
+        {
+            ShowShieldRequirementWarnings(terminal, character, lootBroadcastSb);
         }
 
         // Get currently equipped item
@@ -12175,7 +12228,7 @@ public partial class CombatEngine
                 {
                     // Shield replacing an off-hand weapon (dual-wield) — show the trade-off
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.offhand_replaced_by_shield", currentEquip.WeaponPower, lootItem.Armor));
+                    terminal.WriteLine(Loc.Get("combat.offhand_replaced_by_shield", currentEquip.WeaponPower, lootItem.ShieldBonus));
                 }
                 else
                 {
@@ -12191,7 +12244,7 @@ public partial class CombatEngine
                     int newStatTotal = lootItem.Strength + lootItem.Dexterity + lootItem.Agility +
                         lootItem.Wisdom + lootItem.Charisma + lootItem.Defence +
                         newConTotal2 + newIntTotal2 +
-                        lootItem.HP + lootItem.Mana + lootItem.Stamina + currentEquip.ShieldBonus + currentEquip.BlockChance;
+                        lootItem.HP + lootItem.Mana + lootItem.Stamina + lootItem.ShieldBonus + lootItem.BlockChance;
                     int diff = newStatTotal - currentStatTotal;
                     
                     terminal.SetColor("white");
