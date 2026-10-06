@@ -212,7 +212,9 @@ public class SaveSlow128Tests : IDisposable
     {
         var instant = new InstantBackend();
         SaveSystem.InitializeWithBackend(instant);
-        var hero = Hero(items: 4000);
+        // warm (JIT done), four thousand items build in 1 to 2 ms; fifty thousand take about 40 ms,
+        // well over the 5 ms threshold, while the instant write stays at 0 ms
+        var hero = Hero(items: 50_000);
         SaveSystem.SlowSaveThresholdMs = 5;
 
         (await SaveSystem.Instance.AutoSave(hero, force: true)).Should().BeTrue();
@@ -220,7 +222,7 @@ public class SaveSlow128Tests : IDisposable
         instant.Writes.Should().Be(1);
         var lines = SlowLines();
         lines.Should().ContainSingle();
-        Ms(lines[0], "build").Should().BeGreaterThan(5, "four thousand items take more than 5 ms to build");
+        Ms(lines[0], "build").Should().BeGreaterThan(5, "fifty thousand items take more than 5 ms to build");
         Ms(lines[0], "write").Should().BeLessThanOrEqualTo(5, "the write returns at once, so only the build is over");
     }
 
