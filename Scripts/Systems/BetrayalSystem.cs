@@ -649,6 +649,89 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.2.8: the betrayers shown at the town safe point. The Stranger and Lyris show at their own story
+        /// moment; the King's advisor is deferred (no source, never shown).
+        /// </summary>
+        internal static readonly string[] SafePointIds = { "TeamBetrayal", "RomanticBetrayal" };
+
+        /// <summary>
+        /// 1.2.8: false on a thread with no player session in a process that serves many players (the MUD
+        /// server or the world simulator), where Instance is the shared fallback. A single player process
+        /// (offline, a BBS door or --online) has no session and passes.
+        /// </summary>
+        internal static bool InPlayerSession =>
+            UsurperRemake.Server.SessionContext.IsActive
+            || (UsurperRemake.Server.MudServer.Instance == null && !UsurperRemake.BBS.DoorMode.IsWorldSimMode);
+
+        /// <summary>
+        /// 1.2.8: a pending team or romantic betrayal, shown between actions in town: never in a dungeon,
+        /// in prison, for a dead player or mid fight (the fight code never calls it). One scene per call.
+        /// </summary>
+        public async Task<bool> ShowPendingAtSafePoint(Character? player, TerminalEmulator terminal, bool isDungeon, bool inPrison)
+        {
+            if (player == null || isDungeon || inPrison || !player.IsAlive || !InPlayerSession)
+                return false;
+
+            foreach (var id in SafePointIds)
+            {
+                if (!HasPendingBetrayal(id)) continue;
+                if ((await ExecuteBetrayal(id, player, terminal)).Occurred)
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// 1.2.8: the Stranger's betrayal, at the Noctura fight after Manwe: pending is set here (not at
+        /// RevealTruth) and the scene runs once. A scene failure is logged and the fight goes on; it is
+        /// never the fight's outcome. The fight's rewards and flags are the fight's own.
+        /// </summary>
+        public async Task<bool> RunStrangerRevelation(Character player, TerminalEmulator terminal)
+        {
+            if (!InPlayerSession || HasBetrayed("TheStranger"))
+                return false;
+
+            TriggerStrangerRevelation();
+            try
+            {
+                return (await ExecuteBetrayal("TheStranger", player, terminal)).Occurred;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("BETRAYAL", $"Stranger betrayal scene failed: {ex.GetType().Name}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// 1.2.8: Lyris's farewell when the player chooses her sacrifice in the paradox, spoken before she
+        /// dies: only while she travels with the player (recruited, alive) and once. Grants nothing; the
+        /// paradox gives the Wisdom and her death the moment.
+        /// </summary>
+        public async Task<bool> RunLyrisSacrifice(Character player, TerminalEmulator terminal)
+        {
+            if (!InPlayerSession || HasBetrayed("Lyris"))
+                return false;
+            var lyris = CompanionSystem.Instance.GetCompanion(CompanionId.Lyris);
+            if (lyris == null || !lyris.IsRecruited || lyris.IsDead)
+                return false;
+            if (!betrayalProfiles.TryGetValue("Lyris", out var profile))
+                return false;
+
+            profile.IsPendingBetrayal = true;
+            profile.TriggerReason = "Gave her life for the cure";
+            try
+            {
+                return (await ExecuteBetrayal("Lyris", player, terminal)).Occurred;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("BETRAYAL", $"Lyris sacrifice scene failed: {ex.GetType().Name}: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>
         /// 1.2.8: the companion who left after a team betrayal, held until forgiveness lets them rejoin.
         /// </summary>
         public CompanionId? DepartedCompanionId { get; set; }
