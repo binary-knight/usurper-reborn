@@ -88,7 +88,7 @@ public class Bump127Tests
 
     // ---------- 3. No dashes, no emojis ----------
 
-    private static readonly Regex DashOrEmoji = new(@"[–—]|[☀-➿]|️|[\uD83C-\uD83E][\uDC00-\uDFFF]");
+    private static readonly Regex DashOrEmoji = new(@"[\u2013\u2014]|[\u2600-\u27BF]|\uFE0F|[\uD83C-\uD83E][\uDC00-\uDFFF]");
 
     [Fact]
     public void NewText_HasNoDashesOrEmojis()
