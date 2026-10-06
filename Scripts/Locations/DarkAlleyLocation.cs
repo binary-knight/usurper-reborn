@@ -2640,6 +2640,11 @@ namespace UsurperRemake.Locations
             await Pacing.Wait(2000);
         }
 
+        // Pit side-bet payouts. 1.2.8: the dark_alley.bet_* labels state these; a test ties them together.
+        internal const float PitBetSafeMultiplier = 1.5f;
+        internal const float PitBetRiskyMultiplier = 2.0f;
+        internal const float PitBetRecklessMultiplier = 2.5f;
+
         private async Task<(long betAmount, float multiplier)> OfferSpectatorBet()
         {
             long betAmount = 0;
@@ -2661,7 +2666,7 @@ namespace UsurperRemake.Locations
 
             if (betChoice != "1" && betChoice != "2" && betChoice != "3") return (0, 1.0f);
 
-            multiplier = betChoice == "1" ? 1.5f : betChoice == "2" ? 2.0f : 2.5f;
+            multiplier = betChoice == "1" ? PitBetSafeMultiplier : betChoice == "2" ? PitBetRiskyMultiplier : PitBetRecklessMultiplier;
 
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get("dark_alley.pit_wager_prompt", maxBet));
