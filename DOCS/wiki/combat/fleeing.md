@@ -1,8 +1,9 @@
 ---
 title: Fear, retreat and fleeing
 path: /wiki/en/combat/fleeing/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Fear messages and the flee and retreat labels are shown in the player's language, with monster names translated.
 history: 1.2.4 | none

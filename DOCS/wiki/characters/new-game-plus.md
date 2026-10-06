@@ -1,8 +1,9 @@
 ---
 title: New Game Plus (NG+) and cycles
 path: /wiki/en/characters/new-game-plus/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MetaProgressionSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.2.7 | none
 history: 1.2.6 | The new character's name cannot contain < > & or a double quote.
 history: 1.2.5 | The ending, ascension and Eternal Cycle screens, including the prestige class list and descriptions, are shown in all five languages.
 history: 1.2.4 | The alt character slot earned by ascending is kept when a new life starts.

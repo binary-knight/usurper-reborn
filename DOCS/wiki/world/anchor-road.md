@@ -1,8 +1,9 @@
 ---
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | A refused Sellsword Hall turn-in now says why in words, and the Gauntlet champion broadcast reaches each player in their own language.
 history: 1.2.4 | none

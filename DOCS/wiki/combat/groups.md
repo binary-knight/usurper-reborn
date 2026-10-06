@@ -1,8 +1,9 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Group combat lines name monsters in each player's own language and wrap inside 79 columns.
 history: 1.2.4 | A follower's turn screen, menus, round status, group lines and NPC ally victory lines are shown in each player's own language.

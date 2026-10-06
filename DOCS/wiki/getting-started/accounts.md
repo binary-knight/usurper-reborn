@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.2.6
-sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, README.md
+checked: 1.2.7
+sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md
+history: 1.2.7 | The game can ask once whether to share combat data: single-player and Steam at start, BBS and server players after login when the operator allows it, and Preferences has a Share combat data line to change the answer.
 history: 1.2.6 | An unknown username and a wrong password get the same login message, a banned account sees its ban only after the right password, a refused registration counts toward the login throttle, and new character names cannot contain < > & or a double quote.
 history: 1.2.5 | The SSH login screen gains G to change its language, and the default message of the day and the idle warning show in your language.
 ---
@@ -95,6 +96,24 @@ Local saves and online characters are separate. Alt characters exist only online
 
 Through a BBS, the BBS has already signed you in: your BBS username is the account, and there is no game password. A BBS door uses the same character screen as the online game, in a shorter layout that fits 24 line terminals, with the same main and alt rules. The short layout does not list the language key; G still changes the language. O, if the sysop allows it, connects to another server, where you log in with that server's own account.
 
+## The combat data question
+
+From 1.2.7 the game can ask once whether to share combat data to help balance the game. The question itself lists what is sent.
+
+- **Single-player and Steam.** The question comes at start, before the main menu, once per copy of the game. The answer covers every character on that copy.
+- **BBS doors and self-hosted servers.** The question comes only when the operator has turned it on; it is off by default. Each player is then asked once after login, after the message of the day and before the character screen. The answer belongs to that account. Deleting a character removes its answer, so the same name is asked again.
+- **The official server** keeps the question off.
+
+Only a yes or a no answers: Y or N, or the yes letter of your language that the question shows. Enter alone and any other key ask again. If no answer comes, because the tries ran out or the connection dropped, nothing is stored and the question comes back at the next start or login. A game started with no one at the keyboard is never asked.
+
+To change the answer later, open Preferences with `~` and press U, the Share combat data line, which shows On or Off:
+
+- Off: U asks the question again, and only a yes turns it on.
+- On, single-player and Steam: U offers Turn off, or New random id.
+- On, BBS door or server: U turns it off at once.
+
+On a BBS door or server the line appears only while the operator allows the question.
+
 ## Server and sysop settings
 
 This section is for people who run their own game: a BBS sysop, a private server operator or a single-player owner. No setting, file or flag changes the number of characters per account or the alt slot rules. Those are fixed in the game.
@@ -127,5 +146,8 @@ A multiplayer server keeps its settings in the game database and the admin dashb
 - Disable online play: default off
 - Idle timeout in minutes: default 15, 1 to 60
 - Message of the day: the default greeting, up to 500 characters
+- Combat data sharing, the question above (telemetry_prompt, under Privacy): default off
+
+A BBS door keeps these settings in its own database. Its SysOp console turns combat data sharing on or off with E.
 
 A local game that is not in online mode reads `sysop_config.json` from its save folder. Its fields and defaults: message of the day, daily turns 325 (1 to 9999), the four multipliers at 1.0 (0.1 to 10.0), maximum dungeon level 100 (1 to 100), SysOp security level 100 (1 to 255), idle timeout 15, default color theme, disable online play off, screen reader off, and the online server address and port that O offers first. Online and BBS door games skip this file and use the database settings.

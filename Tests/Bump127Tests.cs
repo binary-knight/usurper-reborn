@@ -94,7 +94,7 @@ public class Bump127Tests
     public void NewText_HasNoDashesOrEmojis()
     {
         foreach (string path in new[] { NotesPath, SteamNotesPath, StorePath, "README.md", "DOCS/release-notes/RELEASE_NOTES_1.2.6.md",
-                     "DOCS/release-notes/README.md", "DOCS/wiki/reference/changelog.md" })
+                     "DOCS/release-notes/README.md", "DOCS/wiki/reference/changelog.md", "DOCS/wiki/getting-started/accounts.md" })
             DashOrEmoji.IsMatch(Repo(path)).Should().BeFalse(path);
         DashOrEmoji.IsMatch(Note()).Should().BeFalse("the fixture");
     }
@@ -115,6 +115,29 @@ public class Bump127Tests
         int from = log.IndexOf("Version **1.2.7**", StringComparison.Ordinal), to = log.IndexOf("Version **1.2.6**", StringComparison.Ordinal);
         from.Should().BeGreaterThan(0);
         yield return ("DOCS/wiki/reference/changelog.md (the 1.2.7 sentence)", log.Substring(from, to - from));
+        string accounts = Repo("DOCS/wiki/getting-started/accounts.md");
+        int q = accounts.IndexOf("\n## The combat data question\n", StringComparison.Ordinal);
+        q.Should().BeGreaterThan(0, "the accounts guide describes the question");
+        int qEnd = accounts.IndexOf("\n## ", q + 1, StringComparison.Ordinal);
+        yield return ("DOCS/wiki/getting-started/accounts.md (the question section)", accounts.Substring(q, qEnd - q));
+        yield return ("DOCS/wiki/getting-started/accounts.md (its settings lines)",
+            string.Join("\n", accounts.Split('\n').Where(l => l.Contains("ombat data") || l.StartsWith("history: 1.2.7", StringComparison.Ordinal))));
+    }
+
+    // ---------- 5. Guides ----------
+
+    [Fact]
+    public void TheAccountsGuide_DescribesTheQuestion_InTheStartAndLoginFlow_WithoutThePrivacyNote()
+    {
+        string accounts = Repo("DOCS/wiki/getting-started/accounts.md");
+        accounts.Should().Contain("\nchecked: 1.2.7\n").And.Contain("\nhistory: 1.2.7 | ");
+        accounts.Should().Contain("before the main menu").And.Contain("asked once after login, after the message of the day");
+        accounts.Should().Contain("press U, the Share combat data line").And.Contain("telemetry_prompt, under Privacy): default off");
+        accounts.Should().Contain("SysOp console turns combat data sharing on or off with E");
+        // the wiki is the website: the note stays in the README and the Steam text (the user's ruling)
+        foreach (string line in Note().Split('\n').Where(l => l.Length > 20))
+            accounts.Should().NotContain(line);
+        Repo("DOCS/wiki/reference/changelog.md").Should().NotContain("Telemetry (opt in).");
     }
 
     [Fact]

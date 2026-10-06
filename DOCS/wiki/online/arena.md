@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | After an Arena win, players in every language now salvage gold from the target's worn weapon and armor; before, English players never did.
 history: 1.2.4 | The notice a defender gets after your Arena attack now reaches their mailbox.
