@@ -39,10 +39,11 @@ function headers(text) {
 function policy() {
   const h = headers(SNIPPET);
   assert.strictEqual(h.length, 1, 'the snippet holds exactly one add_header line');
+  // each directive as a set of whole source tokens, so a check is token equality, never a substring
   const map = {};
   for (const part of h[0].value.split(';')) {
     const [name, ...sources] = part.trim().split(/\s+/);
-    if (name) map[name] = sources;
+    if (name) map[name] = new Set(sources);
   }
   return map;
 }
@@ -98,7 +99,7 @@ test('the node server and the pages set no policy of their own', () => {
 });
 
 const hostOf = (u) => new URL(u).origin;
-const allowed = (list, origin) => list.includes(origin);
+const allowed = (tokens, origin) => tokens.has(origin);
 
 test('every external script, stylesheet, frame and image host is allowed where it is used', () => {
   const p = policy();
@@ -121,13 +122,13 @@ test('every external script, stylesheet, frame and image host is allowed where i
   // fonts come from the stylesheet host's companion, sponsor avatars from GitHub, the favicon is data:
   assert.ok(allowed(p['font-src'], 'https://fonts.gstatic.com'));
   assert.ok(allowed(p['img-src'], 'https://avatars.githubusercontent.com'));
-  assert.ok(p['img-src'].includes('data:'));
+  assert.ok(allowed(p['img-src'], 'data:'));
   // the terminal websocket and the fetch and event stream calls
-  assert.ok(p['connect-src'].includes("'self'"));
+  assert.ok(allowed(p['connect-src'], "'self'"));
   assert.ok(allowed(p['connect-src'], 'wss://usurper-reborn.net'));
   assert.ok(allowed(p['connect-src'], 'wss://play.usurper-reborn.net'));
   // inline script and style stay allowed while the pages carry them
-  assert.ok(p['script-src'].includes("'unsafe-inline'"));
-  assert.ok(p['style-src'].includes("'unsafe-inline'"));
-  assert.deepStrictEqual(p['object-src'], ["'none'"]);
+  assert.ok(allowed(p['script-src'], "'unsafe-inline'"));
+  assert.ok(allowed(p['style-src'], "'unsafe-inline'"));
+  assert.deepStrictEqual(p['object-src'], new Set(["'none'"]));
 });
