@@ -22,26 +22,9 @@ public static class StatEffectsSystem
         return (int)(strength / 4);
     }
 
-    /// <summary>
-    /// Carry capacity bonus (for future inventory weight system)
-    /// </summary>
-    public static int GetCarryCapacity(long strength)
-    {
-        return (int)(50 + strength * 2);
-    }
-
     // =====================================================
     // DEXTERITY - Accuracy, ranged damage, critical hits
     // =====================================================
-
-    /// <summary>
-    /// Hit chance bonus from Dexterity
-    /// Formula: (Dexterity - 10) * 2 percent (so 20 DEX = +20% hit chance)
-    /// </summary>
-    public static int GetDexterityHitBonus(long dexterity)
-    {
-        return (int)((dexterity - 10) * 2);
-    }
 
     /// <summary>
     /// Critical hit chance from Dexterity + equipment bonuses.
@@ -111,14 +94,6 @@ public static class StatEffectsSystem
         return Math.Min(multiplier, 3.0f); // Cap at 3x to prevent exponential damage at high DEX
     }
 
-    /// <summary>
-    /// Ranged attack bonus damage
-    /// </summary>
-    public static int GetRangedDamageBonus(long dexterity)
-    {
-        return (int)(dexterity / 5);
-    }
-
     // =====================================================
     // CONSTITUTION - HP, poison/disease resistance, stamina regen
     // =====================================================
@@ -130,40 +105,6 @@ public static class StatEffectsSystem
     public static long GetConstitutionHPBonus(long constitution, int level)
     {
         return (constitution - 10) * 3 + level * (constitution / 15);
-    }
-
-    /// <summary>
-    /// Poison resistance percentage
-    /// Formula: Constitution * 2 (so 20 CON = 40% resist)
-    /// </summary>
-    public static int GetPoisonResistance(long constitution)
-    {
-        return Math.Min(75, (int)(constitution * 2));
-    }
-
-    /// <summary>
-    /// Disease resistance percentage
-    /// </summary>
-    public static int GetDiseaseResistance(long constitution)
-    {
-        return Math.Min(75, (int)(constitution * 2));
-    }
-
-    /// <summary>
-    /// HP regeneration per rest (at inn, etc.)
-    /// Formula: Level + Constitution / 5
-    /// </summary>
-    public static int GetHPRegenPerRest(long constitution, int level)
-    {
-        return level + (int)(constitution / 5);
-    }
-
-    /// <summary>
-    /// Bonus stamina regen per round from Constitution
-    /// </summary>
-    public static int GetStaminaRegenBonus(long constitution)
-    {
-        return (int)(constitution / 15);
     }
 
     // =====================================================
@@ -219,15 +160,6 @@ public static class StatEffectsSystem
         return Math.Clamp((int)((intelligence - 10) / 2), 0, 50); // Cap at 50% like physical crits
     }
 
-    /// <summary>
-    /// Bonus XP from learning (percentage bonus)
-    /// Formula: Intelligence / 10 percent bonus
-    /// </summary>
-    public static int GetXPBonusPercent(long intelligence)
-    {
-        return (int)(intelligence / 10);
-    }
-
     // =====================================================
     // WISDOM - Mana cost reduction, spell resistance, healing
     // =====================================================
@@ -248,15 +180,6 @@ public static class StatEffectsSystem
     public static long GetWisdomManaBonus(long wisdom)
     {
         return Math.Max(0, (wisdom - 10) * 3);
-    }
-
-    /// <summary>
-    /// Magic resistance percentage
-    /// Formula: Wisdom / 3 + equipment magic resist bonus, capped at 50%
-    /// </summary>
-    public static int GetMagicResistance(long wisdom, int equipmentMagicResist = 0)
-    {
-        return Math.Min(50, (int)(wisdom / 3) + equipmentMagicResist);
     }
 
     /// <summary>
@@ -288,68 +211,9 @@ public static class StatEffectsSystem
     // CHARISMA - Prices, NPC reactions, conversion/mercy
     // =====================================================
 
-    /// <summary>
-    /// Shop price modifier (percentage reduction)
-    /// Formula: Charisma / 5 percent discount (so 20 CHA = 4% cheaper)
-    /// </summary>
-    public static int GetShopDiscount(long charisma)
-    {
-        return Math.Min(25, (int)(charisma / 5));
-    }
-
-    /// <summary>
-    /// NPC reaction bonus (for future dialogue system)
-    /// </summary>
-    public static int GetNPCReactionBonus(long charisma)
-    {
-        return (int)(charisma - 10);
-    }
-
-    /// <summary>
-    /// Mercy/conversion chance bonus
-    /// </summary>
-    public static int GetMercyChanceBonus(long charisma)
-    {
-        return (int)(charisma * 2);
-    }
-
-    /// <summary>
-    /// Team recruitment bonus (how many members you can have)
-    /// </summary>
-    public static int GetMaxTeamMembers(long charisma)
-    {
-        return 2 + (int)(charisma / 8);
-    }
-
     // =====================================================
     // STAMINA - Combat stamina pool, physical endurance
     // =====================================================
-
-    /// <summary>
-    /// Max combat stamina (already implemented in Character.cs)
-    /// Formula: 50 + (Stamina * 2) + (Level * 3)
-    /// </summary>
-    public static long GetMaxCombatStamina(long stamina, int level)
-    {
-        return 50 + (stamina * 2) + (level * 3);
-    }
-
-    /// <summary>
-    /// Stamina regeneration per round
-    /// Formula: 5 + (Stamina / 10)
-    /// </summary>
-    public static int GetStaminaRegenPerRound(long stamina)
-    {
-        return 5 + (int)(stamina / 10);
-    }
-
-    /// <summary>
-    /// Extra dungeon fights from Stamina
-    /// </summary>
-    public static int GetBonusDungeonFights(long stamina)
-    {
-        return (int)(stamina / 15);
-    }
 
     // =====================================================
     // AGILITY - Dodge, initiative, multiple attacks
@@ -365,29 +229,12 @@ public static class StatEffectsSystem
     }
 
     /// <summary>
-    /// Initiative bonus (determines who attacks first)
-    /// Formula: Agility / 2 + Level / 4
-    /// </summary>
-    public static int GetInitiativeBonus(long agility, int level)
-    {
-        return (int)(agility / 2 + level / 4);
-    }
-
-    /// <summary>
     /// Chance for extra attack per round
     /// Formula: (Agility - 15) * 2 percent (requires 15+ AGI)
     /// </summary>
     public static int GetExtraAttackChance(long agility)
     {
         return Math.Max(0, Math.Min(40, (int)((agility - 15) * 2)));
-    }
-
-    /// <summary>
-    /// Escape bonus (added to escape chance)
-    /// </summary>
-    public static int GetEscapeBonus(long agility)
-    {
-        return (int)(agility / 3);
     }
 
     /// <summary>
@@ -401,30 +248,6 @@ public static class StatEffectsSystem
     // =====================================================
     // COMBINED CALCULATIONS
     // =====================================================
-
-    /// <summary>
-    /// Calculate total attack bonus from all relevant stats
-    /// </summary>
-    public static int GetTotalAttackBonus(Character character)
-    {
-        int bonus = 0;
-        bonus += GetStrengthDamageBonus(character.Strength);
-        bonus += GetDexterityHitBonus(character.Dexterity) / 5; // Partial contribution
-        bonus += character.Level / 2;
-        return bonus;
-    }
-
-    /// <summary>
-    /// Calculate total defense from all relevant stats
-    /// </summary>
-    public static int GetTotalDefenseBonus(Character character)
-    {
-        int bonus = 0;
-        bonus += (int)(character.Defence / 2);
-        bonus += GetAgilityDefenseBonus(character.Agility);
-        bonus += character.Level / 3;
-        return bonus;
-    }
 
     /// <summary>
     /// Roll for a critical hit
@@ -509,86 +332,11 @@ public static class StatEffectsSystem
     }
 
     /// <summary>
-    /// Roll for poison resistance
-    /// </summary>
-    public static bool RollPoisonResist(Character character)
-    {
-        // Drug ConstitutionBonus adds to effective constitution for poison resistance (e.g., Ironhide: +25)
-        var drugEffects = DrugSystem.GetDrugEffects(character);
-        long effectiveCon = character.Constitution + drugEffects.ConstitutionBonus;
-        int resist = GetPoisonResistance(effectiveCon);
-        return _random.Next(100) < resist;
-    }
-
-    /// <summary>
-    /// Roll for magic resistance
-    /// </summary>
-    public static bool RollMagicResist(Character character)
-    {
-        int resist = GetMagicResistance(character.Wisdom, character.GetEquipmentMagicResistance());
-        return _random.Next(100) < resist;
-    }
-
-    /// <summary>
     /// Roll for extra attack this round
     /// </summary>
     public static bool RollExtraAttack(Character attacker, Random? rng = null)   // v1.1.14: rng as in RollCriticalHit
     {
         int chance = GetExtraAttackChance(attacker.Agility);
         return (rng ?? _random).Next(100) < chance;
-    }
-
-    /// <summary>
-    /// Get descriptive tooltip for a stat
-    /// </summary>
-    public static string GetStatDescription(string statName, Character character)
-    {
-        return statName.ToLower() switch
-        {
-            "strength" => $"Strength ({character.Strength})\n" +
-                          $"  +{GetStrengthDamageBonus(character.Strength)} melee damage\n" +
-                          $"  Affects: Physical attacks, carrying capacity",
-
-            "dexterity" => $"Dexterity ({character.Dexterity})\n" +
-                           $"  +{GetDexterityHitBonus(character.Dexterity)}% hit chance\n" +
-                           $"  {GetCriticalHitChance(character.Dexterity, character.GetEquipmentCritChanceBonus())}% critical chance\n" +
-                           $"  Affects: Accuracy, crits, ranged attacks, escaping",
-
-            "constitution" => $"Constitution ({character.Constitution})\n" +
-                              $"  +{GetConstitutionHPBonus(character.Constitution, character.Level)} max HP\n" +
-                              $"  {GetPoisonResistance(character.Constitution)}% poison resist\n" +
-                              $"  Affects: Health, resistances, stamina regen",
-
-            "intelligence" => $"Intelligence ({character.Intelligence})\n" +
-                              $"  +{GetIntelligenceManaBonus(character.Intelligence, character.Level)} max mana\n" +
-                              $"  {GetSpellDamageMultiplier(character.Intelligence):P0} spell damage\n" +
-                              $"  +{GetXPBonusPercent(character.Intelligence)}% XP bonus\n" +
-                              $"  Affects: Spell power, mana pool, learning",
-
-            "wisdom" => $"Wisdom ({character.Wisdom})\n" +
-                        $"  -{GetManaCostReduction(character.Wisdom)}% mana costs\n" +
-                        $"  {GetMagicResistance(character.Wisdom, character.GetEquipmentMagicResistance())}% magic resist\n" +
-                        $"  {GetHealingMultiplier(character.Wisdom):P0} healing power\n" +
-                        $"  Affects: Spell efficiency, resistance, healing",
-
-            "charisma" => $"Charisma ({character.Charisma})\n" +
-                          $"  {GetShopDiscount(character.Charisma)}% shop discount\n" +
-                          $"  Max team: {GetMaxTeamMembers(character.Charisma)} members\n" +
-                          $"  Affects: Prices, NPC reactions, mercy",
-
-            "stamina" => $"Stamina ({character.Stamina})\n" +
-                         $"  {GetMaxCombatStamina(character.Stamina, character.Level)} combat stamina\n" +
-                         $"  +{GetStaminaRegenPerRound(character.Stamina)} stamina/round\n" +
-                         $"  +{GetBonusDungeonFights(character.Stamina)} dungeon fights\n" +
-                         $"  Affects: Ability usage, endurance",
-
-            "agility" => $"Agility ({character.Agility})\n" +
-                         $"  {GetDodgeChance(character.Agility)}% dodge chance\n" +
-                         $"  +{GetInitiativeBonus(character.Agility, character.Level)} initiative\n" +
-                         $"  {GetExtraAttackChance(character.Agility)}% extra attack\n" +
-                         $"  Affects: Evasion, speed, extra attacks",
-
-            _ => $"{statName}: No description available"
-        };
     }
 }
