@@ -8509,6 +8509,12 @@ public partial class CombatEngine
         "necro", "drain",
     };
 
+    /// <summary>An ability that needs a bow is a ranged hit, not a melee one (the Gnoll bite is melee only).</summary>
+    internal static bool IsRangedAbility(ClassAbilitySystem.ClassAbility? ability)
+    {
+        return ability?.RequiredWeaponTypes != null && ability.RequiredWeaponTypes.Contains(WeaponType.Bow);
+    }
+
     private static bool IsMagicalAbilityEffect(string? specialEffect)
     {
         return !string.IsNullOrEmpty(specialEffect) && MagicalAbilityEffects.Contains(specialEffect);
@@ -8589,12 +8595,12 @@ public partial class CombatEngine
         result.Player?.Statistics.RecordDamageDealt(actualDamage, crit || alreadyCrit);
 
         ApplyPostHitEnchantments(player, target, actualDamage, result,
-            isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+            notMelee: IsMagicalAbilityEffect(abilityResult.SpecialEffect) || IsRangedAbility(abilityResult.AbilityUsed));   // the Gnoll bite is melee only
 
         return actualDamage;
     }
 
-    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
+    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false, EquipmentSlot weaponSlot = EquipmentSlot.MainHand, bool notMelee = false)
     {
         if (damage <= 0 || target == null) return;
 
@@ -8803,8 +8809,9 @@ public partial class CombatEngine
         if (!isSpellDamage && target.IsAlive)
             ApplyPoisonEffectsOnHit(attacker, target, isPlayer);
 
-        // Gnoll racial: Poisonous Bite — 15% chance to poison on hit (melee only)
-        if (attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
+        // Gnoll racial: Poisonous Bite — 15% chance to poison on hit (melee only: never a spell,
+        // a magical ability, or a ranged hit; notMelee is set by the callers that know the hit is one)
+        if (!isSpellDamage && !notMelee && attacker.GetEquipment(weaponSlot)?.WeaponType != WeaponType.Bow && attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
         {
             target.Poisoned = true;
             target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
@@ -13372,7 +13379,11 @@ public partial class CombatEngine
         _ => 0.25 // 25% floor for 4th+ targets
     };
 
-    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource = null, bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
+    private Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource = null, bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
+        => ApplyAoEDamageCore(monsters, totalDamage, result, damageSource, isSpellDamage, attacker, spellCaster, notMelee: false);
+
+    // notMelee: a ranged hit (Volley, Arrow Storm), so the Gnoll bite stays off it
+    private async Task ApplyAoEDamageCore(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource, bool isSpellDamage, Character? attacker, Character? spellCaster, bool notMelee)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
@@ -13476,7 +13487,7 @@ public partial class CombatEngine
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             var enchantAttacker = attacker ?? result.Player;
             if (enchantAttacker != null)
-                ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage);
+                ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage, notMelee: notMelee);
 
             if (monster.HP <= 0)
             {
@@ -15359,7 +15370,7 @@ public partial class CombatEngine
                 // AoE abilities hit all monsters
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.ability_aoe_all"));
-                await ApplyAoEDamage(monsters, actualDamage, result, ability.DisplayName, attacker: player);
+                await ApplyAoEDamageCore(monsters, actualDamage, result, ability.DisplayName, false, player, null, notMelee: IsRangedAbility(ability));
                 // AoE confusion: confuse surviving monsters
                 if (abilityResult.SpecialEffect == "aoe_confusion")
                 {
@@ -15443,7 +15454,7 @@ public partial class CombatEngine
 
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
-                ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+                ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect), notMelee: IsRangedAbility(ability));
 
                 // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals the caster. Applied
                 // here so the heal fires even if the target died to the base damage (previously the
@@ -24358,7 +24369,7 @@ public partial class CombatEngine
 
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
-            ApplyPostHitEnchantments(player, monster, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+            ApplyPostHitEnchantments(player, monster, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect), notMelee: IsRangedAbility(ability));
 
             // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals caster even on killing blow.
             if (abilityResult.SpecialEffect == "shadow_harvest" && actualDamage > 0)
