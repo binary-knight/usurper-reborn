@@ -13379,7 +13379,11 @@ public partial class CombatEngine
         _ => 0.25 // 25% floor for 4th+ targets
     };
 
-    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource = null, bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null, bool notMelee = false)
+    private Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource = null, bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
+        => ApplyAoEDamageCore(monsters, totalDamage, result, damageSource, isSpellDamage, attacker, spellCaster, notMelee: false);
+
+    // notMelee: a ranged hit (Volley, Arrow Storm), so the Gnoll bite stays off it
+    private async Task ApplyAoEDamageCore(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource, bool isSpellDamage, Character? attacker, Character? spellCaster, bool notMelee)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
@@ -15366,7 +15370,7 @@ public partial class CombatEngine
                 // AoE abilities hit all monsters
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.ability_aoe_all"));
-                await ApplyAoEDamage(monsters, actualDamage, result, ability.DisplayName, attacker: player, notMelee: IsRangedAbility(ability));
+                await ApplyAoEDamageCore(monsters, actualDamage, result, ability.DisplayName, false, player, null, notMelee: IsRangedAbility(ability));
                 // AoE confusion: confuse surviving monsters
                 if (abilityResult.SpecialEffect == "aoe_confusion")
                 {
