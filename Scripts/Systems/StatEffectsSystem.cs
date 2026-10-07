@@ -219,15 +219,6 @@ public static class StatEffectsSystem
         return Math.Clamp((int)((intelligence - 10) / 2), 0, 50); // Cap at 50% like physical crits
     }
 
-    /// <summary>
-    /// Bonus XP from learning (percentage bonus)
-    /// Formula: Intelligence / 10 percent bonus
-    /// </summary>
-    public static int GetXPBonusPercent(long intelligence)
-    {
-        return (int)(intelligence / 10);
-    }
-
     // =====================================================
     // WISDOM - Mana cost reduction, spell resistance, healing
     // =====================================================
@@ -289,15 +280,6 @@ public static class StatEffectsSystem
     // =====================================================
 
     /// <summary>
-    /// Shop price modifier (percentage reduction)
-    /// Formula: Charisma / 5 percent discount (so 20 CHA = 4% cheaper)
-    /// </summary>
-    public static int GetShopDiscount(long charisma)
-    {
-        return Math.Min(25, (int)(charisma / 5));
-    }
-
-    /// <summary>
     /// NPC reaction bonus (for future dialogue system)
     /// </summary>
     public static int GetNPCReactionBonus(long charisma)
@@ -313,43 +295,9 @@ public static class StatEffectsSystem
         return (int)(charisma * 2);
     }
 
-    /// <summary>
-    /// Team recruitment bonus (how many members you can have)
-    /// </summary>
-    public static int GetMaxTeamMembers(long charisma)
-    {
-        return 2 + (int)(charisma / 8);
-    }
-
     // =====================================================
     // STAMINA - Combat stamina pool, physical endurance
     // =====================================================
-
-    /// <summary>
-    /// Max combat stamina (already implemented in Character.cs)
-    /// Formula: 50 + (Stamina * 2) + (Level * 3)
-    /// </summary>
-    public static long GetMaxCombatStamina(long stamina, int level)
-    {
-        return 50 + (stamina * 2) + (level * 3);
-    }
-
-    /// <summary>
-    /// Stamina regeneration per round
-    /// Formula: 5 + (Stamina / 10)
-    /// </summary>
-    public static int GetStaminaRegenPerRound(long stamina)
-    {
-        return 5 + (int)(stamina / 10);
-    }
-
-    /// <summary>
-    /// Extra dungeon fights from Stamina
-    /// </summary>
-    public static int GetBonusDungeonFights(long stamina)
-    {
-        return (int)(stamina / 15);
-    }
 
     // =====================================================
     // AGILITY - Dodge, initiative, multiple attacks
@@ -362,15 +310,6 @@ public static class StatEffectsSystem
     public static int GetDodgeChance(long agility)
     {
         return Math.Max(0, Math.Min(35, 5 + (int)((agility - 10) / 2)));
-    }
-
-    /// <summary>
-    /// Initiative bonus (determines who attacks first)
-    /// Formula: Agility / 2 + Level / 4
-    /// </summary>
-    public static int GetInitiativeBonus(long agility, int level)
-    {
-        return (int)(agility / 2 + level / 4);
     }
 
     /// <summary>
@@ -536,59 +475,5 @@ public static class StatEffectsSystem
     {
         int chance = GetExtraAttackChance(attacker.Agility);
         return (rng ?? _random).Next(100) < chance;
-    }
-
-    /// <summary>
-    /// Get descriptive tooltip for a stat
-    /// </summary>
-    public static string GetStatDescription(string statName, Character character)
-    {
-        return statName.ToLower() switch
-        {
-            "strength" => $"Strength ({character.Strength})\n" +
-                          $"  +{GetStrengthDamageBonus(character.Strength)} melee damage\n" +
-                          $"  Affects: Physical attacks, carrying capacity",
-
-            "dexterity" => $"Dexterity ({character.Dexterity})\n" +
-                           $"  +{GetDexterityHitBonus(character.Dexterity)}% hit chance\n" +
-                           $"  {GetCriticalHitChance(character.Dexterity, character.GetEquipmentCritChanceBonus())}% critical chance\n" +
-                           $"  Affects: Accuracy, crits, ranged attacks, escaping",
-
-            "constitution" => $"Constitution ({character.Constitution})\n" +
-                              $"  +{GetConstitutionHPBonus(character.Constitution, character.Level)} max HP\n" +
-                              $"  {GetPoisonResistance(character.Constitution)}% poison resist\n" +
-                              $"  Affects: Health, resistances, stamina regen",
-
-            "intelligence" => $"Intelligence ({character.Intelligence})\n" +
-                              $"  +{GetIntelligenceManaBonus(character.Intelligence, character.Level)} max mana\n" +
-                              $"  {GetSpellDamageMultiplier(character.Intelligence):P0} spell damage\n" +
-                              $"  +{GetXPBonusPercent(character.Intelligence)}% XP bonus\n" +
-                              $"  Affects: Spell power, mana pool, learning",
-
-            "wisdom" => $"Wisdom ({character.Wisdom})\n" +
-                        $"  -{GetManaCostReduction(character.Wisdom)}% mana costs\n" +
-                        $"  {GetMagicResistance(character.Wisdom, character.GetEquipmentMagicResistance())}% magic resist\n" +
-                        $"  {GetHealingMultiplier(character.Wisdom):P0} healing power\n" +
-                        $"  Affects: Spell efficiency, resistance, healing",
-
-            "charisma" => $"Charisma ({character.Charisma})\n" +
-                          $"  {GetShopDiscount(character.Charisma)}% shop discount\n" +
-                          $"  Max team: {GetMaxTeamMembers(character.Charisma)} members\n" +
-                          $"  Affects: Prices, NPC reactions, mercy",
-
-            "stamina" => $"Stamina ({character.Stamina})\n" +
-                         $"  {GetMaxCombatStamina(character.Stamina, character.Level)} combat stamina\n" +
-                         $"  +{GetStaminaRegenPerRound(character.Stamina)} stamina/round\n" +
-                         $"  +{GetBonusDungeonFights(character.Stamina)} dungeon fights\n" +
-                         $"  Affects: Ability usage, endurance",
-
-            "agility" => $"Agility ({character.Agility})\n" +
-                         $"  {GetDodgeChance(character.Agility)}% dodge chance\n" +
-                         $"  +{GetInitiativeBonus(character.Agility, character.Level)} initiative\n" +
-                         $"  {GetExtraAttackChance(character.Agility)}% extra attack\n" +
-                         $"  Affects: Evasion, speed, extra attacks",
-
-            _ => $"{statName}: No description available"
-        };
     }
 }
