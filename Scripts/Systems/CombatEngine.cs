@@ -8809,7 +8809,7 @@ public partial class CombatEngine
         if (!isSpellDamage && target.IsAlive)
             ApplyPoisonEffectsOnHit(attacker, target, isPlayer);
 
-        // Gnoll racial: Poisonous Bite — 15% chance to poison on hit (melee only: never a spell,
+        // Gnoll racial: Poisonous Bite: 15% chance to poison on hit (melee only: never a spell,
         // a magical ability, or a ranged hit; notMelee is set by the callers that know the hit is one)
         if (!isSpellDamage && !notMelee && attacker.GetEquipment(weaponSlot)?.WeaponType != WeaponType.Bow && attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
         {
