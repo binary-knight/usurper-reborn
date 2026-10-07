@@ -1261,6 +1261,9 @@ function renderSslVersion(sslData, versionData) {
   const el = document.getElementById('ssl-version-body');
 
   let sslHtml = '<div style="margin-bottom: 1rem;"><strong style="color:var(--gold)">SSL Certificate</strong></div>';
+  if (sslData.validationError) {
+    sslHtml += `<div class="ssl-invalid" style="color:var(--red); margin-bottom: 1rem;">Certificate failed validation: ${escapeHtml(sslData.validationError)}${sslData.expiresAt ? '' : ' (expiry unknown)'}</div>`;
+  }
   if (sslData.expiresAt) {
     const daysCls = sslData.daysRemaining > 30 ? 'good' : sslData.daysRemaining > 7 ? 'warn' : 'danger';
     sslHtml += `
@@ -1279,7 +1282,7 @@ function renderSslVersion(sslData, versionData) {
         </div>
       </div>
     `;
-  } else {
+  } else if (!sslData.validationError) {
     sslHtml += '<div style="color:var(--dim); margin-bottom: 1rem;">Certificate info unavailable</div>';
   }
 
