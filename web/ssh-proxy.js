@@ -3104,6 +3104,96 @@ async function getAdminDatabase() {
   return result;
 }
 
+// --- Admin SSL Certificate Probe (1.2.8) ---
+// Method 2 of the admin SSL card: a TLS connection to this machine's own HTTPS port that reads
+// the served certificate with validation on. The name checked is usurper-reborn.net (sent as
+// SNI), against the system's trusted roots. A certificate that fails validation (expired, wrong
+// name, untrusted chain) is the card's result, with its error code, and its expiry is reported as
+// unknown: Node does not hand over a rejected certificate, except on a name mismatch, where the
+// error carries it. Host and port are a seam for the tests and default to localhost:443; a hard
+// check refuses any host other than localhost or 127.0.0.1 before tls is touched. tls is passed
+// in, so the tests run this section with no require.
+const SSL_PROBE_DEFAULT_HOST = 'localhost';
+const SSL_PROBE_DEFAULT_PORT = 443;
+const SSL_PROBE_HOSTS = ['localhost', '127.0.0.1'];
+const SSL_PROBE_SERVERNAME = 'usurper-reborn.net';
+const SSL_PROBE_TIMEOUT_MS = 5000;
+
+// The host and port the probe connects to: the given ones, else localhost:443.
+function sslProbeTarget(options) {
+  const o = options || {};
+  return {
+    host: o.host === undefined ? SSL_PROBE_DEFAULT_HOST : o.host,
+    port: o.port === undefined ? SSL_PROBE_DEFAULT_PORT : o.port,
+  };
+}
+
+// The hard check: throws unless the host is exactly localhost or 127.0.0.1 and the port is a TCP port.
+function assertSslProbeTarget(target) {
+  if (typeof target.host !== 'string' || !SSL_PROBE_HOSTS.includes(target.host)) {
+    throw new Error('SSL probe refused: only localhost or 127.0.0.1 may be probed');
+  }
+  if (!Number.isInteger(target.port) || target.port < 1 || target.port > 65535) {
+    throw new Error('SSL probe refused: port out of range');
+  }
+}
+
+// options: { tls, host, port, timeoutMs }. Resolves to one of
+//   { status: 'valid', cert }                     validation passed, cert read from the socket
+//   { status: 'invalid', code, cert }             validation failed; cert is null unless the error carried it
+//   { status: 'unavailable', code }               no TLS session (refused, timeout, other error)
+// Throws, before any connection, for a host or port the hard check refuses.
+function probeSslCertificate(options) {
+  const o = options || {};
+  const target = sslProbeTarget(o);
+  assertSslProbeTarget(target);
+  const tls = o.tls;
+  const timeoutMs = o.timeoutMs === undefined ? SSL_PROBE_TIMEOUT_MS : o.timeoutMs;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (outcome) => { if (!settled) { settled = true; resolve(outcome); } };
+    const sock = tls.connect({
+      host: target.host,
+      port: target.port,
+      servername: SSL_PROBE_SERVERNAME,
+      rejectUnauthorized: true,
+    }, () => {
+      const cert = sock.getPeerCertificate();
+      sock.destroy();
+      finish({ status: 'valid', cert });
+    });
+    sock.setTimeout(timeoutMs, () => { sock.destroy(); finish({ status: 'unavailable', code: 'TIMEOUT' }); });
+    sock.on('error', (err) => {
+      // Node sets authorizationError on the socket when the certificate check is what failed.
+      if (sock.authorizationError) {
+        const cert = err && err.cert && err.cert.valid_to ? err.cert : null;
+        finish({ status: 'invalid', code: String(sock.authorizationError), cert });
+      } else {
+        finish({ status: 'unavailable', code: err && err.code ? String(err.code) : 'ERROR' });
+      }
+    });
+  });
+}
+
+// Writes a probe outcome into the card's result: expiry, days left and issuer when a certificate
+// was read; certValid true or false once a TLS session was reached; validationError on a failure.
+function applySslProbe(result, outcome, nowMs) {
+  if (!outcome || outcome.status === 'unavailable') return result;
+  result.certValid = outcome.status === 'valid';
+  if (outcome.status === 'invalid') result.validationError = outcome.code;
+  const cert = outcome.cert;
+  if (cert && cert.valid_to) {
+    const expires = new Date(cert.valid_to);
+    if (!isNaN(expires.getTime())) {
+      result.expiresAt = expires.toISOString();
+      result.daysRemaining = Math.floor((expires.getTime() - nowMs) / 86400000);
+      result.issuer = cert.issuer && cert.issuer.O ? cert.issuer.O : (cert.issuer ? JSON.stringify(cert.issuer) : 'Unknown');
+    }
+  }
+  return result;
+}
+// --- End Admin SSL Certificate Probe ---
+
 async function getAdminSsl() {
   const now = Date.now();
   if (adminSslCache && (now - adminSslCacheTime) < 3600000) return adminSslCache;
@@ -3134,24 +3224,11 @@ async function getAdminSsl() {
     parseSslOutput(out);
   } catch (e) { /* permission denied — expected for usurper user */ }
 
-  // Method 2: Connect to local HTTPS and read cert via Node.js TLS
+  // Method 2: connect to this machine's HTTPS port with certificate validation on (see the
+  // Admin SSL Certificate Probe section). A certificate that fails validation is the result.
   if (!result.expiresAt) {
     try {
-      const tls = require('tls');
-      const cert = await new Promise((resolve, reject) => {
-        const sock = tls.connect(443, 'localhost', { servername: 'usurper-reborn.net', rejectUnauthorized: false }, () => {
-          const peerCert = sock.getPeerCertificate();
-          sock.destroy();
-          resolve(peerCert);
-        });
-        sock.setTimeout(5000, () => { sock.destroy(); reject(new Error('timeout')); });
-        sock.on('error', reject);
-      });
-      if (cert && cert.valid_to) {
-        result.expiresAt = new Date(cert.valid_to).toISOString();
-        result.daysRemaining = Math.floor((new Date(cert.valid_to) - Date.now()) / 86400000);
-        result.issuer = cert.issuer && cert.issuer.O ? cert.issuer.O : (cert.issuer ? JSON.stringify(cert.issuer) : 'Unknown');
-      }
+      applySslProbe(result, await probeSslCertificate({ tls: require('tls') }), Date.now());
     } catch (e2) { /* both methods failed */ }
   }
 
