@@ -4068,6 +4068,11 @@ async function handleAdminRequest(req, res) {
       const banIp = body.banIp !== false;
 
       dbWrite.prepare("UPDATE players SET is_banned = 1, ban_reason = ? WHERE LOWER(username) = LOWER(?)").run(reason, playerUsername);
+      // 1.2.8: a ban ends every remember-me token of the account; a database without the table (game server
+      // not yet on 1.2.8) has none to end
+      try {
+        dbWrite.prepare("DELETE FROM login_tokens WHERE LOWER(username) = LOWER(?)").run(playerUsername);
+      } catch (e) { /* no login_tokens table yet */ }
 
       // Capture IP for ban (current online IP first, fall back to last_login_ip)
       let bannedIp = null;
@@ -4219,6 +4224,10 @@ async function handleAdminRequest(req, res) {
       // 1.2.8: the game's own PBKDF2 form; the bcrypt or SHA256 written before could never log in.
       const hashed = hashGamePassword(body.newPassword);
       dbWrite.prepare("UPDATE players SET password_hash = ? WHERE LOWER(username) = LOWER(?)").run(hashed, playerUsername);
+      // 1.2.8: a reset ends every remember-me token of the account; a database without the table has none
+      try {
+        dbWrite.prepare("DELETE FROM login_tokens WHERE LOWER(username) = LOWER(?)").run(playerUsername);
+      } catch (e) { /* no login_tokens table yet */ }
 
       try {
         dbWrite.prepare("INSERT INTO wizard_log (wizard_name, action, target, details, created_at) VALUES (?, ?, ?, ?, datetime('now'))")
@@ -4304,7 +4313,7 @@ async function handleAdminRequest(req, res) {
 
       // Delete from all related tables
       // v1.1.14: wizard_flags (frozen, muted) are kept by account name through a delete and recreate
-      const tables = ['players', 'sleeping_players', 'online_players', 'pvp_log'];
+      const tables = ['players', 'sleeping_players', 'online_players', 'pvp_log', 'login_tokens'];
       for (const table of tables) {
         try {
           dbWrite.prepare(`DELETE FROM ${table} WHERE LOWER(username) = LOWER(?)`).run(playerUsername);
