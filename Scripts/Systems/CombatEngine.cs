@@ -8811,7 +8811,7 @@ public partial class CombatEngine
 
         // Gnoll racial: Poisonous Bite — 15% chance to poison on hit (melee only: never a spell,
         // a magical ability, or a ranged hit; notMelee is set by the callers that know the hit is one)
-        if (!isSpellDamage && !notMelee && attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
+        if (!isSpellDamage && !notMelee && attacker.GetEquipment(weaponSlot)?.WeaponType != WeaponType.Bow && attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
         {
             target.Poisoned = true;
             target.PoisonRounds = Math.Max(target.PoisonRounds, 3);

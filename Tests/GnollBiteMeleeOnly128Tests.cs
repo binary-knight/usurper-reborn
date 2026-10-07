@@ -22,11 +22,17 @@ public class GnollBiteMeleeOnly128Tests
     private static readonly MethodInfo PostHit = typeof(CombatEngine).GetMethod(
         "ApplyPostHitEnchantments", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
-    private static int PoisonedHits(CharacterRace race, bool isSpell, bool notMelee)
+    private static int PoisonedHits(CharacterRace race, bool isSpell, bool notMelee, WeaponType? weapon = null)
     {
         var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
         engine.SeedRandomForTests(128);
         var attacker = new Character { Name2 = "Biter", Class = CharacterClass.Warrior, Race = race, Level = 10, HP = 200, MaxHP = 200 };
+        if (weapon != null)
+            attacker.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(new Equipment
+            {
+                Name = "Test " + weapon, Slot = EquipmentSlot.MainHand, WeaponType = weapon.Value,
+                WeaponPower = 10, MinLevel = 1, Rarity = EquipmentRarity.Common,
+            });
         var result = new CombatResult { Player = attacker };
         int poisoned = 0;
         for (int i = 0; i < Hits; i++)
@@ -49,6 +55,14 @@ public class GnollBiteMeleeOnly128Tests
     [Fact]
     public void GnollRangedHit_NeverPoisons() =>
         PoisonedHits(CharacterRace.Gnoll, isSpell: false, notMelee: true).Should().Be(0);
+
+    [Fact]
+    public void GnollSwingWithABowInHand_NeverPoisons() =>
+        PoisonedHits(CharacterRace.Gnoll, isSpell: false, notMelee: false, WeaponType.Bow).Should().Be(0);
+
+    [Fact]
+    public void GnollSwingWithAMeleeWeapon_CanPoison() =>
+        PoisonedHits(CharacterRace.Gnoll, isSpell: false, notMelee: false, WeaponType.Sword).Should().BeGreaterThan(0);
 
     [Fact]
     public void NonGnollMeleeHit_NeverPoisons() =>
