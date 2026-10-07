@@ -25,6 +25,7 @@ public class StatEffectsStaleHelperPinTests
         var src = Read("Scripts", "Systems", "StatEffectsSystem.cs");
         src.Should().NotContain("GetStatDescription");
         src.Should().NotContain("GetStaminaRegenPerRound");
+        src.Should().NotContain("GetStaminaRegenBonus"); // second stale copy (Constitution / 15)
     }
 
     [Fact]

@@ -22,26 +22,9 @@ public static class StatEffectsSystem
         return (int)(strength / 4);
     }
 
-    /// <summary>
-    /// Carry capacity bonus (for future inventory weight system)
-    /// </summary>
-    public static int GetCarryCapacity(long strength)
-    {
-        return (int)(50 + strength * 2);
-    }
-
     // =====================================================
     // DEXTERITY - Accuracy, ranged damage, critical hits
     // =====================================================
-
-    /// <summary>
-    /// Hit chance bonus from Dexterity
-    /// Formula: (Dexterity - 10) * 2 percent (so 20 DEX = +20% hit chance)
-    /// </summary>
-    public static int GetDexterityHitBonus(long dexterity)
-    {
-        return (int)((dexterity - 10) * 2);
-    }
 
     /// <summary>
     /// Critical hit chance from Dexterity + equipment bonuses.
@@ -111,14 +94,6 @@ public static class StatEffectsSystem
         return Math.Min(multiplier, 3.0f); // Cap at 3x to prevent exponential damage at high DEX
     }
 
-    /// <summary>
-    /// Ranged attack bonus damage
-    /// </summary>
-    public static int GetRangedDamageBonus(long dexterity)
-    {
-        return (int)(dexterity / 5);
-    }
-
     // =====================================================
     // CONSTITUTION - HP, poison/disease resistance, stamina regen
     // =====================================================
@@ -130,40 +105,6 @@ public static class StatEffectsSystem
     public static long GetConstitutionHPBonus(long constitution, int level)
     {
         return (constitution - 10) * 3 + level * (constitution / 15);
-    }
-
-    /// <summary>
-    /// Poison resistance percentage
-    /// Formula: Constitution * 2 (so 20 CON = 40% resist)
-    /// </summary>
-    public static int GetPoisonResistance(long constitution)
-    {
-        return Math.Min(75, (int)(constitution * 2));
-    }
-
-    /// <summary>
-    /// Disease resistance percentage
-    /// </summary>
-    public static int GetDiseaseResistance(long constitution)
-    {
-        return Math.Min(75, (int)(constitution * 2));
-    }
-
-    /// <summary>
-    /// HP regeneration per rest (at inn, etc.)
-    /// Formula: Level + Constitution / 5
-    /// </summary>
-    public static int GetHPRegenPerRest(long constitution, int level)
-    {
-        return level + (int)(constitution / 5);
-    }
-
-    /// <summary>
-    /// Bonus stamina regen per round from Constitution
-    /// </summary>
-    public static int GetStaminaRegenBonus(long constitution)
-    {
-        return (int)(constitution / 15);
     }
 
     // =====================================================
@@ -242,15 +183,6 @@ public static class StatEffectsSystem
     }
 
     /// <summary>
-    /// Magic resistance percentage
-    /// Formula: Wisdom / 3 + equipment magic resist bonus, capped at 50%
-    /// </summary>
-    public static int GetMagicResistance(long wisdom, int equipmentMagicResist = 0)
-    {
-        return Math.Min(50, (int)(wisdom / 3) + equipmentMagicResist);
-    }
-
-    /// <summary>
     /// Healing effectiveness multiplier
     /// Formula: 1.0 + (Wisdom - 10) * 0.015 (so 20 WIS = 1.15x, 30 WIS = 1.30x healing)
     /// Balanced to give meaningful healing bonuses from Wisdom investment.
@@ -279,22 +211,6 @@ public static class StatEffectsSystem
     // CHARISMA - Prices, NPC reactions, conversion/mercy
     // =====================================================
 
-    /// <summary>
-    /// NPC reaction bonus (for future dialogue system)
-    /// </summary>
-    public static int GetNPCReactionBonus(long charisma)
-    {
-        return (int)(charisma - 10);
-    }
-
-    /// <summary>
-    /// Mercy/conversion chance bonus
-    /// </summary>
-    public static int GetMercyChanceBonus(long charisma)
-    {
-        return (int)(charisma * 2);
-    }
-
     // =====================================================
     // STAMINA - Combat stamina pool, physical endurance
     // =====================================================
@@ -322,14 +238,6 @@ public static class StatEffectsSystem
     }
 
     /// <summary>
-    /// Escape bonus (added to escape chance)
-    /// </summary>
-    public static int GetEscapeBonus(long agility)
-    {
-        return (int)(agility / 3);
-    }
-
-    /// <summary>
     /// Defense bonus from Agility (evasion component)
     /// </summary>
     public static int GetAgilityDefenseBonus(long agility)
@@ -340,30 +248,6 @@ public static class StatEffectsSystem
     // =====================================================
     // COMBINED CALCULATIONS
     // =====================================================
-
-    /// <summary>
-    /// Calculate total attack bonus from all relevant stats
-    /// </summary>
-    public static int GetTotalAttackBonus(Character character)
-    {
-        int bonus = 0;
-        bonus += GetStrengthDamageBonus(character.Strength);
-        bonus += GetDexterityHitBonus(character.Dexterity) / 5; // Partial contribution
-        bonus += character.Level / 2;
-        return bonus;
-    }
-
-    /// <summary>
-    /// Calculate total defense from all relevant stats
-    /// </summary>
-    public static int GetTotalDefenseBonus(Character character)
-    {
-        int bonus = 0;
-        bonus += (int)(character.Defence / 2);
-        bonus += GetAgilityDefenseBonus(character.Agility);
-        bonus += character.Level / 3;
-        return bonus;
-    }
 
     /// <summary>
     /// Roll for a critical hit
@@ -445,27 +329,6 @@ public static class StatEffectsSystem
         dodgeChance = Math.Min(dodgeChance, 45); // Cap at 45% with armor bonus (base cap was 35%)
 
         return (rng ?? _random).Next(100) < dodgeChance;
-    }
-
-    /// <summary>
-    /// Roll for poison resistance
-    /// </summary>
-    public static bool RollPoisonResist(Character character)
-    {
-        // Drug ConstitutionBonus adds to effective constitution for poison resistance (e.g., Ironhide: +25)
-        var drugEffects = DrugSystem.GetDrugEffects(character);
-        long effectiveCon = character.Constitution + drugEffects.ConstitutionBonus;
-        int resist = GetPoisonResistance(effectiveCon);
-        return _random.Next(100) < resist;
-    }
-
-    /// <summary>
-    /// Roll for magic resistance
-    /// </summary>
-    public static bool RollMagicResist(Character character)
-    {
-        int resist = GetMagicResistance(character.Wisdom, character.GetEquipmentMagicResistance());
-        return _random.Next(100) < resist;
     }
 
     /// <summary>
