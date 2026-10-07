@@ -197,6 +197,15 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine("");
                 return transport;
             }
+            catch (HostKeyRefusedException ex)
+            {
+                // 1.2.8: the server's SSH host key is not the one expected; nothing was sent
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("");
+                foreach (var line in OnlineHostKeyPolicy.RefusalLines(ex.Check))
+                    terminal.WriteLine(line);
+                return null;
+            }
             catch (TimeoutException)
             {
                 terminal.SetColor("bright_red");
@@ -1165,10 +1174,22 @@ namespace UsurperRemake.Systems
             Stream = stream;
         }
 
-        internal static SshAuthTransport Connect(string host, int port)
+        internal static SshAuthTransport Connect(string host, int port) => Connect(host, port, OnlineHostKeyPolicy.ForGame());
+
+        /// <summary>
+        /// 1.2.8: the host key is checked by <paramref name="policy"/> during the key exchange, before the login is
+        /// sent. A refused key closes the connection and throws <see cref="HostKeyRefusedException"/>.
+        /// </summary>
+        internal static SshAuthTransport Connect(string host, int port, OnlineHostKeyPolicy policy)
         {
             OnlineTestGuard.CheckHost(host); // guard 2: before any DNS or connect
             var client = new SshClient(host, port, GatewayUser, GatewayPass);
+            HostKeyCheck? hostKeyCheck = null;
+            client.HostKeyReceived += (_, e) =>
+            {
+                hostKeyCheck = policy.Check(host, port, e.HostKey);
+                e.CanTrust = hostKeyCheck.Trusted;
+            };
             try
             {
                 client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(10);
@@ -1188,6 +1209,7 @@ namespace UsurperRemake.Systems
             catch
             {
                 try { client.Dispose(); } catch { }
+                if (hostKeyCheck is { Trusted: false } refused) throw new HostKeyRefusedException(refused);
                 throw;
             }
         }
