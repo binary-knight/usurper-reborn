@@ -20,7 +20,9 @@ namespace UsurperRemake.Tests
     /// Each test runs RelayClient.ConnectAndBridge against a fake MUD on a loopback TcpListener
     /// (127.0.0.1, port 0) and captures the auth reply through the RelayClient.OpenStdout seam.
     /// All four tests share one class so xunit runs them one at a time (the seam is static).
+    /// 1.2.8: RelayToken128Tests swaps the same seam, so both run in one collection.
     /// </summary>
+    [Collection("SharedGameSingletons")]
     public class RelayEcho128Tests
     {
         private const string ErrReason = "Invalid username or password.";

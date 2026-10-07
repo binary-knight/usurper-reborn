@@ -28,8 +28,24 @@ public static class RelayClient
 {
     private const int MAX_AUTH_ATTEMPTS = 5;
 
-    /// <summary>Test seam: the stream the auth reply lines go to. Default is the real stdout.</summary>
+    /// <summary>Test seam: the stream the auth reply lines (and, 1.2.8, the bridged session) go to. Default is the real stdout.</summary>
     internal static Func<Stream> OpenStdout = Console.OpenStandardOutput;
+
+    /// <summary>1.2.8 test seam: the passthrough's stdin for the bridge. Default is the real stdin.</summary>
+    internal static Func<Stream> OpenStdin = Console.OpenStandardInput;
+
+    /// <summary>
+    /// 1.2.8: the game server's host. The relay runs on the server's own machine and only ever connects to
+    /// loopback: this is the default, and <see cref="LoopbackOnly"/> refuses anything else before connecting.
+    /// </summary>
+    internal static string MudHost = "127.0.0.1";
+
+    /// <summary>1.2.8: the address for <paramref name="host"/> when it is a loopback IP; throws for any other host, before any DNS or connect.</summary>
+    internal static System.Net.IPAddress LoopbackOnly(string host)
+    {
+        if (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip)) return ip;
+        throw new InvalidOperationException("The relay connects only to a loopback address.");
+    }
 
     public static async Task RunAsync(string username, int port, string connectionType, CancellationToken ct)
     {
@@ -77,6 +93,11 @@ public static class RelayClient
             // Support direct AUTH passthrough from game client (OnlinePlaySystem sends AUTH via SSH)
             if (choice.StartsWith("AUTH:", StringComparison.Ordinal))
             {
+                // 1.2.8: the capability probe and the token login; every other shape goes on as before.
+                var tokenRoute = await TokenPassthrough(choice, port, lang, ct);
+                if (tokenRoute == true) return;
+                if (tokenRoute == false) continue; // the menu again; this used one attempt
+
                 var authResult = ParseDirectAuth(choice);
                 if (authResult.HasValue)
                 {
@@ -232,16 +253,25 @@ public static class RelayClient
     /// False for the AUTH: passthrough used by the desktop and BBS clients, which
     /// keep their own line editors.
     /// </param>
-    private static async Task<bool> ConnectAndBridge(
+    private static Task<bool> ConnectAndBridge(
         string username, string? password, int port, string connectionType, CancellationToken ct,
-        bool isRegistration = false, bool rawTerminal = false, string lang = "en")
+        bool isRegistration = false, bool rawTerminal = false, string lang = "en") =>
+        ConnectAndBridgeCore(username, password, port, connectionType, ct, isRegistration, rawTerminal, lang, forwardLine: null);
+
+    /// <summary>
+    /// <see cref="ConnectAndBridge"/>, and 1.2.8: with <paramref name="forwardLine"/> (a validated token login
+    /// line) that line is sent as the AUTH line instead, unchanged; the reply handling and the bridge are the same.
+    /// </summary>
+    private static async Task<bool> ConnectAndBridgeCore(
+        string username, string? password, int port, string connectionType, CancellationToken ct,
+        bool isRegistration, bool rawTerminal, string lang, string? forwardLine)
     {
         TcpClient? client = null;
         IDisposable? rawMode = null;
         try
         {
             client = new TcpClient();
-            await client.ConnectAsync("127.0.0.1", port, ct);
+            await client.ConnectAsync(LoopbackOnly(MudHost), port, ct);
             client.NoDelay = true;
 
             var stream = client.GetStream();
@@ -268,7 +298,9 @@ public static class RelayClient
 
             // Send AUTH header
             string authLine;
-            if (password != null && isRegistration)
+            if (forwardLine != null)
+                authLine = forwardLine + "\n";
+            else if (password != null && isRegistration)
                 authLine = $"AUTH:{username}:{password}:REGISTER:{connectionType}\n";
             else if (password != null)
                 authLine = $"AUTH:{username}:{password}:{connectionType}\n";
@@ -329,7 +361,7 @@ public static class RelayClient
                     // each keystroke goes straight to the server.
                     using Stream stdin = rawMode != null
                         ? new FileStream(new Microsoft.Win32.SafeHandles.SafeFileHandle((IntPtr)0, ownsHandle: false), FileAccess.Read, bufferSize: 1, isAsync: false)
-                        : Console.OpenStandardInput();
+                        : OpenStdin();
                     while (!linkedCts.Token.IsCancellationRequested)
                     {
                         int read = await stdin.ReadAsync(buffer, 0, buffer.Length, linkedCts.Token);
@@ -350,7 +382,7 @@ public static class RelayClient
                 try
                 {
                     var buffer = new byte[4096];
-                    var stdout = Console.OpenStandardOutput();
+                    var stdout = OpenStdout();
                     while (!linkedCts.Token.IsCancellationRequested)
                     {
                         int read = await stream.ReadAsync(buffer, 0, buffer.Length, linkedCts.Token);
@@ -390,6 +422,67 @@ public static class RelayClient
             rawMode?.Dispose();
             client?.Close();
         }
+    }
+
+    /// <summary>
+    /// 1.2.8: the new AUTH: passthrough shapes, ahead of <see cref="ParseDirectAuth"/>. "AUTH:CAPS" exactly: the
+    /// probe, then false. A token login line (no ':' after AUTH:): when well formed it is forwarded unchanged and
+    /// the reply handled as for a password line (true once a session ran, false after a refusal); when
+    /// malformed only "Invalid AUTH format: token" is logged, then false. Null for every other line.
+    /// </summary>
+    internal static async Task<bool?> TokenPassthrough(string choice, int port, string lang, CancellationToken ct)
+    {
+        if (choice == UsurperRemake.Server.LoginTokenProtocol.CapsLine)
+            return await ProbeCapabilities(port, ct, rawTerminal: false);
+        if (!UsurperRemake.Server.LoginTokenProtocol.IsTokenLoginLine(choice))
+            return null;
+        if (!UsurperRemake.Server.LoginTokenProtocol.TryParseTokenLogin(choice, out _, out _, out _, out _))
+        {
+            Console.Error.WriteLine("[RELAY] Invalid AUTH format: token");
+            return false;
+        }
+        return await ConnectAndBridgeCore("(token)", null, port, "", ct,
+            isRegistration: false, rawTerminal: false, lang: lang, forwardLine: choice);
+    }
+
+    /// <summary>
+    /// 1.2.8: the capability probe for the AUTH: passthrough. One connection to the game server: the X-IP
+    /// line, AUTH:CAPS, one reply line, close. A CAPS: reply goes to stdout for the programmatic client
+    /// only (not on the raw-terminal path); anything else is dropped. Nothing is logged but a failed connect.
+    /// Always false: the relay then shows its menu again.
+    /// </summary>
+    internal static async Task<bool> ProbeCapabilities(int port, CancellationToken ct, bool rawTerminal)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            timeout.CancelAfter(TimeSpan.FromSeconds(5));
+            await client.ConnectAsync(LoopbackOnly(MudHost), port, timeout.Token);
+            client.NoDelay = true;
+            var stream = client.GetStream();
+            var sshClient = Environment.GetEnvironmentVariable("SSH_CLIENT");
+            var request = new StringBuilder();
+            if (!string.IsNullOrEmpty(sshClient))
+                request.Append($"X-IP:{sshClient.Split(' ')[0]}\n");
+            request.Append(UsurperRemake.Server.LoginTokenProtocol.CapsLine).Append('\n');
+            var bytes = Encoding.UTF8.GetBytes(request.ToString());
+            await stream.WriteAsync(bytes, 0, bytes.Length, timeout.Token);
+            var reply = await ReadLineAsync(stream, timeout.Token);
+            if (!rawTerminal && reply != null && reply.StartsWith("CAPS:", StringComparison.Ordinal))
+            {
+                var stdout = OpenStdout();
+                await WriteAnsi(stdout, reply + "\r\n");
+                await stdout.FlushAsync(ct);
+            }
+        }
+        catch (SocketException ex)
+        {
+            Console.Error.WriteLine($"[RELAY] Cannot connect to game server on port {port}: {ex.Message}");
+        }
+        catch (OperationCanceledException) { }
+        catch (IOException) { }
+        return false;
     }
 
     private static async Task ShowAuthMenu(Stream stdout, string lang, CancellationToken ct)

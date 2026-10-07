@@ -674,6 +674,35 @@ public class MudServer
                 username = result.Value.username;
                 connectionType = proxyClientType ?? result.Value.connectionType;
             }
+            else if (authLine == LoginTokenProtocol.CapsLine)
+            {
+                // 1.2.8: the capability probe. One reply line and close: no session, no throttle record, no log.
+                await WriteLineAsync(stream, LoginTokenProtocol.CapsReply);
+                client.Close();
+                return;
+            }
+            else if (LoginTokenProtocol.IsTokenLoginLine(authLine))
+            {
+                // 1.2.8: a remember-me token login (AUTH:TOKEN1, no ':' after AUTH:). The line is never logged.
+                var tokenLogin = await TokenLoginAsync(authLine!, stream, sqlBackend, effectiveIp, client);
+                if (tokenLogin == null)
+                {
+                    client.Close();
+                    return;
+                }
+                (username, connectionType, clientVersion, wantsServerEcho) = tokenLogin.Value;
+                var tokenUserKey = username.ToLowerInvariant();
+                username = tokenUserKey;
+
+                // Kick existing session if duplicate (reconnect takes priority), as for a password login
+                if (ActiveSessions.TryGetValue(tokenUserKey, out var existingTokenSession))
+                {
+                    await KickStaleSessionAsync(tokenUserKey, existingTokenSession, "reconnect");
+                    kickedSession = existingTokenSession;
+                }
+
+                await WriteLineAsync(stream, LoginTokenProtocol.OkLine);
+            }
             else
             {
                 // Protocol mode: parse AUTH header
@@ -716,7 +745,8 @@ public class MudServer
                     connectionType = parts[2].Trim();
                 }
 
-                connectionType = ParseConnectionTypeParams(connectionType, out wantsServerEcho);
+                connectionType = ParseConnectionTypeParams(connectionType, out wantsServerEcho, out bool wantsToken);
+                string? tokenReply = null; // 1.2.8: the line after OK when the login asked for a token
 
                 var usernameKey = username.ToLowerInvariant();
                 Console.Error.WriteLine($"[MUD] Connection from {client.Client.RemoteEndPoint}: user={username}, type={connectionType}, auth={( password != null ? (isRegistration ? "register" : "password") : "trusted" )}");
@@ -777,6 +807,14 @@ public class MudServer
                         return;
                     }
                     ClearFailedLogins(effectiveIp);
+                    // 1.2.8: a remembered login asked for with ";token=1": the row is made before OK.
+                    if (wantsToken)
+                    {
+                        var issued = sqlBackend.IssueLoginToken(username, connectionType);
+                        tokenReply = issued is { } t
+                            ? $"{LoginTokenProtocol.TokenReplyPrefix}{t.Token}:{t.ExpiresUnix}"
+                            : LoginTokenProtocol.TokenReplyNone;
+                    }
                     // Account-level preferences (screenReader, language) are loaded by PlayerSession
                     // directly from DB after SessionContext is created (per-session AsyncLocal).
                     // Do NOT replace username with displayName — displayName is a cosmetic
@@ -814,6 +852,8 @@ public class MudServer
                 // Send OK to signal auth success. v1.2.4: sent before waiting for the kicked
                 // session's cleanup; clients give up on the OK after 5 seconds.
                 await WriteLineAsync(stream, "OK");
+                if (tokenReply != null)
+                    await WriteLineAsync(stream, tokenReply); // 1.2.8: exactly one line after OK, never logged
             }
 
             // v1.2.4: let the kicked session's emergency save finish before this one loads.
@@ -1545,6 +1585,46 @@ public class MudServer
         return (null, null);
     }
 
+    /// <summary>
+    /// 1.2.8: the AUTH:TOKEN1 branch. A malformed line counts as a failed login. A well formed one is
+    /// throttled as a password is, then checked by <see cref="SqlSaveBackend.AuthenticateByToken"/>. A refusal
+    /// writes ERR with the generic text (or the ban text) and logs the account and the reason; neither the
+    /// line nor the token is ever logged or echoed. Returns the account key, connection type, client version
+    /// and echo request, or null after the refusal was written.
+    /// </summary>
+    private async Task<(string username, string connectionType, string? clientVersion, bool wantsServerEcho)?> TokenLoginAsync(
+        string authLine, Stream stream, SqlSaveBackend sqlBackend, string? effectiveIp, TcpClient client)
+    {
+        if (!LoginTokenProtocol.TryParseTokenLogin(authLine, out var selector, out var verifier, out var rawType, out var version))
+        {
+            RecordFailedLogin(effectiveIp);
+            Console.Error.WriteLine(AuthFailedLogLine("?", SqlSaveBackend.LoginFailure.TokenMalformed));
+            await WriteLineAsync(stream, LoginTokenProtocol.ErrLine(Loc.GetIn(GameConfig.Language, "auth.err_bad_login")));
+            return null;
+        }
+
+        if (IsLoginThrottled(effectiveIp, out int throttleWait))
+        {
+            Console.Error.WriteLine($"[MUD] SECURITY: throttled AUTH attempt from {effectiveIp} ({throttleWait}s remaining)");
+            await WriteLineAsync(stream, LoginTokenProtocol.ErrLine(Loc.GetIn(GameConfig.Language, "auth.err_throttled", throttleWait)));
+            return null;
+        }
+
+        var (success, account, message, reason) = sqlBackend.AuthenticateByToken(selector, verifier, effectiveIp);
+        if (!success)
+        {
+            RecordFailedLogin(effectiveIp);
+            Console.Error.WriteLine(AuthFailedLogLine(account, reason));
+            await WriteLineAsync(stream, LoginTokenProtocol.ErrLine(message));
+            return null;
+        }
+        ClearFailedLogins(effectiveIp);
+
+        string connectionType = ParseConnectionTypeParams(rawType, out bool wantsServerEcho);
+        Console.Error.WriteLine($"[MUD] Connection from {client.Client.RemoteEndPoint}: user={account}, type={connectionType}, auth=token");
+        return (account, connectionType, version, wantsServerEcho);
+    }
+
     /// <summary>Write a line to a stream with \r\n terminator.</summary>
     private static async Task WriteLineAsync(Stream stream, string message)
     {
@@ -1693,9 +1773,14 @@ public class MudServer
     /// wants the server to echo. Parameters ride inside the existing field so an older
     /// server just stores the odd type string and keeps working; only "echo" is known.
     /// </summary>
-    internal static string ParseConnectionTypeParams(string? connectionType, out bool wantsServerEcho)
+    internal static string ParseConnectionTypeParams(string? connectionType, out bool wantsServerEcho) =>
+        ParseConnectionTypeParams(connectionType, out wantsServerEcho, out _);
+
+    /// <summary>1.2.8: also ";token=1", a password or REGISTER login asking for a remember-me token.</summary>
+    internal static string ParseConnectionTypeParams(string? connectionType, out bool wantsServerEcho, out bool wantsToken)
     {
         wantsServerEcho = false;
+        wantsToken = false;
         if (string.IsNullOrEmpty(connectionType)) return "";
         int semi = connectionType.IndexOf(';');
         if (semi < 0) return connectionType.Trim();
@@ -1705,6 +1790,8 @@ public class MudServer
             var kv = parts[i].Split('=', 2);
             if (kv.Length == 2 && kv[0].Trim().Equals("echo", StringComparison.OrdinalIgnoreCase) && kv[1].Trim() == "1")
                 wantsServerEcho = true;
+            if (kv.Length == 2 && kv[0].Trim().Equals(LoginTokenProtocol.RequestParam, StringComparison.OrdinalIgnoreCase) && kv[1].Trim() == "1")
+                wantsToken = true;
         }
         return parts[0].Trim();
     }
@@ -1966,14 +2053,21 @@ public class MudServer
                 }
 
                 // Periodic cleanup
-                _sqlBackend.PruneSnoopBuffer();
-                _sqlBackend.ExpireStaleAdminCommands();
+                PeriodicCleanup(_sqlBackend);
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"[MUD] Admin command poller error: {ex.Message}");
             }
         }
+    }
+
+    /// <summary>The admin poller's periodic cleanup. 1.2.8: expired remembered logins too.</summary>
+    internal static void PeriodicCleanup(SqlSaveBackend db)
+    {
+        db.PruneSnoopBuffer();
+        db.ExpireStaleAdminCommands();
+        db.PruneExpiredLoginTokens();
     }
 
     /// <summary>
