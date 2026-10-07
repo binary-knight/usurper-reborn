@@ -201,6 +201,7 @@ public class LoginToken128Tests : IDisposable
         var server = (MudServer)RuntimeHelpers.GetUninitializedObject(typeof(MudServer));
         typeof(MudServer).GetField("<ActiveSessions>k__BackingField", NP)!
             .SetValue(server, new ConcurrentDictionary<string, PlayerSession>());
+        server.StopAfterLoginReply = true; // the replies only: no game session starts in these tests
         return server;
     }
 
@@ -292,7 +293,7 @@ public class LoginToken128Tests : IDisposable
         try
         {
             var started = DateTime.UtcNow;
-            Func<Task> connect = () => TestLoopback.Connect(4000);
+            Func<Task> connect = () => TestLoopback.Connect(4000).WaitAsync(TimeSpan.FromSeconds(2));
             await connect.Should().ThrowAsync<InvalidOperationException>().WithMessage("*loopback*");
             Action listen = () => TestLoopback.Listen();
             listen.Should().Throw<InvalidOperationException>();
@@ -422,6 +423,14 @@ public class LoginToken128Tests : IDisposable
     }
 
     // ================= row 10, 11: token login =================
+
+    [Fact]
+    public void Server_StopAfterLoginReply_IsOffUnlessATestSetsIt()
+    {
+        var src = Src("Server", "MudServer.cs");
+        src.Should().Contain("internal bool StopAfterLoginReply;", "no initializer: false on every real server");
+        System.Text.RegularExpressions.Regex.Matches(src, @"StopAfterLoginReply\s*=").Count.Should().Be(0, "the server never sets it");
+    }
 
     [Fact]
     public async Task Row10_TokenLogin_LogsInAsTheRowsAccount_AndSetsLastUsed()

@@ -453,6 +453,9 @@ public class MudServer
 
     private readonly List<Task> _sessionTasks = new();
 
+    /// <summary>1.2.8, tests only: end each connection right after its login reply lines, before a session starts. Never set by the server.</summary>
+    internal bool StopAfterLoginReply;
+
     /// <summary>
     /// Handle a single incoming TCP connection.
     /// Supports two modes:
@@ -855,6 +858,9 @@ public class MudServer
                 if (tokenReply != null)
                     await WriteLineAsync(stream, tokenReply); // 1.2.8: exactly one line after OK, never logged
             }
+
+            // 1.2.8 tests: the login replies are checked without starting a game session
+            if (StopAfterLoginReply) return;
 
             // v1.2.4: let the kicked session's emergency save finish before this one loads.
             await WaitForStaleCleanupAsync(kickedSession);
