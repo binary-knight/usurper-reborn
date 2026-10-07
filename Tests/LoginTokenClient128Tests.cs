@@ -598,6 +598,21 @@ public class LoginTokenClient128Tests : IDisposable
         run.AllSent.Split('\n').Count(l => l.Contains(stale)).Should().Be(1, "the refused token is sent once and then forgotten");
     }
 
+    [Fact]
+    public async Task Row31_RefusedToken_IsForgottenAtOnce_EvenWhenThePlayerThenQuits()
+    {
+        var stale = NewToken();
+        Remember(HostA, 4000, "Wanderer", stale);
+
+        var run = await Play(NewRelay("pw", goodToken: "something-else"), new[] { "Q" });
+
+        run.Outcome.Should().Be(OnlineAuthOutcome.Quit);
+        var entry = OnlineLoginStore.Find(HostA, 4000)!;
+        entry.Token.Should().BeNull("the refused mark ends the token");
+        entry.Username.Should().Be("Wanderer", "the username stays for the prompt");
+        AllFiles().Should().NotContain(stale);
+    }
+
     [Theory]
     [InlineData("ERR:Too many failed logins. Try again in 30 seconds.")]
     [InlineData("ERR:Your account has been banned.")]
