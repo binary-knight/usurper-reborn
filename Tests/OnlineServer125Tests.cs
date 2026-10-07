@@ -824,7 +824,8 @@ public class OnlineServer125Tests : IDisposable
         // 1.2.8: the remember-me token lines (probe, reply, token login, token line) are English constants
         var token = Src("Scripts/Server/LoginTokenProtocol.cs");
         token.Should().Contain("CapsLine = \"AUTH:CAPS\"").And.Contain("CapsReply = \"CAPS:token=1\"")
-            .And.Contain("TokenLoginPrefix = \"AUTH:TOKEN1 \"").And.Contain("TokenReplyPrefix = \"TOKEN:\"");
+            .And.Contain("TokenLoginPrefix = \"AUTH:TOKEN1 \"").And.Contain("TokenReplyPrefix = \"TOKEN:\"")
+            .And.Contain("TokenRefusedPrefix = \"ERR:[token=refused] \"");
         // The group invite and chat channels are ids: unchanged in the history and mute keys.
         Src("Scripts/Server/MudChatSystem.cs").Should().Contain("channelKey: \"gossip\"").And.Contain("historyChannel: \"say\"");
     }

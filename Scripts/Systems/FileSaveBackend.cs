@@ -783,24 +783,6 @@ namespace UsurperRemake.Systems
             }
         }
 
-        private string GetUserDataPath()
-        {
-            var appName = "UsurperReloaded";
-
-            if (System.Environment.OSVersion.Platform == PlatformID.Win32NT)
-            {
-                return Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), appName);
-            }
-            else if (System.Environment.OSVersion.Platform == PlatformID.Unix)
-            {
-                var home = System.Environment.GetEnvironmentVariable("HOME");
-                return Path.Combine(home ?? "/tmp", ".local", "share", appName);
-            }
-            else
-            {
-                var home = System.Environment.GetEnvironmentVariable("HOME");
-                return Path.Combine(home ?? "/tmp", "Library", "Application Support", appName);
-            }
-        }
+        private string GetUserDataPath() => UserDataPaths.Get();
     }
 }
