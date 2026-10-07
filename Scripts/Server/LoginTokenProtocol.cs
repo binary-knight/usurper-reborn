@@ -29,6 +29,15 @@ internal static class LoginTokenProtocol
     public const string ErrPrefix = "ERR:";
     public static string ErrLine(string message) => ErrPrefix + message;
 
+    /// <summary>
+    /// The refusal of a token login whose token is no good (malformed, unknown, wrong, expired or revoked). The
+    /// client clears its saved token only on this mark; a throttle or ban reply has none, so the token is kept.
+    /// Machine-readable and English: client and server may run different languages, so the client never
+    /// matches the localized text after it.
+    /// </summary>
+    public const string TokenRefusedPrefix = "ERR:[token=refused] ";
+    public static string TokenRefusedLine(string message) => TokenRefusedPrefix + message;
+
     /// <summary>The connection type parameter that asks for a token on a password or REGISTER line.</summary>
     public const string RequestParam = "token";
 

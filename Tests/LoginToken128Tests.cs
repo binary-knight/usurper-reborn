@@ -460,7 +460,7 @@ public class LoginToken128Tests : IDisposable
         var (lines, raw, stderr, server) = await Exchange(
             $"X-IP:{ip}\n{LoginTokenProtocol.FormatTokenLogin($"{selector}.{WrongVerifier(verifier)}", "Steam", "1.2.8")}\n");
 
-        lines[0].Should().Be("ERR:" + L("auth.err_bad_login"), raw);
+        lines[0].Should().Be(LoginTokenProtocol.TokenRefusedPrefix + L("auth.err_bad_login"), raw); // 1.2.8 C3c: the refused mark
         server.ActiveSessions.Should().BeEmpty();
         FailedLogins()[ip].Fails.Should().Be(1, "a wrong token counts as a failed login");
         stderr.Should().Contain(MudServer.AuthFailedLogLine("guarded", SqlSaveBackend.LoginFailure.TokenMismatch));
@@ -480,7 +480,7 @@ public class LoginToken128Tests : IDisposable
         var ver = t.Verifier;
         var line = string.Format(shape, $"{t.Selector}.{t.Verifier}");
         var (lines, raw, stderr, _) = await Exchange($"X-IP:{ip}\n{line}\n");
-        lines[0].Should().Be("ERR:" + L("auth.err_bad_login"), raw);
+        lines[0].Should().Be(LoginTokenProtocol.TokenRefusedPrefix + L("auth.err_bad_login"), raw); // 1.2.8 C3c: the refused mark
         FailedLogins()[ip].Fails.Should().Be(1);
         stderr.Should().Contain(MudServer.AuthFailedLogLine("?", SqlSaveBackend.LoginFailure.TokenMalformed));
         stderr.Should().NotContain(ver);
@@ -495,7 +495,8 @@ public class LoginToken128Tests : IDisposable
         FailedLogins()[ip] = (99, DateTime.UtcNow, DateTime.UtcNow.AddMinutes(5));
         int before = Db.TokenVerifies;
         var (lines, raw, _, _) = await Exchange($"X-IP:{ip}\n{LoginTokenProtocol.FormatTokenLogin(token, "Steam", null)}\n");
-        lines[0].Should().StartWith("ERR:").And.NotBe("ERR:" + L("auth.err_bad_login"));
+        lines[0].Should().StartWith("ERR:").And.NotBe("ERR:" + L("auth.err_bad_login"))
+            .And.NotStartWith(LoginTokenProtocol.TokenRefusedPrefix, "1.2.8 C3c: a throttle keeps the client's token");
         Db.TokenVerifies.Should().Be(before, "no lookup while the IP is locked");
     }
 

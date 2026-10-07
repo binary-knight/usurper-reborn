@@ -1605,7 +1605,7 @@ public class MudServer
         {
             RecordFailedLogin(effectiveIp);
             Console.Error.WriteLine(AuthFailedLogLine("?", SqlSaveBackend.LoginFailure.TokenMalformed));
-            await WriteLineAsync(stream, LoginTokenProtocol.ErrLine(Loc.GetIn(GameConfig.Language, "auth.err_bad_login")));
+            await WriteLineAsync(stream, LoginTokenProtocol.TokenRefusedLine(Loc.GetIn(GameConfig.Language, "auth.err_bad_login")));
             return null;
         }
 
@@ -1621,7 +1621,10 @@ public class MudServer
         {
             RecordFailedLogin(effectiveIp);
             Console.Error.WriteLine(AuthFailedLogLine(account, reason));
-            await WriteLineAsync(stream, LoginTokenProtocol.ErrLine(message));
+            // 1.2.8 (C3c): a token that is no good carries the refused mark; a ban keeps the plain ERR
+            await WriteLineAsync(stream, TokenIsNoGood(reason)
+                ? LoginTokenProtocol.TokenRefusedLine(message)
+                : LoginTokenProtocol.ErrLine(message));
             return null;
         }
         ClearFailedLogins(effectiveIp);
@@ -1630,6 +1633,12 @@ public class MudServer
         Console.Error.WriteLine($"[MUD] Connection from {client.Client.RemoteEndPoint}: user={account}, type={connectionType}, auth=token");
         return (account, connectionType, version, wantsServerEcho);
     }
+
+    /// <summary>1.2.8: the token refusals after which the client should forget its token (not a ban or a database error).</summary>
+    internal static bool TokenIsNoGood(SqlSaveBackend.LoginFailure reason) =>
+        reason is SqlSaveBackend.LoginFailure.TokenMalformed or SqlSaveBackend.LoginFailure.TokenUnknown
+            or SqlSaveBackend.LoginFailure.TokenMismatch or SqlSaveBackend.LoginFailure.TokenExpired
+            or SqlSaveBackend.LoginFailure.TokenStale;
 
     /// <summary>Write a line to a stream with \r\n terminator.</summary>
     private static async Task WriteLineAsync(Stream stream, string message)

@@ -4690,29 +4690,6 @@ public partial class GameEngine
             DebugLogger.Instance.LogError("WYWEG", $"Failed to show 'While you were gone': {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// Get user data path (cross-platform)
-    /// </summary>
-    private string GetUserDataPath()
-    {
-        var appName = "UsurperReloaded";
-
-        if (System.Environment.OSVersion.Platform == PlatformID.Win32NT)
-        {
-            return System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), appName);
-        }
-        else if (System.Environment.OSVersion.Platform == PlatformID.Unix)
-        {
-            var home = System.Environment.GetEnvironmentVariable("HOME");
-            return System.IO.Path.Combine(home ?? "/tmp", ".local", "share", appName);
-        }
-        else
-        {
-            var home = System.Environment.GetEnvironmentVariable("HOME");
-            return System.IO.Path.Combine(home ?? "/tmp", "Library", "Application Support", appName);
-        }
-    }
     
     /// <summary>
     /// Load existing game from save file

@@ -25,7 +25,7 @@ public class YesNoGuard1115Tests
     /// The reviewed exceptions today: ArmorShopLocation 1, WeaponShopLocation 1, MagicShopLocation 1
     /// (three-way haggle menus; the magic shop's since v1.2.4), CombatEngine 3 (the spare/finish legacy alias chain, one explanatory comment line plus
     /// the two lines of the boolean it documents), OnlineAdminConsole 3 (its own strict-loop building
-    /// blocks, plus a blank-or-Y "take the suggestion" branch), OnlinePlaySystem 1 and
+    /// blocks, plus a blank-or-Y "take the suggestion" branch), OnlineAuthFlow 1 (the Online Play remember question, moved from OnlinePlaySystem in 1.2.8) and
     /// StreetEncounterSystem 1 (a third accept key alongside Y/N), VisualNovelDialogueSystem 1 (a kept
     /// legacy "1" alias). A marker counts here whether or not its own line is itself a hit, so a new
     /// exemption anywhere (even a bare explanatory comment) needs a deliberate edit to this constant.
