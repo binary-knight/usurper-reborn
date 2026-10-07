@@ -14,6 +14,13 @@ namespace UsurperRemake.Systems
     /// </summary>
     internal static class OfficialHostKeys
     {
+        /// <summary>
+        /// The official server as shipped. The pins apply to this address and port only, not to the Online Play
+        /// server setting, which a sysop can point at their own server.
+        /// </summary>
+        internal const string Host = "play.usurper-reborn.net";
+        internal const int Port = 4000;
+
         internal const string Ed25519 = "SHA256:WSDcsAljcssdVzgocPuc7BfF3ei370TOVlYsy2Q2l9s";
         internal const string Ecdsa = "SHA256:W1zNGJgPxWKyItXLSm2vQYH5tV5IT5O/QKbSXczzW28";
         internal const string Rsa = "SHA256:J3X2VcqzItS0d2CmKpHQ5/OQTWIzyW9qFPlj6wq174s";
@@ -84,9 +91,10 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
-    /// 1.2.8: which SSH host keys Online Play trusts. The official server (the configured official address and
-    /// port, compared as text after case normalising, never by DNS result) only with its pinned fingerprints; any
-    /// other server by trust on first use, remembered per host and port, refused if the key later changes.
+    /// 1.2.8: which SSH host keys Online Play trusts. The official server (the shipped official address and port,
+    /// compared as text after case normalising, never by DNS result) only with its pinned fingerprints; any other
+    /// server, a sysop's configured one included, by trust on first use, remembered per host and port, refused if
+    /// the key later changes.
     /// </summary>
     internal sealed class OnlineHostKeyPolicy
     {
@@ -103,9 +111,9 @@ namespace UsurperRemake.Systems
             KnownHostsPath = knownHostsPath;
         }
 
-        /// <summary>The game's policy: the configured official server, the shipped pins, the per-user known hosts file.</summary>
+        /// <summary>The game's policy: the shipped official server, the shipped pins, the per-user known hosts file.</summary>
         internal static OnlineHostKeyPolicy ForGame() =>
-            new(GameConfig.OnlineServerAddress, GameConfig.OnlineServerPort, OfficialHostKeys.ByType, OnlineKnownHosts.DefaultPath);
+            new(OfficialHostKeys.Host, OfficialHostKeys.Port, OfficialHostKeys.ByType, OnlineKnownHosts.DefaultPath);
 
         internal bool IsOfficial(string host, int port) =>
             port == OfficialPort && OnlineLoginStore.HostKey(host) == OnlineLoginStore.HostKey(OfficialHost);

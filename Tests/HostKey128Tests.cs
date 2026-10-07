@@ -12,7 +12,7 @@ using Xunit;
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.2.8 (C3d): the SSH host key check of Online Play. The official server (the configured official address and
+/// 1.2.8 (C3d): the SSH host key check of Online Play. The official server (the shipped official address and
 /// port) is trusted only with its pinned fingerprint for the negotiated key type; any other server is trusted on
 /// first use, remembered per host and port in online_known_hosts.txt, and refused if its key changes. The SSH
 /// tests run against <see cref="SshKexDouble"/> on loopback; "connects" means the client finished the key
@@ -38,17 +38,18 @@ public class HostKey128Tests : IDisposable
     /// Guard 1 of the SSH client side: the host is the loopback seam (<see cref="TestLoopback.Host"/>) and any host
     /// that is not a loopback IP literal is refused here, before the real transport (which holds guard 2).
     /// </summary>
-    private static SshAuthTransport ConnectToDouble(string host, int port, OnlineHostKeyPolicy policy)
+    private static SshAuthTransport ConnectToDouble(string host, int port, OnlineHostKeyPolicy? policy)
     {
         if (!IPAddress.TryParse(host, out var ip) || !IPAddress.IsLoopback(ip))
             throw new InvalidOperationException($"host key tests reach only the loopback SSH double; refused {host}");
-        return SshAuthTransport.Connect(host, port, policy);
+        // no policy: the game's own entry point, which uses OnlineHostKeyPolicy.ForGame()
+        return policy == null ? SshAuthTransport.Connect(host, port) : SshAuthTransport.Connect(host, port, policy);
     }
 
     private static string DoubleHost => TestLoopback.Host.ToString();
 
     /// <summary>One connection to the double: whether the double saw NEWKEYS, and what the client threw.</summary>
-    private static async Task<(bool Trusted, Exception? Error)> Attempt(SshKexDouble dbl, OnlineHostKeyPolicy policy)
+    private static async Task<(bool Trusted, Exception? Error)> Attempt(SshKexDouble dbl, OnlineHostKeyPolicy? policy)
     {
         var serve = dbl.ServeOneAsync();
         Exception? error = null;
@@ -144,13 +145,71 @@ public class HostKey128Tests : IDisposable
     }
 
     [Fact]
-    public void ForGame_UsesTheConfiguredOfficialServer_TheShippedPins_AndTheLoginDirectory()
+    public void ForGame_UsesTheShippedOfficialServer_TheShippedPins_AndTheLoginDirectory()
     {
+        OfficialHostKeys.Host.Should().Be("play.usurper-reborn.net");
+        OfficialHostKeys.Port.Should().Be(4000);
         var policy = OnlineHostKeyPolicy.ForGame();
-        policy.OfficialHost.Should().Be(GameConfig.OnlineServerAddress);
-        policy.OfficialPort.Should().Be(GameConfig.OnlineServerPort);
+        policy.OfficialHost.Should().Be(OfficialHostKeys.Host);
+        policy.OfficialPort.Should().Be(OfficialHostKeys.Port);
         policy.Pins.Should().BeSameAs(OfficialHostKeys.ByType);
         policy.KnownHostsPath.Should().Be(Path.Combine(OnlineLoginStore.DirectoryPath, "online_known_hosts.txt"));
+    }
+
+    [Fact]
+    public async Task SysopServerSetting_ChangedToAnotherHost_IsTrustOnFirstUse_NotThePins()
+    {
+        using var dbl = new SshKexDouble();
+        string oldAddress = GameConfig.OnlineServerAddress;
+        int oldPort = GameConfig.OnlineServerPort;
+        var oldDir = OnlineLoginStore.DirectoryOverride;
+        try
+        {
+            // a sysop points the Online Play server setting at their own server (here the loopback double)
+            GameConfig.OnlineServerAddress = DoubleHost;
+            GameConfig.OnlineServerPort = dbl.Port;
+            OnlineLoginStore.DirectoryOverride = () => _root;
+
+            var (trusted, error) = await Attempt(dbl, null); // the game's entry point and policy
+            trusted.Should().BeTrue("an unknown key on the sysop's server is trusted on first use");
+            error.Should().NotBeOfType<HostKeyRefusedException>();
+            File.ReadAllLines(KnownHosts).Should().Equal(
+                $"[{DoubleHost}]:{dbl.Port} ecdsa-sha2-nistp256 {HostKeyFingerprint.Sha256(dbl.HostKeyBlob)}");
+        }
+        finally
+        {
+            GameConfig.OnlineServerAddress = oldAddress;
+            GameConfig.OnlineServerPort = oldPort;
+            OnlineLoginStore.DirectoryOverride = oldDir;
+        }
+    }
+
+    [Fact]
+    public void TheShippedOfficialServer_StillUsesThePins_WhateverTheServerSetting()
+    {
+        var blob = Convert.FromBase64String("AAAAC3NzaC1lZDI1NTE5AAAAIKjJ44gYLtYBJrzMAux2NCMwDfxQJSk7wybAB95L5aqT");
+        var mutated = (byte[])blob.Clone();
+        mutated[^1] ^= 1;
+        string oldAddress = GameConfig.OnlineServerAddress;
+        int oldPort = GameConfig.OnlineServerPort;
+        var oldDir = OnlineLoginStore.DirectoryOverride;
+        try
+        {
+            OnlineLoginStore.DirectoryOverride = () => _root;
+            GameConfig.OnlineServerAddress = "sysop-server.invalid";
+            GameConfig.OnlineServerPort = 4100;
+            var policy = OnlineHostKeyPolicy.ForGame();
+            policy.Check("PLAY.Usurper-Reborn.net", 4000, blob).Verdict.Should().Be(HostKeyVerdict.Pinned);
+            policy.Check("play.usurper-reborn.net", 4000, mutated).Verdict.Should().Be(HostKeyVerdict.RefusedOfficial);
+            policy.IsOfficial("sysop-server.invalid", 4100).Should().BeFalse();
+            File.Exists(KnownHosts).Should().BeFalse("the official server is never written to the known hosts file");
+        }
+        finally
+        {
+            GameConfig.OnlineServerAddress = oldAddress;
+            GameConfig.OnlineServerPort = oldPort;
+            OnlineLoginStore.DirectoryOverride = oldDir;
+        }
     }
 
     // ================= the official server, over SSH on loopback =================
