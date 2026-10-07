@@ -34,4 +34,9 @@
     <None Include="Fixtures/telemetry-privacy-note-en.txt" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <!-- 1.2.8: the game password vector the web reset and the game login both check -->
+  <ItemGroup>
+    <None Include="Fixtures/game-password-vector.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

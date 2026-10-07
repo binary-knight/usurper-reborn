@@ -171,7 +171,8 @@ function loadApi(options = {}) {
     clearLoginAttempts() {},
     verifyBalancePassword: () => false,
     setBalancePasswordHash: () => true,
-    hashPassword: (p) => p,
+    canHashBalancePassword: () => true,
+    hashBalancePassword: (p) => p,
     isDefaultCredentialActive: () => state.locked,
   };
   vm.createContext(ctx);

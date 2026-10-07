@@ -26,7 +26,8 @@ let bcrypt;
 try {
   bcrypt = require('bcryptjs');
 } catch (err) {
-  console.warn(`[usurper-web] bcryptjs not available, falling back to SHA256: ${err.message}`);
+  // 1.2.8: no fallback. Without bcryptjs the dashboard password cannot be changed or migrated.
+  console.warn(`[usurper-web] bcryptjs not available; dashboard password changes are refused: ${err.message}`);
 }
 
 const WS_PORT = 3000;
@@ -128,25 +129,44 @@ const SERVER_START_TIME = Date.now();
 
 const BCRYPT_ROUNDS = 12;
 
-// Legacy SHA256 hash (for migration detection)
-function hashPasswordSha256(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+// --- Password hashing (1.2.8) ---
+// Game accounts: the game (SqlSaveBackend.HashPassword and VerifyPassword) stores players.password_hash
+// as PBKDF2-HMAC-SHA256 "base64(salt):base64(key)", a 16 byte salt, 100000 iterations, a 32 byte key.
+// A web reset writes that same form, so the player can log in with it (bcrypt or SHA256 never verified).
+const GAME_PBKDF2_ITERATIONS = 100000;
+const GAME_PBKDF2_SALT_BYTES = 16;
+const GAME_PBKDF2_KEY_BYTES = 32;
+
+function hashGamePassword(password) {
+  const salt = crypto.randomBytes(GAME_PBKDF2_SALT_BYTES);
+  const key = crypto.pbkdf2Sync(password, salt, GAME_PBKDF2_ITERATIONS, GAME_PBKDF2_KEY_BYTES, 'sha256');
+  return salt.toString('base64') + ':' + key.toString('base64');
 }
 
-// Hash password with bcrypt (preferred) or SHA256 (fallback)
-function hashPassword(password) {
-  if (bcrypt) return bcrypt.hashSync(password, BCRYPT_ROUNDS);
-  return hashPasswordSha256(password);
+// Dashboard password (balance_config.password_hash): bcrypt only. Without bcryptjs no new hash is
+// made; canHashBalancePassword() lets a change route refuse with a clear error first.
+function canHashBalancePassword() {
+  return !!bcrypt;
 }
 
-// Detect if a stored hash is legacy SHA256 (64 hex chars) vs bcrypt ($2a$/$2b$)
+function hashBalancePassword(password) {
+  if (!bcrypt) throw new Error('bcryptjs is not installed; the dashboard password cannot be hashed');
+  return bcrypt.hashSync(password, BCRYPT_ROUNDS);
+}
+
 function isBcryptHash(hash) {
-  return hash && (hash.startsWith('$2a$') || hash.startsWith('$2b$'));
+  return typeof hash === 'string' && (hash.startsWith('$2a$') || hash.startsWith('$2b$'));
 }
 
-// Get stored password hash from DB, or fall back to default
+// A dashboard hash from before bcrypt: unsalted SHA256, 64 hex characters. Read only by the
+// one-time migration below; nothing writes this form any more.
+function isLegacyBalanceHash(hash) {
+  return typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash);
+}
+
+// The stored dashboard hash, or null when none is stored (the default password is then in force).
 function getBalancePasswordHash() {
-  if (!dbWrite) return hashPasswordSha256(BALANCE_DEFAULT_PASS);
+  if (!dbWrite) return null;
   try {
     dbWrite.exec(`CREATE TABLE IF NOT EXISTS balance_config (
       key TEXT PRIMARY KEY,
@@ -157,7 +177,7 @@ function getBalancePasswordHash() {
   } catch (e) {
     console.error(`[usurper-web] Balance config read error: ${e.message}`);
   }
-  return hashPasswordSha256(BALANCE_DEFAULT_PASS);
+  return null;
 }
 
 function setBalancePasswordHash(hash) {
@@ -176,21 +196,34 @@ function setBalancePasswordHash(hash) {
   }
 }
 
+// Constant time compare of two strings (a different length is refused first).
+function passwordTextMatches(a, b) {
+  const x = Buffer.from(String(a), 'utf8');
+  const y = Buffer.from(String(b), 'utf8');
+  if (x.length !== y.length) return false;
+  return crypto.timingSafeEqual(x, y);
+}
+
 // v0.65.8 (audit T1-4): with no BALANCE_PASS env and the stored password still
 // the shipped default, the dashboards front /api/admin/nuke (full world wipe),
 // bans, and player edits wide open on any fresh self-hosted/Docker deploy.
 // While the default credential is active, every authenticated route EXCEPT
-// change-password is disabled -- the operator logs in with the default once,
+// change-password is disabled: the operator logs in with the default once,
 // is forced to set a real password, and only then does the dashboard unlock.
 // Cached because bcrypt.compareSync is ~100ms; invalidated on password change.
 //
 // v0.65.14 (security audit F2): the env check below used to be
-// `if (process.env.BALANCE_PASS) return false;` -- merely SETTING the variable
+// `if (process.env.BALANCE_PASS) return false;`, so merely SETTING the variable
 // disarmed the lock regardless of its value. docker-compose.yml ships
 // `BALANCE_PASS=changeme`, so every stock Docker deploy authenticated
 // admin/changeme straight through to /api/admin/nuke. The env bypass now
 // requires the operator's password to differ from the shipped default; setting
 // it to 'changeme' is treated as no password at all (fail closed).
+//
+// 1.2.8: the default is checked without hashing it. No stored hash means the default is in force;
+// a bcrypt hash is compared against the default (the 1.2.7 migration could store a bcrypt hash of
+// it); a legacy SHA256 hash, or a bcrypt hash with no bcryptjs to read it, counts as the default
+// (locked) until a login migrates it.
 let _defaultCredCache = null; // null = unknown, else boolean
 function isDefaultCredentialActive() {
   if (process.env.BALANCE_PASS) {
@@ -202,11 +235,12 @@ function isDefaultCredentialActive() {
   try {
     const storedHash = getBalancePasswordHash();
     let isDefault;
-    if (isBcryptHash(storedHash)) {
-      // Auto-migration can persist a bcrypt hash OF the default, so compare.
-      isDefault = bcrypt ? bcrypt.compareSync(BALANCE_DEFAULT_PASS, storedHash) : false;
+    if (storedHash === null) {
+      isDefault = true;
+    } else if (isBcryptHash(storedHash) && bcrypt) {
+      isDefault = bcrypt.compareSync(BALANCE_DEFAULT_PASS, storedHash);
     } else {
-      isDefault = storedHash === hashPasswordSha256(BALANCE_DEFAULT_PASS);
+      isDefault = true; // fail closed: a hash this server cannot read without migrating
     }
     _defaultCredCache = isDefault;
     return isDefault;
@@ -216,22 +250,28 @@ function isDefaultCredentialActive() {
   }
 }
 
-// Verify password — supports both bcrypt and legacy SHA256, auto-migrates to bcrypt
+// One-time migration of a legacy SHA256 dashboard hash: verified once, then replaced by bcrypt.
+// Refused without bcryptjs, and refused when the bcrypt hash cannot be stored.
+function migrateLegacyBalancePassword(password, storedHash) {
+  if (!bcrypt) {
+    console.error('[security] Legacy dashboard password hash found but bcryptjs is not installed; login refused until it is.');
+    return false;
+  }
+  const legacy = crypto.createHash('sha256').update(password).digest('hex');
+  if (!passwordTextMatches(legacy, storedHash)) return false;
+  if (!setBalancePasswordHash(bcrypt.hashSync(password, BCRYPT_ROUNDS))) return false;
+  console.log('[security] Migrated password hash from SHA256 to bcrypt');
+  return true;
+}
+
+// Verify the dashboard password: bcrypt; the default when nothing is stored; a legacy hash only
+// through the one-time migration.
 function verifyBalancePassword(password) {
+  if (typeof password !== 'string') return false;
   const storedHash = getBalancePasswordHash();
-  if (isBcryptHash(storedHash)) {
-    // Modern bcrypt hash
-    return bcrypt ? bcrypt.compareSync(password, storedHash) : false;
-  }
-  // Legacy SHA256 hash — verify then auto-migrate to bcrypt
-  if (hashPasswordSha256(password) === storedHash) {
-    if (bcrypt) {
-      const newHash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
-      setBalancePasswordHash(newHash);
-      console.log('[security] Migrated password hash from SHA256 to bcrypt');
-    }
-    return true;
-  }
+  if (storedHash === null) return passwordTextMatches(password, BALANCE_DEFAULT_PASS);
+  if (isBcryptHash(storedHash)) return bcrypt ? bcrypt.compareSync(password, storedHash) : false;
+  if (isLegacyBalanceHash(storedHash)) return migrateLegacyBalancePassword(password, storedHash);
   return false;
 }
 
@@ -2213,6 +2253,11 @@ async function handleBalanceRequest(req, res) {
 
   // POST /api/balance/change-password
   if (method === 'POST' && url === '/api/balance/change-password') {
+    // 1.2.8: bcrypt only; without bcryptjs the change is refused, never stored in a weaker form.
+    if (!canHashBalancePassword()) {
+      sendJson(res, 503, { error: 'Password change refused: bcryptjs is not installed on the server (run npm install in web/).' });
+      return true;
+    }
     try {
       const body = await readBody(req);
       if (!body.newPassword || body.newPassword.length < 6) {
@@ -2223,7 +2268,7 @@ async function handleBalanceRequest(req, res) {
         sendJson(res, 400, { error: 'New password must differ from the default' });
         return true;
       }
-      if (setBalancePasswordHash(hashPassword(body.newPassword))) {
+      if (setBalancePasswordHash(hashBalancePassword(body.newPassword))) {
         sendJson(res, 200, { success: true });
       } else {
         sendJson(res, 500, { error: 'Failed to save password' });
@@ -3378,6 +3423,11 @@ async function handleAdminRequest(req, res) {
 
   // POST /api/admin/change-password — changes balance password (shared)
   if (method === 'POST' && url === '/api/admin/change-password') {
+    // 1.2.8: bcrypt only; without bcryptjs the change is refused, never stored in a weaker form.
+    if (!canHashBalancePassword()) {
+      sendJson(res, 503, { error: 'Password change refused: bcryptjs is not installed on the server (run npm install in web/).' });
+      return true;
+    }
     try {
       const body = await readBody(req);
       if (!body.newPassword || body.newPassword.length < 6) {
@@ -3388,7 +3438,7 @@ async function handleAdminRequest(req, res) {
         sendJson(res, 400, { error: 'New password must differ from the default' });
         return true;
       }
-      if (setBalancePasswordHash(hashPassword(body.newPassword))) {
+      if (setBalancePasswordHash(hashBalancePassword(body.newPassword))) {
         sendJson(res, 200, { success: true });
       } else {
         sendJson(res, 500, { error: 'Failed to save password' });
@@ -4166,7 +4216,8 @@ async function handleAdminRequest(req, res) {
       if (!body.newPassword || body.newPassword.length < 4) {
         sendJson(res, 400, { error: 'Password must be at least 4 characters' }); return true;
       }
-      const hashed = hashPassword(body.newPassword);
+      // 1.2.8: the game's own PBKDF2 form; the bcrypt or SHA256 written before could never log in.
+      const hashed = hashGamePassword(body.newPassword);
       dbWrite.prepare("UPDATE players SET password_hash = ? WHERE LOWER(username) = LOWER(?)").run(hashed, playerUsername);
 
       try {
