@@ -19009,7 +19009,7 @@ public partial class CombatEngine
 
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
-            int healPerPotion = (int)PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
+            int healPerPotion = (int)PotionBonus.AverageHeal(player, targetAlly); // 1.2.8: scaled by the ally's MaxHP
             healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, monsters); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
@@ -19059,7 +19059,7 @@ public partial class CombatEngine
             for (int i = 0; i < potionsToUse && targetAlly.HP < targetAlly.MaxHP; i++)
             {
                 player.Healing--;
-                int healAmount = (int)PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
+                int healAmount = (int)PotionBonus.BaseHeal(player, random, receiver: targetAlly); // 1.2.8: at least 20% of the ally's MaxHP
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount, monsters); // v1.1.11: the giver's Infirmary
                 EvUse(player, CombatEventKind.Potion);   // 1.2.6
                 EvHeal(player, targetAlly, HealRoom(targetAlly, healAmount), CombatEventKind.Potion);
@@ -19726,7 +19726,7 @@ public partial class CombatEngine
         StatsFor(teammate).PotionsDrunk++;
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
-        int healAmount = (int)PotionBonus.BaseHeal(teammate, random); // 1.2.8: at least 20% of MaxHP
+        int healAmount = (int)PotionBonus.BaseHeal(teammate, random, receiver: target); // 1.2.8: at least 20% of the target's MaxHP
         healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);

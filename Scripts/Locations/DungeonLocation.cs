@@ -12895,7 +12895,7 @@ public class DungeonLocation : BaseLocation
 
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
-        int healPerPotion = (int)PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
+        int healPerPotion = (int)PotionBonus.AverageHeal(player, target); // 1.2.8: scaled by the teammate's MaxHP
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -12960,7 +12960,7 @@ public class DungeonLocation : BaseLocation
         for (int i = 0; i < potionsToUse && target.HP < target.MaxHP; i++)
         {
             player.Healing--;
-            int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
+            int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, target); // 1.2.8: at least 20% of the teammate's MaxHP
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
@@ -13000,14 +13000,14 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
-        int healPerPotion = (int)PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
-        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
+        // 1.2.8: the estimate per receiver, scaled by that receiver's MaxHP; v1.1.11: the giver's Infirmary
+        int HealPerPotion(Character receiver) => (int)PotionBonus.ApplyOwnerBonuses(player, PotionBonus.AverageHeal(player, receiver));
         int totalPotionsUsed = 0;
         long totalHealing = 0;
 
         // Calculate total potions needed
         long playerMissing = player.MaxHP - player.HP;
-        int playerPotionsNeeded = playerMissing > 0 ? (int)Math.Ceiling((double)playerMissing / healPerPotion) : 0;
+        int playerPotionsNeeded = playerMissing > 0 ? (int)Math.Ceiling((double)playerMissing / HealPerPotion(player)) : 0;
 
         int teammatesPotionsNeeded = 0;
         foreach (var companion in companions)
@@ -13015,7 +13015,7 @@ public class DungeonLocation : BaseLocation
             long missing = companion.MaxHP - companion.HP;
             if (missing > 0)
             {
-                teammatesPotionsNeeded += (int)Math.Ceiling((double)missing / healPerPotion);
+                teammatesPotionsNeeded += (int)Math.Ceiling((double)missing / HealPerPotion(companion));
             }
         }
 
@@ -13103,7 +13103,7 @@ public class DungeonLocation : BaseLocation
                 {
                     player.Healing--;
                     totalPotionsUsed++;
-                    int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
+                    int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, companion); // 1.2.8: at least 20% of the companion's MaxHP
                     healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }

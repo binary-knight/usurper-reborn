@@ -134,7 +134,8 @@ public class ScaledPotions128Tests
         Count("Scripts/Locations/DungeonLocation.cs", "PotionBonus.BaseHeal(").Should().Be(4);
         Count("Scripts/Locations/DungeonLocation.cs", "PotionBonus.AverageHeal(").Should().Be(2);
         Count("Scripts/Locations/BaseLocation.cs", "PotionBonus.BaseHeal(").Should().Be(1);
-        Count("Scripts/Locations/DungeonLocation.cs", ", 31)").Should().BeGreaterThanOrEqualTo(4, "the dungeon sites keep their roll to 31");
+        Regex.Matches(File.ReadAllText(Path.Combine(RepoRoot(), "Scripts/Locations/DungeonLocation.cs")), @"PotionBonus\.BaseHeal\([^;]*, 31[,)]").Count
+            .Should().Be(4, "the dungeon sites keep their roll to 31");
     }
 
     // C4
@@ -241,5 +242,72 @@ public class ScaledPotions128Tests
         }
         WithSwitch(false, () => PotionBonus.AverageHeal(hero)).Should().Be(300, "50 + 5 x 50");
         GameConfig.ScaledPotionsEnabled.Should().BeTrue("the switch is on by default");
+    }
+
+    // C7 (supervisor ruling 2026-10-08): a potion given to an ally heals at least 20% of the ALLY's MaxHP.
+    // The flat part still reads the giver's level.
+    private static Character Ally(long maxHp) => new Character
+    {
+        Name1 = "ally", Name2 = "Ally", Class = CharacterClass.Warrior, Level = 50, MaxHP = maxHp, HP = 1,
+        Healing = 0, CombatSpeed = CombatSpeed.Instant,
+    };
+
+    [Fact]
+    public void C7_APotionGivenToAnAlly_IsScaledByTheAllysMaxHP()
+    {
+        var giver = Hero(50, 1950);
+        for (int seed = 1; seed <= 20; seed++)
+        {
+            WithSwitch(true, () => PotionBonus.BaseHeal(giver, new Random(seed), receiver: Ally(10_000))).Should().Be(2000, "20% of the ally's 10,000");
+            WithSwitch(true, () => PotionBonus.BaseHeal(giver, new Random(seed), 31, Ally(10_000))).Should().Be(2000);
+            WithSwitch(true, () => PotionBonus.BaseHeal(giver, new Random(seed), receiver: Ally(500)))
+                .Should().Be(280 + Roll(seed), "20% of the ally's 500 is under the giver's flat heal; the giver's 390 does not apply");
+            WithSwitch(false, () => PotionBonus.BaseHeal(giver, new Random(seed), receiver: Ally(10_000))).Should().Be(280 + Roll(seed));
+        }
+        WithSwitch(true, () => PotionBonus.AverageHeal(giver, Ally(10_000))).Should().Be(2000);
+        WithSwitch(true, () => PotionBonus.AverageHeal(giver, Ally(500))).Should().Be(300);
+    }
+
+    [Theory]
+    [InlineData(10_000, 2000, 2000)]
+    [InlineData(500, 290, 309)]
+    public async Task C7_ATeammatesPotion_IsScaledByTheTargetsMaxHP(long targetMaxHp, long min, long max)
+    {
+        bool saved = GameConfig.ScaledPotionsEnabled;
+        try
+        {
+            GameConfig.ScaledPotionsEnabled = true;
+            var teammate = Hero(50, 1950);
+            var target = Ally(targetMaxHp);
+            var (engine, _) = Engine(Hero(10, 100), Array.Empty<string>(), 5);
+            await (Task<bool>)typeof(CombatEngine).GetMethod("TeammateHealWithPotion", F)!
+                .Invoke(engine, new object[] { teammate, target, new CombatResult(), false })!;
+            teammate.Healing.Should().Be(9);
+            (target.HP - 1).Should().BeInRange(min, max);
+        }
+        finally { GameConfig.ScaledPotionsEnabled = saved; }
+    }
+
+    [Fact]
+    public async Task C7_ADungeonPotionGivenToATeammate_IsScaledByTheTeammatesMaxHP()
+    {
+        bool saved = GameConfig.ScaledPotionsEnabled;
+        try
+        {
+            GameConfig.ScaledPotionsEnabled = true;
+            var player = Hero(50, 1950);
+            player.HP = player.MaxHP;
+            var ally = Ally(10_000);
+            var output = new MemoryStream();
+            var dungeon = new DungeonLocation();
+            typeof(BaseLocation).GetField("terminal", F)!.SetValue(dungeon,
+                new TerminalEmulator(new LineStream(new[] { "1", "1" }.Concat(Enumerable.Repeat("", 20))), output));
+            await (Task)typeof(DungeonLocation).GetMethod("HealTeammate", F)!
+                .Invoke(dungeon, new object[] { player, new List<Character> { ally } })!;
+            player.Healing.Should().Be(9);
+            (ally.HP - 1).Should().Be(2000, "20% of the teammate's 10,000, not the giver's 390");
+            Text(output).Should().Contain(Loc.Get("dungeon.each_potion_heals", 2000));
+        }
+        finally { GameConfig.ScaledPotionsEnabled = saved; }
     }
 }
