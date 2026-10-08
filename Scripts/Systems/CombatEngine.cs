@@ -4362,7 +4362,7 @@ public partial class CombatEngine
         {
             // Quick heal uses one potion
             player.Healing--;
-            long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
             healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
             // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
@@ -4383,7 +4383,7 @@ public partial class CombatEngine
         {
             // Regular heal - ask how many potions to use for full control
             long missingHP = player.MaxHP - player.HP;
-            long avgHealPerPotion = 50 + player.Level * 5;  // Average heal: 30 + level*5 + avg(10-30)
+            long avgHealPerPotion = PotionBonus.AverageHeal(player);  // 1.2.8: the scaled average heal
             avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion, result.Monsters); // v1.1.11: Infirmary
             int potionsToFullHeal = (int)Math.Ceiling((double)missingHP / avgHealPerPotion);
             potionsToFullHeal = Math.Min(potionsToFullHeal, (int)player.Healing);
@@ -4407,7 +4407,7 @@ public partial class CombatEngine
             for (int i = 0; i < potionsToUse && player.HP < player.MaxHP; i++)
             {
                 player.Healing--;
-                long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+                long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
                 healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
                 // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
                 healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
@@ -9681,7 +9681,7 @@ public partial class CombatEngine
 
         // Don't waste a potion if the deficit is trivial — only auto-heal
         // when missing at least half a potion's average healing value
-        long avgPotionHeal = 30 + player.Level * 5 + 20; // midpoint of random(10,30)
+        long avgPotionHeal = PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
         avgPotionHeal = PotionBonus.ApplyOwnerBonuses(player, avgPotionHeal); // v1.1.11: Infirmary
         long hpDeficit = player.MaxHP - player.HP;
         if (hpDeficit < avgPotionHeal / 2)
@@ -9696,7 +9696,7 @@ public partial class CombatEngine
             if (potionsUsed > 0 && remaining < avgPotionHeal / 2)
                 break;
 
-            long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
@@ -19011,7 +19011,7 @@ public partial class CombatEngine
 
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
-            int healPerPotion = 30 + player.Level * 5 + 20; // Average heal per potion
+            int healPerPotion = (int)PotionBonus.AverageHeal(player, targetAlly); // 1.2.8: scaled by the ally's MaxHP
             healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, monsters); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
@@ -19061,7 +19061,7 @@ public partial class CombatEngine
             for (int i = 0; i < potionsToUse && targetAlly.HP < targetAlly.MaxHP; i++)
             {
                 player.Healing--;
-                int healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+                int healAmount = (int)PotionBonus.BaseHeal(player, random, receiver: targetAlly); // 1.2.8: at least 20% of the ally's MaxHP
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount, monsters); // v1.1.11: the giver's Infirmary
                 EvUse(player, CombatEventKind.Potion);   // 1.2.6
                 EvHeal(player, targetAlly, HealRoom(targetAlly, healAmount), CombatEventKind.Potion);
@@ -19728,7 +19728,7 @@ public partial class CombatEngine
         StatsFor(teammate).PotionsDrunk++;
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
-        int healAmount = 30 + teammate.Level * 5 + random.Next(10, 30);
+        int healAmount = (int)PotionBonus.BaseHeal(teammate, random, receiver: target); // 1.2.8: at least 20% of the target's MaxHP
         healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
@@ -23986,7 +23986,7 @@ public partial class CombatEngine
         }
 
         long hpNeeded = player.MaxHP - player.HP;
-        int healPerPotion = 30 + player.Level * 5 + random.Next(10, 30);
+        int healPerPotion = (int)PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, result.Monsters); // v1.1.11: Infirmary, so potionsNeeded shrinks too
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -27379,7 +27379,7 @@ public partial class CombatEngine
         if (computer.HP < computer.MaxHP / 3 && computer.Healing > 0)
         {
             computer.Healing--;
-            long heal = 30 + computer.Level * 5 + random.Next(10, 30);
+            long heal = PotionBonus.BaseHeal(computer, random); // 1.2.8: at least 20% of MaxHP
             heal = PotionBonus.ApplyOwnerBonuses(computer, heal); // v1.1.11: the defender's own Infirmary
             heal = Math.Min(heal, computer.MaxHP - computer.HP);
             computer.HP += heal;
