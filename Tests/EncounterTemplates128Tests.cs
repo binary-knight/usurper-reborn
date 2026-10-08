@@ -481,9 +481,58 @@ public class EncounterTemplates128Tests
         var lines = File.ReadAllLines(Path.Combine(root, "Scripts", "Locations", "DungeonLocation.cs"))
             .Where(l => l.Contains("MonsterGenerator.GenerateMonsterGroup(") && !l.TrimStart().StartsWith("//")).ToList();
         lines.Should().HaveCount(2);
-        lines.Should().OnlyContain(l => l.Contains("EncounterRules.Dungeon(currentDungeonLevel)"));
-        lines.Should().ContainSingle(l => l.Contains("GenerateMonsterGroup(effectiveMonsterLevel,"), "the room fight keeps its straggler level");
-        lines.Should().ContainSingle(l => l.Contains("GenerateMonsterGroup(currentDungeonLevel,"));
+        lines.Should().ContainSingle(l => l.Contains("GenerateMonsterGroup(effectiveMonsterLevel,")
+            && l.Contains("RoomEncounterRules(currentDungeonLevel, room.IsBossRoom)"), "the room fight keeps its straggler level and passes the real floor");
+        lines.Should().ContainSingle(l => l.Contains("GenerateMonsterGroup(currentDungeonLevel,") && l.Contains("EncounterRules.Dungeon(currentDungeonLevel)"),
+            "MonsterEncounter is the exploration fight: it has no room and so no boss room");
+    }
+
+    // ---------------------------------------------------------------- E9
+
+    /// <summary>The room fight's call (DungeonLocation.RoomEncounterRules decides the rules).</summary>
+    private static List<Monster> Room(int level, int floor, bool bossRoom, Random random) =>
+        MonsterGenerator.GenerateMonsterGroup(level, random, MonsterGenerator.OldGodApproachScale(floor), DungeonLocation.RoomEncounterRules(floor, bossRoom));
+
+    [Fact]
+    public void E9_ABossRoom_PassesNoRules_AndIsDrawnAsBefore_ARegularRoomKeepsTheTemplate()
+    {
+        WithSwitch(true, () =>
+        {
+            for (int floor = 1; floor <= 100; floor++)
+                DungeonLocation.RoomEncounterRules(floor, bossRoom: true).Should().BeNull("floor {0}", floor);
+            DungeonLocation.RoomEncounterRules(7, bossRoom: false)!.RealFloor.Should().Be(7);
+
+            // the golden lists of the code before this piece (0c8b24a5), floors 5 and 7
+            foreach (int floor in new[] { 5, 7 })
+                foreach (int seed in Enumerable.Range(1, 8))
+                    Sig(Room(floor, floor, true, new Random(seed))).Should().Be(GoldenShallow[$"{floor},{floor},{seed}"], "boss room, floor {0}, seed {1}", floor, seed);
+
+            for (int floor = 4; floor <= 10; floor++)
+            {
+                int threes = 0, casters = 0, differ = 0;
+                for (int seed = 0; seed < 2000; seed++)
+                {
+                    var a = new RecordingRandom(seed); var b = new RecordingRandom(seed);
+                    var boss = Room(floor, floor, true, a);
+                    var before = MonsterGenerator.GenerateMonsterGroup(floor, b, MonsterGenerator.OldGodApproachScale(floor));
+                    Sig(boss).Should().Be(Sig(before), "boss room, floor {0}, seed {1}", floor, seed);
+                    a.Calls.Should().Equal(b.Calls, "boss room, floor {0}, seed {1}: the same draws in the same order", floor, seed);
+                    boss.Select(m => (m.MaxHP, m.Strength, m.Punch, m.WeapPow)).Should().Equal(before.Select(m => (m.MaxHP, m.Strength, m.Punch, m.WeapPow)));
+                    boss.Count.Should().BeLessThanOrEqualTo(2);
+                    boss.Should().NotContain(m => IsCaster(m));
+
+                    var regular = Room(floor, floor, false, new Random(seed));
+                    Sig(regular).Should().Be(Sig(Dungeon(floor, floor, seed)));
+                    if (regular.Count == 3) threes++;
+                    casters += regular.Count(IsCaster);
+                    if (Sig(regular) != Sig(before)) differ++;
+                }
+                threes.Should().BeInRange(300, 420, "a regular room on floor {0} still gets the template (18% threes)", floor);
+                casters.Should().BeGreaterThan(200);
+                differ.Should().BeGreaterThan(800);
+            }
+            return 0;
+        });
     }
 
     // ---------------------------------------------------------------- E8

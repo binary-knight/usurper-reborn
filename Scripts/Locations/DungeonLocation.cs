@@ -5660,8 +5660,9 @@ public class DungeonLocation : BaseLocation
         }
 
         // Generate monsters appropriate for this room
-        // 1.2.8: the rules carry the real floor; a straggler room keeps its lower monster level
-        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel), EncounterRules.Dungeon(currentDungeonLevel));
+        // 1.2.8: the rules carry the real floor; a straggler room keeps its lower monster level. A boss room
+        // passes no rules, so its group is drawn as before 1.2.8.
+        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel), RoomEncounterRules(currentDungeonLevel, room.IsBossRoom));
 
         // v0.61.3 (player report, post-v0.61.2 cleared floors): "champions
         // typically have more HP than the floor boss, regular enemies often
@@ -7687,6 +7688,14 @@ public class DungeonLocation : BaseLocation
         await terminal.PressAnyKey();
     }
     
+    /// <summary>
+    /// 1.2.8: the encounter rules of a room fight. A regular room passes the dungeon rules with the real
+    /// floor; a boss room passes none, on every floor, so the group around its boss is drawn exactly as
+    /// before 1.2.8 (no template size, budget or caster).
+    /// </summary>
+    internal static EncounterRules? RoomEncounterRules(int realFloor, bool bossRoom) =>
+        bossRoom ? null : EncounterRules.Dungeon(realFloor);
+
     /// <summary>
     /// Monster encounter - Pascal DUNGEVC.PAS mechanics
     /// </summary>
