@@ -550,6 +550,22 @@ public static class MonsterGenerator
         GameConfig.EncounterTemplatesEnabled && rules != null
         && rules.RealFloor >= TemplateMinFloor && rules.RealFloor <= TemplateMaxFloor;
 
+    /// <summary>1.2.8 elites: the six affix ids, in the order the draw indexes them. An elite's name is its
+    /// current name in monster.elite.{id}; its description is monster.elite_desc.{id}.</summary>
+    internal static readonly string[] EliteAffixIds = { "frenzied", "warded", "venomous", "commanding", "mending", "swift" };
+
+    /// <summary>The chance that a regular dungeon encounter on this real floor holds an elite.</summary>
+    internal static double EliteChance(int realFloor) =>
+        realFloor < GameConfig.EliteMinFloor ? 0.0
+        : realFloor <= 10 ? GameConfig.EliteChanceFloors3To10
+        : realFloor <= 30 ? GameConfig.EliteChanceFloors11To30
+        : GameConfig.EliteChanceFloors31Plus;
+
+    /// <summary>True when an encounter can hold an elite: the switch is on, the caller is the dungeon (rules
+    /// given; a boss room gives none) and the real floor has a chance. False draws nothing.</summary>
+    internal static bool ElitesApply(EncounterRules? rules) =>
+        GameConfig.EliteMonstersEnabled && rules != null && EliteChance(rules.RealFloor) > 0.0;
+
     /// <summary>The size of a templated regular group from one roll in [0, 1).</summary>
     internal static int TemplateGroupSize(double roll) =>
         roll < TemplateSizeOneShare ? 1 : roll < TemplateSizeOneShare + TemplateSizeTwoShare ? 2 : TemplateMaxGroupSize;
@@ -558,7 +574,9 @@ public static class MonsterGenerator
     /// GameConfig.EncounterTemplatesEnabled on and that floor in 4 to 10 the group follows the encounter
     /// templates: sizes 1, 2 and 3, one family half the time, a budgeted group of 3 and one caster in a
     /// mixed group. Without rules, with the switch off or on any other floor the method draws the same
-    /// random numbers in the same order as before 1.2.8.</param>
+    /// random numbers in the same order as before 1.2.8. With GameConfig.EliteMonstersEnabled on and the
+    /// floor 3 or deeper, a regular group then rolls for an elite (ElitesApply, PromoteElite): the last
+    /// draws of the call, after everything above.</param>
     public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null, double approachScale = 1.0, EncounterRules? rules = null)
     {
         random ??= Random.Shared;
@@ -673,7 +691,54 @@ public static class MonsterGenerator
             if (!sameFamily && monsters.Count >= 2) AssignCaster(monsters, random);
         }
 
+        // 1.2.8 elites: the last step, so every draw above is the one made without it. The champion
+        // encounter returned earlier and never reaches this.
+        if (ElitesApply(rules) && random.NextDouble() < EliteChance(rules!.RealFloor))
+            PromoteElite(monsters, random, rules.RealFloor);
+
         return monsters;
+    }
+
+    /// <summary>
+    /// 1.2.8: promotes one member of a built regular group to an elite. Draws: the member, then one affix,
+    /// then from GameConfig.EliteSecondAffixFloor a second one among the other five. Budget: the elite takes
+    /// its member's place, and a group of 3 or more loses one further member, the last one that is not the
+    /// elite (no draw). The elite keeps its member's stats (a templated budget and the caster's Strength
+    /// included) times the GameConfig elite multipliers, and its stored reward times the reward ones. Its
+    /// name is its full current name in monster.elite.{affix}, written in English through
+    /// MonsterNames.FromKey and shown in each reader's language, so a caster stays one ("Frenzied Kobold
+    /// Shaman"). TierName and FamilyName stay; IsMiniBoss is not touched. What an affix does is not here.
+    /// </summary>
+    internal static Monster PromoteElite(List<Monster> monsters, Random random, int realFloor)
+    {
+        var elite = monsters[random.Next(monsters.Count)];
+        if (monsters.Count >= 3)
+            monsters.RemoveAt(ReferenceEquals(monsters[monsters.Count - 1], elite) ? monsters.Count - 2 : monsters.Count - 1);
+
+        elite.IsElite = true;
+        elite.MaxHP = Math.Max(1, (long)(elite.MaxHP * GameConfig.EliteHpMultiplier));
+        elite.HP = elite.MaxHP;
+        elite.Strength = (long)(elite.Strength * GameConfig.EliteDamageMultiplier);
+        elite.Punch = (long)(elite.Punch * GameConfig.EliteDamageMultiplier);
+        elite.WeapPow = (long)(elite.WeapPow * GameConfig.EliteDamageMultiplier);
+        elite.Defence = (int)(elite.Defence * GameConfig.EliteDefenceMultiplier);
+        elite.ArmPow = (long)(elite.ArmPow * GameConfig.EliteDefenceMultiplier);
+        // the reward a victory reads is the one stored when the monster was built
+        elite.Experience = (long)(elite.Experience * GameConfig.EliteExperienceMultiplier);
+        elite.Gold = (long)(elite.Gold * GameConfig.EliteGoldMultiplier);
+
+        var pool = EliteAffixIds.ToList();
+        int affixes = realFloor >= GameConfig.EliteSecondAffixFloor ? 2 : 1;
+        for (int i = 0; i < affixes; i++)
+        {
+            int pick = random.Next(pool.Count);
+            elite.EliteAffixes.Add(pool[pick]);
+            pool.RemoveAt(pick);
+        }
+        // the first affix is the outermost word of the name
+        for (int i = elite.EliteAffixes.Count - 1; i >= 0; i--)
+            elite.Name = MonsterNames.FromKey("monster.elite." + elite.EliteAffixes[i], elite.Name);
+        return elite;
     }
 
     /// <summary>1.2.8 threat budget of a templated group of 3: HP x0.8, Strength, Punch and WeapPow x0.9

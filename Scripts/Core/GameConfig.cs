@@ -230,6 +230,37 @@ public static partial class GameConfig
     /// </summary>
     public static bool EncounterTemplatesEnabled { get; internal set; } = true;
 
+    /// <summary>
+    /// 1.2.8 difficulty pass: a regular dungeon encounter (MonsterGenerator.GenerateMonsterGroup with
+    /// EncounterRules.Dungeon) can promote one member to an elite after the group is built: more HP, damage
+    /// and defence, one affix (two from floor 51), a higher reward, and one member fewer in a group of 3 or
+    /// more. Never a champion encounter, never a boss room (it passes no rules), never floors 1 and 2.
+    /// Default on. The setter is internal: it is not a sysop setting; tests and the balance simulator turn
+    /// it off. Off, and for every caller that passes no rules, the generator draws exactly the random
+    /// numbers it drew before and returns the same group.
+    /// </summary>
+    public static bool EliteMonstersEnabled { get; internal set; } = true;
+
+    /// <summary>1.2.8: the chance that a regular dungeon encounter holds an elite, by the real dungeon floor:
+    /// none below EliteMinFloor, then floors 3 to 10, 11 to 30 and 31 and deeper.</summary>
+    public const int EliteMinFloor = 3;
+    public const double EliteChanceFloors3To10 = 0.08;
+    public const double EliteChanceFloors11To30 = 0.10;
+    public const double EliteChanceFloors31Plus = 0.12;
+
+    /// <summary>1.2.8: an elite carries two affixes from this dungeon floor on, one above it.</summary>
+    public const int EliteSecondAffixFloor = 51;
+
+    /// <summary>1.2.8: an elite's stats over the member it was promoted from: HP; Strength, Punch and WeapPow;
+    /// Defence and ArmPow.</summary>
+    public const double EliteHpMultiplier = 1.6;
+    public const double EliteDamageMultiplier = 1.15;
+    public const double EliteDefenceMultiplier = 1.1;
+
+    /// <summary>1.2.8: an elite's experience and gold over the member it was promoted from.</summary>
+    public const double EliteExperienceMultiplier = 1.6;
+    public const double EliteGoldMultiplier = 1.5;
+
     /// <summary>1.2.8: the share of MaxHP a healing potion heals at least while ScaledPotionsEnabled is on.</summary>
     public const double ScaledPotionMaxHPFraction = 0.20;
 
