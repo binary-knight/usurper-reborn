@@ -2036,6 +2036,8 @@ function balancePct(part, whole) {
 
 // Difficulty tab filters: a class name (letters and spaces) and a DifficultyMode value 0..3.
 const BALANCE_CLASS_RE = /^[A-Za-z][A-Za-z ]{0,39}$/;
+// 1.2.8: the class charts' ?levels= band, a whitelist bound as two integers (player_level is 1 to 100).
+const BALANCE_LEVEL_BANDS = { 'all': null, '1-9': [1, 9], '10-19': [10, 19], '20-29': [20, 29], '30-39': [30, 39], '40+': [40, 100] };
 const BALANCE_DIFFICULTIES = ['0', '1', '2', '3'];
 
 // --- Balance Remote View (1.2.7) ---
@@ -2308,6 +2310,14 @@ async function handleBalanceRequest(req, res) {
     if (BALANCE_SOURCES[s] !== null) remoteSource = s;
   }
 
+  // 1.2.8: the class charts' ?levels= is checked before anything reads the database.
+  const levelsParam = query.get('levels');
+  if (method === 'GET' && url === '/api/balance/class-performance' && levelsParam !== null
+      && !Object.prototype.hasOwnProperty.call(BALANCE_LEVEL_BANDS, levelsParam)) {
+    sendJson(res, 400, { error: 'Unknown level band. Use one of: ' + Object.keys(BALANCE_LEVEL_BANDS).join(', ') });
+    return true;
+  }
+
   let win = null;
   if (method === 'GET' && BALANCE_COMBAT_VIEWS.includes(url) && remoteSource === null) {
     try {
@@ -2362,9 +2372,11 @@ async function handleBalanceRequest(req, res) {
 
   // GET /api/balance/class-performance
   if (method === 'GET' && url === '/api/balance/class-performance') {
+    const band = levelsParam === null ? null : BALANCE_LEVEL_BANDS[levelsParam];
     try {
       const rows = db.prepare(`
         SELECT +player_class as player_class,
+          COUNT(DISTINCT player_name) as players,
           COUNT(*) as total,
           SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
           SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
@@ -2375,12 +2387,13 @@ async function handleBalanceRequest(req, res) {
           AVG(CASE WHEN outcome = 'victory' THEN rounds END) as avg_rounds,
           MAX(damage_dealt) as max_damage
         FROM combat_events
-        WHERE created_at >= ?
+        WHERE created_at >= ?${band ? ' AND player_level >= ? AND player_level <= ?' : ''}
         GROUP BY +player_class
         ORDER BY total DESC, player_class
-      `).all(win.bound);
+      `).all(...(band ? [win.bound, band[0], band[1]] : [win.bound]));
       sendJson(res, 200, {
         window: balanceWindowJson(win),
+        levels: levelsParam === null ? 'all' : levelsParam,
         rows: rows.map(r => ({
           ...r,
           winRate: balancePct(r.wins, r.total),

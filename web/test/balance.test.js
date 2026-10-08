@@ -387,3 +387,29 @@ test('a server value shaped like a page-marked cell is still escaped: the mark i
   assert.ok(h.el('difficulty-table').querySelector('.tag-boss'));
   assert.ok(h.el('npc-recent-table').querySelector('.tag'));
 });
+
+test('class charts: a level band selector (default 1-9), the player count on each bar, grey under 3 players', async () => {
+  const rows = [
+    { player_class: 'Warrior', players: 4, winRate: 80, avg_damage: 100 },
+    { player_class: 'Jester', players: 1, winRate: 50, avg_damage: 70 },
+  ];
+  const p = await page('Alice', { balance_token: 'tok' }, (url) => (endpoint(url) === 'class-performance'
+    ? { window: { key: 'since126', label: 'Alice', from: FROM, clipped: false }, levels: '1-9', rows } : undefined));
+  await p.settle();
+  const urls = p.calls.fetch.map((c) => c.url).filter((u) => endpoint(u) === 'class-performance');
+  assert.ok(urls.length > 0);
+  for (const u of urls) assert.match(u, /[?&]levels=1-9(&|$)/, 'the charts default to a level band: ' + u);
+  p.run("updateChart = function (id, config) { globalThis.__seen = globalThis.__seen || {}; globalThis.__seen[id] = config; }");
+  p.calls.fetch.length = 0;
+  p.el('levels-select').value = '20-29';
+  p.doc.dispatch(p.el('levels-select'), 'change');
+  await p.settle();
+  assert.ok(p.calls.fetch.some((c) => /class-performance\?.*levels=20-29/.test(c.url)));
+  const cfg = p.ctx.__seen.classWinChart;
+  assert.deepStrictEqual(Array.from(cfg.data.labels), ['Warrior (4)', 'Jester (1 player)']);
+  const ds = cfg.data.datasets[0];
+  assert.match(ds.backgroundColor[0], /^hsla\(/);
+  assert.strictEqual(ds.backgroundColor[1], 'rgba(128,128,128,0.5)');
+  assert.strictEqual(ds.borderColor[1], 'rgb(128,128,128)');
+  assert.deepStrictEqual(Array.from(p.ctx.__seen.classDmgChart.data.labels), ['Warrior (4)', 'Jester (1 player)']);
+});
