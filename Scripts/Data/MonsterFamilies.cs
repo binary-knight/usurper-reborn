@@ -38,6 +38,9 @@ public static class MonsterFamilies
         public int MaxLevel { get; set; }
         public string Color { get; set; } = "white";
         public float PowerMultiplier { get; set; } = 1.0f;
+        /// <summary>v1.2.8: power used only when this tier is rolled for a floor boss. Null means the same as
+        /// PowerMultiplier, so a tier (or a GameData override) without the field behaves as before.</summary>
+        public float? BossPowerMultiplier { get; set; }
         public List<string> SpecialAbilities { get; set; } = new();
     }
 
@@ -101,7 +104,7 @@ public static class MonsterFamilies
             AttackType = "physical",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Orc", MinLevel = 5, MaxLevel = 20, Color = "red", PowerMultiplier = 1.0f },
+                new() { Name = "Orc", MinLevel = 5, MaxLevel = 20, Color = "red", PowerMultiplier = 0.9f, BossPowerMultiplier = 1.0f },
                 new() { Name = "Orc Warrior", MinLevel = 21, MaxLevel = 40, Color = "bright_red", PowerMultiplier = 1.3f, SpecialAbilities = new() { "Rage" } },
                 new() { Name = "Orc Berserker", MinLevel = 41, MaxLevel = 60, Color = "bright_red", PowerMultiplier = 1.6f, SpecialAbilities = new() { "Rage", "Frenzy" } },
                 new() { Name = "Orc Chieftain", MinLevel = 61, MaxLevel = 80, Color = "magenta", PowerMultiplier = 1.9f, SpecialAbilities = new() { "Rage", "Frenzy", "Warcry" } },

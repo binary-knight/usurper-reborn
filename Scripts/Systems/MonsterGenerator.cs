@@ -27,7 +27,7 @@ public static class MonsterGenerator
         var (family, tier) = MonsterFamilies.GetMonsterForLevel(dungeonLevel, random);
 
         // Calculate base stats using smooth scaling formulas
-        var stats = CalculateMonsterStats(dungeonLevel, tier.PowerMultiplier, isBoss, isMiniBoss, approachScale);
+        var stats = CalculateMonsterStats(dungeonLevel, isBoss ? (tier.BossPowerMultiplier ?? tier.PowerMultiplier) : tier.PowerMultiplier, isBoss, isMiniBoss, approachScale);
 
         // Generate monster name - mini-bosses get "Champion" suffix
         string monsterName = tier.Name;
