@@ -33,8 +33,8 @@ public partial class CombatEngine
     /// <summary>
     /// v1.1.14: test-only. Gives this engine its own RNG from a seed, so a test that drives a fight gets the
     /// same rolls every run. Every roll the engine makes itself goes through this field; a game never calls
-    /// this, so play keeps Random.Shared. Rolls made outside the engine (monster abilities, items) are not
-    /// covered.
+    /// this, so play keeps Random.Shared. Rolls made outside the engine (items) are not covered. 1.2.8: a
+    /// monster ability's own rolls come from this field while GameConfig.MonsterTacticsEnabled is on.
     /// </summary>
     internal void SeedRandomForTests(int seed) => random = new Random(seed);
     private bool _lastMonsterTargetedGroupPlayer; // Set by ProcessMonsterAction when monster attacks a grouped player
@@ -6012,10 +6012,20 @@ public partial class CombatEngine
         result.CombatLog.Add($"{monster.Name} summons {summonCount} reinforcements");
     }
 
+    /// <summary>
+    /// 1.2.8: MonsterTactics (ability choice, target traits, an ability's rolls from the engine's random) applies
+    /// when GameConfig.MonsterTacticsEnabled is on and the fight is not an Old God's. A BossContext fight keeps
+    /// SelectBossAbility, TryBossAbility and the plain target weights for every monster in it.
+    /// </summary>
+    private bool MonsterTacticsActive => GameConfig.MonsterTacticsEnabled && BossContext == null;
+
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
     {
+        // 1.2.8: MonsterTactics picks for every fight but an Old God's (BossContext keeps its own picker)
+        bool tactics = MonsterTacticsActive;
+
         // No abilities? Normal attack
-        if (monster.SpecialAbilities == null || monster.SpecialAbilities.Count == 0)
+        if (tactics ? !MonsterTactics.HasAbilities(monster) : (monster.SpecialAbilities == null || monster.SpecialAbilities.Count == 0))
             return false;
 
         // Base 30% chance to use special ability (scales with monster level)
@@ -6029,9 +6039,13 @@ public partial class CombatEngine
         // Pick a random ability. Bosses draw from the phase-filtered pool
         // (SelectBossAbility) -- the single picker, now that the duplicate
         // pre-announcement in ProcessMonsterAction is gone.
-        string abilityName = (BossContext != null && monster.IsBoss)
+        string? abilityName = (BossContext != null && monster.IsBoss)
             ? SelectBossAbility(BossContext)
-            : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+            : tactics
+                ? MonsterTactics.Choose(monster, player, result.CurrentRound, monsterList, random)
+                : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+        if (abilityName == null)
+            return false; // 1.2.8: every pick would be wasted, so the monster makes its normal attack
 
         // Old God boss abilities — handle by name before generic enum parse
         if (BossContext != null && monster.IsBoss)
@@ -6049,7 +6063,7 @@ public partial class CombatEngine
             return false;
 
         // Execute the ability
-        var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, player);
+        var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, player, tactics ? random : null);
         var monKind = MonsterAbilityEventKind(abilityType);   // 1.2.6
 
         // Display ability message
@@ -20689,13 +20703,16 @@ public partial class CombatEngine
         var targetWeights = new List<(Character target, int weight)>();
 
         // Player base weight - squishy classes get lower weight (less likely to be targeted)
-        int playerWeight = GetTargetWeight(player);
+        // 1.2.8: Predator and Skirmisher families add their trait bonus (after the taunt check above, so a
+        // taunt still wins); 0 for every other family and whenever MonsterTactics is not active
+        bool traits = MonsterTacticsActive;
+        int playerWeight = GetTargetWeight(player) + (traits ? MonsterTactics.TraitBonus(monster, player) : 0);
         targetWeights.Add((player, playerWeight));
 
         // Add all alive teammates with their weights
         foreach (var teammate in aliveTeammates)
         {
-            int teammateWeight = GetTargetWeight(teammate);
+            int teammateWeight = GetTargetWeight(teammate) + (traits ? MonsterTactics.TraitBonus(monster, teammate) : 0);
             targetWeights.Add((teammate, teammateWeight));
         }
 
@@ -20948,16 +20965,20 @@ public partial class CombatEngine
 
         // Monster special abilities can also fire against companions
         bool shownAttackMessage = false;
-        if (monster.SpecialAbilities != null && monster.SpecialAbilities.Count > 0)
+        bool tactics = MonsterTacticsActive;   // 1.2.8: the same tactic as against the player
+        if (tactics ? MonsterTactics.HasAbilities(monster) : (monster.SpecialAbilities != null && monster.SpecialAbilities.Count > 0))
         {
             int abilityChance = 30 + (monster.Level / 5);
             if (random.Next(100) < abilityChance)
             {
-                string abilityName = monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
-                if (Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType)
+                string? abilityName = tactics
+                    ? MonsterTactics.Choose(monster, companion, result.CurrentRound, liveMonsterList, random)
+                    : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+                if (abilityName != null
+                    && Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType)
                     && !MonsterAbilities.FallsBackToNormalAttack(abilityType, monster, companion)) // v1.1.14: else the normal attack below
                 {
-                    var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, companion);
+                    var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, companion, tactics ? random : null);
                     // Show "attacks companion!" only if ability targets them (not self-only like Regeneration)
                     if (!abilityResult.IsSelfOnly)
                     {
