@@ -210,6 +210,16 @@ public static partial class GameConfig
     /// </summary>
     public static bool ScaledPotionsEnabled { get; internal set; } = true;
 
+    /// <summary>
+    /// 1.2.8 difficulty pass: monsters choose their special ability with MonsterTactics (no wasted pick,
+    /// tier-1 signature abilities from monster level 3) and Predator and Skirmisher families weigh their
+    /// targets by trait. Default on. The setter is internal: it is not a sysop setting; tests and the
+    /// balance simulator turn it off. Off, every monster picks uniformly from its abilities and the fight
+    /// draws exactly the random numbers it drew before 1.2.8. Old God fights (BossContext) keep their own
+    /// picker either way.
+    /// </summary>
+    public static bool MonsterTacticsEnabled { get; internal set; } = true;
+
     /// <summary>1.2.8: the share of MaxHP a healing potion heals at least while ScaledPotionsEnabled is on.</summary>
     public const double ScaledPotionMaxHPFraction = 0.20;
 

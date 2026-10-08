@@ -223,6 +223,9 @@ public class Monster
     public string MonsterColor { get; set; } = "white";     // Color for display
     public string AttackType { get; set; } = "physical";    // Attack type (physical, fire, poison, etc.)
     public List<string> SpecialAbilities { get; set; } = new List<string>();  // Special abilities
+    /// <summary>1.2.8: tier-1 signature abilities (MonsterFamilies.MonsterTier.SignatureAbilities). Read only by
+    /// MonsterTactics, from monster level 3 and while GameConfig.MonsterTacticsEnabled is on.</summary>
+    public List<string> SignatureAbilities { get; set; } = new List<string>();
 
     /// <summary>
     /// Constructor for creating a monster

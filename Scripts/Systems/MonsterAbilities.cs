@@ -272,8 +272,11 @@ public static class MonsterAbilities
     /// <summary>
     /// Execute a monster ability and return the result
     /// </summary>
-    public static AbilityResult ExecuteAbility(AbilityType ability, Monster monster, Character target)
+    /// <remarks>1.2.8: every roll of the ability comes from <paramref name="rng"/> when one is given (the fight's
+    /// random source, so a seeded fight is reproducible); without one it uses the static source as before.</remarks>
+    public static AbilityResult ExecuteAbility(AbilityType ability, Monster monster, Character target, Random? rng = null)
     {
+        rng ??= _rnd;
         var result = new AbilityResult { AbilityUsed = ability };
 
         // Target pronouns: player target reads as "you"/"your"; companions and NPC teammates use their name.
@@ -284,7 +287,7 @@ public static class MonsterAbilities
         switch (ability)
         {
             case AbilityType.Multiattack:
-                result.ExtraAttacks = _rnd.Next(1, 3); // 1-2 extra attacks
+                result.ExtraAttacks = rng.Next(1, 3); // 1-2 extra attacks
                 result.Message = Loc.Get("mability.multiattack", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;
@@ -317,7 +320,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.FireBreath:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
@@ -327,7 +330,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.FrostBreath:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.2f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.2f, rng);
                 result.InflictStatus = StatusEffect.Frozen;
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
@@ -337,7 +340,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.PoisonCloud:
-                result.DirectDamage = CalculateBreathDamage(monster, 0.8f);
+                result.DirectDamage = CalculateBreathDamage(monster, 0.8f, rng);
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 6;
                 result.StatusChance = 70;
@@ -354,7 +357,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.ManaDrain:
-                result.ManaDrain = Math.Min(target.Mana, monster.Level * 5 + _rnd.Next(5, 15));
+                result.ManaDrain = Math.Min(target.Mana, monster.Level * 5 + rng.Next(5, 15));
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.mana_drain", MonsterNames.Display(monster), result.ManaDrain);
                 result.MessageColor = "bright_blue";
@@ -408,7 +411,7 @@ public static class MonsterAbilities
 
             case AbilityType.Phase:
                 result.DamageMultiplier = 0; // Damage avoidance — no damage
-                if (_rnd.Next(100) < 25)
+                if (rng.Next(100) < 25)
                 {
                     result.AvoidAllDamage = true;
                     monster.EvasionRounds = 2;
@@ -501,7 +504,7 @@ public static class MonsterAbilities
 
             case AbilityType.SummonMinions:
                 result.SummonMonsters = true;
-                result.SummonCount = _rnd.Next(1, 3);
+                result.SummonCount = rng.Next(1, 3);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.summon_minions", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
@@ -516,7 +519,7 @@ public static class MonsterAbilities
 
             case AbilityType.SoulReap:
                 // Small chance of instant kill
-                if (_rnd.Next(100) < 5) // 5% chance
+                if (rng.Next(100) < 5) // 5% chance
                 {
                     result.DirectDamage = (int)target.HP;
                     result.Message = (isPlayerTarget ? Loc.Get("mability.soul_reap_kill.you", MonsterNames.Display(monster)) : Loc.Get("mability.soul_reap_kill.ally", MonsterNames.Display(monster), target.Name));
@@ -616,7 +619,7 @@ public static class MonsterAbilities
 
             case AbilityType.CommandArmy:
                 result.SummonMonsters = true;
-                result.SummonCount = _rnd.Next(2, 4);
+                result.SummonCount = rng.Next(2, 4);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.command_army", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
@@ -633,7 +636,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Incorporeal:
-                result.AvoidAllDamage = _rnd.Next(100) < 30;
+                result.AvoidAllDamage = rng.Next(100) < 30;
                 result.DamageMultiplier = 0;
                 if (result.AvoidAllDamage)
                 {
@@ -649,8 +652,8 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Spellcasting:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.3f);
-                result.InflictStatus = _rnd.Next(3) switch { 0 => StatusEffect.Cursed, 1 => StatusEffect.Weakened, _ => StatusEffect.Silenced };
+                result.DirectDamage = CalculateBreathDamage(monster, 1.3f, rng);
+                result.InflictStatus = rng.Next(3) switch { 0 => StatusEffect.Cursed, 1 => StatusEffect.Weakened, _ => StatusEffect.Silenced };
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
                 result.SkipNormalAttack = true;
@@ -695,7 +698,7 @@ public static class MonsterAbilities
 
             case AbilityType.Frenzy:
                 result.DamageMultiplier = 1.3f;
-                result.ExtraAttacks = _rnd.Next(1, 3);
+                result.ExtraAttacks = rng.Next(1, 3);
                 result.Message = Loc.Get("mability.frenzy", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
                 break;
@@ -736,7 +739,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.AncientMagic:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.0f);
+                result.DirectDamage = CalculateBreathDamage(monster, 2.0f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.dragon_magic", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
@@ -765,7 +768,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Hellfire:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.8f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.8f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 4;
                 result.StatusChance = 60;
@@ -794,7 +797,7 @@ public static class MonsterAbilities
 
             // Giant
             case AbilityType.Boulder:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 30;
@@ -820,7 +823,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Lightning:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.7f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.7f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
@@ -830,7 +833,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Earthquake:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.4f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.4f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 50;
@@ -893,7 +896,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Immolate:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.6f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.6f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 4;
                 result.StatusChance = 70;
@@ -903,7 +906,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Fireball:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.fireball", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
@@ -929,7 +932,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Inferno:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.0f);
+                result.DirectDamage = CalculateBreathDamage(monster, 2.0f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 5;
                 result.StatusChance = 80;
@@ -973,8 +976,8 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.ShapeShift:
-                monster.Strength += _rnd.Next(-3, 8);
-                monster.ArmPow += _rnd.Next(-3, 8);
+                monster.Strength += rng.Next(-3, 8);
+                monster.ArmPow += rng.Next(-3, 8);
                 result.DamageMultiplier = 1.2f;
                 result.Message = Loc.Get("mability.shifts_form", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
@@ -984,7 +987,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2;
                 result.StatusChance = 35;
-                result.DirectDamage = CalculateBreathDamage(monster, 0.8f);
+                result.DirectDamage = CalculateBreathDamage(monster, 0.8f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = (isPlayerTarget ? Loc.Get("mability.madness.you", MonsterNames.Display(monster)) : Loc.Get("mability.madness.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_magenta";
@@ -1006,7 +1009,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.PhaseShift:
-                result.AvoidAllDamage = _rnd.Next(100) < 30;
+                result.AvoidAllDamage = rng.Next(100) < 30;
                 result.DamageMultiplier = 0;
                 if (result.AvoidAllDamage)
                 {
@@ -1031,7 +1034,7 @@ public static class MonsterAbilities
 
             case AbilityType.SummonSpiders:
                 result.SummonMonsters = true;
-                result.SummonCount = _rnd.Next(2, 4);
+                result.SummonCount = rng.Next(2, 4);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.summon_spiders", MonsterNames.Display(monster));
                 result.MessageColor = "white";
@@ -1047,7 +1050,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Swarm:
-                result.ExtraAttacks = _rnd.Next(2, 5);
+                result.ExtraAttacks = rng.Next(2, 5);
                 result.DamageMultiplier = 0.6f;
                 result.Message = Loc.Get("mability.spiderlings", MonsterNames.Display(monster));
                 result.MessageColor = "white";
@@ -1087,7 +1090,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.PoisonGas:
-                result.DirectDamage = CalculateBreathDamage(monster, 0.9f);
+                result.DirectDamage = CalculateBreathDamage(monster, 0.9f, rng);
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 5;
                 result.StatusChance = 65;
@@ -1123,7 +1126,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Overload:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.5f);
+                result.DirectDamage = CalculateBreathDamage(monster, 2.5f, rng);
                 monster.HP = Math.Max(1, monster.HP - monster.MaxHP / 5); // Self-damage
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.overload", MonsterNames.Display(monster));
@@ -1141,7 +1144,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.TreeMeld:
-                result.AvoidAllDamage = _rnd.Next(100) < 35;
+                result.AvoidAllDamage = rng.Next(100) < 35;
                 result.DamageMultiplier = 0;
                 if (result.AvoidAllDamage)
                 {
@@ -1167,14 +1170,14 @@ public static class MonsterAbilities
 
             case AbilityType.AnimateTrees:
                 result.SummonMonsters = true;
-                result.SummonCount = _rnd.Next(1, 3);
+                result.SummonCount = rng.Next(1, 3);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.animate_trees", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
                 break;
 
             case AbilityType.RootEntangle:
-                result.DirectDamage = CalculateBreathDamage(monster, 0.8f);
+                result.DirectDamage = CalculateBreathDamage(monster, 0.8f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
@@ -1184,7 +1187,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.TimeStop:
-                result.ExtraAttacks = _rnd.Next(2, 4);
+                result.ExtraAttacks = rng.Next(2, 4);
                 result.DamageMultiplier = 1.0f;
                 result.Message = Loc.Get("mability.stops_time", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
@@ -1201,7 +1204,7 @@ public static class MonsterAbilities
 
             // Sea Creature
             case AbilityType.TentacleGrab:
-                result.ExtraAttacks = _rnd.Next(1, 3);
+                result.ExtraAttacks = rng.Next(1, 3);
                 result.DamageMultiplier = 0.9f;
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
@@ -1225,7 +1228,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Whirlpool:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
@@ -1235,7 +1238,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.TidalWave:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.0f);
+                result.DirectDamage = CalculateBreathDamage(monster, 2.0f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.tidal_wave", MonsterNames.Display(monster));
                 result.MessageColor = "bright_blue";
@@ -1243,7 +1246,7 @@ public static class MonsterAbilities
 
             // Celestial
             case AbilityType.HolySmite:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.6f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.6f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.holy_smite", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
@@ -1260,7 +1263,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.DivineJudgment:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.2f);
+                result.DirectDamage = CalculateBreathDamage(monster, 2.2f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = (isPlayerTarget ? Loc.Get("mability.divine_judgment.you", MonsterNames.Display(monster)) : Loc.Get("mability.divine_judgment.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_yellow";
@@ -1301,7 +1304,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Terror:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.0f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.0f, rng);
                 result.InflictStatus = StatusEffect.Feared;
                 result.StatusDuration = 3;
                 result.StatusChance = 45;
@@ -1321,7 +1324,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Nightmare:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.3f);
+                result.DirectDamage = CalculateBreathDamage(monster, 1.3f, rng);
                 result.InflictStatus = StatusEffect.Feared;
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
@@ -1331,7 +1334,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.DevourSoul:
-                if (_rnd.Next(100) < 5)
+                if (rng.Next(100) < 5)
                 {
                     result.DirectDamage = (int)target.HP;
                     result.Message = (isPlayerTarget ? Loc.Get("mability.devour_soul_kill.you", MonsterNames.Display(monster)) : Loc.Get("mability.devour_soul_kill.ally", MonsterNames.Display(monster), target.Name));
@@ -1347,8 +1350,8 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.RealityBreak:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.8f);
-                result.InflictStatus = _rnd.Next(4) switch
+                result.DirectDamage = CalculateBreathDamage(monster, 1.8f, rng);
+                result.InflictStatus = rng.Next(4) switch
                 {
                     0 => StatusEffect.Stunned,
                     1 => StatusEffect.Feared,
@@ -1386,10 +1389,10 @@ public static class MonsterAbilities
     /// <summary>
     /// Calculate breath weapon damage
     /// </summary>
-    private static int CalculateBreathDamage(Monster monster, float multiplier)
+    private static int CalculateBreathDamage(Monster monster, float multiplier, Random rng)
     {
         int baseDamage = (int)(monster.Level * 3 + monster.Strength / 2);
-        return (int)(baseDamage * multiplier) + _rnd.Next(5, 15);
+        return (int)(baseDamage * multiplier) + rng.Next(5, 15);
     }
 
     /// <summary>

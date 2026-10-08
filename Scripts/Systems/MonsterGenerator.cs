@@ -88,6 +88,7 @@ public static class MonsterGenerator
         {
             monster.SpecialAbilities.Add(ability);
         }
+        monster.SignatureAbilities.AddRange(tier.SignatureAbilities ?? new());   // 1.2.8: read by MonsterTactics only
 
         // NG+ cycle monster buff (v0.52.0) — monsters get stronger each cycle
         // v0.56.1: also scale WeapPow and ArmPow (were missed in the original implementation
@@ -587,6 +588,7 @@ public static class MonsterGenerator
                 {
                     monster.SpecialAbilities.Add(ability);
                 }
+                monster.SignatureAbilities.AddRange(tier.SignatureAbilities ?? new());   // 1.2.8: read by MonsterTactics only
 
                 // NG+ cycle monster buff (v0.52.0) — same scaling as GenerateMonster()
                 // v0.56.1: include WeapPow and ArmPow to match the single-monster path
