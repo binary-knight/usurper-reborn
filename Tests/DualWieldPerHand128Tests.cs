@@ -56,14 +56,15 @@ public class DualWieldPerHand128Tests
             WeaponPower = power, MinLevel = 1, Rarity = EquipmentRarity.Common,
         });
 
-    private static int Shield() => EquipmentDatabase.RegisterDynamic(new Equipment
+    private static int Shield(int weaponPower = 0) => EquipmentDatabase.RegisterDynamic(new Equipment
     {
-        Name = "Test Kite Shield", Slot = EquipmentSlot.OffHand, WeaponType = WeaponType.Shield,
-        Handedness = WeaponHandedness.OffHandOnly, ShieldBonus = 4, BlockChance = 10, MinLevel = 1, Rarity = EquipmentRarity.Common,
+        Name = $"Test Kite Shield {weaponPower}", Slot = EquipmentSlot.OffHand, WeaponType = WeaponType.Shield,
+        Handedness = WeaponHandedness.OffHandOnly, ShieldBonus = 4, BlockChance = 10, WeaponPower = weaponPower,
+        MinLevel = 1, Rarity = EquipmentRarity.Common,
     });
 
     private static Character Hero(int? main, int? off, CharacterClass cls = CharacterClass.Assassin, int level = 30,
-        long str = 116, bool shield = false, CharacterAI ai = CharacterAI.Human, string name = "Tester")
+        long str = 116, bool shield = false, CharacterAI ai = CharacterAI.Human, string name = "Tester", int shieldPower = 0)
     {
         var c = new Character
         {
@@ -77,7 +78,7 @@ public class DualWieldPerHand128Tests
         };
         if (main.HasValue) c.EquippedItems[EquipmentSlot.MainHand] = Weapon(main.Value);
         if (off.HasValue) c.EquippedItems[EquipmentSlot.OffHand] = Weapon(off.Value);
-        if (shield) c.EquippedItems[EquipmentSlot.OffHand] = Shield();
+        if (shield) c.EquippedItems[EquipmentSlot.OffHand] = Shield(shieldPower);
         c.RecalculateStats();
         c.HP = c.MaxHP;
         return c;
@@ -143,7 +144,7 @@ public class DualWieldPerHand128Tests
     {
         var setups = new (string what, Character c)[]
         {
-            ("sword and shield", Hero(140, null, shield: true)),
+            ("sword and a shield with weapon power", Hero(140, null, shield: true, shieldPower: 7)),
             ("sword alone", Hero(140, null)),
             ("unarmed", Hero(null, null)),
         };
@@ -161,7 +162,7 @@ public class DualWieldPerHand128Tests
             c.SwingWeapPow(true).Should().Be(c.WeapPow, what);
             c.AbilityWeapPow.Should().Be(c.WeapPow, what);
         }
-        setups[0].c.WeapPow.Should().Be(Shared + 140);
+        setups[0].c.WeapPow.Should().Be(Shared + 140 + 7, "the shield's weapon power stays in");
         two.WeapPow.Should().Be(Shared + 150);
     }
 
@@ -209,6 +210,24 @@ public class DualWieldPerHand128Tests
         long mainAtHalf = SwingDamage(NewRig(hero, new FixedRandom(low: false)).Engine, Hero(1000, 1000, CharacterClass.Warrior), offHand: true);
         hits[1].Should().Be(offSwing);
         hits[1].Should().BeLessThan(mainAtHalf / 2, "a 10-power off hand is far below a 1000-power one");
+    }
+
+    [Fact]
+    public async Task TeammateAbilityOffHandFollowUp_ReadsTheOffHand()
+    {
+        async Task<List<long>> Hits(int main, int off)
+        {
+            var leader = Hero(10, null, name: "Leader");
+            var mate = Hero(main, off, CharacterClass.Warrior, ai: CharacterAI.Computer, name: "Mate");
+            var rig = NewRig(leader, new FixedRandom(low: false), new List<Character> { mate });
+            var ability = ClassAbilitySystem.UseAbility(mate, "power_strike", new FixedRandom(low: false));
+            await Call(rig.Engine, "ApplyAbilityEffectsMultiMonster", mate, rig.Monsters[0], rig.Monsters, ability, rig.Result);
+            return rig.Amounts(CombatSide.Team);
+        }
+        var both = await Hits(140, 133);
+        both.Should().HaveCount(2, "the ability hit, then the off-hand follow-up");
+        (await Hits(50, 133))[1].Should().Be(both[1], "the follow-up does not read the main hand");
+        (await Hits(140, 10))[1].Should().BeLessThan(both[1], "the follow-up reads the off hand");
     }
 
     // ---------- B6: teammate swings ----------
