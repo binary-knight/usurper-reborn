@@ -12895,7 +12895,7 @@ public class DungeonLocation : BaseLocation
 
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
-        int healPerPotion = 30 + player.Level * 5 + 20;
+        int healPerPotion = (int)PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -12960,7 +12960,7 @@ public class DungeonLocation : BaseLocation
         for (int i = 0; i < potionsToUse && target.HP < target.MaxHP; i++)
         {
             player.Healing--;
-            int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+            int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
@@ -13000,7 +13000,7 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
-        int healPerPotion = 30 + player.Level * 5 + 20;
+        int healPerPotion = (int)PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int totalPotionsUsed = 0;
         long totalHealing = 0;
@@ -13083,7 +13083,7 @@ public class DungeonLocation : BaseLocation
             {
                 player.Healing--;
                 totalPotionsUsed++;
-                int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
                 player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             }
@@ -13103,7 +13103,7 @@ public class DungeonLocation : BaseLocation
                 {
                     player.Healing--;
                     totalPotionsUsed++;
-                    int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                    int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
                     healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }
@@ -19344,7 +19344,7 @@ public class DungeonLocation : BaseLocation
         else
         {
             long oldHP = player.HP;
-            int healAmount = 30 + player.Level * 5 + Random.Shared.Next(10, 31);
+            int healAmount = (int)PotionBonus.BaseHeal(player, Random.Shared, 31); // 1.2.8: at least 20% of MaxHP
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the follower's own Infirmary
             player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             long actualHeal = player.HP - oldHP;

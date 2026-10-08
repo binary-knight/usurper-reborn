@@ -202,6 +202,17 @@ public static partial class GameConfig
     /// </summary>
     public static bool TelemetryPromptEnabled { get; set; } = false;
 
+    /// <summary>
+    /// 1.2.8 difficulty pass: a healing potion heals at least ScaledPotionMaxHPFraction of MaxHP, of the
+    /// character whose level the flat heal uses (PotionBonus.BaseHeal and AverageHeal). Default on. The
+    /// setter is internal: it is not a sysop setting; tests and the balance simulator turn it off to
+    /// reproduce the flat heal. Off or on, a potion draws the same random number.
+    /// </summary>
+    public static bool ScaledPotionsEnabled { get; internal set; } = true;
+
+    /// <summary>1.2.8: the share of MaxHP a healing potion heals at least while ScaledPotionsEnabled is on.</summary>
+    public const double ScaledPotionMaxHPFraction = 0.20;
+
     // ============================================================
     // v0.65.6 Renewable resurrections (player-experience analysis:
     // 3 lifetime lives vs a ~900-fight 20->40 grind at ~1% death

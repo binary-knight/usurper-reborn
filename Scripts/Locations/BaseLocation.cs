@@ -4232,7 +4232,7 @@ public abstract class BaseLocation
         }
 
         // Use one potion
-        long healAmount = 30 + currentPlayer.Level * 5 + Random.Shared.Next(10, 30);
+        long healAmount = PotionBonus.BaseHeal(currentPlayer, Random.Shared); // 1.2.8: at least 20% of MaxHP
         healAmount = PotionBonus.ApplyOwnerBonuses(currentPlayer, healAmount); // v1.1.11: Infirmary, before the cap
         healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
         currentPlayer.HP += healAmount;
