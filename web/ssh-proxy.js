@@ -2036,8 +2036,9 @@ function balancePct(part, whole) {
 
 // Difficulty tab filters: a class name (letters and spaces) and a DifficultyMode value 0..3.
 const BALANCE_CLASS_RE = /^[A-Za-z][A-Za-z ]{0,39}$/;
-// 1.2.8: the class charts' ?levels= band, a whitelist bound as two integers (player_level is 1 to 100).
-const BALANCE_LEVEL_BANDS = { 'all': null, '1-9': [1, 9], '10-19': [10, 19], '20-29': [20, 29], '30-39': [30, 39], '40+': [40, 100] };
+// 1.2.8: the class charts' ?levels= band, a whitelist bound as two integers (player_level is 1 to 100;
+// all spans every value, so the statement text is the same for every band).
+const BALANCE_LEVEL_BANDS = { 'all': [0, 1000000], '1-9': [1, 9], '10-19': [10, 19], '20-29': [20, 29], '30-39': [30, 39], '40+': [40, 100] };
 const BALANCE_DIFFICULTIES = ['0', '1', '2', '3'];
 
 // --- Balance Remote View (1.2.7) ---
@@ -2372,7 +2373,7 @@ async function handleBalanceRequest(req, res) {
 
   // GET /api/balance/class-performance
   if (method === 'GET' && url === '/api/balance/class-performance') {
-    const band = levelsParam === null ? null : BALANCE_LEVEL_BANDS[levelsParam];
+    const band = BALANCE_LEVEL_BANDS[levelsParam === null ? 'all' : levelsParam];
     try {
       const rows = db.prepare(`
         SELECT +player_class as player_class,
@@ -2387,10 +2388,10 @@ async function handleBalanceRequest(req, res) {
           AVG(CASE WHEN outcome = 'victory' THEN rounds END) as avg_rounds,
           MAX(damage_dealt) as max_damage
         FROM combat_events
-        WHERE created_at >= ?${band ? ' AND player_level >= ? AND player_level <= ?' : ''}
+        WHERE created_at >= ? AND player_level >= ? AND player_level <= ?
         GROUP BY +player_class
         ORDER BY total DESC, player_class
-      `).all(...(band ? [win.bound, band[0], band[1]] : [win.bound]));
+      `).all(win.bound, band[0], band[1]);
       sendJson(res, 200, {
         window: balanceWindowJson(win),
         levels: levelsParam === null ? 'all' : levelsParam,
