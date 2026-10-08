@@ -396,6 +396,8 @@ test('class charts: a level band selector (default 1-9), the player count on eac
   const p = await page('Alice', { balance_token: 'tok' }, (url) => (endpoint(url) === 'class-performance'
     ? { window: { key: 'since126', label: 'Alice', from: FROM, clipped: false }, levels: '1-9', rows } : undefined));
   await p.settle();
+  const chosen = p.el('levels-select').querySelectorAll('option').filter((o) => o.getAttribute('selected') !== null).map((o) => o.getAttribute('value'));
+  assert.deepStrictEqual(chosen, ['1-9'], 'the selector opens on a level band, not on all levels');
   const urls = p.calls.fetch.map((c) => c.url).filter((u) => endpoint(u) === 'class-performance');
   assert.ok(urls.length > 0);
   for (const u of urls) assert.match(u, /[?&]levels=1-9(&|$)/, 'the charts default to a level band: ' + u);
