@@ -247,6 +247,15 @@
         <option value="7d">Last 7 d</option>
         <option value="30d">Last 30 d</option>
       </select>
+      <label class="refresh-info" for="levels-select">Class charts level</label>
+      <select id="levels-select">
+        <option value="all">All levels</option>
+        <option value="1-9" selected>Levels 1-9</option>
+        <option value="10-19">Levels 10-19</option>
+        <option value="20-29">Levels 20-29</option>
+        <option value="30-39">Levels 30-39</option>
+        <option value="40+">Levels 40+</option>
+      </select>
       <span class="refresh-info" id="last-refresh"></span>
       <button onclick="refreshVisible()">Refresh</button>
       <button onclick="goToAdmin()" style="color:#ffaa00; border-color:#ffaa00;">&larr; Server Admin</button>
@@ -497,6 +506,14 @@ function currentWindow() {
   return document.getElementById('window-select').value || 'since126';
 }
 
+// The level band the class charts count (the default is the band with the most players).
+function currentLevels() {
+  return document.getElementById('levels-select').value || '1-9';
+}
+
+// A bar from fewer than this many players is drawn grey and says how many it is.
+const MIN_BAR_PLAYERS = 3;
+
 function withWindow(path) {
   return path + (path.includes('?') ? '&' : '?') + 'window=' + encodeURIComponent(currentWindow());
 }
@@ -588,11 +605,15 @@ function setWindowNote(id, w) {
 
 // --- Class Performance Charts ---
 async function loadClassPerformance() {
-  const d = await apiFetch(withWindow('/class-performance'));
+  const d = await apiFetch(withWindow('/class-performance') + '&levels=' + encodeURIComponent(currentLevels()));
   const data = d.rows;
   setWindowNote('classWinChart-window', d.window);
   setWindowNote('classDmgChart-window', d.window);
-  const labels = data.map(r => r.player_class);
+  const labels = data.map(r => r.player_class + (r.players < MIN_BAR_PLAYERS
+    ? ` (${r.players} ${r.players === 1 ? 'player' : 'players'})` : ` (${r.players})`));
+  const barFill = (r, i, alpha, offset) => r.players < MIN_BAR_PLAYERS
+    ? (alpha ? 'rgba(128,128,128,0.5)' : 'rgb(128,128,128)')
+    : (alpha ? `hsla(${i * 33 + offset}, 70%, 55%, 0.7)` : `hsl(${i * 33 + offset}, 70%, 55%)`);
   const winRates = data.map(r => r.winRate);
   const avgDmg = data.map(r => r.avg_damage);
 
@@ -602,8 +623,8 @@ async function loadClassPerformance() {
       labels,
       datasets: [{
         data: winRates,
-        backgroundColor: labels.map((_, i) => `hsla(${i * 33}, 70%, 55%, 0.7)`),
-        borderColor: labels.map((_, i) => `hsl(${i * 33}, 70%, 55%)`),
+        backgroundColor: data.map((r, i) => barFill(r, i, true, 0)),
+        borderColor: data.map((r, i) => barFill(r, i, false, 0)),
         borderWidth: 1
       }]
     },
@@ -616,8 +637,8 @@ async function loadClassPerformance() {
       labels,
       datasets: [{
         data: avgDmg,
-        backgroundColor: labels.map((_, i) => `hsla(${i * 33 + 180}, 70%, 55%, 0.7)`),
-        borderColor: labels.map((_, i) => `hsl(${i * 33 + 180}, 70%, 55%)`),
+        backgroundColor: data.map((r, i) => barFill(r, i, true, 180)),
+        borderColor: data.map((r, i) => barFill(r, i, false, 180)),
         borderWidth: 1
       }]
     },
@@ -1199,6 +1220,7 @@ document.querySelectorAll('.tab').forEach(tab => {
 
 // --- Filters ---
 document.getElementById('window-select').addEventListener('change', () => refreshVisible());
+document.getElementById('levels-select').addEventListener('change', () => refreshVisible());
 // a class list belongs to one source, so a new source starts from all classes
 document.getElementById('diff-source').addEventListener('change', () => {
   document.getElementById('diff-class').value = '';
