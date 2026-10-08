@@ -511,10 +511,59 @@ public static class MonsterGenerator
         return 1.0;
     }
 
-    public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null, double approachScale = 1.0)
+    /// <summary>1.2.8: the dungeon floors with encounter templates (GameConfig.EncounterTemplatesEnabled).</summary>
+    public const int TemplateMinFloor = 4;
+    public const int TemplateMaxFloor = 10;
+
+    /// <summary>1.2.8: a templated regular group is 1 (35%), 2 (45%) or 3 (20%) monsters, never more.</summary>
+    public const double TemplateSizeOneShare = 0.35;
+    public const double TemplateSizeTwoShare = 0.45;
+    public const int TemplateMaxGroupSize = 3;
+
+    /// <summary>The chance that a regular group is one family and one tier: 0.5 with templates, 0.7 without.</summary>
+    public const double TemplateSameFamilyChance = 0.5;
+    public const double SameFamilyChance = 0.7;
+
+    /// <summary>1.2.8 threat budget: each member of a templated group of 3 keeps this share of its HP and of
+    /// its Strength, Punch and WeapPow, so three are about 1.3 times two, not 1.5.</summary>
+    public const double TemplateBudgetHp = 0.8;
+    public const double TemplateBudgetDamage = 0.9;
+
+    /// <summary>1.2.8 caster role: the member that gets its family's spell keeps this share of its Strength.</summary>
+    public const double CasterStrength = 0.85;
+
+    /// <summary>1.2.8 caster role: the spell of each family that has one. A family not listed here (Fey and
+    /// Aberration by design, and every other one) never gives a caster. All three are in
+    /// CombatEvents.MonsterSpellAbilities, so the damage is recorded as spell damage.</summary>
+    internal static readonly Dictionary<string, string> CasterSpells = new(StringComparer.Ordinal)
+    {
+        ["Draconic"] = "Fireball", ["Elemental"] = "Fireball",
+        ["Undead"] = "Spellcasting", ["Goblinoid"] = "Spellcasting",
+        ["Demonic"] = "Hellfire",
+    };
+
+    /// <summary>True when the encounter templates apply: the switch is on, the caller is the dungeon (rules
+    /// given) and the real dungeon floor is in the template band. The band is read from the rules' floor,
+    /// never from the monster level: a straggler room on floor 14 asks for level 7 monsters and must keep
+    /// the draws made before 1.2.8.</summary>
+    internal static bool TemplatesApply(EncounterRules? rules) =>
+        GameConfig.EncounterTemplatesEnabled && rules != null
+        && rules.RealFloor >= TemplateMinFloor && rules.RealFloor <= TemplateMaxFloor;
+
+    /// <summary>The size of a templated regular group from one roll in [0, 1).</summary>
+    internal static int TemplateGroupSize(double roll) =>
+        roll < TemplateSizeOneShare ? 1 : roll < TemplateSizeOneShare + TemplateSizeTwoShare ? 2 : TemplateMaxGroupSize;
+
+    /// <param name="rules">1.2.8: given only by the dungeon (EncounterRules.Dungeon with the real floor). With
+    /// GameConfig.EncounterTemplatesEnabled on and that floor in 4 to 10 the group follows the encounter
+    /// templates: sizes 1, 2 and 3, one family half the time, a budgeted group of 3 and one caster in a
+    /// mixed group. Without rules, with the switch off or on any other floor the method draws the same
+    /// random numbers in the same order as before 1.2.8.</param>
+    public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null, double approachScale = 1.0, EncounterRules? rules = null)
     {
         random ??= Random.Shared;
         var monsters = new List<Monster>();
+        bool templates = TemplatesApply(rules);
 
         // Clamp dungeon level to valid range (1-100)
         dungeonLevel = Math.Max(1, Math.Min(100, dungeonLevel));
@@ -529,7 +578,8 @@ public static class MonsterGenerator
 
         // Regular encounter - 1 to 5 monsters
         // Higher levels tend toward more monsters
-        int groupSize = dungeonLevel switch
+        // 1.2.8: a templated dungeon floor rolls its own sizes (one draw, as before)
+        int groupSize = templates ? TemplateGroupSize(random.NextDouble()) : dungeonLevel switch
         {
             <= 10 => random.Next(1, 3),   // 1-2 monsters early game
             <= 30 => random.Next(1, 4),   // 1-3 monsters mid-early
@@ -538,7 +588,7 @@ public static class MonsterGenerator
         };
 
         // Generate monsters (usually same family for thematic encounters)
-        bool sameFamily = random.NextDouble() < 0.7; // 70% chance for same family
+        bool sameFamily = random.NextDouble() < (templates ? TemplateSameFamilyChance : SameFamilyChance); // 70% chance for same family (50% templated)
 
         if (sameFamily)
         {
@@ -617,6 +667,47 @@ public static class MonsterGenerator
             }
         }
 
+        if (templates)
+        {
+            if (monsters.Count >= TemplateMaxGroupSize) ApplyGroupBudget(monsters);
+            if (!sameFamily && monsters.Count >= 2) AssignCaster(monsters, random);
+        }
+
         return monsters;
+    }
+
+    /// <summary>1.2.8 threat budget of a templated group of 3: HP x0.8, Strength, Punch and WeapPow x0.9
+    /// for every member. Draws nothing.</summary>
+    private static void ApplyGroupBudget(List<Monster> monsters)
+    {
+        foreach (var m in monsters)
+        {
+            m.MaxHP = Math.Max(1, (long)(m.MaxHP * TemplateBudgetHp));
+            m.HP = m.MaxHP;
+            m.Strength = (long)(m.Strength * TemplateBudgetDamage);
+            m.Punch = (long)(m.Punch * TemplateBudgetDamage);
+            m.WeapPow = (long)(m.WeapPow * TemplateBudgetDamage);
+        }
+    }
+
+    /// <summary>
+    /// 1.2.8 caster role of a mixed templated group: one member whose family has a spell (CasterSpells),
+    /// picked with one draw when there is any (none otherwise), gets the spell added to its abilities and
+    /// its Strength x0.85. Its name is its tier name in monster.role.caster, written in English through
+    /// MonsterNames.FromKey and shown in each reader's language; TierName and FamilyName stay.
+    /// </summary>
+    private static void AssignCaster(List<Monster> monsters, Random random)
+    {
+        var eligible = monsters.Where(m => m.FamilyName != null && CasterSpells.ContainsKey(m.FamilyName)).ToList();
+        if (eligible.Count == 0) return;
+        MakeCaster(eligible[random.Next(eligible.Count)]);
+    }
+
+    private static void MakeCaster(Monster caster)
+    {
+        string spell = CasterSpells[caster.FamilyName];
+        if (!caster.SpecialAbilities.Contains(spell)) caster.SpecialAbilities.Add(spell);
+        caster.Strength = (long)(caster.Strength * CasterStrength);
+        caster.Name = MonsterNames.FromKey("monster.role.caster", caster.TierName);
     }
 }

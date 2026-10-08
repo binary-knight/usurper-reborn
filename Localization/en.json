@@ -17735,6 +17735,7 @@
   "monster.champion.alpha": "Alpha {0}",
   "monster.champion.default": "{0} Champion",
   "monster.leader": "{0} Leader",
+  "monster.role.caster": "{0} Shaman",
   "combat.loot_choice_equip": "Equip",
   "combat.loot_choice_take": "Take",
   "combat.loot_choice_pass": "Pass",

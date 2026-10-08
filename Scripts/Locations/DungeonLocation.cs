@@ -5660,7 +5660,8 @@ public class DungeonLocation : BaseLocation
         }
 
         // Generate monsters appropriate for this room
-        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
+        // 1.2.8: the rules carry the real floor; a straggler room keeps its lower monster level
+        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel), EncounterRules.Dungeon(currentDungeonLevel));
 
         // v0.61.3 (player report, post-v0.61.2 cleared floors): "champions
         // typically have more HP than the floor boss, regular enemies often
@@ -7696,7 +7697,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         // Use new MonsterGenerator to create level-appropriate monsters
-        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
+        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel), EncounterRules.Dungeon(currentDungeonLevel));
 
         var combatEngine = new CombatEngine(terminal);
 
