@@ -17,6 +17,8 @@ NG+ is offered only after the main story's final encounter ends with an ending. 
 
 The NG+ screen shows your current and next cycle and the prestige classes the ending unlocks. Ascending instead turns the character into a [player-god](/wiki/en/gods/player-gods/).
 
+An alt character cannot ascend; the game then offers it the Eternal Cycle. Reaching the level cap of 100 is not required for either path.
+
 ## What carries over
 
 NG+ creates a brand new character. The old save is replaced, and these do not carry over:
