@@ -5749,6 +5749,7 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine("!");
             }
         }
+        WriteEliteIntro(monsters);   // 1.2.8: the elite of the group and what its affixes do
 
         terminal.WriteLine("");
 
@@ -5762,6 +5763,8 @@ public class DungeonLocation : BaseLocation
             BroadcastDungeonEvent(lang => bossRoom
                 ? $"\u001b[1;31m  *** {Loc.GetIn(lang, "dungeon.bc_boss_encounter", MonsterSummary(lang))} ***\u001b[0m"
                 : $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.bc_combat", MonsterSummary(lang))}\u001b[0m");
+            // 1.2.8: the elite's line, in each follower's language
+            if (monsters.Any(m => m.IsElite)) BroadcastDungeonEvent(EliteBroadcast(monsters));
         }
 
         await Pacing.Wait(1500);
@@ -7697,6 +7700,34 @@ public class DungeonLocation : BaseLocation
         bossRoom ? null : EncounterRules.Dungeon(realFloor);
 
     /// <summary>
+    /// 1.2.8: the line that names the elite of an encounter and says what its affixes do, in the given
+    /// language; null when the encounter has no elite. Two descriptions (from floor 51) are joined by the
+    /// encounter line's own "and". The line can be longer than 79 columns: both writers wrap it.
+    /// </summary>
+    internal static string? EliteIntro(string lang, IReadOnlyList<Monster> monsters)
+    {
+        var elite = monsters.FirstOrDefault(m => m.IsElite);
+        if (elite == null) return null;
+        string does = string.Join(Loc.GetIn(lang, "dungeon.and_separator"),
+            elite.EliteAffixes.Select(affix => Loc.GetIn(lang, "monster.elite_desc." + affix)));
+        return Loc.GetIn(lang, monsters.Count > 1 ? "dungeon.elite_appears" : "dungeon.elite_appears_alone",
+            MonsterNames.DisplayIn(lang, elite), does);
+    }
+
+    /// <summary>1.2.8: the elite's line as a group follower reads it, built in the follower's language
+    /// (BroadcastDungeonEvent wraps it to 79 columns).</summary>
+    internal static Func<string, string> EliteBroadcast(IReadOnlyList<Monster> monsters) =>
+        lang => $"\u001b[1;35m  {EliteIntro(lang, monsters)}\u001b[0m";
+
+    /// <summary>1.2.8: writes the elite's line to the player, wrapped to 79 columns; nothing without an elite.</summary>
+    private void WriteEliteIntro(List<Monster> monsters)
+    {
+        if (EliteIntro(GameConfig.Language, monsters) is not string intro) return;
+        terminal.SetColor("bright_magenta");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, intro);
+    }
+
+    /// <summary>
     /// Monster encounter - Pascal DUNGEVC.PAS mechanics
     /// </summary>
     private async Task MonsterEncounter()
@@ -7780,6 +7811,7 @@ public class DungeonLocation : BaseLocation
             }
             terminal.WriteLine("");
         }
+        WriteEliteIntro(monsters);   // 1.2.8: the elite of the group and what its affixes do
 
         // Show difficulty assessment
         var currentPlayer = GetCurrentPlayer();

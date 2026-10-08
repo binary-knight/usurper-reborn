@@ -111,9 +111,10 @@ public class EncounterTemplates128Tests
 
     private static T WithSwitch<T>(bool on, Func<T> body)
     {
-        bool saved = GameConfig.EncounterTemplatesEnabled;
-        try { GameConfig.EncounterTemplatesEnabled = on; return body(); }
-        finally { GameConfig.EncounterTemplatesEnabled = saved; }
+        // elites (the piece after this one, EliteMonsters128Tests) are off here: these rows read the templates alone
+        bool saved = GameConfig.EncounterTemplatesEnabled, savedElites = GameConfig.EliteMonstersEnabled;
+        try { GameConfig.EncounterTemplatesEnabled = on; GameConfig.EliteMonstersEnabled = false; return body(); }
+        finally { GameConfig.EncounterTemplatesEnabled = saved; GameConfig.EliteMonstersEnabled = savedElites; }
     }
 
     private static string Sig(IEnumerable<Monster> group) =>

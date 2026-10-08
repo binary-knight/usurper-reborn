@@ -72,6 +72,15 @@ public class Monster
     // Special monster flags
     public bool IsBoss { get; set; } = false;
     public bool IsMiniBoss { get; set; } = false;       // Champion/elite monsters (10% random encounters)
+    /// <summary>1.2.8: an elite of a regular dungeon group (MonsterGenerator.PromoteElite). Run time only, never
+    /// saved. An elite is not a mini-boss: fear, stun and loot rules treat it as a regular monster.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsElite { get; set; } = false;
+    /// <summary>1.2.8: the elite's affixes as MonsterGenerator.EliteAffixIds ids ("frenzied"), the outermost
+    /// word of its name first; one, or two from GameConfig.EliteSecondAffixFloor. Empty for every other
+    /// monster. Run time only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<string> EliteAffixes { get; set; } = new List<string>();
     public bool IsUnique { get; set; } = false;
     public bool CanSpeak { get; set; } = false;         // From Pascal mon_talk setting
     public bool IsProperName { get; set; } = false;     // Named NPCs (no "The" prefix)
