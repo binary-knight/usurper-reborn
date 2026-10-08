@@ -138,6 +138,22 @@ public class MonsterTactics128Tests
         Draws(false).Should().NotContain(c => c.StartsWith("Next(1,3)="), "off, it comes from the static source as before");
     }
 
+    [Fact]
+    public void D1_TheCompanionPath_HandsTheEngineRandomToTheAbility_OnlyWhileTacticsAreOn()
+    {
+        List<string> Draws(bool on) => WithSwitch(on, () =>
+        {
+            var random = new RecordingRandom(128);
+            var companion = Fighter("Lyra");
+            var rig = NewRig(random, companion);
+            var wolf = Mon("Dire Wolf", "Beast", 300, "Multiattack");
+            for (int i = 0; i < 40; i++) HitCompanion(rig, wolf, companion);
+            return random.Calls;
+        });
+        Draws(true).Should().Contain(c => c.StartsWith("Next(1,3)="));
+        Draws(false).Should().NotContain(c => c.StartsWith("Next(1,3)="));
+    }
+
     // ---------------------------------------------------------------- D2
 
     private static int Count(string ability, Monster m, Character target, int seed = 128)
@@ -193,6 +209,32 @@ public class MonsterTactics128Tests
         var cursed = Fighter("Cursed");
         foreach (var s in new[] { StatusEffect.Cursed, StatusEffect.Weakened, StatusEffect.Silenced }) cursed.ApplyStatus(s, 3);
         Count("Spellcasting", lich, cursed).Should().Be(Turns, "Spellcasting rolls its status, so it is never left out");
+    }
+
+    [Fact]
+    public void D3_ThePlayerPath_UsesTheTactic()
+    {
+        int Webs(bool on, bool stunned) => WithSwitch(on, () =>
+        {
+            var rig = NewRig(new Random(128));
+            var spider = Mon("Giant Spider", "Insectoid", 300, "WebTrap");   // chance 90
+            string web = MonsterAbilities.ExecuteAbility(MonsterAbilities.AbilityType.WebTrap, spider, rig.Hero, new Random(1)).Message;
+            int webs = 0;
+            for (int i = 0; i < 60; i++)
+            {
+                rig.Hero.ActiveStatuses.Clear();
+                if (stunned) rig.Hero.ApplyStatus(StatusEffect.Stunned, 2);
+                rig.Output.SetLength(0);
+                bool used = Special(rig, spider);
+                bool shown = Shown(rig).Contains(web);
+                used.Should().Be(shown, "WebTrap takes the turn when it is used");
+                if (shown) webs++;
+            }
+            return webs;
+        });
+        Webs(on: true, stunned: false).Should().BeGreaterThan(30, "a free player is webbed at the 90% ability chance");
+        Webs(on: true, stunned: true).Should().Be(0, "a stunned player gets the spider's normal attack");
+        Webs(on: false, stunned: true).Should().BeGreaterThan(30, "off, the pick is uniform as before");
     }
 
     /// <summary>The table MonsterTactics reads is the status each handler really sets.</summary>
