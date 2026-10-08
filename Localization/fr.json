@@ -18316,6 +18316,7 @@
   "base.stat_combat_style": "Style de Combat : ",
   "base.style_two_handed": "Deux Mains (+25% dégâts, -15% défense)",
   "base.style_dual_wield": "Ambidextre (+1 attaque, -10% défense)",
+  "base.style_dual_wield_hands": "Puissance d’arme : main principale {0}, main secondaire {1}",
   "base.style_sword_board": "Épée & Bouclier (équilibré, 20% blocage)",
   "base.style_one_handed": "Une Main",
   "base.slot_main_hand": "Main Principale : ",

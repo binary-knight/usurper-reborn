@@ -1205,6 +1205,44 @@ public class Character
         return null;
     }
 
+    // 1.2.8: dual-wield per hand. WeapPow sums every equipped item, so a dual-wielder used to swing
+    // both weapons on every swing. Each swing now reads its own hand's weapon; abilities read the
+    // main hand plus half the off hand. Everything that is not a hand item (base, bonus, sets,
+    // artifacts, other gear) is shared by both hands. Not dual-wielding, every helper is WeapPow.
+
+    /// <summary>1.2.8: the WeaponPower of the item in that hand (0 when empty, never below 0).</summary>
+    public long HandWeapPow(EquipmentSlot slot) => Math.Max(0, (long)(GetEquipment(slot)?.WeaponPower ?? 0));
+
+    /// <summary>1.2.8: the weapon power both hands share when dual-wielding: WeapPow less the two hand items.</summary>
+    public long SharedWeapPow =>
+        IsDualWielding ? Math.Max(0, WeapPow - HandWeapPow(EquipmentSlot.MainHand) - HandWeapPow(EquipmentSlot.OffHand)) : WeapPow;
+
+    /// <summary>1.2.8: the weapon power one swing reads: the shared power plus that hand's item.</summary>
+    public long SwingWeapPow(bool offHand)
+    {
+        if (!IsDualWielding) return WeapPow;
+        long main = HandWeapPow(EquipmentSlot.MainHand), off = HandWeapPow(EquipmentSlot.OffHand);
+        long hand = offHand ? off : main;
+        // Something that cut WeapPow itself below the two items (a PvP disarm halves it) cuts each
+        // hand by the same share, so the cut still bites a dual-wielder.
+        if (WeapPow < main + off)
+            return main + off > 0 ? Math.Max(0, WeapPow) * hand / (main + off) : 0;
+        return SharedWeapPow + hand;
+    }
+
+    /// <summary>1.2.8: the weapon power an ability reads: the shared power, the main hand and half the off hand.</summary>
+    public long AbilityWeapPow
+    {
+        get
+        {
+            if (!IsDualWielding) return WeapPow;
+            long main = HandWeapPow(EquipmentSlot.MainHand), off = HandWeapPow(EquipmentSlot.OffHand);
+            if (WeapPow < main + off)
+                return main + off > 0 ? Math.Max(0, WeapPow) * (main + off / 2) / (main + off) : 0;
+            return SharedWeapPow + main + off / 2;
+        }
+    }
+
     /// <summary>
     /// Check if an item requires the player to choose which slot to equip it in.
     /// Returns true for one-handed weapons (can go in MainHand or OffHand for dual wielding).

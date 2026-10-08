@@ -18335,6 +18335,7 @@
   "base.stat_combat_style": "Harci stílus: ",
   "base.style_two_handed": "Kétkezes (+25% sebzés, -15% védekezés)",
   "base.style_dual_wield": "Páros fegyver (+1 támadás, -10% védekezés)",
+  "base.style_dual_wield_hands": "Fegyvererő: főkéz {0}, másik kéz {1}",
   "base.style_sword_board": "Kard és pajzs (kiegyensúlyozott, 20% hárítási esély)",
   "base.style_one_handed": "Egykezes",
   "base.slot_main_hand": "Fő kéz:      ",

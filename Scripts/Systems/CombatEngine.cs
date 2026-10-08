@@ -13879,9 +13879,10 @@ public partial class CombatEngine
                             attackPower = Math.Max(1, attackPower - player.Level / 10 - 4);
 
                         // Weapon power with level scaling and random (soft cap prevents extreme stacking)
-                        if (player.WeapPow > 0)
+                        long swingWeapPow = player.SwingWeapPow(isOffHandAttack);   // 1.2.8: this hand's weapon
+                        if (swingWeapPow > 0)
                         {
-                            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+                            long effectiveWeap = GetEffectiveWeapPow(swingWeapPow);
                             long weaponBonus = effectiveWeap + (player.Level / 10);
                             attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
                         }
@@ -14745,7 +14746,7 @@ public partial class CombatEngine
         int successChance = Math.Min(95, 50 + (int)(effectiveDex / 2));
         if (random.Next(100) < successChance)
         {
-            long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 3;
+            long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 3;
             backstabDamage += random.Next(1, 20);
             backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
 
@@ -14815,9 +14816,10 @@ public partial class CombatEngine
             powerDamage = Math.Max(1, powerDamage - player.Level / 10 - 4);
 
         // Weapon power with variance
-        if (player.WeapPow > 0)
+        long abilityWeapPow = player.AbilityWeapPow;   // 1.2.8: main hand plus half the off hand
+        if (abilityWeapPow > 0)
         {
-            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+            long effectiveWeap = GetEffectiveWeapPow(abilityWeapPow);
             powerDamage += effectiveWeap + random.Next(0, (int)Math.Min(int.MaxValue, effectiveWeap / 2 + 1));
         }
         int variationMax = Math.Max(21, player.Level / 2);
@@ -14920,7 +14922,7 @@ public partial class CombatEngine
         await Pacing.Wait(GetCombatDelay(500));
 
         // Precise Strike: normal damage, +25% accuracy via reducing defense by 25%
-        long attackPower = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
+        long attackPower = player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow) + random.Next(1, 15);
 
         // Apply weapon configuration damage modifier (2H bonus)
         double damageModifier = GetWeaponConfigDamageModifier(player);
@@ -15009,7 +15011,7 @@ public partial class CombatEngine
         await Pacing.Wait(GetCombatDelay(500));
 
         // Smite: 150% damage + level bonus (with weapon soft cap)
-        long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.5) + player.Level;
+        long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 1.5) + player.Level;
         smiteDamage += random.Next(10, 25);
         smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
 
@@ -15552,7 +15554,7 @@ public partial class CombatEngine
                 }
                 else
                 {
-                    ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
+                    ohDamage = player.Strength + GetEffectiveWeapPow(player.SwingWeapPow(offHand: true)) + random.Next(1, 15);
                     double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
                     ohDamage = (long)(ohDamage * ohMod);
                     ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
@@ -19433,7 +19435,7 @@ public partial class CombatEngine
                 await Pacing.Wait(GetCombatDelay(500));
 
                 // Calculate teammate attack damage (with weapon soft cap)
-                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.SwingWeapPow(isOffHandAttack)) + random.Next(1, 16);
                 attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
 
                 // Apply weapon configuration damage modifier (includes alignment bonuses, off-hand penalty)
@@ -26908,7 +26910,7 @@ public partial class CombatEngine
             return;
         }
 
-        long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
+        long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.SwingWeapPow(isOffHand)) + random.Next(1, 16);
 
         // Weapon config modifier; the off-hand flag applies the same reduced-power
         // off-hand multiplier the PvE path uses.
@@ -27495,7 +27497,7 @@ public partial class CombatEngine
             await Pacing.Wait(GetCombatDelay(800));
             return;
         }
-        long attackPower = computer.Strength + GetEffectiveWeapPow(computer.WeapPow) + random.Next(1, 16);
+        long attackPower = computer.Strength + GetEffectiveWeapPow(computer.SwingWeapPow(offHand: false)) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
         double damageModifier = GetWeaponConfigDamageModifier(computer);

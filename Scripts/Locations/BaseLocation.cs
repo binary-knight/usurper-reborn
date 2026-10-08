@@ -7036,6 +7036,10 @@ public abstract class BaseLocation
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("base.style_dual_wield"));
+            // 1.2.8: each swing reads its own hand's weapon
+            terminal.SetColor("white");
+            terminal.WriteLine("  " + Loc.Get("base.style_dual_wield_hands",
+                currentPlayer.SwingWeapPow(offHand: false), currentPlayer.SwingWeapPow(offHand: true)));
         }
         else if (currentPlayer.HasShieldEquipped)
         {

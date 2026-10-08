@@ -18327,6 +18327,7 @@
   "base.stat_combat_style": "Estilo de Combate: ",
   "base.style_two_handed": "Dos Manos (+25% daño, -15% defensa)",
   "base.style_dual_wield": "Doble Arma (+1 ataque, -10% defensa)",
+  "base.style_dual_wield_hands": "Poder de arma: mano principal {0}, mano secundaria {1}",
   "base.style_sword_board": "Espada y Escudo (equilibrado, 20% bloqueo)",
   "base.style_one_handed": "Una Mano",
   "base.slot_main_hand": "Mano Ppal: ",
