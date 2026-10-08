@@ -1,15 +1,36 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.2.5
-sources: Scripts/Systems/SpellSystem.cs
+checked: 1.2.7
+sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs
 history: 1.2.5 | Spell cast messages are shown in all five languages, and long spell messages wrap inside 79 columns.
 history: 1.2.4 | none
 ---
-Spells are class-specific definitions. Required level, mana cost and effect text below come from the game. The spell's catalog slot is not the same as your character level.
+Spells are class-specific definitions. The table below shows each spell's catalog values and effect text. The spell's catalog slot is not the same as your character level.
 
 Learn spells through the appropriate in-game training or shop options. A catalog entry is not proof that your current character has learned it. Multi-target effects, wards and status effects also follow their combat rules.
 
 {{table:spells}}
 
 For Sage party wards and the difference between a shield and healing, read [groups and support](/wiki/en/combat/groups/).
+
+## Level and mana
+
+The level at which you can learn and cast a spell is the higher of its listed required level and the level of its catalog slot. Slots 1 to 25 open at levels 1, 4, 8, 12, 16, 20, 25, 28, 32, 36, 40, 44, 47, 50, 54, 58, 62, 66, 70, 75, 80, 85, 90, 95 and 100. For the 25-spell classes the slot level decides; for the five-spell prestige classes the listed level can be higher.
+
+A cast costs 10 mana plus 5 per catalog slot, not the table's mana value. Wisdom lowers that by 1.5 percent per point above 10, up to half, and a cast never costs less than 5 plus one fifth of the slot, rounded down. Ocean's Memory halves the final cost.
+
+## How spells scale
+
+Spells do not use the ability scaling. Each kind of effect has its own rule, and training proficiency in the spell multiplies all of them.
+
+- Damage: the base damage times 1 plus 3 percent per character level, times your casting stat multiplier. The casting stat is Intelligence; Wavecallers use Charisma. The multiplier is 1 plus 5 percent per point above 10 up to 85, then 1.5 percent per point above 85, and never more than 8 times. Clerics and Sages also gain 1 percent per point of Wisdom above 10, and lose 1 percent per point below 10. Magicians deal 15 percent more spell damage. Damage varies by up to 10 percent either way.
+- Spell critical hits, for damage only: the chance is half of your casting stat above 10, in percent, up to 50 percent. A critical spell does 50 percent more damage.
+- Healing: the base healing times 1 plus 2.5 percent per character level, times 1 plus 1.5 percent per point of Wisdom above 10, at most 3 times. Healing varies by up to 5 percent either way. Clerics heal 25 percent more with spells.
+- Protection: the base protection times 1 plus 2 percent per character level, times 1 plus 1.5 percent per point of Intelligence above 10 up to 60, then 0.5 percent per point, at most 2.5 times. Wavecallers use Charisma here too.
+
+Drugs, herbs, food and god boons can add to these results. A healer [specialization](/wiki/en/characters/specializations/) adds 20 percent to spell healing.
+
+## Spells that move alignment
+
+Two Cleric spells change your alignment each time you cast them. Cure Critical removes up to 10 Darkness, or adds 10 Chivalry if you have no Darkness. Judgment removes up to 30 Darkness, or adds 30 Chivalry if you have no Darkness. See [alignment](/wiki/en/characters/stats/#alignment).
