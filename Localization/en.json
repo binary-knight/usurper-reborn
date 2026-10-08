@@ -18541,6 +18541,7 @@
   "base.stat_combat_style": "Combat Style: ",
   "base.style_two_handed": "Two-Handed (+25% damage, -15% defense)",
   "base.style_dual_wield": "Dual-Wield (+1 attack, -10% defense)",
+  "base.style_dual_wield_hands": "Weapon power: main hand {0}, off hand {1}",
   "base.style_sword_board": "Sword & Board (balanced, 20% block chance)",
   "base.style_one_handed": "One-Handed",
   "base.slot_main_hand": "Main Hand: ",

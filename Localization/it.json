@@ -18316,6 +18316,7 @@
   "base.stat_combat_style": "Stile di Combattimento: ",
   "base.style_two_handed": "Due Mani (+25% danno, -15% difesa)",
   "base.style_dual_wield": "Doppia Arma (+1 attacco, -10% difesa)",
+  "base.style_dual_wield_hands": "Potenza arma: mano principale {0}, mano secondaria {1}",
   "base.style_sword_board": "Spada e Scudo (bilanciato, 20% probabilità di parata)",
   "base.style_one_handed": "Una Mano",
   "base.slot_main_hand": "Mano Principale: ",
