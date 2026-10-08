@@ -17529,6 +17529,7 @@
   "monster.champion.alpha": "Alfa {0}",
   "monster.champion.default": "{0} Bajnok",
   "monster.leader": "{0} Vezér",
+  "monster.role.caster": "{0} Sámán",
   "combat.loot_choice_equip": "Felszerel",
   "combat.loot_choice_take": "Elvesz",
   "combat.loot_choice_pass": "Kihagy",

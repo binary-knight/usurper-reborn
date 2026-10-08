@@ -17521,6 +17521,7 @@
   "monster.champion.alpha": "{0} Alfa",
   "monster.champion.default": "Campeón {0}",
   "monster.leader": "Líder {0}",
+  "monster.role.caster": "Chamán {0}",
   "combat.loot_choice_equip": "Equipar",
   "combat.loot_choice_take": "Tomar",
   "combat.loot_choice_pass": "Pasar",

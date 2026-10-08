@@ -17521,6 +17521,7 @@
   "monster.champion.alpha": "{0} Alfa",
   "monster.champion.default": "Campione {0}",
   "monster.leader": "Capo {0}",
+  "monster.role.caster": "Sciamano {0}",
   "combat.loot_choice_equip": "Equipaggia",
   "combat.loot_choice_take": "Prendi",
   "combat.loot_choice_pass": "Passa",

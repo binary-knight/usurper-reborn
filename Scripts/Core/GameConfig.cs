@@ -220,6 +220,16 @@ public static partial class GameConfig
     /// </summary>
     public static bool MonsterTacticsEnabled { get; internal set; } = true;
 
+    /// <summary>
+    /// 1.2.8 difficulty pass: dungeon floors 4 to 10 build regular encounters from templates
+    /// (MonsterGenerator.GenerateMonsterGroup with EncounterRules.Dungeon): sizes 1, 2 and 3, one family half
+    /// the time, a budgeted group of 3 and one caster in a mixed group. Default on. The setter is internal:
+    /// it is not a sysop setting; tests and the balance simulator turn it off. Off, on any other floor and
+    /// for every caller outside the dungeon the generator draws exactly the random numbers it drew before
+    /// 1.2.8.
+    /// </summary>
+    public static bool EncounterTemplatesEnabled { get; internal set; } = true;
+
     /// <summary>1.2.8: the share of MaxHP a healing potion heals at least while ScaledPotionsEnabled is on.</summary>
     public const double ScaledPotionMaxHPFraction = 0.20;
 
