@@ -692,6 +692,43 @@ public class EliteMonsters128Tests
         WithElites(true, () => MonsterGenerator.ElitesApply(EncounterRules.Dungeon(2))).Should().BeFalse();
     }
 
+    /// <summary>Floor: the next Random.Next() after GenerateMonsterGroup(floor, new Random(seed), approach scale)
+    /// for seeds 1 to 8, written by the code of release-1.2.8 at 25ae2a88, before this piece.</summary>
+    private static readonly Dictionary<int, int[]> GoldenNext = new()
+    {
+        [1] = new[] { 2026928803, 956804207, 1738297895, 512880076, 2041397713, 325561466, 964263065, 978507572 },
+        [2] = new[] { 2026928803, 956804207, 1738297895, 512880076, 2041397713, 325561466, 964263065, 978507572 },
+        [3] = new[] { 2026928803, 956804207, 1738297895, 512880076, 2041397713, 325561466, 964263065, 978507572 },
+        [5] = new[] { 2026928803, 956804207, 1738297895, 512880076, 2041397713, 325561466, 964263065, 978507572 },
+        [7] = new[] { 2026928803, 956804207, 1738297895, 512880076, 2041397713, 325561466, 964263065, 978507572 },
+        [10] = new[] { 2026928803, 956804207, 1738297895, 512880076, 2041397713, 325561466, 964263065, 978507572 },
+        [11] = new[] { 2026928803, 1643613848, 1941174205, 1182260519, 2041397713, 325561466, 239012274, 978507572 },
+        [20] = new[] { 2026928803, 1643613848, 1941174205, 1182260519, 2041397713, 325561466, 239012274, 978507572 },
+        [30] = new[] { 2026928803, 1643613848, 1941174205, 1182260519, 2041397713, 325561466, 239012274, 978507572 },
+        [31] = new[] { 61497087, 1095264800, 1022645543, 1167815425, 2094996837, 1669652147, 1728474465, 398896179 },
+        [51] = new[] { 61497087, 1095264800, 1022645543, 1167815425, 2094996837, 1669652147, 1728474465, 398896179 },
+        [60] = new[] { 61497087, 1095264800, 1022645543, 1167815425, 2094996837, 1669652147, 1728474465, 398896179 },
+        [100] = new[] { 2125508764, 1509870614, 173222122, 1854161696, 152016555, 1369710355, 53742861, 1356251957 },
+    };
+
+    [Fact]
+    public void F14_SwitchOff_OrNoRules_TheNextRandomAfterTheCall_IsTheOneOfBefore()
+    {
+        foreach (var (floor, golden) in GoldenNext)
+            for (int seed = 1; seed <= 8; seed++)
+            {
+                double scale = MonsterGenerator.OldGodApproachScale(floor);
+                // no rules, the switch at its default (on): every caller outside the dungeon
+                var a = new Random(seed);
+                WithElites(true, () => MonsterGenerator.GenerateMonsterGroup(floor, a, scale));
+                a.Next().Should().Be(golden[seed - 1], "no rules: floor {0} seed {1}", floor, seed);
+                // the dungeon's rules with the switch off (templates off too: they are another piece's draws)
+                var b = new Random(seed);
+                WithTemplatesOff(() => WithElites(false, () => MonsterGenerator.GenerateMonsterGroup(floor, b, scale, EncounterRules.Dungeon(floor))));
+                b.Next().Should().Be(golden[seed - 1], "switch off: floor {0} seed {1}", floor, seed);
+            }
+    }
+
     private static T WithTemplatesOff<T>(Func<T> body)
     {
         bool saved = GameConfig.EncounterTemplatesEnabled;
