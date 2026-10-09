@@ -5732,21 +5732,8 @@ public class DungeonLocation : BaseLocation
             }
             else
             {
-                // Mixed encounter
-                terminal.Write(Loc.Get("dungeon.you_face_prefix"));
-                for (int i = 0; i < monsterGroups.Count; i++)
-                {
-                    var group = monsterGroups[i];
-                    string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);
-
-                    if (i > 0 && i == monsterGroups.Count - 1)
-                        terminal.Write(Loc.Get("dungeon.and_separator"));
-                    else if (i > 0)
-                        terminal.Write(", ");
-
-                    terminal.Write($"{group.Count} {plural}");
-                }
-                terminal.WriteLine("!");
+                // Mixed encounter (1.2.8: one row, wrapped at 79 columns when it is longer)
+                WriteMixedEncounterLine(terminal, monsters, GetPluralName);
             }
         }
         WriteEliteIntro(monsters);   // 1.2.8: the elite of the group and what its affixes do
@@ -7713,6 +7700,31 @@ public class DungeonLocation : BaseLocation
         return Loc.GetIn(lang, monsters.Count > 1 ? "dungeon.elite_appears" : "dungeon.elite_appears_alone",
             MonsterNames.DisplayIn(lang, elite), does);
     }
+
+    /// <summary>
+    /// 1.2.8: the room fight's line for a group of more than one name ("You face 1 A, 1 B and 1 C!"), in the
+    /// reader's language, as one row. It can be longer than 79 columns with four or five long names on the
+    /// deep floors: the caller writes it through UIHelper.WriteRow, which leaves a row that fits as it is.
+    /// </summary>
+    internal static string MixedEncounterLine(IReadOnlyList<Monster> monsters, Func<string, string> englishPlural)
+    {
+        var groups = monsters.GroupBy(m => m.Name).Select(g => (Count: g.Count(), Sample: g.First())).ToList();
+        var line = new System.Text.StringBuilder(Loc.Get("dungeon.you_face_prefix"));
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (i > 0 && i == groups.Count - 1)
+                line.Append(Loc.Get("dungeon.and_separator"));
+            else if (i > 0)
+                line.Append(", ");
+            line.Append($"{groups[i].Count} {MonsterNames.Count(groups[i].Count, groups[i].Sample, englishPlural)}");
+        }
+        return line.Append('!').ToString();
+    }
+
+    /// <summary>1.2.8: writes MixedEncounterLine in the terminal's current colour through UIHelper.WriteRow:
+    /// one row when it fits 79 columns, word-wrapped rows when it does not.</summary>
+    internal static void WriteMixedEncounterLine(TerminalEmulator terminal, IReadOnlyList<Monster> monsters, Func<string, string> englishPlural) =>
+        UsurperRemake.UI.UIHelper.WriteRow(terminal, MixedEncounterLine(monsters, englishPlural));
 
     /// <summary>1.2.8: the elite's line as a group follower reads it, built in the follower's language
     /// (BroadcastDungeonEvent wraps it to 79 columns).</summary>
