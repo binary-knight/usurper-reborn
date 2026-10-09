@@ -241,6 +241,29 @@ public static partial class GameConfig
     /// </summary>
     public static bool EliteMonstersEnabled { get; internal set; } = true;
 
+    /// <summary>
+    /// 1.2.8 difficulty pass: a player's physical attack on a monster rolls to hit (TrainingSystem.RollPlayerHit):
+    /// basic swings (each hand on its own), Power Attack, Precise Strike, Backstab, Smite, the ranged attack,
+    /// physical single-target class abilities and their off-hand follow-up, and the same for teammates and
+    /// companions. Old God fights roll; PvP, spells, magical and area abilities do not. The monster's evasion
+    /// check stays first; a miss deals nothing and fires no on-hit effect; the natural 20 of the hit die is
+    /// the basic swing's critical hit, in place of the separate die. Default on. The setter is internal: it is
+    /// not a sysop setting; tests and the balance simulator turn it off. Off, every fight draws exactly the
+    /// random numbers it drew before 1.2.8, the separate critical die included.
+    /// </summary>
+    public static bool PlayerHitRollEnabled { get; internal set; } = true;
+
+    /// <summary>1.2.8: the natural roll a player's attack needs is held in a window, as the monster's is
+    /// (AtLevelAccuracyGap): never below PlayerHitMinNeeded (a natural 1 always misses), at most
+    /// PlayerHitMaxNeededAtLevel against a target up to AtLevelAccuracyGap levels above the attacker (hit at
+    /// least 90%), at most PlayerHitMaxNeededAbove against a higher one (hit at least 65%).</summary>
+    public const int PlayerHitMinNeeded = 2;
+    public const int PlayerHitMaxNeededAtLevel = 3;
+    public const int PlayerHitMaxNeededAbove = 8;
+
+    /// <summary>1.2.8: Precise Strike needs this much less on the hit die (never below PlayerHitMinNeeded).</summary>
+    public const int PreciseStrikeNeededBonus = 4;
+
     /// <summary>1.2.8: the chance that a regular dungeon encounter holds an elite, by the real dungeon floor:
     /// none below EliteMinFloor, then floors 3 to 10, 11 to 30 and 31 and deeper.</summary>
     public const int EliteMinFloor = 3;
