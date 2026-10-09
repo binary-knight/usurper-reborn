@@ -625,8 +625,15 @@ public partial class TerminalEmulator
         else if (DoorMode.ShouldUseAnsiOutput)
         {
             // In door/online mode, use ANSI escape codes since Console.ForegroundColor doesn't travel through SSH
-            Console.Write($"\x1b[{GetAnsiColorCode(effectiveColor)}m");
-            Console.Write(text);
+            // v1.2.8: a text with [colour]...[/] markup is rendered, as WriteLine renders it (same test,
+            // same parser); after each pair the colour goes back to the colour of this Write.
+            if (text.Contains("[") && text.Contains("[/]"))
+                Console.Write(RenderMarkupInColor(text, effectiveColor));
+            else
+            {
+                Console.Write($"\x1b[{GetAnsiColorCode(effectiveColor)}m");
+                Console.Write(text);
+            }
             // Don't reset here - let next Write/WriteLine handle color
         }
         else
@@ -634,7 +641,11 @@ public partial class TerminalEmulator
             // Console fallback – approximate ANSI colour mapping
             ConsoleColor oldColor = Console.ForegroundColor;
             Console.ForegroundColor = ColorNameToConsole(effectiveColor);
-            Console.Write(text);
+            // v1.2.8: markup is rendered by the parser WriteLine uses here; it returns to this colour after a pair
+            if (text.Contains("[") && text.Contains("[/]"))
+                WriteMarkupToConsole(text);
+            else
+                Console.Write(text);
             Console.ForegroundColor = oldColor;
         }
 
@@ -2828,7 +2839,11 @@ public partial class TerminalEmulator
             return;
         }
 
-        var ansi = $"\x1b[{GetAnsiColorCode(color)}m{text}";
+        // v1.2.8: a text with [colour]...[/] markup is rendered, as WriteLineToStream renders it (same test,
+        // same parser), with no line end. A text without a pair is sent as it is.
+        var ansi = text.Contains("[") && text.Contains("[/]")
+            ? RenderMarkupInColor(text, color)
+            : $"\x1b[{GetAnsiColorCode(color)}m{text}";
         lock (_streamWriterLock)
         {
             if (UseCp437)
@@ -2839,6 +2854,20 @@ public partial class TerminalEmulator
                 ForwardToSpectators(ansi);
             }
         }
+    }
+
+    /// <summary>
+    /// v1.2.8, for Write: the text in <paramref name="color"/> with its [colour]...[/] markup rendered by
+    /// RenderMarkupToStringBuilder. That parser ends a pair with a reset; the colour of the Write is sent
+    /// again after each reset, so the rest of the row keeps the colour it was written in.
+    /// </summary>
+    private string RenderMarkupInColor(string text, string color)
+    {
+        string baseCode = $"\x1b[{GetAnsiColorCode(color)}m";
+        var sb = new StringBuilder(baseCode);
+        RenderMarkupToStringBuilder(sb, text);
+        sb.Replace("\x1b[0m", "\x1b[0m" + baseCode, baseCode.Length, sb.Length - baseCode.Length);
+        return sb.ToString();
     }
 
     /// <summary>Parse [colorname]text[/] markup and write to the MUD TCP stream using ANSI codes.</summary>
