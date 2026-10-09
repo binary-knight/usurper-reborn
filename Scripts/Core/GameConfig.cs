@@ -1484,6 +1484,13 @@ public static partial class GameConfig
     // Economy Tuning (v0.30.9)
     public const int NpcRecruitmentCostPerLevel = 2000;       // Gold cost per NPC level to recruit (was hardcoded 500)
     public const int NpcDailyWagePerLevel = 100;              // Daily gold wage per NPC level for team members
+    // v1.2.8: the per-level part of the hire price and the wage are the LOWER of the linear term above and
+    // a square term (level * level * factor). The two meet at level 25, so nothing changes from level 25 up.
+    public const int NpcRecruitmentCostPerLevelSquared = 80;  // Hire price: level * level * 80 (equals level * 2000 at level 25)
+    public const int NpcDailyWagePerLevelSquared = 4;         // Daily wage: level * level * 4 (equals level * 100 at level 25)
+    // v1.2.8: an NPC above the recruiter's level costs 5% more per level above, up to x1.5 (10 or more above).
+    public const int RecruitAboveLevelPercentPerLevel = 5;    // The 5% step, in percent of the base price
+    public const int RecruitAboveLevelMaxPercent = 150;       // The x1.5 cap, in percent of the base price
     public const int MaxUnpaidWageDays = 3;                   // NPC leaves team after this many days of unpaid wages
 
     // v0.57.11: Relationship-based recruitment price multipliers.

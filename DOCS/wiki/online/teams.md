@@ -1,7 +1,7 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.2.6
+checked: 1.2.7
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs
 history: 1.2.6 | A new team or guild name cannot contain < > & or a double quote; existing names are kept.
 history: 1.2.5 | Team news now shows the headline and the event, and guild ranks show in each player's language while saved in English.

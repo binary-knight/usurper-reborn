@@ -1708,7 +1708,7 @@ public class TeamCornerLocation : BaseLocation
                 Band = band,
                 Multiplier = mult,
                 Cost = cost,
-                DailyWage = npc.Level * GameConfig.NpcDailyWagePerLevel,
+                DailyWage = TeamSystem.GetDailyWage(npc),
             });
         }
 
@@ -2136,7 +2136,7 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.npc_joined", recruit.DisplayName));
         terminal.WriteLine(Loc.Get("team.paid_recruitment", $"{liveCost:N0}"));
-        long wage = recruit.Level * GameConfig.NpcDailyWagePerLevel;
+        long wage = TeamSystem.GetDailyWage(recruit);
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("team.daily_wage", $"{wage:N0}"));
         terminal.WriteLine("");
