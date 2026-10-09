@@ -296,7 +296,7 @@ public class MaintenanceSystem
 
         long totalWages = 0;
         foreach (var npc in teamNPCs)
-            totalWages += npc.Level * GameConfig.NpcDailyWagePerLevel;
+            totalWages += TeamSystem.GetDailyWage(npc);
 
         if (totalWages <= 0) return;
 

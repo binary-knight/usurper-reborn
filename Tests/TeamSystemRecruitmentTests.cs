@@ -199,7 +199,7 @@ public class TeamSystemRecruitmentTests
 
         long cost = TeamSystem.GetRecruitmentBaseCost(npc, player);
 
-        // Under 0.7× discount: 15 * 2000 + 20 * 20 = 30400; ×0.7 = 21280
+        // v1.2.8: 15 * 15 * 80 + 20 * 20 = 18400; x0.7 = 12880 (was 30400 and 21280)
         cost.Should().BeLessThan(30400);
         cost.Should().BeGreaterThan(100);
     }
