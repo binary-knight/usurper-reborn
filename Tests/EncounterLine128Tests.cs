@@ -29,7 +29,7 @@ public class EncounterLine128Tests
     public EncounterLine128Tests(ITestOutputHelper output) { _out = output; }
 
     /// <summary>The English plural of the room fight (DungeonLocation.GetPluralName), enough for these names.</summary>
-    private static string Plural(string name) => name.EndsWith("f") ? name.Substring(0, name.Length - 1) + "ves" : name + "s";
+    internal static string Plural(string name) => name.EndsWith("f") ? name.Substring(0, name.Length - 1) + "ves" : name + "s";
 
     private sealed class NoInput : Stream
     {
@@ -104,7 +104,7 @@ public class EncounterLine128Tests
     }
 
     /// <summary>Five different members: the longest elite and the four longest tier names in lang.</summary>
-    private static List<Monster> WorstGroup(string lang)
+    internal static List<Monster> WorstGroup(string lang)
     {
         var elite = LongestElite(lang);
         var group = new List<Monster> { elite };
@@ -113,7 +113,7 @@ public class EncounterLine128Tests
         return group;
     }
 
-    private static T In<T>(string lang, Func<T> read)
+    internal static T In<T>(string lang, Func<T> read)
     {
         string saved = GameConfig.Language;
         try { GameConfig.Language = lang; return read(); }
@@ -261,7 +261,7 @@ public class EncounterLine128Tests
     /// <summary>The text of a row without its [colour] tags: what a client that renders the markup shows.</summary>
     private static string Visible(string row) => Tag.Replace(row, "");
 
-    private static List<Monster> Coloured(List<Monster> group)
+    internal static List<Monster> Coloured(List<Monster> group)
     {
         var names = group.Select(m => m.Name).Distinct().ToList();
         foreach (var m in group) m.MonsterColor = Colours[names.IndexOf(m.Name)];
@@ -292,18 +292,28 @@ public class EncounterLine128Tests
         Sent(t => { t.SetColor("yellow"); DungeonLocation.WriteWanderingEncounterLine(t, group, Plural); t.WriteLine(""); });
 
     /// <summary>The words of the line with no markup, as one row.</summary>
-    private static string WanderingText(string lang, List<Monster> group)
+    internal static string WanderingText(string lang, List<Monster> group)
     {
         var shown = group.GroupBy(m => m.Name).Select(g => $"{g.Count()} {MonsterNames.CountIn(lang, g.Count(), g.First(), Plural)}").ToList();
         return Loc.GetIn(lang, "dungeon.you_encounter") + string.Join(", ", shown.Take(shown.Count - 1))
             + Loc.GetIn(lang, "dungeon.and_separator") + shown[shown.Count - 1] + "!";
     }
 
-    /// <summary>The rows the stream terminal sends (it sends the tags of a Write as they are), and for each
-    /// colour the text inside its pairs, row after row.</summary>
+    private static readonly string[] ColourCodes = { "91", "32", "36", "35", "94" };   // the ANSI codes of Colours
+
+    /// <summary>The transcript with each rendered pair put back as its [colour]...[/] tags (since the Write
+    /// markup fix of 1.2.8 the stream terminal renders the pairs of a Write: a colour code, the text, a reset).</summary>
+    private static string Remarked(string sent)
+    {
+        for (int i = 0; i < Colours.Length; i++) sent = sent.Replace($"\u001b[{ColourCodes[i]}m", $"[{Colours[i]}]");
+        return sent.Replace("\u001b[0m", "[/]");
+    }
+
+    /// <summary>The rows the stream terminal sends, each pair shown as its tags, and for each colour the text
+    /// inside its pairs, row after row.</summary>
     private static (List<string> Rows, Dictionary<string, List<string>> Inside) WanderingRows(string sent, string lang)
     {
-        var rows = Rows(sent);
+        var rows = Rows(Remarked(sent));
         var inside = new Dictionary<string, List<string>>();
         foreach (string row in rows)
         {
@@ -356,8 +366,9 @@ public class EncounterLine128Tests
         inside.Keys.Should().BeEquivalentTo(group.Select(m => m.MonsterColor));
         foreach (var m in group)
             string.Join(" ", inside[m.MonsterColor]).Should().Be("1 " + MonsterNames.DisplayIn(lang, m), "{0}", lang);
-        // no markup beyond the pairs of the groups: a group cut by a row end has one pair on each row
-        Tag.Matches(sent).Count.Should().Be(2 * inside.Values.Sum(t => t.Count));
+        // no colour beyond the pairs of the groups: a group cut by a row end has one pair on each row
+        Tag.Matches(Remarked(sent)).Count.Should().Be(2 * inside.Values.Sum(t => t.Count));
+        Tag.Matches(sent).Count.Should().Be(0, "the pairs are rendered: no tag reaches the player");
         UIHelper.StripAnsi(sent).Should().NotContain("\u001b");
     }
 
