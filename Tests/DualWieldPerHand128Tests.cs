@@ -22,8 +22,14 @@ namespace UsurperReborn.Tests;
 /// not look, on engines with the same seed, so every draw lines up.
 /// </summary>
 [Collection("SharedGameSingletons")]
-public class DualWieldPerHand128Tests
+public class DualWieldPerHand128Tests : IDisposable
 {
+    // 1.2.8 (the player to-hit roll): these rows read the damage of each hand with fixed draws, so the roll is
+    // switched off for them (a fixed lowest draw would be a natural 1 on every swing)
+    private readonly bool _savedHitRoll = GameConfig.PlayerHitRollEnabled;
+    public DualWieldPerHand128Tests() { GameConfig.PlayerHitRollEnabled = false; }
+    public void Dispose() { GameConfig.PlayerHitRollEnabled = _savedHitRoll; }
+
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
     private const long Shared = 20;   // BonusWeapPow: not a hand item, so both hands keep it
 

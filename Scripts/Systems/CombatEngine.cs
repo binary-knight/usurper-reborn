@@ -13563,6 +13563,9 @@ public partial class CombatEngine
     // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
+        // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
+        bool evasionChecked = _evasionCheckedByHitRoll;
+        _evasionCheckedByHitRoll = false;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -13573,13 +13576,9 @@ public partial class CombatEngine
         // abilities all set AbilityResult.AvoidAllDamage or EvasionBonus, but nothing
         // ever read those flags, so the buffs were cosmetic only. Rounds decrement
         // happens once per monster-action cycle (see ProcessMonsterAction).
-        if (target.EvasionRounds > 0 && target.EvasionMissChance > 0
-            && random.Next(100) < target.EvasionMissChance)
-        {
-            terminal.SetColor("bright_cyan");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.evasion_miss", MonsterNames.Display(target)));
+        // 1.2.8: a caller that rolls to hit (ResolvePlayerHit) has run this check already, before its roll
+        if (!evasionChecked && MonsterEvades(target))
             return false; // evaded -- caller must skip post-hit enchantments (lifesteal etc.)
-        }
 
         // Boss phase immunity — apply only the matching type. Previously this hardcoded
         // isMagicalDamage:true and missed IsPhysicalImmune entirely, so physical abilities
@@ -13773,6 +13772,116 @@ public partial class CombatEngine
         return true; // attack landed -- caller may apply post-hit effects
     }
 
+    // 1.2.8 (the player to-hit roll): true while the one ApplySingleMonsterDamage call made by
+    // ApplySingleMonsterDamageChecked reads it; that call does not run the evasion check a second time.
+    private bool _evasionCheckedByHitRoll;
+
+    /// <summary>1.2.8: ApplySingleMonsterDamage for a caller that rolls to hit. evasionChecked is true when the
+    /// caller ran the evasion check itself, before its roll (ResolvePlayerHit); false is the plain call.</summary>
+    private async Task<bool> ApplySingleMonsterDamageChecked(Monster target, long damage, CombatResult result, string damageSource, Character? attacker, bool isSpellDamage, bool evasionChecked)
+    {
+        _evasionCheckedByHitRoll = evasionChecked;
+        try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage); }
+        finally { _evasionCheckedByHitRoll = false; }
+    }
+
+    /// <summary>The monster's evasion buff (Incorporeal, Phase and the like): one draw while the buff is up,
+    /// and the pass-through line when it procs. The same check, draw and line as before 1.2.8.</summary>
+    private bool MonsterEvades(Monster target)
+    {
+        if (target.EvasionRounds > 0 && target.EvasionMissChance > 0
+            && random.Next(100) < target.EvasionMissChance)
+        {
+            terminal.SetColor("bright_cyan");
+            UIHelper.WriteRow(terminal, Loc.Get("combat.evasion_miss", MonsterNames.Display(target)));
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>1.2.8 (the player to-hit roll): what a physical attack's check gave. Natural is 0 when no die
+    /// was rolled (the attack was evaded, or it was certain to hit).</summary>
+    private readonly record struct HitCheck(bool Lands, int Natural);
+
+    /// <summary>
+    /// 1.2.8 difficulty pass, the player to-hit roll, for an attack that goes through ApplySingleMonsterDamage.
+    /// Only called while GameConfig.PlayerHitRollEnabled is on. The order: the monster's evasion check first
+    /// (the caller then passes evasionChecked to ApplySingleMonsterDamage), then the roll; a certain attack
+    /// (Hidden, a Miracle crit) is not rolled. On a miss the caller deals no damage and runs no on-hit effect.
+    /// </summary>
+    private HitCheck ResolvePlayerHit(Character attacker, Monster target, CombatResult result, bool certain = false, int neededBonus = 0)
+    {
+        if (MonsterEvades(target)) return new HitCheck(false, 0);
+        if (certain) return new HitCheck(true, 0);
+        return ShowPlayerHitRoll(attacker, target, result, neededBonus);
+    }
+
+    /// <summary>
+    /// 1.2.8: one to-hit roll from the fight's random (TrainingSystem.RollPlayerHit) and its line: the natural
+    /// roll and the natural roll needed after the clamp, a natural 1 and a natural 20 named; the acting
+    /// player in the second person, a teammate or companion in the third with the name. Written like the
+    /// monster's roll line (one row, ColorRole.Derived, always shown). A miss adds the miss line. With the
+    /// Sunforged Blade the acting player misses only on a natural 1.
+    /// </summary>
+    private HitCheck ShowPlayerHitRoll(Character attacker, Monster target, CombatResult result, int neededBonus = 0)
+    {
+        var roll = TrainingSystem.RollPlayerHit(attacker, target, 0, random, neededBonus);
+        bool acting = attacker == currentPlayer;
+        string who = attacker.DisplayName;
+
+        terminal.SetColor(ColorRole.Derived);
+        if (roll.IsNatural1)
+            UIHelper.WriteRow(terminal, acting ? Loc.Get("combat.hit_roll_nat1") : Loc.Get("combat.hit_roll_nat1_third", who));
+        else if (roll.IsNatural20)
+            UIHelper.WriteRow(terminal, acting ? Loc.Get("combat.hit_roll_nat20") : Loc.Get("combat.hit_roll_nat20_third", who));
+        else
+            UIHelper.WriteRow(terminal, acting ? Loc.Get("combat.hit_roll", roll.Natural, roll.Needed) : Loc.Get("combat.hit_roll_third", who, roll.Natural, roll.Needed));
+
+        bool hit = roll.Hit;
+        if (!hit && !roll.IsNatural1 && acting && ArtifactSystem.Instance.HasSunforgedBlade())
+        {
+            terminal.SetColor("bright_yellow");
+            UIHelper.WriteRow(terminal, Loc.Get("combat.sunforged_guides"));
+            hit = true;
+        }
+        if (!hit)
+        {
+            if (!acting)
+            {
+                terminal.SetColor("gray");
+                UIHelper.WriteRow(terminal, Loc.Get("combat.you_miss_third", who, MonsterNames.Display(target)));
+            }
+            else if (roll.IsNatural1)
+            {
+                terminal.SetColor("dark_red");
+                UIHelper.WriteRow(terminal, Loc.Get("combat.critical_miss"));
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                UIHelper.WriteRow(terminal, Loc.Get("combat.you_miss", MonsterNames.Display(target)));
+            }
+            result.CombatLog.Add($"{who} misses {target.Name} (roll: {roll.Natural}, needed: {roll.Needed})");
+        }
+        return new HitCheck(hit, roll.Natural);
+    }
+
+    /// <summary>
+    /// 1.2.8: a class ability rolls to hit when it is a physical single-target attack: an Attack ability with
+    /// damage whose effect is not area, magical or mental (the test of the off-hand follow-up below, and
+    /// MagicalAbilityEffects), that deals its damage in the base block (the effects with their own damage
+    /// handler are area or prestige magic), and that does not promise a certain hit (Precise Shot).
+    /// </summary>
+    internal static bool AbilityRollsToHit(ClassAbilitySystem.ClassAbility ability, ClassAbilityResult abilityResult, bool hasOwnDamageHandler)
+    {
+        if (ability.Type != ClassAbilitySystem.AbilityType.Attack || abilityResult.Damage <= 0 || hasOwnDamageHandler) return false;
+        string effect = abilityResult.SpecialEffect ?? "";
+        if (effect.Contains("aoe") || effect.Contains("distract") || effect.Contains("psychic") || effect.Contains("magic")
+            || effect.Contains("charm") || effect.Contains("fear") || effect.Contains("confus")) return false;
+        if (IsMagicalAbilityEffect(effect)) return false;
+        return effect != "guaranteed_hit";
+    }
+
     // Unified post-hit on-hit effects for a landed player melee swing. Extracted verbatim from the
     // multi-monster basic-attack path so EVERY landed player swing (basic attack main/off-hand AND
     // the [P] Power Attack main/off-hand) runs the identical enchant pipeline. Player report: the
@@ -13864,6 +13973,12 @@ public partial class CombatEngine
     // proficiency, level/weapon scaling, crit, and every buff). Synchronous: the block contains no
     // awaits. `s`/`swings` are passed through only for the diagnostic COMBAT_ATTACK log line.
     private long ComputePlayerSwingDamage(Character player, Monster target, bool isOffHandAttack, int s, int swings)
+        => ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, 0);
+
+    // 1.2.8 (the player to-hit roll): hitNatural is the natural roll of the swing's to-hit die, or 0 when no
+    // die was rolled (GameConfig.PlayerHitRollEnabled off, or a certain hit). With a roll, its natural 20 is
+    // the critical hit and the separate die below is not drawn; without one the separate die is drawn as before.
+    private long ComputePlayerSwingDamageRolled(Character player, Monster target, bool isOffHandAttack, int s, int swings, int hitNatural)
     {
                         // Calculate player attack damage (unified with single-combat formula)
                         // Bard/Jester use CHA (performance-based combat), others use STR
@@ -13948,7 +14063,7 @@ public partial class CombatEngine
                             rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
                             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
                         }
-                        bool isCrit = !miracleCrit && !stealthCrit && random.Next(1, 21) == 20; // natural 20
+                        bool isCrit = !miracleCrit && !stealthCrit && (hitNatural > 0 ? hitNatural == 20 : random.Next(1, 21) == 20); // natural 20
                         bool dexCrit = !miracleCrit && !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
                         if (isCrit)
                         {
@@ -14554,9 +14669,21 @@ public partial class CombatEngine
                         }
                         await Pacing.Wait(GetCombatDelay(500));
 
-                        long damage = ComputePlayerSwingDamage(player, target, isOffHandAttack, s, swings);
+                        // 1.2.8: the to-hit roll, each swing on its own: evasion first, then the roll; a swing from
+                        // hiding or with a Miracle crit is certain. A miss deals nothing and runs no on-hit effect.
+                        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+                        int hitNatural = 0;
+                        if (hitRolled)
+                        {
+                            var hitCheck = ResolvePlayerHit(player, target, result, certain: player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden));
+                            if (!hitCheck.Lands)
+                                continue;
+                            hitNatural = hitCheck.Natural;
+                        }
 
-                        bool swingLanded = await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
+                        long damage = ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, hitNatural);
+
+                        bool swingLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
 
                         // If the swing was evaded (Incorporeal / Phase / etc. -- the attack passes
                         // through for 0 damage), skip EVERY on-hit effect for this swing: lifesteal
@@ -14760,6 +14887,14 @@ public partial class CombatEngine
         int successChance = Math.Min(95, 50 + (int)(effectiveDex / 2));
         if (random.Next(100) < successChance)
         {
+            // 1.2.8: the to-hit roll, after the backstab's own check
+            bool hitRolled = GameConfig.PlayerHitRollEnabled;
+            if (hitRolled && !ResolvePlayerHit(player, target, result).Lands)
+            {
+                await Pacing.Wait(GetCombatDelay(1000));
+                return;
+            }
+
             long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 3;
             backstabDamage += random.Next(1, 20);
             backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
@@ -14767,7 +14902,7 @@ public partial class CombatEngine
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.critical_backstab", backstabDamage));
 
-            await ApplySingleMonsterDamage(target, backstabDamage, result, "backstab", player);
+            await ApplySingleMonsterDamageChecked(target, backstabDamage, result, "backstab", player, isSpellDamage: false, evasionChecked: hitRolled);
             if (!target.IsAlive) GodDeedSystem.Record(player, GodAct.StealthKill, terminal);   // 1.2.0 Temple gods: Shadow deed
         }
         else
@@ -14800,6 +14935,15 @@ public partial class CombatEngine
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("combat.power_attack_windup", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
+
+        // 1.2.8: the to-hit roll, with the power stance applied above (+2 to the armour class); a strike from
+        // hiding is certain. On a miss the off hand still follows with its own roll.
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result, certain: player.HasStatus(StatusEffect.Hidden)).Lands)
+        {
+            await PowerAttackOffHandFollowUp(player, target, monsters, result, hitRolled);
+            return;
+        }
 
         // Mirror the basic-attack damage stack so Power Strike doesn't lose to it just
         // because it skipped every multiplier (player report). Same fix as the single-
@@ -14896,9 +15040,16 @@ public partial class CombatEngine
         // Power Attack runs the same on-hit enchant pipeline as a basic swing (lifesteal, elemental
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
         // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
-        if (await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player))
+        if (await ApplySingleMonsterDamageChecked(target, powerDamage, result, "power attack", player, isSpellDamage: false, evasionChecked: hitRolled))
             ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, powerDamage), isOffHandAttack: false, result);   // v1.1.11
 
+        await PowerAttackOffHandFollowUp(player, target, monsters, result, hitRolled);
+    }
+
+    // The Power Attack's off-hand follow-up, in its own method since 1.2.8 so that it also follows a main-hand
+    // strike that missed its to-hit roll. hitRolled: GameConfig.PlayerHitRollEnabled as the caller read it.
+    private async Task PowerAttackOffHandFollowUp(Character player, Monster target, List<Monster> monsters, CombatResult result, bool hitRolled)
+    {
         // Follow up with off-hand attack if dual-wielding
         if (player.IsDualWielding)
         {
@@ -14910,16 +15061,25 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", MonsterNames.Display(offHandTarget)));
                 await Pacing.Wait(GetCombatDelay(500));
 
+                // 1.2.8: the off hand rolls to hit on its own
+                int hitNatural = 0;
+                if (hitRolled)
+                {
+                    var hitCheck = ResolvePlayerHit(player, offHandTarget, result, certain: player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden));
+                    if (!hitCheck.Lands) return;
+                    hitNatural = hitCheck.Natural;
+                }
+
                 // Off-hand follow-up does a FULL off-hand swing using the same formula as a normal
                 // off-hand basic attack (ComputePlayerSwingDamage), so a skill's off-hand strike no
                 // longer deals different damage than a normal off-hand attack (player report). The
                 // old bespoke STR + WeapPow + random(1,15) formula dropped proficiency, level/weapon
                 // scaling, crit, and all buffs, making it far weaker than a real off-hand swing.
-                long ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
+                long ohDamage = ComputePlayerSwingDamageRolled(player, offHandTarget, isOffHandAttack: true, 1, 1, hitNatural);
 
                 // Off-hand follow-up procs its enchants only if it actually connected (same evade
                 // gate + shared on-hit pipeline as the basic-attack off-hand swing).
-                if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
+                if (await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
                     ApplyPlayerSwingOnHitEffects(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), isOffHandAttack: true, result);   // v1.1.11
             }
         }
@@ -14935,6 +15095,15 @@ public partial class CombatEngine
         UIHelper.WriteRow(terminal, Loc.Get("combat.precise_strike_aim", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll; the careful aim needs PreciseStrikeNeededBonus less on the die. That is the
+        // strike's accuracy now, in place of the 25% cut of the target's Defence below.
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result, neededBonus: GameConfig.PreciseStrikeNeededBonus).Lands)
+        {
+            await Pacing.Wait(GetCombatDelay(800));
+            return;
+        }
+
         // Precise Strike: normal damage, +25% accuracy via reducing defense by 25%
         long attackPower = player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow) + random.Next(1, 15);
 
@@ -14946,7 +15115,8 @@ public partial class CombatEngine
         // ApplySingleMonsterDamage below subtracts armor itself; doing both double-taxed
         // Precise Strike against armored monsters (same fix as Power Attack).
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
-        defense = (long)(defense * 0.75);
+        if (!hitRolled)
+            defense = (long)(defense * 0.75);
 
         long damage = Math.Max(1, attackPower - defense);
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
@@ -14954,7 +15124,7 @@ public partial class CombatEngine
         terminal.SetColor("bright_cyan");
         UIHelper.WriteRow(terminal, Loc.Get("combat.precise_strike_hit", MonsterNames.Display(target), damage));
 
-        await ApplySingleMonsterDamage(target, damage, result, "precise strike", player);
+        await ApplySingleMonsterDamageChecked(target, damage, result, "precise strike", player, isSpellDamage: false, evasionChecked: hitRolled);
         await Pacing.Wait(GetCombatDelay(800));
     }
 
@@ -15024,6 +15194,11 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.smite_channel", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result).Lands)
+            return;
+
         // Smite: 150% damage + level bonus (with weapon soft cap)
         long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 1.5) + player.Level;
         smiteDamage += random.Next(10, 25);
@@ -15032,7 +15207,7 @@ public partial class CombatEngine
         terminal.SetColor("bright_white");
         UIHelper.WriteRow(terminal, Loc.Get("combat.smite_damage", smiteDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
 
-        await ApplySingleMonsterDamage(target, smiteDamage, result, "smite", player);
+        await ApplySingleMonsterDamageChecked(target, smiteDamage, result, "smite", player, isSpellDamage: false, evasionChecked: hitRolled);
     }
 
     private async Task ExecuteRangedAttackMultiMonster(Character player, List<Monster> monsters, int? targetIndex, CombatResult result)
@@ -15054,6 +15229,11 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.ranged_fire", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result).Lands)
+            return;
+
         // Ranged damage: DEX-based + weapon power + level bonus (mirrors melee formula)
         long rangedDamage = player.Dexterity + (player.Level / 2) + random.Next(1, 21);
         if (player.WeapPow > 0)
@@ -15070,7 +15250,7 @@ public partial class CombatEngine
         terminal.SetColor("green");
         UIHelper.WriteRow(terminal, Loc.Get("combat.ranged_hit", MonsterNames.Display(target), rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
 
-        await ApplySingleMonsterDamage(target, rangedDamage, result, "ranged attack", player);
+        await ApplySingleMonsterDamageChecked(target, rangedDamage, result, "ranged attack", player, isSpellDamage: false, evasionChecked: hitRolled);
     }
 
     private async Task ExecuteDisarmMultiMonster(Character player, List<Monster> monsters, int? targetIndex, CombatResult result)
@@ -15304,8 +15484,17 @@ public partial class CombatEngine
             or "entropy_aoe" or "singularity" or "abyssal_eruption"
             or "abyss_unchained";
 
+        // 1.2.8: a physical single-target ability rolls to hit (AbilityRollsToHit); from hiding it is certain.
+        // This path has no evasion check and gets none. A missed ability does nothing: no damage, no healing,
+        // no buff and no special effect; its off-hand follow-up still swings, with its own roll.
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        bool abilityMissed = hitRolled && target != null && target.IsAlive
+            && AbilityRollsToHit(ability, abilityResult, isAoEAbility)
+            && !player.HasStatus(StatusEffect.Hidden)
+            && !ShowPlayerHitRoll(player, target, result).Lands;
+
         // Apply damage
-        if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility)
+        if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility && !abilityMissed)
         {
             long actualDamage = abilityResult.Damage;
             bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
@@ -15561,10 +15750,25 @@ public partial class CombatEngine
                 // dual-wielding NPC keeps the lightweight off-hand formula: ComputePlayerSwingDamage
                 // emits player-perspective ("You") crit/proc lines and folds in player-only buffs,
                 // which must not fire for a teammate's swing (player/teammate attribution).
-                long ohDamage;
-                if (isPlayer)
+                // 1.2.8: the off-hand follow-up rolls to hit on its own (evasion first, then the roll)
+                int ohNatural = 0;
+                bool ohLands = true;
+                if (hitRolled)
                 {
-                    ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
+                    var ohCheck = ResolvePlayerHit(player, offHandTarget, result,
+                        certain: isPlayer && (player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden)));
+                    ohLands = ohCheck.Lands;
+                    ohNatural = ohCheck.Natural;
+                }
+
+                long ohDamage = 0;
+                if (!ohLands)
+                {
+                    // missed or evaded: no damage is worked out and nothing is drawn for it
+                }
+                else if (isPlayer)
+                {
+                    ohDamage = ComputePlayerSwingDamageRolled(player, offHandTarget, isOffHandAttack: true, 1, 1, ohNatural);
                 }
                 else
                 {
@@ -15576,13 +15780,13 @@ public partial class CombatEngine
 
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
                 // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
-                if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
+                if (ohLands && await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
                     ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);   // v1.1.11: riders scale from the boosted hit, as at every other caller
             }
         }
 
         // Apply healing (with ally targeting for CanTargetAlly abilities)
-        if (abilityResult.Healing > 0)
+        if (abilityResult.Healing > 0 && !abilityMissed)
         {
             // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
             abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monsters);
@@ -15662,7 +15866,7 @@ public partial class CombatEngine
         }
 
         // Apply buffs
-        if (abilityResult.AttackBonus > 0)
+        if (abilityResult.AttackBonus > 0 && !abilityMissed)
         {
             // Use the higher of current or new bonus (don't let weaker buff overwrite stronger)
             if (abilityResult.AttackBonus > player.TempAttackBonus)
@@ -15685,7 +15889,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_attack_up" : "combat.ability_attack_up_npc", actorName, abilityResult.AttackBonus, abilityResult.Duration));
         }
 
-        if (abilityResult.DefenseBonus > 0)
+        if (abilityResult.DefenseBonus > 0 && !abilityMissed)
         {
             // Use the higher of current or new bonus
             if (abilityResult.DefenseBonus > player.TempDefenseBonus || player.TempDefenseBonusDuration <= 0)
@@ -15700,7 +15904,7 @@ public partial class CombatEngine
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_defense_up" : "combat.ability_defense_up_npc", actorName, abilityResult.DefenseBonus, abilityResult.Duration));
         }
-        else if (abilityResult.DefenseBonus < 0)
+        else if (abilityResult.DefenseBonus < 0 && !abilityMissed)
         {
             // Rage reduces defense
             player.TempDefenseBonus = abilityResult.DefenseBonus;
@@ -15709,8 +15913,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_defense_down" : "combat.ability_defense_down_npc", actorName, -abilityResult.DefenseBonus));
         }
 
-        // Handle special effects
-        switch (abilityResult.SpecialEffect)
+        // Handle special effects (1.2.8: none after a missed to-hit roll; no case matches the empty effect)
+        switch (abilityMissed ? "" : abilityResult.SpecialEffect)
         {
             case "escape":
                 terminal.SetColor("magenta");
@@ -19448,6 +19652,11 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.teammate_attacks", teammate.DisplayName, MonsterNames.Display(target)));
                 await Pacing.Wait(GetCombatDelay(500));
 
+                // 1.2.8: the to-hit roll with the teammate's own stats, each swing on its own (evasion first)
+                bool hitRolled = GameConfig.PlayerHitRollEnabled;
+                if (hitRolled && !ResolvePlayerHit(teammate, target, result).Lands)
+                    continue;
+
                 // Calculate teammate attack damage (with weapon soft cap)
                 long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.SwingWeapPow(isOffHandAttack)) + random.Next(1, 16);
                 attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
@@ -19458,7 +19667,7 @@ public partial class CombatEngine
 
                 long damage = Math.Max(1, attackPower);
                 damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-                bool tmLanded = await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate);
+                bool tmLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
 
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
@@ -32438,7 +32647,8 @@ public partial class CombatEngine
     internal static string CapturedInLanguage(LocRecording? recording, string captured, string lang, string name)
     {
         // v1.2.4: English and unrecorded captures read as before: English, "You attack" made "Name attacks"
-        string english = ConvertToThirdPerson(recording?.Render(captured, "en") ?? captured, name);
+        // 1.2.8: the to-hit roll line opens with a bracket, out of reach of the "You verb" rule: it takes its key's third person form
+        string english = ConvertToThirdPerson(recording?.Render(captured, "en", (key, args) => BracketedThirdPersonLine("en", key, name, args)) ?? captured, name);
         if (recording == null) return ConvertToThirdPerson(captured, name);
         if (lang == "en") return english;
 
@@ -32462,7 +32672,15 @@ public partial class CombatEngine
         ["combat.defend_stance"] = "combat.defend_stance_third",
         ["combat.you_attack_target"] = "combat.you_attack_target_third",
         ["combat.you_miss"] = "combat.you_miss_third",
+        // 1.2.8: the to-hit roll line
+        ["combat.hit_roll"] = "combat.hit_roll_third",
+        ["combat.hit_roll_nat1"] = "combat.hit_roll_nat1_third",
+        ["combat.hit_roll_nat20"] = "combat.hit_roll_nat20_third",
     };
+
+    /// <summary>1.2.8: the third person form of a line that does not start with "You" in English (the to-hit roll line).</summary>
+    private static string? BracketedThirdPersonLine(string lang, string key, string name, object[] args)
+        => key.StartsWith("combat.hit_roll", StringComparison.Ordinal) ? ThirdPersonLine(lang, key, name, args) : null;
 
     private static string? ThirdPersonLine(string lang, string key, string name, object[] args)
     {
