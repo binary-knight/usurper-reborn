@@ -250,4 +250,222 @@ public class EncounterLine128Tests
         src.Should().Contain("BroadcastDungeonEvent(lang => bossRoom");
         src.Should().Contain("GroupSystem.Instance!.BroadcastToAllGroupSessionsLocalized(group, FollowerMessage(buildMessage),");
     }
+
+    // ================================================================ the wandering encounter (MonsterEncounter)
+    // The same fault at the second site: "You encounter 1 A, 1 B and 1 C!" (dungeon.you_encounter), each group in
+    // its own [colour]...[/] pair, written piece by piece with no wrapping.
+
+    private static readonly System.Text.RegularExpressions.Regex Tag = new(@"\[(/|[a-z_]+)\]");
+    private static readonly string[] Colours = { "bright_red", "green", "cyan", "magenta", "bright_blue" };
+
+    /// <summary>The text of a row without its [colour] tags: what a client that renders the markup shows.</summary>
+    private static string Visible(string row) => Tag.Replace(row, "");
+
+    private static List<Monster> Coloured(List<Monster> group)
+    {
+        var names = group.Select(m => m.Name).Distinct().ToList();
+        foreach (var m in group) m.MonsterColor = Colours[names.IndexOf(m.Name)];
+        return group;
+    }
+
+    /// <summary>The wandering line as MonsterEncounter wrote it at 3a8dd9dc, up to the row end its caller writes.</summary>
+    private static void WriteWanderingAsBefore(TerminalEmulator terminal, List<Monster> monsters)
+    {
+        var monsterGroups = monsters.GroupBy(m => m.Name).Select(g => new { Count = g.Count(), Color = g.First().MonsterColor, Sample = g.First() }).ToList();
+        terminal.Write(Loc.Get("dungeon.you_encounter"));
+        for (int i = 0; i < monsterGroups.Count; i++)
+        {
+            var group = monsterGroups[i];
+            string plural = MonsterNames.Count(group.Count, group.Sample, Plural);
+            if (i > 0 && i == monsterGroups.Count - 1)
+                terminal.Write(Loc.Get("dungeon.and_separator"));
+            else if (i > 0)
+                terminal.Write(", ");
+            terminal.Write($"[{group.Color}]{group.Count} {plural}[/]");
+        }
+        terminal.Write("!");
+        terminal.WriteLine("");
+    }
+
+    /// <summary>The wandering line as MonsterEncounter writes it now, with the row end of its caller.</summary>
+    private static string SentWandering(List<Monster> group) =>
+        Sent(t => { t.SetColor("yellow"); DungeonLocation.WriteWanderingEncounterLine(t, group, Plural); t.WriteLine(""); });
+
+    /// <summary>The words of the line with no markup, as one row.</summary>
+    private static string WanderingText(string lang, List<Monster> group)
+    {
+        var shown = group.GroupBy(m => m.Name).Select(g => $"{g.Count()} {MonsterNames.CountIn(lang, g.Count(), g.First(), Plural)}").ToList();
+        return Loc.GetIn(lang, "dungeon.you_encounter") + string.Join(", ", shown.Take(shown.Count - 1))
+            + Loc.GetIn(lang, "dungeon.and_separator") + shown[shown.Count - 1] + "!";
+    }
+
+    /// <summary>The rows the stream terminal sends (it sends the tags of a Write as they are), and for each
+    /// colour the text inside its pairs, row after row.</summary>
+    private static (List<string> Rows, Dictionary<string, List<string>> Inside) WanderingRows(string sent, string lang)
+    {
+        var rows = Rows(sent);
+        var inside = new Dictionary<string, List<string>>();
+        foreach (string row in rows)
+        {
+            string? open = null;
+            int from = 0;
+            foreach (System.Text.RegularExpressions.Match tag in Tag.Matches(row))
+            {
+                if (tag.Value == "[/]")
+                {
+                    open.Should().NotBeNull("{0}: a closing tag with no pair open in [{1}]", lang, row);
+                    if (!inside.TryGetValue(open!, out var texts)) inside[open!] = texts = new List<string>();
+                    texts.Add(row.Substring(from, tag.Index - from));
+                    open = null;
+                }
+                else
+                {
+                    open.Should().BeNull("{0}: a pair opened inside a pair in [{1}]", lang, row);
+                    open = tag.Value.Trim('[', ']');
+                    from = tag.Index + tag.Length;
+                }
+            }
+            open.Should().BeNull("{0}: every pair opened in a row is closed in that row: [{1}]", lang, row);
+        }
+        return (rows, inside);
+    }
+
+    // ---------------------------------------------------------------- row 3: the wandering line wraps
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void Row3_TheWorstCaseWanderingLine_IsWrapped_NoRowPasses79_AndEveryRowIsBalanced(string lang)
+    {
+        var group = Coloured(WorstGroup(lang));
+        string text = WanderingText(lang, group);
+        text.Length.Should().BeGreaterThan(79, "the worst case does not fit one row in {0}", lang);
+        string sent = In(lang, () => SentWandering(group));
+        var (rows, inside) = WanderingRows(sent, lang);
+        _out.WriteLine($"{lang} {text.Length} in {rows.Count} rows:");
+        foreach (string row in rows) _out.WriteLine($"  {Visible(row).Length,2} {row}");
+
+        rows.Count.Should().BeGreaterThan(1);
+        foreach (string row in rows)
+            Visible(row).Length.Should().BeLessThanOrEqualTo(79, "{0}: [{1}]", lang, row);
+        string.Join(" ", rows.Select(Visible)).Should().Be(text, "wrapping keeps every word, in order");
+        // every group reads whole in its own colour, and nothing else is coloured
+        inside.Keys.Should().BeEquivalentTo(group.Select(m => m.MonsterColor));
+        foreach (var m in group)
+            string.Join(" ", inside[m.MonsterColor]).Should().Be("1 " + MonsterNames.DisplayIn(lang, m), "{0}", lang);
+        // no markup beyond the pairs of the groups: a group cut by a row end has one pair on each row
+        Tag.Matches(sent).Count.Should().Be(2 * inside.Values.Sum(t => t.Count));
+        UIHelper.StripAnsi(sent).Should().NotContain("\u001b");
+    }
+
+    [Fact]
+    public void Row3_ARowEndInsideAGroup_GivesAWholePairOnEachRow()
+    {
+        // 79 columns end inside "1 Commanding Frenzied Goblin Champion Shaman": the pair is not left open
+        var elite = Elite(MonsterNames.FromKey("monster.role.caster", "Goblin Champion"), "Goblin Champion", "commanding", "frenzied");
+        var group = Coloured(new List<Monster> { Plain("Ancient Construct"), Plain("Adamantine Golem"), Plain("Gelatinous Cube"), elite });
+        var rows = In("en", () => DungeonLocation.WanderingEncounterRows(group, Plural));
+        rows.Select(r => string.Concat(r)).Should().Equal(
+            "You encounter [bright_red]1 Ancient Construct[/], [green]1 Adamantine Golem[/], [cyan]1 Gelatinous Cube[/] and [magenta]1[/]",
+            "[magenta]Commanding Frenzied Goblin Champion Shaman[/]!");
+        var (_, inside) = WanderingRows(In("en", () => SentWandering(group)), "en");
+        inside["magenta"].Should().Equal("1", "Commanding Frenzied Goblin Champion Shaman");
+    }
+
+    [Fact]
+    public void Row3_MonsterEncounter_WritesTheMixedLine_ThroughTheWrappingWriter()
+    {
+        string src = File.ReadAllText(Path.Combine(Leftovers1114BTests.RepoRoot(), "Scripts", "Locations", "DungeonLocation.cs"));
+        src.Should().Contain("WriteWanderingEncounterLine(terminal, monsters, GetPluralName);");
+        src.Should().NotContain("terminal.Write(Loc.Get(\"dungeon.you_encounter\"));", "the line is no longer written with no wrapping");
+        System.Text.RegularExpressions.Regex.Matches(src, "\"dungeon\\.you_encounter\"").Count.Should().Be(1, "one builder holds the key");
+        src.Should().Contain("var wrapped = UsurperRemake.UI.UIHelper.MessageRows(plain);");
+    }
+
+    // ---------------------------------------------------------------- row 4: a wandering line that fits
+
+    [Fact]
+    public void Row4_AWanderingLineThatFits_IsSentExactly_AsBefore()
+    {
+        var group = Coloured(new List<Monster> { Plain("Wolf"), Plain("Goblin"), Plain("Wolf"), Plain("Goblin"), Plain("Goblin"), Elite(MonsterNames.FromKey("monster.role.caster", "Kobold"), "Kobold", "venomous") });
+        foreach (string lang in Langs)
+        {
+            var (sent, before, rows) = In(lang, () => (SentWandering(group), Sent(t => { t.SetColor("yellow"); WriteWanderingAsBefore(t, group); }),
+                DungeonLocation.WanderingEncounterRows(group, Plural)));
+            WanderingText(lang, group).Length.Should().BeLessThanOrEqualTo(79);
+            // the same writes in the same order: what the terminal receives is the same, colour codes and all
+            Encoding.UTF8.GetBytes(sent).Should().Equal(Encoding.UTF8.GetBytes(before), "{0}", lang);
+            rows.Should().ContainSingle();
+            Visible(string.Concat(rows[0])).Should().Be(WanderingText(lang, group));
+            Rows(sent).Should().HaveCount(1, "one row and no blank row after it, as before");
+            if (lang == "en")
+                string.Concat(rows[0]).Should().Be("You encounter [bright_red]2 Wolves[/], [green]3 Goblins[/] and [cyan]1 Venomous Kobold Shaman[/]!");
+        }
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void Row4_TwoAndThreeNames_AreSentAsBefore(string lang)
+    {
+        foreach (var group in new[]
+        {
+            Coloured(new List<Monster> { Plain("Wolf"), Plain("Goblin") }),
+            Coloured(new List<Monster> { Plain("Wolf"), Plain("Goblin"), Plain("Kobold") }),
+        })
+        {
+            var (sent, before) = In(lang, () => (SentWandering(group), Sent(t => { t.SetColor("yellow"); WriteWanderingAsBefore(t, group); })));
+            sent.Should().Be(before);
+            Visible(Rows(sent).Single()).Should().Be(WanderingText(lang, group));
+        }
+    }
+
+    // ---------------------------------------------------------------- measured, not changed
+
+    private static IEnumerable<string> BossNames()
+    {
+        var pool = typeof(DungeonLocation).GetField("BossNamePool", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!.GetValue(null)!;
+        foreach (var names in ((System.Collections.IDictionary)pool).Values)
+            foreach (string name in (string[])names!) yield return name;
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void TheFamilyLine_AndABossAlone_Fit79Columns_AtTheirWorst(string lang)
+    {
+        BossNames().Should().HaveCount(40);
+        string Widest(IEnumerable<string> rows) => rows.OrderByDescending(r => Visible(r).Length).First();
+        var measured = In(lang, () =>
+        {
+            // one family of the wandering encounter: five of a tier, then its family
+            string family = Widest(MonsterFamilies.AllFamilies.SelectMany(f => f.Tiers.Select(t =>
+                Loc.Get("dungeon.encounter_group_family", $"[white]5 {MonsterNames.CountIn(lang, 5, t.Name, Plural)}[/]", MonsterNames.Family(f.FamilyName)))));
+            // a boss room's boss alone (the room fight), the longest boss name
+            string bossAttacks = Widest(BossNames().Select(b => Loc.Get("dungeon.monster_attacks", GameConfig.ArticulateForLanguage(MonsterNames.Display(b)))));
+            // a boss alone in the wandering encounter, both of its lines
+            string BossWithArticle(string b) => lang == "en"
+                ? $"{GameConfig.GetIndefiniteArticle(MonsterNames.Display(b))} {Loc.Get("dungeon.boss_powerful")} [white]{MonsterNames.Display(b)}[/]"
+                : $"[white]{MonsterNames.Display(b)}[/]";
+            string bossVisual = Widest(BossNames().Select(b => Loc.Get("dungeon.boss_blocks_path_visual", BossWithArticle(b))));
+            string bossSr = Widest(BossNames().Select(b => Loc.Get("dungeon.boss_blocks_path_sr", BossWithArticle(b))));
+            // one monster of the wandering encounter: the longest elite
+            var elite = LongestElite(lang);
+            string appears = Loc.Get("dungeon.monster_appears", lang == "en"
+                ? $"{GameConfig.GetIndefiniteArticle(elite.Name)} [white]{elite.Name}[/]" : $"[white]{MonsterNames.Display(elite)}[/]");
+            return new[] { ("encounter_group_family", family), ("monster_attacks (boss)", bossAttacks), ("boss_blocks_path_visual", bossVisual),
+                ("boss_blocks_path_sr", bossSr), ("monster_appears (elite)", appears) };
+        });
+        foreach (var (name, row) in measured)
+        {
+            _out.WriteLine($"{lang} {name} {Visible(row).Length}: {Visible(row)}");
+            Visible(row).Length.Should().BeLessThanOrEqualTo(79, "{0} {1}", lang, name);
+        }
+    }
 }
