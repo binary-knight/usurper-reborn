@@ -158,6 +158,14 @@ public class CombatEvents126Tests
         off1.Result.Tally.Started.Should().BeFalse("events off feed nothing");
         on.Result.Tally.Started.Should().BeTrue();
         rec.Events.Should().NotBeEmpty();
+        // 1.2.8: the to-hit counters (player_swings, player_misses, elite_count) ride the same events
+        off1.Result.Tally.PlayerSwings.Should().Be(0);
+        if (GameConfig.PlayerHitRollEnabled)
+            on.Result.Tally.PlayerSwings.Should().BeGreaterThan(0, "the player rolled to hit with the events on");
+        on.Result.Tally.PlayerSwings.Should().Be(rec.Events.Count(e => e.IsRoll && e.Actor == CombatSide.Player));
+        on.Result.Tally.PlayerMisses.Should().Be(rec.Events.Count(e => e.IsRoll && e.Missed && e.Actor == CombatSide.Player));
+        on.Result.Tally.PlayerMisses.Should().BeLessThanOrEqualTo(on.Result.Tally.PlayerSwings);
+        on.Result.Tally.EliteCount.Should().Be(0);
     }
 
     /// <summary>The screen up to the victory's rewards. The loot found after a win comes from

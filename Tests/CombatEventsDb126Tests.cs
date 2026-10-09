@@ -109,6 +109,7 @@ public class CombatEventsDb126Tests : IDisposable
         "dmg_to_player_basic", "dmg_to_player_ability", "dmg_to_player_spell", "dmg_to_player_dot",
         "dmg_to_team", "dmg_by_player", "dmg_by_team", "heal_player",
         "potions_used", "abilities_used", "spells_used", "teammates_lost", "player_hp_end",
+        "player_swings", "player_misses", "elite_count",   // 1.2.8
     };
 
     private static object?[] TallyValues(CombatTally t) => new object?[]
@@ -117,6 +118,7 @@ public class CombatEventsDb126Tests : IDisposable
         t.DmgToPlayerBasic, t.DmgToPlayerAbility, t.DmgToPlayerSpell, t.DmgToPlayerDot,
         t.DmgToTeam, t.DmgByPlayer, t.DmgByTeam, t.HealPlayer,
         (long)t.PotionsUsed, (long)t.AbilitiesUsed, (long)t.SpellsUsed, (long)t.TeammatesLost, t.PlayerHpEnd,
+        (long)t.PlayerSwings, (long)t.PlayerMisses, (long)t.EliteCount,
     };
 
     // ---------- fight harness (as CombatEvents126Tests) ----------

@@ -34,7 +34,8 @@ function schemaSql() {
   };
   const indexes = (src, tbl) => src.match(new RegExp('CREATE INDEX IF NOT EXISTS \\w+ ON ' + tbl + '\\([^;]*\\);', 'g')) || [];
   const tally = [...combat.matchAll(/\("(\w+)", t => t\.\w+\)/g)].map((m) => m[1]);
-  if (tally.length !== 18) throw new Error('expected the 18 tally columns, found ' + tally.length);
+  // 18 from 1.2.6, and player_swings, player_misses, elite_count from 1.2.8
+  if (tally.length !== 21) throw new Error('expected the 21 tally columns, found ' + tally.length);
   const sql = [
     table('combat_events'),
     ...indexes(backend, 'combat_events'),
