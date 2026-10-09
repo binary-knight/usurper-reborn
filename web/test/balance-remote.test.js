@@ -558,3 +558,55 @@ test('row C: one statement per remote view, through idx_rce_day, at most the row
     assert.deepStrictEqual([r.rowsRead, r.truncated], [3, false]);
   });
 });
+
+// ---------------------------------------------------------------- 1.2.8 (P8, row H4)
+
+// The row keys of 1.2.7, written out: the remote ingest and the remote view keep exactly these.
+const KEYS_127 = [
+  'outcome', 'player_class', 'monster_family', 'is_boss', 'has_teammates',
+  'player_level', 'player_max_hp', 'player_str', 'player_dex', 'player_weap_pow', 'player_arm_pow',
+  'monster_level', 'monster_max_hp', 'monster_str', 'monster_def', 'rounds',
+  'damage_dealt', 'damage_taken', 'xp_gained', 'gold_gained', 'monster_count',
+  'floor_actual', 'difficulty', 'party_size', 'encounter_size', 'first_actor',
+  'dmg_to_player_basic', 'dmg_to_player_ability', 'dmg_to_player_spell', 'dmg_to_player_dot',
+  'dmg_to_team', 'dmg_by_player', 'dmg_by_team', 'heal_player',
+  'potions_used', 'abilities_used', 'spells_used', 'teammates_lost', 'player_hp_end',
+];
+const NEW_128 = ['player_swings', 'player_misses', 'elite_count'];
+
+test('row H4 (1.2.8): the remote ingest keeps the 1.2.7 column list; a row carrying a 1.2.8 column is refused like any unknown column', async () => {
+  const names = H.loadSection().names;
+  const node = plain(names.TELEMETRY_COLUMNS).map((c) => c[0]);
+  assert.deepStrictEqual(node, KEYS_127);
+  assert.deepStrictEqual(H.csharpColumns().map((c) => c[0]), KEYS_127);
+  for (const k of NEW_128) assert.ok(!node.includes(k), k);
+  // the official table does hold them (SqlSaveBackend.CombatTallyColumns), after the 18 of 1.2.6
+  assert.deepStrictEqual(B.schemaSql().tally.slice(18), NEW_128);
+
+  const dir = H.makeDir();
+  const t = H.makeEndpoint(dir, { t: NOW });
+  try {
+    const good = await H.send(t, { body: H.bodyOf() });
+    assert.strictEqual(good.status, 200);
+    assert.strictEqual(H.remoteCount(dir.dbPath), 1);
+    const unknown = await H.send(t, { body: H.bodyOf({ rows: [H.goodRow({ not_a_column: 1 })] }) });
+    assert.strictEqual(unknown.status, 400);
+    for (const k of NEW_128) {
+      const body = H.bodyOf({ rows: [H.goodRow(), H.goodRow({ [k]: 1 })] });
+      assert.strictEqual(names.parseTelemetryBatch(body), null, k);
+      const r = await H.send(t, { body });
+      assert.strictEqual(r.status, unknown.status, k);
+      assert.strictEqual(r.body, unknown.body, k + ': the same reply as an unknown column');
+    }
+    assert.strictEqual(H.remoteCount(dir.dbPath), 1, 'nothing of a refused batch is stored, not even its good row');
+    const d = new Database(dir.dbPath, { readonly: true, fileMustExist: true });
+    try {
+      const cols = d.prepare('PRAGMA table_info(remote_combat_events)').all().map((c) => c.name);
+      assert.deepStrictEqual(cols.slice(-39), KEYS_127);
+      for (const k of NEW_128) assert.ok(!cols.includes(k), k);
+    } finally { d.close(); }
+  } finally {
+    t.ep.close();
+    dir.cleanup();
+  }
+});

@@ -13863,6 +13863,7 @@ public partial class CombatEngine
             }
             result.CombatLog.Add($"{who} misses {target.Name} (roll: {roll.Natural}, needed: {roll.Needed})");
         }
+        EvRoll(attacker, hit);   // 1.2.8: the one place a to-hit die is counted (player_swings, player_misses)
         return new HitCheck(hit, roll.Natural);
     }
 

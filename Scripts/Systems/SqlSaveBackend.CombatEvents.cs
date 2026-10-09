@@ -13,14 +13,16 @@ namespace UsurperRemake.Systems
         int FloorActual, int Difficulty, int PartySize, int EncounterSize, int FirstActor,
         long DmgToPlayerBasic, long DmgToPlayerAbility, long DmgToPlayerSpell, long DmgToPlayerDot,
         long DmgToTeam, long DmgByPlayer, long DmgByTeam, long HealPlayer,
-        int PotionsUsed, int AbilitiesUsed, int SpellsUsed, int TeammatesLost, long? PlayerHpEnd)
+        int PotionsUsed, int AbilitiesUsed, int SpellsUsed, int TeammatesLost, long? PlayerHpEnd,
+        int PlayerSwings = 0, int PlayerMisses = 0, int EliteCount = 0)
     {
         /// <summary>The tally's values, or null when the fight was not entered (the new columns stay NULL).</summary>
         public static CombatRowTally? From(CombatTally? t) => t == null || !t.Started ? null : new CombatRowTally(
             t.FloorActual, t.Difficulty, t.PartySize, t.EncounterSize, t.FirstActor,
             t.DmgToPlayerBasic, t.DmgToPlayerAbility, t.DmgToPlayerSpell, t.DmgToPlayerDot,
             t.DmgToTeam, t.DmgByPlayer, t.DmgByTeam, t.HealPlayer,
-            t.PotionsUsed, t.AbilitiesUsed, t.SpellsUsed, t.TeammatesLost, t.Ended ? t.PlayerHpEnd : null);
+            t.PotionsUsed, t.AbilitiesUsed, t.SpellsUsed, t.TeammatesLost, t.Ended ? t.PlayerHpEnd : null,
+            t.PlayerSwings, t.PlayerMisses, t.EliteCount);
     }
 
     /// <summary>
@@ -39,7 +41,9 @@ namespace UsurperRemake.Systems
     public partial class SqlSaveBackend
     {
         /// <summary>1.2.6: the accumulator columns of combat_events, in insert order, with their values.
-        /// INTEGER with no default: NULL on rows written before 1.2.6 and on a fight that was not entered.</summary>
+        /// INTEGER with no default: NULL on rows written before 1.2.6 and on a fight that was not entered.
+        /// 1.2.8: player_swings, player_misses and elite_count, NULL on rows written before 1.2.8; a fight
+        /// with the to-hit roll off writes 0 and 0. They are not in the telemetry row (TelemetryRow.Columns).</summary>
         internal static readonly (string Column, Func<CombatRowTally, object?> Value)[] CombatTallyColumns =
         {
             ("floor_actual", t => t.FloorActual),
@@ -60,6 +64,9 @@ namespace UsurperRemake.Systems
             ("spells_used", t => t.SpellsUsed),
             ("teammates_lost", t => t.TeammatesLost),
             ("player_hp_end", t => t.PlayerHpEnd),
+            ("player_swings", t => t.PlayerSwings),
+            ("player_misses", t => t.PlayerMisses),
+            ("elite_count", t => t.EliteCount),
         };
 
         /// <summary>1.2.6: the accumulator columns on a database made by an older release, then the indexes
