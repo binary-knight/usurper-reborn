@@ -21727,9 +21727,12 @@ public partial class CombatEngine
         var npcId = npc.ID ?? "";
         var deathLocation = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
         bool wasPermadeath = false;
+        bool warded = false;   // v1.2.8 (H3)
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
+            // v1.2.8 (H3): asked before the team is cleared below: on the player's team, or in this party
+            warded = WardSystem.IsWarded(worldNpc, result.Teammates, GameEngine.Instance?.DungeonPartyNPCIds);
             // Temporarily clear team so MarkNPCDead doesn't trigger the world-sim
             // player-team protection (that guard is for background NPC-vs-NPC violence,
             // not real combat deaths)
@@ -21760,7 +21763,7 @@ public partial class CombatEngine
             // v1.2: an ally who dies in the player's party rolls the team rate (2 percent), not
             // the "player killed an NPC" rate (8 percent) this passed since v0.42.
             wasPermadeath = WorldSimulator.Instance?.MarkNPCDead(worldNpc, GameConfig.PermadeathChanceDungeonTeam,
-                killerName, deathLocation) ?? false;
+                killerName, deathLocation, atPlayersSide: true) ?? false;
             worldNpc.IsInConversation = savedEngaged;
             worldNpc.Team = savedTeam;
 
@@ -21776,6 +21779,12 @@ public partial class CombatEngine
             terminal.WriteLine("═══════════════════════════════════════════════════════════");
         terminal.WriteLine("");
         await Pacing.Wait(1500);
+
+        // v1.2.8 (H3): the ward. Not permanent: one row that the ward caught them. Permanent: the scene
+        // (the ward flares and breaks, a last line picked by a hash of the NPC's ID, the closing row) and
+        // the lasting memory. No random number is drawn here. The grief trigger below is as before.
+        if (warded)
+            await ShowWardOutcome(npc, npcId, wasPermadeath);
 
         // Mark the combat character reference as dead
         if (npc is NPC npcRef)
@@ -21836,7 +21845,14 @@ public partial class CombatEngine
             bool wasSpouse = romanceTracker.IsPlayerMarriedTo(npcId);
             bool wasLover = romanceTracker.IsPlayerInRelationshipWith(npcId);
 
-            if (wasSpouse)
+            // v1.2.8 (H3): a fall the ward caught shows the fallen banner and the caught row only; the rows of
+            // loss below are for a permanent fall (after the scene) and for an NPC that is not warded
+            bool caughtByWard = warded && !wasPermadeath;
+            if (caughtByWard)
+            {
+                // nothing more is shown: they are carried out and will mend
+            }
+            else if (wasSpouse)
             {
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get("combat.spouse_fallen", npc.DisplayName));
@@ -21855,8 +21871,14 @@ public partial class CombatEngine
             }
 
             // Always run the unified cleanup. Idempotent for non-romance NPCs.
-            romanceTracker.OnNPCPermadied(npcId);
-            NPCMarriageRegistry.Instance.OnNPCPermadied(npcId);
+            // v1.2.8 (H3): but not for a fall the ward caught: they will mend, so the marriage, the romance,
+            // the jealousy and an affair stay as they were. A permanent fall, an NPC that is not warded and
+            // the switch off run it as before.
+            if (!caughtByWard)
+            {
+                romanceTracker.OnNPCPermadied(npcId);
+                NPCMarriageRegistry.Instance.OnNPCPermadied(npcId);
+            }
         }
 
         terminal.WriteLine("");
@@ -21875,6 +21897,35 @@ public partial class CombatEngine
         // Prevent save cheesing — persist death outcomes immediately (both online and offline)
         if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
+    }
+
+    /// <summary>
+    /// v1.2.8 (H3): what the ward did for a warded NPC that fell in the player's fight. The rows go through
+    /// the fight's terminal, so a grouped player who watches reads them from the same capture in their own
+    /// language (CapturedInLanguage); none of them addresses the player.
+    /// </summary>
+    private async Task ShowWardOutcome(Character npc, string npcId, bool wasPermadeath)
+    {
+        if (!wasPermadeath)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(WardSystem.CaughtRow(npc.DisplayName));
+            terminal.WriteLine("");
+            await Pacing.Wait(1000);
+            return;
+        }
+
+        var rows = WardSystem.BreakSceneRows(npc.DisplayName, npcId);
+        for (int i = 0; i < rows.Length; i++)
+        {
+            terminal.SetColor(i == 2 ? "white" : i == rows.Length - 1 ? "dark_red" : "bright_cyan");
+            terminal.WriteLine(rows[i]);
+            await Pacing.Wait(i == rows.Length - 1 ? 1500 : 1200);
+        }
+        terminal.WriteLine("");
+
+        // the record that lasts: the player's memories of the fallen (saved with the grief memories)
+        UsurperRemake.Systems.GriefSystem.Instance.AddNpcMemory(npcId, npc.DisplayName, WardSystem.MemoryText(npc.DisplayName));
     }
 
     /// <summary>

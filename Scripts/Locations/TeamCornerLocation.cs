@@ -705,6 +705,15 @@ public class TeamCornerLocation : BaseLocation
 
         await ShowTeamMembers(currentPlayer.Team, true);
 
+        // v1.2.8 (H3): the ward is named where the team is shown, when a hired member is under it
+        var statusTeam = currentPlayer.Team;
+        if (NPCSpawnSystem.Instance.ActiveNPCs.Any(n => n.Team == statusTeam && WardSystem.IsWarded(n)))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(WardSystem.TeamViewRow());
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         await terminal.PressAnyKey();
@@ -1457,6 +1466,9 @@ public class TeamCornerLocation : BaseLocation
         if (await terminal.AskYesNoAsync(""))
         {
             string oldTeam = currentPlayer.Team;
+            // v1.2.8 (H3): asked while the team is still a player's team
+            bool wardedMembers = NPCSpawnSystem.Instance.ActiveNPCs.Any(n => n.Team == oldTeam && WardSystem.IsWarded(n));
+            bool lastPlayerLeft = true;
             currentPlayer.Team = "";
             currentPlayer.TeamPW = "";
             currentPlayer.CTurf = false;
@@ -1488,6 +1500,7 @@ public class TeamCornerLocation : BaseLocation
 
                 // v1.1.12: the protection is kept while a player is still on the team; it was dropped on
                 // every quit, which left the members still in it open to the NPC AI
+                lastPlayerLeft = remainingPlayers.Count == 0;
                 if (remainingPlayers.Count == 0)
                     WorldSimulator.UnregisterPlayerTeam(oldTeam);
 
@@ -1502,6 +1515,13 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("team.left_team"));
+            // v1.2.8 (H3): the hired members stay behind without a player: the ward lifts from them
+            if (wardedMembers && lastPlayerLeft)
+            {
+                terminal.SetColor("cyan");
+                foreach (var row in WardSystem.LiftTeamRows())
+                    terminal.WriteLine(row);
+            }
             terminal.WriteLine("");
 
             NewsSystem.Instance.Newsy(true, Loc.Get("team.news_left", currentPlayer.DisplayName, oldTeam));
@@ -2152,6 +2172,13 @@ public class TeamCornerLocation : BaseLocation
         long wage = TeamSystem.GetDailyWage(recruit);
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("team.daily_wage", $"{wage:N0}"));
+        // v1.2.8 (H3): the ward is laid on the new member
+        if (WardSystem.IsWarded(recruit))
+        {
+            terminal.SetColor("cyan");
+            foreach (var row in WardSystem.HireRows(recruit.DisplayName))
+                terminal.WriteLine(row);
+        }
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("team.recruit_quote", recruit.DisplayName));
@@ -2684,6 +2711,7 @@ public class TeamCornerLocation : BaseLocation
             await Pacing.Wait(2000);
             return;
         }
+        bool wardedBeforeSack = WardSystem.IsWarded(live);   // v1.2.8 (H3): asked while still on the team
         live.Team = "";
         live.TeamPW = "";
         live.CTurf = false;
@@ -2691,6 +2719,12 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.member_sacked", live.DisplayName));
+        if (wardedBeforeSack)
+        {
+            terminal.SetColor("cyan");
+            foreach (var row in WardSystem.LiftRows(live.DisplayName))   // v1.2.8 (H3)
+                terminal.WriteLine(row);
+        }
         terminal.WriteLine("");
 
         NewsSystem.Instance.Newsy(true, Loc.Get("team.news_sacked", live.DisplayName, currentPlayer.Team));

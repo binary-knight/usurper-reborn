@@ -268,6 +268,18 @@ public static partial class GameConfig
     /// </summary>
     public static bool RecruitPoolEnabled { get; internal set; } = true;
 
+    /// <summary>
+    /// 1.2.8 (H3): the ward. An NPC on a player's team, and an NPC in a player's dungeon party for the length
+    /// of that run, is warded (WardSystem.IsWarded; story companions are not). At the player's side the chance
+    /// that a fall is permanent is unchanged (PermadeathChanceDungeonTeam, the same draw at the same place);
+    /// the ward adds the story: a row at hiring, at joining the party and at leaving, a row when a fall is
+    /// not permanent, a scene and a lasting memory when it is. Away from the player a permanent death is
+    /// refused for an NPC on a player's team (WorldSimulator.RollPermadeathUnderWard). Default on. The setter
+    /// is internal: it is not a sysop setting and not in balance.json. Off, every death, every draw and
+    /// every line is as before 1.2.8.
+    /// </summary>
+    public static bool WardEnabled { get; internal set; } = true;
+
     /// <summary>1.2.8 (H2): the highest level of a recruit pool member (the pool is levels 1 to 15).</summary>
     public const int RecruitPoolMaxLevel = 15;
     /// <summary>1.2.8 (H2): the top level of each pool band: 1 to 5, 6 to 10 and 11 to 15.</summary>

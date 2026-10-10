@@ -11762,6 +11762,10 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.paid_fee", fee));
             }
 
+            // v1.2.8 (H3): an NPC that is not on the team comes under the ward by joining the party; told once,
+            // here at the joining (asked before it is in the party, so a team member gets no second row)
+            bool wardedBeforeJoining = WardSystem.IsWarded(npc);
+
             // Defensive duplicate check by NPC ID before adding
             if (!teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npc.ID))
             {
@@ -11777,6 +11781,11 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.npc_joins", npc.DisplayName));
             terminal.WriteLine(Loc.Get("dungeon.fight_alongside"));
+            if (!wardedBeforeJoining && WardSystem.IsWarded(npc, teammates))
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine(WardSystem.PartyJoinRow(npc.DisplayName));   // v1.2.8 (H3)
+            }
 
             // Show XP penalty warning if applicable
             float xpMult = balanceSystem.CalculateXPMultiplier(player, teammates);
