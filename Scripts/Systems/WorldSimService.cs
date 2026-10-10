@@ -1454,6 +1454,7 @@ namespace UsurperRemake.Systems
                     IsAgedDeath = data.IsAgedDeath,
                     IsPermaDead = data.IsPermaDead,
                     DeathDate = data.DeathDate,
+                    LastOnPlayerTeamAt = data.LastOnPlayerTeamAt,   // v1.2.8 (H2)
                     PregnancyDueDate = data.PregnancyDueDate,
                     PregnancyFatherName = data.PregnancyFatherName,
 

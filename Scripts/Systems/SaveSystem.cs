@@ -1374,6 +1374,7 @@ namespace UsurperRemake.Systems
                     IsAgedDeath = npc.IsAgedDeath,
                     IsPermaDead = npc.IsPermaDead,
                     DeathDate = npc.DeathDate,
+                    LastOnPlayerTeamAt = npc.LastOnPlayerTeamAt,   // v1.2.8 (H2)
                     PregnancyDueDate = npc.PregnancyDueDate,
                     PregnancyFatherName = npc.PregnancyFatherName,
 

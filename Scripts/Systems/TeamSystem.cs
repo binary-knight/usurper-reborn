@@ -1035,6 +1035,13 @@ public partial class TeamSystem
     /// That's a design call — if we wanted to hide refused NPCs too, change
     /// this filter to also exclude `band == Refused`.
     /// </summary>
+    /// <summary>
+    /// v1.2.8 (H2): the town locations the Team Corner hire list and its name search read. A recruit pool
+    /// arrival is placed in one of them (NPCSpawnSystem.GenerateImmigrantNPC).
+    /// </summary>
+    public static readonly string[] RecruitTownLocations =
+        { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+
     public static bool IsRecruitable(Character player, NPC npc, out RecruitmentBand band)
     {
         band = RecruitmentBand.Neutral;

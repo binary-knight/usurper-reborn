@@ -119,6 +119,7 @@ public class WorldInitializerSystem
             .Where(n => n.IsAlive &&
                    string.IsNullOrEmpty(n.Team) &&
                    n.Level >= 5 &&
+                   WorldSimulator.MayJoinNpcTeam(n) &&   // v1.2.8 (H2): the surplus rule
                    !n.IsStoryNPC &&
                    (n.Brain?.Personality?.Ambition > 0.5f ||
                     n.Brain?.Personality?.IsLikelyToJoinGang() == true))
@@ -130,6 +131,7 @@ public class WorldInitializerSystem
         {
             if (teamsFormed >= targetTeams) break;
             if (!string.IsNullOrEmpty(leader.Team)) continue;
+            if (!WorldSimulator.MayJoinNpcTeam(leader)) continue;   // v1.2.8 (H2): the surplus rule
 
             // Form a new team with lore-friendly name
             string teamName = GenerateLoreFriendlyTeamName();
@@ -154,6 +156,7 @@ public class WorldInitializerSystem
                 .Where(n => n.IsAlive &&
                        string.IsNullOrEmpty(n.Team) &&
                        n.Id != leader.Id &&
+                       WorldSimulator.MayJoinNpcTeam(n) &&   // v1.2.8 (H2): the surplus rule
                        !n.IsStoryNPC &&
                        n.Brain?.Personality?.IsLikelyToJoinGang() == true)
                 .OrderBy(_ => random.Next())
@@ -162,6 +165,7 @@ public class WorldInitializerSystem
 
             foreach (var recruit in recruits)
             {
+                if (!WorldSimulator.MayJoinNpcTeam(recruit)) continue;   // v1.2.8 (H2): the surplus rule
                 recruit.Team = teamName;
                 recruit.TeamPW = password;
                 recruit.CTurf = false;
@@ -519,7 +523,7 @@ public class WorldInitializerSystem
             {
                 // Try to recruit
                 var candidate = NPCSpawnSystem.Instance.ActiveNPCs
-                    .Where(n => n.IsAlive && string.IsNullOrEmpty(n.Team))
+                    .Where(n => n.IsAlive && string.IsNullOrEmpty(n.Team) && WorldSimulator.MayJoinNpcTeam(n))   // v1.2.8 (H2): the surplus rule
                     .OrderBy(_ => random.Next())
                     .FirstOrDefault();
 
