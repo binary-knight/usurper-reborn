@@ -91,6 +91,21 @@ public partial class NPC : Character
     public DateTime BirthDate { get; set; } = DateTime.MinValue;
 
     /// <summary>
+    /// v1.2.8 (H2): when the ageing check last saw this NPC on a player's team (UTC); null when it never did.
+    /// Saved. While the NPC is on the team the check moves BirthDate forward by the time since this stamp, so
+    /// its age stands still; after it leaves, it cannot die of old age for GameConfig.RecruitOldAgeGraceDays
+    /// from this stamp. Only WorldSimulator.ProcessNPCAging writes it.
+    /// </summary>
+    public DateTime? LastOnPlayerTeamAt { get; set; }
+
+    /// <summary>
+    /// v1.2.8 (H2): not saved. Whether the ageing check of this process last saw the NPC on a player's team
+    /// (null: not checked yet since it was loaded). It tells a rehire (the stamp is old because the NPC was
+    /// away: only stamp again) from unbroken membership (move BirthDate by the time since the stamp).
+    /// </summary>
+    internal bool? SeenOnPlayerTeamAtLastAgeCheck { get; set; }
+
+    /// <summary>
     /// True if this NPC died of old age (permanent, no respawn - the soul has moved on).
     /// Unlike IsDead which can be reversed by respawn, IsAgedDeath is forever.
     /// </summary>

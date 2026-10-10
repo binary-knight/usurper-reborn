@@ -1004,6 +1004,7 @@ namespace UsurperRemake.Systems
         public bool IsAgedDeath { get; set; }
         public bool IsPermaDead { get; set; }  // Permanent combat death (v0.42.0)
         public DateTime? DeathDate { get; set; }  // v0.65.5: prune grace window for permanent deaths
+        public DateTime? LastOnPlayerTeamAt { get; set; }  // v1.2.8 (H2): null on older saves (never on a player's team)
         public DateTime? PregnancyDueDate { get; set; }
         public string? PregnancyFatherName { get; set; }
 

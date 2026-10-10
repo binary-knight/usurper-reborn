@@ -274,6 +274,7 @@ public class EnhancedNPCBehaviorSystem
         foreach (var npc in availableNPCs)
         {
             if (recruited >= maxRecruits) break;
+            if (!WorldSimulator.MayJoinNpcTeam(npc)) continue;   // v1.2.8 (H2): the surplus rule
             
             if (random.Next(3) == 0) // 33% chance to recruit
             {

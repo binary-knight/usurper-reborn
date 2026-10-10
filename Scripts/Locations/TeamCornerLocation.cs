@@ -1529,7 +1529,7 @@ public class TeamCornerLocation : BaseLocation
     ///      Filters out lovers / spouses / FWB / exes via RomanceTracker,
     ///      scripted NPCs, prisoners, dead NPCs, NPCs already on other teams.
     ///   3. Sort by relationship band (Friend > Neutral > Rival > Refused),
-    ///      then level descending within each band.
+    ///      then nearest the player's level first within each band (v1.2.8).
     ///   4. Render page of 12 rows with relationship tags, price multipliers,
     ///      and [S]earch / [F]ilter / [N]ext / [P]rev / [Q]uit footer.
     ///   5. On digit select, show price-breakdown confirmation before charging.
@@ -1679,11 +1679,11 @@ public class TeamCornerLocation : BaseLocation
     /// already on other teams are excluded. Enemy / Hate tier NPCs are
     /// INCLUDED (with band = Refused) so the player sees they exist and can't
     /// be recruited — narrative signal. Sort: band asc (Friend first, Refused
-    /// last), then level desc within band.
+    /// last), then nearest the player's level first within band (v1.2.8).
     /// </summary>
     private List<RecruitmentRow> BuildRecruitmentCandidates(List<NPC> allNPCs, UsurperRemake.Data.SpecRole? roleFilter)
     {
-        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var townLocations = TeamSystem.RecruitTownLocations;   // v1.2.8 (H2): one list, also read by the pool arrival
         var rows = new List<RecruitmentRow>();
 
         foreach (var npc in allNPCs)
@@ -1712,7 +1712,7 @@ public class TeamCornerLocation : BaseLocation
             });
         }
 
-        // Sort: Family (0, top) → Friend (1) → Neutral (2) → Rival (3) → Refused (4), then level desc.
+        // Sort: Family (0, top) → Friend (1) → Neutral (2) → Rival (3) → Refused (4), then the level order below.
         // v0.63.0 slice 3b C3: adult children sort to the top because the player
         // overwhelmingly wants to find their kids fast in the recruit list.
         int BandOrder(TeamSystem.RecruitmentBand b) => b switch
@@ -1724,6 +1724,19 @@ public class TeamCornerLocation : BaseLocation
             TeamSystem.RecruitmentBand.Refused  => 4,
             _ => 99, // Hidden shouldn't appear — IsRecruitable filters it out
         };
+
+        // v1.2.8 (H2): inside a band the NPC nearest the player's level comes first (ties: the lower level,
+        // then the name as stored, so the order is stable). With the switch off: level descending as before.
+        if (GameConfig.RecruitPoolEnabled)
+        {
+            int playerLevel = currentPlayer?.Level ?? 1;
+            return rows
+                .OrderBy(r => BandOrder(r.Band))
+                .ThenBy(r => Math.Abs(r.Npc.Level - playerLevel))
+                .ThenBy(r => r.Npc.Level)
+                .ThenBy(r => r.Npc.Name2 ?? "", StringComparer.Ordinal)
+                .ToList();
+        }
 
         return rows
             .OrderBy(r => BandOrder(r.Band))
@@ -1868,7 +1881,7 @@ public class TeamCornerLocation : BaseLocation
         // tell the player "no, that's your spouse" instead of "no match found"
         // when they type a specific name.
         var lookup = raw;
-        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var townLocations = TeamSystem.RecruitTownLocations;   // v1.2.8 (H2): one list, also read by the pool arrival
         var pool = allNPCs.Where(n => n.IsAlive && !n.IsDead && string.IsNullOrEmpty(n.Team)
                                    && townLocations.Contains(n.CurrentLocation)
                                    && !n.IsSpecialNPC

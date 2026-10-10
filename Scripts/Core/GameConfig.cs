@@ -253,6 +253,43 @@ public static partial class GameConfig
     /// </summary>
     public static bool PlayerHitRollEnabled { get; internal set; } = true;
 
+    /// <summary>
+    /// 1.2.8 (H2): the recruit pool. The world keeps a pool of living, unteamed NPCs at levels 1 to
+    /// RecruitPoolMaxLevel for low-level players to hire (WorldSimulator.ProcessRecruitPoolTopUp), pool members
+    /// earn world-simulator experience at x1.0 (WorldSimulator.WorldSimXpMultiplier), a pool arrival is aged
+    /// RecruitPoolMinAge to RecruitPoolMaxAge, an NPC on a player's team does not age and cannot die of old age
+    /// (WorldSimulator.IsOnPlayerTeam, with RecruitOldAgeGraceDays after it leaves), an NPC of level 15 or lower
+    /// founds or joins an NPC team only while its band holds more than six free NPCs
+    /// (WorldSimulator.MayJoinNpcTeam), and the hire list is
+    /// sorted nearest the player's level first inside a relationship band. Default on. The setter is internal:
+    /// it is not a sysop setting and not in balance.json. Off, the world simulator draws exactly the random
+    /// numbers it drew before 1.2.8, the saved stamp is neither read nor written, and the list is level
+    /// descending.
+    /// </summary>
+    public static bool RecruitPoolEnabled { get; internal set; } = true;
+
+    /// <summary>1.2.8 (H2): the highest level of a recruit pool member (the pool is levels 1 to 15).</summary>
+    public const int RecruitPoolMaxLevel = 15;
+    /// <summary>1.2.8 (H2): the top level of each pool band: 1 to 5, 6 to 10 and 11 to 15.</summary>
+    public static readonly int[] RecruitPoolBandTopLevels = { 5, 10, RecruitPoolMaxLevel };
+    /// <summary>1.2.8 (H2): the number of pool members the world keeps in each band.</summary>
+    public const int RecruitPoolPerBand = 6;
+    /// <summary>1.2.8 (H2): the whole pool (three bands of six).</summary>
+    public const int RecruitPoolSize = 3 * RecruitPoolPerBand;
+    /// <summary>1.2.8 (H2): a pool arrival is let in only while the town (the living NPCs plus those waiting
+    /// for their respawn) is below this: 190, where ordinary immigration slows (MaxNPCPopulation minus 10).
+    /// The pool so never lifts the town to MaxNPCPopulation, where pregnancies, comings of age and ordinary
+    /// immigration stop.</summary>
+    public const int RecruitPoolTownLimit = MaxNPCPopulation - 10;
+    /// <summary>1.2.8 (H2): world ticks between two pool arrivals (20 ticks is about 10 minutes at the
+    /// server's 30 second tick, so an empty pool fills in about 3 hours).</summary>
+    public const int RecruitPoolTicksBetweenArrivals = 20;
+    /// <summary>1.2.8 (H2): a pool arrival is aged 18 to 22 (other immigrants stay 20 to 35).</summary>
+    public const int RecruitPoolMinAge = 18;
+    public const int RecruitPoolMaxAge = 22;
+    /// <summary>1.2.8 (H2): real days an NPC cannot die of old age after it was last on a player's team.</summary>
+    public const int RecruitOldAgeGraceDays = 7;
+
     /// <summary>1.2.8: the natural roll a player's attack needs is held in a window, as the monster's is
     /// (AtLevelAccuracyGap): never below PlayerHitMinNeeded (a natural 1 always misses), at most
     /// PlayerHitMaxNeededAtLevel against a target up to AtLevelAccuracyGap levels above the attacker (hit at
