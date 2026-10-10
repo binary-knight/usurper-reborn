@@ -31068,5 +31068,20 @@
   "team.news_repelled_header": "Gang Repelled!",
   "team.news_defended": "{0} successfully defended against {1}!",
   "team.news_auto_header": "Automated Gang Battle!",
-  "team.news_auto_defeated": "{0} defeated {1} in automated combat!"
+  "team.news_auto_defeated": "{0} defeated {1} in automated combat!",
+  "oath_mark.hire_laid": "The oath-mark of your banner settles on {0}.",
+  "oath_mark.hire_holds": "It stills their years and calls them back from death. The deep can break it.",
+  "oath_mark.team_view": "The oath-mark of your banner lies on every hired member of this team.",
+  "oath_mark.party_joins": "Your oath-mark covers {0} as they walk beside you.",
+  "oath_mark.caught": "  The oath-mark holds. {0} is carried out to mend.",
+  "oath_mark.flares": "  The oath-mark on {0} flares white.",
+  "oath_mark.breaks": "  It strains against the deep, and it breaks.",
+  "oath_mark.last_1": "  {0}: \"Go on. Finish this without me.\"",
+  "oath_mark.last_2": "  {0}: \"So the road ends here. It was a good road.\"",
+  "oath_mark.last_3": "  {0}: \"Tell them I held the line.\"",
+  "oath_mark.gone": "  The light goes out. {0} will not return.",
+  "oath_mark.memory": "{0} fell in the deep when the oath-mark broke.",
+  "oath_mark.lifts": "The oath-mark lifts from {0}.",
+  "oath_mark.lifts_team": "The oath-mark lifts from those who stay behind.",
+  "oath_mark.years_return": "Their years will find them again in {0} days."
 }

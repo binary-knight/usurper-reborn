@@ -858,6 +858,20 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// v1.2.8 (H3): the permadeath roll under the ward, the ONE place where the ward refuses a permanent death.
+    /// The roll is always drawn (the draw sequence is the same warded or not, switch on or off). Away from the
+    /// player (atPlayersSide false: every world simulator site) a permanent outcome is refused for a warded NPC
+    /// (WardSystem.IsWarded with no party: a member of a player's team). At the player's side the roll stands:
+    /// the chance there is the one from before 1.2.8.
+    /// </summary>
+    internal bool RollPermadeathUnderWard(NPC npc, float baseChance, bool atPlayersSide)
+    {
+        bool permanent = RollPermadeath(npc, baseChance);
+        if (permanent && !atPlayersSide && WardSystem.IsWarded(npc)) return false;
+        return permanent;
+    }
+
+    /// <summary>
     /// v0.64.0 hygiene: garbage-collect permanently-dead NPCs from the
     /// `npcs` list after their grace window has elapsed. Without this,
     /// IsAgedDeath / IsPermaDead corpses accumulate forever in
@@ -919,8 +933,11 @@ public class WorldSimulator
     /// <param name="basePermadeathChance">Base permadeath chance for this death context</param>
     /// <param name="killerName">Who killed them (for news)</param>
     /// <param name="location">Where they died</param>
+    /// <param name="atPlayersSide">v1.2.8 (H3): true only for a fall in the player's own fight
+    /// (CombatEngine.HandleNpcTeammateDeath); every world simulator site leaves it false, and there the ward
+    /// refuses a permanent death for an NPC on a player's team (RollPermadeathUnderWard).</param>
     /// <returns>True if the death was permanent</returns>
-    public bool MarkNPCDead(NPC npc, float basePermadeathChance, string killerName, string location)
+    public bool MarkNPCDead(NPC npc, float basePermadeathChance, string killerName, string location, bool atPlayersSide = false)
     {
         if (npc == null) return false;
 
@@ -955,7 +972,7 @@ public class WorldSimulator
         npc.PregnancyFatherName = null;
         CheckKingDeath(npc);
 
-        bool permadeath = RollPermadeath(npc, basePermadeathChance);
+        bool permadeath = RollPermadeathUnderWard(npc, basePermadeathChance, atPlayersSide);   // v1.2.8 (H3)
         if (permadeath)
         {
             // v0.65.5 (T0-2): make the rolled permadeath ACTUALLY permanent so the cascade below
