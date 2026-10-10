@@ -59,30 +59,148 @@ public class WorldSimulator
     private static readonly HashSet<string> _playerTeamNames = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _teamLock = new();
 
+    // v1.2.8 (F5): the list above is two sets. _playerTeamNames holds what the STORE said at the last refresh
+    // (the world simulator's service replaces it whole, WorldSimService.RefreshPlayerTeamNames). The names a
+    // session of THIS process registered (login, create, join) wait in _sessionTeamNames with the number of
+    // their registration, so a refresh keeps one the store does not hold yet and drops it once the store has
+    // had a whole refresh interval to say so. Single-player never refreshes: only the session set is used.
+    private static readonly Dictionary<string, long> _sessionTeamNames = new(StringComparer.OrdinalIgnoreCase);
+    private static long _teamRegistrations;          // counts RegisterPlayerTeam calls
+    private static long _keptSince;                  // registrations numbered above this survive the next refresh
+
     public static void RegisterPlayerTeam(string teamName)
     {
         if (string.IsNullOrEmpty(teamName)) return;
-        lock (_teamLock) { _playerTeamNames.Add(teamName); }
+        lock (_teamLock) { _sessionTeamNames[teamName] = ++_teamRegistrations; }
     }
 
     public static void UnregisterPlayerTeam(string teamName)
     {
         if (string.IsNullOrEmpty(teamName)) return;
-        lock (_teamLock) { _playerTeamNames.Remove(teamName); }
+        lock (_teamLock) { _sessionTeamNames.Remove(teamName); _playerTeamNames.Remove(teamName); }
     }
 
     public static bool IsPlayerTeam(string? teamName)
     {
         if (string.IsNullOrEmpty(teamName)) return false;
-        lock (_teamLock) { return _playerTeamNames.Contains(teamName); }
+        lock (_teamLock) { return _playerTeamNames.Contains(teamName) || _sessionTeamNames.ContainsKey(teamName); }
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): the mark a refresh takes BEFORE it reads the store: registrations made after it are newer
+    /// than what the read can have seen. Pass it to ReplaceStorePlayerTeams with the names read.
+    /// </summary>
+    internal static long BeginPlayerTeamRefresh()
+    {
+        lock (_teamLock) { return _teamRegistrations; }
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): the store's answer replaces the stored set, so a name the store no longer holds leaves
+    /// (the last player left the team) and a name another process wrote arrives. A session registration is
+    /// kept for as long as a live session of this process has its player on that team, whatever the store
+    /// says (a session whose saves fail must not lose its hires). Otherwise one the store does not hold stays
+    /// through the first refresh after it and is dropped by the one after that, and one the store holds is no
+    /// longer needed. No random is drawn.
+    /// </summary>
+    internal static void ReplaceStorePlayerTeams(IEnumerable<string> storeNames, long mark)
+    {
+        var live = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var team in LiveSessionTeams())
+            if (!string.IsNullOrEmpty(team)) live.Add(team);
+        lock (_teamLock)
+        {
+            _playerTeamNames.Clear();
+            foreach (var name in storeNames)
+                if (!string.IsNullOrEmpty(name)) _playerTeamNames.Add(name);
+            foreach (var old in _sessionTeamNames.Where(kv => !live.Contains(kv.Key) && (kv.Value <= _keptSince || _playerTeamNames.Contains(kv.Key))).Select(kv => kv.Key).ToList())
+                _sessionTeamNames.Remove(old);
+            _keptSince = mark;
+        }
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): the teams of the players in this process's live sessions: every MUD session's player, or
+    /// in a door or single-player process the one current player. Read by the refresh; a test may replace it.
+    /// </summary>
+    internal static Func<IEnumerable<string?>> LiveSessionTeams = ReadLiveSessionTeams;
+
+    private static IEnumerable<string?> ReadLiveSessionTeams()
+    {
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server != null) return server.ActiveSessions.Values.ToList().Select(session => session.Context?.Player?.Team).ToList();
+        return new[] { GameEngine.InstanceIfAny?.CurrentPlayer?.Team };
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): one reader of the store's player team names with the fail-closed rule, for whoever drives
+    /// a simulator: the service (WorldSimService) and a session's own loop (StartSimulation). A read that
+    /// fails keeps the list as it was. Read returns whether the list may be relied on: false only while no
+    /// read has succeeded yet (the caller then holds its step). A failure is logged when it starts, then once
+    /// every FailureLogEvery failed reads, and once more when the reads work again.
+    /// </summary>
+    internal sealed class PlayerTeamStoreReader
+    {
+        internal const int FailureLogEvery = 60;
+        private readonly string _who;
+        private bool _loaded;
+        private int _failures;
+        /// <summary>How many failure lines this reader has logged (the tests read it).</summary>
+        internal int FailureLines { get; private set; }
+
+        internal PlayerTeamStoreReader(string who) { _who = who; }
+
+        internal bool Read(SqlSaveBackend store)
+        {
+            long mark = BeginPlayerTeamRefresh();
+            var names = store.ReadPlayerTeamNames(out string? error);
+            if (names == null)
+            {
+                if (_failures++ % FailureLogEvery == 0)
+                {
+                    FailureLines++;
+                    DebugLogger.Instance.LogError("WORLDSIM", _loaded
+                        ? $"The player team names could not be read ({error}); {_who} keeps the list it has."
+                        : $"The player team names could not be read ({error}); {_who} holds its ticks until a read succeeds.");
+                }
+                return _loaded;
+            }
+            ReplaceStorePlayerTeams(names, mark);
+            if (!_loaded)
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Registered {names.Count} player team names for protection ({_who})");
+            else if (_failures > 0)
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"The player team names are read again after {_failures} failed read(s): {names.Count} names ({_who}).");
+            _failures = 0;
+            _loaded = true;
+            return true;
+        }
+    }
+
+    private readonly PlayerTeamStoreReader _sessionLoopTeams = new("this session's world sim");
+    internal int SessionLoopFailureLines => _sessionLoopTeams.FailureLines;
+
+    /// <summary>
+    /// v1.2.8 (F5): one pass of a session's own loop (StartSimulation). Online (a door process that does not
+    /// host the world sim service: without the lock, or with --no-worldsim) the loop knew only its own
+    /// session's team and took every other player's team for an NPC team; its changes reach the shared roster
+    /// with the session's save. So online it reads the players' teams from the store before each step, as the
+    /// service does, and holds the step while no read has succeeded. Single-player has no shared store: no
+    /// read, the step runs as before. Returns whether the step ran.
+    /// </summary>
+    internal bool SessionLoopStep()
+    {
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend store
+            && !_sessionLoopTeams.Read(store)) return false;
+        SimulateStep();
+        return true;
     }
 
     /// <summary>
     /// v1.2.8 (H2): THE test for "this NPC is a member of a player's team": its Team is a name in the
     /// player team list above. A name enters that list when a player creates, joins or loads into the team
     /// (TeamCornerLocation, GameEngine: single-player and online alike) and, online, when the world simulator
-    /// loads the player_teams table (WorldSimService.LoadPlayerTeamNames); it leaves when the last player
-    /// leaves or the empty team is removed. An NPC-only team is never in the list. A dungeon party member
+    /// reads the store before a tick (WorldSimService.RefreshPlayerTeamNames: every team a player's save
+    /// names, in any process); it leaves when the last player leaves or the empty team is removed. An NPC-only team is never in the list. A dungeon party member
     /// that is not on the team (a spouse, a companion) is not covered. Callers that need the rule use this
     /// method, not their own copy.
     /// </summary>
@@ -455,7 +573,7 @@ public class WorldSimulator
             {
                 try
                 {
-                    SimulateStep();
+                    SessionLoopStep();   // v1.2.8 (F5): online, the players' teams are read from the store first
                 }
                 catch (Exception ex)
                 {

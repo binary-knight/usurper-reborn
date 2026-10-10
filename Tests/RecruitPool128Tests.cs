@@ -875,7 +875,7 @@ internal static partial class RecruitPoolRuns
             var other = Make("Tide Gnoll", CharacterRace.Gnoll, 12, team: NpcTeam, age: 55);
             WorldSimulator.IsOnPlayerTeam(hired).Should().BeFalse();
             var service = new WorldSimService(db);
-            ((Task)typeof(WorldSimService).GetMethod("LoadPlayerTeamNames", F)!.Invoke(service, null)!).GetAwaiter().GetResult();
+            service.RefreshPlayerTeamNames().Should().BeTrue();   // v1.2.8 (F5): the start load is the refresh
             WorldSimulator.IsOnPlayerTeam(hired).Should().BeTrue();
             WorldSimulator.IsOnPlayerTeam(other).Should().BeFalse();
             AgeCheck(w);

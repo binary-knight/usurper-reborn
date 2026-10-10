@@ -132,6 +132,13 @@ public partial class GameEngine
     }
 
     /// <summary>
+    /// v1.2.8 (F5): the engine of this session or process if one exists; unlike Instance it never makes one
+    /// (the world sim's thread asks which team the current player is on, and must not create an engine to ask).
+    /// </summary>
+    internal static GameEngine? InstanceIfAny =>
+        UsurperRemake.Server.SessionContext.Current?.Engine ?? _fallbackInstance ?? (lazyInstance.IsValueCreated ? lazyInstance.Value : null);
+
+    /// <summary>
     /// Set the instance explicitly
     /// </summary>
     public static void SetInstance(GameEngine engine)
