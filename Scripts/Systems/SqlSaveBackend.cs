@@ -6963,6 +6963,52 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
+    /// v1.2.8 (F5): which teams are players' teams, for the world simulator's protection list: every team a
+    /// player's save names (so a team an NPC founded and a player joined counts, in whichever process the
+    /// player joined it, and a team its last player left does not), a character archived by permadeath
+    /// inside its restore window included, and banned players included (a ban can be lifted), as the
+    /// empty-team cleanup counts them. Plus every player_teams row joined or created within
+    /// EmptyTeamJoinGraceMinutes (the stamp is written before the membership reaches the save). While a
+    /// malformed save exists it cannot say which team it names, so every player_teams row counts.
+    /// Null when the read FAILED, with the reason in error: the caller must not take that for "no teams", and
+    /// it does the logging (the world sim reads before every tick, so a line per failure would flood the log).
+    /// Reads only; no row is written.
+    /// </summary>
+    public List<string>? ReadPlayerTeamNames(out string? error)
+    {
+        error = null;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = PlayerTeamNamesSql;
+            cmd.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
+            var names = new List<string>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) names.Add(reader.GetString(0));
+            return names;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return null;
+        }
+    }
+
+    internal const string PlayerTeamNamesSql = @"
+        WITH named AS MATERIALIZED (
+            SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END AS team
+            FROM players
+            UNION ALL
+            SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END
+            FROM deleted_characters WHERE expires_at > datetime('now'))
+        SELECT team FROM named WHERE typeof(team) = 'text' AND team != ''
+        UNION
+        SELECT team_name FROM player_teams
+        WHERE last_join_at >= datetime('now', '-' || @joinGrace || ' minutes')
+           OR EXISTS (SELECT 1 FROM players WHERE NOT json_valid(player_data));";
+
+    /// <summary>
     /// v1.1.12: the team rankings' player side: every player_teams row plus every team named only in player
     /// saves (HasTeamRow false), with the viewer's own save left out (excludeSaveKey, the players.username key)
     /// so the caller adds the in-memory character once, with its current level and team.
