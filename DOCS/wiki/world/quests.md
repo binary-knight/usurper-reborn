@@ -1,7 +1,7 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs
 history: 1.2.5 | A player in any language can no longer take a second royal quest, and royal quests to clear a dungeon floor are now floor quests.
 ---
