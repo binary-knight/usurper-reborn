@@ -633,6 +633,47 @@ namespace UsurperRemake.Systems
             {
                 if (companion == null || companion.IsDead) continue;
 
+                var charWrapper = BuildCombatCharacter(companion);
+
+                // Initialize HP if needed, AFTER RecalculateStats so MaxHP includes equipment bonuses
+                if (!companionCurrentHP.ContainsKey(companion.Id))
+                {
+                    companionCurrentHP[companion.Id] = (int)charWrapper.MaxHP;
+                }
+
+                // Restore tracked combat HP (don't heal to full mid-combat)
+                charWrapper.HP = companionCurrentHP[companion.Id];
+                charWrapper.Mana = companion.BaseStats.MagicPower * 5;
+
+                // Store companion ID in the character for tracking
+                charWrapper.CompanionId = companion.Id;
+                charWrapper.IsCompanion = true;
+
+                // Copy proficiency from Companion to Character wrapper
+                if (companion.SkillProficiencies.Count > 0)
+                {
+                    foreach (var kvp in companion.SkillProficiencies)
+                        charWrapper.SkillProficiencies[kvp.Key] = (TrainingSystem.ProficiencyLevel)kvp.Value;
+                }
+                if (companion.SkillTrainingProgress.Count > 0)
+                {
+                    foreach (var kvp in companion.SkillTrainingProgress)
+                        charWrapper.SkillTrainingProgress[kvp.Key] = kvp.Value;
+                }
+
+                result.Add(charWrapper);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// v1.2.8: the Character a companion fights as, with its class, stats and equipment: the first part of
+        /// GetCompanionsAsCharacters, moved out unchanged so the Inn can show the mana a cast charges it.
+        /// The fight's own state (tracked HP, mana, id, proficiencies) is set by GetCompanionsAsCharacters.
+        /// </summary>
+        internal static Character BuildCombatCharacter(Companion companion)
+        {
                 var charWrapper = new Character
                 {
                     Name2 = companion.Name,
@@ -680,36 +721,7 @@ namespace UsurperRemake.Systems
                 // RecalculateStats applies equipment bonuses on top of Base* values
                 charWrapper.RecalculateStats();
 
-                // Initialize HP if needed — AFTER RecalculateStats so MaxHP includes equipment bonuses
-                if (!companionCurrentHP.ContainsKey(companion.Id))
-                {
-                    companionCurrentHP[companion.Id] = (int)charWrapper.MaxHP;
-                }
-
-                // Restore tracked combat HP (don't heal to full mid-combat)
-                charWrapper.HP = companionCurrentHP[companion.Id];
-                charWrapper.Mana = companion.BaseStats.MagicPower * 5;
-
-                // Store companion ID in the character for tracking
-                charWrapper.CompanionId = companion.Id;
-                charWrapper.IsCompanion = true;
-
-                // Copy proficiency from Companion to Character wrapper
-                if (companion.SkillProficiencies.Count > 0)
-                {
-                    foreach (var kvp in companion.SkillProficiencies)
-                        charWrapper.SkillProficiencies[kvp.Key] = (TrainingSystem.ProficiencyLevel)kvp.Value;
-                }
-                if (companion.SkillTrainingProgress.Count > 0)
-                {
-                    foreach (var kvp in companion.SkillTrainingProgress)
-                        charWrapper.SkillTrainingProgress[kvp.Key] = kvp.Value;
-                }
-
-                result.Add(charWrapper);
-            }
-
-            return result;
+                return charWrapper;
         }
 
         /// <summary>

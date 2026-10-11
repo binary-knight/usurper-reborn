@@ -125,7 +125,7 @@ public static class SpellSystem
             [7] = new SpellInfo(7, "Sanctuary", "Create a holy ward that makes enemies hesitate. Protection: +18, scales with level and WIS. Duration: 3 rounds.", 25, 7, "Sanctuarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Advanced Divine Arts ---
-            [8] = new SpellInfo(8, "Cure Critical", "Powerful divine healing with chivalry blessing. Effect: 50-75 hp, scales with WIS. +10 Chivalry.", 30, 8, "Majorhealarie", false, "Heal"),
+            [8] = new SpellInfo(8, "Cure Critical", "Powerful divine healing with chivalry blessing. Effect: 50-75 hp, scales with WIS. Removes up to 10 Darkness; with no Darkness, +10 Chivalry.", 30, 8, "Majorhealarie", false, "Heal"),
             [9] = new SpellInfo(9, "Holy Smite", "Call down righteous fury. Damage: 45-65, scales with WIS. Double damage vs undead and demons.", 35, 9, "Adrealitarieum", false, "Attack"),
             [10] = new SpellInfo(10, "Armor of Faith", "Divine armor surrounds the faithful. Protection: +28, scales with level and WIS. Duration: whole fight.", 40, 10, "Faitharmarie", false, "Buff"),
             [11] = new SpellInfo(11, "Dispel Evil", "Banish dark enchantments and weaken evil creatures. Removes enemy buffs.", 45, 11, "Dispeldarkie", false, "Debuff"),
@@ -145,7 +145,7 @@ public static class SpellSystem
             [21] = new SpellInfo(21, "Aurelion's Radiance", "Channel the Sun God's blinding light. Damage: 160-220 to all, scales with WIS. Double damage vs undead and demons.", 140, 21, "Aurelionluxarie", true, "Attack"),
             [22] = new SpellInfo(22, "Resurrection Prayer", "Call back the nearly dead. Effect: 320-450 hp, scales with WIS. Duration: 1 turn.", 160, 22, "Resurrectarie", false, "Heal"),
             [23] = new SpellInfo(23, "Divine Avatar", "Become a vessel of divine power. ATK and DEF +55, scales with level. Duration: whole fight.", 180, 23, "Avatardivinarie", false, "Buff"),
-            [24] = new SpellInfo(24, "Judgment", "Pass divine judgment on the wicked. Damage: 220-320, scales with WIS. Double vs undead/demons. +30 Chivalry.", 200, 24, "Judiciumarie", false, "Attack"),
+            [24] = new SpellInfo(24, "Judgment", "Pass divine judgment on the wicked. Damage: 220-320, scales with WIS. Double vs undead/demons. Removes up to 30 Darkness; with no Darkness, +30 Chivalry.", 200, 24, "Judiciumarie", false, "Attack"),
             [25] = new SpellInfo(25, "God's Finger", "The ultimate divine strike from the heavens. Damage: 320-450 to all, scales with WIS. Double vs undead and demons.", 250, 25, "Umbarakahstahx", true, "Attack")
         },
 
@@ -312,7 +312,7 @@ public static class SpellSystem
         // Level 1 spell = 15 base cost
         // Level 10 spell = 60 base cost
         // Level 25 spell = 135 base cost
-        int baseCost = 10 + (spell.Level * 5);
+        int baseCost = BaseManaCost(spell.Level);
 
         // Apply Wisdom-based mana cost reduction from StatEffectsSystem (max 50%)
         int reductionPercent = StatEffectsSystem.GetManaCostReduction(caster.Wisdom);
@@ -378,10 +378,22 @@ public static class SpellSystem
         if (SpellBook.TryGetValue(characterClass, out var classSpells)
             && classSpells.TryGetValue(spellLevel, out var spellInfo))
         {
-            return Math.Max(tableLevel, spellInfo.LevelRequired);
+            return LevelGate(spellLevel, spellInfo.LevelRequired);
         }
         return tableLevel;
     }
+
+    /// <summary>
+    /// v1.2.8: the character level that opens a spell: the higher of its slot's level and the level listed on
+    /// the spell. GetLevelRequired applies it to the spell book; the wiki export applies it to the built-in values.
+    /// </summary>
+    internal static int LevelGate(int spellLevel, int listedLevel) => Math.Max(TableLevelRequired(spellLevel), listedLevel);
+
+    /// <summary>
+    /// v1.2.8: what a cast of this slot costs before the caster's Wisdom lowers it: 10 + 5 per slot. The
+    /// first step of CalculateManaCost, and the mana value of the wiki export.
+    /// </summary>
+    internal static int BaseManaCost(int spellLevel) => 10 + (spellLevel * 5);
 
     private static int TableLevelRequired(int spellLevel)
     {

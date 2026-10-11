@@ -225,7 +225,7 @@ namespace UsurperRemake.BBS
         /// <summary>Simulation tick interval in seconds (default: 60).</summary>
         public static int SimIntervalSeconds => _simIntervalSeconds;
 
-        /// <summary>NPC XP gain multiplier (default: 0.25 = 25% of normal).</summary>
+        /// <summary>NPC XP gain multiplier (--npc-xp, 0.01 to 10.0, default: 5.0). Recruit pool members earn x1.0 whatever it is (WorldSimulator.WorldSimXpMultiplier).</summary>
         public static float NpcXpMultiplier => _npcXpMultiplier;
 
         /// <summary>How often to persist NPC state to database, in minutes (default: 5).</summary>
@@ -1018,7 +1018,8 @@ namespace UsurperRemake.BBS
             Console.WriteLine("  --no-worldsim        Disable auto world sim (use with separate --worldsim process)");
             Console.WriteLine("  --worldsim           Run headless 24/7 world simulator (no terminal/auth)");
             Console.WriteLine("  --sim-interval <sec> Simulation tick interval in seconds (default: 60)");
-            Console.WriteLine("  --npc-xp <mult>      NPC XP gain multiplier, 0.01-2.0 (default: 0.25)");
+            Console.WriteLine("  --npc-xp <mult>      NPC XP gain multiplier, 0.01 to 10.0 (default: 5.0)");
+            Console.WriteLine("                       The recruit pool (no team, level 1 to 15) earns x1.0");
             Console.WriteLine("  --save-interval <min> State persistence interval in minutes (default: 5)");
             Console.WriteLine("");
             Console.WriteLine("Examples:");
