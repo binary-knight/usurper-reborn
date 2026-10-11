@@ -872,7 +872,7 @@ public partial class CombatEngine
                 }
                 else if (preventingStatus != StatusEffect.None)
                 {
-                    terminal.WriteLine(Loc.Get("combat.you_status_prevented", preventingStatus.GetDescription().ToLower()), "red");
+                    terminal.WriteLine(Loc.Get("combat.you_status_prevented", StatusWord(preventingStatus)), "red");   // 1.2.8: the status word, in the player's language
                     await Pacing.Wait(GetCombatDelay(800));
                 }
                 else
@@ -910,7 +910,7 @@ public partial class CombatEngine
                 }
                 else if (defenderPreventing != StatusEffect.None)
                 {
-                    terminal.WriteLine(Loc.Get("combat.npc_status_prevented", defender.DisplayName, defenderPreventing.GetDescription().ToLower()), "cyan");
+                    terminal.WriteLine(Loc.Get("combat.npc_status_prevented", defender.DisplayName, StatusWord(defenderPreventing)), "cyan");   // 1.2.8
                     await Pacing.Wait(GetCombatDelay(800));
                 }
                 else
@@ -2591,7 +2591,7 @@ public partial class CombatEngine
             {
                 var preventingStatus = player.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("combat.you_status_prevented", preventingStatus.ToString().ToLower()));
+                terminal.WriteLine(Loc.Get("combat.you_status_prevented", StatusWord(preventingStatus)));   // 1.2.8
                 await Pacing.Wait(GetCombatDelay(1500));
                 return new CombatAction { Type = CombatActionType.None };
             }
@@ -14472,7 +14472,7 @@ public partial class CombatEngine
             {
                 var preventingStatus = player.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("combat.cannot_act", preventingStatus.ToString().ToLower()));
+                terminal.WriteLine(Loc.Get("combat.cannot_act", StatusWord(preventingStatus)));   // 1.2.8
                 await Pacing.Wait(GetCombatDelay(1500));
                 return (new CombatAction { Type = CombatActionType.None }, false);
             }
@@ -27458,7 +27458,7 @@ public partial class CombatEngine
             for (int i = 0; i < spells.Count; i++)
             {
                 var sp = spells[i];
-                terminal.WriteLine($"  [{i + 1}] {sp.DisplayName} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {sp.ManaCost})", "white");
+                terminal.WriteLine($"  [{i + 1}] {sp.DisplayName} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {SpellSystem.CalculateManaCost(sp, attacker)})", "white");   // 1.2.8: what the cast charges, not the template value
             }
 
             var choice = await terminal.GetInput(Loc.Get("combat.cast_which_spell"));
@@ -32810,7 +32810,13 @@ public partial class CombatEngine
     /// <summary>
     /// v1.2.2: a status as the lower-case word in the player's language, for the "is stunned and cannot act" line.
     /// </summary>
-    internal static string StatusWord(StatusEffect status) => StatusWord(status, GameConfig.Language);
+    internal static string StatusWord(StatusEffect status)
+    {
+        string word = StatusWord(status, GameConfig.Language);
+        // 1.2.8: while combat output is recorded for group members, the word follows the reader's language
+        Loc.RecordArgument(word, lang => StatusWord(status, lang));
+        return word;
+    }
 
     /// <summary>v1.2.2: an ability's cost in the ability menus, "10 stamina, 5 mana" in the player's language.</summary>
     internal static string AbilityCostText(ClassAbilitySystem.ClassAbility ability)
@@ -32871,6 +32877,9 @@ public partial class CombatEngine
         ["combat.defend_stance"] = "combat.defend_stance_third",
         ["combat.you_attack_target"] = "combat.you_attack_target_third",
         ["combat.you_miss"] = "combat.you_miss_third",
+        // 1.2.8: "You are stunned and cannot act!" reads "Name is stunned and cannot act!" for another reader
+        ["combat.you_status_prevented"] = "combat.teammate_status_prevented",
+        ["combat.cannot_act"] = "combat.teammate_status_prevented",
         // 1.2.8: the to-hit roll line
         ["combat.hit_roll"] = "combat.hit_roll_third",
         ["combat.hit_roll_nat1"] = "combat.hit_roll_nat1_third",

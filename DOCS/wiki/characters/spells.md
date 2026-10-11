@@ -6,7 +6,7 @@ sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, S
 history: 1.2.5 | Spell cast messages are shown in all five languages, and long spell messages wrap inside 79 columns.
 history: 1.2.4 | none
 ---
-Spells are class-specific definitions. The table below shows each spell's catalog values and effect text. The spell's catalog slot is not the same as your character level.
+Spells are class-specific definitions. The table below shows, for each spell, the character level at which you can learn and cast it, the mana a cast costs before your Wisdom lowers it, and the effect text. The spell's catalog slot is not the same as your character level.
 
 Learn spells through the appropriate in-game training or shop options. A catalog entry is not proof that your current character has learned it. Multi-target effects, wards and status effects also follow their combat rules.
 
@@ -16,9 +16,9 @@ For Sage party wards and the difference between a shield and healing, read [grou
 
 ## Level and mana
 
-The level at which you can learn and cast a spell is the higher of its listed required level and the level of its catalog slot. Slots 1 to 25 open at levels 1, 4, 8, 12, 16, 20, 25, 28, 32, 36, 40, 44, 47, 50, 54, 58, 62, 66, 70, 75, 80, 85, 90, 95 and 100. For the 25-spell classes the slot level decides; for the five-spell prestige classes the listed level can be higher.
+The required level in the table is the level at which you can learn and cast the spell: the higher of the level listed on the spell and the level of its catalog slot. Slots 1 to 25 open at levels 1, 4, 8, 12, 16, 20, 25, 28, 32, 36, 40, 44, 47, 50, 54, 58, 62, 66, 70, 75, 80, 85, 90, 95 and 100. For the 25-spell classes the slot level decides; for the five-spell prestige classes the listed level can be higher.
 
-A cast costs 10 mana plus 5 per catalog slot, not the table's mana value. Wisdom lowers that by 1.5 percent per point above 10, up to half, and a cast never costs less than 5 plus one fifth of the slot, rounded down. Ocean's Memory halves the final cost.
+A cast costs 10 mana plus 5 per catalog slot; this is the table's mana value. Wisdom lowers that by 1.5 percent per point above 10, up to half, and a cast never costs less than 5 plus one fifth of the slot, rounded down. Ocean's Memory halves the final cost.
 
 ## How spells scale
 

@@ -4462,9 +4462,11 @@ public class InnLocation : BaseLocation
 
             int enabledCount = 0;
             int enabledSpells = 0;
+            // 1.2.8: the mana shown is what a cast charges this companion in a fight (its Wisdom lowers it)
+            var caster = CompanionSystem.BuildCombatCharacter(companion);
             var layout = SkillLayout.For(
                 abilities.Select(a => (a.DisplayName, SkillCost("inn.skill_cost_st", ClassAbilitySystem.GetEffectiveStaminaCost(a)), Loc.Get("ability.level_tag", a.LevelRequired)))
-                    .Concat(spells.Select(sp => (sp.DisplayName, SkillCost("inn.skill_cost_mp", sp.ManaCost), Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, sp.Level))))));
+                    .Concat(spells.Select(sp => (sp.DisplayName, SkillCost("inn.skill_cost_mp", SpellSystem.CalculateManaCost(sp, caster)), Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, sp.Level))))));
 
             // --- Abilities section ---
             if (abilities.Count > 0)
@@ -4502,7 +4504,7 @@ public class InnLocation : BaseLocation
                     if (!isDisabled) enabledSpells++;
 
                     WriteSkillRow(layout, displayIdx, isDisabled, spell.DisplayName,
-                        SkillCost("inn.skill_cost_mp", spell.ManaCost),
+                        SkillCost("inn.skill_cost_mp", SpellSystem.CalculateManaCost(spell, caster)),
                         Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, spell.Level)), spell.DisplayDescription);
                 }
             }

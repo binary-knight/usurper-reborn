@@ -1,7 +1,7 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.2.5
+checked: 1.2.7
 sources: Scripts/Systems/WikiDataExporter.cs
 history: 1.2.5 | Generated item, monster, specialization, achievement and Old God names are exported in all five languages.
 ---

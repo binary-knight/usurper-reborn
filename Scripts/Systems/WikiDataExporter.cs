@@ -243,7 +243,12 @@ public static class WikiDataExporter
             spell.Level,
             name = Names(key + ".name", spell.Name ?? ""),
             description = Names(key + ".desc", spell.Description ?? ""),
-            spell.ManaCost, spell.LevelRequired, spell.MagicWords,
+            // 1.2.8: what the game applies, not the stored template values: a cast charges 10 + 5 per slot
+            // before Wisdom (the template ManaCost is never charged), and the level that opens the spell is
+            // the higher of the slot's level and the listed one
+            ManaCost = SpellSystem.BaseManaCost(spell.Level),
+            LevelRequired = SpellSystem.LevelGate(spell.Level, spell.LevelRequired ?? 0),
+            spell.MagicWords,
             info.IsMultiTarget, info.SpellType
         };
     }).ToArray();

@@ -315,7 +315,7 @@ public class CombatLocC122Tests
         Capture($"combat-c-worldboss-spells-{lang}.txt", text);
         var first = SpellSystem.GetSpellInfo(CharacterClass.Cleric, 1)!;
         string name = await WithLanguage(lang, () => Task.FromResult(first.DisplayName));
-        text.Should().Contain("  " + Loc.GetIn(lang, "world_boss.spell_option", 1, name, first.ManaCost));
+        text.Should().Contain("  " + Loc.GetIn(lang, "world_boss.spell_option", 1, name, SpellSystem.CalculateManaCost(first, Cleric())));   // 1.2.8: what the cast charges
     }
 
     // ---------- 5. the ability and spell quickbar menus ----------

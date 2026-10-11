@@ -107,7 +107,7 @@ public class CombatStatsFree128Tests
         // Round 1 the stunned player reads no input; round 2 the A is the player's first action.
         string text = await Duel("A\n", attacker, defender);
 
-        text.Should().Contain(Loc.Get("combat.you_status_prevented", StatusEffect.Stunned.GetDescription().ToLower()),
+        text.Should().Contain(Loc.Get("combat.you_status_prevented", CombatEngine.StatusWord(StatusEffect.Stunned)),
             "the stun is announced; transcript: {0}", text);
         CountLines(text, "combat.pvp_your_hp").Should().Be(1, "the stunned round has no attack, the A comes in round 2; transcript: {0}", text);
         OpponentActions(text).Should().Be(2, "the opponent acts in the stunned round and in round 2; transcript: {0}", text);
