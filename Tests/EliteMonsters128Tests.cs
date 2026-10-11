@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
 using UsurperRemake;
@@ -18,14 +19,18 @@ namespace UsurperReborn.Tests;
 /// 1.2.8 difficulty pass, DESIGN item 3, the core (rows F1 to F5 and F11 to F14): a regular dungeon encounter
 /// can promote one member to an elite after the group is built, behind GameConfig.EliteMonstersEnabled and
 /// only for a caller that passes EncounterRules.Dungeon. What an affix does is not built here (rows F6 to
-/// F10 and Warded); the affix is drawn, stored and named.
+/// F10); the affix is drawn, stored and named. 1.3.0: Warded is out of the draw (rows V1 to V4): no elite
+/// gets it, the draw is still one random number an affix, and the other five share its place evenly.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class EliteMonsters128Tests
 {
     private const int Groups = 10_000;
     private static readonly string[] Langs = { "en", "es", "fr", "hu", "it" };
+    /// <summary>The six ids that have a name and a sentence in the language files (Warded's are unused).</summary>
     private static readonly string[] Affixes = { "frenzied", "warded", "venomous", "commanding", "mending", "swift" };
+    /// <summary>The five an elite can get.</summary>
+    private static readonly string[] Drawn = { "frenzied", "venomous", "commanding", "mending", "swift" };
 
     private sealed class RecordingRandom : Random
     {
@@ -37,7 +42,9 @@ public class EliteMonsters128Tests
         public override double NextDouble() { double v = base.NextDouble(); Calls.Add($"NextDouble()={v:R}"); return v; }
     }
 
-    /// <summary>Answers Next(max) from a list (the member, then the affixes of PromoteElite).</summary>
+    /// <summary>Answers Next(max) from a list (the member, then the affixes of PromoteElite). An affix answer
+    /// is a place in the finer draw of 1.3.0: for the first affix slot * 5 + place (0 to 4 Frenzied, 5 to 9
+    /// the Warded slot, 10 to 14 Venomous, 15 to 19 Commanding, 20 to 24 Mending, 25 to 29 Swift).</summary>
     private sealed class FixedRandom : Random
     {
         private readonly Queue<int> _picks;
@@ -283,7 +290,7 @@ public class EliteMonsters128Tests
                 elites++;
                 string member = p.Off[p.Slot].Name;
                 string affix = e.EliteAffixes.Should().ContainSingle("one affix below floor 51").Subject;
-                Affixes.Should().Contain(affix);
+                Drawn.Should().Contain(affix);
                 firstAffix[affix] = firstAffix.GetValueOrDefault(affix) + 1;
                 e.Name.Should().Be(Loc.GetIn("en", "monster.elite." + affix, member));
                 e.TierName.Should().Be(p.Off[p.Slot].TierName);
@@ -299,10 +306,10 @@ public class EliteMonsters128Tests
             MonsterNames.DisplayIn("hu", "Frenzied Orc").Should().Be("Őrjöngő Ork");
             MonsterNames.DisplayIn("es", "Frenzied Orc").Should().Be("Orco en Frenesí");
             MonsterNames.DisplayIn("fr", "Frenzied Orc").Should().Be("Orc en Furie");
-            // each of the six affixes is drawn about one time in six
-            firstAffix.Keys.Should().BeEquivalentTo(Affixes);
+            // each of the five affixes is drawn about one time in five (1.3.0: Warded is out of the draw)
+            firstAffix.Keys.Should().BeEquivalentTo(Drawn);
             foreach (var (affix, n) in firstAffix)
-                (n / (double)elites).Should().BeInRange(0.12, 0.21, affix);
+                (n / (double)elites).Should().BeInRange(0.15, 0.25, affix);
         }
         finally { GameConfig.Language = saved; }
     }
@@ -338,7 +345,7 @@ public class EliteMonsters128Tests
                 if (p.Elite is not Monster e) continue;
                 e.EliteAffixes.Should().HaveCount(2, "floor {0} seed {1}", floor, p.Seed);
                 e.EliteAffixes.Distinct().Should().HaveCount(2);
-                e.EliteAffixes.Should().OnlyContain(a => Affixes.Contains(a));
+                e.EliteAffixes.Should().OnlyContain(a => Drawn.Contains(a));
                 pairsSeen.Add(string.Join("+", e.EliteAffixes));
                 string member = p.Off[p.Slot].Name;
                 string inner = Loc.GetIn("en", "monster.elite." + e.EliteAffixes[1], member);
@@ -347,7 +354,7 @@ public class EliteMonsters128Tests
                     MonsterNames.DisplayIn(lang, e).Should().Be(Loc.GetIn(lang, "monster.elite." + e.EliteAffixes[0],
                         Loc.GetIn(lang, "monster.elite." + e.EliteAffixes[1], MonsterNames.DisplayIn(lang, member))), "{0} in {1}", e.Name, lang);
             }
-            pairsSeen.Count.Should().BeGreaterThan(20, "floor {0}: the 30 ordered pairs are drawn", floor);
+            pairsSeen.Count.Should().BeGreaterThan(15, "floor {0}: the 20 ordered pairs are drawn", floor);
         }
     }
 
@@ -479,7 +486,7 @@ public class EliteMonsters128Tests
         {
             GameConfig.Language = "en";   // the leader reads English
             var pair = KoboldShamanPair();
-            var elite = MonsterGenerator.PromoteElite(pair, new FixedRandom(pair.FindIndex(m => m.Name == "Kobold Shaman"), 2), 7);
+            var elite = MonsterGenerator.PromoteElite(pair, new FixedRandom(pair.FindIndex(m => m.Name == "Kobold Shaman"), 10), 7);
             elite.Name.Should().Be("Venomous Kobold Shaman");
             var broadcast = DungeonLocation.FollowerMessage(DungeonLocation.EliteBroadcast(pair));
             string es = broadcast("es");
@@ -599,8 +606,11 @@ public class EliteMonsters128Tests
         async Task<CombatResult> Win(bool promote)
         {
             var pair = PairWithRewards(1000, 400);
-            var foe = promote ? MonsterGenerator.PromoteElite(pair, new FixedRandom(0, 5), 7) : pair[0];
+            // Frenzied: the foe has 1 HP of 1, so it is never below half while it lives and its affix cannot
+            // act; any other affix could change the fight itself
+            var foe = promote ? MonsterGenerator.PromoteElite(pair, new FixedRandom(0, 1), 7) : pair[0];
             foe.IsElite.Should().Be(promote);
+            if (promote) foe.EliteAffixes.Should().Equal("frenzied");
             foe.HP = foe.MaxHP = 1; foe.Defence = 0; foe.ArmPow = 0; foe.Strength = 1; foe.Punch = 1; foe.WeapPow = 1;
             foe.SpecialAbilities.Clear(); foe.SignatureAbilities.Clear();
             var (result, transcript) = await Fight(Hero(), new List<Monster> { foe }, 20);
@@ -769,12 +779,161 @@ public class EliteMonsters128Tests
     }
 
     [Fact]
-    public void NoAffixBehaviour_IsBuiltInThisPiece()
+    public void TheAffixBehaviour_IsItsOwnPiece_AndWardedIsNeverPicked()
     {
-        // the affix is drawn, stored and named here; what it does comes with rows F6 to F10 and Warded
+        // the affix is drawn, stored and named by the generator; what five of them do is rows F6 to F10
+        // (EliteAffixes128Tests). Warded was never built, so from 1.3.0 the generator never picks it
         string root = Leftovers1114BTests.RepoRoot();
-        File.ReadAllText(Path.Combine(root, "Localization", "en.json")).Should().NotContain("\"combat.elite_");
-        string engine = File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "CombatEngine.cs"));
-        engine.Should().NotContain("EliteAffixes").And.NotContain("IsElite");
+        string en = File.ReadAllText(Path.Combine(root, "Localization", "en.json"));
+        Regex.Matches(en, "\"combat\\.elite_[a-z]+\"").Select(m => m.Value).Should().BeEquivalentTo(new[]
+            { "\"combat.elite_frenzy\"", "\"combat.elite_mend\"", "\"combat.elite_command\"", "\"combat.elite_swift\"" });
+        // the affix as fight code could name it, not the bare word: the oath-mark handler has a local called warded
+        Regex.IsMatch(File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "CombatEngine.cs")), EliteAffixes128Tests.WardedAffixInCode, RegexOptions.IgnoreCase).Should().BeFalse();
+        File.ReadAllText(Path.Combine(root, "Scripts", "Systems", "MonsterGenerator.cs")).Should().NotContain("EliteFrenzyUsed").And.NotContain("EliteMendReadyRound");
+
+        MonsterGenerator.EliteAffixNotDrawn.Should().Be("warded");
+        MonsterGenerator.EliteAffixPool.Should().Equal(Drawn);
+        foreach (int floor in new[] { 3, 7, 30, 51, 80 })
+            foreach (var p in Floor(floor, 3000))
+                if (p.Elite is Monster e)
+                {
+                    e.EliteAffixes.Should().NotContain("warded", "floor {0} seed {1}", floor, p.Seed);
+                    e.Name.Should().NotContain("Warded", "floor {0} seed {1}", floor, p.Seed);
+                    foreach (string lang in Langs)
+                        (DungeonLocation.EliteIntro(lang, p.On) ?? "").Should().NotContain(Loc.GetIn(lang, "monster.elite_desc.warded"), "{0}, floor {1} seed {2}", lang, floor, p.Seed);
+                }
+    }
+
+    // ---------------------------------------------------------------- 1.3.0: Warded is out of the draw (V1 to V4)
+
+    private const int SeededElites = 20_000;
+
+    /// <summary>The affixes of before 1.3.0 from the same random numbers: one index among the six, then one
+    /// among the five left (PromoteElite as it was at a705b716).</summary>
+    private static List<string> AffixesOfBefore(Random twin, int count)
+    {
+        var pool = Affixes.ToList();
+        var got = new List<string>();
+        for (int i = 0; i < count; i++) { int pick = twin.Next(pool.Count); got.Add(pool[pick]); pool.RemoveAt(pick); }
+        return got;
+    }
+
+    /// <summary>One seeded promotion on a fresh pair, and its twin: the same seed through the draws of before
+    /// 1.3.0. Both randoms are left where the promotion left them.</summary>
+    private sealed record Promotion(int Seed, Monster Elite, List<string> Before, RecordingRandom Rng, Random Twin);
+
+    private static List<Promotion> Promotions(int floor, List<Monster> template)
+    {
+        var list = new List<Promotion>(SeededElites);
+        for (int seed = 0; seed < SeededElites; seed++)
+        {
+            var pair = template.Select(m => new Monster { Name = m.Name, TierName = m.TierName, FamilyName = m.FamilyName, Level = m.Level,
+                HP = m.HP, MaxHP = m.MaxHP, Strength = m.Strength, Punch = m.Punch, WeapPow = m.WeapPow, Defence = m.Defence, ArmPow = m.ArmPow,
+                Experience = m.Experience, Gold = m.Gold }).ToList();
+            var rng = new RecordingRandom(seed);
+            var twin = new Random(seed);
+            var elite = MonsterGenerator.PromoteElite(pair, rng, floor);
+            twin.Next(template.Count);   // the member
+            list.Add(new Promotion(seed, elite, AffixesOfBefore(twin, floor >= GameConfig.EliteSecondAffixFloor ? 2 : 1), rng, twin));
+        }
+        return list;
+    }
+
+    [Fact]
+    public void V1_Over20000SeededElites_NoneIsWarded_AndTheFiveShareItsPlaceEvenly()
+    {
+        var all = Promotions(7, PairWithRewards(100, 10));
+        all.Should().OnlyContain(p => p.Elite.EliteAffixes.Count == 1 && Drawn.Contains(p.Elite.EliteAffixes[0]));
+        all.Should().NotContain(p => p.Elite.Name.Contains("Warded"));
+        // before: one in six each, Warded among them
+        var before = Affixes.ToDictionary(a => a, a => all.Count(p => p.Before[0] == a) / (double)SeededElites);
+        foreach (var (affix, share) in before) share.Should().BeInRange(0.155, 0.178, "before, {0}", affix);
+        // after: one in five each
+        var after = Drawn.ToDictionary(a => a, a => all.Count(p => p.Elite.EliteAffixes[0] == a) / (double)SeededElites);
+        foreach (var (affix, share) in after) share.Should().BeInRange(0.19, 0.21, "after, {0}", affix);
+        // an elite whose draw fell on a real affix keeps it; only the ones on Warded's slot change, and
+        // they go to the five about evenly (a fifth of them each: 3.3 percent of all elites)
+        all.Where(p => p.Before[0] != "warded").Should().OnlyContain(p => p.Elite.EliteAffixes[0] == p.Before[0]);
+        var moved = all.Where(p => p.Before[0] == "warded").ToList();
+        foreach (string affix in Drawn)
+            (moved.Count(p => p.Elite.EliteAffixes[0] == affix) / (double)moved.Count).Should().BeInRange(0.17, 0.23, "of the Warded slot, {0}", affix);
+        // through the generator too: no dungeon group holds a Warded elite
+        foreach (int floor in new[] { 3, 10, 30, 50 })
+            Floor(floor, 5000).Where(p => p.Elite != null).Should().OnlyContain(p => p.Elite!.EliteAffixes.Count == 1 && Drawn.Contains(p.Elite.EliteAffixes[0]), "floor {0}", floor);
+    }
+
+    [Fact]
+    public void V2_ATwoAffixElite_FromFloor51_NeverHoldsWarded_AndEveryPairOfTheFiveIsDrawn()
+    {
+        GameConfig.EliteSecondAffixFloor.Should().Be(51);
+        var template = PairWithRewards(100, 10);
+        foreach (int floor in new[] { 51, 100 })
+        {
+            var all = Promotions(floor, template);
+            all.Should().OnlyContain(p => p.Elite.EliteAffixes.Count == 2 && p.Elite.EliteAffixes[0] != p.Elite.EliteAffixes[1]
+                && Drawn.Contains(p.Elite.EliteAffixes[0]) && Drawn.Contains(p.Elite.EliteAffixes[1]), "floor {0}", floor);
+            all.Should().NotContain(p => p.Elite.Name.Contains("Warded"));
+            all.Select(p => p.Elite.EliteAffixes[0] + "+" + p.Elite.EliteAffixes[1]).Distinct().Should().HaveCount(20, "the 20 ordered pairs of five");
+            foreach (string affix in Drawn)
+            {
+                (all.Count(p => p.Elite.EliteAffixes[0] == affix) / (double)SeededElites).Should().BeInRange(0.19, 0.21, "first, {0}", affix);
+                (all.Count(p => p.Elite.EliteAffixes[1] == affix) / (double)SeededElites).Should().BeInRange(0.19, 0.21, "second, {0}", affix);
+                (all.Count(p => p.Elite.EliteAffixes.Contains(affix)) / (double)SeededElites).Should().BeInRange(0.385, 0.415, "holds {0}", affix);
+            }
+            // before: one elite in three held Warded
+            (all.Count(p => p.Before.Contains("warded")) / (double)SeededElites).Should().BeInRange(0.32, 0.345);
+            // an elite that held no Warded before holds the same two, in the same order
+            all.Where(p => !p.Before.Contains("warded")).Should().OnlyContain(p => p.Elite.EliteAffixes.SequenceEqual(p.Before));
+            // Warded second: the first stays
+            all.Where(p => p.Before[1] == "warded").Should().OnlyContain(p => p.Elite.EliteAffixes[0] == p.Before[0]);
+        }
+        foreach (int floor in new[] { 51, 80, 100 })
+            Floor(floor, 5000).Where(p => p.Elite != null).Should().OnlyContain(p => p.Elite!.EliteAffixes.Count == 2 && p.Elite.EliteAffixes.All(a => Drawn.Contains(a)), "floor {0}", floor);
+    }
+
+    [Fact]
+    public void V3_ThePromotion_DrawsOneNumberAnAffix_AndTheStreamAfterAnElite_IsTheOneOfBefore()
+    {
+        var template = PairWithRewards(100, 10);
+        foreach (int floor in new[] { 7, 60 })
+            foreach (var p in Promotions(floor, template))
+            {
+                // the member, then one draw an affix: nothing else
+                var expected = floor >= 51 ? new[] { "Next(2)", "Next(30)", "Next(20)" } : new[] { "Next(2)", "Next(30)" };
+                p.Rng.Calls.Select(c => c.Split('=')[0]).Should().Equal(expected, "floor {0} seed {1}", floor, p.Seed);
+                // the random numbers after the elite are the ones the draws of before 1.3.0 left
+                for (int i = 0; i < 3; i++) p.Rng.Next().Should().Be(p.Twin.Next(), "floor {0} seed {1}", floor, p.Seed);
+            }
+        // and through the generator: the roll, the member, the affixes (row F14 holds every floor)
+        foreach (int floor in new[] { 7, 60 })
+            foreach (var p in Floor(floor, 3000).Where(p => p.Elite != null))
+                (p.OnCalls.Count - p.OffCalls.Count).Should().Be(floor >= 51 ? 4 : 3, "floor {0} seed {1}", floor, p.Seed);
+    }
+
+    [Fact]
+    public void V4_TheDraw_GivesEachPlaceInsideWardedsSlot_ToOneOfTheOthers()
+    {
+        // first affix: 30 places, five a slot; Warded's slot (places 5 to 9) gives the five in order
+        var first = Enumerable.Range(0, 30).Select(r => MonsterGenerator.DrawEliteAffix(Affixes.ToList(), new FixedRandom(r))).ToList();
+        first.Should().Equal(
+            "frenzied", "frenzied", "frenzied", "frenzied", "frenzied",
+            "frenzied", "venomous", "commanding", "mending", "swift",
+            "venomous", "venomous", "venomous", "venomous", "venomous",
+            "commanding", "commanding", "commanding", "commanding", "commanding",
+            "mending", "mending", "mending", "mending", "mending",
+            "swift", "swift", "swift", "swift", "swift");
+        // second affix after Venomous: 20 places, four a slot; Warded's slot (places 4 to 7) gives the four left
+        var slots = Affixes.Where(a => a != "venomous").ToList();
+        var second = Enumerable.Range(0, 20).Select(r => MonsterGenerator.DrawEliteAffix(slots.ToList(), new FixedRandom(r))).ToList();
+        second.Should().Equal(
+            "frenzied", "frenzied", "frenzied", "frenzied",
+            "frenzied", "commanding", "mending", "swift",
+            "commanding", "commanding", "commanding", "commanding",
+            "mending", "mending", "mending", "mending",
+            "swift", "swift", "swift", "swift");
+        // the picked affix leaves the slots; Warded's slot stays
+        var left = Affixes.ToList();
+        MonsterGenerator.DrawEliteAffix(left, new FixedRandom(7)).Should().Be("commanding");
+        left.Should().Equal("frenzied", "warded", "venomous", "mending", "swift");
     }
 }

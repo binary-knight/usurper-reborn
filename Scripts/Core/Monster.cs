@@ -81,6 +81,15 @@ public class Monster
     /// monster. Run time only, never saved.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public List<string> EliteAffixes { get; set; } = new List<string>();
+    /// <summary>1.2.8: the state of an elite's affixes in a fight (UsurperRemake.Systems.EliteAffixes). A
+    /// Frenzied elite has had its one Strength rise; a Commanding elite's line has been shown; a Mending
+    /// elite may mend again from this round. Run time only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EliteFrenzyUsed { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EliteCommandShown { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EliteMendReadyRound { get; set; } = 0;
     public bool IsUnique { get; set; } = false;
     public bool CanSpeak { get; set; } = false;         // From Pascal mon_talk setting
     public bool IsProperName { get; set; } = false;     // Named NPCs (no "The" prefix)

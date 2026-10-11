@@ -215,6 +215,9 @@ public class ChallengeSystem
         // v0.60.3: also exclude by name match against the current throne-holder.
         // CastleLocation.SetCurrentKing doesn't set npc.King=true on the source NPC,
         // so `!n.King` alone can let the queen challenge herself.
+        // v1.3.0: an NPC on a player's team is never a candidate (it left the team by itself to challenge;
+        // the player-king branch above already refuses that). The filter adds no draw: the pick
+        // below is still one draw among the candidates that are left, and none when no one is left.
         var candidates = NPCSpawnSystem.Instance?.ActiveNPCs?
             .Where(n => n.IsAlive &&
                    n.Level >= 15 &&
@@ -222,6 +225,7 @@ public class ChallengeSystem
                    !n.King &&
                    !string.Equals(n.Name, king.Name, StringComparison.OrdinalIgnoreCase) &&
                    !n.IsStoryNPC &&
+                   !WorldSimulator.IsPlayerTeam(n.Team) &&
                    n.Brain?.Personality?.Ambition > 0.6f)
             .OrderByDescending(n => n.Level + n.Strength)
             .Take(5)
@@ -601,12 +605,15 @@ public class ChallengeSystem
         var previousOrphans = CastleLocation.GetCurrentKing()?.Orphans?.ToList();
 
         // Check designated heir from previous king first
+        // v1.3.0: an NPC on a player's team is not found as heir (it would be taken off the team to be
+        // crowned); the "heir missing" line below is shown and the throne goes on to the next rule
         if (!string.IsNullOrEmpty(_lastDesignatedHeir))
         {
             var heir = NPCSpawnSystem.Instance?.ActiveNPCs?
                 .FirstOrDefault(n => n.Name == _lastDesignatedHeir &&
                     n.IsAlive && !n.IsDead && n.DaysInPrison <= 0 &&
-                    n.Level >= GameConfig.MinLevelKing && !n.IsStoryNPC);
+                    n.Level >= GameConfig.MinLevelKing && !n.IsStoryNPC &&
+                    !WorldSimulator.IsPlayerTeam(n.Team));
             if (heir != null)
             {
                 // v1.1.13: the new court is one versioned write; the rest follows only once it lands
@@ -647,11 +654,13 @@ public class ChallengeSystem
         if (candidates == null || candidates.Count == 0)
         {
             // Try someone in a team who will leave (still excluding story NPCs)
+            // v1.3.0: never an NPC on a player's team; with no one else able the throne stays empty this tick
             candidates = NPCSpawnSystem.Instance?.ActiveNPCs?
                 .Where(n => n.IsAlive &&
                        n.Level >= 10 &&
                        n.DaysInPrison <= 0 &&
                        !n.IsStoryNPC &&
+                       !WorldSimulator.IsPlayerTeam(n.Team) &&
                        n.Brain?.Personality?.Ambition > 0.7f)
                 .OrderByDescending(n => n.Level)
                 .Take(3)

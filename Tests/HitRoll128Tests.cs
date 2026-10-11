@@ -81,8 +81,15 @@ public class HitRoll128Tests
         int? main = null, int? off = null, WeaponType mainType = WeaponType.Sword, string name = "Tester")
         => G.Hero(50_000, strength, level, cls, dexterity, main, off, mainType, name);
 
-    /// <summary>A foe at the fighter's level whose armour class is out of reach: the clamp sets the roll at 3.</summary>
+    /// <summary>A foe at the fighter's level whose armour class is out of reach: the clamp sets the roll at 2
+    /// (1.3.0; it was 3), so at level only a natural 1 misses.</summary>
     private static Monster AtLevel() => G.Dummy(50, 600);
+
+    /// <summary>A foe against which a 2 is a plain miss. 1.3.0: at level every roll needs 2, so a plain miss
+    /// exists only above the at-level gap. This foe is 10 levels above with a Defence that leaves the attacker
+    /// needing exactly 3, inside the window: the rows of the rows below ("you need 3 or more", a 2 misses, a 3
+    /// or a 10 lands) are the ones they held against the at-level foe while the clamp was 3.</summary>
+    private static Monster PlainMissOn2(Character attacker) => Needing(attacker, 3);
 
     /// <summary>A foe 10 levels above the fighter, out of reach: the clamp sets the roll at 8.</summary>
     private static Monster Above() => G.Dummy(60, 600);
@@ -170,17 +177,26 @@ public class HitRoll128Tests
     }
 
     [Fact]
-    public void G2_AtLevel_TheClampHoldsTheHitRateAt90Percent()
+    public void G2_AtLevel_TheClampHoldsTheHitRateAt95Percent()
     {
+        // 1.3.0: the at-level clamp is 2 (it was 3, 90 percent)
+        GameConfig.PlayerHitMaxNeededAtLevel.Should().Be(2);
         var hero = Fighter();
         var foe = AtLevel();
         (TrainingSystem.PlayerHitTargetAC(hero, foe) - TrainingSystem.PlayerHitModifier(hero)).Should().BeGreaterThan(20, "unclamped, only a natural 20 would hit");
-        TrainingSystem.PlayerHitNeeded(hero, foe).Should().Be(3);
-        PureRate(hero, foe).Should().BeInRange(0.89, 0.91);
+        TrainingSystem.PlayerHitNeeded(hero, foe).Should().Be(2);
+        PureRate(hero, foe).Should().BeInRange(0.94, 0.96);
         // five levels above is still at level; a generated floor-50 monster against the level 50 fighter too
-        TrainingSystem.PlayerHitNeeded(hero, G.Dummy(55, 600)).Should().Be(3);
+        TrainingSystem.PlayerHitNeeded(hero, G.Dummy(55, 600)).Should().Be(2);
         var generated = MonsterGenerator.GenerateMonster(50, false, false, new Random(5));
-        TrainingSystem.PlayerHitNeeded(hero, generated).Should().BeInRange(2, 3);
+        TrainingSystem.PlayerHitNeeded(hero, generated).Should().Be(2);
+        // the top of the at-level window is its bottom: neither Dexterity nor the armour class moves the roll
+        foreach (int dexterity in new[] { 10, 30, 250 })
+            foreach (int defence in new[] { 0, 100, 600, 3000 })
+                foreach (int level in new[] { 1, 50, 55 })
+                    TrainingSystem.PlayerHitNeeded(Fighter(dexterity: dexterity), G.Dummy(level, defence)).Should().Be(2, "Dexterity {0}, Defence {1}, level {2}", dexterity, defence, level);
+        // Precise Strike cannot go below 2 either
+        TrainingSystem.PlayerHitNeeded(hero, foe, 0, GameConfig.PreciseStrikeNeededBonus).Should().Be(2);
     }
 
     [Fact]
@@ -191,7 +207,12 @@ public class HitRoll128Tests
         TrainingSystem.PlayerHitNeeded(hero, foe).Should().Be(8);
         PureRate(hero, foe).Should().BeInRange(0.64, 0.66);
         TrainingSystem.PlayerHitNeeded(hero, G.Dummy(26, 600)).Should().Be(8, "six levels above is past the at-level gap");
-        TrainingSystem.PlayerHitNeeded(hero, G.Dummy(25, 600)).Should().Be(3);
+        TrainingSystem.PlayerHitNeeded(hero, G.Dummy(25, 600)).Should().Be(2, "five levels above is at level: the clamp of 2");
+        // past the gap the window is 2 to 8 as before: Dexterity and the armour class still move the roll there
+        GameConfig.PlayerHitMaxNeededAbove.Should().Be(8);
+        foreach (int defence in new[] { 0, 300, 600, 3000 })
+            TrainingSystem.PlayerHitNeeded(hero, G.Dummy(30, defence)).Should().BeInRange(2, 8, "Defence {0}", defence);
+        TrainingSystem.PlayerHitNeeded(Fighter(), Needing(Fighter(), 5)).Should().Be(5);
     }
 
     [Fact]
@@ -290,7 +311,7 @@ public class HitRoll128Tests
     {
         var miss = Leech();
         long hp = miss.HP;
-        var missed = Do(miss, Swing, AtLevel(), Always(2), times: 20);
+        var missed = Do(miss, Swing, PlainMissOn2(miss), Always(2), times: 20);
         int swings = missed.Rows.Count(r => r.StartsWith("You attack"));
         swings.Should().BeGreaterThanOrEqualTo(20);
         missed.RollRows.Should().Be(swings);
@@ -300,7 +321,7 @@ public class HitRoll128Tests
         missed.Rows.Should().NotContain(r => r.Contains("Flametongue"), "the weapon enchant does not fire on a miss");
 
         var hit = Leech();
-        var landed = Do(hit, Swing, AtLevel(), Always(10), times: 20);
+        var landed = Do(hit, Swing, PlainMissOn2(hit), Always(10), times: 20);
         landed.MissRows.Should().Be(0);
         landed.Damage.Should().BeGreaterThan(0);
         hit.HP.Should().BeGreaterThan(hp, "the same weapon steals life on a hit");
@@ -316,7 +337,7 @@ public class HitRoll128Tests
         var random = new DieRandom(128);
         var seen = WithSwitch(true, () =>
         {
-            var foe = AtLevel();
+            var foe = PlainMissOn2(hero);
             var rig = G.NewRig(hero, random, null, foe);
             random.Die = _ => Rows(rig.Shown()).Last().StartsWith("Off-hand") ? 2 : 10;
             long start = foe.HP;
@@ -345,7 +366,7 @@ public class HitRoll128Tests
             var hero = Fighter(CharacterClass.Assassin, main: 40, off: 35);
             // first die (the main strike) misses, second (the off hand) hits, and so on
             var random = new DieRandom(128, i => i % 2 == 0 ? 2 : 10);
-            var seen = Do(hero, action, AtLevel(), random, times: 10, before: (r, _) => r.Hero.ActiveStatuses.Remove(StatusEffect.PowerStance));
+            var seen = Do(hero, action, PlainMissOn2(hero), random, times: 10, before: (r, _) => r.Hero.ActiveStatuses.Remove(StatusEffect.PowerStance));
             random.Naturals.Count.Should().Be(20, "{0}: the strike and its off-hand follow-up each roll", action.Type);
             seen.RollRows.Should().Be(20);
             seen.MissRows.Should().Be(10, "the main strike misses and the off hand lands");
@@ -405,10 +426,10 @@ public class HitRoll128Tests
         var action = G.A(CombatActionType.UseAbility, abilityId);
         var seeded = Do(Fighter(cls), action, AtLevel(), new Random(128), times: 1000);
         seeded.RollRows.Should().Be(1000, "one roll an ability");
-        seeded.HitRate.Should().BeInRange(0.88, 0.92, "misses occur, at the at-level rate");
+        seeded.HitRate.Should().BeInRange(0.93, 0.97, "misses occur, at the at-level rate (95 percent from 1.3.0)");
 
         var hero = Fighter(cls);
-        var missed = Do(hero, action, AtLevel(), Always(2), times: 10);
+        var missed = Do(hero, action, PlainMissOn2(hero), Always(2), times: 10);
         missed.Rows.Count(r => r == "You miss Wolf!").Should().Be(10);
         missed.Damage.Should().Be(0, "a missed ability deals nothing");
         missed.Rows.Should().NotContain(r => r.StartsWith("You deal "));
@@ -419,9 +440,9 @@ public class HitRoll128Tests
     public void G10_AMissedAbility_DoesNothing_NoHealingNoBuffNoEffect()
     {
         // Execute's effect is extra damage to a wounded foe; a stun or a heal would sit in the same places
-        var foe = AtLevel();
-        foe.HP = foe.MaxHP / 10;
         var hero = Fighter();
+        var foe = PlainMissOn2(hero);
+        foe.HP = foe.MaxHP / 10;
         var missed = Do(hero, G.A(CombatActionType.UseAbility, "execute"), foe, Always(2), times: 5);
         missed.Damage.Should().Be(0);
         foe.Stunned.Should().BeFalse();
@@ -514,7 +535,7 @@ public class HitRoll128Tests
 
         var seeded = Do(hero, Swing, AtLevel(), new Random(128), times: 2000, team: new List<Character> { mate }, teammateTurn: mate);
         seeded.RollRows.Should().BeGreaterThanOrEqualTo(2000);
-        seeded.HitRate.Should().BeInRange(0.88, 0.92);
+        seeded.HitRate.Should().BeInRange(0.93, 0.97, "a teammate's at-level rate is the player's: 95 percent from 1.3.0");
     }
 
     [Fact]
@@ -524,7 +545,7 @@ public class HitRoll128Tests
         var mate = G.Mate("Ally One", 30_000, 50, 300, 20);
         var seen = WithSwitch(true, () =>
         {
-            var foe = AtLevel();
+            var foe = PlainMissOn2(mate);
             var rig = G.NewRig(hero, Always(2), new List<Character> { mate }, foe);
             var ability = ClassAbilitySystem.GetAbility("power_strike")!;
             var used = new ClassAbilityResult { Success = true, AbilityUsed = ability, Damage = 500, SpecialEffect = "" };
@@ -542,7 +563,7 @@ public class HitRoll128Tests
         foreach (var (type, cls) in new[] { (CombatActionType.Backstab, CharacterClass.Assassin), (CombatActionType.Smite, CharacterClass.Paladin), (CombatActionType.RangedAttack, CharacterClass.Ranger) })
         {
             Character Hero() => Fighter(cls, dexterity: 200, main: cls == CharacterClass.Ranger ? 30 : null, mainType: cls == CharacterClass.Ranger ? WeaponType.Bow : WeaponType.Sword);
-            var missed = Do(Hero(), G.A(type), AtLevel(), new DieRandom(128, i => 2), times: 30);
+            var missed = Do(Hero(), G.A(type), PlainMissOn2(Hero()), new DieRandom(128, i => 2), times: 30);
             missed.RollRows.Should().BeGreaterThan(20, "{0} rolls", type);
             missed.MissRows.Should().Be(missed.RollRows);
             missed.Damage.Should().Be(0, "{0}: a miss deals nothing", type);
@@ -724,7 +745,7 @@ public class HitRoll128Tests
         var seen = Do(Fighter(), Swing, AtLevel(), new Random(128), times: 2000, setup: r => r.Engine.BossContext = G.Boss());
         seen.RollRows.Should().Be(2000, "every swing of a BossContext fight rolls");
         seen.MissRows.Should().BeGreaterThan(0, "misses occur");
-        seen.HitRate.Should().BeInRange(0.88, 0.92, "at the at-level rate");
+        seen.HitRate.Should().BeInRange(0.93, 0.97, "at the at-level rate (95 percent from 1.3.0)");
 
         var mate = G.Mate("Ally One", 30_000, 50, 300, 20);
         var team = Do(Fighter(), Swing, AtLevel(), new Random(128), times: 1000, setup: r => r.Engine.BossContext = G.Boss(), team: new List<Character> { mate }, teammateTurn: mate);
@@ -859,7 +880,7 @@ public class HitRoll128Tests
     [InlineData(19)]
     public void G22_ANonCriticalHit_DealsTodaysDamage_WhateverTheMargin(int face)
     {
-        // at the clamp (needed 3): a 3, a 15 and a 19 beat it by 0, 12 and 16; the damage is the swing's of before
+        // at the clamp (needed 2): a 3, a 15 and a 19 beat it by 1, 13 and 17; the damage is the swing's of before
         long on = Do(Fighter(main: 80), Swing, AtLevel(), new FlatRandom(face), times: 1).Damage;
         long off = Do(Fighter(main: 80), Swing, AtLevel(), new FlatRandom(face), times: 1, on: false).Damage;
         off.Should().BeGreaterThan(100);
@@ -881,7 +902,19 @@ public class HitRoll128Tests
     [Fact]
     public void T1_TheRollLine_ShowsTheNaturalRollAndTheNeededRoll_OneLineARoll()
     {
-        var seen = Do(Fighter(), Swing, AtLevel(), Faces(10, 2, 1, 20, 3), times: 5);
+        // at level (1.3.0): every roll needs 2, so a 2 lands and only the natural 1 misses
+        var atLevel = Do(Fighter(), Swing, AtLevel(), Faces(10, 2, 1, 20, 3), times: 5);
+        atLevel.Rows.Where(r => r.StartsWith("[") || r.StartsWith("You miss") || r.StartsWith("CRITICAL")).Should().Equal(
+            "[You roll 10; you need 2 or more]",
+            "[You roll 2; you need 2 or more]",
+            "[You roll a natural 1: always a miss]", "CRITICAL MISS! You stumble badly!",
+            "[You roll a natural 20: always a hit]", "CRITICAL HIT!",
+            "[You roll 3; you need 2 or more]");
+        atLevel.RollRows.Should().Be(5, "one line a roll");
+        atLevel.MissRows.Should().Be(1, "the natural 1");
+
+        // above the at-level gap, a foe that needs 3: the plain miss and the roll that just reaches
+        var seen = Do(Fighter(), Swing, PlainMissOn2(Fighter()), Faces(10, 2, 1, 20, 3), times: 5);
         seen.Rows.Where(r => !r.StartsWith("You attack") && !r.Contains("Wolf for") && !r.Contains("damage") && !r.StartsWith("CRITICAL HIT") && !r.Contains("hit ")).Should().NotBeEmpty();
         var story = seen.Rows.Where(r => r.StartsWith("[") || r.StartsWith("You miss") || r.StartsWith("CRITICAL")).ToList();
         story.Should().Equal(
@@ -948,10 +981,10 @@ public class HitRoll128Tests
             }
         }
         // the third person form takes the name first, then the second person form's arguments
-        Loc.GetIn("en", "combat.hit_roll", 7, 3).Should().Be("[You roll 7; you need 3 or more]");
-        Loc.GetIn("en", "combat.hit_roll_third", "Ally", 7, 3).Should().Be("[Ally rolls 7; needs 3 or more]");
-        Loc.GetIn("hu", "combat.hit_roll", 7, 3).Should().Be("[Dobásod: 7; legalább 3 kell]");
-        Loc.GetIn("hu", "combat.hit_roll_third", "Ally", 7, 3).Should().Be("[Ally dobása: 7; legalább 3 kell]");
+        Loc.GetIn("en", "combat.hit_roll", 7, 2).Should().Be("[You roll 7; you need 2 or more]");
+        Loc.GetIn("en", "combat.hit_roll_third", "Ally", 7, 2).Should().Be("[Ally rolls 7; needs 2 or more]");
+        Loc.GetIn("hu", "combat.hit_roll", 7, 2).Should().Be("[Dobásod: 7; legalább 2 kell]");
+        Loc.GetIn("hu", "combat.hit_roll_third", "Ally", 7, 2).Should().Be("[Ally dobása: 7; legalább 2 kell]");
     }
 
     private static string LongestEliteCaster(string lang)
@@ -1082,7 +1115,7 @@ public class HitRoll128Tests
         GameConfig.PlayerHitRollEnabled.Should().BeTrue();
         p.SetMethod!.IsAssembly.Should().BeTrue("the setter is internal");
         GameConfig.PlayerHitMinNeeded.Should().Be(2);
-        GameConfig.PlayerHitMaxNeededAtLevel.Should().Be(3);
+        GameConfig.PlayerHitMaxNeededAtLevel.Should().Be(2);
         GameConfig.PlayerHitMaxNeededAbove.Should().Be(8);
         GameConfig.AtLevelAccuracyGap.Should().Be(5);
         string root = RepoRoot();
