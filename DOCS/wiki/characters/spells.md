@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.0 | The spell table shows the level at which each spell can be learned and cast and the mana a cast costs before Wisdom, and the Cure Critical and Judgment descriptions say that a cast removes Darkness first.
 history: 1.2.5 | Spell cast messages are shown in all five languages, and long spell messages wrap inside 79 columns.
 history: 1.2.4 | none
 ---
@@ -22,7 +23,7 @@ A cast costs 10 mana plus 5 per catalog slot; this is the table's mana value. Wi
 
 ## How spells scale
 
-Spells do not use the ability scaling. Each kind of effect has its own rule, and training proficiency in the spell multiplies all of them.
+Spells do not use the ability scaling, and a spell does not make the [hit roll](/wiki/en/combat/#the-hit-roll) of a physical attack. Each kind of effect has its own rule, and training proficiency in the spell multiplies all of them.
 
 - Damage: the base damage times 1 plus 3 percent per character level, times your casting stat multiplier. The casting stat is Intelligence; Wavecallers use Charisma. The multiplier is 1 plus 5 percent per point above 10 up to 85, then 1.5 percent per point above 85, and never more than 8 times. Clerics and Sages also gain 1 percent per point of Wisdom above 10, and lose 1 percent per point below 10. Magicians deal 15 percent more spell damage. Damage varies by up to 10 percent either way.
 - Spell critical hits, for damage only: the chance is half of your casting stat above 10, in percent, up to 50 percent. A critical spell does 50 percent more damage.

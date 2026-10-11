@@ -363,7 +363,7 @@ Cover (Codex), immunity windows by phase (mechanics), per-boss hand-authored
 telegraph scripts, an enrage against the window, companions as above, the
 NPC rally trickle (participation; it would let a solo plus NPCs exceed the
 budget), siege prices, the world boss currency and vendor (1.2), a trophy in
-the Player District (1.3).
+the Player District (1.4).
 
 ## The 1.1.4 slice, in two milestones
 

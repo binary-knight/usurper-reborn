@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+history: 1.3.0 | In an Arena fight a dual-wielder's swing uses the weapon in its own hand; before, every swing used both weapons' power added together.
 history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | After an Arena win, players in every language now salvage gold from the target's worn weapon and armor; before, English players never did.
@@ -43,4 +44,4 @@ A loss costs experience, a larger share of your gold and some Fame, and you revi
 
 PvP wins count toward achievements.
 
-Arena fights follow [player combat rules](/wiki/en/combat/pvp/): ordinary Mental loss and daily Miracles do not apply.
+Arena fights follow [player combat rules](/wiki/en/combat/pvp/): ordinary Mental loss and daily Miracles do not apply. A dual-wielder's swing uses the weapon in its own hand, for you and for the copy you fight.

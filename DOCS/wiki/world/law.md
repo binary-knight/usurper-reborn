@@ -1,8 +1,9 @@
 ---
 title: Crime, prison and the law
 path: /wiki/en/world/law/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs
+history: 1.3.0 | An NPC you beat in an honor duel keeps its HP and stays where it is and a kill contract on it is not paid, and town honor duels share the Inn duels' daily cap of 3 wins.
 history: 1.2.7 | none
 history: 1.2.5 | Prison activity effects now show what each one gives (for example "+1 Strength" for pushups), and a prisoner using a screen reader gets the screen reader prison menu.
 history: 1.2.4 | An enraged avenger in a murder grudge fight really has the extra HP the box shows, and the townsperson's own HP is no longer raised.
@@ -17,7 +18,7 @@ Crime has consequences in town. Theft and murder can be taboos for your god, and
 - **Murder.** Guards come for a murderer. A captured murderer may be executed; otherwise the character loses gold and serves a sentence without escape or bail.
 - **The ruler.** A ruler can imprison characters, within daily limits.
 
-Self-defense against a street attacker is not murder.
+Self-defense against a street attacker is not murder. Neither is an honor duel: the NPC you beat keeps the HP it had before the fight and stays where it is. Honor duels in town and duels at the Inn share one daily cap of 3 wins.
 
 ## Life in prison
 
@@ -46,6 +47,6 @@ You can do a few activities a day. Pushups, yoga, reading, meditation, stretchin
 
 ## Bounties
 
-The ruler posts bounties on criminals, and a citizen can report a crime at a royal audience. An unpaid royal loan can put a bounty on you. Read the bounty board at the Quest Hall. Defeating a bounty target pays the reward; a bounty on a player goes to whoever beats them in a duel or the [Arena](/wiki/en/online/arena/). Very feared characters can also meet bounty hunters in the street.
+The ruler posts bounties on criminals, and a citizen can report a crime at a royal audience. An unpaid royal loan can put a bounty on you. Read the bounty board at the Quest Hall. Defeating a bounty target pays the reward, but a win in an honor duel does not pay a kill contract on the NPC; a bounty on a player goes to whoever beats them in a duel or the [Arena](/wiki/en/online/arena/). Very feared characters can also meet bounty hunters in the street.
 
 Judicar rewards appropriate prison orders and treats theft as a taboo. See the [god pages](/wiki/en/gods/) for deeds and taboos.

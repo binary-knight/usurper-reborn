@@ -1,8 +1,9 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.0 | Teammates and companions roll to hit as you do, a healing potion given to an ally heals at least 20 percent of the ally's maximum HP, and a hired NPC or a friend in your party carries the oath-mark of your banner.
 history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Group combat lines name monsters in each player's own language and wrap inside 79 columns.
@@ -13,6 +14,14 @@ Groups can combine damage, healing and protection. A teammate has its own resour
 ## Support roles
 
 Heals restore HP. Party wards absorb later damage and are not the same as immediately filling health. Sage ward changes in 1.2.0 make support relevant to party survival; read the spell description before deciding whether a heal or shield is needed.
+
+## Hits and potions
+
+A teammate or companion makes the same [hit roll](/wiki/en/combat/#the-hit-roll) as you for each physical swing at a monster, with its own stats. A healing potion you give to an ally heals at least 20 percent of the ally's maximum HP.
+
+## The oath-mark
+
+An NPC hired for your team, and an NPC friend who joins your dungeon party, carries the oath-mark of your banner; story companions do not. The game says so when you hire, in your team view and when someone joins the party. The chance that a fall at your side is permanent is the same as before. When one of them falls in your fight and will recover, the game says the oath-mark held. When one is lost for good, a short scene plays. If the one who fell and will recover is your spouse, lover or affair partner, the marriage or romance is not ended.
 
 ## Mental in a group
 

@@ -1,8 +1,9 @@
 ---
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs
+history: 1.3.0 | A healing potion heals at least 20 percent of the drinker's maximum HP, and a potion given to an ally at least 20 percent of the ally's maximum HP.
 history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Healer menus and the potion and herb labels are shown in all five languages.
@@ -13,6 +14,8 @@ Consumables solve particular problems. Healing supplies restore HP, mana supplie
 ## Use the correct supply
 
 Check the combat and room menus for available consumable actions. Boss potion cooldowns and fight context can limit repeated use. Herbs and potions can interact with healing bonuses; the final amount is not always the raw item label.
+
+A healing potion heals a flat amount that grows with level, or 20 percent of the drinker's maximum HP when that is more. A potion given to an ally uses the ally's maximum HP.
 
 Willow Draught stops at your ordinary Mental cap and is kept if there is nothing to restore. Addiction and Broken require their own treatment decisions.
 
