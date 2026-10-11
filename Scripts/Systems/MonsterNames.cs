@@ -151,6 +151,21 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// The name a tier's champion (the dungeon mini-boss) shows in a fight, in the given language: the
+        /// English name MonsterGenerator.GetChampionName writes for the tier and its family, shown as
+        /// DisplayIn shows the monster that carries it.
+        /// </summary>
+        public static string ChampionOfTierIn(string lang, string tierName, string familyName)
+        {
+            string stored = MonsterGenerator.GetChampionName(tierName, familyName);
+            return ChampionIn(lang, stored, tierName, familyName) ?? DisplayIn(lang, stored);
+        }
+
+        /// <summary>ChampionOfTierIn in the reader's language, recorded for a group capture.</summary>
+        public static string ChampionOfTier(string tierName, string familyName) =>
+            Recorded(ChampionOfTierIn(GameConfig.Language, tierName, familyName), lang => ChampionOfTierIn(lang, tierName, familyName));
+
+        /// <summary>
         /// The monster as a sentence subject: English keeps Monster.TheNameOrName ("The Drake", a proper name
         /// bare); another language shows the name alone, its templates carry their own article. Before 1.2.5
         /// the English "The" showed in every language.

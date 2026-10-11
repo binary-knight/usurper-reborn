@@ -21,7 +21,8 @@ namespace UsurperReborn.Tests;
 /// rendered them. Write now renders them with the parsers WriteLine uses, with no line end, and goes back
 /// to the colour of the Write after a pair. A text without a pair is sent exactly as before.
 /// Row 1 stream, row 2 plain text, row 3 door and console, row 4 a text without a pair, row 5 the colour
-/// after a pair, row 6 the wandering encounter line; then the capture buffer and the BBS adapter.
+/// after a pair, row 6 the wandering encounter line; then the capture buffer and the BBS adapter's local
+/// branches (its socket branch: SocketMarkup128Tests).
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class WriteMarkup128Tests
@@ -307,12 +308,59 @@ public class WriteMarkup128Tests
     // ---------------------------------------------------------------- the column count
 
     [Fact]
-    public void TheColumn_DoesNotCountAnOpeningTag_AndCountsTheClosingTag_AsBefore()
+    public void TheColumn_CountsNoTagOfAPair()
     {
         var terminal = new TerminalEmulator(new NoInput(), new MemoryStream());
         terminal.Write("[red]ab[/]", "yellow");
-        // ColumnMarkup needs a name after the optional slash, so "[red]" is not counted and "[/]" is: 2 + 3.
-        terminal.Column.Should().Be(5);
+        // neither "[red]" nor "[/]" takes a column: the two letters
+        terminal.Column.Should().Be(2);
+        terminal.Write("[red]cd[/] and [green]ef[/]", "yellow");
+        terminal.Column.Should().Be(2 + 9);
+    }
+
+    [Theory]
+    [InlineData("[/]", 0)]
+    [InlineData("a[/]b", 2)]
+    [InlineData("[red]", 0)]
+    [InlineData("[bright_red]ab", 2)]
+    [InlineData("[/red]", 0)]
+    [InlineData("[A]ttack", 8)]
+    [InlineData("[RED]", 5)]
+    [InlineData("[1] Sword", 9)]
+    [InlineData("[", 1)]
+    [InlineData("[/ ]", 4)]
+    [InlineData("[//]", 4)]
+    [InlineData("\u001b[31mab\u001b[0m", 2)]
+    [InlineData("plain text", 10)]
+    public void TheColumn_OfAWrite_CountsTheClosingTagAsNothing_AndEveryOtherTextAsBefore(string text, int columns)
+    {
+        // every row but the first two had this count before the closing tag was added to the pattern
+        var terminal = new TerminalEmulator(new NoInput(), new MemoryStream());
+        terminal.Write(text, "yellow");
+        terminal.Column.Should().Be(columns);
+    }
+
+    [Fact]
+    public void ATailAfterAMarkedWrite_StartsAtTheColumnThePlayerSees()
+    {
+        // 60 + 2 columns written, then a tail of 17: 79 in all, one row. With "[/]" counted as 3 columns the
+        // tail was laid out from column 65 and wrapped.
+        GameConfig.ScreenReaderMode.Should().BeFalse();
+        string head = new string('x', 60);
+        string tail = " " + new string('y', 16);
+        var terminal = new TerminalEmulator(new NoInput(), new MemoryStream());
+        terminal.Write(head + "[red]ab[/]", "yellow");
+        terminal.Column.Should().Be(62);
+        UIHelper.TailRows(terminal.Column, 4, new (string?, string)[] { ("gray", tail) }).Count.Should().Be(1);
+        string sent = Sent(t =>
+        {
+            t.Write(head + "[red]ab[/]", "yellow");
+            UIHelper.WriteTail(t, 4, ("gray", tail));
+            t.WriteLine("");
+        });
+        var rows = UIHelper.StripAnsi(sent).Split("\r\n");
+        rows.Should().Equal(head + "ab" + tail, "");
+        rows[0].Length.Should().Be(79);
     }
 
     // ---------------------------------------------------------------- the BBS adapter
@@ -346,17 +394,5 @@ public class WriteMarkup128Tests
         UIHelper.StripAnsi(ansi).Should().Be("You encounter 1 Wolf!");
         ansi.Should().Contain(Esc + "[");
         ThroughAdapter(ConnectionType.Local, false, a => a.Write("You encounter [red]1 Wolf[/]!", "yellow")).Should().Be("You encounter 1 Wolf!");
-    }
-
-    [Fact]
-    public void TheBbsAdapter_SocketBranch_SendsTheTagsAsTheyAre_InWriteAndInWriteLine()
-    {
-        // The branch TerminalEmulator routes to (ShouldUseBBSAdapter needs a connection that is not local):
-        // SocketTerminal.WriteAsync(text, colour) sets the colour and sends the text, with no markup pass.
-        // Not changed in this piece; WriteLine does the same there.
-        string write = ThroughAdapter(ConnectionType.Telnet, false, a => a.Write("You encounter [red]1 Wolf[/]!", "yellow"));
-        UIHelper.StripAnsi(write).Should().Be("You encounter [red]1 Wolf[/]!");
-        string line = ThroughAdapter(ConnectionType.Telnet, false, a => a.WriteLine("You encounter [red]1 Wolf[/]!", "yellow"));
-        UIHelper.StripAnsi(line).Should().Be("You encounter [red]1 Wolf[/]!\r\n");
     }
 }

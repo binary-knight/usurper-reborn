@@ -579,7 +579,7 @@ public partial class TerminalEmulator
     public int RowsSinceClear { get; private set; }
 
     private static readonly System.Text.RegularExpressions.Regex ColumnMarkup =
-        new(@"\x1b\[[0-9;?]*[A-Za-z]|\[/?[a-z_]+\]", System.Text.RegularExpressions.RegexOptions.Compiled);
+        new(@"\x1b\[[0-9;?]*[A-Za-z]|\[(?:/|/?[a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private void AdvanceColumn(string? text)
     {
@@ -2748,6 +2748,73 @@ public partial class TerminalEmulator
             sb.Append(text[pos]);
             pos++;
         }
+    }
+
+    /// <summary>
+    /// The runs of a [colour]...[/] text, for an output that sets colours by name (the BBS socket terminal).
+    /// The walk is the one RenderMarkupToStringBuilder makes: a "[word]" of letters and underscores opens a
+    /// pair up to its matching "[/]", pairs nest, a "[/]" with no opening is dropped, and an opening with no
+    /// matching "[/]" ends the text. A run's Color is the name of the pair it opens in; it is null from a
+    /// "[/]" on, as the stream goes back to the colour of the Write after every pair. Empty runs are left out.
+    /// </summary>
+    internal static List<(string Text, string? Color)> MarkupSegments(string text)
+    {
+        var runs = new List<(string Text, string? Color)>();
+        var run = new StringBuilder();
+        string? color = null;
+        void Flush() { if (run.Length > 0) { runs.Add((run.ToString(), color)); run.Clear(); } }
+        void Walk(string part)
+        {
+            int pos = 0;
+            while (pos < part.Length)
+            {
+                var tagMatch = System.Text.RegularExpressions.Regex.Match(
+                    part.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (tagMatch.Success)
+                {
+                    string colorName = tagMatch.Groups[1].Value;
+                    pos += tagMatch.Length;
+                    int depth = 1;
+                    int contentStart = pos;
+                    int contentEnd = pos;
+
+                    while (pos < part.Length && depth > 0)
+                    {
+                        if (pos + 2 <= part.Length - 1 && part[pos] == '[' && part[pos + 1] == '/' && part[pos + 2] == ']')
+                        {
+                            depth--;
+                            if (depth == 0) { contentEnd = pos; pos += 3; break; }
+                            pos += 3;
+                            continue;
+                        }
+                        var nestedMatch = System.Text.RegularExpressions.Regex.Match(
+                            part.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (nestedMatch.Success) { depth++; pos += nestedMatch.Length; continue; }
+                        pos++;
+                    }
+
+                    Flush();
+                    color = colorName;
+                    Walk(part.Substring(contentStart, contentEnd - contentStart));
+                    Flush();
+                    color = null;
+                    continue;
+                }
+
+                if (pos + 2 <= part.Length - 1 && part[pos] == '[' && part[pos + 1] == '/' && part[pos + 2] == ']')
+                {
+                    pos += 3;
+                    continue;
+                }
+
+                run.Append(part[pos]);
+                pos++;
+            }
+        }
+        Walk(text ?? "");
+        Flush();
+        return runs;
     }
 
     // ═══════════════════════════════════════════════════════════════════
