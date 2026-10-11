@@ -550,9 +550,18 @@ public static class MonsterGenerator
         GameConfig.EncounterTemplatesEnabled && rules != null
         && rules.RealFloor >= TemplateMinFloor && rules.RealFloor <= TemplateMaxFloor;
 
-    /// <summary>1.2.8 elites: the six affix ids, in the order the draw indexes them. An elite's name is its
-    /// current name in monster.elite.{id}; its description is monster.elite_desc.{id}.</summary>
+    /// <summary>1.2.8 elites: the six slots of the affix draw, in the order the draw indexes them. An elite's
+    /// name is its current name in monster.elite.{id}; its description is monster.elite_desc.{id}. One slot,
+    /// EliteAffixNotDrawn, gives no affix of its own (DrawEliteAffix).</summary>
     internal static readonly string[] EliteAffixIds = { "frenzied", "warded", "venomous", "commanding", "mending", "swift" };
+
+    /// <summary>1.3.0: Warded is out of the draw. No elite gets it: it was never built (it belongs to the
+    /// player's to-hit roll), so its name and sentence would be untrue. Its slot stays in EliteAffixIds so
+    /// that the draw keeps its shape; its texts stay in the language files, unused by the game.</summary>
+    internal const string EliteAffixNotDrawn = "warded";
+
+    /// <summary>The five affixes an elite can get, in slot order.</summary>
+    internal static readonly string[] EliteAffixPool = EliteAffixIds.Where(id => id != EliteAffixNotDrawn).ToArray();
 
     /// <summary>The chance that a regular dungeon encounter on this real floor holds an elite.</summary>
     internal static double EliteChance(int realFloor) =>
@@ -701,7 +710,8 @@ public static class MonsterGenerator
 
     /// <summary>
     /// 1.2.8: promotes one member of a built regular group to an elite. Draws: the member, then one affix,
-    /// then from GameConfig.EliteSecondAffixFloor a second one among the other five. Budget: the elite takes
+    /// then from GameConfig.EliteSecondAffixFloor a second one among the others (DrawEliteAffix: one draw
+    /// an affix, never Warded). Budget: the elite takes
     /// its member's place, and a group of 3 or more loses one further member, the last one that is not the
     /// elite (no draw). The elite keeps its member's stats (a templated budget and the caster's Strength
     /// included) times the GameConfig elite multipliers, and its stored reward times the reward ones. Its
@@ -727,18 +737,33 @@ public static class MonsterGenerator
         elite.Experience = (long)(elite.Experience * GameConfig.EliteExperienceMultiplier);
         elite.Gold = (long)(elite.Gold * GameConfig.EliteGoldMultiplier);
 
-        var pool = EliteAffixIds.ToList();
+        var slots = EliteAffixIds.ToList();
         int affixes = realFloor >= GameConfig.EliteSecondAffixFloor ? 2 : 1;
         for (int i = 0; i < affixes; i++)
-        {
-            int pick = random.Next(pool.Count);
-            elite.EliteAffixes.Add(pool[pick]);
-            pool.RemoveAt(pick);
-        }
+            elite.EliteAffixes.Add(DrawEliteAffix(slots, random));
         // the first affix is the outermost word of the name
         for (int i = elite.EliteAffixes.Count - 1; i >= 0; i--)
             elite.Name = MonsterNames.FromKey("monster.elite." + elite.EliteAffixes[i], elite.Name);
         return elite;
+    }
+
+    /// <summary>
+    /// 1.3.0: one affix from the slots still open, with ONE draw, as before Warded left the draw (so the
+    /// random numbers after an elite are the ones of before). The draw is the old one made finer: it picks a
+    /// slot (r / n) and a place inside the slot (r % n), n being the number of real affixes still open. A
+    /// real affix's slot gives that affix, so with a seeded random an elite whose draw fell on a real affix
+    /// keeps it. Warded's slot gives no Warded: the place inside it picks one of the real affixes still open,
+    /// each as likely as the other. Every real affix is therefore as likely as every other (one in five for
+    /// the first, one in four for the second). The picked affix leaves the slots.
+    /// </summary>
+    internal static string DrawEliteAffix(List<string> slots, Random random)
+    {
+        var open = slots.Where(id => id != EliteAffixNotDrawn).ToList();
+        int r = random.Next(slots.Count * open.Count);
+        string slot = slots[r / open.Count];
+        string affix = slot == EliteAffixNotDrawn ? open[r % open.Count] : slot;
+        slots.Remove(affix);
+        return affix;
     }
 
     /// <summary>1.2.8 threat budget of a templated group of 3: HP x0.8, Strength, Punch and WeapPow x0.9

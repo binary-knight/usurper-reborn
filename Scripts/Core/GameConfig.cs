@@ -305,9 +305,12 @@ public static partial class GameConfig
     /// <summary>1.2.8: the natural roll a player's attack needs is held in a window, as the monster's is
     /// (AtLevelAccuracyGap): never below PlayerHitMinNeeded (a natural 1 always misses), at most
     /// PlayerHitMaxNeededAtLevel against a target up to AtLevelAccuracyGap levels above the attacker (hit at
-    /// least 90%), at most PlayerHitMaxNeededAbove against a higher one (hit at least 65%).</summary>
+    /// least 95%), at most PlayerHitMaxNeededAbove against a higher one (hit at least 65%). 1.3.0: the
+    /// at-level top is 2 (it was 3, hit at least 90%), which is PlayerHitMinNeeded: against a target up to
+    /// AtLevelAccuracyGap levels above, every roll needs exactly 2 and neither Dexterity nor the target's
+    /// armour class moves it.</summary>
     public const int PlayerHitMinNeeded = 2;
-    public const int PlayerHitMaxNeededAtLevel = 3;
+    public const int PlayerHitMaxNeededAtLevel = 2;
     public const int PlayerHitMaxNeededAbove = 8;
 
     /// <summary>1.2.8: Precise Strike needs this much less on the hit die (never below PlayerHitMinNeeded).</summary>

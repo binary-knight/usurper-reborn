@@ -509,9 +509,10 @@ public class HitColumns128Tests : IDisposable
         var (tally, lines) = WithRoll(true, () =>
         {
             G.Rig rig = null!;
-            // every main-hand die a 10 (a hit), every off-hand die a 2 (a miss)
+            // every main-hand die a 10 (a hit), every off-hand die a 2 (a miss). The foe is 10 levels above
+            // (the roll needs 8): from 1.3.0 an at-level roll needs 2 and a 2 would land
             var random = new DieRandom(_ => RowsOf(rig.Shown()).Last().StartsWith("Off-hand") ? 2 : 10);
-            rig = RigWithTally(hero, random, null, G.Dummy(50, 600), rec);
+            rig = RigWithTally(hero, random, null, G.Dummy(60, 600), rec);
             for (int i = 0; i < 20; i++) G.Act(rig, G.A(CombatActionType.Attack));
             return (rig.Result.Tally, Read(rig.Shown()));
         });
@@ -532,9 +533,10 @@ public class HitColumns128Tests : IDisposable
         var hero = G.Hero(50_000, 300, 50, CharacterClass.Assassin, 30, 40, 35);
         var (tally, lines, dice) = WithRoll(true, () =>
         {
-            // first die (the main strike) misses, second (the off-hand follow-up) hits, and so on
+            // first die (the main strike) misses, second (the off-hand follow-up) hits, and so on. The foe is
+            // 10 levels above (the roll needs 8): from 1.3.0 an at-level roll needs 2 and a 2 would land
             var random = new DieRandom(i => i % 2 == 0 ? 2 : 10);
-            var rig = RigWithTally(hero, random, null, G.Dummy(50, 600));
+            var rig = RigWithTally(hero, random, null, G.Dummy(60, 600));
             for (int i = 0; i < 10; i++)
             {
                 rig.Hero.ActiveStatuses.Remove(StatusEffect.PowerStance);

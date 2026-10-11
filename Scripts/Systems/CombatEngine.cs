@@ -1427,7 +1427,13 @@ public partial class CombatEngine
         // Ambush: determine how many monsters catch the leader off guard via opposed roll.
         // Monster stealth vs leader awareness (AGI + DEX + level scaling).
         // Only monsters that win the roll get a free attack — partial ambushes are common.
-        if (isAmbush && player.IsAlive && monsters.Any(m => m.IsAlive))
+        // 1.2.8: a Swift elite acts before round 1 through this step. In a plain fight it is the one
+        // ambusher and nothing is rolled; in an ambush it joins the ambushers without its roll. Either
+        // way it is in the list once, so it gets one free attack.
+        var swiftElites = EliteAffixesActive
+            ? monsters.Where(m => m.IsAlive && EliteAffixes.Has(m, EliteAffixes.Swift)).ToList()
+            : new List<Monster>();
+        if ((isAmbush || swiftElites.Count > 0) && player.IsAlive && monsters.Any(m => m.IsAlive))
         {
             var ambushRng = random;   // v1.1.14: the engine RNG, so a test seed covers it
 
@@ -1451,6 +1457,8 @@ public partial class CombatEngine
                 .Where(m => m.IsAlive)
                 .Where(m =>
                 {
+                    if (swiftElites.Contains(m)) return true;   // 1.2.8: no roll for a Swift elite
+                    if (!isAmbush) return false;                // 1.2.8: a plain fight rolls for no one
                     int monsterRoll  = m.Level * 3 + ambushRng.Next(1, 21);
                     int playerRoll   = (int)leaderAwareness + ambushRng.Next(1, 21);
                     return monsterRoll > playerRoll;
@@ -1462,7 +1470,11 @@ public partial class CombatEngine
 
             bool hasGroupAmbush = result.Teammates?.Any(t => t.IsGroupedPlayer) == true;
 
-            if (ambushCount == 0)
+            if (!isAmbush)
+            {
+                // 1.2.8: a plain fight with a Swift elite has no ambush headline; its own line follows
+            }
+            else if (ambushCount == 0)
             {
                 // Perfect detection — no free attacks
                 terminal.SetColor("bright_green");
@@ -1490,6 +1502,10 @@ public partial class CombatEngine
                 BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;31m", "combat.group_ambush_full"));
             }
 
+            // 1.2.8: the Swift elite's line, once, for the player and for each follower in their language
+            foreach (var swift in swiftElites)
+                WriteEliteLine(result, "combat.elite_swift", "bright_red", "\u001b[1;31m", swift);
+
             // v0.61.2 Last-Stand cap also covers the ambush phase. Capture
             // the player's pre-ambush HP so the no-one-shot rule fires even
             // if all the damage is from monsters that got the jump on them.
@@ -1503,6 +1519,7 @@ public partial class CombatEngine
                 if (!player.IsAlive) break;
 
                 _lastMonsterTargetedGroupPlayer = false;
+                EliteAffixTurn(ambushMonster, result);   // 1.2.8
                 // v1.2.4: the Loc calls are recorded, so each member reads the capture in their own language
                 LocRecording? ambushRecording = null;
                 if (hasGroupAmbush) { terminal.StartCapture(); ambushRecording = Loc.BeginRecording(); }
@@ -2015,6 +2032,7 @@ public partial class CombatEngine
                     // Capture per-attack so we can skip broadcast when monster targets a grouped player
                     // (MonsterAttacksCompanion already sends direct messages to grouped players)
                     _lastMonsterTargetedGroupPlayer = false;
+                    if (atk == 0) EliteAffixTurn(monster, result);   // 1.2.8: before the capture, so followers get its lines directly
                     // v1.2.4: recorded, so each member reads the capture in their own language
                     LocRecording? monsterRecording = null;
                     if (hasGroup) { terminal.StartCapture(); monsterRecording = Loc.BeginRecording(); }
@@ -5339,6 +5357,14 @@ public partial class CombatEngine
             }
         }
 
+        // 1.2.8: a Mending elite that healed an ally this turn (EliteAffixTurn) has acted: no target, no
+        // ability roll, no attack. Its ticks and holds above ran as on any turn.
+        if (ReferenceEquals(_eliteMendedThisTurn, monster))
+        {
+            _eliteMendedThisTurn = null;
+            return;
+        }
+
         // Check if player will dodge the next attack
         if (player.DodgeNextAttack)
         {
@@ -5713,6 +5739,7 @@ public partial class CombatEngine
         // from taking only 1-2 damage per hit and auto-battling indefinitely.
         long minDamage = GetMinIncomingDamage(player, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - playerDefense);
+        actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8: before the caps below
 
         // Show defense calculation only when armor actually reduced the damage (and didn't
         // fully absorb it). v0.60.10 (druidah report): pre-fix this fired unconditionally,
@@ -5849,6 +5876,7 @@ public partial class CombatEngine
         // Apply damage
         player.HP = Math.Max(0, player.HP - actualDamage);
         EvHurt(player, actualDamage, CombatEventKind.Basic);   // 1.2.6
+        bool venomLanded = actualDamage > 0 && player.IsAlive && EliteVenomLands(monster, player);   // 1.2.8: the line follows the hit line
 
         // Divine Mandate thorn reflect: reflect % of damage taken back to attacker (v0.56.0)
         if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
@@ -5897,6 +5925,7 @@ public partial class CombatEngine
         }
 
         result.CombatLog.Add($"{monster.Name} attacks player for {actualDamage} damage (roll: {monsterRoll.NaturalRoll})");
+        if (venomLanded) ApplyEliteVenom(player, isLeader: true);   // 1.2.8
 
         // Scales of Law artifact: reflect 15% of damage taken (30% during Manwe fight)
         if (actualDamage > 0 && monster.IsAlive && ArtifactSystem.Instance.HasScalesOfLaw())
@@ -6019,6 +6048,116 @@ public partial class CombatEngine
     /// </summary>
     private bool MonsterTacticsActive => GameConfig.MonsterTacticsEnabled && BossContext == null;
 
+    /// <summary>
+    /// 1.2.8: elite affixes (EliteAffixes) act in every fight but an Old God's. An elite exists only while
+    /// the elite switch of GameConfig is on (MonsterGenerator.PromoteElite), so a fight with no elite takes
+    /// none of these branches and draws the random numbers it drew before.
+    /// </summary>
+    private bool EliteAffixesActive => BossContext == null;
+
+    /// <summary>1.2.8: the Mending elite whose heal was its action this turn; ProcessMonsterAction reads and clears it.</summary>
+    private Monster? _eliteMendedThisTurn;
+
+    /// <summary>
+    /// 1.2.8: an elite line for the player (wrapped at 79 columns) and for each follower in their own
+    /// language, sent directly: it is written outside the captured stretch of a monster's action, so it
+    /// reaches followers whoever the monster attacks.
+    /// </summary>
+    private void WriteEliteLine(CombatResult result, string key, string color, string ansi, Monster elite, Monster? ally = null, long amount = 0)
+    {
+        UIHelper.WriteRow(terminal, ally == null
+            ? Loc.Get(key, MonsterNames.Display(elite))
+            : Loc.Get(key, MonsterNames.Display(elite), MonsterNames.Display(ally), amount), color);
+        BroadcastGroupLocalized(result, lang => ally == null
+            ? GroupLineWrapped(lang, ansi, key, MonsterNames.DisplayIn(lang, elite))
+            : GroupLineWrapped(lang, ansi, key, MonsterNames.DisplayIn(lang, elite), MonsterNames.DisplayIn(lang, ally), amount));
+    }
+
+    /// <summary>
+    /// 1.2.8: what an elite's affixes do when its turn comes and it is not held (asleep, feared, stunned or
+    /// frozen), before its action. Frenzied: the one Strength rise below half HP, with its line. Commanding:
+    /// its line, the first time it acts with a living ally (the aura itself needs no turn, CommandedDamage).
+    /// Mending: it heals its most wounded ally and that is its action this turn. No random number.
+    /// </summary>
+    private void EliteAffixTurn(Monster monster, CombatResult result)
+    {
+        _eliteMendedThisTurn = null;
+        if (!EliteAffixesActive || !monster.IsElite || !monster.IsAlive) return;
+
+        if (EliteAffixes.TryFrenzy(monster))
+            WriteEliteLine(result, "combat.elite_frenzy", "bright_red", "\u001b[1;31m", monster);
+
+        if (EliteAffixes.Has(monster, EliteAffixes.Commanding) && !monster.EliteCommandShown
+            && EliteAffixes.HasLivingAlly(monster, result.Monsters))
+        {
+            monster.EliteCommandShown = true;
+            WriteEliteLine(result, "combat.elite_command", "yellow", "\u001b[1;33m", monster);
+        }
+
+        if (EliteAffixes.MendTarget(monster, result.Monsters, result.CurrentRound) is Monster ally)
+        {
+            long healed = EliteAffixes.Mend(monster, ally, result.CurrentRound);
+            WriteEliteLine(result, "combat.elite_mend", "green", "\u001b[32m", monster, ally, healed);
+            _eliteMendedThisTurn = monster;
+        }
+    }
+
+    /// <summary>1.2.8: Commanding. The damage of an ally of a living Commanding elite, x1.10 after the
+    /// target's defence and before the caps on a hit; unchanged for every other attacker.</summary>
+    private long CommandedDamage(Monster attacker, CombatResult result, long damage) =>
+        EliteAffixesActive ? EliteAffixes.CommandedDamage(attacker, result.Monsters, damage) : damage;
+
+    /// <summary>1.2.8: Venomous. True when this basic hit of a Venomous elite poisons (one draw, and only
+    /// for a Venomous elite against a target that is not poisoned already).</summary>
+    private bool EliteVenomLands(Monster attacker, Character target) =>
+        EliteAffixesActive && EliteAffixes.VenomLands(attacker, target, random);
+
+    /// <summary>
+    /// 1.2.8: Venomous. The existing Poisoned status through the resist order of a monster ability that
+    /// inflicts a status (immunity, Cyclebreaker, Paladin, Calm Waters), with the existing lines; the
+    /// status is named in the reader's language.
+    /// </summary>
+    private void ApplyEliteVenom(Character target, bool isLeader)
+    {
+        string status = StatusName(StatusEffect.Poisoned);
+        string name = target.DisplayName;
+        if (isLeader ? target.HasStatusImmunity : target.HasStatusImmunity && target.StatusImmunityDuration > 0)
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.iron_will_resists", status) : Loc.Get("combat.companion_iron_will_resists", name, status), "bright_white");
+            return;
+        }
+        if (target.Class == CharacterClass.Cyclebreaker && random.Next(100) < (int)(GameConfig.CyclebreakerDebuffResistChance * 100))
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.probability_negates", status) : Loc.Get("combat.companion_probability_negates", name, status), "bright_magenta");
+            return;
+        }
+        if (target.Class == CharacterClass.Paladin && random.Next(100) < (int)(GameConfig.PaladinDivineResolveStatusResist * 100))
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.divine_resolve", status) : Loc.Get("combat.companion_divine_resolve", name, status), "bright_white");
+            return;
+        }
+        if (target.CalmWatersRounds > 0 && random.Next(100) < (int)(GameConfig.CalmWatersResistChance * 100))
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.calm_waters_deflects", status) : Loc.Get("combat.companion_calm_waters_deflects", name, status), "bright_cyan");
+            return;
+        }
+        target.ApplyStatus(StatusEffect.Poisoned, EliteAffixes.VenomRounds);
+        terminal.WriteLine(isLeader
+            ? Loc.Get("combat.afflicted_with", status)
+            : Loc.Get("combat.companion_afflicted", name, status), "yellow");
+        // a grouped player is told directly, as for the blow itself (the capture of a monster's action is
+        // not sent when it struck a grouped player)
+        if (!isLeader && target.IsGroupedPlayer && target.GroupPlayerUsername != null
+            && GroupSystem.Instance?.GetGroupFor(target.GroupPlayerUsername) is { } group)
+        {
+            GroupSystem.Instance!.BroadcastToGroupSessionsLocalized(group,
+                target.GroupPlayerUsername,
+                lang => GroupLine(lang, "\u001b[33m", "combat.afflicted_with", Loc.GetIn(lang, "status.poisoned")),
+                lang => GroupLine(lang, "\u001b[33m", "combat.companion_afflicted", name, Loc.GetIn(lang, "status.poisoned")),
+                inDungeonOnly: true);
+        }
+    }
+
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
     {
         // 1.2.8: MonsterTactics picks for every fight but an Old God's (BossContext keeps its own picker)
@@ -6105,6 +6244,7 @@ public partial class CombatEngine
                 long abilityDefense = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
                 // v0.57.14: incoming-damage floor now scales with player MaxHP (see GetMinIncomingDamage)
                 long actualDamage = Math.Max(GetMinIncomingDamage(player, abilityResult.DirectDamage), abilityResult.DirectDamage - abilityDefense);
+                actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8
 
                 // Show defense calculation
                 if (abilityDefense > 0)
@@ -6251,6 +6391,7 @@ public partial class CombatEngine
                 long rawLifeStealDamage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                 // v0.57.14: incoming-damage floor scales with player MaxHP
                 long damage = Math.Max(GetMinIncomingDamage(player, rawLifeStealDamage), rawLifeStealDamage - player.Defence);
+                damage = CommandedDamage(monster, result, damage);   // 1.2.8
 
                 // v0.56.1 Old God solo: +15% boss damage, -20% player damage (life-steal ability path)
                 if (isSoloAgainstOldGodAbility)
@@ -6304,6 +6445,7 @@ public partial class CombatEngine
                 long abilityDef = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
                 // v0.57.14: incoming-damage floor scales with player MaxHP
                 long damage = Math.Max(GetMinIncomingDamage(player, rawDamage), rawDamage - abilityDef);
+                damage = CommandedDamage(monster, result, damage);   // 1.2.8
 
                 // Show defense calculation
                 if (abilityDef > 0 && abilityDef < rawDamage)
@@ -21206,6 +21348,7 @@ public partial class CombatEngine
                         // Ability defense: Defence stat + 50% ArmPow (abilities partially bypass armor)
                         long abilityDefense = companion.Defence + (companion.ArmPow / 2);
                         long actualDmg = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
+                        actualDmg = CommandedDamage(monster, result, actualDmg);   // 1.2.8
                         if (abilityDefense > 0)
                         {
                             terminal.SetColor("dark_gray");
@@ -21233,6 +21376,7 @@ public partial class CombatEngine
                         abilityDefense += companion.TempDefenseBonus;
                         long rawAbilityDmg = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                         long dmg = Math.Max(1, rawAbilityDmg - abilityDefense);
+                        dmg = CommandedDamage(monster, result, dmg);   // 1.2.8
                         if (abilityDefense > 0)
                         {
                             terminal.SetColor("dark_gray");
@@ -21413,6 +21557,7 @@ public partial class CombatEngine
         // reason it does for the player — high-tank companions can't tank indefinitely.
         long minDamage = GetMinIncomingDamage(companion, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - companionDefense);
+        actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8: before the caps below
 
         // Show defense calculation
         if (companionDefense > 0 && companionDefense < monsterAttack)
@@ -21480,6 +21625,8 @@ public partial class CombatEngine
 
         terminal.SetColor(ColorRole.Notice);
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion_hp", actualDamage, companion.DisplayName, companion.HP, companion.MaxHP));
+        if (actualDamage > 0 && companion.IsAlive && EliteVenomLands(monster, companion))   // 1.2.8
+            ApplyEliteVenom(companion, isLeader: false);
 
         // Divine Mandate thorn reflect (v0.56.0, NPC tank)
         if (companion.TempThornReflectPercent > 0 && companion.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
