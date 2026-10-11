@@ -375,8 +375,8 @@ public partial class QuestSystem
                 var (family, tier) = MonsterFamilies.GetMonsterForLevel(
                     Math.Min(playerLevel + quest.Difficulty * 3, maxAccessibleFloor), random);
                 // Use base tier name as targetId so it matches OnMonsterKilled tierId
-                // v1.2.5: stored English (quest.title.champion around the English tier); shown in the reader's
-                // language by ShowMonsterArgs, which rebuilds it from the tier in TargetId
+                // v1.2.5: stored English (quest.title.champion around the English tier). ShowMonsterArgs shows
+                // it as the fight name of that tier's champion, in the reader's language, from the tier in TargetId
                 var bossName = Loc.GetIn("en", "quest.title.champion", tier.Name);
                 var bossId = tier.Name.ToLower().Replace(" ", "_");
                 quest.Objectives.Add(QuestObjective.Localized(
@@ -2087,9 +2087,10 @@ public partial class QuestSystem
     /// <summary>
     /// v1.2.5: a kill objective's (or a boss quest's title's) arguments with the monster shown in the reader's
     /// language. The objective stores the monster's English name (TargetName, matched by OnMonsterKilled);
-    /// an argument equal to it, or to its English plural, shows through MonsterNames. A boss quest's champion
-    /// name was written at creation through quest.title.champion in the creator's language around the
-    /// English tier; its tier is the objective's TargetId, so it is written again in the reader's language.
+    /// an argument equal to it, or to its English plural, shows through MonsterNames. A boss quest stores its
+    /// target as quest.title.champion around the English tier (in English, or in the creator's language in an
+    /// older save); its tier is the objective's TargetId. Such an argument shows as the name that tier's
+    /// champion has in a fight (MonsterNames.ChampionOfTier), whatever the stored text says.
     /// Every other argument shows as stored. Nothing is written back.
     /// </summary>
     internal static object[] ShowMonsterArgs(object[] args, QuestObjective? objective)
@@ -2098,29 +2099,29 @@ public partial class QuestSystem
         if (objective.ObjectiveType != QuestObjectiveType.KillSpecificMonster && objective.ObjectiveType != QuestObjectiveType.KillBoss)
             return args;
         string target = objective.TargetName ?? "";
-        string? tier = objective.ObjectiveType == QuestObjectiveType.KillBoss ? TierFromId(objective.TargetId) : null;
+        var tier = objective.ObjectiveType == QuestObjectiveType.KillBoss ? TierFromId(objective.TargetId) : null;
         var shown = (object[])args.Clone();
         for (int i = 0; i < shown.Length; i++)
         {
             if (shown[i] is not string a || a.Length == 0) continue;
-            if (a == target && MonsterNames.KeyOf(target) != null)
+            if (tier != null && Loc.LoadedLanguages.Any(lang => Loc.GetIn(lang, "quest.title.champion", tier.Value.Tier) == a))
+                shown[i] = MonsterNames.ChampionOfTier(tier.Value.Tier, tier.Value.Family);
+            else if (a == target && MonsterNames.KeyOf(target) != null)
                 shown[i] = MonsterNames.Display(target);
             else if (target.Length > 0 && a == GetPluralName(target) && MonsterNames.KeyOf(target) != null)
                 shown[i] = MonsterNames.Count(Math.Max(2, objective.RequiredProgress), target, GetPluralName);
-            else if (tier != null && Loc.LoadedLanguages.Any(lang => Loc.GetIn(lang, "quest.title.champion", tier) == a))
-                shown[i] = Loc.Get("quest.title.champion", MonsterNames.Display(tier));
         }
         return shown;
     }
 
     /// <summary>The English tier name a boss quest's TargetId was made from (tier name, lower case, spaces as
-    /// underscores), or null.</summary>
-    private static string? TierFromId(string? targetId)
+    /// underscores) and the name of the family that holds the tier, or null.</summary>
+    private static (string Tier, string Family)? TierFromId(string? targetId)
     {
         if (string.IsNullOrEmpty(targetId)) return null;
         foreach (var family in MonsterFamilies.GetBuiltInFamilies())
             foreach (var t in family.Tiers)
-                if (t.Name.ToLower().Replace(" ", "_") == targetId) return t.Name;
+                if (t.Name.ToLower().Replace(" ", "_") == targetId) return (t.Name, family.FamilyName);
         return null;
     }
 

@@ -157,7 +157,12 @@ namespace UsurperRemake.BBS
             // Use socket terminal for remote connections
             if (_socketTerminal != null)
             {
-                _socketTerminal.WriteLineAsync(text, color).GetAwaiter().GetResult();
+                // a text with a [colour]...[/] pair is rendered (the test the local branches use); any other
+                // text is sent as it is
+                if (text.Contains("[") && text.Contains("[/]"))
+                    _socketTerminal.WriteMarkupLineAsync(text, color).GetAwaiter().GetResult();
+                else
+                    _socketTerminal.WriteLineAsync(text, color).GetAwaiter().GetResult();
             }
         }
 
@@ -217,7 +222,11 @@ namespace UsurperRemake.BBS
             // Use socket terminal for remote connections
             if (_socketTerminal != null)
             {
-                _socketTerminal.WriteAsync(text, color).GetAwaiter().GetResult();
+                // as WriteLine: a text with a [colour]...[/] pair is rendered, with no line end
+                if (text.Contains("[") && text.Contains("[/]"))
+                    _socketTerminal.WriteMarkupAsync(text, color).GetAwaiter().GetResult();
+                else
+                    _socketTerminal.WriteAsync(text, color).GetAwaiter().GetResult();
             }
         }
 

@@ -112,7 +112,7 @@ public static class MonsterGenerator
     /// <summary>
     /// Get a champion name for a mini-boss based on the base monster name
     /// </summary>
-    private static string GetChampionName(string baseName, string familyName)
+    internal static string GetChampionName(string baseName, string familyName)
     {
         // Check if the name already has a rank suffix
         string[] existingRanks = { "King", "Lord", "Chieftain", "Warlord", "Champion", "Berserker", "Elder" };

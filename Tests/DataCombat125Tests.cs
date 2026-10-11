@@ -354,7 +354,10 @@ public class DataCombat125Tests
         {
             var kill = boss.Objectives.Single(o => o.ObjectiveType == QuestObjectiveType.KillBoss);
             string tier = Tiers().First(t => t.tier.Name.ToLower().Replace(" ", "_") == kill.TargetId).tier.Name;
-            InLang("hu", kill.GetDisplayDescription).Should().Be(L("hu", "quest.objective.defeat_boss", L("hu", "quest.title.champion", MonsterNames.DisplayIn("hu", tier))));
+            // 1.2.8: shown as the name the tier's champion has in a fight
+            string family = MonsterFamilies.AllFamilies.First(f => f.Tiers.Any(t => t.Name == tier)).FamilyName;
+            var champion = new Monster { Name = MonsterGenerator.GetChampionName(tier, family), TierName = tier, FamilyName = family };
+            InLang("hu", kill.GetDisplayDescription).Should().Be(L("hu", "quest.objective.defeat_boss", MonsterNames.DisplayIn("hu", champion)));
             InLang("hu", boss.GetDisplayTitle).Should().Contain(MonsterNames.DisplayIn("hu", tier));
         }
         finally { boss.Deleted = true; }

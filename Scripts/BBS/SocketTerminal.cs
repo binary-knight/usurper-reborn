@@ -1030,6 +1030,29 @@ namespace UsurperRemake.BBS
             await WriteLineAsync();
         }
 
+        /// <summary>
+        /// Write a [colour]...[/] text with its tags rendered: each run of TerminalEmulator.MarkupSegments
+        /// through SetColorAsync and WriteAsync, a pair in its own colour and the rest in baseColor, with
+        /// baseColor set again at the end. No tag is sent. SetColorAsync keeps _currentColor and sends no
+        /// escape code to an ASCII session.
+        /// </summary>
+        public async Task WriteMarkupAsync(string text, string baseColor)
+        {
+            foreach (var (content, color) in TerminalEmulator.MarkupSegments(text))
+            {
+                await SetColorAsync(color ?? baseColor);
+                await WriteAsync(content);
+            }
+            await SetColorAsync(baseColor);
+        }
+
+        /// <summary>WriteMarkupAsync(text, baseColor), then the line end.</summary>
+        public async Task WriteMarkupLineAsync(string text, string baseColor)
+        {
+            await WriteMarkupAsync(text, baseColor);
+            await WriteLineAsync();
+        }
+
         #endregion
 
         /// <summary>
