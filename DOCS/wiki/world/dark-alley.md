@@ -1,8 +1,9 @@
 ---
 title: The Dark Alley
 path: /wiki/en/world/dark-alley/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs
+history: 1.3.0 | The Pit's reckless side bet is labelled 2.5x, the amount it pays.
 history: 1.2.5 | The Pit monster, the street mugger and the Loan Shark enforcer are stored in English and shown in each player's language.
 history: 1.2.4 | In English, the Shadows standing line in the Dark Alley says "use" instead of "access".
 ---
@@ -31,7 +32,7 @@ The Inn has its own tavern games too: High-Low dice, a Skull and Bones tile game
 
 ## The Pit
 
-T enters the Pit, a few fights a day: a bare-knuckle fight without armor, a monster fight for double gold, or a fight with an NPC near your level where the winner takes part of the loser's gold. A Pit loss is an exhibition, not a real death. You can add a side bet.
+T enters the Pit, a few fights a day: a bare-knuckle fight without armor, a monster fight for double gold, or a fight with an NPC near your level where the winner takes part of the loser's gold. A Pit loss is an exhibition, not a real death. You can add a side bet that pays 1.5x, 2x or 2.5x.
 
 ## Pickpocketing
 

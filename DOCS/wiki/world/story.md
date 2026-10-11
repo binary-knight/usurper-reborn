@@ -1,8 +1,9 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.3.0 | A betrayal scene now plays once before one late story fight, and the Temple's Faith room can settle a betrayal afterwards.
 history: 1.2.6 | none
 history: 1.2.5 | The Mysterious Stranger now meets characters from level 3 in town, and the answer you give carries into the Manwe fight; the story is shown in all five languages.
 history: 1.2.4 | In group combat, an Old God's opening line is shown in each player's own language.
@@ -33,7 +34,7 @@ Your choices with the Old Gods, your alignment, the seals and your Awakening dec
 :::spoiler Spoiler: seal floors and the Old Gods
 One seal is in the Temple. The others lie on dungeon floors 15, 30, 45, 60, 80 and 99.
 
-In order: Maelketh on floor 25, Veloura on floor 40, Thorgrim on floor 55, Noctura on floor 70, Aurelion on floor 85, Terravok on floor 95, and Manwe, the Weary Creator, on floor 100. Each of the first six gives an artifact whether it is killed or spared. Maelketh and Thorgrim cannot be saved. Veloura and Aurelion can be spared and later restored with their artifact. Terravok can be awakened. Noctura offers an alliance during the fight, and an ally may not stay loyal after the end. Manwe is met only after all six are resolved, and the final choice comes when his strength fails.
+In order: Maelketh on floor 25, Veloura on floor 40, Thorgrim on floor 55, Noctura on floor 70, Aurelion on floor 85, Terravok on floor 95, and Manwe, the Weary Creator, on floor 100. Each of the first six gives an artifact whether it is killed or spared. Maelketh and Thorgrim cannot be saved. Veloura and Aurelion can be spared and later restored with their artifact. Terravok can be awakened. Noctura offers an alliance during the fight, and an ally may not stay loyal after the end. If she turns on you, a betrayal scene plays once before that fight; afterwards the Faith room of the Temple lists it to forgive, or to avenge once if she escaped the fight. Manwe is met only after all six are resolved, and the final choice comes when his strength fails.
 :::
 
 :::spoiler Spoiler: ending conditions

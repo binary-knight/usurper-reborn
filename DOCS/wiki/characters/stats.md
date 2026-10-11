@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.0 | Physical attacks on monsters roll to hit, with Strength, Dexterity, level, weapon power and basic attack proficiency lowering the number needed against a monster more than 5 levels above you, and Status shows a dual-wielder the weapon power of each hand.
 history: 1.2.6 | none
 history: 1.2.5 | Equip messages and the equipment summary show item names in the player's language.
 history: 1.2.4 | none
@@ -16,6 +17,7 @@ Strength:
 - Your basic attack and Power Attack add Strength plus a quarter of Strength to your damage. Bards and Jesters use Charisma here instead, and Wavecallers use Charisma for Power Attack.
 - Attack abilities of most classes grow 4 percent per point above 10 (see [abilities](/wiki/en/characters/abilities/)).
 - Strength checks outside combat, such as forcing open dungeon features and arm wrestling at the Inn.
+- The [hit roll](/wiki/en/combat/#the-hit-roll) of a physical attack, only against a monster more than 5 levels above you: Strength lowers the number you need.
 
 Dexterity:
 
@@ -25,6 +27,7 @@ Dexterity:
 - Fleeing a monster fight: 40 percent plus half your Dexterity plus a third of your level, with class bonuses. Bosses use their own odds.
 - Backstab, Hide and Disarm success, many dungeon traps and several street and Dark Alley checks.
 - A smaller share of attack ability scaling.
+- The [hit roll](/wiki/en/combat/#the-hit-roll) of a physical attack, only against a monster more than 5 levels above you: Dexterity lowers the number you need.
 
 Agility:
 
@@ -85,6 +88,7 @@ Stamina, the stat, sets your combat stamina, the pool that pays for martial abil
 ## Resources
 
 - HP is your current health. Maximum HP is your capacity, not your current health.
+- When you dual wield, Status shows the weapon power of your main hand and of your off hand. Each swing uses the weapon in its own hand.
 - Mana pays for spells and some abilities; only spellcasting classes have mana.
 
 ## Character creation

@@ -1,8 +1,9 @@
 ---
 title: Castle, king and throne
 path: /wiki/en/world/castle/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Locations/CastleLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/King.cs, Scripts/Systems/ChallengeSystem.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/DailySystemManager.cs
+history: 1.3.0 | An NPC on a player's team is no longer picked to challenge an NPC ruler or to be crowned on an empty throne, and one kill advances a royal quest objective once.
 history: 1.2.5 | A player in any language can no longer take a second royal quest, and a royal quest to clear a dungeon floor now asks you to clear a floor.
 history: 1.2.4 | none
 ---
@@ -21,7 +22,7 @@ There are two ways to the throne, and both need a minimum level that the menu sh
 - **Claim an empty throne.** When no one rules, the menu offers C to claim it. You start a fresh court with a starting treasury.
 - **Challenge the ruler.** When someone rules, press I to infiltrate the castle. You fight the monster guards, then the hired guards, then the ruler, who fights with extra HP and defence. You can try once a day, not within a day of a new coronation, and not when the ruler is too many levels above you.
 
-You must leave your team before you take the throne, and the game asks first. If you lose, you are thrown out to Main Street alive. If you win, you inherit the treasury, prisoners and orphans, but not the guards. Online, a ruler who is offline defends with an AI copy of their character, and a team can besiege the castle with B instead. NPCs with ambition can challenge a player ruler as well; a failed challenger goes to prison.
+You must leave your team before you take the throne, and the game asks first. If you lose, you are thrown out to Main Street alive. If you win, you inherit the treasury, prisoners and orphans, but not the guards. Online, a ruler who is offline defends with an AI copy of their character, and a team can besiege the castle with B instead. NPCs with ambition can challenge a player ruler as well; a failed challenger goes to prison. An NPC on a player's team is not picked to challenge an NPC ruler, and is not crowned on an empty throne as the named heir or as a claimant.
 
 ## Powers and duties of the ruler
 

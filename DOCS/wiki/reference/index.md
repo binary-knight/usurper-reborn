@@ -1,8 +1,9 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Systems/WikiDataExporter.cs
+history: 1.3.0 | The generated spell table shows the level at which a spell can be learned and cast and the mana a cast costs before Wisdom.
 history: 1.2.5 | Generated item, monster, specialization, achievement and Old God names are exported in all five languages.
 ---
 - [Balance rules](/wiki/en/reference/balance/)

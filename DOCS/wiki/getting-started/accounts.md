@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md
+history: 1.3.0 | Online Play in the standalone game saves a login token in place of your password when you choose to stay logged in, asks before the login is sent, and checks the server's identity key over SSH.
 history: 1.2.7 | The game can ask once whether to share combat data: single-player and Steam at start, BBS and server players after login when the operator allows it, and Preferences has a Share combat data line to change the answer.
 history: 1.2.6 | An unknown username and a wrong password get the same login message, a banned account sees its ban only after the right password, a refused registration counts toward the login throttle, and new character names cannot contain < > & or a double quote.
 history: 1.2.5 | The SSH login screen gains G to change its language, and the default message of the day and the idle warning show in your language.
@@ -15,7 +16,7 @@ An online account is a username and a password kept by the game server. The brow
 
 - **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen.
 - **SSH.** The SSH gateway uses one shared gateway login, published with the connection instructions. It is not your account. After it, a login screen with the same L, R, G and Q choices asks for your own username and password. Its G changes the language of these login screens only; it is not saved to an account registered there.
-- **The standalone game.** O (Online Multiplayer) on the main menu offers the official server or a server address and port you type in. Its own login menu has L, R and Q, and uses the language the game is already set to. After you log in it offers to remember your login on this computer: Y, N, or D to stop asking.
+- **The standalone game.** O (Online Multiplayer) on the main menu offers the official server or a server address and port you type in. Its own login menu has L, R and Q, and uses the language the game is already set to. When the server can keep you logged in, the game asks "Stay logged in on this computer?" after you type your username and password and before the login is sent: Y, N, or D to stop asking. See [staying logged in](#staying-logged-in).
 
 Registration rules:
 
@@ -27,7 +28,18 @@ A login with an unknown username and a login with a wrong password get the same 
 
 The language you chose on the login screen is saved to a new account. Online, your screen reader setting and language belong to the account and come back at your next login. Only one connection per account plays at a time: logging in again replaces the older session.
 
-P on the character screen changes your password. It asks for the current one first.
+P on the character screen changes your password. It asks for the current one first. A new password ends every saved login of the account.
+
+## Staying logged in
+
+This applies to O (Online Multiplayer) in the standalone game.
+
+- A yes saves a login token from the server, not your password. The token is kept in your own user folder and is used only for the server and port it came from.
+- A token expires after 90 days. It ends at once when the password is changed or reset, or when the account is banned or deleted.
+- A password saved by a version before 1.3.0 is used once for its own server and then erased from the disk.
+- A server older than 1.3.0 cannot keep you logged in; the game asks for the password there.
+
+Over SSH the game also checks the server's identity key. The official server's key fingerprints ship with the game, and any other key is refused there. For another server the key is remembered on the first connection; if it changes later the connection is refused, and the message names the file and the line to delete if the server's owner confirms the new key.
 
 ## Character slots online
 

@@ -1,8 +1,9 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
+history: 1.3.0 | When you dual wield, each swing uses the weapon in its own hand and Status shows the weapon power of each hand, and the loot comparison for a shield warns when the shield would take off the weapon your spells or abilities need.
 history: 1.2.7 | none
 history: 1.2.6 | none
 history: 1.2.5 | Equipment and backpack rows mark weapons [1H] or [2H] and armor weight as [Lgt], [Med] or [Hvy], with stats separated by spaces.
@@ -43,11 +44,12 @@ The inventory screen groups the slots in three sections. The key before each slo
 There are two weapon slots, Main Hand and Off Hand. Each weapon is one-handed, two-handed or off-hand only. Shields, bucklers and tower shields are off-hand only.
 
 - A one-handed weapon can go in either hand.
-- Two one-handed weapons and no shield is dual wielding.
+- Two one-handed weapons and no shield is dual wielding. Each swing uses the weapon in its own hand, the off-hand swing deals half damage, and Status shows the weapon power of each hand.
 - A two-handed weapon fills both hands. Equipping one moves whatever was in both hands to your inventory.
 - Equipping a shield while you hold a two-handed weapon takes the two-handed weapon off.
 - A one-handed weapon cannot go in the off hand while you hold a two-handed weapon; the game refuses with a message.
 - Staves, mauls, polearms and bows always count as two-handed.
+- When loot offers a shield, the comparison warns if the shield would take off the weapon your class's spells or abilities need.
 
 ## Rings
 

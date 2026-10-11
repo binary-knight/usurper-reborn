@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.2.7";
-    public const string VersionName = "Devotion"; // 1.2 line: Mental Health, the Sage and the gods
+    public const string Version = "1.3.0";
+    public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
