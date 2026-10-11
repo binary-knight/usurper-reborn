@@ -337,6 +337,47 @@ public partial class Quest
     }
 
     /// <summary>
+    /// Update progress for one event that answers to two target ids (a monster's name and its base tier).
+    /// An objective is ticked once when it names either id or names no target, and never twice.
+    /// An empty altTargetId is ignored; an empty targetId matches every objective of the type.
+    /// </summary>
+    public void UpdateObjectiveProgress(QuestObjectiveType type, int amount, string targetId, string altTargetId)
+    {
+        foreach (var objective in Objectives.Where(o => o.ObjectiveType == type && !o.IsComplete))
+        {
+            bool matchesAny = string.IsNullOrEmpty(objective.TargetId) || string.IsNullOrEmpty(targetId);
+            bool matchesId = string.Equals(objective.TargetId, targetId, StringComparison.OrdinalIgnoreCase)
+                || (!string.IsNullOrEmpty(altTargetId) && string.Equals(objective.TargetId, altTargetId, StringComparison.OrdinalIgnoreCase));
+            if (!matchesAny && !matchesId) continue;
+
+            objective.CurrentProgress += amount;
+            if (objective.CurrentProgress >= objective.RequiredProgress)
+            {
+                objective.CurrentProgress = objective.RequiredProgress;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Update progress only for objectives that name this target. An objective with no target is not
+    /// ticked, and an empty targetId ticks nothing.
+    /// </summary>
+    public void UpdateTargetedObjectiveProgress(QuestObjectiveType type, int amount, string targetId)
+    {
+        if (string.IsNullOrEmpty(targetId)) return;
+        foreach (var objective in Objectives.Where(o => o.ObjectiveType == type && !o.IsComplete))
+        {
+            if (!string.Equals(objective.TargetId, targetId, StringComparison.OrdinalIgnoreCase)) continue;
+
+            objective.CurrentProgress += amount;
+            if (objective.CurrentProgress >= objective.RequiredProgress)
+            {
+                objective.CurrentProgress = objective.RequiredProgress;
+            }
+        }
+    }
+
+    /// <summary>
     /// Human-readable reward description string – e.g. "High Gold", "Medium Experience".
     /// </summary>
     public string GetRewardDescription()

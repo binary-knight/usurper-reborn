@@ -7711,7 +7711,7 @@ public partial class CombatEngine
             UsurperRemake.Server.RoomRegistry.BroadcastActionLocalized(lang =>
                 Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, MonsterNames.Display(result.Monster)));
 
-        QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss, result.Monster.TierName);
+        QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss, result.Monster.TierName, result.Monster.IsMiniBoss);
 
         // Calculate rewards (Pascal-compatible) with world event and difficulty modifiers
         long baseExpReward = result.Monster.GetExperienceReward();
@@ -22170,7 +22170,7 @@ public partial class CombatEngine
             // Update quest progress for each monster killed
             // ONLY actual floor bosses count for boss-related tracking
             bool isBoss = monster.IsBoss;
-            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBoss, monster.TierName);
+            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBoss, monster.TierName, monster.IsMiniBoss);
 
             // Calculate exp reward based on level difference
             long baseExp = monster.Experience;
@@ -22858,7 +22858,7 @@ public partial class CombatEngine
             result.Player.MKills++;
             RecordFirstKillFunnel(result.Player);
             result.Player.Statistics?.RecordMonsterKill(baseExp, goldReward, isBossPV, monster.IsUnique);
-            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBossPV, monster.TierName);
+            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBossPV, monster.TierName, monster.IsMiniBoss);
             ArchetypeTracker.Instance.RecordMonsterKill(monster.Level, monster.IsUnique);
         }
 
@@ -32644,7 +32644,7 @@ public partial class CombatEngine
                     monster.IsBoss, monster.IsUnique);
 
                 // Update quest progress for grouped player (kill quests, bounties, etc.)
-                QuestSystem.OnMonsterKilled(groupedPlayer, monster.Name, monster.IsBoss, monster.TierName);
+                QuestSystem.OnMonsterKilled(groupedPlayer, monster.Name, monster.IsBoss, monster.TierName, monster.IsMiniBoss);
             }
             groupedPlayer.Statistics.RecordGoldChange(groupedPlayer.Gold);
 

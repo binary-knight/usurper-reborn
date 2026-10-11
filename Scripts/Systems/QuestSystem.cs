@@ -1515,7 +1515,7 @@ public partial class QuestSystem
         }
     }
 
-    public static void OnMonsterKilled(Character player, string monsterName, bool isBoss = false, string tierName = "")
+    public static void OnMonsterKilled(Character player, string monsterName, bool isBoss = false, string tierName = "", bool isMiniBoss = false)
     {
         var playerQuests = GetPlayerQuests(player.Name2);
         string nameId = monsterName.ToLower().Replace(" ", "_");
@@ -1526,22 +1526,20 @@ public partial class QuestSystem
         {
             // Update kill monster objectives
             quest.UpdateObjectiveProgress(QuestObjectiveType.KillMonsters, 1);
-            quest.UpdateObjectiveProgress(QuestObjectiveType.KillSpecificMonster, 1, nameId);
-
-            // Also try matching by base tier name (champion/boss variants should count)
-            if (!string.IsNullOrEmpty(tierId) && tierId != nameId)
-            {
-                quest.UpdateObjectiveProgress(QuestObjectiveType.KillSpecificMonster, 1, tierId);
-            }
+            // The kill counts for an objective that names the monster or its base tier (champion and boss
+            // variants count for their tier). One kill ticks each objective once, also one with no target.
+            quest.UpdateObjectiveProgress(QuestObjectiveType.KillSpecificMonster, 1, nameId, tierId);
 
             // Update boss kill objectives
             if (isBoss)
             {
-                quest.UpdateObjectiveProgress(QuestObjectiveType.KillBoss, 1, nameId);
-                if (!string.IsNullOrEmpty(tierId) && tierId != nameId)
-                {
-                    quest.UpdateObjectiveProgress(QuestObjectiveType.KillBoss, 1, tierId);
-                }
+                quest.UpdateObjectiveProgress(QuestObjectiveType.KillBoss, 1, nameId, tierId);
+            }
+            else if (isMiniBoss)
+            {
+                // A champion (mini-boss) counts only for a boss objective that names its tier, such as the
+                // board quest for that tier's champion. A boss objective with no target needs a floor boss.
+                quest.UpdateTargetedObjectiveProgress(QuestObjectiveType.KillBoss, 1, tierId);
             }
         }
     }
@@ -1683,15 +1681,12 @@ public partial class QuestSystem
                 string targetLower = quest.TargetNPCName.ToLower().Replace(" ", "_");
                 if (targetLower == npcNameLower || quest.TargetNPCName.Equals(npcName, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Mark the DefeatNPC objective as complete
-                    quest.UpdateObjectiveProgress(QuestObjectiveType.DefeatNPC, 1, npcName);
-
-                    // Also mark the quest as having activity (for legacy validation)
+                    // Mark the quest as having activity (for legacy validation)
                     quest.OccupiedDays = Math.Max(1, quest.OccupiedDays);
                 }
             }
 
-            // Generic NPC defeat objectives
+            // NPC defeat objectives, a bounty's own included: one defeat ticks each objective once
             quest.UpdateObjectiveProgress(QuestObjectiveType.DefeatNPC, 1, npcName);
         }
 
