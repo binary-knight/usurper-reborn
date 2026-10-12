@@ -17,7 +17,7 @@ Chosen characters can receive remarks about their god's mark. NPC faith also con
 
 ## Loss and grief
 
-The death of a companion, teammate, spouse or lover can cause Mental loss and grief. Grief stages have their own consequences; a replacement party member is not an immediate cure for the relationship's loss.
+The death of a companion, teammate, spouse or lover can cause Mental loss and grief. Grief stages have their own consequences, listed in the [Mental guide](/wiki/en/characters/mental/#grief); a replacement party member is not an immediate cure for the relationship's loss.
 
 A hired NPC or an NPC friend in your dungeon party who falls in your fight and will recover is carried out to mend. If that NPC is your spouse, lover or affair partner, the marriage or romance is not ended; it ends only when the NPC is lost for good.
 

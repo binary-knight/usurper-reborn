@@ -25,7 +25,7 @@ The Old Gods are ancient bosses deep in the dungeon. Each encounter needs a mini
 
 ## The Awakening
 
-The Awakening measures what your character comes to understand. It rises through stages from loss, mercy and wonder: companions, sparing a beaten foe, dreams, visions, discoveries, Wave Fragments and the songs of the Old Gods. Each stage brings a small lasting boon. Read your Ocean Journal from Main Street: Status district, then Progress. The last stage has its own condition, which the journal describes.
+The Awakening measures what your character comes to understand. It rises through stages from loss, mercy and wonder: companions, sparing a beaten foe, dreams, visions, discoveries, Wave Fragments and the songs of the Old Gods. Each stage brings a small lasting boon, listed under [Awakening boons](/wiki/en/characters/stats/#awakening-boons). Read your Ocean Journal from Main Street: Status district, then Progress. The last stage has its own condition, which the journal describes.
 
 ## Endings
 

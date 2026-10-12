@@ -55,6 +55,7 @@ public static class WikiDataExporter
         Write(outputDir, "balance", Balance());
         Write(outputDir, "achievements", Achievements());
         Write(outputDir, "bosses", Bosses());
+        Write(outputDir, "characters", Characters());
 
         File.WriteAllText(Path.Combine(outputDir, "meta.json"), JsonSerializer.Serialize(new
         {
@@ -177,6 +178,14 @@ public static class WikiDataExporter
                 .ToArray(),
             startingAttributes = entry.Value,
             growthPerLevel = ClassGrowth(entry.Key),
+            // 1.3.1 wiki depth: what the game itself holds for a class: whether it has mana, the roles it lists
+            // (a starting class through its specializations, a prestige class through the fallback list of
+            // SpecializationData.GetDefaultRolesForClass), the training points of a level before Intelligence
+            // and Wisdom, and what it may equip
+            usesMana = new Character { Class = entry.Key }.IsManaClass,
+            defaultRoles = SpecializationData.GetDefaultRolesForClass(entry.Key),
+            trainingPointsPerLevel = TrainingSystem.CalculateTrainingPointsPerLevel(new Character { Class = entry.Key }),
+            equipment = ClassEquipment(entry.Key),
             specializations = SpecializationData.GetSpecsForClass(entry.Key).OrderBy(s => s.Spec)
                 .Select(spec => new
                 {
@@ -222,6 +231,142 @@ public static class WikiDataExporter
             agility = character.BaseAgility - baseline
         };
     }
+
+    /// <summary>
+    /// 1.3.1 wiki depth: what a class may equip, asked of the game's own check (Equipment.CanEquip) on the items
+    /// the shops stock (ShopItemGenerator.GenerateAllShopItems, built from the weapon and shield templates loot
+    /// uses too). The probe character is level 100 with Strength far above any requirement, so only the class
+    /// list, the Mystic Shaman main hand rule and the prestige bypass decide. Counts are templates, not items:
+    /// one template gives one shop item per level step. Bows are left out: four bow names exist twice in the
+    /// templates with different class lists, and a dropped bow is matched to a template by name alone.
+    /// </summary>
+    private static object ClassEquipment(CharacterClass characterClass)
+    {
+        var probe = new Character
+        {
+            Class = characterClass, Race = CharacterRace.Human, Level = GameConfig.MaxLevel,
+            Strength = int.MaxValue, BaseStrength = int.MaxValue
+        };
+        var stock = ShopStock.Value;
+        return new
+        {
+            // a body piece of each weight with no class list and no requirement, put to the same check
+            armorWeights = Enum.GetValues<ArmorWeightClass>().Where(w => w != ArmorWeightClass.None
+                && new Equipment { Slot = EquipmentSlot.Body, WeightClass = w }.CanEquip(probe, out _)).ToArray(),
+            weapons = TemplateCounts(stock.Where(e => e.Slot == EquipmentSlot.MainHand), probe),
+            shields = TemplateCounts(stock.Where(e => e.Slot == EquipmentSlot.OffHand), probe)
+        };
+    }
+
+    private static readonly Lazy<List<Equipment>> ShopStock = new(() => ShopItemGenerator.GenerateAllShopItems()
+        .Where(e => e.WeaponType != WeaponType.None && e.WeaponType != WeaponType.Bow).ToList());
+
+    private static object TemplateCounts(IEnumerable<Equipment> items, Character probe) => items
+        .GroupBy(e => e.WeaponType).OrderBy(g => g.Key)
+        .Select(g => new
+        {
+            type = g.Key,
+            usable = g.Where(e => e.CanEquip(probe, out _)).Select(e => e.Family).Distinct().Count(),
+            total = g.Select(e => e.Family).Distinct().Count()
+        }).ToArray();
+
+    /// <summary>
+    /// 1.3.1 wiki depth: character rules that are data or public functions: proficiency tiers, the experience
+    /// of each level, the weapon and shield templates with their class lists, the armour type weights, and the
+    /// named constants the Characters guides print through directives.
+    /// </summary>
+    private static object Characters()
+    {
+        var weaponTemplates = LootGenerator.GetWeaponTemplates();
+        return new
+        {
+            proficiency = Enum.GetValues<TrainingSystem.ProficiencyLevel>().Select(level => new
+            {
+                id = level.ToString(),
+                effectMultiplier = TrainingSystem.GetEffectMultiplier(level),
+                rollModifier = TrainingSystem.GetRollModifier(level),
+                failureChance = TrainingSystem.GetFailureChance(level),
+                // the tier above costs (progress needed) x (training points per progress); none above Legendary
+                trainingPointsToNext = level == TrainingSystem.ProficiencyLevel.Legendary
+                    ? (int?)null : TrainingSystem.GetTotalCostToNextLevel(level, 0),
+                improveByUseChance = TrainingSystem.GetCombatImprovementChance(level)
+            }).ToArray(),
+            experienceByLevel = Enumerable.Range(1, GameConfig.MaxLevel).Select(level => new
+            {
+                level,
+                totalExperience = GameConfig.GetExperienceForLevel(level),
+                killExperienceMultiplier = Math.Round(GameConfig.GetEarlyGameXPMultiplier(level), 2)
+            }).ToArray(),
+            // the weapon type and the hands are decided as the shop decides them: by name
+            // (ShopItemGenerator.InferWeaponType), two hands from LootGenerator.TwoHandedWeaponStartIndex on
+            weaponTemplates = weaponTemplates.Select((t, index) => (t, type: ShopItemGenerator.InferWeaponType(t.Name), index))
+                .Where(x => x.type != WeaponType.Bow)
+                .Select(x => new
+                {
+                    name = x.t.Name, weaponType = x.type,
+                    handedness = x.index >= LootGenerator.TwoHandedWeaponStartIndex
+                        ? WeaponHandedness.TwoHanded : ShopItemGenerator.InferHandedness(x.type),
+                    classes = x.t.Classes, minLevel = x.t.MinLevel, maxLevel = x.t.MaxLevel
+                }).ToArray(),
+            shieldTemplates = LootGenerator.GetShieldTemplates().Select(t => new
+            {
+                name = t.Name, weaponType = ShopItemGenerator.InferShieldType(t.Name),
+                classes = t.Classes, minLevel = t.MinLevel, maxLevel = t.MaxLevel
+            }).ToArray(),
+            armorTypeWeights = Enum.GetValues<ArmorType>().Where(a => a != ArmorType.None)
+                .Select(a => new { armorType = a, weightClass = a.GetWeightClass() }).ToArray(),
+            constants = CharacterConstants()
+        };
+    }
+
+    private static SortedDictionary<string, object?> CharacterConstants()
+    {
+        var constants = Named(typeof(GameConfig), string.Empty,
+            nameof(GameConfig.AlchemistPotionMasteryBonus), nameof(GameConfig.HerbHealPercent),
+            nameof(GameConfig.HerbBuffDuration), nameof(GameConfig.HerbSwiftDuration),
+            nameof(GameConfig.MagicianArcaneSpellBonus), nameof(GameConfig.ClericDivineGraceBonus),
+            nameof(GameConfig.PaladinDivineResolveDamageBonus), nameof(GameConfig.PaladinDivineResolveStatusResist),
+            nameof(GameConfig.BardInspirationChance), nameof(GameConfig.BardInspirationAttackBonus),
+            nameof(GameConfig.BardInspirationDuration), nameof(GameConfig.JesterTrickstersLuckChance),
+            nameof(GameConfig.JesterLuckBonusDamage), nameof(GameConfig.JesterLuckStaminaRefund),
+            nameof(GameConfig.AssassinLethalPrecisionCritBonus), nameof(GameConfig.AssassinLethalPrecisionPoisonBonus),
+            nameof(GameConfig.ShamanEnchantBaseDamage), nameof(GameConfig.ShamanElementalMastery),
+            nameof(GameConfig.ShamanEnchantPowerCap), nameof(GameConfig.ShamanEnchantDuration),
+            nameof(GameConfig.ShamanTotemBaseDuration), nameof(GameConfig.ShamanTotemHealPercent),
+            nameof(GameConfig.ShamanTotemHealPercentGroup), nameof(GameConfig.ShamanWindfuryProcChance),
+            nameof(GameConfig.ShamanSpiritLinkPercent), nameof(GameConfig.TideswornOceansBlessingBonus),
+            nameof(GameConfig.TideswornOceansResiliencePercent), nameof(GameConfig.TideswornOceansResilienceBelowHalfBonus),
+            nameof(GameConfig.WavecallerHarmonicResonanceBonus), nameof(GameConfig.WavecallerOceansVoiceCritBonus),
+            nameof(GameConfig.WavecallerReflectionPercent), nameof(GameConfig.CalmWatersShieldDuration),
+            nameof(GameConfig.CalmWatersResistChance), nameof(GameConfig.CyclebreakerPassiveEvadePercent),
+            nameof(GameConfig.CyclebreakerDebuffResistChance), nameof(GameConfig.CyclebreakerCycleXPBonus),
+            nameof(GameConfig.CyclebreakerCycleXPBonusCap), nameof(GameConfig.AbysswardenAbyssalSiphonPercent),
+            nameof(GameConfig.AbysswardenPrisonWardResist), nameof(GameConfig.AbysswardenCorruptionHealPercent),
+            nameof(GameConfig.VoidreaverVoidHungerPercent), nameof(GameConfig.VoidreaverSoulEaterManaPercent),
+            nameof(GameConfig.VoidreaverPainThresholdBonus), nameof(GameConfig.VoidreaverReflectionPercent),
+            nameof(GameConfig.HealerSpecHealBonus), nameof(GameConfig.SoftTauntStickChance),
+            nameof(GameConfig.BossChannelInterruptChance), nameof(GameConfig.BossChannelInterruptSpeedThreshold),
+            nameof(GameConfig.RespecBaseGoldCost), nameof(GameConfig.RespecGoldPerLevel),
+            nameof(GameConfig.NPCProficiencyCap), nameof(GameConfig.CompanionProficiencyCap),
+            nameof(GameConfig.DefaultStartingGold), nameof(GameConfig.DefaultStartingHealing),
+            nameof(GameConfig.MaxLevel));
+        // the Awakening boons, as AwakeningBonusWisdom1 and so on
+        foreach (var entry in Named(typeof(AwakeningBonus), nameof(AwakeningBonus),
+            nameof(AwakeningBonus.Wisdom1), nameof(AwakeningBonus.Mana2), nameof(AwakeningBonus.XP3),
+            nameof(AwakeningBonus.HP4), nameof(AwakeningBonus.Damage5), nameof(AwakeningBonus.Defense6),
+            nameof(AwakeningBonus.Stage7Extra)))
+            constants[entry.Key] = entry.Value;
+        return constants;
+    }
+
+    /// <summary>Named public constants of a type, by exact name; a name that is not a constant fails the export.</summary>
+    private static SortedDictionary<string, object?> Named(Type type, string prefix, params string[] names) =>
+        new(names.ToDictionary(n => prefix + n, n =>
+        {
+            var field = type.GetField(n, BindingFlags.Public | BindingFlags.Static);
+            if (field == null || !field.IsLiteral) throw new InvalidOperationException(type.Name + "." + n);
+            return field.GetRawConstantValue();
+        }));
 
     private static object Races() => GameConfig.RaceAttributes.OrderBy(x => x.Key)
         .Select(entry => new
