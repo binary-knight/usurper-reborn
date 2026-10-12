@@ -69,7 +69,7 @@ namespace UsurperRemake.Systems
             if (story.HasStoryFlag("aurelion_saved")) savedGods++;
             if (story.HasStoryFlag("aurelion_destroyed")) destroyedGods++;
             // Terravok - God of Earth
-            if (story.HasStoryFlag("terravok_awakened")) savedGods++;
+            if (story.HasStoryFlag("terravok_saved")) savedGods++;
             if (story.HasStoryFlag("terravok_destroyed")) destroyedGods++;
             // Noctura - Goddess of Night
             if (story.HasStoryFlag("noctura_ally")) savedGods++;
@@ -138,7 +138,7 @@ namespace UsurperRemake.Systems
             if (story.HasStoryFlag("veloura_saved")) sparedGods++;
             if (story.HasStoryFlag("aurelion_saved")) sparedGods++;
             if (story.HasStoryFlag("noctura_ally")) sparedGods++;
-            if (story.HasStoryFlag("terravok_awakened")) sparedGods++;
+            if (story.HasStoryFlag("terravok_saved")) sparedGods++;
             if (sparedGods < 2)
                 return false;
 
