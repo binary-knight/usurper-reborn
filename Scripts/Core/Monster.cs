@@ -550,9 +550,6 @@ public class Monster
             baseExp *= 5;
         }
 
-        // Apply difficulty modifier
-        baseExp = DifficultySystem.ApplyExperienceMultiplier(baseExp);
-
         return Math.Max(15, baseExp);
     }
     
@@ -602,9 +599,6 @@ public class Monster
         {
             baseGold *= 5; // Unique = 5x gold (stacks with boss)
         }
-
-        // Apply difficulty modifier
-        baseGold = DifficultySystem.ApplyGoldMultiplier(baseGold);
 
         return Math.Max(10, baseGold);
     }
