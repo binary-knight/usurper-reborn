@@ -109,6 +109,7 @@ function loadData(dir) {
     "balance",
     "achievements",
     "bosses",
+    "characters",
   ]) {
     const file = JSON.parse(
       fs.readFileSync(path.join(dir, kind + ".json"), "utf8"),
@@ -149,6 +150,31 @@ function loadData(dir) {
   for (const e of [...data.items, ...data.abilities])
     for (const c of e.classes)
       if (!classes.has(c)) throw Error(`Unknown class: ${c}`);
+  // 1.3.1: character rules exported from public functions and the weapon and shield templates
+  const ch = data.characters;
+  for (const key of [
+    "proficiency",
+    "experienceByLevel",
+    "weaponTemplates",
+    "shieldTemplates",
+    "armorTypeWeights",
+  ])
+    if (!Array.isArray(ch[key]) || !ch[key].length)
+      throw Error(`Empty dataset: characters/${key}`);
+  if (!ch.constants || !Object.keys(ch.constants).length)
+    throw Error("Empty dataset: characters/constants");
+  for (const t of [...ch.weaponTemplates, ...ch.shieldTemplates])
+    for (const c of t.classes)
+      if (c !== "All" && !classes.has(c))
+        throw Error(`Unknown template class: ${t.name}/${c}`);
+  for (const c of data.classes)
+    if (
+      !c.equipment ||
+      !Array.isArray(c.equipment.weapons) ||
+      !Array.isArray(c.equipment.shields) ||
+      !Array.isArray(c.equipment.armorWeights)
+    )
+      throw Error(`Missing class equipment: ${c.id}`);
   return { meta, data };
 }
 function renderers(data) {
@@ -168,7 +194,116 @@ function renderers(data) {
     ...data.balance.godConstants,
     ...data.mental.constants,
     ...data.gods.favorRules,
+    ...data.characters.constants,
   };
+  const className = (id) => name(data.classes.find((c) => c.id === id));
+  // "All" in a template's class list means no class list; every class may use it
+  const templateClasses = (t) =>
+    t.classes.includes("All")
+      ? "Every class"
+      : escape(t.classes.map(className).join(", "));
+  const typeLabel = (type) => label(type);
+  // Abilities whose effect turns monsters onto the user: CombatEngine.ApplyAbilityEffectsMultiMonster
+  // cases aoe_taunt, undertow, abyssal_anchor and eternal_vigil, and ApplyTankTauntAndBuff for the
+  // three level 40 abilities. A list here, because the template holds only the effect name.
+  const tauntEffects = new Set([
+    "aoe_taunt",
+    "shield_wall_formation",
+    "divine_mandate",
+    "rage_challenge",
+    "undertow",
+    "abyssal_anchor",
+    "eternal_vigil",
+  ]);
+  // The class healing bonus on abilities (ClassAbilitySystem.UseAbility), by class
+  // classes whose equipment limits the guides do not state yet
+  const heldEquipmentClasses = new Set(["MysticShaman"]);
+  const classHealBonus = {
+    Alchemist: "AlchemistPotionMasteryBonus",
+    Cleric: "ClericDivineGraceBonus",
+    Tidesworn: "TideswornOceansBlessingBonus",
+    Wavecaller: "WavecallerHarmonicResonanceBonus",
+  };
+  // Mental gains by source, each a GameConfig constant; the label says where the game applies it
+  const mentalRecovery = [
+    ["MentalDailyReset", "A new day"],
+    ["MentalDungeonCampGain", "Dungeon camp"],
+    ["MentalSafeHavenGain", "Safe Haven rest"],
+    ["MentalInnTableGain", "Inn table rest"],
+    ["MentalInnFriendGain", "Inn table rest with a friend present"],
+    ["MentalInnSleepGain", "Inn sleep or a rented room"],
+    ["MentalHomeRestGain", "Home rest"],
+    ["MentalHomeSleepGain", "Home sleep"],
+    ["MentalSpouseGain", "Time with your spouse"],
+    ["MentalTemplePrayerGain", "Temple daily prayer"],
+    ["MentalConfessionGain", "Church confession"],
+    ["MentalFriendTalkGain", "Talking with a friend"],
+    ["MentalWildernessGain", "First wilderness exploration of the day"],
+    ["MentalLearningGain", "Learning: a new spell, a training session or Library reading"],
+    ["MentalWillowDraughtGain", "Willow Draught, drunk in the dungeon"],
+    ["MentalRehabGain", "Addiction Rehab at the Healer"],
+    ["MentalGriefAcceptanceGain", "A grief reaching Acceptance"],
+  ];
+  const abilityCost = (a) =>
+    [
+      a.staminaCost ? `${a.staminaCost} stamina` : "",
+      a.manaCost ? `${a.manaCost} mana` : "",
+    ]
+      .filter(Boolean)
+      .join(" and ") || "no cost";
+  const abilityLine = (a) =>
+    `${link("characters/abilities", a)} (level ${a.levelRequired}, ${abilityCost(a)}, cooldown ${a.cooldown} rounds${a.requiresShield ? ", needs a shield" : ""})`;
+  function classRoles() {
+    return data.classes
+      .map((c) => {
+        const mine = data.abilities
+          .filter((a) => a.classes.includes(c.id))
+          .sort((a, b) => a.levelRequired - b.levelRequired);
+        const list = (items) =>
+          items.length ? items.map(abilityLine).join("; ") : "none";
+        const g = c.growthPerLevel;
+        const roles = c.specializations.length
+          ? `The game lists these roles through its specializations: ${c.specializations.map((s) => `${escape(name(s))} is ${escape(s.role)}`).join(", ")}.`
+          : `The class has no specialization; where the game lists roles for it, it lists ${escape(c.defaultRoles.join(" and "))}.`;
+        const heal = classHealBonus[c.id]
+          ? ` Its abilities heal ${Math.round(constants[classHealBonus[c.id]] * 100)} percent more.`
+          : "";
+        return (
+          // level four: the search index weighs h2 and h3 words, and a class name in seventeen
+          // headings would pull every question that names a class to this page
+          `<h4 id="${slug(name(c))}-role-numbers">${escape(name(c))} role numbers</h4>` +
+          `<p>${escape(name(c))} gains ${g.maxHP} maximum HP, ${g.defence} Defence and ${g.maxMana} maximum mana per level, before specialization. ` +
+          `${c.usesMana ? "It has mana." : "It has no mana and pays for abilities with combat stamina."} ` +
+          `${heldEquipmentClasses.has(c.id) ? "" : `Armor weights it can wear: ${escape(c.equipment.armorWeights.join(", "))}. `}${roles}${heal}</p>` +
+          `<p>Taunt abilities: ${list(mine.filter((a) => tauntEffects.has(a.specialEffect)))}.</p>` +
+          `<p>Defense abilities: ${list(mine.filter((a) => a.type === "Defense" && !tauntEffects.has(a.specialEffect)))}.</p>` +
+          `<p>Heal abilities: ${list(mine.filter((a) => a.type === "Heal"))}.</p>`
+        );
+      })
+      .join("");
+  }
+  function templateTables(templates, order, hands) {
+    return order
+      .map((type) => {
+        const rows = templates.filter((t) => t.weaponType === type);
+        if (!rows.length) return "";
+        const heading = `${typeLabel(type)}: classes that can use each one`;
+        return (
+          `<h3 id="${slug(heading)}">${escape(heading)}</h3>` +
+          table(
+            [typeLabel(type), ...(hands ? ["Hands"] : []), "Levels", "Classes"],
+            rows.map((t) => [
+              escape(t.name),
+              ...(hands ? [t.handedness === "TwoHanded" ? "Two" : "One"] : []),
+              `${t.minLevel} to ${t.maxLevel}`,
+              templateClasses(t),
+            ]),
+            `${typeLabel(type)} templates`,
+          )
+        );
+      })
+      .join("");
+  }
   function god(e) {
     const boons = Object.fromEntries(
       Object.entries(e.boonConstants).map(([k, v]) => [
@@ -249,6 +384,12 @@ function renderers(data) {
       if (!(id in constants)) throw Error(`Unknown balance constant: ${id}`);
       return escape(constants[id]);
     }
+    if (kind === "percent") {
+      // a fraction constant as whole percent: 0.25 prints 25
+      if (!(id in constants) || typeof constants[id] !== "number")
+        throw Error(`Unknown percent constant: ${id}`);
+      return escape(Math.round(constants[id] * 100));
+    }
     if (kind === "god") return god(find(data.gods.gods, id));
     if (kind === "monster-family") return monster(find(data.monsters, id));
     if (kind !== "table") throw Error(`Unknown directive: ${kind}`);
@@ -274,13 +415,103 @@ function renderers(data) {
       );
     if (id === "classes")
       return table(
-        ["Class", "Type", "Specializations"],
+        [
+          "Class",
+          "Type",
+          "HP per level",
+          "Defence per level",
+          "Mana per level",
+          "Roles the game lists",
+          "Specializations",
+        ],
         rows.map((e) => [
           link("characters/classes", e),
           e.prestige ? "Prestige" : "Starting",
+          e.growthPerLevel.maxHP,
+          e.growthPerLevel.defence,
+          e.growthPerLevel.maxMana,
+          escape(e.defaultRoles.join(", ")),
           escape(e.specializations.map(name).join(", ")),
         ]),
         "Classes",
+      );
+    if (id === "class-roles") return classRoles();
+    if (id === "class-equipment") {
+      const types = data.classes[0].equipment.weapons.map((w) => w.type);
+      const shields = data.classes[0].equipment.shields.map((w) => w.type);
+      return (
+        `<p>Armor weight by armor type: ${data.characters.armorTypeWeights.map((a) => `${escape(a.armorType)} is ${escape(a.weightClass)}`).join(", ")}.</p>` +
+        table(
+          ["Class", "Armor weights", ...types.map(typeLabel), ...shields.map(typeLabel)],
+          data.classes.filter((c) => !heldEquipmentClasses.has(c.id)).map((c) => [
+            link("characters/classes", c),
+            escape(c.equipment.armorWeights.join(", ")),
+            ...[...c.equipment.weapons, ...c.equipment.shields].map(
+              (w) => `${w.usable} of ${w.total}`,
+            ),
+          ]),
+          "Weapon and shield templates each class can use",
+        )
+      );
+    }
+    if (id === "weapon-templates")
+      return (
+        templateTables(
+          data.characters.weaponTemplates,
+          data.classes[0].equipment.weapons.map((w) => w.type),
+          true,
+        ) +
+        templateTables(
+          data.characters.shieldTemplates,
+          data.classes[0].equipment.shields.map((w) => w.type),
+          false,
+        )
+      );
+    if (id === "proficiency")
+      return table(
+        [
+          "Tier",
+          "Effect multiplier",
+          "Roll modifier",
+          "Spell fumble chance (%)",
+          "Training points to the next tier",
+          "Chance to improve by use (%)",
+        ],
+        data.characters.proficiency.map((e) => [
+          escape(e.id),
+          e.effectMultiplier.toFixed(2),
+          e.rollModifier,
+          e.failureChance,
+          e.trainingPointsToNext ?? "None",
+          e.improveByUseChance,
+        ]),
+        "Proficiency tiers",
+      );
+    if (id === "xp-levels")
+      return table(
+        [
+          "Level",
+          "Total experience",
+          "Experience from the level before",
+          "Kill experience multiplier",
+        ],
+        data.characters.experienceByLevel.map((e, i, all) => [
+          `Level ${e.level}`,
+          e.totalExperience,
+          i ? e.totalExperience - all[i - 1].totalExperience : 0,
+          e.killExperienceMultiplier,
+        ]),
+        "Experience for each level",
+      );
+    if (id === "mental-recovery")
+      return table(
+        ["Source", "Mental restored"],
+        mentalRecovery.map(([key, text]) => {
+          if (!(key in data.mental.constants))
+            throw Error(`Unknown Mental constant: ${key}`);
+          return [escape(text), data.mental.constants[key]];
+        }),
+        "Mental recovery by source",
       );
     if (id === "races")
       return table(
@@ -351,12 +582,26 @@ function renderers(data) {
       );
     if (id === "abilities")
       return table(
-        ["Ability", "Classes", "Required level", "Stamina / mana", "Effect"],
+        [
+          "Ability",
+          "Classes",
+          "Required level",
+          "Stamina / mana",
+          "Cooldown (rounds)",
+          "Base damage / healing",
+          "Attack / defense bonus",
+          "Duration (rounds)",
+          "Effect",
+        ],
         rows.map((e) => [
           link("characters/abilities", e),
           escape(e.classes.join(", ")),
           e.levelRequired,
           `${e.staminaCost} / ${e.manaCost}`,
+          e.cooldown,
+          `${e.baseDamage} / ${e.baseHealing}`,
+          `${e.attackBonus} / ${e.defenseBonus}`,
+          e.duration,
           escape(e.description.en),
         ]),
         "Ability definitions",

@@ -59,6 +59,12 @@ Numbers should come from directives, not copied tables:
 ```text
 {{table:items slot=MainHand}}
 {{table:classes}}
+{{table:class-roles}}
+{{table:class-equipment}}
+{{table:weapon-templates}}
+{{table:proficiency}}
+{{table:xp-levels}}
+{{table:mental-recovery}}
 {{table:races}}
 {{table:spells classId=Cleric}}
 {{table:abilities}}
@@ -73,7 +79,17 @@ Numbers should come from directives, not copied tables:
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
+{{percent:ClericDivineGraceBonus}}
 ```
+
+`{{percent:Key}}` prints a fraction constant as a whole percent: 0.25 prints 25.
+`class-roles` writes one section per class under a level-four heading, and
+`weapon-templates` one section per weapon and shield type under a level-three
+heading. The
+`class-equipment` counts come from the game's own equip check on shop stock.
+Bows are left out of both equipment tables. The Mystic Shaman is left out of the
+`class-equipment` table and has no armor weight line in `class-roles`. The character constants a guide
+can print are in the `constants` block of `characters.json` in the export.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.

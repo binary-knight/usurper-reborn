@@ -2,7 +2,7 @@
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
 checked: 1.3.0
-sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs
 history: 1.3.0 | Physical attacks on monsters roll to hit, with Strength, Dexterity, level, weapon power and basic attack proficiency lowering the number needed against a monster more than 5 levels above you, and Status shows a dual-wielder the weapon power of each hand.
 history: 1.2.6 | none
 history: 1.2.5 | Equip messages and the equipment summary show item names in the player's language.
@@ -24,7 +24,7 @@ Dexterity:
 - Critical hit chance: 5 percent plus one percent per 10 Dexterity, plus equipment. The ceiling is 50 percent, raised by one percent per 30 Dexterity up to 75 percent.
 - Critical damage: 1.5 times, plus 0.02 per point above 10, plus equipment, at most 3 times.
 - Your armor class against monster attacks, which makes their swings miss more often.
-- Fleeing a monster fight: 40 percent plus half your Dexterity plus a third of your level, with class bonuses. Bosses use their own odds.
+- Fleeing a monster fight: 40 percent plus half your Dexterity plus a third of your level. A Ranger or an Assassin adds 15 and a Jester or a Bard adds 10. The chance is never more than 75 percent. Bosses use their own odds.
 - Backstab, Hide and Disarm success, many dungeon traps and several street and Dark Alley checks.
 - A smaller share of attack ability scaling.
 - The [hit roll](/wiki/en/combat/#the-hit-roll) of a physical attack, only against a monster more than 5 levels above you: Dexterity lowers the number you need.
@@ -57,7 +57,7 @@ Intelligence:
 - Maximum mana for spellcasting classes: 5 per point above 10, plus your level times an eighth of your Intelligence.
 - Spell damage, spell critical chance and protection spells (see [spells](/wiki/en/characters/spells/)).
 - Alchemist attack abilities and Debuff abilities scale with it.
-- Training points at each level: one more for every 40 points of Intelligence and Wisdom combined.
+- [Training points](/wiki/en/characters/leveling/#training-points-per-level) at each level: one more for every 40 points of Intelligence and Wisdom combined.
 
 Wisdom:
 
@@ -89,7 +89,7 @@ Stamina, the stat, sets your combat stamina, the pool that pays for martial abil
 
 - HP is your current health. Maximum HP is your capacity, not your current health.
 - When you dual wield, Status shows the weapon power of your main hand and of your off hand. Each swing uses the weapon in its own hand.
-- Mana pays for spells and some abilities; only spellcasting classes have mana.
+- Mana pays for spells and some abilities. Nine classes have mana and the other eight have none: see [mana classes](/wiki/en/characters/classes/#mana-classes).
 
 ## Character creation
 
@@ -103,6 +103,10 @@ Creation rolls three six-sided dice for each of Strength, Stamina, Agility, Char
 
 You may reroll up to 5 times; the last roll must be accepted. Online, a roll in progress is kept if your connection drops and comes back with the rerolls you had left. Quick Start makes a single roll with no reroll.
 
+### Starting gold and potions
+
+A new character starts at level 1 with {{balance:DefaultStartingGold}} gold and {{balance:DefaultStartingHealing}} healing potions.
+
 ## Alignment
 
 Alignment comes from your Chivalry and Darkness. Every new character starts with both at 0; no race or class adds to either. Your deeds change them, and so do two Cleric spells (see [spells](/wiki/en/characters/spells/#spells-that-move-alignment)).
@@ -112,6 +116,18 @@ When Chivalry and Darkness are both 0, or their shares of the total differ by le
 - Good: 1 Wisdom, 1 Charisma and 2 maximum HP.
 - Evil: 1 Strength, 1 Constitution and 1 maximum HP.
 - Neutral: 1 Intelligence, 1 Dexterity and 3 maximum mana.
+
+## Awakening boons
+
+Each stage of the [Awakening](/wiki/en/world/story/#the-awakening) adds a lasting boon, and you keep the boons of the stages before it:
+
+- Stage 1: {{balance:AwakeningBonusWisdom1}} Wisdom.
+- Stage 2: {{percent:AwakeningBonusMana2}} percent more maximum mana.
+- Stage 3: {{percent:AwakeningBonusXP3}} percent more experience from fights.
+- Stage 4: {{percent:AwakeningBonusHP4}} percent more maximum HP.
+- Stage 5: {{percent:AwakeningBonusDamage5}} percent more damage.
+- Stage 6: {{percent:AwakeningBonusDefense6}} percent less damage taken.
+- Stage 7: each of the five percentages above rises by {{percent:AwakeningBonusStage7Extra}} percentage points.
 
 ## Permanent versus temporary
 
