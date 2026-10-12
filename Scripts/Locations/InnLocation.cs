@@ -121,7 +121,7 @@ public class InnLocation : BaseLocation
         if (aldricBanditEventTriggered) return;
 
         var aldric = CompanionSystem.Instance.GetCompanion(CompanionId.Aldric);
-        if (aldric == null || aldric.IsRecruited || aldric.IsDead) return;
+        if (aldric == null || aldric.IsRecruited || aldric.IsDead || CompanionSystem.Instance.IsDeparted(CompanionId.Aldric)) return;
         if (currentPlayer.Level < aldric.RecruitLevel) return;
 
         // 20% chance to trigger the event
@@ -321,6 +321,7 @@ public class InnLocation : BaseLocation
         if (currentPlayer != null && currentPlayer.Level >= 3 && CompanionSystem.Instance != null
             && !(CompanionSystem.Instance.GetCompanion(CompanionId.Aldric)?.IsRecruited ?? true)
             && !(CompanionSystem.Instance.GetCompanion(CompanionId.Aldric)?.IsDead ?? true)
+            && !CompanionSystem.Instance.IsDeparted(CompanionId.Aldric)
             && !currentPlayer.HintsShown.Contains(HintSystem.HINT_COMPANION_ALDRIC_TEASER))
         {
             currentPlayer.HintsShown.Add(HintSystem.HINT_COMPANION_ALDRIC_TEASER);
@@ -908,15 +909,13 @@ public class InnLocation : BaseLocation
     }
 
     /// <summary>
-    /// Fight Seth Able using full combat engine.
-    /// Seth scales to player level so he's always a genuine challenge.
-    /// Uses nr:1 to prevent inflated XP from level-based formulas.
+    /// Build Seth Able for the fight. 1.2.8: he fights at the level the challenge screen shows
+    /// (GetSethLevel). nr:1 still feeds CreateMonster so his stats keep their old shape; Level is
+    /// set afterwards. CallerPaysReward keeps the engine from paying XP, gold or loot: the flat
+    /// reward in FightSethAble is all a win pays.
     /// </summary>
-    private async Task FightSethAble()
+    internal Monster CreateSethMonster()
     {
-        terminal.WriteLine(Loc.Get("inn.seth_inn_falls_silent"), "red");
-        await Pacing.Wait(2000);
-
         int sethLevel = GetSethLevel();
         long sethHP = GetSethHP(sethLevel);
         // Stats scale with level: always a tough brawler
@@ -926,8 +925,6 @@ public class InnLocation : BaseLocation
         long sethArmPow = 8 + sethLevel / 3;
         long sethWeapPow = 15 + sethLevel / 2;
 
-        // nr:1 keeps monster Level=1 so GetExperienceReward()/GetGoldReward() yield
-        // minimal base rewards. The real reward is the flat bonus below.
         var sethMonster = Monster.CreateMonster(
             nr: 1,
             name: "Seth Able",
@@ -946,11 +943,24 @@ public class InnLocation : BaseLocation
             weappow: sethWeapPow
         );
 
-        // Override display level (for UI) without affecting reward formulas
-        // Note: CreateMonster sets Level = Math.Max(1, nr), so Level=1 for rewards
+        sethMonster.Level = sethLevel;           // 1.2.8: the level the challenge screen shows, for to-hit and abilities too
+        sethMonster.CallerPaysReward = true;     // 1.2.8: the flat reward below is the whole reward, and no loot roll
         sethMonster.IsUnique = true;
         sethMonster.IsBoss = false;
         sethMonster.CanSpeak = true;
+        return sethMonster;
+    }
+
+    /// <summary>
+    /// Fight Seth Able using full combat engine.
+    /// Seth scales to player level so he's always a genuine challenge.
+    /// </summary>
+    private async Task FightSethAble()
+    {
+        terminal.WriteLine(Loc.Get("inn.seth_inn_falls_silent"), "red");
+        await Pacing.Wait(2000);
+
+        var sethMonster = CreateSethMonster();
 
         var combatEngine = new CombatEngine(terminal);
         var result = await combatEngine.PlayerVsMonster(currentPlayer, sethMonster);
@@ -995,8 +1005,7 @@ public class InnLocation : BaseLocation
                     currentPlayer.Fame += 1;
                 }
 
-                // Flat reward: modest XP and gold, NOT scaling with fake level
-                // This replaces the combat engine's level-based reward (which is tiny at nr=1)
+                // Flat reward: modest XP and gold. 1.2.8: the engine pays none (CallerPaysReward), so this is all of it
                 long xpReward = currentPlayer.Level * 200;
                 long goldReward = 50 + currentPlayer.Level * 5;
 
@@ -1288,9 +1297,9 @@ public class InnLocation : BaseLocation
         terminal.WriteLine(Loc.Get("inn.challenging_npc", npc.Name2));
         terminal.WriteLine("");
 
-        // Daily duel limit — prevent XP farming by dueling the same NPCs repeatedly (separate from Seth fights)
-        const int maxDuelsPerDay = 3;
-        if (currentPlayer.InnDuelsToday >= maxDuelsPerDay)
+        // Daily duel limit: prevent XP farming by dueling the same NPCs repeatedly (separate from Seth fights).
+        // 1.2.8: one cap shared with town honor duels (BaseLocation.ChallengeNPC)
+        if (currentPlayer.InnDuelsToday >= GameConfig.MaxNpcDuelsPerDay)
         {
             terminal.SetColor("gray");
             terminal.WriteLine(Loc.Get("inn.too_many_duels"));
@@ -4453,9 +4462,11 @@ public class InnLocation : BaseLocation
 
             int enabledCount = 0;
             int enabledSpells = 0;
+            // 1.2.8: the mana shown is what a cast charges this companion in a fight (its Wisdom lowers it)
+            var caster = CompanionSystem.BuildCombatCharacter(companion);
             var layout = SkillLayout.For(
                 abilities.Select(a => (a.DisplayName, SkillCost("inn.skill_cost_st", ClassAbilitySystem.GetEffectiveStaminaCost(a)), Loc.Get("ability.level_tag", a.LevelRequired)))
-                    .Concat(spells.Select(sp => (sp.DisplayName, SkillCost("inn.skill_cost_mp", sp.ManaCost), Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, sp.Level))))));
+                    .Concat(spells.Select(sp => (sp.DisplayName, SkillCost("inn.skill_cost_mp", SpellSystem.CalculateManaCost(sp, caster)), Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, sp.Level))))));
 
             // --- Abilities section ---
             if (abilities.Count > 0)
@@ -4493,7 +4504,7 @@ public class InnLocation : BaseLocation
                     if (!isDisabled) enabledSpells++;
 
                     WriteSkillRow(layout, displayIdx, isDisabled, spell.DisplayName,
-                        SkillCost("inn.skill_cost_mp", spell.ManaCost),
+                        SkillCost("inn.skill_cost_mp", SpellSystem.CalculateManaCost(spell, caster)),
                         Loc.Get("ability.level_tag", SpellSystem.GetLevelRequired(charClass, spell.Level)), spell.DisplayDescription);
                 }
             }

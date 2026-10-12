@@ -1,0 +1,24 @@
+[h1]Usurper Reborn 1.3.0 "Reckoning"[/h1]
+
+1.3.0 is the first step of a longer rework of dungeon difficulty. In this step monsters use their abilities and spells more, encounters on dungeon floors 4 to 10 mix monster types and sizes, elite monsters carry traits, the player's attacks roll to hit, and healing potions scale with the character. Its targets were set for dungeon floors 1 to 10, measured with a combat simulator. Elites, monster tactics, the hit roll and scaled potions are also active on deeper floors, which have not been tuned yet. Next steps: 1.3.1 brings tuning and fixes from play on 1.3.0; 1.3.2 covers dungeon floors 11 to 25, 1.3.3 floors 26 to 50 and 1.3.4 floors 51 to 100.
+
+[list]
+[*]A character whose level equals the dungeon floor will find floors 6 to 10 harder than before, most of all with a companion. The first time you enter the dungeon the game starts you on the floor equal to your level; you can pick a lower floor at the entrance.
+[*]Your physical attacks on monsters now roll to hit: a twenty-sided die, shown with the number needed. Against a monster at your level or up to 5 levels above you always need 2 or more (a 95% chance to hit); against a monster more than 5 levels above you need up to 8 or more. Spells, area abilities and player against player fights do not roll.
+[*]Monsters use their abilities with more sense, and five early monsters have a signature ability from monster level 3.
+[*]Dungeon floors 4 to 10: regular rooms can hold up to three monsters, and groups mix monster families more often. A mixed group can include one spellcaster, shown as a "Shaman".
+[*]Elite monsters from dungeon floor 3: more HP, damage and defence, more experience and gold, and a named trait (Frenzied, Venomous, Commanding, Mending or Swift), announced when the fight starts.
+[*]Healing potions heal at least 20% of the drinker's maximum HP.
+[*]Dual-wielding: each swing uses the weapon in its own hand, the off-hand swing at half strength.
+[*]Betrayal is part of play and saved with the character: the Stranger turns on you before her fight, companions remember what they witness and the least loyal can leave, and the Temple's Faith room can settle a betrayal (an atonement costs 100 gold per level, at least 100, once a day).
+[*]Hiring NPCs for your team costs less below level 25, and the town keeps a pool of up to 18 low-level NPCs to hire.
+[*]Hired NPCs and friends in your dungeon party carry the oath-mark of your banner. An NPC on your team does not age while it serves you.
+[*]Online Play no longer stores your password. "Remember me" saves a login token from the server, and Online Play over SSH checks the server's identity.
+[*]Seth Able fights at the level his challenge screen shows, town honor duels and Inn duels share one daily cap of 3 wins, and an NPC you beat in an honor duel keeps its HP and stays where it is.
+[*]Rooms you cleared on a dungeon floor stay cleared after a disconnect, a reconnect or a save taken on the floor.
+[*]The website's Content-Security-Policy is enforced.
+[*]Sysops: back up the database before upgrading. The clean roll-back is restoring that backup. Two versions on one database at once is not supported.
+[*]Known: a party member or companion whose name holds a word in square brackets shows empty lines for its hit, miss and death lines in a fight.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.3.0.md

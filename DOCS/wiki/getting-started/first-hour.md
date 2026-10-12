@@ -1,8 +1,9 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.2.5
+checked: 1.3.0
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.0 | Rooms you cleared stay cleared after a disconnect or a save taken on the floor, your physical attacks roll to hit, and a healing potion heals at least 20 percent of your maximum HP.
 history: 1.2.5 | Level Master, Healer and dungeon screens are shown in all five languages, and long dungeon rows wrap inside 79 columns.
 history: 1.2.4 | none
 history: 1.2.3 | Dungeon room views, exits, floor notices and the status row are translated into all five languages, and the status row no longer doubles its colons.
@@ -17,6 +18,8 @@ Treat your first trip as reconnaissance, not a race to the deepest floor.
 4. Keep gold for treatment and consider depositing surplus at the [Bank](/wiki/en/items/banking/).
 
 ## In the dungeon
+
+The first time you enter the dungeon the game puts you on the floor equal to your level, or on the deepest floor open to you if that is lower. On the floor overview, L changes the floor, so you can pick a lower one before your first fight.
 
 Read each room and the enemy before choosing an action. Try your ordinary attack first to learn what your character can handle. Use [abilities](/wiki/en/characters/abilities/) or [spells](/wiki/en/characters/spells/) deliberately so that you do not exhaust resources without noticing.
 

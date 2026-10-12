@@ -38,7 +38,13 @@ public static class MonsterFamilies
         public int MaxLevel { get; set; }
         public string Color { get; set; } = "white";
         public float PowerMultiplier { get; set; } = 1.0f;
+        /// <summary>v1.2.8: power used only when this tier is rolled for a floor boss. Null means the same as
+        /// PowerMultiplier, so a tier (or a GameData override) without the field behaves as before.</summary>
+        public float? BossPowerMultiplier { get; set; }
         public List<string> SpecialAbilities { get; set; } = new();
+        /// <summary>v1.2.8: abilities the tier's monsters use only through MonsterTactics (from monster level 3,
+        /// GameConfig.MonsterTacticsEnabled on). Empty for a tier (or a GameData override) without the field.</summary>
+        public List<string> SignatureAbilities { get; set; } = new();
     }
 
     /// <summary>
@@ -67,7 +73,7 @@ public static class MonsterFamilies
             AttackType = "physical",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Goblin", MinLevel = 1, MaxLevel = 10, Color = "green", PowerMultiplier = 0.8f },
+                new() { Name = "Goblin", MinLevel = 1, MaxLevel = 10, Color = "green", PowerMultiplier = 0.8f, SignatureAbilities = new() { "Rally" } },
                 new() { Name = "Hobgoblin", MinLevel = 11, MaxLevel = 25, Color = "yellow", PowerMultiplier = 1.0f },
                 new() { Name = "Goblin Champion", MinLevel = 26, MaxLevel = 50, Color = "bright_yellow", PowerMultiplier = 1.3f, SpecialAbilities = new() { "CriticalStrike" } },
                 new() { Name = "Goblin Warlord", MinLevel = 51, MaxLevel = 75, Color = "bright_red", PowerMultiplier = 1.6f, SpecialAbilities = new() { "CriticalStrike", "Rally" } },
@@ -84,7 +90,7 @@ public static class MonsterFamilies
             AttackType = "necrotic",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Zombie", MinLevel = 1, MaxLevel = 15, Color = "gray", PowerMultiplier = 0.9f },
+                new() { Name = "Zombie", MinLevel = 1, MaxLevel = 15, Color = "gray", PowerMultiplier = 0.9f, SignatureAbilities = new() { "Enfeeble" } },
                 new() { Name = "Ghoul", MinLevel = 16, MaxLevel = 30, Color = "cyan", PowerMultiplier = 1.1f, SpecialAbilities = new() { "Paralyze" } },
                 new() { Name = "Wight", MinLevel = 31, MaxLevel = 50, Color = "blue", PowerMultiplier = 1.4f, SpecialAbilities = new() { "LifeDrain" } },
                 new() { Name = "Wraith", MinLevel = 51, MaxLevel = 75, Color = "bright_blue", PowerMultiplier = 1.7f, SpecialAbilities = new() { "LifeDrain", "Incorporeal" } },
@@ -101,7 +107,7 @@ public static class MonsterFamilies
             AttackType = "physical",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Orc", MinLevel = 5, MaxLevel = 20, Color = "red", PowerMultiplier = 1.0f },
+                new() { Name = "Orc", MinLevel = 5, MaxLevel = 20, Color = "red", PowerMultiplier = 0.9f, BossPowerMultiplier = 1.0f },
                 new() { Name = "Orc Warrior", MinLevel = 21, MaxLevel = 40, Color = "bright_red", PowerMultiplier = 1.3f, SpecialAbilities = new() { "Rage" } },
                 new() { Name = "Orc Berserker", MinLevel = 41, MaxLevel = 60, Color = "bright_red", PowerMultiplier = 1.6f, SpecialAbilities = new() { "Rage", "Frenzy" } },
                 new() { Name = "Orc Chieftain", MinLevel = 61, MaxLevel = 80, Color = "magenta", PowerMultiplier = 1.9f, SpecialAbilities = new() { "Rage", "Frenzy", "Warcry" } },
@@ -118,7 +124,7 @@ public static class MonsterFamilies
             AttackType = "fire",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Kobold", MinLevel = 1, MaxLevel = 12, Color = "yellow", PowerMultiplier = 0.7f },
+                new() { Name = "Kobold", MinLevel = 1, MaxLevel = 12, Color = "yellow", PowerMultiplier = 0.7f, SignatureAbilities = new() { "Poison" } },
                 new() { Name = "Drake", MinLevel = 13, MaxLevel = 30, Color = "bright_yellow", PowerMultiplier = 1.2f, SpecialAbilities = new() { "FireBreath" } },
                 new() { Name = "Wyvern", MinLevel = 31, MaxLevel = 55, Color = "bright_red", PowerMultiplier = 1.5f, SpecialAbilities = new() { "FireBreath", "Flight" } },
                 new() { Name = "Young Dragon", MinLevel = 56, MaxLevel = 80, Color = "bright_red", PowerMultiplier = 1.9f, SpecialAbilities = new() { "FireBreath", "Flight", "DragonFear" } },
@@ -186,7 +192,7 @@ public static class MonsterFamilies
             AttackType = "fire",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Spark", MinLevel = 5, MaxLevel = 18, Color = "yellow", PowerMultiplier = 0.7f },
+                new() { Name = "Spark", MinLevel = 5, MaxLevel = 18, Color = "yellow", PowerMultiplier = 0.7f, SignatureAbilities = new() { "Burn" } },
                 new() { Name = "Fire Elemental", MinLevel = 19, MaxLevel = 38, Color = "bright_yellow", PowerMultiplier = 1.2f, SpecialAbilities = new() { "Burn" } },
                 new() { Name = "Inferno", MinLevel = 39, MaxLevel = 60, Color = "bright_red", PowerMultiplier = 1.6f, SpecialAbilities = new() { "Burn", "Immolate" } },
                 new() { Name = "Fire Lord", MinLevel = 61, MaxLevel = 85, Color = "bright_red", PowerMultiplier = 2.0f, SpecialAbilities = new() { "Burn", "Immolate", "Fireball" } },
@@ -237,7 +243,7 @@ public static class MonsterFamilies
             AttackType = "physical",
             Tiers = new List<MonsterTier>
             {
-                new() { Name = "Animated Armor", MinLevel = 8, MaxLevel = 22, Color = "white", PowerMultiplier = 1.0f },
+                new() { Name = "Animated Armor", MinLevel = 8, MaxLevel = 22, Color = "white", PowerMultiplier = 1.0f, SignatureAbilities = new() { "Stoneskin" } },
                 new() { Name = "Golem", MinLevel = 23, MaxLevel = 45, Color = "gray", PowerMultiplier = 1.4f, SpecialAbilities = new() { "ImmuneMagic" } },
                 new() { Name = "Iron Golem", MinLevel = 46, MaxLevel = 68, Color = "bright_white", PowerMultiplier = 1.8f, SpecialAbilities = new() { "ImmuneMagic", "PoisonGas" } },
                 new() { Name = "Adamantine Golem", MinLevel = 69, MaxLevel = 88, Color = "bright_cyan", PowerMultiplier = 2.2f, SpecialAbilities = new() { "ImmuneMagic", "Indestructible" } },

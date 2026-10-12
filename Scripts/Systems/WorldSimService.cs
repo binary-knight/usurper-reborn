@@ -143,6 +143,10 @@ namespace UsurperRemake.Systems
             // Update heartbeat (embedded mode leader election)
             if (!await BeatWorldSimLockAsync()) return false;
 
+            // v1.2.8 (F5): the players' teams as the store has them now; while no read has ever succeeded the
+            // tick is held, as for a sim paused without the lock, so no team is taken for an NPC team unread
+            if (!RefreshPlayerTeamNames()) return false;
+
             // Run one simulation tick
             worldSimulator?.SimulateStep();
             _tickCount++;
@@ -246,8 +250,8 @@ namespace UsurperRemake.Systems
             // Load last world daily reset time from world_state
             LoadLastWorldDailyReset();
 
-            // Load player team names so WorldSimulator can protect them from NPC AI
-            await LoadPlayerTeamNames();
+            // Load player team names so WorldSimulator can protect them from NPC AI (v1.2.8: then before every tick)
+            RefreshPlayerTeamNames();
 
             // Track initial versions so we can detect player modifications
             lastNpcVersion = sqlBackend.GetWorldStateVersion(OnlineStateManager.KEY_NPCS);
@@ -1320,26 +1324,19 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Load all player team names from player_teams table so WorldSimulator
-        /// can protect them from NPC AI dissolution and unauthorized modification.
-        /// Critical in MUD mode where GameEngine.Instance is null on the world sim thread.
+        /// v1.2.8 (F5): the world simulator's list of players' teams is read from the store (every team a
+        /// player's save names, SqlSaveBackend.ReadPlayerTeamNames) at start and before every tick, so a team
+        /// made or joined in another process is known at the next tick and a team its last player left is an
+        /// NPC team again. A read that fails keeps the list as it was. Returns whether the list may be relied
+        /// on: false only while no read has succeeded since this simulator started (the tick is then held,
+        /// RunOneTickAsync). The reading and its logging are WorldSimulator.PlayerTeamStoreReader, which a
+        /// session's own loop uses as well. No random is drawn.
         /// </summary>
-        private async Task LoadPlayerTeamNames()
-        {
-            try
-            {
-                var teams = await sqlBackend.GetPlayerTeams();
-                foreach (var team in teams)
-                {
-                    WorldSimulator.RegisterPlayerTeam(team.TeamName);
-                }
-                DebugLogger.Instance.LogInfo("WORLDSIM", $"Registered {teams.Count} player team names for protection");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogError("WORLDSIM", $"Failed to load player team names: {ex.Message}");
-            }
-        }
+        internal bool RefreshPlayerTeamNames() => _playerTeams.Read(sqlBackend);
+
+        private readonly WorldSimulator.PlayerTeamStoreReader _playerTeams = new("the world sim");
+        /// <summary>How many failure lines this simulator has logged (the tests read it).</summary>
+        internal int PlayerTeamFailureLines => _playerTeams.FailureLines;
 
         /// <summary>
         /// Restore NPCs from saved data. Follows the same pattern as GameEngine.RestoreNPCs()
@@ -1454,6 +1451,7 @@ namespace UsurperRemake.Systems
                     IsAgedDeath = data.IsAgedDeath,
                     IsPermaDead = data.IsPermaDead,
                     DeathDate = data.DeathDate,
+                    LastOnPlayerTeamAt = data.LastOnPlayerTeamAt,   // v1.2.8 (H2)
                     PregnancyDueDate = data.PregnancyDueDate,
                     PregnancyFatherName = data.PregnancyFatherName,
 

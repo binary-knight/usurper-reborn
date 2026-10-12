@@ -269,9 +269,10 @@ public class Leftovers125Tests
             boss.TitleKey.Should().Be("quest.title.defeat_boss");
             boss.TitleArgs.Should().Equal(english);
             boss.Title.Should().Be(L("en", "quest.title.defeat_boss", english));
-            InLang("hu", boss.GetDisplayTitle).Should().Be(L("hu", "quest.title.defeat_boss", L("hu", "quest.title.champion", MonsterNames.DisplayIn("hu", tier))));
-            InLang("en", boss.GetDisplayTitle).Should().Be(L("en", "quest.title.defeat_boss", english));
-            InLang("hu", kill.GetDisplayDescription).Should().Be(L("hu", "quest.objective.defeat_boss", L("hu", "quest.title.champion", MonsterNames.DisplayIn("hu", tier))));
+            // 1.2.8: shown as the name the tier's champion has in a fight
+            InLang("hu", boss.GetDisplayTitle).Should().Be(L("hu", "quest.title.defeat_boss", FightName("hu", tier)));
+            InLang("en", boss.GetDisplayTitle).Should().Be(L("en", "quest.title.defeat_boss", FightName("en", tier)));
+            InLang("hu", kill.GetDisplayDescription).Should().Be(L("hu", "quest.objective.defeat_boss", FightName("hu", tier)));
         }
         finally { boss.Deleted = true; }
     }
@@ -301,10 +302,17 @@ public class Leftovers125Tests
             var q = QuestSystem.GetAllQuests(true).Single(x => x.Id == "D11OLDBOSS");
             q.TitleArgs.Should().Equal(frChampion);
             q.Objectives.Single().TargetName.Should().Be(frChampion, "an old quest is not rewritten");
-            InLang("hu", q.GetDisplayTitle).Should().Be(L("hu", "quest.title.defeat_boss", L("hu", "quest.title.champion", MonsterNames.DisplayIn("hu", tier))));
-            InLang("en", q.GetDisplayTitle).Should().Be(L("en", "quest.title.defeat_boss", L("en", "quest.title.champion", tier)));
+            InLang("hu", q.GetDisplayTitle).Should().Be(L("hu", "quest.title.defeat_boss", FightName("hu", tier)));
+            InLang("en", q.GetDisplayTitle).Should().Be(L("en", "quest.title.defeat_boss", FightName("en", tier)));
         }
         finally { RestoreQuests(keep); }
+    }
+
+    /// <summary>The name the tier's dungeon champion shows in a fight, in lang.</summary>
+    private static string FightName(string lang, string tier)
+    {
+        string family = MonsterFamilies.AllFamilies.First(f => f.Tiers.Any(t => t.Name == tier)).FamilyName;
+        return MonsterNames.DisplayIn(lang, new Monster { Name = MonsterGenerator.GetChampionName(tier, family), TierName = tier, FamilyName = family });
     }
 
     private static string TierOf(string targetId) =>

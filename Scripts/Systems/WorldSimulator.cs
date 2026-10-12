@@ -59,23 +59,228 @@ public class WorldSimulator
     private static readonly HashSet<string> _playerTeamNames = new(StringComparer.OrdinalIgnoreCase);
     private static readonly object _teamLock = new();
 
+    // v1.2.8 (F5): the list above is two sets. _playerTeamNames holds what the STORE said at the last refresh
+    // (the world simulator's service replaces it whole, WorldSimService.RefreshPlayerTeamNames). The names a
+    // session of THIS process registered (login, create, join) wait in _sessionTeamNames with the number of
+    // their registration, so a refresh keeps one the store does not hold yet and drops it once the store has
+    // had a whole refresh interval to say so. Single-player never refreshes: only the session set is used.
+    private static readonly Dictionary<string, long> _sessionTeamNames = new(StringComparer.OrdinalIgnoreCase);
+    private static long _teamRegistrations;          // counts RegisterPlayerTeam calls
+    private static long _keptSince;                  // registrations numbered above this survive the next refresh
+
     public static void RegisterPlayerTeam(string teamName)
     {
         if (string.IsNullOrEmpty(teamName)) return;
-        lock (_teamLock) { _playerTeamNames.Add(teamName); }
+        lock (_teamLock) { _sessionTeamNames[teamName] = ++_teamRegistrations; }
     }
 
     public static void UnregisterPlayerTeam(string teamName)
     {
         if (string.IsNullOrEmpty(teamName)) return;
-        lock (_teamLock) { _playerTeamNames.Remove(teamName); }
+        lock (_teamLock) { _sessionTeamNames.Remove(teamName); _playerTeamNames.Remove(teamName); }
     }
 
     public static bool IsPlayerTeam(string? teamName)
     {
         if (string.IsNullOrEmpty(teamName)) return false;
-        lock (_teamLock) { return _playerTeamNames.Contains(teamName); }
+        lock (_teamLock) { return _playerTeamNames.Contains(teamName) || _sessionTeamNames.ContainsKey(teamName); }
     }
+
+    /// <summary>
+    /// v1.2.8 (F5): the mark a refresh takes BEFORE it reads the store: registrations made after it are newer
+    /// than what the read can have seen. Pass it to ReplaceStorePlayerTeams with the names read.
+    /// </summary>
+    internal static long BeginPlayerTeamRefresh()
+    {
+        lock (_teamLock) { return _teamRegistrations; }
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): the store's answer replaces the stored set, so a name the store no longer holds leaves
+    /// (the last player left the team) and a name another process wrote arrives. A session registration is
+    /// kept for as long as a live session of this process has its player on that team, whatever the store
+    /// says (a session whose saves fail must not lose its hires). Otherwise one the store does not hold stays
+    /// through the first refresh after it and is dropped by the one after that, and one the store holds is no
+    /// longer needed. No random is drawn.
+    /// </summary>
+    internal static void ReplaceStorePlayerTeams(IEnumerable<string> storeNames, long mark)
+    {
+        var live = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var team in LiveSessionTeams())
+            if (!string.IsNullOrEmpty(team)) live.Add(team);
+        lock (_teamLock)
+        {
+            _playerTeamNames.Clear();
+            foreach (var name in storeNames)
+                if (!string.IsNullOrEmpty(name)) _playerTeamNames.Add(name);
+            foreach (var old in _sessionTeamNames.Where(kv => !live.Contains(kv.Key) && (kv.Value <= _keptSince || _playerTeamNames.Contains(kv.Key))).Select(kv => kv.Key).ToList())
+                _sessionTeamNames.Remove(old);
+            _keptSince = mark;
+        }
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): the teams of the players in this process's live sessions: every MUD session's player, or
+    /// in a door or single-player process the one current player. Read by the refresh; a test may replace it.
+    /// </summary>
+    internal static Func<IEnumerable<string?>> LiveSessionTeams = ReadLiveSessionTeams;
+
+    private static IEnumerable<string?> ReadLiveSessionTeams()
+    {
+        var server = UsurperRemake.Server.MudServer.Instance;
+        if (server != null) return server.ActiveSessions.Values.ToList().Select(session => session.Context?.Player?.Team).ToList();
+        return new[] { GameEngine.InstanceIfAny?.CurrentPlayer?.Team };
+    }
+
+    /// <summary>
+    /// v1.2.8 (F5): one reader of the store's player team names with the fail-closed rule, for whoever drives
+    /// a simulator: the service (WorldSimService) and a session's own loop (StartSimulation). A read that
+    /// fails keeps the list as it was. Read returns whether the list may be relied on: false only while no
+    /// read has succeeded yet (the caller then holds its step). A failure is logged when it starts, then once
+    /// every FailureLogEvery failed reads, and once more when the reads work again.
+    /// </summary>
+    internal sealed class PlayerTeamStoreReader
+    {
+        internal const int FailureLogEvery = 60;
+        private readonly string _who;
+        private bool _loaded;
+        private int _failures;
+        /// <summary>How many failure lines this reader has logged (the tests read it).</summary>
+        internal int FailureLines { get; private set; }
+
+        internal PlayerTeamStoreReader(string who) { _who = who; }
+
+        internal bool Read(SqlSaveBackend store)
+        {
+            long mark = BeginPlayerTeamRefresh();
+            var names = store.ReadPlayerTeamNames(out string? error);
+            if (names == null)
+            {
+                if (_failures++ % FailureLogEvery == 0)
+                {
+                    FailureLines++;
+                    DebugLogger.Instance.LogError("WORLDSIM", _loaded
+                        ? $"The player team names could not be read ({error}); {_who} keeps the list it has."
+                        : $"The player team names could not be read ({error}); {_who} holds its ticks until a read succeeds.");
+                }
+                return _loaded;
+            }
+            ReplaceStorePlayerTeams(names, mark);
+            if (!_loaded)
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"Registered {names.Count} player team names for protection ({_who})");
+            else if (_failures > 0)
+                DebugLogger.Instance.LogInfo("WORLDSIM", $"The player team names are read again after {_failures} failed read(s): {names.Count} names ({_who}).");
+            _failures = 0;
+            _loaded = true;
+            return true;
+        }
+    }
+
+    private readonly PlayerTeamStoreReader _sessionLoopTeams = new("this session's world sim");
+    internal int SessionLoopFailureLines => _sessionLoopTeams.FailureLines;
+
+    /// <summary>
+    /// v1.2.8 (F5): one pass of a session's own loop (StartSimulation). Online (a door process that does not
+    /// host the world sim service: without the lock, or with --no-worldsim) the loop knew only its own
+    /// session's team and took every other player's team for an NPC team; its changes reach the shared roster
+    /// with the session's save. So online it reads the players' teams from the store before each step, as the
+    /// service does, and holds the step while no read has succeeded. Single-player has no shared store: no
+    /// read, the step runs as before. Returns whether the step ran.
+    /// </summary>
+    internal bool SessionLoopStep()
+    {
+        if (UsurperRemake.BBS.DoorMode.IsOnlineMode && SaveSystem.Instance?.Backend is SqlSaveBackend store
+            && !_sessionLoopTeams.Read(store)) return false;
+        SimulateStep();
+        return true;
+    }
+
+    /// <summary>
+    /// v1.2.8 (H2): THE test for "this NPC is a member of a player's team": its Team is a name in the
+    /// player team list above. A name enters that list when a player creates, joins or loads into the team
+    /// (TeamCornerLocation, GameEngine: single-player and online alike) and, online, when the world simulator
+    /// reads the store before a tick (WorldSimService.RefreshPlayerTeamNames: every team a player's save
+    /// names, in any process); it leaves when the last player leaves or the empty team is removed. An NPC-only team is never in the list. A dungeon party member
+    /// that is not on the team (a spouse, a companion) is not covered. Callers that need the rule use this
+    /// method, not their own copy.
+    /// </summary>
+    public static bool IsOnPlayerTeam(NPC? npc) => npc != null && IsPlayerTeam(npc.Team);
+
+    /// <summary>
+    /// v1.2.8 (H2): a recruit pool member: an NPC that TeamSystem.IsRecruitable would accept for an ordinary
+    /// player apart from the relationship (alive, not dead of age, not permanently dead, on no team, not a
+    /// special NPC, not immortal, not in prison) at level 1 to GameConfig.RecruitPoolMaxLevel. Membership is
+    /// computed, never stored.
+    /// </summary>
+    public static bool IsRecruitPoolMember(NPC? npc) =>
+        npc != null && npc.IsAlive && !npc.IsDead && HoldsRecruitPoolPlace(npc);
+
+    /// <summary>
+    /// v1.2.8 (H2): the pool member test without "alive now": an NPC waiting for its ordinary respawn still
+    /// holds its place, so the top-up does not replace it and then find seven in the band when it returns.
+    /// </summary>
+    internal static bool HoldsRecruitPoolPlace(NPC npc) =>
+        !npc.IsAgedDeath && !npc.IsPermaDead
+        && string.IsNullOrEmpty(npc.Team) && !npc.IsSpecialNPC && !npc.IsImmortal && npc.DaysInPrison <= 0
+        && npc.Level >= 1 && npc.Level <= GameConfig.RecruitPoolMaxLevel;
+
+    /// <summary>v1.2.8 (H2): part G on its own, for the measurements of the brief (tests only; it is on
+    /// whenever GameConfig.RecruitPoolEnabled is on in the game).</summary>
+    internal static bool PoolCapCountsWaiting { get; set; } = true;
+
+    /// <summary>
+    /// v1.2.8 (H2): the surplus rule, THE test asked before an NPC founds or joins an NPC-only team (or is
+    /// taken into one). Level 16 and higher: yes, as before 1.2.8. Level GameConfig.RecruitPoolMaxLevel (15) or
+    /// lower, while GameConfig.RecruitPoolEnabled is on: only while its pool band (1 to 5, 6 to 10, 11 to 15)
+    /// holds MORE free NPCs than the band's share (GameConfig.RecruitPoolPerBand, 6), so a join takes a band
+    /// from 7 to 6 and never below 6: the teams take the surplus and the pool keeps its six. The count is the
+    /// top-up's (HoldsRecruitPoolPlace: an NPC waiting for its respawn counts), taken anew at each call (one
+    /// pass over the roster, for a low-level NPC only): a count kept for the tick would let two joins of one
+    /// tick take a band below six. Nothing is released: a low-level NPC already on a team stays. Hiring by a
+    /// player does not ask it. Asked at NPCTryJoinOrFormTeam (the joiner or founder, the two first-recruit
+    /// lists, and the recruit as it joins), NPCTryRecruitForTeam, WorldInitializerSystem (the first leaders
+    /// and their recruits, each on the list and as it joins, and SimulateTeamActivity) and the two
+    /// RecruitGangMembers (as each joins; the first also on its list of three). Where a site picks from a list
+    /// and can take more than one NPC in a call, it asks on the list (so a refused NPC takes no pick) and again
+    /// as each joins (so two of one band cannot both go when only one may). It draws nothing.
+    /// </summary>
+    public static bool MayJoinNpcTeam(Character? npc)
+    {
+        if (npc == null) return false;
+        if (!GameConfig.RecruitPoolEnabled) return true;
+        int band = RecruitPoolBandOf(npc.Level);
+        if (npc.Level > GameConfig.RecruitPoolMaxLevel || band < 0) return true;
+        return RecruitPoolBandCount(band) > GameConfig.RecruitPoolPerBand;
+    }
+
+    /// <summary>v1.2.8 (H2): the NPCs that hold a pool place in a band (the count of the surplus rule).</summary>
+    internal static int RecruitPoolBandCount(int band)
+    {
+        var roster = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs;
+        if (roster == null) return 0;
+        int count = 0;
+        foreach (var n in roster.ToList())
+            if (n != null && HoldsRecruitPoolPlace(n) && RecruitPoolBandOf(n.Level) == band) count++;
+        return count;
+    }
+
+    /// <summary>v1.2.8 (H2): the pool band of a level (0: 1 to 5, 1: 6 to 10, 2: 11 to 15), or -1 outside the pool.</summary>
+    internal static int RecruitPoolBandOf(int level)
+    {
+        if (level < 1) return -1;
+        var tops = GameConfig.RecruitPoolBandTopLevels;
+        for (int i = 0; i < tops.Length; i++)
+            if (level <= tops[i]) return i;
+        return -1;
+    }
+
+    /// <summary>
+    /// v1.2.8 (H2): the multiplier of world-simulator experience for this NPC, the ONE place it is decided:
+    /// a recruit pool member (unteamed, level 1 to 15) earns at x1.0, every other NPC (on any team, hired,
+    /// level 16 or above) at NpcXpMultiplier. With GameConfig.RecruitPoolEnabled off it is NpcXpMultiplier.
+    /// </summary>
+    internal static float WorldSimXpMultiplier(NPC? npc) =>
+        GameConfig.RecruitPoolEnabled && IsRecruitPoolMember(npc) ? 1.0f : NpcXpMultiplier;
 
     /// <summary>
     /// v0.64.0 Brain v2 Slice 4: Tier A triage. NPCs that should route through
@@ -368,7 +573,7 @@ public class WorldSimulator
             {
                 try
                 {
-                    SimulateStep();
+                    SessionLoopStep();   // v1.2.8 (F5): online, the players' teams are read from the store first
                 }
                 catch (Exception ex)
                 {
@@ -430,6 +635,9 @@ public class WorldSimulator
             // Process NPC immigration (replenish extinct/critical races)
             // Gated during catch-up to prevent population explosion
             ProcessNPCImmigration();
+
+            // v1.2.8 (H2): the recruit pool top-up, after the immigration phases
+            ProcessRecruitPoolTopUp();
 
             // Process NPC pregnancies and births (including affairs)
             ProcessNPCPregnancies();
@@ -650,6 +858,20 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// v1.2.8 (H3): the permadeath roll under the ward, the ONE place where the ward refuses a permanent death.
+    /// The roll is always drawn (the draw sequence is the same warded or not, switch on or off). Away from the
+    /// player (atPlayersSide false: every world simulator site) a permanent outcome is refused for a warded NPC
+    /// (WardSystem.IsWarded with no party: a member of a player's team). At the player's side the roll stands:
+    /// the chance there is the one from before 1.2.8.
+    /// </summary>
+    internal bool RollPermadeathUnderWard(NPC npc, float baseChance, bool atPlayersSide)
+    {
+        bool permanent = RollPermadeath(npc, baseChance);
+        if (permanent && !atPlayersSide && WardSystem.IsWarded(npc)) return false;
+        return permanent;
+    }
+
+    /// <summary>
     /// v0.64.0 hygiene: garbage-collect permanently-dead NPCs from the
     /// `npcs` list after their grace window has elapsed. Without this,
     /// IsAgedDeath / IsPermaDead corpses accumulate forever in
@@ -711,8 +933,11 @@ public class WorldSimulator
     /// <param name="basePermadeathChance">Base permadeath chance for this death context</param>
     /// <param name="killerName">Who killed them (for news)</param>
     /// <param name="location">Where they died</param>
+    /// <param name="atPlayersSide">v1.2.8 (H3): true only for a fall in the player's own fight
+    /// (CombatEngine.HandleNpcTeammateDeath); every world simulator site leaves it false, and there the ward
+    /// refuses a permanent death for an NPC on a player's team (RollPermadeathUnderWard).</param>
     /// <returns>True if the death was permanent</returns>
-    public bool MarkNPCDead(NPC npc, float basePermadeathChance, string killerName, string location)
+    public bool MarkNPCDead(NPC npc, float basePermadeathChance, string killerName, string location, bool atPlayersSide = false)
     {
         if (npc == null) return false;
 
@@ -747,7 +972,7 @@ public class WorldSimulator
         npc.PregnancyFatherName = null;
         CheckKingDeath(npc);
 
-        bool permadeath = RollPermadeath(npc, basePermadeathChance);
+        bool permadeath = RollPermadeathUnderWard(npc, basePermadeathChance, atPlayersSide);   // v1.2.8 (H3)
         if (permadeath)
         {
             // v0.65.5 (T0-2): make the rolled permadeath ACTUALLY permanent so the cascade below
@@ -962,12 +1187,19 @@ public class WorldSimulator
         if (companionSystem != null)
         {
             int loyaltyLoss = isDeliberate ? GameConfig.CompanionLossPerMurder : 5;
+            bool witnessed = false;
             foreach (CompanionId id in Enum.GetValues(typeof(CompanionId)))
             {
                 var companion = companionSystem.GetCompanion(id);
                 if (companion != null && companion.IsActive)
+                {
                     companionSystem.ModifyLoyalty(id, -loyaltyLoss, $"witnessed the death of {victimName}");
+                    witnessed = true;
+                }
             }
+            // 1.2.8: one grievance of the team per murder the party witnessed, however many companions saw it
+            if (witnessed)
+                BetrayalSystem.Instance.AddTeamGrievance("witnessed a murder");
         }
 
         DebugLogger.Instance.LogInfo("BLOOD_PRICE",
@@ -1207,9 +1439,14 @@ public class WorldSimulator
             // Skip NPCs without birth dates (shouldn't happen, but safety)
             if (npc.BirthDate <= DateTime.MinValue) continue;
 
+            // v1.2.8 (H2): an NPC on a player's team does not age and cannot die of old age; after it leaves
+            // it cannot die of old age for the grace. This is the one site: every leaving route is seen here.
+            DateTime now = DateTime.Now;
+            bool heldFromOldAge = GameConfig.RecruitPoolEnabled && HoldAgeOnPlayerTeam(npc, now.ToUniversalTime());
+
             // Calculate current age from birth date (using accelerated lifecycle rate)
             int previousAge = npc.Age;
-            int currentAge = (int)((DateTime.Now - npc.BirthDate).TotalHours / GameConfig.NpcLifecycleHoursPerYear);
+            int currentAge = (int)((now - npc.BirthDate).TotalHours / GameConfig.NpcLifecycleHoursPerYear);
             npc.Age = currentAge;
 
             // Birthday announcement when age increments
@@ -1221,7 +1458,7 @@ public class WorldSimulator
             // Check for natural death
             if (GameConfig.RaceLifespan.TryGetValue(npc.Race, out int maxAge))
             {
-                if (currentAge >= maxAge)
+                if (currentAge >= maxAge && !heldFromOldAge)
                 {
                     // v0.63.0 slice 4 (audit npc-N7): race-extinction guard.
                     // Pre-fix, aging-death could push a race below the
@@ -1290,6 +1527,29 @@ public class WorldSimulator
                 }
             }
         }
+    }
+
+    /// <summary>
+    /// v1.2.8 (H2): the ageing rule of an NPC on a player's team, called by ProcessNPCAging for every living
+    /// NPC. On a player's team (IsOnPlayerTeam): BirthDate moves forward by the time since the stamp, so the
+    /// age stands still (the first check after hiring, or after a time away, only stamps), and the natural
+    /// death check is skipped. Off the team: ageing runs from the age it has, and the natural death check is
+    /// skipped while the stamp is younger than GameConfig.RecruitOldAgeGraceDays. Returns true when the
+    /// natural death check must be skipped.
+    /// </summary>
+    internal static bool HoldAgeOnPlayerTeam(NPC npc, DateTime nowUtc)
+    {
+        if (IsOnPlayerTeam(npc))
+        {
+            if (npc.LastOnPlayerTeamAt is DateTime last && npc.SeenOnPlayerTeamAtLastAgeCheck != false && nowUtc > last)
+                npc.BirthDate = npc.BirthDate + (nowUtc - last);
+            npc.LastOnPlayerTeamAt = nowUtc;
+            npc.SeenOnPlayerTeamAtLastAgeCheck = true;
+            return true;
+        }
+        npc.SeenOnPlayerTeamAtLastAgeCheck = false;
+        return npc.LastOnPlayerTeamAt is DateTime left
+            && nowUtc - left < TimeSpan.FromDays(GameConfig.RecruitOldAgeGraceDays);
     }
 
     /// <summary>
@@ -1368,9 +1628,11 @@ public class WorldSimulator
     /// <summary>
     /// Spawn a single immigrant NPC of the given race and sex.
     /// </summary>
-    private void SpawnImmigrant(CharacterRace race, CharacterSex sex, int avgLevel)
+    private bool SpawnImmigrant(CharacterRace race, CharacterSex sex, int avgLevel, bool forRecruitPool = false)
     {
-        var immigrant = NPCSpawnSystem.Instance?.GenerateImmigrantNPC(race, sex, avgLevel);
+        var immigrant = forRecruitPool
+            ? NPCSpawnSystem.Instance?.GenerateImmigrantNPC(race, sex, avgLevel, forRecruitPool: true)
+            : NPCSpawnSystem.Instance?.GenerateImmigrantNPC(race, sex, avgLevel);
         if (immigrant != null)
         {
             NPCSpawnSystem.Instance?.AddRestoredNPC(immigrant);
@@ -1384,6 +1646,65 @@ public class WorldSimulator
             UsurperRemake.Systems.DebugLogger.Instance.LogInfo("IMMIGRATION",
                 $"Generated immigrant: {immigrant.Name2} ({race} {immigrant.Class} L{immigrant.Level} {sex})");
         }
+        return immigrant != null;
+    }
+
+    // v1.2.8 (H2): the tick of the last recruit pool arrival (far in the past: the first top-up is not delayed)
+    private int _lastRecruitPoolArrivalTick = int.MinValue / 2;
+
+    /// <summary>
+    /// v1.2.8 (H2): the recruit pool top-up, once per world tick after the immigration phases. When a band
+    /// (levels 1 to 5, 6 to 10, 11 to 15) holds fewer than GameConfig.RecruitPoolPerBand pool members, ONE
+    /// immigrant arrives for the band furthest under its target (ties: the lowest band), at a level drawn
+    /// inside the band, of the least represented race, in a town location the hire list reads. At most one
+    /// arrival per GameConfig.RecruitPoolTicksBetweenArrivals ticks, and none while the town (the living plus
+    /// those waiting for their respawn) is at GameConfig.RecruitPoolTownLimit (190) or more. The phases above
+    /// keep their own gates.
+    /// </summary>
+    private void ProcessRecruitPoolTopUp()
+    {
+        if (!GameConfig.RecruitPoolEnabled) return;
+        if (_currentTick - _lastRecruitPoolArrivalTick < GameConfig.RecruitPoolTicksBetweenArrivals) return;
+
+        var aliveNPCs = npcs.Where(n => n.IsAlive && !n.IsDead && !n.IsAgedDeath && !n.IsPermaDead).ToList();
+        // part G: the gate counts the living plus the dead that will respawn (not dead of age, not permanently
+        // dead), and stops arrivals at 190, so the pool never fills the town to the 200 at which pregnancies,
+        // comings of age and ordinary immigration stop. The gates of the phases above read the living only.
+        int counted = PoolCapCountsWaiting ? npcs.Count(n => !n.IsAgedDeath && !n.IsPermaDead) : aliveNPCs.Count;
+        if (counted >= GameConfig.RecruitPoolTownLimit) return;
+
+        var tops = GameConfig.RecruitPoolBandTopLevels;
+        var held = new int[tops.Length];
+        foreach (var n in npcs)
+        {
+            if (!HoldsRecruitPoolPlace(n)) continue;
+            int b = RecruitPoolBandOf(n.Level);
+            if (b >= 0) held[b]++;
+        }
+
+        int band = -1, furthestUnder = 0;
+        for (int b = 0; b < tops.Length; b++)
+        {
+            int under = GameConfig.RecruitPoolPerBand - held[b];
+            if (under > furthestUnder) { furthestUnder = under; band = b; }   // ties: the lowest band
+        }
+        if (band < 0) return;
+
+        int lowest = band == 0 ? 1 : tops[band - 1] + 1;
+        int level = lowest + random.Next(tops[band] - lowest + 1);
+
+        // the immigration rule: the least represented of the ten base races
+        const int raceCount = 10;
+        var raceCounts = new int[raceCount];
+        foreach (var n in aliveNPCs)
+            if ((int)n.Race >= 0 && (int)n.Race < raceCount) raceCounts[(int)n.Race]++;
+        int race = 0;
+        for (int r = 1; r < raceCount; r++)
+            if (raceCounts[r] < raceCounts[race]) race = r;
+        var sex = random.Next(2) == 0 ? CharacterSex.Male : CharacterSex.Female;
+
+        if (SpawnImmigrant((CharacterRace)race, sex, level, forRecruitPool: true))
+            _lastRecruitPoolArrivalTick = _currentTick;
     }
 
     /// <summary>
@@ -3698,6 +4019,8 @@ public class WorldSimulator
     /// </summary>
     private void NPCTryJoinOrFormTeam(NPC npc)
     {
+        // v1.2.8 (H2): the surplus rule: a low-level NPC founds or joins only from a band above six
+        if (!MayJoinNpcTeam(npc)) return;
         // Look for existing NPC teams at this location to join
         // Exclude player teams — NPCs shouldn't autonomously join them
         var teamsAtLocation = npcs
@@ -3739,7 +4062,8 @@ public class WorldSimulator
             .Where(n => n.IsAlive && !n.IsDead &&
                    string.IsNullOrEmpty(n.Team) &&
                    n.CurrentLocation == npc.CurrentLocation &&
-                   n.Id != npc.Id)
+                   n.Id != npc.Id &&
+                   MayJoinNpcTeam(n))   // v1.2.8 (H2): the surplus rule
             .ToList();
 
         // Fall back to any unaffiliated NPC in the realm if nobody at this location
@@ -3749,6 +4073,7 @@ public class WorldSimulator
                 .Where(n => n.IsAlive && !n.IsDead &&
                        string.IsNullOrEmpty(n.Team) &&
                        n.Id != npc.Id &&
+                       MayJoinNpcTeam(n) &&   // v1.2.8 (H2): the surplus rule
                        n.Brain?.Personality?.IsLikelyToJoinGang() == true)
                 .ToList();
         }
@@ -3777,7 +4102,7 @@ public class WorldSimulator
                 if (compat > bestCompat) { bestCompat = compat; bestRecruit = candidate; }
             }
 
-            if (bestRecruit != null && bestCompat > 0.25f)
+            if (bestRecruit != null && bestCompat > 0.25f && MayJoinNpcTeam(bestRecruit))   // v1.2.8 (H2): asked again as it joins (the founder has just left the same band)
             {
                 bestRecruit.Team = teamName;
                 bestRecruit.TeamPW = teamPassword;
@@ -3819,7 +4144,8 @@ public class WorldSimulator
             .Where(n => n.IsAlive &&
                    string.IsNullOrEmpty(n.Team) &&
                    n.CurrentLocation == npc.CurrentLocation &&
-                   n.Id != npc.Id)
+                   n.Id != npc.Id &&
+                   MayJoinNpcTeam(n))   // v1.2.8 (H2): the surplus rule
             .ToList();
 
         if (candidates.Count == 0) return;
@@ -4069,10 +4395,12 @@ public class WorldSimulator
                 long goldShare = totalGold / survivors.Count;
 
                 // Bonus for team play, throttled by NpcXpMultiplier for world sim mode
-                expShare = (long)(expShare * 1.15 * NpcXpMultiplier);
+                // v1.2.8 (H2): the multiplier is decided per member by WorldSimXpMultiplier
+                long baseExpShare = expShare;
 
                 foreach (var member in survivors)
                 {
+                    expShare = (long)(baseExpShare * 1.15 * WorldSimXpMultiplier(member));
                     member.GainExperience(expShare);
                     member.GainGold(goldShare);
                 }
@@ -4127,10 +4455,10 @@ public class WorldSimulator
                 {
                     long fullReward = monsters.Sum(m => m.GetExperienceReward());
                     float xpScale = Math.Min(0.50f, groupDealtPct * 0.50f);
-                    long partialExpShare = (long)(fullReward * xpScale * NpcXpMultiplier / survivors.Count);
-                    if (partialExpShare > 0)
+                    foreach (var member in survivors)
                     {
-                        foreach (var member in survivors)
+                        long partialExpShare = (long)(fullReward * xpScale * WorldSimXpMultiplier(member) / survivors.Count);
+                        if (partialExpShare > 0)
                             member.GainExperience(partialExpShare);
                     }
                 }
@@ -4521,7 +4849,7 @@ public class WorldSimulator
         if (IsTierANPC(npc))
         {
             var simResult = NPCCombatSimulator.Simulate(npc, new List<Monster> { monster }, null, random);
-            long expGain = (long)(simResult.ExpReward * NpcXpMultiplier);
+            long expGain = (long)(simResult.ExpReward * WorldSimXpMultiplier(npc));
             long goldGain = simResult.GoldReward;
             if (expGain > 0) npc.GainExperience(expGain);
             if (goldGain > 0) npc.GainGold(goldGain);
@@ -4674,7 +5002,7 @@ public class WorldSimulator
         if (npcWon)
         {
             // NPC wins - gain XP and gold (XP throttled by NpcXpMultiplier for world sim mode)
-            long expGain = (long)(monster.GetExperienceReward() * NpcXpMultiplier);
+            long expGain = (long)(monster.GetExperienceReward() * WorldSimXpMultiplier(npc));
             long goldGain = monster.GetGoldReward();
 
             npc.GainExperience(expGain);
@@ -4731,7 +5059,7 @@ public class WorldSimulator
             if (dealtPct >= 0.30f)
             {
                 float xpScale = Math.Min(0.50f, dealtPct * 0.50f); // 30% dealt -> 15% reward, 90%+ -> 45%
-                long partialXP = (long)(monster.GetExperienceReward() * NpcXpMultiplier * xpScale);
+                long partialXP = (long)(monster.GetExperienceReward() * WorldSimXpMultiplier(npc) * xpScale);
                 if (partialXP > 0)
                     npc.GainExperience(partialXP);
             }
@@ -6228,7 +6556,7 @@ public class WorldSimulator
         // Small chance to gain experience from training
         if ((float)Random.Shared.NextDouble() < 0.3f)
         {
-            var expGain = (long)(Random.Shared.Next(10, 31) * NpcXpMultiplier);
+            var expGain = (long)(Random.Shared.Next(10, 31) * WorldSimXpMultiplier(npc));
             npc.GainExperience(expGain);
             // GD.Print($"[WorldSim] {npc.Name} trained and gained {expGain} experience");
         }

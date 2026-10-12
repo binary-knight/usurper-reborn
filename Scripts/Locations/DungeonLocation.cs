@@ -34,6 +34,11 @@ public class DungeonLocation : BaseLocation
     private DungeonFloor currentFloor = null!;
     private bool inRoomMode = false; // Are we exploring a room?
 
+    // 1.2.8: true while the player is on currentFloor in this visit (set once the floor is
+    // generated or resumed, cleared at the next entry and on leaving). currentFloor itself is
+    // kept as a cache after the player leaves, so a save may copy it only while this is true.
+    private bool floorActiveForSave;
+
     /// <summary>
     /// v0.60.3: public accessor for the currently-occupied dungeon room. Used by
     /// LocationManager when building the GMCP Room.Info exits map and by other
@@ -108,6 +113,7 @@ public class DungeonLocation : BaseLocation
         currentPlayer = player;
         terminal = term;
         _declinedCautious.Clear(); // v1.1.3: a new visit; the location object lives for the whole session
+        floorActiveForSave = false; // 1.2.8: a group follower or a blocked entry never owns currentFloor
 
         // Block entry if player is imprisoned
         if (player.DaysInPrison > 0)
@@ -303,6 +309,9 @@ public class DungeonLocation : BaseLocation
             term.SetColor("darkgray");
             await term.PressAnyKey(Loc.Get("dungeon.press_enter_continue"));
         }
+
+        // 1.2.8: the player now stands on currentFloor, so a save copies it first
+        floorActiveForSave = true;
 
         // Refresh bounty board quests based on player level
         QuestSystem.RefreshBountyBoard(player?.Level ?? 1, player?.Statistics?.DeepestDungeonLevel ?? 0);
@@ -4053,6 +4062,7 @@ public class DungeonLocation : BaseLocation
         {
             SaveFloorState(player);
         }
+        floorActiveForSave = false; // 1.2.8: left the floor; the cache is no longer live
 
         await base.NavigateToLocation(destination);
     }
@@ -5650,7 +5660,9 @@ public class DungeonLocation : BaseLocation
         }
 
         // Generate monsters appropriate for this room
-        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
+        // 1.2.8: the rules carry the real floor; a straggler room keeps its lower monster level. A boss room
+        // passes no rules, so its group is drawn as before 1.2.8.
+        var monsters = MonsterGenerator.GenerateMonsterGroup(effectiveMonsterLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel), RoomEncounterRules(currentDungeonLevel, room.IsBossRoom));
 
         // v0.61.3 (player report, post-v0.61.2 cleared floors): "champions
         // typically have more HP than the floor boss, regular enemies often
@@ -5720,23 +5732,11 @@ public class DungeonLocation : BaseLocation
             }
             else
             {
-                // Mixed encounter
-                terminal.Write(Loc.Get("dungeon.you_face_prefix"));
-                for (int i = 0; i < monsterGroups.Count; i++)
-                {
-                    var group = monsterGroups[i];
-                    string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);
-
-                    if (i > 0 && i == monsterGroups.Count - 1)
-                        terminal.Write(Loc.Get("dungeon.and_separator"));
-                    else if (i > 0)
-                        terminal.Write(", ");
-
-                    terminal.Write($"{group.Count} {plural}");
-                }
-                terminal.WriteLine("!");
+                // Mixed encounter (1.2.8: one row, wrapped at 79 columns when it is longer)
+                WriteMixedEncounterLine(terminal, monsters, GetPluralName);
             }
         }
+        WriteEliteIntro(monsters);   // 1.2.8: the elite of the group and what its affixes do
 
         terminal.WriteLine("");
 
@@ -5750,6 +5750,8 @@ public class DungeonLocation : BaseLocation
             BroadcastDungeonEvent(lang => bossRoom
                 ? $"\u001b[1;31m  *** {Loc.GetIn(lang, "dungeon.bc_boss_encounter", MonsterSummary(lang))} ***\u001b[0m"
                 : $"\u001b[1;33m  {Loc.GetIn(lang, "dungeon.bc_combat", MonsterSummary(lang))}\u001b[0m");
+            // 1.2.8: the elite's line, in each follower's language
+            if (monsters.Any(m => m.IsElite)) BroadcastDungeonEvent(EliteBroadcast(monsters));
         }
 
         await Pacing.Wait(1500);
@@ -5769,6 +5771,27 @@ public class DungeonLocation : BaseLocation
 
         // Combat
         var combatEngine = new CombatEngine(terminal);
+        // 1.2.8: the room's cleared state is set at the win, before the victory autosave and the loot
+        // screens, so a save there (or the disconnect save of a player who drops at them) keeps the
+        // room cleared; the check after the fight then sets nothing twice
+        // (a boss room's two BossDefeated flags too, so a reload keeps the boss dead; its rewards
+        // stay after the fight)
+        bool roomClearedAtVictory = false;
+        var fightFloor = currentFloor;
+        int fightLevel = currentDungeonLevel;
+        combatEngine.VictoryPreSaveHook = _ =>
+        {
+            if (player.HP <= 0) return;
+            room.IsCleared = true;
+            fightFloor.MonstersKilled += monsters.Count;
+            if (room.IsBossRoom)
+            {
+                fightFloor.BossDefeated = true;
+                if (player.DungeonFloorStates.TryGetValue(fightLevel, out var bossFloorState))
+                    bossFloorState.BossDefeated = true;
+            }
+            roomClearedAtVictory = true;
+        };
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
 
@@ -5792,8 +5815,11 @@ public class DungeonLocation : BaseLocation
         // Check if player survived AND won (fleeing doesn't clear the room)
         if (player.HP > 0 && combatResult.Outcome == CombatOutcome.Victory)
         {
-            room.IsCleared = true;
-            currentFloor.MonstersKilled += monsters.Count;
+            if (!roomClearedAtVictory)
+            {
+                room.IsCleared = true;
+                currentFloor.MonstersKilled += monsters.Count;
+            }
 
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.room_cleared"));
@@ -5801,12 +5827,15 @@ public class DungeonLocation : BaseLocation
 
             if (room.IsBossRoom)
             {
-                currentFloor.BossDefeated = true;
-
-                // Also set the persistent flag in floor state
-                if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                if (!roomClearedAtVictory)   // 1.2.8: else the win already set both flags
                 {
-                    floorState.BossDefeated = true;
+                    currentFloor.BossDefeated = true;
+
+                    // Also set the persistent flag in floor state
+                    if (player.DungeonFloorStates.TryGetValue(currentDungeonLevel, out var floorState))
+                    {
+                        floorState.BossDefeated = true;
+                    }
                 }
 
                 terminal.SetColor("bright_yellow");
@@ -6805,10 +6834,51 @@ public class DungeonLocation : BaseLocation
     /// <summary>
     /// Save current floor state to player's persistent data
     /// Called when leaving dungeon or changing floors
+    /// 1.2.8: the copy step (CopyFloorState) and the clear step (RecordFloorClear), so a save
+    /// can copy the floor without the clear step's quest notice.
     /// </summary>
     private void SaveFloorState(Character player)
     {
-        if (currentFloor == null || player == null) return;
+        var floorState = CopyFloorState(player);
+        if (floorState == null) return;
+        RecordFloorClear(floorState, currentDungeonLevel);
+    }
+
+    /// <summary>
+    /// 1.2.8: before a save serializes DungeonFloorStates, copy the floor the player is standing
+    /// on into it (the copy step only: no clear flags, no OnDungeonFloorCleared). Without this a
+    /// save taken mid-floor (the disconnect save above all) wrote no room progress for the
+    /// current floor, and the reload rebuilt it fresh. Runs only when this session's location is
+    /// the dungeon, its floor is live (floorActiveForSave) and the saved character is the one in
+    /// it. Never throws: a failed copy must not stop the save.
+    /// </summary>
+    internal static void FlushActiveFloorForSave(Character player)
+    {
+        try
+        {
+            if (player == null) return;
+            var manager = LocationManager.Existing;
+            if (manager == null || manager.GetCurrentLocation() != GameLocation.Dungeons) return;
+            if (manager.GetLocation(GameLocation.Dungeons) is not DungeonLocation dungeon) return;
+            dungeon.FlushFloorForSave(player);
+        }
+        catch (Exception ex)
+        {
+            DebugLogger.Instance.LogWarning("SAVE", $"Dungeon floor copy before save failed: {ex.Message}");
+        }
+    }
+
+    private void FlushFloorForSave(Character player)
+    {
+        if (!floorActiveForSave || currentFloor == null || currentFloor.Level != currentDungeonLevel) return;
+        if (!ReferenceEquals(player, currentPlayer)) return;
+        CopyFloorState(player);
+    }
+
+    /// <summary>1.2.8: the copy step of SaveFloorState: visit time, current room and room states.</summary>
+    private DungeonFloorState? CopyFloorState(Character player)
+    {
+        if (currentFloor == null || player == null) return null;
 
         var floorLevel = currentDungeonLevel;
 
@@ -6822,6 +6892,32 @@ public class DungeonLocation : BaseLocation
         floorState.LastVisitedAt = DateTime.Now;
         floorState.CurrentRoomId = currentFloor.CurrentRoomId;
 
+        // Save room states
+        floorState.RoomStates.Clear();
+        foreach (var room in currentFloor.Rooms)
+        {
+            floorState.RoomStates[room.Id] = new DungeonRoomState
+            {
+                RoomId = room.Id,
+                IsExplored = room.IsExplored,
+                IsCleared = room.IsCleared,
+                TreasureLooted = room.TreasureLooted,
+                TrapTriggered = room.TrapTriggered,
+                EventCompleted = room.EventCompleted,
+                PuzzleSolved = room.PuzzleSolved,
+                RiddleAnswered = room.RiddleAnswered,
+                LoreCollected = room.LoreCollected,
+                InsightGranted = room.InsightGranted,
+                MemoryTriggered = room.MemoryTriggered,
+                SecretBossDefeated = room.SecretBossDefeated
+            };
+        }
+        return floorState;
+    }
+
+    /// <summary>1.2.8: the clear step of SaveFloorState: the cleared flags and the quest notice.</summary>
+    private void RecordFloorClear(DungeonFloorState floorState, int floorLevel)
+    {
         // Check if floor is now fully cleared
         bool isNowCleared = IsFloorCleared();
         if (isNowCleared)
@@ -6845,27 +6941,6 @@ public class DungeonLocation : BaseLocation
             {
                 QuestSystem.OnDungeonFloorCleared(questPlayer, floorLevel);
             }
-        }
-
-        // Save room states
-        floorState.RoomStates.Clear();
-        foreach (var room in currentFloor.Rooms)
-        {
-            floorState.RoomStates[room.Id] = new DungeonRoomState
-            {
-                RoomId = room.Id,
-                IsExplored = room.IsExplored,
-                IsCleared = room.IsCleared,
-                TreasureLooted = room.TreasureLooted,
-                TrapTriggered = room.TrapTriggered,
-                EventCompleted = room.EventCompleted,
-                PuzzleSolved = room.PuzzleSolved,
-                RiddleAnswered = room.RiddleAnswered,
-                LoreCollected = room.LoreCollected,
-                InsightGranted = room.InsightGranted,
-                MemoryTriggered = room.MemoryTriggered,
-                SecretBossDefeated = room.SecretBossDefeated
-            };
         }
     }
 
@@ -7604,6 +7679,124 @@ public class DungeonLocation : BaseLocation
     }
     
     /// <summary>
+    /// 1.2.8: the encounter rules of a room fight. A regular room passes the dungeon rules with the real
+    /// floor; a boss room passes none, on every floor, so the group around its boss is drawn exactly as
+    /// before 1.2.8 (no template size, budget or caster).
+    /// </summary>
+    internal static EncounterRules? RoomEncounterRules(int realFloor, bool bossRoom) =>
+        bossRoom ? null : EncounterRules.Dungeon(realFloor);
+
+    /// <summary>
+    /// 1.2.8: the line that names the elite of an encounter and says what its affixes do, in the given
+    /// language; null when the encounter has no elite. Two descriptions (from floor 51) are joined by the
+    /// encounter line's own "and". The line can be longer than 79 columns: both writers wrap it.
+    /// </summary>
+    internal static string? EliteIntro(string lang, IReadOnlyList<Monster> monsters)
+    {
+        var elite = monsters.FirstOrDefault(m => m.IsElite);
+        if (elite == null) return null;
+        string does = string.Join(Loc.GetIn(lang, "dungeon.and_separator"),
+            elite.EliteAffixes.Select(affix => Loc.GetIn(lang, "monster.elite_desc." + affix)));
+        return Loc.GetIn(lang, monsters.Count > 1 ? "dungeon.elite_appears" : "dungeon.elite_appears_alone",
+            MonsterNames.DisplayIn(lang, elite), does);
+    }
+
+    /// <summary>
+    /// 1.2.8: the room fight's line for a group of more than one name ("You face 1 A, 1 B and 1 C!"), in the
+    /// reader's language, as one row. It can be longer than 79 columns with four or five long names on the
+    /// deep floors: the caller writes it through UIHelper.WriteRow, which leaves a row that fits as it is.
+    /// </summary>
+    internal static string MixedEncounterLine(IReadOnlyList<Monster> monsters, Func<string, string> englishPlural)
+    {
+        var groups = monsters.GroupBy(m => m.Name).Select(g => (Count: g.Count(), Sample: g.First())).ToList();
+        var line = new System.Text.StringBuilder(Loc.Get("dungeon.you_face_prefix"));
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (i > 0 && i == groups.Count - 1)
+                line.Append(Loc.Get("dungeon.and_separator"));
+            else if (i > 0)
+                line.Append(", ");
+            line.Append($"{groups[i].Count} {MonsterNames.Count(groups[i].Count, groups[i].Sample, englishPlural)}");
+        }
+        return line.Append('!').ToString();
+    }
+
+    /// <summary>1.2.8: writes MixedEncounterLine in the terminal's current colour through UIHelper.WriteRow:
+    /// one row when it fits 79 columns, word-wrapped rows when it does not.</summary>
+    internal static void WriteMixedEncounterLine(TerminalEmulator terminal, IReadOnlyList<Monster> monsters, Func<string, string> englishPlural) =>
+        UsurperRemake.UI.UIHelper.WriteRow(terminal, MixedEncounterLine(monsters, englishPlural));
+
+    /// <summary>
+    /// 1.2.8: the wandering encounter's line for a group of more than one name ("You encounter 1 A, 1 B and
+    /// 1 C!"), in the reader's language, as the rows it is written in; each row is its pieces in order, a
+    /// group's piece inside its own [colour]...[/] pair. A line that fits 79 visible columns is one row with
+    /// the pieces as they were written before 1.2.8. A longer line is cut where UIHelper.MessageRows wraps
+    /// its text without the markup; a group cut by a row end gets a whole pair on each row.
+    /// </summary>
+    internal static List<List<string>> WanderingEncounterRows(IReadOnlyList<Monster> monsters, Func<string, string> englishPlural)
+    {
+        var groups = monsters.GroupBy(m => m.Name).Select(g => (Count: g.Count(), Color: g.First().MonsterColor, Sample: g.First())).ToList();
+        var pieces = new List<(string Text, string? Color)> { (Loc.Get("dungeon.you_encounter"), null) };
+        for (int i = 0; i < groups.Count; i++)
+        {
+            if (i > 0 && i == groups.Count - 1)
+                pieces.Add((Loc.Get("dungeon.and_separator"), null));
+            else if (i > 0)
+                pieces.Add((", ", null));
+            pieces.Add(($"{groups[i].Count} {MonsterNames.Count(groups[i].Count, groups[i].Sample, englishPlural)}", groups[i].Color));
+        }
+        pieces.Add(("!", null));
+        static string Marked(string text, string? color) => color == null ? text : $"[{color}]{text}[/]";
+
+        string plain = string.Concat(pieces.Select(p => p.Text));
+        var wrapped = UsurperRemake.UI.UIHelper.MessageRows(plain);
+        if (wrapped.Count == 1 || string.Join(" ", wrapped) != plain)
+            return new List<List<string>> { pieces.Select(p => Marked(p.Text, p.Color)).ToList() };
+
+        var rows = new List<List<string>>();
+        int rowStart = 0;
+        foreach (string row in wrapped)
+        {
+            int rowEnd = rowStart + row.Length, pieceStart = 0;
+            var parts = new List<string>();
+            foreach (var (text, color) in pieces)
+            {
+                int from = Math.Max(pieceStart, rowStart), to = Math.Min(pieceStart + text.Length, rowEnd);
+                if (from < to) parts.Add(Marked(plain.Substring(from, to - from), color));
+                pieceStart += text.Length;
+            }
+            rows.Add(parts);
+            rowStart = rowEnd + 1;   // the space the wrap replaced
+        }
+        return rows;
+    }
+
+    /// <summary>1.2.8: writes WanderingEncounterRows piece by piece in the terminal's current colour, as before
+    /// 1.2.8, and leaves the last row open: the caller ends it.</summary>
+    internal static void WriteWanderingEncounterLine(TerminalEmulator terminal, IReadOnlyList<Monster> monsters, Func<string, string> englishPlural)
+    {
+        var rows = WanderingEncounterRows(monsters, englishPlural);
+        for (int i = 0; i < rows.Count; i++)
+        {
+            if (i > 0) terminal.WriteLine("");
+            foreach (string piece in rows[i]) terminal.Write(piece);
+        }
+    }
+
+    /// <summary>1.2.8: the elite's line as a group follower reads it, built in the follower's language
+    /// (BroadcastDungeonEvent wraps it to 79 columns).</summary>
+    internal static Func<string, string> EliteBroadcast(IReadOnlyList<Monster> monsters) =>
+        lang => $"\u001b[1;35m  {EliteIntro(lang, monsters)}\u001b[0m";
+
+    /// <summary>1.2.8: writes the elite's line to the player, wrapped to 79 columns; nothing without an elite.</summary>
+    private void WriteEliteIntro(List<Monster> monsters)
+    {
+        if (EliteIntro(GameConfig.Language, monsters) is not string intro) return;
+        terminal.SetColor("bright_magenta");
+        UsurperRemake.UI.UIHelper.WriteWrapped(terminal, intro);
+    }
+
+    /// <summary>
     /// Monster encounter - Pascal DUNGEVC.PAS mechanics
     /// </summary>
     private async Task MonsterEncounter()
@@ -7613,7 +7806,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine("");
 
         // Use new MonsterGenerator to create level-appropriate monsters
-        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel));
+        var monsters = MonsterGenerator.GenerateMonsterGroup(currentDungeonLevel, dungeonRandom, MonsterGenerator.OldGodApproachScale(currentDungeonLevel), EncounterRules.Dungeon(currentDungeonLevel));
 
         var combatEngine = new CombatEngine(terminal);
 
@@ -7669,24 +7862,12 @@ public class DungeonLocation : BaseLocation
             }
             else
             {
-                // Mixed encounter - show all monster types
-                terminal.Write(Loc.Get("dungeon.you_encounter"));
-                for (int i = 0; i < monsterGroups.Count; i++)
-                {
-                    var group = monsterGroups[i];
-                    string plural = MonsterNames.Count(group.Count, group.Sample, GetPluralName);
-
-                    if (i > 0 && i == monsterGroups.Count - 1)
-                        terminal.Write(Loc.Get("dungeon.and_separator"));
-                    else if (i > 0)
-                        terminal.Write(", ");
-
-                    terminal.Write($"[{group.Color}]{group.Count} {plural}[/]");
-                }
-                terminal.Write("!");
+                // Mixed encounter - show all monster types (1.2.8: wrapped at 79 columns when it is longer)
+                WriteWanderingEncounterLine(terminal, monsters, GetPluralName);
             }
             terminal.WriteLine("");
         }
+        WriteEliteIntro(monsters);   // 1.2.8: the elite of the group and what its affixes do
 
         // Show difficulty assessment
         var currentPlayer = GetCurrentPlayer();
@@ -9316,7 +9497,8 @@ public class DungeonLocation : BaseLocation
         var lyris = companionSystem.GetCompanion(UsurperRemake.Systems.CompanionId.Lyris);
 
         // Check if Lyris can be recruited
-        if (lyris == null || lyris.IsRecruited || lyris.IsDead || player.Level < lyris.RecruitLevel)
+        if (lyris == null || lyris.IsRecruited || lyris.IsDead || player.Level < lyris.RecruitLevel
+            || companionSystem.IsDeparted(UsurperRemake.Systems.CompanionId.Lyris))
         {
             return false;
         }
@@ -11580,6 +11762,10 @@ public class DungeonLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("dungeon.paid_fee", fee));
             }
 
+            // v1.2.8 (H3): an NPC that is not on the team comes under the ward by joining the party; told once,
+            // here at the joining (asked before it is in the party, so a team member gets no second row)
+            bool wardedBeforeJoining = WardSystem.IsWarded(npc);
+
             // Defensive duplicate check by NPC ID before adding
             if (!teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npc.ID))
             {
@@ -11595,6 +11781,11 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("green");
             terminal.WriteLine(Loc.Get("dungeon.npc_joins", npc.DisplayName));
             terminal.WriteLine(Loc.Get("dungeon.fight_alongside"));
+            if (!wardedBeforeJoining && WardSystem.IsWarded(npc, teammates))
+            {
+                terminal.SetColor("cyan");
+                terminal.WriteLine(WardSystem.PartyJoinRow(npc.DisplayName));   // v1.2.8 (H3)
+            }
 
             // Show XP penalty warning if applicable
             float xpMult = balanceSystem.CalculateXPMultiplier(player, teammates);
@@ -11898,7 +12089,7 @@ public class DungeonLocation : BaseLocation
         var companionSystem = UsurperRemake.Systems.CompanionSystem.Instance;
         var companion = companionSystem.GetCompanion(companionId);
 
-        if (companion == null || companion.IsRecruited || companion.IsDead)
+        if (companion == null || companion.IsRecruited || companion.IsDead || companionSystem.IsDeparted(companionId))
             return false;
 
         // Count non-companion teammates (NPCs, spouse, etc.)
@@ -12811,7 +13002,7 @@ public class DungeonLocation : BaseLocation
 
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
-        int healPerPotion = 30 + player.Level * 5 + 20;
+        int healPerPotion = (int)PotionBonus.AverageHeal(player, target); // 1.2.8: scaled by the teammate's MaxHP
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -12876,7 +13067,7 @@ public class DungeonLocation : BaseLocation
         for (int i = 0; i < potionsToUse && target.HP < target.MaxHP; i++)
         {
             player.Healing--;
-            int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+            int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, target); // 1.2.8: at least 20% of the teammate's MaxHP
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
@@ -12916,14 +13107,14 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
-        int healPerPotion = 30 + player.Level * 5 + 20;
-        healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
+        // 1.2.8: the estimate per receiver, scaled by that receiver's MaxHP; v1.1.11: the giver's Infirmary
+        int HealPerPotion(Character receiver) => (int)PotionBonus.ApplyOwnerBonuses(player, PotionBonus.AverageHeal(player, receiver));
         int totalPotionsUsed = 0;
         long totalHealing = 0;
 
         // Calculate total potions needed
         long playerMissing = player.MaxHP - player.HP;
-        int playerPotionsNeeded = playerMissing > 0 ? (int)Math.Ceiling((double)playerMissing / healPerPotion) : 0;
+        int playerPotionsNeeded = playerMissing > 0 ? (int)Math.Ceiling((double)playerMissing / HealPerPotion(player)) : 0;
 
         int teammatesPotionsNeeded = 0;
         foreach (var companion in companions)
@@ -12931,7 +13122,7 @@ public class DungeonLocation : BaseLocation
             long missing = companion.MaxHP - companion.HP;
             if (missing > 0)
             {
-                teammatesPotionsNeeded += (int)Math.Ceiling((double)missing / healPerPotion);
+                teammatesPotionsNeeded += (int)Math.Ceiling((double)missing / HealPerPotion(companion));
             }
         }
 
@@ -12999,7 +13190,7 @@ public class DungeonLocation : BaseLocation
             {
                 player.Healing--;
                 totalPotionsUsed++;
-                int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
                 player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             }
@@ -13019,7 +13210,7 @@ public class DungeonLocation : BaseLocation
                 {
                     player.Healing--;
                     totalPotionsUsed++;
-                    int healAmount = 30 + player.Level * 5 + dungeonRandom.Next(10, 31);
+                    int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, companion); // 1.2.8: at least 20% of the companion's MaxHP
                     healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }
@@ -19260,7 +19451,7 @@ public class DungeonLocation : BaseLocation
         else
         {
             long oldHP = player.HP;
-            int healAmount = 30 + player.Level * 5 + Random.Shared.Next(10, 31);
+            int healAmount = (int)PotionBonus.BaseHeal(player, Random.Shared, 31); // 1.2.8: at least 20% of MaxHP
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the follower's own Infirmary
             player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             long actualHeal = player.HP - oldHP;

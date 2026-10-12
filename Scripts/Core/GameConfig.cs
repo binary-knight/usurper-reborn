@@ -10,8 +10,8 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.2.7";
-    public const string VersionName = "Devotion"; // 1.2 line: Mental Health, the Sage and the gods
+    public const string Version = "1.3.0";
+    public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
     // as defense in depth against direct-mutation bypass sites that don't route through AlignmentSystem.ChangeAlignment.
@@ -201,6 +201,143 @@ public static partial class GameConfig
     /// TelemetryConsent.ApplyOperatorSwitch, which also clears the queue and id when it goes off.
     /// </summary>
     public static bool TelemetryPromptEnabled { get; set; } = false;
+
+    /// <summary>
+    /// 1.2.8 difficulty pass: a healing potion heals at least ScaledPotionMaxHPFraction of MaxHP, of the
+    /// character whose level the flat heal uses (PotionBonus.BaseHeal and AverageHeal). Default on. The
+    /// setter is internal: it is not a sysop setting; tests and the balance simulator turn it off to
+    /// reproduce the flat heal. Off or on, a potion draws the same random number.
+    /// </summary>
+    public static bool ScaledPotionsEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.2.8 difficulty pass: monsters choose their special ability with MonsterTactics (no wasted pick,
+    /// tier-1 signature abilities from monster level 3) and Predator and Skirmisher families weigh their
+    /// targets by trait. Default on. The setter is internal: it is not a sysop setting; tests and the
+    /// balance simulator turn it off. Off, every monster picks uniformly from its abilities and the fight
+    /// draws exactly the random numbers it drew before 1.2.8. Old God fights (BossContext) keep their own
+    /// picker either way.
+    /// </summary>
+    public static bool MonsterTacticsEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.2.8 difficulty pass: dungeon floors 4 to 10 build regular encounters from templates
+    /// (MonsterGenerator.GenerateMonsterGroup with EncounterRules.Dungeon): sizes 1, 2 and 3, one family half
+    /// the time, a budgeted group of 3 and one caster in a mixed group. Default on. The setter is internal:
+    /// it is not a sysop setting; tests and the balance simulator turn it off. Off, on any other floor and
+    /// for every caller outside the dungeon the generator draws exactly the random numbers it drew before
+    /// 1.2.8.
+    /// </summary>
+    public static bool EncounterTemplatesEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.2.8 difficulty pass: a regular dungeon encounter (MonsterGenerator.GenerateMonsterGroup with
+    /// EncounterRules.Dungeon) can promote one member to an elite after the group is built: more HP, damage
+    /// and defence, one affix (two from floor 51), a higher reward, and one member fewer in a group of 3 or
+    /// more. Never a champion encounter, never a boss room (it passes no rules), never floors 1 and 2.
+    /// Default on. The setter is internal: it is not a sysop setting; tests and the balance simulator turn
+    /// it off. Off, and for every caller that passes no rules, the generator draws exactly the random
+    /// numbers it drew before and returns the same group.
+    /// </summary>
+    public static bool EliteMonstersEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.2.8 difficulty pass: a player's physical attack on a monster rolls to hit (TrainingSystem.RollPlayerHit):
+    /// basic swings (each hand on its own), Power Attack, Precise Strike, Backstab, Smite, the ranged attack,
+    /// physical single-target class abilities and their off-hand follow-up, and the same for teammates and
+    /// companions. Old God fights roll; PvP, spells, magical and area abilities do not. The monster's evasion
+    /// check stays first; a miss deals nothing and fires no on-hit effect; the natural 20 of the hit die is
+    /// the basic swing's critical hit, in place of the separate die. Default on. The setter is internal: it is
+    /// not a sysop setting; tests and the balance simulator turn it off. Off, every fight draws exactly the
+    /// random numbers it drew before 1.2.8, the separate critical die included.
+    /// </summary>
+    public static bool PlayerHitRollEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.2.8 (H2): the recruit pool. The world keeps a pool of living, unteamed NPCs at levels 1 to
+    /// RecruitPoolMaxLevel for low-level players to hire (WorldSimulator.ProcessRecruitPoolTopUp), pool members
+    /// earn world-simulator experience at x1.0 (WorldSimulator.WorldSimXpMultiplier), a pool arrival is aged
+    /// RecruitPoolMinAge to RecruitPoolMaxAge, an NPC on a player's team does not age and cannot die of old age
+    /// (WorldSimulator.IsOnPlayerTeam, with RecruitOldAgeGraceDays after it leaves), an NPC of level 15 or lower
+    /// founds or joins an NPC team only while its band holds more than six free NPCs
+    /// (WorldSimulator.MayJoinNpcTeam), and the hire list is
+    /// sorted nearest the player's level first inside a relationship band. Default on. The setter is internal:
+    /// it is not a sysop setting and not in balance.json. Off, the world simulator draws exactly the random
+    /// numbers it drew before 1.2.8, the saved stamp is neither read nor written, and the list is level
+    /// descending.
+    /// </summary>
+    public static bool RecruitPoolEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.2.8 (H3): the ward. An NPC on a player's team, and an NPC in a player's dungeon party for the length
+    /// of that run, is warded (WardSystem.IsWarded; story companions are not). At the player's side the chance
+    /// that a fall is permanent is unchanged (PermadeathChanceDungeonTeam, the same draw at the same place);
+    /// the ward adds the story: a row at hiring, at joining the party and at leaving, a row when a fall is
+    /// not permanent, a scene and a lasting memory when it is. Away from the player a permanent death is
+    /// refused for an NPC on a player's team (WorldSimulator.RollPermadeathUnderWard). Default on. The setter
+    /// is internal: it is not a sysop setting and not in balance.json. Off, every death, every draw and
+    /// every line is as before 1.2.8.
+    /// </summary>
+    public static bool WardEnabled { get; internal set; } = true;
+
+    /// <summary>1.2.8 (H2): the highest level of a recruit pool member (the pool is levels 1 to 15).</summary>
+    public const int RecruitPoolMaxLevel = 15;
+    /// <summary>1.2.8 (H2): the top level of each pool band: 1 to 5, 6 to 10 and 11 to 15.</summary>
+    public static readonly int[] RecruitPoolBandTopLevels = { 5, 10, RecruitPoolMaxLevel };
+    /// <summary>1.2.8 (H2): the number of pool members the world keeps in each band.</summary>
+    public const int RecruitPoolPerBand = 6;
+    /// <summary>1.2.8 (H2): the whole pool (three bands of six).</summary>
+    public const int RecruitPoolSize = 3 * RecruitPoolPerBand;
+    /// <summary>1.2.8 (H2): a pool arrival is let in only while the town (the living NPCs plus those waiting
+    /// for their respawn) is below this: 190, where ordinary immigration slows (MaxNPCPopulation minus 10).
+    /// The pool so never lifts the town to MaxNPCPopulation, where pregnancies, comings of age and ordinary
+    /// immigration stop.</summary>
+    public const int RecruitPoolTownLimit = MaxNPCPopulation - 10;
+    /// <summary>1.2.8 (H2): world ticks between two pool arrivals (20 ticks is about 10 minutes at the
+    /// server's 30 second tick, so an empty pool fills in about 3 hours).</summary>
+    public const int RecruitPoolTicksBetweenArrivals = 20;
+    /// <summary>1.2.8 (H2): a pool arrival is aged 18 to 22 (other immigrants stay 20 to 35).</summary>
+    public const int RecruitPoolMinAge = 18;
+    public const int RecruitPoolMaxAge = 22;
+    /// <summary>1.2.8 (H2): real days an NPC cannot die of old age after it was last on a player's team.</summary>
+    public const int RecruitOldAgeGraceDays = 7;
+
+    /// <summary>1.2.8: the natural roll a player's attack needs is held in a window, as the monster's is
+    /// (AtLevelAccuracyGap): never below PlayerHitMinNeeded (a natural 1 always misses), at most
+    /// PlayerHitMaxNeededAtLevel against a target up to AtLevelAccuracyGap levels above the attacker (hit at
+    /// least 95%), at most PlayerHitMaxNeededAbove against a higher one (hit at least 65%). 1.3.0: the
+    /// at-level top is 2 (it was 3, hit at least 90%), which is PlayerHitMinNeeded: against a target up to
+    /// AtLevelAccuracyGap levels above, every roll needs exactly 2 and neither Dexterity nor the target's
+    /// armour class moves it.</summary>
+    public const int PlayerHitMinNeeded = 2;
+    public const int PlayerHitMaxNeededAtLevel = 2;
+    public const int PlayerHitMaxNeededAbove = 8;
+
+    /// <summary>1.2.8: Precise Strike needs this much less on the hit die (never below PlayerHitMinNeeded).</summary>
+    public const int PreciseStrikeNeededBonus = 4;
+
+    /// <summary>1.2.8: the chance that a regular dungeon encounter holds an elite, by the real dungeon floor:
+    /// none below EliteMinFloor, then floors 3 to 10, 11 to 30 and 31 and deeper.</summary>
+    public const int EliteMinFloor = 3;
+    public const double EliteChanceFloors3To10 = 0.08;
+    public const double EliteChanceFloors11To30 = 0.10;
+    public const double EliteChanceFloors31Plus = 0.12;
+
+    /// <summary>1.2.8: an elite carries two affixes from this dungeon floor on, one above it.</summary>
+    public const int EliteSecondAffixFloor = 51;
+
+    /// <summary>1.2.8: an elite's stats over the member it was promoted from: HP; Strength, Punch and WeapPow;
+    /// Defence and ArmPow.</summary>
+    public const double EliteHpMultiplier = 1.6;
+    public const double EliteDamageMultiplier = 1.15;
+    public const double EliteDefenceMultiplier = 1.1;
+
+    /// <summary>1.2.8: an elite's experience and gold over the member it was promoted from.</summary>
+    public const double EliteExperienceMultiplier = 1.6;
+    public const double EliteGoldMultiplier = 1.5;
+
+    /// <summary>1.2.8: the share of MaxHP a healing potion heals at least while ScaledPotionsEnabled is on.</summary>
+    public const double ScaledPotionMaxHPFraction = 0.20;
 
     // ============================================================
     // v0.65.6 Renewable resurrections (player-experience analysis:
@@ -841,6 +978,7 @@ public static partial class GameConfig
     // NPC Murder/Assassination System (v0.40.2)
     public const float MurderGoldTheftPercent = 0.50f;       // Steal 50% of NPC's gold on murder
     public const int MurderDarknessGain = 250;                // 50 -> 250 (paired with -125 chivalry).
+    public const int MaxNpcDuelsPerDay = 3;                   // 1.2.8: one daily cap for NPC duels won, at the Inn and in town (Character.InnDuelsToday)
     public const int MaxMurdersPerDay = 3;                    // v0.57.6: cap non-bounty NPC murders to prevent a dark-aligned player from wiping the town in a single play session.
     public const int MaxAlignedSparesPerDay = 3;              // v0.64.1: cap the +10 paired-good alignment reward from sparing beaten PvP NPCs (mirror of the murder cap; sparing itself is never blocked).
 
@@ -1421,6 +1559,13 @@ public static partial class GameConfig
     // Economy Tuning (v0.30.9)
     public const int NpcRecruitmentCostPerLevel = 2000;       // Gold cost per NPC level to recruit (was hardcoded 500)
     public const int NpcDailyWagePerLevel = 100;              // Daily gold wage per NPC level for team members
+    // v1.2.8: the per-level part of the hire price and the wage are the LOWER of the linear term above and
+    // a square term (level * level * factor). The two meet at level 25, so nothing changes from level 25 up.
+    public const int NpcRecruitmentCostPerLevelSquared = 80;  // Hire price: level * level * 80 (equals level * 2000 at level 25)
+    public const int NpcDailyWagePerLevelSquared = 4;         // Daily wage: level * level * 4 (equals level * 100 at level 25)
+    // v1.2.8: an NPC above the recruiter's level costs 5% more per level above, up to x1.5 (10 or more above).
+    public const int RecruitAboveLevelPercentPerLevel = 5;    // The 5% step, in percent of the base price
+    public const int RecruitAboveLevelMaxPercent = 150;       // The x1.5 cap, in percent of the base price
     public const int MaxUnpaidWageDays = 3;                   // NPC leaves team after this many days of unpaid wages
 
     // v0.57.11: Relationship-based recruitment price multipliers.
@@ -2312,6 +2457,18 @@ public static partial class GameConfig
     // v1.2 (design item G): an NPC left to die while the player could have helped
     public const int AbandonPenaltySteps = 2;
     public const int AbandonCompanionLoyaltyPenalty = 15;
+    // 1.2.8: team betrayal. Each murder a companion witnesses and each companion left to die adds
+    // the points once per event; a loyalty gain of the minimum or more (raw, before difficulty)
+    // takes off its amount and counts as a kindness. At the warning a companion grows cold; at the
+    // threshold the least loyal leaves. Forgiveness at the Temple brings them back at the rejoin loyalty.
+    public const int TeamBetrayalPointsPerEvent = 15;
+    public const int TeamBetrayalKindnessMinGain = 5;
+    public const int TeamBetrayalWarningPoints = 50;
+    public const int TeamBetrayalRejoinLoyalty = 50;
+    // 1.2.8: an act of atonement in the Temple's Faith room, once a game day while a companion is
+    // gone: costs Math.Max(BetrayalAtonementMinCost, BetrayalAtonementCostPerLevel * player level) gold.
+    public const int BetrayalAtonementMinCost = 100;
+    public const int BetrayalAtonementCostPerLevel = 100;
     // v1.2: teammate self-preservation. Below the first, a companion or NPC teammate with no
     // heal left prefers a defensive or evasive ability; below the second it braces (Defend,
     // half damage) instead of attacking.

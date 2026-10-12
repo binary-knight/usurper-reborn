@@ -944,19 +944,60 @@ public partial class TeamSystem
     /// </summary>
     public static long GetRecruitmentBaseCost(NPC npc, Character recruiter)
     {
-        long baseCost = npc.Level * GameConfig.NpcRecruitmentCostPerLevel
+        long baseCost = GetRecruitmentLevelCost(npc.Level)
                       + (npc.Strength + npc.Defence + npc.Agility) * 20;
 
-        // Level-gap modifier preserves the pre-v0.57.11 behavior: overlevelled
-        // NPCs cost more, underlevelled NPCs cost less. Applied BEFORE the
-        // relationship multiplier so social standing layers on top.
+        // Level-gap modifier: overlevelled NPCs cost more, underlevelled NPCs
+        // cost less. Applied BEFORE the relationship multiplier so social
+        // standing layers on top. v1.2.8: the surcharge is graded (5% per level
+        // above the recruiter, capped at x1.5), in whole percent so no price is
+        // lost to a rounding of 1.15 or 1.35.
         if (npc.Level > recruiter.Level)
-            baseCost = (long)(baseCost * 1.5);
+            baseCost = baseCost * GetRecruitmentAboveLevelPercent(npc.Level, recruiter.Level) / 100;
         else if (npc.Level < recruiter.Level - 5)
             baseCost = (long)(baseCost * 0.7);
 
         return Math.Max(100, baseCost);
     }
+
+    /// <summary>
+    /// v1.2.8: the per-level part of the hire price, the lower of level * 2000 and level * level * 80.
+    /// The two are equal at level 25, so the price is unchanged from level 25 up.
+    /// </summary>
+    public static long GetRecruitmentLevelCost(int level)
+    {
+        long linear = (long)level * GameConfig.NpcRecruitmentCostPerLevel;
+        long square = (long)level * level * GameConfig.NpcRecruitmentCostPerLevelSquared;
+        return Math.Min(linear, square);
+    }
+
+    /// <summary>
+    /// v1.2.8: the price of an NPC above the recruiter's level, in percent of the base price: 5% per
+    /// level above, capped at 150 (10 or more levels above). 100 when the NPC is not above.
+    /// </summary>
+    public static int GetRecruitmentAboveLevelPercent(int npcLevel, int recruiterLevel)
+    {
+        long above = (long)npcLevel - recruiterLevel;
+        if (above <= 0) return 100;
+        return (int)Math.Min(GameConfig.RecruitAboveLevelMaxPercent,
+                             100 + above * GameConfig.RecruitAboveLevelPercentPerLevel);
+    }
+
+    /// <summary>
+    /// v1.2.8: the daily wage of a team NPC, the lower of level * 100 and level * level * 4, never
+    /// below 1 gold (levels 1 to 3 pay 4, 16 and 36). Equal to level * 100 from level 25 up. The hire
+    /// list, the line shown after hiring and the daily charge all read this one method.
+    /// </summary>
+    public static long GetDailyWage(int level)
+    {
+        if (level <= 0) return 0;
+        long linear = (long)level * GameConfig.NpcDailyWagePerLevel;
+        long square = (long)level * level * GameConfig.NpcDailyWagePerLevelSquared;
+        return Math.Max(1, Math.Min(linear, square));
+    }
+
+    /// <summary>v1.2.8: the daily wage of this team NPC (see <see cref="GetDailyWage(int)"/>).</summary>
+    public static long GetDailyWage(NPC npc) => GetDailyWage(npc.Level);
 
     /// <summary>
     /// v0.57.11: final recruitment cost (base × relationship multiplier). Returns
@@ -994,6 +1035,13 @@ public partial class TeamSystem
     /// That's a design call — if we wanted to hide refused NPCs too, change
     /// this filter to also exclude `band == Refused`.
     /// </summary>
+    /// <summary>
+    /// v1.2.8 (H2): the town locations the Team Corner hire list and its name search read. A recruit pool
+    /// arrival is placed in one of them (NPCSpawnSystem.GenerateImmigrantNPC).
+    /// </summary>
+    public static readonly string[] RecruitTownLocations =
+        { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+
     public static bool IsRecruitable(Character player, NPC npc, out RecruitmentBand band)
     {
         band = RecruitmentBand.Neutral;

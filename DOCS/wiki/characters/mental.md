@@ -1,8 +1,9 @@
 ---
 title: Mental health
 path: /wiki/en/characters/mental/
-checked: 1.2.0
-sources: Scripts/Systems/MentalSystem.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+checked: 1.3.0
+sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.0 | none
 ---
 Mental measures how well your character is coping, separately from HP. Status shows your current Mental and band. It is saved with your character.
 
@@ -13,6 +14,15 @@ Mental measures how well your character is coping, separately from HP. Status sh
 Entering new dungeon rooms and finishing monster fights add fractional, depth-dependent strain. Revisited rooms do not charge new-room strain. Race, class and living story companions modify the rate.
 
 Fleeing, near-death finishes, bosses, death, grief, disasters and drug effects can cause separate losses. Player fights do not charge the ordinary monster-fight Mental losses. Being in town does not by itself slowly restore Mental.
+
+## Strain by race and class
+
+Your race and your class each scale dungeon strain, as a percent of the normal amount:
+
+- Race: Troll, Orc, Gnoll and Mutant {{balance:MentalStrainRacePctHardy}}; Elf and Hobbit {{balance:MentalStrainRacePctSensitive}}; Half-Elf and Gnome {{balance:MentalStrainRacePctUneasy}}; Human and Dwarf 100.
+- Class: Assassin, Abysswarden and Voidreaver {{balance:MentalStrainClassPctDark}}; Sage {{balance:MentalStrainClassPctSage}}; Barbarian {{balance:MentalStrainClassPctBarbarian}}; Cleric, Paladin and Tidesworn {{balance:MentalStrainClassPctDevout}}; Bard and Jester {{balance:MentalStrainClassPctPerformer}}; every other class 100.
+
+Your rate is the race percent times the class percent, divided by 100 and rounded to the nearest whole percent, halves rounding up. A Mutant Sage, an Orc Assassin, a Gnoll Assassin and a Mutant Assassin each take 68 percent; an Elf Bard takes 132 percent. Each living story companion in your party then cuts strain by {{balance:MentalStrainCompanionCutPct}} percent, up to {{balance:MentalStrainCompanionCutMaxPct}} percent. The percentages apply to dungeon strain only, not to the separate losses above. [Races](/wiki/en/characters/races/) lists the classes each race cannot take.
 
 ## Recovery
 
@@ -39,7 +49,7 @@ Use Talk Therapy at the Healer to clear Broken and restore Mental. Addiction Reh
 
 Addiction lowers your ordinary recovery cap. Drug highs can temporarily exceed it but later crash; therapy can also lift Mental above the cap until the daily reset. Rehab removes addiction and its cap.
 
-From Devout onward, your [god's ward](/wiki/en/gods/favor/) protects a particular Mental loss. It does not remove every source of strain.
+From Devout onward, your [god's ward](/wiki/en/gods/favor/) reduces a particular Mental loss; it does not block it. It does not remove every source of strain.
 
 :::spoiler Exact hidden effects and collapse boundary
 The deeper-collapse boundary is dungeon floor {{balance:MentalCollapseDeathFloor}}. Rescue sets Mental to {{balance:MentalCollapseRescueMental}} and takes {{balance:MentalCollapseGoldFeePct}} percent of carried gold.

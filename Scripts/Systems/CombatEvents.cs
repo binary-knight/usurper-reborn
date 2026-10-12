@@ -14,14 +14,18 @@ public enum CombatEventKind { Basic, Ability, Spell, Dot, Heal, Potion }
 /// 1.2.6: one hit or heal in a monster fight, raised where the engine applies the amount it already
 /// computed. A use event (IsUse) marks one spell cast, ability use or potion drunk by the actor; it has
 /// amount 0 and its target is the actor's own side. TargetFell is set on the first event that left a
-/// player or team target at 0 HP in this fight.
+/// player or team target at 0 HP in this fight. 1.2.8: a roll event (IsRoll) marks one to-hit die rolled by
+/// the actor against a monster (CombatEngine.ShowPlayerHitRoll); it has amount 0, and Missed says the
+/// strike did not land.
 /// </summary>
 public readonly record struct CombatEvent(
-    CombatSide Actor, CombatSide Target, long Amount, CombatEventKind Kind, bool IsUse = false, bool TargetFell = false);
+    CombatSide Actor, CombatSide Target, long Amount, CombatEventKind Kind, bool IsUse = false, bool TargetFell = false,
+    bool IsRoll = false, bool Missed = false);
 
 /// <summary>1.2.6: the facts of a fight known before its first blow. FirstActor is 0 when the player's
-/// side acts first, 1 when monsters won an ambush and struck first.</summary>
-public readonly record struct CombatFightStart(int FloorActual, int Difficulty, int PartySize, int EncounterSize, int FirstActor);
+/// side acts first, 1 when monsters won an ambush and struck first. 1.2.8: EliteCount is the number of the
+/// encounter's monsters that are elites (Monster.IsElite), taken with EncounterSize.</summary>
+public readonly record struct CombatFightStart(int FloorActual, int Difficulty, int PartySize, int EncounterSize, int FirstActor, int EliteCount = 0);
 
 /// <summary>1.2.6: receives a monster fight's events from CombatEngine.Observer. An exception thrown
 /// here is caught by the engine and logged once per fight; the fight goes on.</summary>
@@ -57,6 +61,14 @@ public sealed class CombatTally : ICombatObserver
     public int SpellsUsed { get; private set; }
     public int TeammatesLost { get; private set; }
     public long PlayerHpEnd { get; private set; }
+    /// <summary>1.2.8: the to-hit dice the fight's own player rolled (CombatEvent.IsRoll, actor Player).
+    /// 0 for a fight with the to-hit roll switched off. A teammate's, companion's or grouped
+    /// follower's die is not counted, nor is an evaded or a certain swing (no die is rolled).</summary>
+    public int PlayerSwings { get; private set; }
+    /// <summary>1.2.8: those of PlayerSwings whose strike did not land (a natural 1 too).</summary>
+    public int PlayerMisses { get; private set; }
+    /// <summary>1.2.8: the elites among the monsters counted in EncounterSize.</summary>
+    public int EliteCount { get; private set; }
     /// <summary>True once the fight start arrived (the fight was entered).</summary>
     public bool Started { get; private set; }
     /// <summary>True once the fight end arrived (PlayerHpEnd is set).</summary>
@@ -70,10 +82,18 @@ public sealed class CombatTally : ICombatObserver
         PartySize = start.PartySize;
         EncounterSize = start.EncounterSize;
         FirstActor = start.FirstActor;
+        EliteCount = start.EliteCount;
     }
 
     public void OnEvent(CombatEvent e)
     {
+        if (e.IsRoll)
+        {
+            if (e.Actor != CombatSide.Player) return;
+            PlayerSwings++;
+            if (e.Missed) PlayerMisses++;
+            return;
+        }
         if (e.TargetFell && e.Target == CombatSide.Team) TeammatesLost++;
         if (e.IsUse)
         {
@@ -177,9 +197,14 @@ public partial class CombatEngine
         {
             int party = 1;
             if (teammates != null) foreach (var t in teammates) if (t != null && t.IsAlive) party++;
-            int encounter = 0;
-            foreach (var m in monsters) if (m != null && m.IsAlive) encounter++;
-            var start = new CombatFightStart(MentalFightFloor(player), (int)player.Difficulty, party, encounter, monstersFirst ? 1 : 0);
+            int encounter = 0, elites = 0;
+            foreach (var m in monsters)
+            {
+                if (m == null || !m.IsAlive) continue;
+                encounter++;
+                if (m.IsElite) elites++;
+            }
+            var start = new CombatFightStart(MentalFightFloor(player), (int)player.Difficulty, party, encounter, monstersFirst ? 1 : 0, elites);
             _eventTally.OnFightStart(start);
             var o = Observer;
             if (o != null) o.OnFightStart(start);
@@ -290,6 +315,14 @@ public partial class CombatEngine
     {
         if (_eventTally == null || target == null || amount <= 0) return;
         RaiseCombatEvent(new CombatEvent(healer == null ? SideOf(target) : SideOf(healer), SideOf(target), amount, kind));
+    }
+
+    /// <summary>1.2.8: one to-hit die rolled by a player-side combatant against a monster, and whether the
+    /// strike landed. Reads only the values handed to it and draws nothing.</summary>
+    private void EvRoll(Character? attacker, bool landed)
+    {
+        if (_eventTally == null) return;
+        RaiseCombatEvent(new CombatEvent(SideOf(attacker), CombatSide.Monster, 0, _actKind, IsRoll: true, Missed: !landed));
     }
 
     /// <summary>One spell cast, ability use or potion drunk.</summary>

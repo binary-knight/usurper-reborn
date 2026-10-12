@@ -1679,7 +1679,7 @@ namespace UsurperRemake.Systems
                 if (SpellSystem.CanCastSpell(player, spell.Level))
                 {
                     terminal.SetColor("cyan");
-                    terminal.WriteLine($"  {Loc.Get("world_boss.spell_option", castableSpells.Count + 1, spell.DisplayName, spell.ManaCost)}");
+                    terminal.WriteLine($"  {Loc.Get("world_boss.spell_option", castableSpells.Count + 1, spell.DisplayName, SpellSystem.CalculateManaCost(spell, player))}");   // 1.2.8: what the cast charges this player
                     castableSpells.Add(spell);
                 }
             }

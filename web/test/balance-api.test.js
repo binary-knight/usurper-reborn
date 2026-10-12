@@ -304,6 +304,58 @@ test('class performance and xp economy count only the window', async () => {
   });
 });
 
+// 1.2.8 class charts: a player count per class and a level band.
+function fillBands(w) {
+  insertFight(w, { player_name: 'LowOne', player_level: 5, player_class: 'Warrior', ago: '-3 hours', tally: tallyOf({}) });
+  insertFight(w, { player_name: 'LowOne', player_level: 5, player_class: 'Warrior', ago: '-4 hours', tally: tallyOf({}) });
+  insertFight(w, { player_name: 'LowTwo', player_level: 6, player_class: 'Warrior', ago: '-5 hours', tally: tallyOf({}) });
+  insertFight(w, { player_name: 'HighOne', player_level: 25, player_class: 'Mage', ago: '-3 hours', tally: tallyOf({}) });
+  insertFight(w, { player_name: 'Top', player_level: 45, player_class: 'Jester', ago: '-3 hours', tally: tallyOf({}) });
+}
+
+test('class performance rows carry the number of distinct players', async () => {
+  await withApi(fillBands, async (a) => {
+    const c = (await a.call('/api/balance/class-performance')).body;
+    assert.deepStrictEqual(c.rows.map((x) => [x.player_class, x.total, x.players]), [['Warrior', 3, 2], ['Jester', 1, 1], ['Mage', 1, 1]]);
+    assert.strictEqual(c.levels, 'all');
+  });
+});
+
+test('class performance ?levels= keeps only that band of player_level', async () => {
+  await withApi(fillBands, async (a) => {
+    const rows = async (q) => (await a.call('/api/balance/class-performance?levels=' + encodeURIComponent(q))).body.rows.map((x) => [x.player_class, x.total, x.players]);
+    assert.deepStrictEqual(await rows('20-29'), [['Mage', 1, 1]]);
+    assert.deepStrictEqual(await rows('1-9'), [['Warrior', 3, 2]]);
+    assert.deepStrictEqual(await rows('40+'), [['Jester', 1, 1]]);
+    assert.deepStrictEqual(await rows('10-19'), []);
+    assert.deepStrictEqual(await rows('all'), [['Warrior', 3, 2], ['Jester', 1, 1], ['Mage', 1, 1]]);
+  });
+});
+
+test('class performance refuses an unknown level band with 400 and never reaches the database', async () => {
+  await withApi(fillBands, async (a) => {
+    for (const bad of ['1;drop', '1-9 OR 1=1', '5-15', '', '0-9', '40', '-1', '%27']) {
+      a.prepared.length = 0;
+      const r = await a.call('/api/balance/class-performance?levels=' + encodeURIComponent(bad));
+      assert.strictEqual(r.status, 400, JSON.stringify(bad));
+      assert.match(r.body.error, /Unknown level band/);
+      assert.strictEqual(a.prepared.length, 0, 'no combat query ran for ' + JSON.stringify(bad));
+    }
+  });
+});
+
+test('the levels filter is a plain comparison on player_level, bound as two integers', async () => {
+  await withApi(fillBands, async (a) => {
+    a.prepared.length = 0;
+    const r = await a.call('/api/balance/class-performance?levels=20-29');
+    assert.strictEqual(r.status, 200);
+    const q = a.prepared.find((p) => /FROM combat_events\s+WHERE created_at/.test(p.sql));
+    assert.match(q.sql, /\bplayer_level >= \? AND player_level <= \?/);
+    assert.doesNotMatch(q.sql, /\w\(\s*player_level/, 'no function of player_level');
+    assert.deepStrictEqual(q.args.slice(1), [20, 29]);
+  });
+});
+
 // ---------------------------------------------------------------- difficulty
 
 test('difficulty: 5-floor bands from floor_actual, bosses in their own row, the rest on the no-floor line', async () => {
@@ -387,7 +439,8 @@ test('npc behaviour: team runs included, goal rows left out, percentages over th
 // ---------------------------------------------------------------- read-only and plans
 
 const REFRESHED = ['overview', 'class-performance', 'xp-economy', 'death-hotspots', 'recent', 'one-hit-kills', 'boss-fights',
-  'player-activity', 'suspects', 'difficulty', 'difficulty?class=Warrior&difficulty=1'];
+  'player-activity', 'suspects', 'difficulty', 'difficulty?class=Warrior&difficulty=1',
+  'class-performance?levels=20-29'];
 
 test('every refreshed combat query is read-only and searches an index (no full scan of combat_events)', async () => {
   // enough rows on both sides that a full scan would be a real cost

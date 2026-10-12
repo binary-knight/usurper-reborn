@@ -1708,7 +1708,11 @@ namespace UsurperRemake.Systems
                 _ => ending.ToString()
             };
 
-            // Defiant ends mortally; Usurper/Savior/TrueEnding offer immortality.
+            // TriggerEnding offers ascension (OfferImmortality, which also emits the immortal_ascension
+            // overlay) after every ending except Secret, Defiant included, on the terminal and for a
+            // graphical client alike; a Defiant ascends with the alignment "Balance".
+            // ImmortalityOffered is a field of the end card payload. It is false for Defiant and for
+            // Secret. No client reads it: the end card is drawn from the title and the statistics.
             // Dissolution returns early in TriggerEnding before we'd reach the loop.
             bool offerImmortal = ending != EndingType.Secret && ending != EndingType.Defiant;
             bool offerNgPlus = ending != EndingType.Secret;

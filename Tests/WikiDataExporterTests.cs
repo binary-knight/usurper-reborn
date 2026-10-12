@@ -209,7 +209,8 @@ public class WikiDataExporterIsolationTests
             WikiDataExporter.Export(changed);
 
             Assert.Equal(GoblinHp(baseline), GoblinHp(changed));
-            Assert.Equal(baseMana, Entry(changed, "spells", spellId).GetProperty("manaCost").GetInt32());
+            // 1.2.8: the mana of the export is what a cast charges before Wisdom, 10 + 5 per slot; no override reaches it
+            Assert.Equal(SpellSystem.BaseManaCost(spell.Level), Entry(changed, "spells", spellId).GetProperty("manaCost").GetInt32());
             Assert.Equal(baseCooldown, Entry(changed, "abilities", ability.Id).GetProperty("cooldown").GetInt32());
         }
         finally

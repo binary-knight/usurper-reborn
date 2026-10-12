@@ -1,8 +1,9 @@
 ---
 title: New Game Plus (NG+) and cycles
 path: /wiki/en/characters/new-game-plus/
-checked: 1.2.7
+checked: 1.3.0
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MetaProgressionSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.0 | A new character, on NG+ too, starts with no record of betrayals.
 history: 1.2.7 | none
 history: 1.2.6 | The new character's name cannot contain < > & or a double quote.
 history: 1.2.5 | The ending, ascension and Eternal Cycle screens, including the prestige class list and descriptions, are shown in all five languages.
@@ -17,13 +18,15 @@ NG+ is offered only after the main story's final encounter ends with an ending. 
 
 The NG+ screen shows your current and next cycle and the prestige classes the ending unlocks. Ascending instead turns the character into a [player-god](/wiki/en/gods/player-gods/).
 
+An alt character cannot ascend; the game then offers it the Eternal Cycle. Reaching the level cap of 100 is not required for either path.
+
 ## What carries over
 
 NG+ creates a brand new character. The old save is replaced, and these do not carry over:
 
 - level, experience, gold, equipment and items;
 - your god and Favor (you choose a god again at the Temple);
-- story progress, seals, artifacts, companions and romances.
+- story progress, seals, artifacts, companions, romances and the record of betrayals.
 
 In single-player the town, its NPCs and your family also start fresh. Online, the world is shared, so the town stays, and children of your previous life no longer count as yours.
 

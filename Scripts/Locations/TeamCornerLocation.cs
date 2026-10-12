@@ -705,6 +705,15 @@ public class TeamCornerLocation : BaseLocation
 
         await ShowTeamMembers(currentPlayer.Team, true);
 
+        // v1.2.8 (H3): the ward is named where the team is shown, when a hired member is under it
+        var statusTeam = currentPlayer.Team;
+        if (NPCSpawnSystem.Instance.ActiveNPCs.Any(n => n.Team == statusTeam && WardSystem.IsWarded(n)))
+        {
+            terminal.WriteLine("");
+            terminal.SetColor("cyan");
+            terminal.WriteLine(WardSystem.TeamViewRow());
+        }
+
         terminal.WriteLine("");
         terminal.SetColor("darkgray");
         await terminal.PressAnyKey();
@@ -1457,6 +1466,9 @@ public class TeamCornerLocation : BaseLocation
         if (await terminal.AskYesNoAsync(""))
         {
             string oldTeam = currentPlayer.Team;
+            // v1.2.8 (H3): asked while the team is still a player's team
+            bool wardedMembers = NPCSpawnSystem.Instance.ActiveNPCs.Any(n => n.Team == oldTeam && WardSystem.IsWarded(n));
+            bool lastPlayerLeft = true;
             currentPlayer.Team = "";
             currentPlayer.TeamPW = "";
             currentPlayer.CTurf = false;
@@ -1488,6 +1500,7 @@ public class TeamCornerLocation : BaseLocation
 
                 // v1.1.12: the protection is kept while a player is still on the team; it was dropped on
                 // every quit, which left the members still in it open to the NPC AI
+                lastPlayerLeft = remainingPlayers.Count == 0;
                 if (remainingPlayers.Count == 0)
                     WorldSimulator.UnregisterPlayerTeam(oldTeam);
 
@@ -1502,6 +1515,13 @@ public class TeamCornerLocation : BaseLocation
             terminal.WriteLine("");
             terminal.SetColor("bright_green");
             terminal.WriteLine(Loc.Get("team.left_team"));
+            // v1.2.8 (H3): the hired members stay behind without a player: the ward lifts from them
+            if (wardedMembers && lastPlayerLeft)
+            {
+                terminal.SetColor("cyan");
+                foreach (var row in WardSystem.LiftTeamRows())
+                    terminal.WriteLine(row);
+            }
             terminal.WriteLine("");
 
             NewsSystem.Instance.Newsy(true, Loc.Get("team.news_left", currentPlayer.DisplayName, oldTeam));
@@ -1529,7 +1549,7 @@ public class TeamCornerLocation : BaseLocation
     ///      Filters out lovers / spouses / FWB / exes via RomanceTracker,
     ///      scripted NPCs, prisoners, dead NPCs, NPCs already on other teams.
     ///   3. Sort by relationship band (Friend > Neutral > Rival > Refused),
-    ///      then level descending within each band.
+    ///      then nearest the player's level first within each band (v1.2.8).
     ///   4. Render page of 12 rows with relationship tags, price multipliers,
     ///      and [S]earch / [F]ilter / [N]ext / [P]rev / [Q]uit footer.
     ///   5. On digit select, show price-breakdown confirmation before charging.
@@ -1679,11 +1699,11 @@ public class TeamCornerLocation : BaseLocation
     /// already on other teams are excluded. Enemy / Hate tier NPCs are
     /// INCLUDED (with band = Refused) so the player sees they exist and can't
     /// be recruited — narrative signal. Sort: band asc (Friend first, Refused
-    /// last), then level desc within band.
+    /// last), then nearest the player's level first within band (v1.2.8).
     /// </summary>
     private List<RecruitmentRow> BuildRecruitmentCandidates(List<NPC> allNPCs, UsurperRemake.Data.SpecRole? roleFilter)
     {
-        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var townLocations = TeamSystem.RecruitTownLocations;   // v1.2.8 (H2): one list, also read by the pool arrival
         var rows = new List<RecruitmentRow>();
 
         foreach (var npc in allNPCs)
@@ -1708,11 +1728,11 @@ public class TeamCornerLocation : BaseLocation
                 Band = band,
                 Multiplier = mult,
                 Cost = cost,
-                DailyWage = npc.Level * GameConfig.NpcDailyWagePerLevel,
+                DailyWage = TeamSystem.GetDailyWage(npc),
             });
         }
 
-        // Sort: Family (0, top) → Friend (1) → Neutral (2) → Rival (3) → Refused (4), then level desc.
+        // Sort: Family (0, top) → Friend (1) → Neutral (2) → Rival (3) → Refused (4), then the level order below.
         // v0.63.0 slice 3b C3: adult children sort to the top because the player
         // overwhelmingly wants to find their kids fast in the recruit list.
         int BandOrder(TeamSystem.RecruitmentBand b) => b switch
@@ -1724,6 +1744,19 @@ public class TeamCornerLocation : BaseLocation
             TeamSystem.RecruitmentBand.Refused  => 4,
             _ => 99, // Hidden shouldn't appear — IsRecruitable filters it out
         };
+
+        // v1.2.8 (H2): inside a band the NPC nearest the player's level comes first (ties: the lower level,
+        // then the name as stored, so the order is stable). With the switch off: level descending as before.
+        if (GameConfig.RecruitPoolEnabled)
+        {
+            int playerLevel = currentPlayer?.Level ?? 1;
+            return rows
+                .OrderBy(r => BandOrder(r.Band))
+                .ThenBy(r => Math.Abs(r.Npc.Level - playerLevel))
+                .ThenBy(r => r.Npc.Level)
+                .ThenBy(r => r.Npc.Name2 ?? "", StringComparer.Ordinal)
+                .ToList();
+        }
 
         return rows
             .OrderBy(r => BandOrder(r.Band))
@@ -1868,7 +1901,7 @@ public class TeamCornerLocation : BaseLocation
         // tell the player "no, that's your spouse" instead of "no match found"
         // when they type a specific name.
         var lookup = raw;
-        var townLocations = new[] { "Main Street", "Auction House", "Inn", "Temple", "Church", "Weapon Shop", "Armor Shop", "Castle", "Bank", "Team Corner" };
+        var townLocations = TeamSystem.RecruitTownLocations;   // v1.2.8 (H2): one list, also read by the pool arrival
         var pool = allNPCs.Where(n => n.IsAlive && !n.IsDead && string.IsNullOrEmpty(n.Team)
                                    && townLocations.Contains(n.CurrentLocation)
                                    && !n.IsSpecialNPC
@@ -2136,9 +2169,16 @@ public class TeamCornerLocation : BaseLocation
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.npc_joined", recruit.DisplayName));
         terminal.WriteLine(Loc.Get("team.paid_recruitment", $"{liveCost:N0}"));
-        long wage = recruit.Level * GameConfig.NpcDailyWagePerLevel;
+        long wage = TeamSystem.GetDailyWage(recruit);
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("team.daily_wage", $"{wage:N0}"));
+        // v1.2.8 (H3): the ward is laid on the new member
+        if (WardSystem.IsWarded(recruit))
+        {
+            terminal.SetColor("cyan");
+            foreach (var row in WardSystem.HireRows(recruit.DisplayName))
+                terminal.WriteLine(row);
+        }
         terminal.WriteLine("");
         terminal.SetColor("bright_cyan");
         terminal.WriteLine(Loc.Get("team.recruit_quote", recruit.DisplayName));
@@ -2671,6 +2711,7 @@ public class TeamCornerLocation : BaseLocation
             await Pacing.Wait(2000);
             return;
         }
+        bool wardedBeforeSack = WardSystem.IsWarded(live);   // v1.2.8 (H3): asked while still on the team
         live.Team = "";
         live.TeamPW = "";
         live.CTurf = false;
@@ -2678,6 +2719,12 @@ public class TeamCornerLocation : BaseLocation
         terminal.WriteLine("");
         terminal.SetColor("bright_green");
         terminal.WriteLine(Loc.Get("team.member_sacked", live.DisplayName));
+        if (wardedBeforeSack)
+        {
+            terminal.SetColor("cyan");
+            foreach (var row in WardSystem.LiftRows(live.DisplayName))   // v1.2.8 (H3)
+                terminal.WriteLine(row);
+        }
         terminal.WriteLine("");
 
         NewsSystem.Instance.Newsy(true, Loc.Get("team.news_sacked", live.DisplayName, currentPlayer.Team));

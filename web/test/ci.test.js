@@ -106,3 +106,47 @@ test('the web tarball leaves out web/test and keeps what is served', () => {
     fs.rmSync(root, { recursive: true, force: true });
   }
 });
+
+// 1.2.8 (CodeQL actions/missing-workflow-permissions): the token every job gets.
+// The block of a "permissions:" key at the given indent, as { scope: level }, or a string for
+// the one-line forms (read-all, write-all, {}). null when the text has no such key.
+function permissionsAt(block, indent) {
+  const lines = block.split('\n');
+  const pad = ' '.repeat(indent);
+  const i = lines.findIndex((l) => l.startsWith(pad + 'permissions:') && !/^\s/.test(l.slice(indent)));
+  if (i < 0) return null;
+  const inline = lines[i].slice(indent + 'permissions:'.length).trim();
+  if (inline) return inline;
+  const scopes = {};
+  for (let j = i + 1; j < lines.length; j++) {
+    const m = lines[j].match(/^(\s*)([a-z-]+):\s*(\S+)\s*$/);
+    if (!m || m[1].length <= indent) break;
+    scopes[m[2]] = m[3];
+  }
+  return scopes;
+}
+
+function jobNames() {
+  const lines = text.split('\n');
+  const start = lines.indexOf('jobs:');
+  assert.ok(start >= 0, 'ci-cd.yml has a jobs: key');
+  return lines.slice(start + 1).map((l) => l.match(/^  ([A-Za-z0-9_-]+):\s*$/)).filter(Boolean).map((m) => m[1]);
+}
+
+test('ci-cd.yml: the top-level token is contents: read and nothing else', () => {
+  const top = text.slice(0, text.indexOf('\njobs:'));
+  assert.deepStrictEqual(permissionsAt(top, 0), { contents: 'read' });
+});
+
+test('ci-cd.yml: attach-to-release alone writes, and only contents', () => {
+  const names = jobNames();
+  assert.ok(names.length >= 11, 'all jobs found: ' + names.join(', '));
+  for (const name of names) {
+    const perms = permissionsAt(jobBlock(name), 4);
+    if (name === 'attach-to-release') {
+      assert.deepStrictEqual(perms, { contents: 'write' }, 'attach-to-release uploads the release assets');
+    } else {
+      assert.strictEqual(perms, null, `${name} takes the top-level read-only token`);
+    }
+  }
+});

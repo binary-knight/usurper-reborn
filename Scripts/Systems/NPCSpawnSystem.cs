@@ -1373,8 +1373,10 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Generate an immigrant NPC for a specific race and sex.
         /// Used by the immigration system to replenish extinct/critical races.
+        /// v1.2.8 (H2): with forRecruitPool the level is targetLevel as given, the age is 18 to 22 and the
+        /// start location is one the hire list reads; without it nothing changed, draw for draw.
         /// </summary>
-        public NPC? GenerateImmigrantNPC(CharacterRace race, CharacterSex sex, int targetLevel)
+        public NPC? GenerateImmigrantNPC(CharacterRace race, CharacterSex sex, int targetLevel, bool forRecruitPool = false)
         {
             try
             {
@@ -1386,12 +1388,20 @@ namespace UsurperRemake.Systems
                 CharacterClass npcClass = PickWeightedClass(race);
 
                 // Age 20-35
-                int age = 20 + random.Next(16);
+                // v1.2.8 (H2): a recruit pool arrival is aged RecruitPoolMinAge to RecruitPoolMaxAge (18 to 22)
+                int age = forRecruitPool
+                    ? GameConfig.RecruitPoolMinAge + random.Next(GameConfig.RecruitPoolMaxAge - GameConfig.RecruitPoolMinAge + 1)
+                    : 20 + random.Next(16);
 
                 // Level scaled to average of alive NPCs (±3 variance, min 1)
                 // In single-player, ensure immigrants span a wider range (not all low level)
                 int level;
-                if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
+                if (forRecruitPool)
+                {
+                    // v1.2.8 (H2): the caller drew the level inside the pool band; it is taken as given
+                    level = Math.Max(1, targetLevel);
+                }
+                else if (!UsurperRemake.BBS.DoorMode.IsOnlineMode)
                 {
                     // Single-player: randomize immigrants across 1-60 range so the world stays diverse
                     int floor = Math.Max(targetLevel, 10);
@@ -1426,7 +1436,10 @@ namespace UsurperRemake.Systems
                     Intelligence = baseStat + random.Next(5),
                     Charisma = baseStat + random.Next(5),
                     Gold = 100 + level * 50,
-                    CurrentLocation = GetRandomStartLocation(),
+                    // v1.2.8 (H2): a pool arrival stands where the hire list looks, so it can be hired at once
+                    CurrentLocation = forRecruitPool
+                        ? TeamSystem.RecruitTownLocations[random.Next(TeamSystem.RecruitTownLocations.Length)]
+                        : GetRandomStartLocation(),
                     AI = CharacterAI.Computer,
                     BirthDate = birthDate
                 };

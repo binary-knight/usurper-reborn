@@ -36,6 +36,42 @@ test("stable IDs, generated numbers and complete references", () => {
   );
   assert.ok(fs.existsSync(path.join(temp, "site/en/items/1000/index.html")));
 });
+test("the spells table shows the level that opens a spell and the mana a cast charges", () => {
+  const { data } = loadData(dataDir);
+  // slots open at these levels (SpellSystem.TableLevelRequired); a cast charges 10 + 5 per slot before Wisdom
+  const slotLevel = [1, 4, 8, 12, 16, 20, 25, 28, 32, 36, 40, 44, 47, 50, 54, 58, 62, 66, 70, 75, 80, 85, 90, 95, 100];
+  for (const e of data.spells) {
+    assert.equal(e.manaCost, 10 + 5 * e.level, `${e.id} mana`);
+    assert.ok(e.levelRequired >= slotLevel[e.level - 1], `${e.id} level`);
+  }
+  const clerics = data.spells.filter((e) => e.classId === "Cleric");
+  assert.equal(clerics.length, 25);
+  for (const e of clerics)
+    assert.equal(e.levelRequired, slotLevel[e.level - 1], `${e.id} level`);
+  assert.equal(
+    data.spells.find((e) => e.id === "Wavecaller:5").levelRequired,
+    22,
+  );
+  const guide = result.pages.find(
+    (p) => p.path === "/wiki/en/characters/spells/",
+  ).body;
+  assert.match(guide, /<th[^>]*>Mana \(before Wisdom\)<\/th>/);
+  assert.doesNotMatch(guide, /<th[^>]*>Mana<\/th>/);
+  const row = guide
+    .split("</tr>")
+    .find((r) => r.includes("/wiki/en/characters/spells/Cleric-5/"));
+  const cells = [...row.matchAll(/<td[^>]*>(.*?)<\/td>/gs)].map((m) => m[1]);
+  // the spell name is the row header, so the cells are class, level, mana, effect
+  assert.equal(cells[0], "Cleric");
+  assert.equal(cells[1], "16", "slot 5 opens at level 16");
+  assert.equal(cells[2], "35", "slot 5 costs 10 + 25 before Wisdom");
+  const page = result.pages.find(
+    (p) => p.path === "/wiki/en/characters/spells/Cleric-5/",
+  ).body;
+  assert.match(page, /Required Level<\/th><td>16/);
+  assert.match(page, /Mana Before Wisdom<\/th><td>35/);
+  assert.match(page, /Wisdom lowers the mana a cast costs/);
+});
 test("secret entities have no standalone pages or search text", () => {
   const { data } = loadData(dataDir);
   const index = JSON.stringify(result.search);

@@ -1563,6 +1563,9 @@ public class StreetEncounterSystem
         bool isBrawl = false, bool isHonorDuel = false, long rageStrengthFlat = 0, double rageStrengthMult = 1.0,
         double rageHpMult = 1.0)
     {
+        // The fight runs on a Monster copy, so the town NPC's own HP is still its HP from before the fight.
+        long hpBeforeFight = npc.HP;
+
         // 1.2.1: a rage buff raises the Monster's strength (and its punch, which is half of it) for
         // this fight only. It used to be written onto the world NPC and never undone.
         long fightStrength = (long)(npc.Strength * rageStrengthMult) + rageStrengthFlat;
@@ -1673,8 +1676,9 @@ public class StreetEncounterSystem
             result.ExperienceGained = expGain;
             result.GoldGained = goldGain;
 
-            // Handle NPC death
-            npc.HP = 0;
+            // The beaten NPC drops to 0 HP. An honor duel spares it: its HP stays as it was before the fight
+            // (an NPC already at 0 stays at 0).
+            npc.HP = isHonorDuel ? hpBeforeFight : 0;
 
             // Record defeat memory on the real NPC for consequence encounters
             var realNpc = NPCSpawnSystem.Instance?.GetNPCByName(npc.Name2 ?? npc.Name);
@@ -1693,10 +1697,11 @@ public class StreetEncounterSystem
 
             // Check for bounty reward BEFORE calling OnNPCDefeated
             string npcNameForBounty = npc.Name ?? npc.Name2 ?? "";
-            long bountyReward = QuestSystem.AutoCompleteBountyForNPC(player, npcNameForBounty);
+            // A spared NPC was not killed: a kill contract on it is neither paid nor ticked, as in the Inn's duel.
+            long bountyReward = QuestSystem.AutoCompleteBountyForNPC(player, npcNameForBounty, includeKillContracts: !isHonorDuel);
 
             // Update quest progress (don't duplicate bounty processing)
-            QuestSystem.OnNPCDefeated(player, npc);
+            QuestSystem.OnNPCDefeated(player, npc, killed: !isHonorDuel);
 
             // Show bounty reward if any
             if (bountyReward > 0)

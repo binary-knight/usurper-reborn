@@ -72,9 +72,28 @@ public class Monster
     // Special monster flags
     public bool IsBoss { get; set; } = false;
     public bool IsMiniBoss { get; set; } = false;       // Champion/elite monsters (10% random encounters)
+    /// <summary>1.2.8: an elite of a regular dungeon group (MonsterGenerator.PromoteElite). Run time only, never
+    /// saved. An elite is not a mini-boss: fear, stun and loot rules treat it as a regular monster.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsElite { get; set; } = false;
+    /// <summary>1.2.8: the elite's affixes as MonsterGenerator.EliteAffixIds ids ("frenzied"), the outermost
+    /// word of its name first; one, or two from GameConfig.EliteSecondAffixFloor. Empty for every other
+    /// monster. Run time only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<string> EliteAffixes { get; set; } = new List<string>();
+    /// <summary>1.2.8: the state of an elite's affixes in a fight (UsurperRemake.Systems.EliteAffixes). A
+    /// Frenzied elite has had its one Strength rise; a Commanding elite's line has been shown; a Mending
+    /// elite may mend again from this round. Run time only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EliteFrenzyUsed { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EliteCommandShown { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EliteMendReadyRound { get; set; } = 0;
     public bool IsUnique { get; set; } = false;
     public bool CanSpeak { get; set; } = false;         // From Pascal mon_talk setting
     public bool IsProperName { get; set; } = false;     // Named NPCs (no "The" prefix)
+    public bool CallerPaysReward { get; set; } = false; // 1.2.8: the caller pays a flat reward; the engine pays no XP, gold or loot
 
     /// <summary>
     /// Returns name with appropriate article: "The Drake" for generic monsters, "Dahlia Coldstream" for named NPCs
@@ -222,6 +241,9 @@ public class Monster
     public string MonsterColor { get; set; } = "white";     // Color for display
     public string AttackType { get; set; } = "physical";    // Attack type (physical, fire, poison, etc.)
     public List<string> SpecialAbilities { get; set; } = new List<string>();  // Special abilities
+    /// <summary>1.2.8: tier-1 signature abilities (MonsterFamilies.MonsterTier.SignatureAbilities). Read only by
+    /// MonsterTactics, from monster level 3 and while GameConfig.MonsterTacticsEnabled is on.</summary>
+    public List<string> SignatureAbilities { get; set; } = new List<string>();
 
     /// <summary>
     /// Constructor for creating a monster

@@ -132,6 +132,13 @@ public partial class GameEngine
     }
 
     /// <summary>
+    /// v1.2.8 (F5): the engine of this session or process if one exists; unlike Instance it never makes one
+    /// (the world sim's thread asks which team the current player is on, and must not create an engine to ask).
+    /// </summary>
+    internal static GameEngine? InstanceIfAny =>
+        UsurperRemake.Server.SessionContext.Current?.Engine ?? _fallbackInstance ?? (lazyInstance.IsValueCreated ? lazyInstance.Value : null);
+
+    /// <summary>
     /// Set the instance explicitly
     /// </summary>
     public static void SetInstance(GameEngine engine)
@@ -4690,29 +4697,6 @@ public partial class GameEngine
             DebugLogger.Instance.LogError("WYWEG", $"Failed to show 'While you were gone': {ex.Message}");
         }
     }
-
-    /// <summary>
-    /// Get user data path (cross-platform)
-    /// </summary>
-    private string GetUserDataPath()
-    {
-        var appName = "UsurperReloaded";
-
-        if (System.Environment.OSVersion.Platform == PlatformID.Win32NT)
-        {
-            return System.IO.Path.Combine(System.Environment.GetFolderPath(System.Environment.SpecialFolder.ApplicationData), appName);
-        }
-        else if (System.Environment.OSVersion.Platform == PlatformID.Unix)
-        {
-            var home = System.Environment.GetEnvironmentVariable("HOME");
-            return System.IO.Path.Combine(home ?? "/tmp", ".local", "share", appName);
-        }
-        else
-        {
-            var home = System.Environment.GetEnvironmentVariable("HOME");
-            return System.IO.Path.Combine(home ?? "/tmp", "Library", "Application Support", appName);
-        }
-    }
     
     /// <summary>
     /// Load existing game from save file
@@ -4821,7 +4805,7 @@ public partial class GameEngine
     /// </summary>
     /// <summary>
     /// The narrative systems a new character starts without. 1.2.5: the answered moral paradoxes too,
-    /// so a new character in the same process is offered them again.
+    /// so a new character in the same process is offered them again. 1.2.8: the betrayal state too.
     /// </summary>
     internal static void ResetNarrativeSystemsForNewGame()
     {
@@ -4831,6 +4815,7 @@ public partial class GameEngine
         UsurperRemake.Systems.OceanPhilosophySystem.Instance.Reset();
         UsurperRemake.Systems.GriefSystem.Instance.Reset();
         UsurperRemake.Systems.MoralParadoxSystem.Instance.Reset();
+        UsurperRemake.Systems.BetrayalSystem.Instance.Reset();
     }
 
     public static int ClearLeftoversForNewCharacter(string? name2)
@@ -6752,6 +6737,7 @@ public partial class GameEngine
                 IsAgedDeath = data.IsAgedDeath,
                 IsPermaDead = data.IsPermaDead,
                 DeathDate = data.DeathDate,
+                LastOnPlayerTeamAt = data.LastOnPlayerTeamAt,   // v1.2.8 (H2)
                 PregnancyDueDate = data.PregnancyDueDate,
                 PregnancyFatherName = data.PregnancyFatherName,
 

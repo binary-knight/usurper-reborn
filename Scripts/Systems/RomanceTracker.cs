@@ -504,6 +504,27 @@ namespace UsurperRemake.Systems
                     // GD.Print($"[Romance] {lover.NPCId} is getting jealous!");
                 }
             }
+
+            RecordInfidelityIfWronged(newLoverId);
+        }
+
+        /// <summary>
+        /// 1.2.8: a new lover while a spouse who agreed to no other (not polyamorous, not told) or an
+        /// exclusive lover who was not told is wronged: the beloved's betrayal turns pending, once per new
+        /// lover, shown at the next town safe point. Only a partner who is an NPC counts (a player partner
+        /// never does). Reads the partner lists and writes only the player's own betrayal state; never the
+        /// marriage, the lovers, the jealousy, the relationship records or any NPC.
+        /// </summary>
+        private void RecordInfidelityIfWronged(string newLoverId)
+        {
+            if (!BetrayalSystem.InPlayerSession) return;
+
+            var wronged = Spouses.Where(s => !s.AcceptsPolyamory && !s.KnowsAboutOthers).Select(s => s.NPCId)
+                .Concat(CurrentLovers.Where(l => l.IsExclusive && !l.KnowsAboutOthers && l.NPCId != newLoverId).Select(l => l.NPCId));
+            var npcs = NPCSpawnSystem.Instance?.ActiveNPCs;
+            var partner = wronged.FirstOrDefault(id => !string.IsNullOrEmpty(id) && npcs != null && npcs.Any(n => n.ID == id));
+            if (partner != null)
+                BetrayalSystem.Instance.RecordInfidelity(partner);
         }
 
         /// <summary>

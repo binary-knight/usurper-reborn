@@ -442,6 +442,69 @@ public static class TrainingSystem
     }
 
     /// <summary>
+    /// 1.2.8 difficulty pass: the attack modifier of a player's to-hit roll. It is RollAttack's sum for a basic
+    /// attack (Strength, basic attack proficiency, level, weapon power) with Dexterity added inside the same
+    /// diminished sum.
+    /// </summary>
+    public static int PlayerHitModifier(Character attacker)
+    {
+        int statMod = (int)((attacker.Strength - 10) / 3);
+        int dexMod = (int)((attacker.Dexterity - 10) / 4);
+        int profMod = GetRollModifier(GetSkillProficiency(attacker, "basic_attack"));
+        int levelMod = attacker.Level / 5;
+        int equipMod = (int)(attacker.WeapPow / 20);
+        int rawMod = statMod + dexMod + profMod + levelMod + equipMod;
+        return rawMod <= 6 ? rawMod : 6 + (rawMod - 6) / 3;
+    }
+
+    /// <summary>
+    /// 1.2.8: the armour class a player's attack rolls against: the monster's level and Defence, the attacker's
+    /// rage (+4), power stance (+2), blessing (-2), royal blessing (-2) and blindness (+6), plus acBonus.
+    /// </summary>
+    public static int PlayerHitTargetAC(Character attacker, Monster target, int acBonus = 0)
+    {
+        int ac = 10 + (target.Level / 2) + (int)(target.Defence / 10);
+        if (attacker.IsRaging) ac += 4;
+        if (attacker.HasStatus(StatusEffect.PowerStance)) ac += 2;
+        if (attacker.HasStatus(StatusEffect.Blessed)) ac -= 2;
+        if (attacker.HasStatus(StatusEffect.RoyalBlessing)) ac -= 2;
+        if (attacker.Blind || attacker.HasStatus(StatusEffect.Blinded)) ac += 6;
+        return ac + acBonus;
+    }
+
+    /// <summary>
+    /// 1.2.8: the natural roll a player's attack needs, after the clamp. The window mirrors the monster's
+    /// (RollMonsterAttack): at most PlayerHitMaxNeededAtLevel against a target up to AtLevelAccuracyGap levels
+    /// above the attacker, at most PlayerHitMaxNeededAbove against a higher one, never below
+    /// PlayerHitMinNeeded. acBonus raises the armour class and the top of the window alike; neededBonus is
+    /// taken off the clamped roll (Precise Strike).
+    /// </summary>
+    public static int PlayerHitNeeded(Character attacker, Monster target, int acBonus = 0, int neededBonus = 0)
+    {
+        int needed = PlayerHitTargetAC(attacker, target, acBonus) - PlayerHitModifier(attacker);
+        bool atLevel = target.Level <= attacker.Level + GameConfig.AtLevelAccuracyGap;
+        int maxNeeded = (atLevel ? GameConfig.PlayerHitMaxNeededAtLevel : GameConfig.PlayerHitMaxNeededAbove) + acBonus;
+        needed = Math.Min(needed, maxNeeded);
+        needed -= neededBonus;
+        return Math.Max(needed, GameConfig.PlayerHitMinNeeded);
+    }
+
+    /// <summary>
+    /// 1.2.8 difficulty pass: a player's (or a teammate's) to-hit roll against a monster. One die from rng: a
+    /// natural 1 always misses, a natural 20 always hits, anything else hits when it reaches the needed roll
+    /// (PlayerHitNeeded). There are no damage tiers for beating the roll by a margin: the caller deals the
+    /// damage it dealt before, and takes the natural 20 as the basic swing's critical hit.
+    /// </summary>
+    public static PlayerHitRoll RollPlayerHit(Character attacker, Monster target, int acBonus, Random? rng, int neededBonus = 0)
+    {
+        rng ??= Random.Shared;
+        int needed = PlayerHitNeeded(attacker, target, acBonus, neededBonus);
+        int natural = rng.Next(1, 21);
+        bool hit = natural == 20 || (natural != 1 && natural >= needed);
+        return new PlayerHitRoll(natural, needed, hit);
+    }
+
+    /// <summary>
     /// Calculate the DC for an ability based on monster level
     /// </summary>
     public static int CalculateAbilityDC(int monsterLevel)
@@ -1206,6 +1269,14 @@ public static class TrainingSystem
 
         return skills;
     }
+}
+
+/// <summary>1.2.8: a player's to-hit roll: the natural roll, the natural roll it needed after the clamp, and
+/// whether it hit.</summary>
+public readonly record struct PlayerHitRoll(int Natural, int Needed, bool Hit)
+{
+    public bool IsNatural1 => Natural == 1;
+    public bool IsNatural20 => Natural == 20;
 }
 
 /// <summary>

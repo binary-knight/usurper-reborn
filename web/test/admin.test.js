@@ -191,3 +191,21 @@ test('admin raw JSON editor and reset dailies buttons run through the delegated 
   h.p.click(h.p.el('panel-daily').querySelector('[data-action="reset-dailies"]'));
   assert.deepStrictEqual(h.calls.map((c) => c[0]), ['saveRawJson', 'resetDailies']);
 });
+
+test('admin SSL card (1.2.8): a certificate that failed validation is shown with its code, escaped', async () => {
+  const version = { version: '1', sizeMB: '1', modifiedAt: null };
+  const { h, b } = await both((p, v) => p.ctx.renderSslVersion({ expiresAt: null, daysRemaining: null, issuer: null, certValid: false, validationError: v }, version));
+  check(h, b, 'ssl-version-body', 'ssl card');
+  const shown = b.p.el('ssl-version-body').textContent;
+  assert.ok(shown.includes('Certificate failed validation: Alice (expiry unknown)'), shown);
+  assert.ok(!shown.includes('Certificate info unavailable'), 'the failure replaces the unavailable line');
+  assert.ok(h.p.el('ssl-version-body').textContent.includes(HOSTILE), 'code shown as text');
+  const { p } = await page();
+  p.ctx.renderSslVersion({ expiresAt: '2031-01-01T00:00:00.000Z', daysRemaining: 5, issuer: 'X', certValid: false, validationError: 'ERR_TLS_CERT_ALTNAME_INVALID' }, version);
+  const withDate = p.el('ssl-version-body').textContent;
+  assert.ok(withDate.includes('Certificate failed validation: ERR_TLS_CERT_ALTNAME_INVALID'), withDate);
+  assert.ok(!withDate.includes('expiry unknown') && withDate.includes('Days Left'), 'a known expiry is still shown');
+  p.ctx.renderSslVersion({ expiresAt: null, daysRemaining: null, issuer: null }, version);
+  assert.ok(p.el('ssl-version-body').textContent.includes('Certificate info unavailable'), 'no result at all reads as before');
+  assert.ok(!p.el('ssl-version-body').textContent.includes('failed validation'));
+});

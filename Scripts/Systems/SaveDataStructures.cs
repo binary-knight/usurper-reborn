@@ -122,6 +122,44 @@ namespace UsurperRemake.Systems
 
         // Amnesia System
         public AmnesiaData? Amnesia { get; set; }
+
+        // 1.2.8: Betrayal System; null in a save written before 1.2.8
+        public BetrayalSaveData? Betrayal { get; set; }
+    }
+
+    /// <summary>
+    /// 1.2.8: the betrayal state of one character: each betrayer's profile, the betrayal records and
+    /// the companion who left after a team betrayal. Enums are stored as numbers.
+    /// </summary>
+    public class BetrayalSaveData
+    {
+        public List<BetrayalProfileSaveData> Profiles { get; set; } = new();
+        public List<ActiveBetrayalSaveData> Records { get; set; } = new();
+        public int? DepartedCompanionId { get; set; }
+    }
+
+    public class BetrayalProfileSaveData
+    {
+        public string NPCId { get; set; } = "";
+        public int BetrayalPoints { get; set; }
+        public bool IsPendingBetrayal { get; set; }
+        public string TriggerReason { get; set; } = "";
+        public bool HasBetrayed { get; set; }
+        public bool WasForgiven { get; set; }
+        public int BetrayalDay { get; set; }
+        public bool WarningShown { get; set; }
+        public List<KindnessAct> ActsOfKindness { get; set; } = new();
+    }
+
+    public class ActiveBetrayalSaveData
+    {
+        public string NPCId { get; set; } = "";
+        public int Type { get; set; }
+        public int Day { get; set; }
+        public bool IsSacrifice { get; set; }
+        public bool CanBeResolved { get; set; }
+        public bool IsResolved { get; set; }
+        public int Resolution { get; set; }
     }
 
     /// <summary>
@@ -966,6 +1004,7 @@ namespace UsurperRemake.Systems
         public bool IsAgedDeath { get; set; }
         public bool IsPermaDead { get; set; }  // Permanent combat death (v0.42.0)
         public DateTime? DeathDate { get; set; }  // v0.65.5: prune grace window for permanent deaths
+        public DateTime? LastOnPlayerTeamAt { get; set; }  // v1.2.8 (H2): null on older saves (never on a player's team)
         public DateTime? PregnancyDueDate { get; set; }
         public string? PregnancyFatherName { get; set; }
 

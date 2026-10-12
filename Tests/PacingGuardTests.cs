@@ -29,7 +29,7 @@ public class PacingGuardTests
     {
         ["Scripts/BBS/SocketTerminal.cs"] = 2,          // socket would-block retry
         ["Scripts/Systems/OnlineStateManager.cs"] = 1,  // roster lock poll
-        ["Scripts/Systems/OnlinePlaySystem.cs"] = 5,    // relay drain and connect waits
+        ["Scripts/Systems/OnlinePlaySystem.cs"] = 4,    // relay drain and connect waits, SSH read poll (1.2.8: the reconnect waits share one helper)
         ["Scripts/Systems/CombatEngine.cs"] = 1,        // skippable pause, input poll with elapsed counter
         ["Scripts/Core/GameEngine.cs"] = 1,             // wait for the world sim to stop
         ["Scripts/Systems/OnlineAdminConsole.cs"] = 1,  // input drain

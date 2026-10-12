@@ -311,6 +311,10 @@ namespace UsurperRemake.Systems
             var choice = await GetPlayerChoice(paradox, player, terminal);
             if (choice == null) return null;
 
+            // 1.2.8: Lyris's farewell is spoken before she dies (only while she travels with the player)
+            if (choice.CompanionDeath == "Lyris")
+                await BetrayalSystem.Instance.RunLyrisSacrifice(player, terminal);
+
             // Display outcome
             await DisplayOutcome(choice, terminal);
 

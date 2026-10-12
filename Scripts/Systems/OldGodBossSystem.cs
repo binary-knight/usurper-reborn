@@ -1395,6 +1395,9 @@ namespace UsurperRemake.Systems
 
             await terminal.PressAnyKey();
 
+            // 1.2.8: the Stranger's betrayal scene, once, before the fight; it catches its own failure
+            await BetrayalSystem.Instance.RunStrangerRevelation(player, terminal);
+
             // Partial heal — Noctura wants a "fair" fight
             long healAmount = (player.MaxHP - player.HP) / 2;
             if (healAmount > 0)

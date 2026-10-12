@@ -890,6 +890,14 @@ public abstract class BaseLocation
                 }
             }
 
+            // 1.2.8: a pending team or romantic betrayal, shown here between actions; never in a
+            // dungeon (this loop also runs there) or in prison
+            if (currentPlayer != null)
+            {
+                bool inPrison = currentPlayer.DaysInPrison > 0 || this is PrisonLocation || this is PrisonWalkLocation;
+                await BetrayalSystem.Instance.ShowPendingAtSafePoint(currentPlayer, terminal, isDungeon: this is DungeonLocation, inPrison: inPrison);
+            }
+
             // In MUD streaming mode: show the full location display only on the first iteration
             // (or after `look`/`l` resets the flag). Subsequent iterations just flow output
             // continuously without wiping the scroll buffer — real MUD behaviour.
@@ -4224,7 +4232,7 @@ public abstract class BaseLocation
         }
 
         // Use one potion
-        long healAmount = 30 + currentPlayer.Level * 5 + Random.Shared.Next(10, 30);
+        long healAmount = PotionBonus.BaseHeal(currentPlayer, Random.Shared); // 1.2.8: at least 20% of MaxHP
         healAmount = PotionBonus.ApplyOwnerBonuses(currentPlayer, healAmount); // v1.1.11: Infirmary, before the cap
         healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
         currentPlayer.HP += healAmount;
@@ -6149,6 +6157,16 @@ public abstract class BaseLocation
     private async Task ChallengeNPC(NPC npc)
     {
         terminal.WriteLine("");
+
+        // 1.2.8: town duels share the Inn's daily cap (one count of duels won, InnDuelsToday)
+        if (currentPlayer.InnDuelsToday >= GameConfig.MaxNpcDuelsPerDay)
+        {
+            terminal.SetColor("gray");
+            terminal.WriteLine(Loc.Get("base.duel_daily_limit"));
+            await Pacing.Wait(2000);
+            return;
+        }
+
         terminal.SetColor("bright_red");
         terminal.WriteLine(Loc.Get("base.duel_challenge", npc.Name2));
         terminal.WriteLine("");
@@ -6193,13 +6211,14 @@ public abstract class BaseLocation
         // v0.61.2: pass isHonorDuel: true so the murder-cap counter / over-cap
         // reward clawback / +10 Darkness penalty all skip this path. A duel is
         // a consensual challenge, not an assault.
-        var result = await StreetEncounterSystem.Instance.AttackCharacter(currentPlayer, npc, terminal, isHonorDuel: true);
+        var result = await FightHonorDuel(npc);
 
         if (result.Victory)
         {
             terminal.SetColor("bright_green");
             terminal.WriteLine("\n  " + Loc.Get("base.duel_victory", npc.Name2));
             currentPlayer.PKills++;
+            currentPlayer.InnDuelsToday++;   // 1.2.8: a win counts toward the shared daily duel cap, as at the Inn
 
             // Small reputation boost for honorable duel — v0.57.12: paired movement
             AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 5, isGood: true, "base.duel_honor");
@@ -6743,10 +6762,14 @@ public abstract class BaseLocation
         }
     }
 
+    /// <summary>The town honor duel's fight. Virtual so a test can stand in for the combat.</summary>
+    protected virtual Task<EncounterResult> FightHonorDuel(NPC npc) =>
+        StreetEncounterSystem.Instance.AttackCharacter(currentPlayer, npc, terminal, isHonorDuel: true);
+
     /// <summary>
-    /// Determine if NPC should accept a duel challenge
+    /// Determine if NPC should accept a duel challenge. Virtual so a test can fix the roll.
     /// </summary>
-    private bool ShouldNPCAcceptDuel(NPC npc)
+    protected virtual bool ShouldNPCAcceptDuel(NPC npc)
     {
         var random = Random.Shared;
 
@@ -7013,6 +7036,10 @@ public abstract class BaseLocation
         {
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("base.style_dual_wield"));
+            // 1.2.8: each swing reads its own hand's weapon
+            terminal.SetColor("white");
+            terminal.WriteLine("  " + Loc.Get("base.style_dual_wield_hands",
+                currentPlayer.SwingWeapPow(offHand: false), currentPlayer.SwingWeapPow(offHand: true)));
         }
         else if (currentPlayer.HasShieldEquipped)
         {

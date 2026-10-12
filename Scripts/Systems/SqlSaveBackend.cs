@@ -1076,6 +1076,15 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"world_edits not ensured: {ex.Message}"); }
 
+            // 1.2.8: remember-me tokens for Online Play (LoginTokenProtocol). Only the verifier's SHA-256 is kept.
+            try
+            {
+                using var migCmd = connection.CreateCommand();
+                migCmd.CommandText = LoginTokensDdl;
+                migCmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"login_tokens not ensured: {ex.Message}"); }
+
             MigrateCombatEventColumns(connection); // 1.2.6: accumulator columns and indexes, after the table exists
 
             MigrateWorldBossTables(connection); // v1.1.4
@@ -1086,6 +1095,7 @@ namespace UsurperRemake.Systems
             EnsureMailUpkeepTables(connection);                       // 1.2.5
             PurgeWorldBossMailOnce();                                 // 1.2.5: once per database
             PruneOldSystemMail(GameConfig.SystemMailKeepDays);        // 1.2.5: also at the world-sim daily reset
+            PruneExpiredLoginTokens();                                // 1.2.8: also in the admin poller
 
             DebugLogger.Instance.LogInfo("SQL", $"Database initialized at {databasePath}");
         }
@@ -1990,6 +2000,8 @@ namespace UsurperRemake.Systems
                     c3.ExecuteNonQuery();
                 }
                 catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"deleted_characters cleanup failed for '{username}': {ex.Message}"); }
+
+                RevokeLoginTokens(username); // 1.2.8: before the account row goes
 
                 // The kill: drop the account row itself.
                 using var cmd = connection.CreateCommand();
@@ -4201,6 +4213,7 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@username", username);
                 cmd.Parameters.AddWithValue("@reason", reason);
                 await cmd.ExecuteNonQueryAsync();
+                RevokeLoginTokens(username); // 1.2.8: a ban ends every remembered login; an unban does not bring them back
 
                 // Also remove from online players
                 using var removeCmd = connection.CreateCommand();
@@ -5295,12 +5308,16 @@ namespace UsurperRemake.Systems
         /// v1.2.6: why a login failed, for operator logs only. Players see one message for every
         /// <see cref="IsGenericLoginFailure"/> reason, so a login never shows whether an account exists.
         /// </summary>
-        public enum LoginFailure { None, IpBanned, UnknownName, NoUsableHash, WrongPassword, BannedWrongPassword, Banned, Error }
+        public enum LoginFailure { None, IpBanned, UnknownName, NoUsableHash, WrongPassword, BannedWrongPassword, Banned, Error,
+            // 1.2.8: remember-me token logins (AuthenticateByToken); the player sees the generic message
+            TokenMalformed, TokenUnknown, TokenMismatch, TokenExpired, TokenStale }
 
         /// <summary>v1.2.6: the reasons that show the player the one generic message.</summary>
         public static bool IsGenericLoginFailure(LoginFailure reason) =>
             reason is LoginFailure.UnknownName or LoginFailure.NoUsableHash
-                or LoginFailure.WrongPassword or LoginFailure.BannedWrongPassword;
+                or LoginFailure.WrongPassword or LoginFailure.BannedWrongPassword
+                or LoginFailure.TokenMalformed or LoginFailure.TokenUnknown or LoginFailure.TokenMismatch
+                or LoginFailure.TokenExpired or LoginFailure.TokenStale;
 
         /// <summary>
         /// v1.2.6: the rows a login screen with an [R] register key shows for a failed login: the
@@ -5410,6 +5427,7 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@hash", newHash);
                 cmd.Parameters.AddWithValue("@username", username);
                 await cmd.ExecuteNonQueryAsync();
+                RevokeLoginTokens(username); // 1.2.8: a new password ends every remembered login
 
                 DebugLogger.Instance.LogInfo("SQL", $"Password changed for: '{username}'");
                 return (true, T("auth.password_changed"));
@@ -5448,6 +5466,7 @@ namespace UsurperRemake.Systems
                 cmd.Parameters.AddWithValue("@hash", newHash);
                 cmd.Parameters.AddWithValue("@username", username);
                 cmd.ExecuteNonQuery();
+                RevokeLoginTokens(username); // 1.2.8: a reset password ends every remembered login
 
                 DebugLogger.Instance.LogInfo("SQL", $"Admin reset password for: '{username}'");
                 return (true, $"Password reset for '{username}'.");
@@ -5456,6 +5475,289 @@ namespace UsurperRemake.Systems
             {
                 DebugLogger.Instance.LogError("SQL", $"Failed to reset password: {ex.Message}");
                 return (false, "Password reset failed.");
+            }
+        }
+
+        // =====================================================================
+        // 1.2.8: remember-me tokens for Online Play (LoginTokenProtocol)
+        // =====================================================================
+
+        internal const string LoginTokensDdl = @"
+            CREATE TABLE IF NOT EXISTS login_tokens (
+                selector      TEXT PRIMARY KEY,
+                verifier_hash TEXT NOT NULL,
+                username      TEXT NOT NULL,
+                pw_stamp      TEXT NOT NULL,
+                created_at    TEXT NOT NULL,
+                expires_at    TEXT NOT NULL,
+                last_used_at  TEXT,
+                client_label  TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_login_tokens_user ON login_tokens(username);";
+
+        /// <summary>1.2.8: a token lives this long from issue, never extended.</summary>
+        internal const int LoginTokenDays = 90;
+        /// <summary>1.2.8: at most this many rows per account; issuing one more drops the least recently used.</summary>
+        internal const int MaxLoginTokensPerAccount = 5;
+        private const string TokenTimeFormat = "yyyy-MM-dd'T'HH:mm:ss'Z'";
+
+        /// <summary>1.2.8: the clock for token issue, expiry and prune (tests move it).</summary>
+        internal Func<DateTime> UtcNow = () => DateTime.UtcNow;
+
+        /// <summary>1.2.8: token verifier compares run by <see cref="AuthenticateByToken"/> (tests).</summary>
+        internal int TokenVerifies;
+        /// <summary>1.2.8: of those, the ones against the dummy hash because no row had the selector (tests).</summary>
+        internal int TokenDummyVerifies;
+
+        /// <summary>1.2.8: compared against when no row has the selector, so an unknown selector does the same work.</summary>
+        private static readonly byte[] DummyVerifierHash = System.Security.Cryptography.SHA256.HashData(new byte[LoginTokenProtocol.VerifierBytes]);
+
+        private static string TokenTime(DateTime utc) => utc.ToString(TokenTimeFormat, System.Globalization.CultureInfo.InvariantCulture);
+
+        private static DateTime ParseTokenTime(string text) =>
+            DateTime.ParseExact(text, TokenTimeFormat, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.AssumeUniversal | System.Globalization.DateTimeStyles.AdjustToUniversal);
+
+        private DateTime TokenNow()
+        {
+            var now = UtcNow().ToUniversalTime();
+            return new DateTime(now.Ticks - now.Ticks % TimeSpan.TicksPerSecond, DateTimeKind.Utc);
+        }
+
+        /// <summary>
+        /// 1.2.8: issue a remember-me token to an account that has just logged in with its password. Stores
+        /// SHA-256 of the verifier, the account key, a stamp of the current password hash, created and expires
+        /// (created + 90 days) and a label; then keeps at most five rows for the account, dropping the least
+        /// recently used, all in one transaction. Returns the token and its expiry (unix seconds), or null when
+        /// none could be issued. Never logs the token.
+        /// </summary>
+        public (string Token, long ExpiresUnix)? IssueLoginToken(string username, string? connectionType)
+        {
+            try
+            {
+                var now = TokenNow();
+                var expires = now.AddDays(LoginTokenDays);
+                using var connection = OpenConnection();
+                using var tx = connection.BeginTransaction(deferred: false);
+
+                string? key = null, passwordHash = null;
+                using (var q = connection.CreateCommand())
+                {
+                    q.Transaction = tx;
+                    q.CommandText = "SELECT username, password_hash FROM players WHERE LOWER(username) = LOWER(@u);";
+                    q.Parameters.AddWithValue("@u", username);
+                    using var r = q.ExecuteReader();
+                    if (r.Read())
+                    {
+                        key = r.GetString(0);
+                        passwordHash = r.IsDBNull(1) ? "" : r.GetString(1);
+                    }
+                }
+                if (key == null || !IsUsableHash(passwordHash)) return null;
+
+                var (selector, verifier, raw) = LoginTokenProtocol.NewToken();
+                using (var ins = connection.CreateCommand())
+                {
+                    ins.Transaction = tx;
+                    ins.CommandText = @"INSERT INTO login_tokens (selector, verifier_hash, username, pw_stamp, created_at, expires_at, last_used_at, client_label)
+                                        VALUES (@s, @h, @u, @p, @c, @e, NULL, @l);";
+                    ins.Parameters.AddWithValue("@s", selector);
+                    ins.Parameters.AddWithValue("@h", LoginTokenProtocol.HashVerifier(raw));
+                    ins.Parameters.AddWithValue("@u", key);
+                    ins.Parameters.AddWithValue("@p", LoginTokenProtocol.PasswordStamp(passwordHash!));
+                    ins.Parameters.AddWithValue("@c", TokenTime(now));
+                    ins.Parameters.AddWithValue("@e", TokenTime(expires));
+                    ins.Parameters.AddWithValue("@l", LoginTokenProtocol.Label(connectionType));
+                    ins.ExecuteNonQuery();
+                }
+                using (var trim = connection.CreateCommand())
+                {
+                    trim.Transaction = tx;
+                    trim.CommandText = @"
+                        DELETE FROM login_tokens WHERE username = @u AND expires_at <= @now;
+                        DELETE FROM login_tokens WHERE username = @u AND selector NOT IN (
+                            SELECT selector FROM login_tokens WHERE username = @u
+                            ORDER BY COALESCE(last_used_at, created_at) DESC, rowid DESC LIMIT @max);";
+                    trim.Parameters.AddWithValue("@u", key);
+                    trim.Parameters.AddWithValue("@now", TokenTime(now));
+                    trim.Parameters.AddWithValue("@max", MaxLoginTokensPerAccount);
+                    trim.ExecuteNonQuery();
+                }
+                tx.Commit();
+                return ($"{selector}.{verifier}", new DateTimeOffset(expires).ToUnixTimeSeconds());
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("AUTH", $"Login token not issued for '{username}': {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 1.2.8: log in with a remember-me token. The verifier's SHA-256 is compared in constant time against
+        /// the row's, or against a dummy when no row has the selector. Refused: a banned IP; an unknown selector;
+        /// a wrong verifier; an expired token (row deleted); an account that is gone or whose password hash has
+        /// changed since the token was issued (row deleted); a banned account (the ban text: the token proves
+        /// the secret, as the right password does). On success last_used_at is set and the account key
+        /// returned. <c>username</c> on a refusal is the row's account or "?", for the operator log only.
+        /// </summary>
+        public (bool success, string username, string message, LoginFailure reason) AuthenticateByToken(
+            string selector, string verifier, string? ipAddress = null, string? lang = null)
+        {
+            string T(string key, params object[] args) => AuthText(lang, key, args);
+            if (!string.IsNullOrWhiteSpace(ipAddress) && IsIpBanned(ipAddress))
+                return (false, "?", T("auth.err_login_ip_banned"), LoginFailure.IpBanned);
+
+            try
+            {
+                var raw = LoginTokenProtocol.DecodeVerifier(verifier);
+                if (raw == null || selector == null || selector.Length != LoginTokenProtocol.SelectorLength)
+                    return (false, "?", T("auth.err_bad_login"), LoginFailure.TokenMalformed);
+                byte[] presented = System.Security.Cryptography.SHA256.HashData(raw);
+
+                using var connection = OpenConnection();
+                string? rowHash = null, rowUser = null, rowStamp = null, rowExpires = null;
+                using (var q = connection.CreateCommand())
+                {
+                    q.CommandText = "SELECT verifier_hash, username, pw_stamp, expires_at FROM login_tokens WHERE selector = @s;";
+                    q.Parameters.AddWithValue("@s", selector);
+                    using var r = q.ExecuteReader();
+                    if (r.Read())
+                    {
+                        rowHash = r.GetString(0);
+                        rowUser = r.GetString(1);
+                        rowStamp = r.GetString(2);
+                        rowExpires = r.GetString(3);
+                    }
+                }
+
+                bool found = rowHash != null;
+                byte[] expected = DummyVerifierHash;
+                if (found)
+                {
+                    var stored = new byte[64];
+                    if (Convert.TryFromBase64String(rowHash!, stored, out int n) && n == presented.Length)
+                        expected = stored.AsSpan(0, n).ToArray();
+                }
+                bool match = TokenVerify(presented, expected, dummy: !found);
+
+                if (!found)
+                    return (false, "?", T("auth.err_bad_login"), LoginFailure.TokenUnknown);
+                if (!match)
+                    return (false, rowUser!, T("auth.err_bad_login"), LoginFailure.TokenMismatch);
+
+                var now = TokenNow();
+                if (ParseTokenTime(rowExpires!) <= now)
+                {
+                    DeleteLoginToken(connection, selector);
+                    return (false, rowUser!, T("auth.err_bad_login"), LoginFailure.TokenExpired);
+                }
+
+                string? passwordHash = null;
+                bool isBanned = false;
+                string? banReason = null;
+                using (var p = connection.CreateCommand())
+                {
+                    p.CommandText = "SELECT password_hash, is_banned, ban_reason FROM players WHERE LOWER(username) = LOWER(@u);";
+                    p.Parameters.AddWithValue("@u", rowUser);
+                    using var r = p.ExecuteReader();
+                    if (r.Read())
+                    {
+                        passwordHash = r.IsDBNull(0) ? "" : r.GetString(0);
+                        isBanned = !r.IsDBNull(1) && r.GetInt32(1) != 0;
+                        banReason = r.IsDBNull(2) ? null : r.GetString(2);
+                    }
+                }
+                if (passwordHash == null || !IsUsableHash(passwordHash)
+                    || !System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                        System.Text.Encoding.UTF8.GetBytes(LoginTokenProtocol.PasswordStamp(passwordHash)),
+                        System.Text.Encoding.UTF8.GetBytes(rowStamp!)))
+                {
+                    DeleteLoginToken(connection, selector);
+                    return (false, rowUser!, T("auth.err_bad_login"), LoginFailure.TokenStale);
+                }
+
+                if (isBanned)
+                {
+                    string msg = T("auth.err_account_banned");
+                    if (!string.IsNullOrEmpty(banReason))
+                        msg += " " + T("auth.err_ban_reason", banReason);
+                    return (false, rowUser!, msg, LoginFailure.Banned);
+                }
+
+                using (var u = connection.CreateCommand())
+                {
+                    u.CommandText = "UPDATE login_tokens SET last_used_at = @t WHERE selector = @s;";
+                    u.Parameters.AddWithValue("@t", TokenTime(now));
+                    u.Parameters.AddWithValue("@s", selector);
+                    u.ExecuteNonQuery();
+                }
+                return (true, rowUser!, T("auth.login_ok"), LoginFailure.None);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogError("SQL", $"Token login failed: {ex.GetType().Name}");
+                return (false, "?", T("auth.err_auth_failed"), LoginFailure.Error);
+            }
+        }
+
+        /// <summary>1.2.8: one counted constant-time verifier compare for <see cref="AuthenticateByToken"/>.</summary>
+        private bool TokenVerify(byte[] presented, byte[] expected, bool dummy)
+        {
+            System.Threading.Interlocked.Increment(ref TokenVerifies);
+            if (dummy) System.Threading.Interlocked.Increment(ref TokenDummyVerifies);
+            bool ok = System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(presented, expected);
+            return ok && !dummy;
+        }
+
+        private static void DeleteLoginToken(SqliteConnection connection, string selector)
+        {
+            using var d = connection.CreateCommand();
+            d.CommandText = "DELETE FROM login_tokens WHERE selector = @s;";
+            d.Parameters.AddWithValue("@s", selector);
+            d.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// 1.2.8: delete every remembered login of an account. Called after a password change or reset, at a
+        /// ban and before an account is erased. Best effort: a failure is logged and the password stamp on
+        /// each row still refuses the token after any password change. Returns the rows deleted.
+        /// </summary>
+        public int RevokeLoginTokens(string username)
+        {
+            if (string.IsNullOrWhiteSpace(username)) return 0;
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM login_tokens WHERE ulower(username) = ulower(@u);";
+                cmd.Parameters.AddWithValue("@u", username);
+                int n = cmd.ExecuteNonQuery();
+                if (n > 0) DebugLogger.Instance.LogInfo("AUTH", $"Revoked {n} remembered login(s) for '{username}'");
+                return n;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("AUTH", $"Remembered logins not revoked for '{username}': {ex.Message}");
+                return 0;
+            }
+        }
+
+        /// <summary>1.2.8: delete expired remembered logins. At database start and in the admin poller. Returns the rows deleted.</summary>
+        public int PruneExpiredLoginTokens()
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "DELETE FROM login_tokens WHERE expires_at <= @now;";
+                cmd.Parameters.AddWithValue("@now", TokenTime(TokenNow()));
+                return cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("AUTH", $"Expired remembered logins not pruned: {ex.Message}");
+                return 0;
             }
         }
 
@@ -6659,6 +6961,52 @@ namespace UsurperRemake.Systems
             return new List<PlayerTeamInfo>();
         }
     }
+
+    /// <summary>
+    /// v1.2.8 (F5): which teams are players' teams, for the world simulator's protection list: every team a
+    /// player's save names (so a team an NPC founded and a player joined counts, in whichever process the
+    /// player joined it, and a team its last player left does not), a character archived by permadeath
+    /// inside its restore window included, and banned players included (a ban can be lifted), as the
+    /// empty-team cleanup counts them. Plus every player_teams row joined or created within
+    /// EmptyTeamJoinGraceMinutes (the stamp is written before the membership reaches the save). While a
+    /// malformed save exists it cannot say which team it names, so every player_teams row counts.
+    /// Null when the read FAILED, with the reason in error: the caller must not take that for "no teams", and
+    /// it does the logging (the world sim reads before every tick, so a line per failure would flood the log).
+    /// Reads only; no row is written.
+    /// </summary>
+    public List<string>? ReadPlayerTeamNames(out string? error)
+    {
+        error = null;
+        try
+        {
+            using var connection = OpenConnection();
+            using var cmd = connection.CreateCommand();
+            cmd.CommandText = PlayerTeamNamesSql;
+            cmd.Parameters.AddWithValue("@joinGrace", GameConfig.EmptyTeamJoinGraceMinutes);
+            var names = new List<string>();
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read()) names.Add(reader.GetString(0));
+            return names;
+        }
+        catch (Exception ex)
+        {
+            error = ex.Message;
+            return null;
+        }
+    }
+
+    internal const string PlayerTeamNamesSql = @"
+        WITH named AS MATERIALIZED (
+            SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END AS team
+            FROM players
+            UNION ALL
+            SELECT CASE WHEN json_valid(player_data) THEN json_extract(player_data, '$.player.team') END
+            FROM deleted_characters WHERE expires_at > datetime('now'))
+        SELECT team FROM named WHERE typeof(team) = 'text' AND team != ''
+        UNION
+        SELECT team_name FROM player_teams
+        WHERE last_join_at >= datetime('now', '-' || @joinGrace || ' minutes')
+           OR EXISTS (SELECT 1 FROM players WHERE NOT json_valid(player_data));";
 
     /// <summary>
     /// v1.1.12: the team rankings' player side: every player_teams row plus every team named only in player

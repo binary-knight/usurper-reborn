@@ -21,9 +21,6 @@ namespace UsurperRemake.Systems
     /// </summary>
     public class OnlinePlaySystem
     {
-        private const string SSH_GATEWAY_USER = "usurper";
-        private const string SSH_GATEWAY_PASS = "play";
-        private const string CREDENTIALS_FILE = "online_credentials.json";
 
         private readonly TerminalEmulator terminal;
         // SSH mode (Local/Steam)
@@ -169,35 +166,51 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Establish SSH connection to the game server's SSH gateway.
-        /// Returns true if connected, false if connection failed.
+        /// 1.2.8: open the login connection through <see cref="OnlineTransport.Factory"/>: the SSH gateway to the
+        /// relay (Local and Steam), or direct TCP for the BBS door (no SSH client in the door environment; sslh on
+        /// port 4000 routes raw TCP to the MUD server). Null after a failure, which is shown here.
         /// </summary>
-        private bool EstablishSSHConnection(string server, int port)
+        private async Task<IOnlineAuthTransport?> ConnectTransportAsync(string server, int port, bool directTcp)
         {
             terminal.WriteLine("");
             terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("online.connecting_encrypted", server, port));
+            terminal.WriteLine(directTcp
+                ? Loc.Get("online.connecting_telnet", server, port)
+                : Loc.Get("online.connecting_encrypted", server, port));
 
             try
             {
-                sshClient = new SshClient(server, port, SSH_GATEWAY_USER, SSH_GATEWAY_PASS);
-                sshClient.ConnectionInfo.Timeout = TimeSpan.FromSeconds(10);
-                sshClient.Connect();
-
-                // Open a shell stream with PTY echo disabled.
-                // We handle all line editing (backspace, echo) locally on the client
-                // and only send complete lines. This prevents PTY echo responses from
-                // corrupting the client's ANSI parser (which caused garbage output on backspace).
-                var terminalModes = new System.Collections.Generic.Dictionary<Renci.SshNet.Common.TerminalModes, uint>
+                var transport = await OnlineTransport.Factory(server, port, directTcp);
+                if (transport is SshAuthTransport ssh)
                 {
-                    { Renci.SshNet.Common.TerminalModes.ECHO, 0 }
-                };
-                shellStream = sshClient.CreateShellStream("xterm", 80, 24, 800, 600, 4096, terminalModes);
+                    sshClient = ssh.Client;
+                    shellStream = ssh.Stream;
+                }
+                else if (transport is TcpAuthTransport tcp)
+                {
+                    tcpClient = tcp.Client;
+                    tcpStream = tcp.Stream;
+                }
 
                 terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("online.connected_ssh"));
+                terminal.WriteLine(directTcp ? Loc.Get("online.connected") : Loc.Get("online.connected_ssh"));
                 terminal.WriteLine("");
-                return true;
+                return transport;
+            }
+            catch (HostKeyRefusedException ex)
+            {
+                // 1.2.8: the server's SSH host key is not the one expected; nothing was sent
+                terminal.SetColor("bright_red");
+                terminal.WriteLine("");
+                foreach (var line in OnlineHostKeyPolicy.RefusalLines(ex.Check))
+                    terminal.WriteLine(line);
+                return null;
+            }
+            catch (TimeoutException)
+            {
+                terminal.SetColor("bright_red");
+                terminal.WriteLine(Loc.Get("online.connection_timed_out"));
+                return null;
             }
             catch (Renci.SshNet.Common.SshConnectionException ex)
             {
@@ -206,74 +219,24 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine(Loc.Get("online.ssh_failed", ex.Message));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("online.server_down"));
-                return false;
-            }
-            catch (System.Net.Sockets.SocketException ex)
-            {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("online.connection_failed", ex.Message));
-                terminal.SetColor("gray");
-                terminal.WriteLine(Loc.Get("online.server_down"));
-                return false;
-            }
-            catch (Exception ex)
-            {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine("");
-                terminal.WriteLine(Loc.Get("online.error", ex.Message));
-                DebugLogger.Instance.LogError("ONLINE_PLAY", $"SSH connection error: {ex}");
-                return false;
-            }
-        }
-
-        /// <summary>
-        /// Establish a direct TCP connection to the game server (for BBS door mode).
-        /// sslh on port 4000 routes non-SSH traffic to the MUD server on port 4001.
-        /// </summary>
-        private async Task<bool> EstablishTcpConnection(string server, int port)
-        {
-            terminal.WriteLine("");
-            terminal.SetColor("bright_cyan");
-            terminal.WriteLine(Loc.Get("online.connecting_telnet", server, port));
-
-            try
-            {
-                tcpClient = new TcpClient();
-                tcpClient.NoDelay = true;
-                // sslh needs a moment to detect protocol — connect with timeout
-                var connectTask = tcpClient.ConnectAsync(server, port);
-                if (await Task.WhenAny(connectTask, Task.Delay(10000)) != connectTask)
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("online.connection_timed_out"));
-                    return false;
-                }
-                await connectTask; // propagate any exception
-
-                tcpStream = tcpClient.GetStream();
-                tcpStream.ReadTimeout = 30000;
-                tcpStream.WriteTimeout = 10000;
-
-                terminal.SetColor("bright_green");
-                terminal.WriteLine(Loc.Get("online.connected"));
-                terminal.WriteLine("");
-                return true;
+                return null;
             }
             catch (SocketException ex)
             {
                 terminal.SetColor("bright_red");
+                if (!directTcp) terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("online.connection_failed", ex.Message));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("online.server_down"));
-                return false;
+                return null;
             }
             catch (Exception ex)
             {
                 terminal.SetColor("bright_red");
+                if (!directTcp) terminal.WriteLine("");
                 terminal.WriteLine(Loc.Get("online.error", ex.Message));
-                DebugLogger.Instance.LogError("ONLINE_PLAY", $"TCP connection error: {ex}");
-                return false;
+                DebugLogger.Instance.LogError("ONLINE_PLAY", $"{(directTcp ? "TCP" : "SSH")} connection error: {ex}");
+                return null;
             }
         }
 
@@ -318,65 +281,6 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
-        /// Read a line response from the active connection (AUTH response).
-        /// Waits up to timeout for OK or ERR: response.
-        /// </summary>
-        private async Task<string?> ReadAuthResponse()
-        {
-            if (useTcpMode)
-                return await ReadLineFromTcp();
-            else
-                return await ReadLineFromShell();
-        }
-
-        /// <summary>
-        /// Read an AUTH response from the TCP stream.
-        /// Uses blocking ReadAsync with cancellation instead of polling DataAvailable,
-        /// because the server may send ERR: and close the connection simultaneously.
-        /// </summary>
-        private async Task<string?> ReadLineFromTcp()
-        {
-            try
-            {
-                var result = new StringBuilder();
-                var buffer = new byte[4096];
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-                while (!cts.Token.IsCancellationRequested)
-                {
-                    int read = await tcpStream!.ReadAsync(buffer, 0, buffer.Length, cts.Token);
-                    if (read == 0)
-                    {
-                        // Connection closed — return whatever we have
-                        break;
-                    }
-
-                    result.Append(Encoding.UTF8.GetString(buffer, 0, read));
-
-                    // Check for auth response markers
-                    var text = result.ToString();
-                    var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                    foreach (var line in lines)
-                    {
-                        var trimmed = line.Trim();
-                        if (trimmed == "OK" || trimmed.StartsWith("ERR:"))
-                            return text;
-                    }
-                }
-
-                return result.Length > 0 ? result.ToString() : null;
-            }
-            catch (OperationCanceledException)
-            {
-                return null;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        /// <summary>
         /// Check if the connection is still alive.
         /// </summary>
         private bool IsConnected()
@@ -392,7 +296,9 @@ namespace UsurperRemake.Systems
         /// BBS door mode uses direct TCP transport (no SSH client available in
         /// the door environment). Local/Steam uses SSH tunnel. Both transports
         /// run the same interactive login/register flow with username + password,
-        /// so BBS users authenticate the same way as everyone else.
+        /// so BBS users authenticate the same way as everyone else. 1.2.8: the
+        /// login itself is <see cref="OnlineAuthFlow"/> (remember-me token, probe,
+        /// conversion of the old saved password).
         /// </summary>
         private async Task ConnectAndPlay(string server, int port)
         {
@@ -402,353 +308,41 @@ namespace UsurperRemake.Systems
             // stays TCP for BBS (door environment can't host an SSH client) but
             // the AUTH wire format is the standard 4-part `AUTH:user:pass:type`.
             bool isBbs = UsurperRemake.BBS.DoorMode.IsInDoorMode;
-            if (isBbs)
+            useTcpMode = isBbs;
+            var transport = await ConnectTransportAsync(server, port, useTcpMode);
+            if (transport == null)
             {
-                useTcpMode = true;
-                bool connected = await EstablishTcpConnection(server, port);
-                if (!connected)
-                {
-                    await terminal.PressAnyKey();
-                    return;
-                }
+                await terminal.PressAnyKey();
+                return;
             }
-            else
+            if (!useTcpMode)
             {
-                useTcpMode = false;
-                bool sshConnected = EstablishSSHConnection(server, port);
-                if (!sshConnected)
-                {
-                    await terminal.PressAnyKey();
-                    return;
-                }
-
                 // SSH mode: drain relay banner before sending AUTH
                 await Task.Delay(500);
-                DrainShellStream();
+                transport.Drain();
             }
 
-            // Auth loop — prompt for Login/Register until success or user quits
-            bool authenticated = false;
-            int attempts = 0;
-            const int MAX_ATTEMPTS = 5;
-
-            // Skip auto-load of saved credentials in BBS mode. The credentials
-            // file is keyed to the install directory (not the user), so on a
-            // multi-user BBS box every door user would inherit the previous
-            // user's saved login. Save is already gated for BBS at the prompt
-            // site; this also gates load. Belt and suspenders.
-            var savedCreds = isBbs ? null : LoadSavedCredentials();
-
-            // Pre-fill username default from the BBS drop file so the user
-            // can just press Enter on the username prompt to use their BBS handle.
-            string? bbsDefaultUser = isBbs ? UsurperRemake.BBS.DoorMode.GetPlayerName() : null;
-
-            while (!authenticated && attempts < MAX_ATTEMPTS)
+            async Task<IOnlineAuthTransport?> Reconnect()
             {
-                attempts++;
-
-                // If we have saved credentials on first attempt, try them automatically
-                if (savedCreds != null && attempts == 1)
+                Disconnect();
+                // the BBS reconnect has always gone to the MUD port directly
+                var next = await ConnectTransportAsync(server, useTcpMode ? 4001 : port, useTcpMode);
+                if (next != null && !useTcpMode)
                 {
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("online.logging_in_as", savedCreds.Username));
-
-                    // v0.65.13: 5th field = client version. The server uses it to pick
-                    // the portrait render tier (truecolor for 0.65.7+ clients whose SGR
-                    // parser passes 38;2 through). Old servers ignore the extra field.
-                    string authLine = $"AUTH:{savedCreds.Username}:{savedCreds.GetDecodedPassword()}:{GetConnectionType()}:{GameConfig.Version}\n";
-                    WriteToServer(authLine);
-
-                    var response = await ReadAuthResponse();
-                    if (response != null && response.Contains("OK"))
-                    {
-                        terminal.SetColor("bright_green");
-                        terminal.WriteLine(Loc.Get("online.logged_in"));
-                        authenticated = true;
-                        break;
-                    }
-                    else
-                    {
-                        // Saved credentials failed — need to reconnect
-                        terminal.SetColor("yellow");
-                        var errMsg = response?.Contains("ERR:") == true
-                            ? response.Substring(response.IndexOf("ERR:") + 4).Trim()
-                            : "Connection lost";
-                        terminal.WriteLine(Loc.Get("online.saved_login_failed", errMsg));
-                        terminal.WriteLine(Loc.Get("online.login_manually"));
-                        terminal.WriteLine("");
-                        DeleteSavedCredentials();
-                        savedCreds = null;
-
-                        // Reconnect for next attempt
-                        Disconnect();
-                        bool reconnected = useTcpMode
-                            ? await EstablishTcpConnection(server, 4001)
-                            : EstablishSSHConnection(server, port);
-                        if (!reconnected)
-                        {
-                            await terminal.PressAnyKey();
-                            return;
-                        }
-                        if (!useTcpMode)
-                        {
-                            await Task.Delay(500);
-                            DrainShellStream();
-                        }
-                    }
+                    await Task.Delay(500);
+                    next.Drain();
                 }
-
-                // Show Login/Register menu
-                if (!GameConfig.ScreenReaderMode)
-                {
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine("  ──────────────────────────────────────");
-                }
-                terminal.SetColor("bright_white");
-                terminal.WriteLine(Loc.Get("online.account_login"));
-                if (!GameConfig.ScreenReaderMode)
-                {
-                    terminal.SetColor("bright_cyan");
-                    terminal.WriteLine("  ──────────────────────────────────────");
-                }
-                terminal.WriteLine("");
-
-                if (GameConfig.ScreenReaderMode)
-                {
-                    terminal.WriteLine($"  L. {Loc.Get("online.login_existing")}", "white");
-                    terminal.WriteLine($"  R. {Loc.Get("online.register_new")}", "white");
-                    terminal.WriteLine($"  Q. {Loc.Get("online.quit")}", "gray");
-                }
-                else
-                {
-                    terminal.SetColor("darkgray");
-                    terminal.Write("  [");
-                    terminal.SetColor("bright_cyan");
-                    terminal.Write("L");
-                    terminal.SetColor("darkgray");
-                    terminal.Write("] ");
-                    terminal.SetColor("white");
-                    terminal.WriteLine(Loc.Get("online.login_existing"));
-
-                    terminal.SetColor("darkgray");
-                    terminal.Write("  [");
-                    terminal.SetColor("bright_green");
-                    terminal.Write("R");
-                    terminal.SetColor("darkgray");
-                    terminal.Write("] ");
-                    terminal.SetColor("white");
-                    terminal.WriteLine(Loc.Get("online.register_new"));
-
-                    terminal.SetColor("darkgray");
-                    terminal.Write("  [");
-                    terminal.SetColor("bright_red");
-                    terminal.Write("Q");
-                    terminal.SetColor("darkgray");
-                    terminal.Write("] ");
-                    terminal.SetColor("gray");
-                    terminal.WriteLine(Loc.Get("online.quit"));
-                }
-
-                terminal.WriteLine("");
-                terminal.SetColor("bright_white");
-                var choice = (await terminal.GetInput($"  {Loc.Get("ui.choice")}")).Trim().ToUpper();
-
-                if (choice == "Q" || string.IsNullOrEmpty(choice))
-                {
-                    Disconnect();
-                    return;
-                }
-
-                string? username = null;
-                string? password = null;
-                bool isRegistration = false;
-
-                if (choice == "L")
-                {
-                    // Login
-                    terminal.WriteLine("");
-                    terminal.SetColor("bright_white");
-                    string usernamePrompt = string.IsNullOrEmpty(bbsDefaultUser)
-                        ? $"  {Loc.Get("online.username_prompt")}"
-                        : $"  {Loc.Get("online.username_prompt")}[{bbsDefaultUser}] ";
-                    username = (await terminal.GetInput(usernamePrompt)).Trim();
-                    if (string.IsNullOrEmpty(username))
-                    {
-                        if (!string.IsNullOrEmpty(bbsDefaultUser)) username = bbsDefaultUser;
-                        else continue;
-                    }
-
-                    terminal.Write($"  {Loc.Get("online.password_prompt")}", "bright_white");
-                    password = (await terminal.GetMaskedInput()).Trim();
-                    if (string.IsNullOrEmpty(password)) continue;
-                }
-                else if (choice == "R")
-                {
-                    // Register
-                    terminal.WriteLine("");
-                    terminal.SetColor("bright_green");
-                    string regUsernamePrompt = string.IsNullOrEmpty(bbsDefaultUser)
-                        ? $"  {Loc.Get("online.choose_username")}"
-                        : $"  {Loc.Get("online.choose_username")}[{bbsDefaultUser}] ";
-                    username = (await terminal.GetInput(regUsernamePrompt)).Trim();
-                    if (string.IsNullOrEmpty(username))
-                    {
-                        if (!string.IsNullOrEmpty(bbsDefaultUser)) username = bbsDefaultUser;
-                        else continue;
-                    }
-
-                    if (username.Length < 2 || username.Length > 20)
-                    {
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("online.username_length"));
-                        terminal.WriteLine("");
-                        continue;
-                    }
-
-                    terminal.Write($"  {Loc.Get("online.choose_password")}", "bright_green");
-                    password = (await terminal.GetMaskedInput()).Trim();
-                    if (string.IsNullOrEmpty(password)) continue;
-
-                    if (password.Length < 4)
-                    {
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("online.password_length"));
-                        terminal.WriteLine("");
-                        continue;
-                    }
-
-                    terminal.Write($"  {Loc.Get("online.confirm_password")}", "bright_green");
-                    var confirm = (await terminal.GetMaskedInput()).Trim();
-                    if (password != confirm)
-                    {
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("online.passwords_no_match"));
-                        terminal.WriteLine("");
-                        continue;
-                    }
-
-                    isRegistration = true;
-                }
-                else
-                {
-                    continue; // Invalid choice
-                }
-
-                // Send AUTH header to the server
-                string connType = GetConnectionType();
-                string authHeader;
-                if (isRegistration)
-                    // REGISTER stays 5-part: appending a version here would fold into
-                    // the type field on pre-0.65.13 servers (Split limit 5). The first
-                    // session after registering just renders portraits at the safe
-                    // tier; every later login sends the versioned form below.
-                    authHeader = $"AUTH:{username}:{password}:REGISTER:{connType}\n";
-                else
-                    // v0.65.13: 5th field = client version (see saved-creds path).
-                    authHeader = $"AUTH:{username}:{password}:{connType}:{GameConfig.Version}\n";
-
-                try
-                {
-                    WriteToServer(authHeader);
-                }
-                catch
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("online.lost_connection"));
-                    await terminal.PressAnyKey();
-                    Disconnect();
-                    return;
-                }
-
-                // Read AUTH response
-                var authResponse = await ReadAuthResponse();
-                if (authResponse == null)
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("online.server_closed"));
-                    await terminal.PressAnyKey();
-                    Disconnect();
-                    return;
-                }
-
-                // The relay echoes back through the SSH shell — look for OK or ERR in response
-                if (authResponse.Contains("ERR:"))
-                {
-                    var errStart = authResponse.IndexOf("ERR:") + 4;
-                    var errEnd = authResponse.IndexOf('\n', errStart);
-                    var errText = errEnd > errStart
-                        ? authResponse.Substring(errStart, errEnd - errStart).Trim()
-                        : authResponse.Substring(errStart).Trim();
-
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine($"  {errText}");
-                    terminal.WriteLine("");
-
-                    // Reconnect for next attempt
-                    Disconnect();
-                    bool reconnected = useTcpMode
-                        ? await EstablishTcpConnection(server, 4001)
-                        : EstablishSSHConnection(server, port);
-                    if (!reconnected)
-                    {
-                        await terminal.PressAnyKey();
-                        return;
-                    }
-                    if (!useTcpMode)
-                    {
-                        await Task.Delay(500);
-                        DrainShellStream();
-                    }
-                    continue;
-                }
-
-                if (authResponse.Contains("OK"))
-                {
-                    authenticated = true;
-
-                    // Offer to save credentials (not in BBS door mode — shared installation)
-                    terminal.SetColor("bright_green");
-                    if (UsurperRemake.BBS.DoorMode.IsInDoorMode || ShouldNeverAskToSave())
-                    {
-                        terminal.WriteLine(Loc.Get("online.authenticated"));
-                    }
-                    else
-                    {
-                        terminal.Write(Loc.Get("online.authenticated_prompt"));
-                        terminal.SetColor("gray");
-                        var save = (await terminal.GetInput(Loc.Get("online.save_credentials_prompt"))).Trim().ToUpper();
-                        if (GameConfig.IsAffirmative(save)) // v1.1.15: yesno-exempt: three-way menu (Y/N/D "don't ask again"), not a plain yes/no
-                        {
-                            SaveCredentials(server, port, username!, password!);
-                            terminal.SetColor("green");
-                            terminal.WriteLine(Loc.Get("online.credentials_saved"));
-                        }
-                        else if (save == "D")
-                        {
-                            SaveNeverAskPreference();
-                            terminal.SetColor("green");
-                            terminal.WriteLine(Loc.Get("online.credentials_never_ask"));
-                        }
-                    }
-                }
-                else
-                {
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("online.unexpected_response"));
-                    DebugLogger.Instance.LogError("ONLINE_PLAY", $"Unexpected auth response: {authResponse}");
-                    Disconnect();
-                    return;
-                }
+                return next;
             }
 
-            if (!authenticated)
+            var flow = new OnlineAuthFlow(terminal, transport, server, port, isBbs, GetConnectionType(), GameConfig.Version, Reconnect);
+            var outcome = await flow.RunAsync();
+            if (outcome != OnlineAuthOutcome.Authenticated)
             {
-                terminal.SetColor("bright_red");
-                terminal.WriteLine(Loc.Get("online.too_many_attempts"));
-                await terminal.PressAnyKey();
                 Disconnect();
                 return;
             }
+            _authLeftover = flow.Leftover;
 
             // Auth succeeded — bridge local terminal ↔ SSH stream
             terminal.SetColor("bright_green");
@@ -763,85 +357,6 @@ namespace UsurperRemake.Systems
             finally
             {
                 Disconnect();
-            }
-        }
-
-        /// <summary>
-        /// Drain any pending data from the SSH shell stream (e.g. relay's menu banner).
-        /// Discards the data since we handle auth locally.
-        /// </summary>
-        private void DrainShellStream()
-        {
-            try
-            {
-                if (shellStream == null) return;
-                while (shellStream.DataAvailable)
-                {
-                    var buffer = new byte[4096];
-                    shellStream.Read(buffer, 0, buffer.Length);
-                }
-            }
-            catch { }
-        }
-
-        /// <summary>
-        /// Read response data from the SSH shell stream after sending an AUTH header.
-        /// Waits up to 5 seconds for data, returns the accumulated text.
-        /// The SSH PTY echoes our AUTH input back, so we look for "OK" or "ERR:"
-        /// as discrete lines (not just substring matches) to avoid false positives.
-        /// </summary>
-        private async Task<string?> ReadLineFromShell()
-        {
-            try
-            {
-                var result = new StringBuilder();
-                var deadline = DateTime.UtcNow.AddSeconds(5);
-
-                while (DateTime.UtcNow < deadline)
-                {
-                    if (shellStream!.DataAvailable)
-                    {
-                        var buffer = new byte[4096];
-                        int read = shellStream.Read(buffer, 0, buffer.Length);
-                        if (read > 0)
-                        {
-                            result.Append(Encoding.UTF8.GetString(buffer, 0, read));
-
-                            // Check each line for auth response markers.
-                            // The PTY echoes our AUTH input, so we need to look for
-                            // "OK" or "ERR:" as their own lines, not inside the echo.
-                            var text = result.ToString();
-                            var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
-                            foreach (var line in lines)
-                            {
-                                var trimmed = line.Trim();
-                                if (trimmed == "OK" || trimmed.StartsWith("ERR:"))
-                                {
-                                    // Save any game data that arrived after the OK/ERR line
-                                    // (e.g. splash screen sent before PipeIO starts reading)
-                                    int okIdx = text.IndexOf(trimmed, StringComparison.Ordinal);
-                                    int afterOk = okIdx + trimmed.Length;
-                                    // Skip past trailing \r\n after the OK line
-                                    while (afterOk < text.Length && (text[afterOk] == '\r' || text[afterOk] == '\n'))
-                                        afterOk++;
-                                    if (afterOk < text.Length)
-                                        _authLeftover = text.Substring(afterOk);
-                                    return text;
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        await Task.Delay(50);
-                    }
-                }
-
-                return result.Length > 0 ? result.ToString() : null;
-            }
-            catch
-            {
-                return null;
             }
         }
 
@@ -1612,144 +1127,229 @@ namespace UsurperRemake.Systems
             cancellationSource?.Dispose();
             cancellationSource = null;
         }
+    }
 
-        // =====================================================================
-        // Credential Storage
-        // =====================================================================
+    /// <summary>
+    /// 1.2.8 network guard 2: set by the test assembly for the whole run (never by the game). While it is set, the
+    /// real SSH and TCP transports refuse any host that is not a loopback IP literal, before any DNS or connect.
+    /// </summary>
+    internal static class OnlineTestGuard
+    {
+        internal static volatile bool Active;
 
-        private OnlineCredentials? LoadSavedCredentials()
+        internal static void CheckHost(string host)
+        {
+            if (!Active) return;
+            if (System.Net.IPAddress.TryParse(host, out var ip) && System.Net.IPAddress.IsLoopback(ip)) return;
+            throw new InvalidOperationException("Online Play under test connects only to a loopback address.");
+        }
+    }
+
+    /// <summary>
+    /// 1.2.8 network guard 1: every Online Play login connection is made through <see cref="Factory"/>. The game
+    /// uses the real transports; the test assembly replaces it for the whole run with a loopback-only factory.
+    /// </summary>
+    internal static class OnlineTransport
+    {
+        internal static Func<string, int, bool, Task<IOnlineAuthTransport>> Factory = ConnectRealAsync;
+
+        /// <summary>The real transports: SSH to the relay, or direct TCP for the BBS door.</summary>
+        internal static async Task<IOnlineAuthTransport> ConnectRealAsync(string host, int port, bool directTcp) =>
+            directTcp ? await TcpAuthTransport.ConnectAsync(host, port) : SshAuthTransport.Connect(host, port);
+    }
+
+    /// <summary>SSH to the gateway user, whose ForceCommand is the relay. The client and stream are also closed by OnlinePlaySystem.Disconnect.</summary>
+    internal sealed class SshAuthTransport : IOnlineAuthTransport
+    {
+        private const string GatewayUser = "usurper";
+        private const string GatewayPass = "play";
+        private readonly Decoder _decoder = new UTF8Encoding(false).GetDecoder();
+
+        internal SshClient Client { get; }
+        internal ShellStream Stream { get; }
+
+        private SshAuthTransport(SshClient client, ShellStream stream)
+        {
+            Client = client;
+            Stream = stream;
+        }
+
+        internal static SshAuthTransport Connect(string host, int port) => Connect(host, port, OnlineHostKeyPolicy.ForGame());
+
+        /// <summary>
+        /// 1.2.8: the host key is checked by <paramref name="policy"/> during the key exchange, before the login is
+        /// sent. A refused key closes the connection and throws <see cref="HostKeyRefusedException"/>.
+        /// </summary>
+        internal static SshAuthTransport Connect(string host, int port, OnlineHostKeyPolicy policy)
+        {
+            OnlineTestGuard.CheckHost(host); // guard 2: before any DNS or connect
+            var client = new SshClient(host, port, GatewayUser, GatewayPass);
+            HostKeyCheck? hostKeyCheck = null;
+            client.HostKeyReceived += (_, e) =>
+            {
+                hostKeyCheck = policy.Check(host, port, e.HostKey);
+                e.CanTrust = hostKeyCheck.Trusted;
+            };
+            try
+            {
+                client.ConnectionInfo.Timeout = TimeSpan.FromSeconds(10);
+                client.Connect();
+
+                // Open a shell stream with PTY echo disabled.
+                // We handle all line editing (backspace, echo) locally on the client
+                // and only send complete lines. This prevents PTY echo responses from
+                // corrupting the client's ANSI parser (which caused garbage output on backspace).
+                var terminalModes = new System.Collections.Generic.Dictionary<Renci.SshNet.Common.TerminalModes, uint>
+                {
+                    { Renci.SshNet.Common.TerminalModes.ECHO, 0 }
+                };
+                var stream = client.CreateShellStream("xterm", 80, 24, 800, 600, 4096, terminalModes);
+                return new SshAuthTransport(client, stream);
+            }
+            catch
+            {
+                try { client.Dispose(); } catch { }
+                if (hostKeyCheck is { Trusted: false } refused) throw new HostKeyRefusedException(refused);
+                throw;
+            }
+        }
+
+        public void Write(string text)
+        {
+            Stream.Write(text);
+            Stream.Flush();
+        }
+
+        public async Task<string?> ReadAsync(TimeSpan timeout)
         {
             try
             {
-                var path = GetCredentialsPath();
-                if (!File.Exists(path))
-                    return null;
-
-                var json = File.ReadAllText(path);
-                var creds = JsonSerializer.Deserialize<OnlineCredentials>(json);
-                if (creds != null && !string.IsNullOrEmpty(creds.Username))
-                    return creds;
+                var deadline = DateTime.UtcNow + timeout;
+                var buffer = new byte[4096];
+                var chars = new char[4097];
+                while (DateTime.UtcNow < deadline)
+                {
+                    if (Stream.DataAvailable)
+                    {
+                        int read = Stream.Read(buffer, 0, buffer.Length);
+                        if (read > 0)
+                        {
+                            int n = _decoder.GetChars(buffer, 0, read, chars, 0);
+                            if (n > 0) return new string(chars, 0, n);
+                        }
+                    }
+                    else if (!Client.IsConnected)
+                    {
+                        return null;
+                    }
+                    else
+                    {
+                        await Task.Delay(50);
+                    }
+                }
             }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogWarning("ONLINE_PLAY", $"Failed to load credentials: {ex.Message}");
-            }
+            catch { }
             return null;
         }
 
-        private bool ShouldNeverAskToSave()
+        public void Drain()
         {
             try
             {
-                var path = GetCredentialsPath();
-                if (!File.Exists(path))
-                    return false;
-
-                var json = File.ReadAllText(path);
-                var creds = JsonSerializer.Deserialize<OnlineCredentials>(json);
-                return creds?.NeverAskToSave == true;
-            }
-            catch { return false; }
-        }
-
-        private void SaveNeverAskPreference()
-        {
-            try
-            {
-                var path = GetCredentialsPath();
-                var creds = new OnlineCredentials { NeverAskToSave = true };
-
-                // Preserve existing credentials if they exist
-                if (File.Exists(path))
-                {
-                    var existing = JsonSerializer.Deserialize<OnlineCredentials>(File.ReadAllText(path));
-                    if (existing != null && !string.IsNullOrEmpty(existing.Username))
-                    {
-                        creds.Username = existing.Username;
-                        creds.Password = existing.Password;
-                        creds.Server = existing.Server;
-                        creds.Port = existing.Port;
-                    }
-                }
-
-                var json = JsonSerializer.Serialize(creds, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(path, json);
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogWarning("ONLINE_PLAY", $"Failed to save preference: {ex.Message}");
-            }
-        }
-
-        private void SaveCredentials(string server, int port, string username, string password)
-        {
-            try
-            {
-                var creds = new OnlineCredentials
-                {
-                    Server = server,
-                    Port = port,
-                    Username = username,
-                    Password = Convert.ToBase64String(Encoding.UTF8.GetBytes(password))
-                };
-
-                var json = JsonSerializer.Serialize(creds, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(GetCredentialsPath(), json);
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.Instance.LogWarning("ONLINE_PLAY", $"Failed to save credentials: {ex.Message}");
-            }
-        }
-
-        private void DeleteSavedCredentials()
-        {
-            try
-            {
-                var path = GetCredentialsPath();
-                if (File.Exists(path))
-                    File.Delete(path);
+                var buffer = new byte[4096];
+                while (Stream.DataAvailable)
+                    Stream.Read(buffer, 0, buffer.Length);
             }
             catch { }
         }
 
-        private string GetCredentialsPath()
+        public void Dispose()
         {
-            var dir = AppContext.BaseDirectory;
-            return Path.Combine(dir, CREDENTIALS_FILE);
+            try { Stream.Dispose(); } catch { }
+            try { Client.Dispose(); } catch { }
+        }
+    }
+
+    /// <summary>Direct TCP (BBS door). The client and stream are also closed by OnlinePlaySystem.Disconnect.</summary>
+    internal sealed class TcpAuthTransport : IOnlineAuthTransport
+    {
+        private readonly Decoder _decoder = new UTF8Encoding(false).GetDecoder();
+
+        internal TcpClient Client { get; }
+        internal NetworkStream Stream { get; }
+
+        private TcpAuthTransport(TcpClient client, NetworkStream stream)
+        {
+            Client = client;
+            Stream = stream;
+        }
+
+        internal static async Task<TcpAuthTransport> ConnectAsync(string host, int port)
+        {
+            OnlineTestGuard.CheckHost(host); // guard 2: before any DNS or connect
+            var client = new TcpClient { NoDelay = true };
+            try
+            {
+                // sslh needs a moment to detect protocol: connect with timeout
+                var connectTask = client.ConnectAsync(host, port);
+                if (await Task.WhenAny(connectTask, Task.Delay(10000)) != connectTask)
+                    throw new TimeoutException();
+                await connectTask; // propagate any exception
+                var stream = client.GetStream();
+                stream.ReadTimeout = 30000;
+                stream.WriteTimeout = 10000;
+                return new TcpAuthTransport(client, stream);
+            }
+            catch
+            {
+                try { client.Dispose(); } catch { }
+                throw;
+            }
+        }
+
+        public void Write(string text)
+        {
+            var bytes = Encoding.UTF8.GetBytes(text);
+            Stream.Write(bytes, 0, bytes.Length);
+            Stream.Flush();
         }
 
         /// <summary>
-        /// Stored credentials with base64-encoded password.
-        /// Not truly secure - just obfuscation to prevent casual reading.
+        /// A blocking read with a timeout instead of polling DataAvailable, because the server may send ERR: and
+        /// close the connection at once. Null on a timeout or when the server closed.
         /// </summary>
-        private class OnlineCredentials
+        public async Task<string?> ReadAsync(TimeSpan timeout)
         {
-            public string Server { get; set; } = GameConfig.OnlineServerAddress;
-            public int Port { get; set; } = GameConfig.OnlineServerPort;
-            public string Username { get; set; } = "";
-            public bool NeverAskToSave { get; set; }
-            public string Password
+            try
             {
-                get => _password;
-                set => _password = value;
+                var buffer = new byte[4096];
+                using var cts = new CancellationTokenSource(timeout);
+                int read = await Stream.ReadAsync(buffer, 0, buffer.Length, cts.Token);
+                if (read == 0) return null;
+                var chars = new char[read + 1];
+                int n = _decoder.GetChars(buffer, 0, read, chars, 0);
+                return new string(chars, 0, n);
             }
-            private string _password = "";
+            catch
+            {
+                return null;
+            }
+        }
 
-            /// <summary>
-            /// Get the actual password (decode from base64).
-            /// </summary>
-            public string GetDecodedPassword()
+        public void Drain()
+        {
+            try
             {
-                try
-                {
-                    return Encoding.UTF8.GetString(Convert.FromBase64String(_password));
-                }
-                catch
-                {
-                    return _password; // Return as-is if not base64
-                }
+                var buffer = new byte[4096];
+                while (Stream.DataAvailable)
+                    Stream.Read(buffer, 0, buffer.Length);
             }
+            catch { }
+        }
+
+        public void Dispose()
+        {
+            try { Client.Dispose(); } catch { }
         }
     }
 }

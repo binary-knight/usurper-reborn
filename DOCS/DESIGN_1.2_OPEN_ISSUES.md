@@ -353,7 +353,7 @@ from the numeric layout. Since 1.1.13 the default Main Street uses district
 letters (D, I, E, T, A, M, G, H, C, S, N, O, plus `~`, `?`, Q); numeric keys
 survive only in the optional Classic Main Street layout
 (`Scripts/Locations/MainStreetClassic.cs`, where `8` maps to the Level Master).
-When 1.3 is designed, choose the Player District entry key against the current
+When 1.4 is designed, choose the Player District entry key against the current
 district key map, and decide whether it sits on Main Street or inside a
 district. This design is otherwise unchanged.
 

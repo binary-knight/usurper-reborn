@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.2.5
+checked: 1.3.0
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs
+history: 1.3.0 | Rooms you cleared stay cleared after a disconnect, a reconnect or a save taken on the floor, a beaten boss included, and from floor 3 a room's monsters can include an elite, announced when the fight starts.
 history: 1.2.5 | Monster names in rooms, merchant wares and crafting materials are shown in the player's language, and long merchant and material rows wrap at 79 columns.
 history: 1.2.4 | When the leader examines a feature, followers see it in their own language, and the merchant purchase confirm wraps at 79 columns.
 history: 1.2.3 | Dungeon rooms, features, puzzle titles and hints, and feature stat checks are translated into all five languages, and puzzle text wraps to fit the screen.
@@ -21,7 +22,7 @@ The room view lists exits and hints about what the room holds. The menu then sho
 - **Make camp and recover** in a cleared room, once per floor.
 - Map, the dungeon guide, inventory, potions, herbs, Willow Draught, party and status are always at hand.
 
-Monsters guard treasure and stairs, so a guarded room must be cleared first. Leaving the dungeon returns you to the floor overview, where you can change level or return to town.
+Monsters guard treasure and stairs, so a guarded room must be cleared first. A cleared room stays cleared after a disconnect, a reconnect or a save taken on the floor; this holds for the room of your last fight and for a boss you beat. From floor 3 the monsters of a room can include an [elite](/wiki/en/monsters/#elites), announced when the fight starts. Leaving the dungeon returns you to the floor overview, where you can change level or return to town.
 
 ## Random room events
 
@@ -93,8 +94,8 @@ A pixie is caught more easily with higher Dexterity. A vision reveals the whole 
 
 Each band of floors has a theme that changes the rooms, features and encounters: Catacombs, Sewers, Caverns, Ancient Ruins, Demon Lair, Frozen Depths, Volcanic Pit and the Abyssal Void, in that order going down. Crypt rooms appear only in the Catacombs and Ancient Ruins.
 
-A floor always starts in a hall and ends in the boss room. One room holds guarded treasure of better quality. Deeper floors add special rooms: an arena room with several monsters and treasure, a meditation chamber that works as a resting place, a lore library, and secret vaults. Some floors also hold story discoveries; see [the story](/wiki/en/world/story/) and [boss references](/wiki/en/monsters/bosses/).
+A floor always starts in a hall and ends in the boss room. One room holds guarded treasure of better quality. Deeper floors add special rooms: an arena room with monsters and treasure, a meditation chamber that works as a resting place, a lore library, and secret vaults. Some floors also hold story discoveries; see [the story](/wiki/en/world/story/) and [boss references](/wiki/en/monsters/bosses/).
 
 :::spoiler Spoiler: floor bands and room counts
-The Catacombs cover floors 1 to 10, the Sewers 11 to 20, the Caverns 21 to 35, the Ancient Ruins 36 to 50, the Demon Lair 51 to 65, the Frozen Depths 66 to 80, the Volcanic Pit 81 to 90 and the Abyssal Void 91 and below. A floor has 15 to 25 rooms. Arena rooms appear from floor 5, meditation chambers from floor 10 and lore libraries from floor 15. The guarded treasure room has two or three monsters and a trap. Each floor's layout is the same every time you visit it.
+The Catacombs cover floors 1 to 10, the Sewers 11 to 20, the Caverns 21 to 35, the Ancient Ruins 36 to 50, the Demon Lair 51 to 65, the Frozen Depths 66 to 80, the Volcanic Pit 81 to 90 and the Abyssal Void 91 and below. A floor has 15 to 25 rooms. Arena rooms appear from floor 5, meditation chambers from floor 10 and lore libraries from floor 15. The guarded treasure room has a trap. The number of monsters in a room is decided when its fight starts; see [monsters](/wiki/en/monsters/). Each floor's layout is the same every time you visit it.
 :::

@@ -2744,7 +2744,7 @@ public static class ClassAbilitySystem
         {
             // BALANCE: Add weapon power contribution to ability damage
             // This ensures abilities scale with gear and always beat basic attacks
-            double weaponBonus = user.WeapPow * 0.25; // 25% of weapon power added
+            double weaponBonus = user.AbilityWeapPow * 0.25; // 25% of weapon power added (1.2.8: dual-wield reads main hand plus half the off hand)
             double scaledDamage = (ability.BaseDamage + weaponBonus) * totalScale;
 
             // v0.57.0 shield-scaling damage — Shield Bash / Holy Shield Slam use the equipped shield's

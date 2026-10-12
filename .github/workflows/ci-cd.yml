@@ -19,6 +19,13 @@ env:
   DOTNET_SYSTEM_GLOBALIZATION_INVARIANT: 1
   DOTNET_VERSION: '8.0.x'
 
+# The GITHUB_TOKEN of every job reads the repository and nothing more. Uses: actions/checkout,
+# the WezTerm release lookup (a public API, the token only lifts the rate limit) and
+# `gh release view` in deploy-server. attach-to-release sets its own contents: write to upload
+# the release assets. web/test/ci.test.js pins both.
+permissions:
+  contents: read
+
 # ═══════════════════════════════════════════════════════════════════
 # Job dependency graph (web-test, the web/ node tests, also gates build and deploy-server):
 #

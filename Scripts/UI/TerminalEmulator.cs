@@ -579,7 +579,7 @@ public partial class TerminalEmulator
     public int RowsSinceClear { get; private set; }
 
     private static readonly System.Text.RegularExpressions.Regex ColumnMarkup =
-        new(@"\x1b\[[0-9;?]*[A-Za-z]|\[/?[a-z_]+\]", System.Text.RegularExpressions.RegexOptions.Compiled);
+        new(@"\x1b\[[0-9;?]*[A-Za-z]|\[(?:/|/?[a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.Compiled);
 
     private void AdvanceColumn(string? text)
     {
@@ -625,8 +625,15 @@ public partial class TerminalEmulator
         else if (DoorMode.ShouldUseAnsiOutput)
         {
             // In door/online mode, use ANSI escape codes since Console.ForegroundColor doesn't travel through SSH
-            Console.Write($"\x1b[{GetAnsiColorCode(effectiveColor)}m");
-            Console.Write(text);
+            // v1.2.8: a text with [colour]...[/] markup is rendered, as WriteLine renders it (same test,
+            // same parser); after each pair the colour goes back to the colour of this Write.
+            if (text.Contains("[") && text.Contains("[/]"))
+                Console.Write(RenderMarkupInColor(text, effectiveColor));
+            else
+            {
+                Console.Write($"\x1b[{GetAnsiColorCode(effectiveColor)}m");
+                Console.Write(text);
+            }
             // Don't reset here - let next Write/WriteLine handle color
         }
         else
@@ -634,7 +641,11 @@ public partial class TerminalEmulator
             // Console fallback – approximate ANSI colour mapping
             ConsoleColor oldColor = Console.ForegroundColor;
             Console.ForegroundColor = ColorNameToConsole(effectiveColor);
-            Console.Write(text);
+            // v1.2.8: markup is rendered by the parser WriteLine uses here; it returns to this colour after a pair
+            if (text.Contains("[") && text.Contains("[/]"))
+                WriteMarkupToConsole(text);
+            else
+                Console.Write(text);
             Console.ForegroundColor = oldColor;
         }
 
@@ -2739,6 +2750,73 @@ public partial class TerminalEmulator
         }
     }
 
+    /// <summary>
+    /// The runs of a [colour]...[/] text, for an output that sets colours by name (the BBS socket terminal).
+    /// The walk is the one RenderMarkupToStringBuilder makes: a "[word]" of letters and underscores opens a
+    /// pair up to its matching "[/]", pairs nest, a "[/]" with no opening is dropped, and an opening with no
+    /// matching "[/]" ends the text. A run's Color is the name of the pair it opens in; it is null from a
+    /// "[/]" on, as the stream goes back to the colour of the Write after every pair. Empty runs are left out.
+    /// </summary>
+    internal static List<(string Text, string? Color)> MarkupSegments(string text)
+    {
+        var runs = new List<(string Text, string? Color)>();
+        var run = new StringBuilder();
+        string? color = null;
+        void Flush() { if (run.Length > 0) { runs.Add((run.ToString(), color)); run.Clear(); } }
+        void Walk(string part)
+        {
+            int pos = 0;
+            while (pos < part.Length)
+            {
+                var tagMatch = System.Text.RegularExpressions.Regex.Match(
+                    part.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (tagMatch.Success)
+                {
+                    string colorName = tagMatch.Groups[1].Value;
+                    pos += tagMatch.Length;
+                    int depth = 1;
+                    int contentStart = pos;
+                    int contentEnd = pos;
+
+                    while (pos < part.Length && depth > 0)
+                    {
+                        if (pos + 2 <= part.Length - 1 && part[pos] == '[' && part[pos + 1] == '/' && part[pos + 2] == ']')
+                        {
+                            depth--;
+                            if (depth == 0) { contentEnd = pos; pos += 3; break; }
+                            pos += 3;
+                            continue;
+                        }
+                        var nestedMatch = System.Text.RegularExpressions.Regex.Match(
+                            part.Substring(pos), @"^\[([a-z_]+)\]", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (nestedMatch.Success) { depth++; pos += nestedMatch.Length; continue; }
+                        pos++;
+                    }
+
+                    Flush();
+                    color = colorName;
+                    Walk(part.Substring(contentStart, contentEnd - contentStart));
+                    Flush();
+                    color = null;
+                    continue;
+                }
+
+                if (pos + 2 <= part.Length - 1 && part[pos] == '[' && part[pos + 1] == '/' && part[pos + 2] == ']')
+                {
+                    pos += 3;
+                    continue;
+                }
+
+                run.Append(part[pos]);
+                pos++;
+            }
+        }
+        Walk(text ?? "");
+        Flush();
+        return runs;
+    }
+
     // ═══════════════════════════════════════════════════════════════════
     // MUD STREAM I/O HELPERS
     // ═══════════════════════════════════════════════════════════════════
@@ -2828,7 +2906,11 @@ public partial class TerminalEmulator
             return;
         }
 
-        var ansi = $"\x1b[{GetAnsiColorCode(color)}m{text}";
+        // v1.2.8: a text with [colour]...[/] markup is rendered, as WriteLineToStream renders it (same test,
+        // same parser), with no line end. A text without a pair is sent as it is.
+        var ansi = text.Contains("[") && text.Contains("[/]")
+            ? RenderMarkupInColor(text, color)
+            : $"\x1b[{GetAnsiColorCode(color)}m{text}";
         lock (_streamWriterLock)
         {
             if (UseCp437)
@@ -2839,6 +2921,20 @@ public partial class TerminalEmulator
                 ForwardToSpectators(ansi);
             }
         }
+    }
+
+    /// <summary>
+    /// v1.2.8, for Write: the text in <paramref name="color"/> with its [colour]...[/] markup rendered by
+    /// RenderMarkupToStringBuilder. That parser ends a pair with a reset; the colour of the Write is sent
+    /// again after each reset, so the rest of the row keeps the colour it was written in.
+    /// </summary>
+    private string RenderMarkupInColor(string text, string color)
+    {
+        string baseCode = $"\x1b[{GetAnsiColorCode(color)}m";
+        var sb = new StringBuilder(baseCode);
+        RenderMarkupToStringBuilder(sb, text);
+        sb.Replace("\x1b[0m", "\x1b[0m" + baseCode, baseCode.Length, sb.Length - baseCode.Length);
+        return sb.ToString();
     }
 
     /// <summary>Parse [colorname]text[/] markup and write to the MUD TCP stream using ANSI codes.</summary>

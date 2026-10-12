@@ -1,8 +1,9 @@
 ---
 title: Gods and faith
 path: /wiki/en/gods/
-checked: 1.2.5
+checked: 1.3.0
 sources: Scripts/Systems/GodSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/FaithSystem.cs, Scripts/Locations/MainStreetDistricts.cs
+history: 1.3.0 | none
 history: 1.2.5 | A Temple priest now points you to the first Seal from level 10, Temple screens are shown in all five languages, and sacrifice notices reach a player-god in that god's language.
 history: 1.2.4 | The notice a player-god gets when you sacrifice gold at its altar now reaches its mailbox.
 ---

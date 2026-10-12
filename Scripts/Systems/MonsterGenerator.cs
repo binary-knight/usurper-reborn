@@ -27,7 +27,7 @@ public static class MonsterGenerator
         var (family, tier) = MonsterFamilies.GetMonsterForLevel(dungeonLevel, random);
 
         // Calculate base stats using smooth scaling formulas
-        var stats = CalculateMonsterStats(dungeonLevel, tier.PowerMultiplier, isBoss, isMiniBoss, approachScale);
+        var stats = CalculateMonsterStats(dungeonLevel, isBoss ? (tier.BossPowerMultiplier ?? tier.PowerMultiplier) : tier.PowerMultiplier, isBoss, isMiniBoss, approachScale);
 
         // Generate monster name - mini-bosses get "Champion" suffix
         string monsterName = tier.Name;
@@ -88,6 +88,7 @@ public static class MonsterGenerator
         {
             monster.SpecialAbilities.Add(ability);
         }
+        monster.SignatureAbilities.AddRange(tier.SignatureAbilities ?? new());   // 1.2.8: read by MonsterTactics only
 
         // NG+ cycle monster buff (v0.52.0) — monsters get stronger each cycle
         // v0.56.1: also scale WeapPow and ArmPow (were missed in the original implementation
@@ -111,7 +112,7 @@ public static class MonsterGenerator
     /// <summary>
     /// Get a champion name for a mini-boss based on the base monster name
     /// </summary>
-    private static string GetChampionName(string baseName, string familyName)
+    internal static string GetChampionName(string baseName, string familyName)
     {
         // Check if the name already has a rank suffix
         string[] existingRanks = { "King", "Lord", "Chieftain", "Warlord", "Champion", "Berserker", "Elder" };
@@ -510,10 +511,86 @@ public static class MonsterGenerator
         return 1.0;
     }
 
-    public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null, double approachScale = 1.0)
+    /// <summary>1.2.8: the dungeon floors with encounter templates (GameConfig.EncounterTemplatesEnabled).</summary>
+    public const int TemplateMinFloor = 4;
+    public const int TemplateMaxFloor = 10;
+
+    /// <summary>1.2.8: a templated regular group is 1 (35%), 2 (45%) or 3 (20%) monsters, never more.</summary>
+    public const double TemplateSizeOneShare = 0.35;
+    public const double TemplateSizeTwoShare = 0.45;
+    public const int TemplateMaxGroupSize = 3;
+
+    /// <summary>The chance that a regular group is one family and one tier: 0.5 with templates, 0.7 without.</summary>
+    public const double TemplateSameFamilyChance = 0.5;
+    public const double SameFamilyChance = 0.7;
+
+    /// <summary>1.2.8 threat budget: each member of a templated group of 3 keeps this share of its HP and of
+    /// its Strength, Punch and WeapPow, so three are about 1.3 times two, not 1.5.</summary>
+    public const double TemplateBudgetHp = 0.8;
+    public const double TemplateBudgetDamage = 0.9;
+
+    /// <summary>1.2.8 caster role: the member that gets its family's spell keeps this share of its Strength.</summary>
+    public const double CasterStrength = 0.85;
+
+    /// <summary>1.2.8 caster role: the spell of each family that has one. A family not listed here (Fey and
+    /// Aberration by design, and every other one) never gives a caster. All three are in
+    /// CombatEvents.MonsterSpellAbilities, so the damage is recorded as spell damage.</summary>
+    internal static readonly Dictionary<string, string> CasterSpells = new(StringComparer.Ordinal)
+    {
+        ["Draconic"] = "Fireball", ["Elemental"] = "Fireball",
+        ["Undead"] = "Spellcasting", ["Goblinoid"] = "Spellcasting",
+        ["Demonic"] = "Hellfire",
+    };
+
+    /// <summary>True when the encounter templates apply: the switch is on, the caller is the dungeon (rules
+    /// given) and the real dungeon floor is in the template band. The band is read from the rules' floor,
+    /// never from the monster level: a straggler room on floor 14 asks for level 7 monsters and must keep
+    /// the draws made before 1.2.8.</summary>
+    internal static bool TemplatesApply(EncounterRules? rules) =>
+        GameConfig.EncounterTemplatesEnabled && rules != null
+        && rules.RealFloor >= TemplateMinFloor && rules.RealFloor <= TemplateMaxFloor;
+
+    /// <summary>1.2.8 elites: the six slots of the affix draw, in the order the draw indexes them. An elite's
+    /// name is its current name in monster.elite.{id}; its description is monster.elite_desc.{id}. One slot,
+    /// EliteAffixNotDrawn, gives no affix of its own (DrawEliteAffix).</summary>
+    internal static readonly string[] EliteAffixIds = { "frenzied", "warded", "venomous", "commanding", "mending", "swift" };
+
+    /// <summary>1.3.0: Warded is out of the draw. No elite gets it: it was never built (it belongs to the
+    /// player's to-hit roll), so its name and sentence would be untrue. Its slot stays in EliteAffixIds so
+    /// that the draw keeps its shape; its texts stay in the language files, unused by the game.</summary>
+    internal const string EliteAffixNotDrawn = "warded";
+
+    /// <summary>The five affixes an elite can get, in slot order.</summary>
+    internal static readonly string[] EliteAffixPool = EliteAffixIds.Where(id => id != EliteAffixNotDrawn).ToArray();
+
+    /// <summary>The chance that a regular dungeon encounter on this real floor holds an elite.</summary>
+    internal static double EliteChance(int realFloor) =>
+        realFloor < GameConfig.EliteMinFloor ? 0.0
+        : realFloor <= 10 ? GameConfig.EliteChanceFloors3To10
+        : realFloor <= 30 ? GameConfig.EliteChanceFloors11To30
+        : GameConfig.EliteChanceFloors31Plus;
+
+    /// <summary>True when an encounter can hold an elite: the switch is on, the caller is the dungeon (rules
+    /// given; a boss room gives none) and the real floor has a chance. False draws nothing.</summary>
+    internal static bool ElitesApply(EncounterRules? rules) =>
+        GameConfig.EliteMonstersEnabled && rules != null && EliteChance(rules.RealFloor) > 0.0;
+
+    /// <summary>The size of a templated regular group from one roll in [0, 1).</summary>
+    internal static int TemplateGroupSize(double roll) =>
+        roll < TemplateSizeOneShare ? 1 : roll < TemplateSizeOneShare + TemplateSizeTwoShare ? 2 : TemplateMaxGroupSize;
+
+    /// <param name="rules">1.2.8: given only by the dungeon (EncounterRules.Dungeon with the real floor). With
+    /// GameConfig.EncounterTemplatesEnabled on and that floor in 4 to 10 the group follows the encounter
+    /// templates: sizes 1, 2 and 3, one family half the time, a budgeted group of 3 and one caster in a
+    /// mixed group. Without rules, with the switch off or on any other floor the method draws the same
+    /// random numbers in the same order as before 1.2.8. With GameConfig.EliteMonstersEnabled on and the
+    /// floor 3 or deeper, a regular group then rolls for an elite (ElitesApply, PromoteElite): the last
+    /// draws of the call, after everything above.</param>
+    public static List<Monster> GenerateMonsterGroup(int dungeonLevel, Random? random = null, double approachScale = 1.0, EncounterRules? rules = null)
     {
         random ??= Random.Shared;
         var monsters = new List<Monster>();
+        bool templates = TemplatesApply(rules);
 
         // Clamp dungeon level to valid range (1-100)
         dungeonLevel = Math.Max(1, Math.Min(100, dungeonLevel));
@@ -528,7 +605,8 @@ public static class MonsterGenerator
 
         // Regular encounter - 1 to 5 monsters
         // Higher levels tend toward more monsters
-        int groupSize = dungeonLevel switch
+        // 1.2.8: a templated dungeon floor rolls its own sizes (one draw, as before)
+        int groupSize = templates ? TemplateGroupSize(random.NextDouble()) : dungeonLevel switch
         {
             <= 10 => random.Next(1, 3),   // 1-2 monsters early game
             <= 30 => random.Next(1, 4),   // 1-3 monsters mid-early
@@ -537,7 +615,7 @@ public static class MonsterGenerator
         };
 
         // Generate monsters (usually same family for thematic encounters)
-        bool sameFamily = random.NextDouble() < 0.7; // 70% chance for same family
+        bool sameFamily = random.NextDouble() < (templates ? TemplateSameFamilyChance : SameFamilyChance); // 70% chance for same family (50% templated)
 
         if (sameFamily)
         {
@@ -587,6 +665,7 @@ public static class MonsterGenerator
                 {
                     monster.SpecialAbilities.Add(ability);
                 }
+                monster.SignatureAbilities.AddRange(tier.SignatureAbilities ?? new());   // 1.2.8: read by MonsterTactics only
 
                 // NG+ cycle monster buff (v0.52.0) — same scaling as GenerateMonster()
                 // v0.56.1: include WeapPow and ArmPow to match the single-monster path
@@ -615,6 +694,110 @@ public static class MonsterGenerator
             }
         }
 
+        if (templates)
+        {
+            if (monsters.Count >= TemplateMaxGroupSize) ApplyGroupBudget(monsters);
+            if (!sameFamily && monsters.Count >= 2) AssignCaster(monsters, random);
+        }
+
+        // 1.2.8 elites: the last step, so every draw above is the one made without it. The champion
+        // encounter returned earlier and never reaches this.
+        if (ElitesApply(rules) && random.NextDouble() < EliteChance(rules!.RealFloor))
+            PromoteElite(monsters, random, rules.RealFloor);
+
         return monsters;
+    }
+
+    /// <summary>
+    /// 1.2.8: promotes one member of a built regular group to an elite. Draws: the member, then one affix,
+    /// then from GameConfig.EliteSecondAffixFloor a second one among the others (DrawEliteAffix: one draw
+    /// an affix, never Warded). Budget: the elite takes
+    /// its member's place, and a group of 3 or more loses one further member, the last one that is not the
+    /// elite (no draw). The elite keeps its member's stats (a templated budget and the caster's Strength
+    /// included) times the GameConfig elite multipliers, and its stored reward times the reward ones. Its
+    /// name is its full current name in monster.elite.{affix}, written in English through
+    /// MonsterNames.FromKey and shown in each reader's language, so a caster stays one ("Frenzied Kobold
+    /// Shaman"). TierName and FamilyName stay; IsMiniBoss is not touched. What an affix does is not here.
+    /// </summary>
+    internal static Monster PromoteElite(List<Monster> monsters, Random random, int realFloor)
+    {
+        var elite = monsters[random.Next(monsters.Count)];
+        if (monsters.Count >= 3)
+            monsters.RemoveAt(ReferenceEquals(monsters[monsters.Count - 1], elite) ? monsters.Count - 2 : monsters.Count - 1);
+
+        elite.IsElite = true;
+        elite.MaxHP = Math.Max(1, (long)(elite.MaxHP * GameConfig.EliteHpMultiplier));
+        elite.HP = elite.MaxHP;
+        elite.Strength = (long)(elite.Strength * GameConfig.EliteDamageMultiplier);
+        elite.Punch = (long)(elite.Punch * GameConfig.EliteDamageMultiplier);
+        elite.WeapPow = (long)(elite.WeapPow * GameConfig.EliteDamageMultiplier);
+        elite.Defence = (int)(elite.Defence * GameConfig.EliteDefenceMultiplier);
+        elite.ArmPow = (long)(elite.ArmPow * GameConfig.EliteDefenceMultiplier);
+        // the reward a victory reads is the one stored when the monster was built
+        elite.Experience = (long)(elite.Experience * GameConfig.EliteExperienceMultiplier);
+        elite.Gold = (long)(elite.Gold * GameConfig.EliteGoldMultiplier);
+
+        var slots = EliteAffixIds.ToList();
+        int affixes = realFloor >= GameConfig.EliteSecondAffixFloor ? 2 : 1;
+        for (int i = 0; i < affixes; i++)
+            elite.EliteAffixes.Add(DrawEliteAffix(slots, random));
+        // the first affix is the outermost word of the name
+        for (int i = elite.EliteAffixes.Count - 1; i >= 0; i--)
+            elite.Name = MonsterNames.FromKey("monster.elite." + elite.EliteAffixes[i], elite.Name);
+        return elite;
+    }
+
+    /// <summary>
+    /// 1.3.0: one affix from the slots still open, with ONE draw, as before Warded left the draw (so the
+    /// random numbers after an elite are the ones of before). The draw is the old one made finer: it picks a
+    /// slot (r / n) and a place inside the slot (r % n), n being the number of real affixes still open. A
+    /// real affix's slot gives that affix, so with a seeded random an elite whose draw fell on a real affix
+    /// keeps it. Warded's slot gives no Warded: the place inside it picks one of the real affixes still open,
+    /// each as likely as the other. Every real affix is therefore as likely as every other (one in five for
+    /// the first, one in four for the second). The picked affix leaves the slots.
+    /// </summary>
+    internal static string DrawEliteAffix(List<string> slots, Random random)
+    {
+        var open = slots.Where(id => id != EliteAffixNotDrawn).ToList();
+        int r = random.Next(slots.Count * open.Count);
+        string slot = slots[r / open.Count];
+        string affix = slot == EliteAffixNotDrawn ? open[r % open.Count] : slot;
+        slots.Remove(affix);
+        return affix;
+    }
+
+    /// <summary>1.2.8 threat budget of a templated group of 3: HP x0.8, Strength, Punch and WeapPow x0.9
+    /// for every member. Draws nothing.</summary>
+    private static void ApplyGroupBudget(List<Monster> monsters)
+    {
+        foreach (var m in monsters)
+        {
+            m.MaxHP = Math.Max(1, (long)(m.MaxHP * TemplateBudgetHp));
+            m.HP = m.MaxHP;
+            m.Strength = (long)(m.Strength * TemplateBudgetDamage);
+            m.Punch = (long)(m.Punch * TemplateBudgetDamage);
+            m.WeapPow = (long)(m.WeapPow * TemplateBudgetDamage);
+        }
+    }
+
+    /// <summary>
+    /// 1.2.8 caster role of a mixed templated group: one member whose family has a spell (CasterSpells),
+    /// picked with one draw when there is any (none otherwise), gets the spell added to its abilities and
+    /// its Strength x0.85. Its name is its tier name in monster.role.caster, written in English through
+    /// MonsterNames.FromKey and shown in each reader's language; TierName and FamilyName stay.
+    /// </summary>
+    private static void AssignCaster(List<Monster> monsters, Random random)
+    {
+        var eligible = monsters.Where(m => m.FamilyName != null && CasterSpells.ContainsKey(m.FamilyName)).ToList();
+        if (eligible.Count == 0) return;
+        MakeCaster(eligible[random.Next(eligible.Count)]);
+    }
+
+    private static void MakeCaster(Monster caster)
+    {
+        string spell = CasterSpells[caster.FamilyName];
+        if (!caster.SpecialAbilities.Contains(spell)) caster.SpecialAbilities.Add(spell);
+        caster.Strength = (long)(caster.Strength * CasterStrength);
+        caster.Name = MonsterNames.FromKey("monster.role.caster", caster.TierName);
     }
 }

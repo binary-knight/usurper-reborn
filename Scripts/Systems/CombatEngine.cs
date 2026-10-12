@@ -33,8 +33,8 @@ public partial class CombatEngine
     /// <summary>
     /// v1.1.14: test-only. Gives this engine its own RNG from a seed, so a test that drives a fight gets the
     /// same rolls every run. Every roll the engine makes itself goes through this field; a game never calls
-    /// this, so play keeps Random.Shared. Rolls made outside the engine (monster abilities, items) are not
-    /// covered.
+    /// this, so play keeps Random.Shared. Rolls made outside the engine (items) are not covered. 1.2.8: a
+    /// monster ability's own rolls come from this field while GameConfig.MonsterTacticsEnabled is on.
     /// </summary>
     internal void SeedRandomForTests(int seed) => random = new Random(seed);
     private bool _lastMonsterTargetedGroupPlayer; // Set by ProcessMonsterAction when monster attacks a grouped player
@@ -320,6 +320,43 @@ public partial class CombatEngine
 
     /// <summary>1.2.7: test seam. A store used instead of the active save directory's.</summary>
     internal TelemetryStore? TelemetryStoreOverride { get; set; }
+
+    /// <summary>1.2.8: test seam. The Divine Favor chance PlayerVsMonsters uses in place of the faction's.</summary>
+    internal Func<float>? DivineFavorChanceOverride { get; set; }
+
+    /// <summary>
+    /// 1.2.8: the one row of a fight that ends outside the death row at the end of HandlePlayerDeath (an
+    /// online permadeath, an arrest or exhibition loss, a rescue): the telemetry row, then the combat_events
+    /// row, as every other fight end writes them. The label is one of victory, fled or death.
+    /// </summary>
+    private void WriteFightRow(CombatResult result, string outcome)
+    {
+        QueueTelemetryRow(result, outcome);
+        LogCombatEventToDb(result, outcome);
+    }
+
+    /// <summary>
+    /// 1.2.8: a rescue (Last Stand, Death's Door, Mortis's Miracle, Divine Favor) came after the fight's end
+    /// was taken with the player at 0 HP or less; the row's player_hp_end is the HP the rescue left. The
+    /// outside observer was told the fight's end once and is not told again.
+    /// </summary>
+    private static void TakeRescueHp(CombatResult result)
+    {
+        var t = result.Tally;
+        if (t != null && t.Ended && result.Player != null) t.OnFightEnd(result.Player.HP);
+    }
+
+    /// <summary>
+    /// 1.2.8: the row of a fight a rescue in HandlePlayerDeath ended. With a monster alive the fight ends as
+    /// an escape and the row says fled. When the rescue came on the killing round (every monster dead, the
+    /// outcome Victory) the victory pipeline the caller runs writes the fight's one row, so none is written here.
+    /// </summary>
+    private void WriteRescueRow(CombatResult result)
+    {
+        TakeRescueHp(result);
+        if (result.Outcome != CombatOutcome.PlayerEscaped) return;
+        WriteFightRow(result, "fled");
+    }
 
     /// <summary>1.2.7: runs the telemetry append off the combat thread. Test seam: a test can hold the
     /// append back until it has changed the fight's objects.</summary>
@@ -835,7 +872,7 @@ public partial class CombatEngine
                 }
                 else if (preventingStatus != StatusEffect.None)
                 {
-                    terminal.WriteLine(Loc.Get("combat.you_status_prevented", preventingStatus.GetDescription().ToLower()), "red");
+                    terminal.WriteLine(Loc.Get("combat.you_status_prevented", StatusWord(preventingStatus)), "red");   // 1.2.8: the status word, in the player's language
                     await Pacing.Wait(GetCombatDelay(800));
                 }
                 else
@@ -873,7 +910,7 @@ public partial class CombatEngine
                 }
                 else if (defenderPreventing != StatusEffect.None)
                 {
-                    terminal.WriteLine(Loc.Get("combat.npc_status_prevented", defender.DisplayName, defenderPreventing.GetDescription().ToLower()), "cyan");
+                    terminal.WriteLine(Loc.Get("combat.npc_status_prevented", defender.DisplayName, StatusWord(defenderPreventing)), "cyan");   // 1.2.8
                     await Pacing.Wait(GetCombatDelay(800));
                 }
                 else
@@ -974,6 +1011,27 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// 1.2.8: set by a caller for its next fight (DungeonLocation's room fight sets the room's
+    /// cleared state with it). Runs at the start of the victory pipeline, before its rewards, loot
+    /// screens and the victory autosave, and only on a Victory with every monster dead, so a save
+    /// taken at any point after the win (the autosave, or the disconnect save of a player who drops
+    /// at a loot screen) already holds what the caller set. PlayerVsMonsters takes it at the start
+    /// of the fight, so a later fight on this engine never runs it.
+    /// </summary>
+    internal Action<CombatResult>? VictoryPreSaveHook { get; set; }
+    private Action<CombatResult>? _victoryPreSaveHookThisFight;
+
+    /// <summary>1.2.8: run this fight's pre-save hook if this is a Victory with every monster dead.</summary>
+    internal void RunVictoryPreSaveHook(CombatResult result)
+    {
+        var hook = _victoryPreSaveHookThisFight;
+        if (hook == null) return;
+        if (result.Outcome != CombatOutcome.Victory) return;
+        if (result.Monsters == null || result.Monsters.Any(m => m.IsAlive)) return;
+        hook(result);
+    }
+
+    /// <summary>
     /// Player vs Multiple Monsters - simultaneous turn-based combat
     /// NEW METHOD for group encounters where all monsters fight at once
     /// </summary>
@@ -985,6 +1043,12 @@ public partial class CombatEngine
         bool isAmbush = false,
         bool storyFight = false)
     {
+        // 1.2.8: the victory pre-save hook belongs to this fight only. Taken here, so the engine
+        // holds none after the fight starts: a later fight never runs it, whether this one ends,
+        // returns early or throws.
+        _victoryPreSaveHookThisFight = VictoryPreSaveHook;
+        VictoryPreSaveHook = null;
+
         // v1.1.15: collapse happens after combat. A fight that ended at Mental 0 is the last one: an
         // action that chains fights (gauntlet waves, a save quest then an ambush) gets this empty
         // result for the next fight, which is not entered, and the location loop carries out the
@@ -1363,7 +1427,13 @@ public partial class CombatEngine
         // Ambush: determine how many monsters catch the leader off guard via opposed roll.
         // Monster stealth vs leader awareness (AGI + DEX + level scaling).
         // Only monsters that win the roll get a free attack — partial ambushes are common.
-        if (isAmbush && player.IsAlive && monsters.Any(m => m.IsAlive))
+        // 1.2.8: a Swift elite acts before round 1 through this step. In a plain fight it is the one
+        // ambusher and nothing is rolled; in an ambush it joins the ambushers without its roll. Either
+        // way it is in the list once, so it gets one free attack.
+        var swiftElites = EliteAffixesActive
+            ? monsters.Where(m => m.IsAlive && EliteAffixes.Has(m, EliteAffixes.Swift)).ToList()
+            : new List<Monster>();
+        if ((isAmbush || swiftElites.Count > 0) && player.IsAlive && monsters.Any(m => m.IsAlive))
         {
             var ambushRng = random;   // v1.1.14: the engine RNG, so a test seed covers it
 
@@ -1387,6 +1457,8 @@ public partial class CombatEngine
                 .Where(m => m.IsAlive)
                 .Where(m =>
                 {
+                    if (swiftElites.Contains(m)) return true;   // 1.2.8: no roll for a Swift elite
+                    if (!isAmbush) return false;                // 1.2.8: a plain fight rolls for no one
                     int monsterRoll  = m.Level * 3 + ambushRng.Next(1, 21);
                     int playerRoll   = (int)leaderAwareness + ambushRng.Next(1, 21);
                     return monsterRoll > playerRoll;
@@ -1398,7 +1470,11 @@ public partial class CombatEngine
 
             bool hasGroupAmbush = result.Teammates?.Any(t => t.IsGroupedPlayer) == true;
 
-            if (ambushCount == 0)
+            if (!isAmbush)
+            {
+                // 1.2.8: a plain fight with a Swift elite has no ambush headline; its own line follows
+            }
+            else if (ambushCount == 0)
             {
                 // Perfect detection — no free attacks
                 terminal.SetColor("bright_green");
@@ -1426,6 +1502,10 @@ public partial class CombatEngine
                 BroadcastGroupLocalized(result, lang => GroupStarLine(lang, "\u001b[1;31m", "combat.group_ambush_full"));
             }
 
+            // 1.2.8: the Swift elite's line, once, for the player and for each follower in their language
+            foreach (var swift in swiftElites)
+                WriteEliteLine(result, "combat.elite_swift", "bright_red", "\u001b[1;31m", swift);
+
             // v0.61.2 Last-Stand cap also covers the ambush phase. Capture
             // the player's pre-ambush HP so the no-one-shot rule fires even
             // if all the damage is from monsters that got the jump on them.
@@ -1439,6 +1519,7 @@ public partial class CombatEngine
                 if (!player.IsAlive) break;
 
                 _lastMonsterTargetedGroupPlayer = false;
+                EliteAffixTurn(ambushMonster, result);   // 1.2.8
                 // v1.2.4: the Loc calls are recorded, so each member reads the capture in their own language
                 LocRecording? ambushRecording = null;
                 if (hasGroupAmbush) { terminal.StartCapture(); ambushRecording = Loc.BeginRecording(); }
@@ -1951,6 +2032,7 @@ public partial class CombatEngine
                     // Capture per-attack so we can skip broadcast when monster targets a grouped player
                     // (MonsterAttacksCompanion already sends direct messages to grouped players)
                     _lastMonsterTargetedGroupPlayer = false;
+                    if (atk == 0) EliteAffixTurn(monster, result);   // 1.2.8: before the capture, so followers get its lines directly
                     // v1.2.4: recorded, so each member reads the capture in their own language
                     LocRecording? monsterRecording = null;
                     if (hasGroup) { terminal.StartCapture(); monsterRecording = Loc.BeginRecording(); }
@@ -2171,7 +2253,7 @@ public partial class CombatEngine
                 bool divineSaved = false;
                 if (!player.DivineFavorTriggeredThisCombat)
                 {
-                    float divineFavorChance = FactionSystem.Instance?.GetDivineFavorChance() ?? 0f;
+                    float divineFavorChance = DivineFavorChanceOverride?.Invoke() ?? FactionSystem.Instance?.GetDivineFavorChance() ?? 0f;
                     if (divineFavorChance > 0 && random.NextDouble() < divineFavorChance)
                     {
                         player.DivineFavorTriggeredThisCombat = true;
@@ -2185,6 +2267,9 @@ public partial class CombatEngine
                         terminal.WriteLine("");
                         await Pacing.Wait(GetCombatDelay(2000));
                         divineSaved = true;
+                        // 1.2.8: the fight's row, at the HP the favor left (a monster is alive in this branch)
+                        TakeRescueHp(result);
+                        WriteFightRow(result, "fled");
                     }
                 }
 
@@ -2506,7 +2591,7 @@ public partial class CombatEngine
             {
                 var preventingStatus = player.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("combat.you_status_prevented", preventingStatus.ToString().ToLower()));
+                terminal.WriteLine(Loc.Get("combat.you_status_prevented", StatusWord(preventingStatus)));   // 1.2.8
                 await Pacing.Wait(GetCombatDelay(1500));
                 return new CombatAction { Type = CombatActionType.None };
             }
@@ -2579,6 +2664,14 @@ public partial class CombatEngine
             // v0.65.4: "?N" shows quickbar slot N's description without spending the turn.
             if (TryShowQuickbarInfo(player, upperChoice))
                 continue;
+
+            // v1.2.8: [S] Stats is an information screen and does not spend the turn. The key is
+            // caught here, so the Status action type stays a spent turn for the stun skip above.
+            if (upperChoice == "S")
+            {
+                await ShowCombatStatus(player, result);
+                continue;
+            }
 
             // Handle quickbar slots [1]-[9] for spells and abilities
             if (upperChoice.Length == 1 && upperChoice[0] >= '1' && upperChoice[0] <= '9')
@@ -4287,7 +4380,7 @@ public partial class CombatEngine
         {
             // Quick heal uses one potion
             player.Healing--;
-            long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
             healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
             // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
@@ -4308,7 +4401,7 @@ public partial class CombatEngine
         {
             // Regular heal - ask how many potions to use for full control
             long missingHP = player.MaxHP - player.HP;
-            long avgHealPerPotion = 50 + player.Level * 5;  // Average heal: 30 + level*5 + avg(10-30)
+            long avgHealPerPotion = PotionBonus.AverageHeal(player);  // 1.2.8: the scaled average heal
             avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion, result.Monsters); // v1.1.11: Infirmary
             int potionsToFullHeal = (int)Math.Ceiling((double)missingHP / avgHealPerPotion);
             potionsToFullHeal = Math.Min(potionsToFullHeal, (int)player.Healing);
@@ -4332,7 +4425,7 @@ public partial class CombatEngine
             for (int i = 0; i < potionsToUse && player.HP < player.MaxHP; i++)
             {
                 player.Healing--;
-                long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+                long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
                 healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount);
                 // v1.1.11: the owner's Potion Mastery and Team HQ Infirmary, the last modifiers before the cap
                 healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount, result.Monsters);
@@ -5264,6 +5357,14 @@ public partial class CombatEngine
             }
         }
 
+        // 1.2.8: a Mending elite that healed an ally this turn (EliteAffixTurn) has acted: no target, no
+        // ability roll, no attack. Its ticks and holds above ran as on any turn.
+        if (ReferenceEquals(_eliteMendedThisTurn, monster))
+        {
+            _eliteMendedThisTurn = null;
+            return;
+        }
+
         // Check if player will dodge the next attack
         if (player.DodgeNextAttack)
         {
@@ -5638,6 +5739,7 @@ public partial class CombatEngine
         // from taking only 1-2 damage per hit and auto-battling indefinitely.
         long minDamage = GetMinIncomingDamage(player, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - playerDefense);
+        actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8: before the caps below
 
         // Show defense calculation only when armor actually reduced the damage (and didn't
         // fully absorb it). v0.60.10 (druidah report): pre-fix this fired unconditionally,
@@ -5774,6 +5876,7 @@ public partial class CombatEngine
         // Apply damage
         player.HP = Math.Max(0, player.HP - actualDamage);
         EvHurt(player, actualDamage, CombatEventKind.Basic);   // 1.2.6
+        bool venomLanded = actualDamage > 0 && player.IsAlive && EliteVenomLands(monster, player);   // 1.2.8: the line follows the hit line
 
         // Divine Mandate thorn reflect: reflect % of damage taken back to attacker (v0.56.0)
         if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
@@ -5822,6 +5925,7 @@ public partial class CombatEngine
         }
 
         result.CombatLog.Add($"{monster.Name} attacks player for {actualDamage} damage (roll: {monsterRoll.NaturalRoll})");
+        if (venomLanded) ApplyEliteVenom(player, isLeader: true);   // 1.2.8
 
         // Scales of Law artifact: reflect 15% of damage taken (30% during Manwe fight)
         if (actualDamage > 0 && monster.IsAlive && ArtifactSystem.Instance.HasScalesOfLaw())
@@ -5937,10 +6041,130 @@ public partial class CombatEngine
         result.CombatLog.Add($"{monster.Name} summons {summonCount} reinforcements");
     }
 
+    /// <summary>
+    /// 1.2.8: MonsterTactics (ability choice, target traits, an ability's rolls from the engine's random) applies
+    /// when GameConfig.MonsterTacticsEnabled is on and the fight is not an Old God's. A BossContext fight keeps
+    /// SelectBossAbility, TryBossAbility and the plain target weights for every monster in it.
+    /// </summary>
+    private bool MonsterTacticsActive => GameConfig.MonsterTacticsEnabled && BossContext == null;
+
+    /// <summary>
+    /// 1.2.8: elite affixes (EliteAffixes) act in every fight but an Old God's. An elite exists only while
+    /// the elite switch of GameConfig is on (MonsterGenerator.PromoteElite), so a fight with no elite takes
+    /// none of these branches and draws the random numbers it drew before.
+    /// </summary>
+    private bool EliteAffixesActive => BossContext == null;
+
+    /// <summary>1.2.8: the Mending elite whose heal was its action this turn; ProcessMonsterAction reads and clears it.</summary>
+    private Monster? _eliteMendedThisTurn;
+
+    /// <summary>
+    /// 1.2.8: an elite line for the player (wrapped at 79 columns) and for each follower in their own
+    /// language, sent directly: it is written outside the captured stretch of a monster's action, so it
+    /// reaches followers whoever the monster attacks.
+    /// </summary>
+    private void WriteEliteLine(CombatResult result, string key, string color, string ansi, Monster elite, Monster? ally = null, long amount = 0)
+    {
+        UIHelper.WriteRow(terminal, ally == null
+            ? Loc.Get(key, MonsterNames.Display(elite))
+            : Loc.Get(key, MonsterNames.Display(elite), MonsterNames.Display(ally), amount), color);
+        BroadcastGroupLocalized(result, lang => ally == null
+            ? GroupLineWrapped(lang, ansi, key, MonsterNames.DisplayIn(lang, elite))
+            : GroupLineWrapped(lang, ansi, key, MonsterNames.DisplayIn(lang, elite), MonsterNames.DisplayIn(lang, ally), amount));
+    }
+
+    /// <summary>
+    /// 1.2.8: what an elite's affixes do when its turn comes and it is not held (asleep, feared, stunned or
+    /// frozen), before its action. Frenzied: the one Strength rise below half HP, with its line. Commanding:
+    /// its line, the first time it acts with a living ally (the aura itself needs no turn, CommandedDamage).
+    /// Mending: it heals its most wounded ally and that is its action this turn. No random number.
+    /// </summary>
+    private void EliteAffixTurn(Monster monster, CombatResult result)
+    {
+        _eliteMendedThisTurn = null;
+        if (!EliteAffixesActive || !monster.IsElite || !monster.IsAlive) return;
+
+        if (EliteAffixes.TryFrenzy(monster))
+            WriteEliteLine(result, "combat.elite_frenzy", "bright_red", "\u001b[1;31m", monster);
+
+        if (EliteAffixes.Has(monster, EliteAffixes.Commanding) && !monster.EliteCommandShown
+            && EliteAffixes.HasLivingAlly(monster, result.Monsters))
+        {
+            monster.EliteCommandShown = true;
+            WriteEliteLine(result, "combat.elite_command", "yellow", "\u001b[1;33m", monster);
+        }
+
+        if (EliteAffixes.MendTarget(monster, result.Monsters, result.CurrentRound) is Monster ally)
+        {
+            long healed = EliteAffixes.Mend(monster, ally, result.CurrentRound);
+            WriteEliteLine(result, "combat.elite_mend", "green", "\u001b[32m", monster, ally, healed);
+            _eliteMendedThisTurn = monster;
+        }
+    }
+
+    /// <summary>1.2.8: Commanding. The damage of an ally of a living Commanding elite, x1.10 after the
+    /// target's defence and before the caps on a hit; unchanged for every other attacker.</summary>
+    private long CommandedDamage(Monster attacker, CombatResult result, long damage) =>
+        EliteAffixesActive ? EliteAffixes.CommandedDamage(attacker, result.Monsters, damage) : damage;
+
+    /// <summary>1.2.8: Venomous. True when this basic hit of a Venomous elite poisons (one draw, and only
+    /// for a Venomous elite against a target that is not poisoned already).</summary>
+    private bool EliteVenomLands(Monster attacker, Character target) =>
+        EliteAffixesActive && EliteAffixes.VenomLands(attacker, target, random);
+
+    /// <summary>
+    /// 1.2.8: Venomous. The existing Poisoned status through the resist order of a monster ability that
+    /// inflicts a status (immunity, Cyclebreaker, Paladin, Calm Waters), with the existing lines; the
+    /// status is named in the reader's language.
+    /// </summary>
+    private void ApplyEliteVenom(Character target, bool isLeader)
+    {
+        string status = StatusName(StatusEffect.Poisoned);
+        string name = target.DisplayName;
+        if (isLeader ? target.HasStatusImmunity : target.HasStatusImmunity && target.StatusImmunityDuration > 0)
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.iron_will_resists", status) : Loc.Get("combat.companion_iron_will_resists", name, status), "bright_white");
+            return;
+        }
+        if (target.Class == CharacterClass.Cyclebreaker && random.Next(100) < (int)(GameConfig.CyclebreakerDebuffResistChance * 100))
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.probability_negates", status) : Loc.Get("combat.companion_probability_negates", name, status), "bright_magenta");
+            return;
+        }
+        if (target.Class == CharacterClass.Paladin && random.Next(100) < (int)(GameConfig.PaladinDivineResolveStatusResist * 100))
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.divine_resolve", status) : Loc.Get("combat.companion_divine_resolve", name, status), "bright_white");
+            return;
+        }
+        if (target.CalmWatersRounds > 0 && random.Next(100) < (int)(GameConfig.CalmWatersResistChance * 100))
+        {
+            terminal.WriteLine(isLeader ? Loc.Get("combat.calm_waters_deflects", status) : Loc.Get("combat.companion_calm_waters_deflects", name, status), "bright_cyan");
+            return;
+        }
+        target.ApplyStatus(StatusEffect.Poisoned, EliteAffixes.VenomRounds);
+        terminal.WriteLine(isLeader
+            ? Loc.Get("combat.afflicted_with", status)
+            : Loc.Get("combat.companion_afflicted", name, status), "yellow");
+        // a grouped player is told directly, as for the blow itself (the capture of a monster's action is
+        // not sent when it struck a grouped player)
+        if (!isLeader && target.IsGroupedPlayer && target.GroupPlayerUsername != null
+            && GroupSystem.Instance?.GetGroupFor(target.GroupPlayerUsername) is { } group)
+        {
+            GroupSystem.Instance!.BroadcastToGroupSessionsLocalized(group,
+                target.GroupPlayerUsername,
+                lang => GroupLine(lang, "\u001b[33m", "combat.afflicted_with", Loc.GetIn(lang, "status.poisoned")),
+                lang => GroupLine(lang, "\u001b[33m", "combat.companion_afflicted", name, Loc.GetIn(lang, "status.poisoned")),
+                inDungeonOnly: true);
+        }
+    }
+
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
     {
+        // 1.2.8: MonsterTactics picks for every fight but an Old God's (BossContext keeps its own picker)
+        bool tactics = MonsterTacticsActive;
+
         // No abilities? Normal attack
-        if (monster.SpecialAbilities == null || monster.SpecialAbilities.Count == 0)
+        if (tactics ? !MonsterTactics.HasAbilities(monster) : (monster.SpecialAbilities == null || monster.SpecialAbilities.Count == 0))
             return false;
 
         // Base 30% chance to use special ability (scales with monster level)
@@ -5954,9 +6178,13 @@ public partial class CombatEngine
         // Pick a random ability. Bosses draw from the phase-filtered pool
         // (SelectBossAbility) -- the single picker, now that the duplicate
         // pre-announcement in ProcessMonsterAction is gone.
-        string abilityName = (BossContext != null && monster.IsBoss)
+        string? abilityName = (BossContext != null && monster.IsBoss)
             ? SelectBossAbility(BossContext)
-            : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+            : tactics
+                ? MonsterTactics.Choose(monster, player, result.CurrentRound, monsterList, random)
+                : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+        if (abilityName == null)
+            return false; // 1.2.8: every pick would be wasted, so the monster makes its normal attack
 
         // Old God boss abilities — handle by name before generic enum parse
         if (BossContext != null && monster.IsBoss)
@@ -5974,7 +6202,7 @@ public partial class CombatEngine
             return false;
 
         // Execute the ability
-        var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, player);
+        var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, player, tactics ? random : null);
         var monKind = MonsterAbilityEventKind(abilityType);   // 1.2.6
 
         // Display ability message
@@ -6016,6 +6244,7 @@ public partial class CombatEngine
                 long abilityDefense = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
                 // v0.57.14: incoming-damage floor now scales with player MaxHP (see GetMinIncomingDamage)
                 long actualDamage = Math.Max(GetMinIncomingDamage(player, abilityResult.DirectDamage), abilityResult.DirectDamage - abilityDefense);
+                actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8
 
                 // Show defense calculation
                 if (abilityDefense > 0)
@@ -6162,6 +6391,7 @@ public partial class CombatEngine
                 long rawLifeStealDamage = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                 // v0.57.14: incoming-damage floor scales with player MaxHP
                 long damage = Math.Max(GetMinIncomingDamage(player, rawLifeStealDamage), rawLifeStealDamage - player.Defence);
+                damage = CommandedDamage(monster, result, damage);   // 1.2.8
 
                 // v0.56.1 Old God solo: +15% boss damage, -20% player damage (life-steal ability path)
                 if (isSoloAgainstOldGodAbility)
@@ -6215,6 +6445,7 @@ public partial class CombatEngine
                 long abilityDef = player.Defence + (player.ArmPow / 2) + player.MagicACBonus;
                 // v0.57.14: incoming-damage floor scales with player MaxHP
                 long damage = Math.Max(GetMinIncomingDamage(player, rawDamage), rawDamage - abilityDef);
+                damage = CommandedDamage(monster, result, damage);   // 1.2.8
 
                 // Show defense calculation
                 if (abilityDef > 0 && abilityDef < rawDamage)
@@ -7480,7 +7711,7 @@ public partial class CombatEngine
             UsurperRemake.Server.RoomRegistry.BroadcastActionLocalized(lang =>
                 Loc.GetIn(lang, "combat.boss_defeated_broadcast", result.Player.DisplayName, MonsterNames.Display(result.Monster)));
 
-        QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss, result.Monster.TierName);
+        QuestSystem.OnMonsterKilled(result.Player, result.Monster.Name, isBoss, result.Monster.TierName, result.Monster.IsMiniBoss);
 
         // Calculate rewards (Pascal-compatible) with world event and difficulty modifiers
         long baseExpReward = result.Monster.GetExperienceReward();
@@ -8434,6 +8665,12 @@ public partial class CombatEngine
         "necro", "drain",
     };
 
+    /// <summary>An ability that needs a bow is a ranged hit, not a melee one (the Gnoll bite is melee only).</summary>
+    internal static bool IsRangedAbility(ClassAbilitySystem.ClassAbility? ability)
+    {
+        return ability?.RequiredWeaponTypes != null && ability.RequiredWeaponTypes.Contains(WeaponType.Bow);
+    }
+
     private static bool IsMagicalAbilityEffect(string? specialEffect)
     {
         return !string.IsNullOrEmpty(specialEffect) && MagicalAbilityEffects.Contains(specialEffect);
@@ -8514,12 +8751,12 @@ public partial class CombatEngine
         result.Player?.Statistics.RecordDamageDealt(actualDamage, crit || alreadyCrit);
 
         ApplyPostHitEnchantments(player, target, actualDamage, result,
-            isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+            notMelee: IsMagicalAbilityEffect(abilityResult.SpecialEffect) || IsRangedAbility(abilityResult.AbilityUsed));   // the Gnoll bite is melee only
 
         return actualDamage;
     }
 
-    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
+    private void ApplyPostHitEnchantments(Character attacker, Monster target, long damage, CombatResult result, bool isSpellDamage = false, EquipmentSlot weaponSlot = EquipmentSlot.MainHand, bool notMelee = false)
     {
         if (damage <= 0 || target == null) return;
 
@@ -8728,8 +8965,9 @@ public partial class CombatEngine
         if (!isSpellDamage && target.IsAlive)
             ApplyPoisonEffectsOnHit(attacker, target, isPlayer);
 
-        // Gnoll racial: Poisonous Bite — 15% chance to poison on hit (melee only)
-        if (attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
+        // Gnoll racial: Poisonous Bite: 15% chance to poison on hit (melee only: never a spell,
+        // a magical ability, or a ranged hit; notMelee is set by the callers that know the hit is one)
+        if (!isSpellDamage && !notMelee && attacker.GetEquipment(weaponSlot)?.WeaponType != WeaponType.Bow && attacker.Race == CharacterRace.Gnoll && target.IsAlive && !target.Poisoned && random.Next(100) < 15)
         {
             target.Poisoned = true;
             target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
@@ -9599,7 +9837,7 @@ public partial class CombatEngine
 
         // Don't waste a potion if the deficit is trivial — only auto-heal
         // when missing at least half a potion's average healing value
-        long avgPotionHeal = 30 + player.Level * 5 + 20; // midpoint of random(10,30)
+        long avgPotionHeal = PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
         avgPotionHeal = PotionBonus.ApplyOwnerBonuses(player, avgPotionHeal); // v1.1.11: Infirmary
         long hpDeficit = player.MaxHP - player.HP;
         if (hpDeficit < avgPotionHeal / 2)
@@ -9614,7 +9852,7 @@ public partial class CombatEngine
             if (potionsUsed > 0 && remaining < avgPotionHeal / 2)
                 break;
 
-            long healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+            long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
@@ -9700,6 +9938,7 @@ public partial class CombatEngine
         // Base 15% per monster, higher level monsters have better drop rates
         foreach (var monster in result.DefeatedMonsters)
         {
+            if (monster.CallerPaysReward) continue;   // 1.2.8: no loot roll; the caller pays a flat reward
             Item? loot = null;
 
             // Mini-bosses (Champions) — v0.56.1: guaranteed 2 items to justify new tuning
@@ -11956,6 +12195,55 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// v1.2.8: a shield takes the off hand, and the main hand too while that holds a two-handed weapon.
+    /// Warns when the weapon it moves out is the one the class's spells or abilities need, and no
+    /// weapon left in hand meets the need.
+    /// </summary>
+    private static void ShowShieldRequirementWarnings(TerminalEmulator terminal, Character character, LocalizedLines? lootBroadcastSb)
+    {
+        var mainHand = character.GetEquipment(EquipmentSlot.MainHand);
+        var offHand = character.GetEquipment(EquipmentSlot.OffHand);
+        bool mainMovesOut = mainHand != null && character.IsTwoHanding;
+        var kept = mainMovesOut ? null : mainHand;
+        var movedOut = new List<Equipment>();
+        if (mainMovesOut) movedOut.Add(mainHand!);
+        if (offHand != null) movedOut.Add(offHand);
+
+        // Spells check the main hand only (SpellSystem.HasRequiredSpellWeapon)
+        var spellReq = SpellSystem.GetSpellWeaponRequirement(character.Class);
+        if (spellReq != null && mainMovesOut && mainHand!.WeaponType == spellReq.Value)
+        {
+            string label = BaseLocation.WeaponTypeLabel(spellReq.Value);
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("combat.loot_spell_req_warning", GameConfig.GetLocalizedClassName(character.Class), label));
+            terminal.WriteLine(Loc.Get("combat.loot_spell_req_block_shield", label));
+            terminal.WriteLine("");
+            lootBroadcastSb?.Add(lang => $"\u001b[31m  {Loc.GetIn(lang, "combat.loot_group_spell_req", spellReq)}\u001b[0m");
+        }
+
+        // Abilities accept the required weapon in either hand (ClassAbilitySystem.CanUseAbility)
+        var abilities = ClassAbilitySystem.GetClassAbilities(character.Class);
+        if (abilities == null) return;
+        foreach (var ability in abilities)
+        {
+            var req = ability.RequiredWeaponTypes;
+            if (req == null || req.Length == 0) continue;
+            if (kept != null && req.Contains(kept.WeaponType)) continue;
+            var lost = movedOut.FirstOrDefault(e => req.Contains(e.WeaponType));
+            if (lost == null) continue;
+
+            string label = BaseLocation.WeaponTypeLabel(lost.WeaponType);
+            terminal.SetColor("red");
+            terminal.WriteLine("");
+            terminal.WriteLine(Loc.Get("combat.loot_ability_req_warning", character.DisplayName, label));
+            terminal.WriteLine(Loc.Get("combat.loot_ability_req_block_shield", label));
+            terminal.WriteLine("");
+            return;
+        }
+    }
+
+    /// <summary>
     /// Show comparison between dropped item and currently equipped item
     /// </summary>
     // v1.1.12: static and shared, so dungeon finds and the dungeon merchant show the same comparison.
@@ -12028,6 +12316,10 @@ public partial class CombatEngine
                     terminal.WriteLine("");
                 }
             }
+        }
+        else if (lootItem.Type == global::ObjType.Shield)
+        {
+            ShowShieldRequirementWarnings(terminal, character, lootBroadcastSb);
         }
 
         // Get currently equipped item
@@ -12127,7 +12419,7 @@ public partial class CombatEngine
                 {
                     // Shield replacing an off-hand weapon (dual-wield) — show the trade-off
                     terminal.SetColor("yellow");
-                    terminal.WriteLine(Loc.Get("combat.offhand_replaced_by_shield", currentEquip.WeaponPower, lootItem.Armor));
+                    terminal.WriteLine(Loc.Get("combat.offhand_replaced_by_shield", currentEquip.WeaponPower, lootItem.ShieldBonus));
                 }
                 else
                 {
@@ -12143,7 +12435,7 @@ public partial class CombatEngine
                     int newStatTotal = lootItem.Strength + lootItem.Dexterity + lootItem.Agility +
                         lootItem.Wisdom + lootItem.Charisma + lootItem.Defence +
                         newConTotal2 + newIntTotal2 +
-                        lootItem.HP + lootItem.Mana + lootItem.Stamina + currentEquip.ShieldBonus + currentEquip.BlockChance;
+                        lootItem.HP + lootItem.Mana + lootItem.Stamina + lootItem.ShieldBonus + lootItem.BlockChance;
                     int diff = newStatTotal - currentStatTotal;
                     
                     terminal.SetColor("white");
@@ -13243,7 +13535,11 @@ public partial class CombatEngine
         _ => 0.25 // 25% floor for 4th+ targets
     };
 
-    private async Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource = null, bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
+    private Task ApplyAoEDamage(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource = null, bool isSpellDamage = false, Character? attacker = null, Character? spellCaster = null)
+        => ApplyAoEDamageCore(monsters, totalDamage, result, damageSource, isSpellDamage, attacker, spellCaster, notMelee: false);
+
+    // notMelee: a ranged hit (Volley, Arrow Storm), so the Gnoll bite stays off it
+    private async Task ApplyAoEDamageCore(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource, bool isSpellDamage, Character? attacker, Character? spellCaster, bool notMelee)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
@@ -13347,7 +13643,7 @@ public partial class CombatEngine
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             var enchantAttacker = attacker ?? result.Player;
             if (enchantAttacker != null)
-                ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage);
+                ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage, notMelee: notMelee);
 
             if (monster.HP <= 0)
             {
@@ -13409,6 +13705,9 @@ public partial class CombatEngine
     // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
+        // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
+        bool evasionChecked = _evasionCheckedByHitRoll;
+        _evasionCheckedByHitRoll = false;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -13419,13 +13718,9 @@ public partial class CombatEngine
         // abilities all set AbilityResult.AvoidAllDamage or EvasionBonus, but nothing
         // ever read those flags, so the buffs were cosmetic only. Rounds decrement
         // happens once per monster-action cycle (see ProcessMonsterAction).
-        if (target.EvasionRounds > 0 && target.EvasionMissChance > 0
-            && random.Next(100) < target.EvasionMissChance)
-        {
-            terminal.SetColor("bright_cyan");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.evasion_miss", MonsterNames.Display(target)));
+        // 1.2.8: a caller that rolls to hit (ResolvePlayerHit) has run this check already, before its roll
+        if (!evasionChecked && MonsterEvades(target))
             return false; // evaded -- caller must skip post-hit enchantments (lifesteal etc.)
-        }
 
         // Boss phase immunity — apply only the matching type. Previously this hardcoded
         // isMagicalDamage:true and missed IsPhysicalImmune entirely, so physical abilities
@@ -13619,6 +13914,117 @@ public partial class CombatEngine
         return true; // attack landed -- caller may apply post-hit effects
     }
 
+    // 1.2.8 (the player to-hit roll): true while the one ApplySingleMonsterDamage call made by
+    // ApplySingleMonsterDamageChecked reads it; that call does not run the evasion check a second time.
+    private bool _evasionCheckedByHitRoll;
+
+    /// <summary>1.2.8: ApplySingleMonsterDamage for a caller that rolls to hit. evasionChecked is true when the
+    /// caller ran the evasion check itself, before its roll (ResolvePlayerHit); false is the plain call.</summary>
+    private async Task<bool> ApplySingleMonsterDamageChecked(Monster target, long damage, CombatResult result, string damageSource, Character? attacker, bool isSpellDamage, bool evasionChecked)
+    {
+        _evasionCheckedByHitRoll = evasionChecked;
+        try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage); }
+        finally { _evasionCheckedByHitRoll = false; }
+    }
+
+    /// <summary>The monster's evasion buff (Incorporeal, Phase and the like): one draw while the buff is up,
+    /// and the pass-through line when it procs. The same check, draw and line as before 1.2.8.</summary>
+    private bool MonsterEvades(Monster target)
+    {
+        if (target.EvasionRounds > 0 && target.EvasionMissChance > 0
+            && random.Next(100) < target.EvasionMissChance)
+        {
+            terminal.SetColor("bright_cyan");
+            UIHelper.WriteRow(terminal, Loc.Get("combat.evasion_miss", MonsterNames.Display(target)));
+            return true;
+        }
+        return false;
+    }
+
+    /// <summary>1.2.8 (the player to-hit roll): what a physical attack's check gave. Natural is 0 when no die
+    /// was rolled (the attack was evaded, or it was certain to hit).</summary>
+    private readonly record struct HitCheck(bool Lands, int Natural);
+
+    /// <summary>
+    /// 1.2.8 difficulty pass, the player to-hit roll, for an attack that goes through ApplySingleMonsterDamage.
+    /// Only called while GameConfig.PlayerHitRollEnabled is on. The order: the monster's evasion check first
+    /// (the caller then passes evasionChecked to ApplySingleMonsterDamage), then the roll; a certain attack
+    /// (Hidden, a Miracle crit) is not rolled. On a miss the caller deals no damage and runs no on-hit effect.
+    /// </summary>
+    private HitCheck ResolvePlayerHit(Character attacker, Monster target, CombatResult result, bool certain = false, int neededBonus = 0)
+    {
+        if (MonsterEvades(target)) return new HitCheck(false, 0);
+        if (certain) return new HitCheck(true, 0);
+        return ShowPlayerHitRoll(attacker, target, result, neededBonus);
+    }
+
+    /// <summary>
+    /// 1.2.8: one to-hit roll from the fight's random (TrainingSystem.RollPlayerHit) and its line: the natural
+    /// roll and the natural roll needed after the clamp, a natural 1 and a natural 20 named; the acting
+    /// player in the second person, a teammate or companion in the third with the name. Written like the
+    /// monster's roll line (one row, ColorRole.Derived, always shown). A miss adds the miss line. With the
+    /// Sunforged Blade the acting player misses only on a natural 1.
+    /// </summary>
+    private HitCheck ShowPlayerHitRoll(Character attacker, Monster target, CombatResult result, int neededBonus = 0)
+    {
+        var roll = TrainingSystem.RollPlayerHit(attacker, target, 0, random, neededBonus);
+        bool acting = attacker == currentPlayer;
+        string who = attacker.DisplayName;
+
+        terminal.SetColor(ColorRole.Derived);
+        if (roll.IsNatural1)
+            UIHelper.WriteRow(terminal, acting ? Loc.Get("combat.hit_roll_nat1") : Loc.Get("combat.hit_roll_nat1_third", who));
+        else if (roll.IsNatural20)
+            UIHelper.WriteRow(terminal, acting ? Loc.Get("combat.hit_roll_nat20") : Loc.Get("combat.hit_roll_nat20_third", who));
+        else
+            UIHelper.WriteRow(terminal, acting ? Loc.Get("combat.hit_roll", roll.Natural, roll.Needed) : Loc.Get("combat.hit_roll_third", who, roll.Natural, roll.Needed));
+
+        bool hit = roll.Hit;
+        if (!hit && !roll.IsNatural1 && acting && ArtifactSystem.Instance.HasSunforgedBlade())
+        {
+            terminal.SetColor("bright_yellow");
+            UIHelper.WriteRow(terminal, Loc.Get("combat.sunforged_guides"));
+            hit = true;
+        }
+        if (!hit)
+        {
+            if (!acting)
+            {
+                terminal.SetColor("gray");
+                UIHelper.WriteRow(terminal, Loc.Get("combat.you_miss_third", who, MonsterNames.Display(target)));
+            }
+            else if (roll.IsNatural1)
+            {
+                terminal.SetColor("dark_red");
+                UIHelper.WriteRow(terminal, Loc.Get("combat.critical_miss"));
+            }
+            else
+            {
+                terminal.SetColor("gray");
+                UIHelper.WriteRow(terminal, Loc.Get("combat.you_miss", MonsterNames.Display(target)));
+            }
+            result.CombatLog.Add($"{who} misses {target.Name} (roll: {roll.Natural}, needed: {roll.Needed})");
+        }
+        EvRoll(attacker, hit);   // 1.2.8: the one place a to-hit die is counted (player_swings, player_misses)
+        return new HitCheck(hit, roll.Natural);
+    }
+
+    /// <summary>
+    /// 1.2.8: a class ability rolls to hit when it is a physical single-target attack: an Attack ability with
+    /// damage whose effect is not area, magical or mental (the test of the off-hand follow-up below, and
+    /// MagicalAbilityEffects), that deals its damage in the base block (the effects with their own damage
+    /// handler are area or prestige magic), and that does not promise a certain hit (Precise Shot).
+    /// </summary>
+    internal static bool AbilityRollsToHit(ClassAbilitySystem.ClassAbility ability, ClassAbilityResult abilityResult, bool hasOwnDamageHandler)
+    {
+        if (ability.Type != ClassAbilitySystem.AbilityType.Attack || abilityResult.Damage <= 0 || hasOwnDamageHandler) return false;
+        string effect = abilityResult.SpecialEffect ?? "";
+        if (effect.Contains("aoe") || effect.Contains("distract") || effect.Contains("psychic") || effect.Contains("magic")
+            || effect.Contains("charm") || effect.Contains("fear") || effect.Contains("confus")) return false;
+        if (IsMagicalAbilityEffect(effect)) return false;
+        return effect != "guaranteed_hit";
+    }
+
     // Unified post-hit on-hit effects for a landed player melee swing. Extracted verbatim from the
     // multi-monster basic-attack path so EVERY landed player swing (basic attack main/off-hand AND
     // the [P] Power Attack main/off-hand) runs the identical enchant pipeline. Player report: the
@@ -13710,6 +14116,12 @@ public partial class CombatEngine
     // proficiency, level/weapon scaling, crit, and every buff). Synchronous: the block contains no
     // awaits. `s`/`swings` are passed through only for the diagnostic COMBAT_ATTACK log line.
     private long ComputePlayerSwingDamage(Character player, Monster target, bool isOffHandAttack, int s, int swings)
+        => ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, 0);
+
+    // 1.2.8 (the player to-hit roll): hitNatural is the natural roll of the swing's to-hit die, or 0 when no
+    // die was rolled (GameConfig.PlayerHitRollEnabled off, or a certain hit). With a roll, its natural 20 is
+    // the critical hit and the separate die below is not drawn; without one the separate die is drawn as before.
+    private long ComputePlayerSwingDamageRolled(Character player, Monster target, bool isOffHandAttack, int s, int swings, int hitNatural)
     {
                         // Calculate player attack damage (unified with single-combat formula)
                         // Bard/Jester use CHA (performance-based combat), others use STR
@@ -13739,9 +14151,10 @@ public partial class CombatEngine
                             attackPower = Math.Max(1, attackPower - player.Level / 10 - 4);
 
                         // Weapon power with level scaling and random (soft cap prevents extreme stacking)
-                        if (player.WeapPow > 0)
+                        long swingWeapPow = player.SwingWeapPow(isOffHandAttack);   // 1.2.8: this hand's weapon
+                        if (swingWeapPow > 0)
                         {
-                            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+                            long effectiveWeap = GetEffectiveWeapPow(swingWeapPow);
                             long weaponBonus = effectiveWeap + (player.Level / 10);
                             attackPower += weaponBonus + random.Next(0, (int)Math.Min(int.MaxValue, weaponBonus + 1));
                         }
@@ -13793,7 +14206,7 @@ public partial class CombatEngine
                             rollMult = StatEffectsSystem.GetCriticalDamageMultiplier(player.Dexterity, player.GetEquipmentCritDamageBonus());
                             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
                         }
-                        bool isCrit = !miracleCrit && !stealthCrit && random.Next(1, 21) == 20; // natural 20
+                        bool isCrit = !miracleCrit && !stealthCrit && (hitNatural > 0 ? hitNatural == 20 : random.Next(1, 21) == 20); // natural 20
                         bool dexCrit = !miracleCrit && !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
                         if (isCrit)
                         {
@@ -14059,7 +14472,7 @@ public partial class CombatEngine
             {
                 var preventingStatus = player.ActiveStatuses.Keys.FirstOrDefault(s => s.PreventsAction());
                 terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("combat.cannot_act", preventingStatus.ToString().ToLower()));
+                terminal.WriteLine(Loc.Get("combat.cannot_act", StatusWord(preventingStatus)));   // 1.2.8
                 await Pacing.Wait(GetCombatDelay(1500));
                 return (new CombatAction { Type = CombatActionType.None }, false);
             }
@@ -14399,9 +14812,21 @@ public partial class CombatEngine
                         }
                         await Pacing.Wait(GetCombatDelay(500));
 
-                        long damage = ComputePlayerSwingDamage(player, target, isOffHandAttack, s, swings);
+                        // 1.2.8: the to-hit roll, each swing on its own: evasion first, then the roll; a swing from
+                        // hiding or with a Miracle crit is certain. A miss deals nothing and runs no on-hit effect.
+                        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+                        int hitNatural = 0;
+                        if (hitRolled)
+                        {
+                            var hitCheck = ResolvePlayerHit(player, target, result, certain: player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden));
+                            if (!hitCheck.Lands)
+                                continue;
+                            hitNatural = hitCheck.Natural;
+                        }
 
-                        bool swingLanded = await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player);
+                        long damage = ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, hitNatural);
+
+                        bool swingLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
 
                         // If the swing was evaded (Incorporeal / Phase / etc. -- the attack passes
                         // through for 0 damage), skip EVERY on-hit effect for this swing: lifesteal
@@ -14605,14 +15030,22 @@ public partial class CombatEngine
         int successChance = Math.Min(95, 50 + (int)(effectiveDex / 2));
         if (random.Next(100) < successChance)
         {
-            long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 3;
+            // 1.2.8: the to-hit roll, after the backstab's own check
+            bool hitRolled = GameConfig.PlayerHitRollEnabled;
+            if (hitRolled && !ResolvePlayerHit(player, target, result).Lands)
+            {
+                await Pacing.Wait(GetCombatDelay(1000));
+                return;
+            }
+
+            long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 3;
             backstabDamage += random.Next(1, 20);
             backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
 
             terminal.SetColor("bright_red");
             terminal.WriteLine(Loc.Get("combat.critical_backstab", backstabDamage));
 
-            await ApplySingleMonsterDamage(target, backstabDamage, result, "backstab", player);
+            await ApplySingleMonsterDamageChecked(target, backstabDamage, result, "backstab", player, isSpellDamage: false, evasionChecked: hitRolled);
             if (!target.IsAlive) GodDeedSystem.Record(player, GodAct.StealthKill, terminal);   // 1.2.0 Temple gods: Shadow deed
         }
         else
@@ -14646,6 +15079,15 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.power_attack_windup", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll, with the power stance applied above (+2 to the armour class); a strike from
+        // hiding is certain. On a miss the off hand still follows with its own roll.
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result, certain: player.HasStatus(StatusEffect.Hidden)).Lands)
+        {
+            await PowerAttackOffHandFollowUp(player, target, monsters, result, hitRolled);
+            return;
+        }
+
         // Mirror the basic-attack damage stack so Power Strike doesn't lose to it just
         // because it skipped every multiplier (player report). Same fix as the single-
         // monster ExecutePowerAttack — see comments there.
@@ -14675,9 +15117,10 @@ public partial class CombatEngine
             powerDamage = Math.Max(1, powerDamage - player.Level / 10 - 4);
 
         // Weapon power with variance
-        if (player.WeapPow > 0)
+        long abilityWeapPow = player.AbilityWeapPow;   // 1.2.8: main hand plus half the off hand
+        if (abilityWeapPow > 0)
         {
-            long effectiveWeap = GetEffectiveWeapPow(player.WeapPow);
+            long effectiveWeap = GetEffectiveWeapPow(abilityWeapPow);
             powerDamage += effectiveWeap + random.Next(0, (int)Math.Min(int.MaxValue, effectiveWeap / 2 + 1));
         }
         int variationMax = Math.Max(21, player.Level / 2);
@@ -14740,9 +15183,16 @@ public partial class CombatEngine
         // Power Attack runs the same on-hit enchant pipeline as a basic swing (lifesteal, elemental
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
         // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
-        if (await ApplySingleMonsterDamage(target, powerDamage, result, "power attack", player))
+        if (await ApplySingleMonsterDamageChecked(target, powerDamage, result, "power attack", player, isSpellDamage: false, evasionChecked: hitRolled))
             ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, powerDamage), isOffHandAttack: false, result);   // v1.1.11
 
+        await PowerAttackOffHandFollowUp(player, target, monsters, result, hitRolled);
+    }
+
+    // The Power Attack's off-hand follow-up, in its own method since 1.2.8 so that it also follows a main-hand
+    // strike that missed its to-hit roll. hitRolled: GameConfig.PlayerHitRollEnabled as the caller read it.
+    private async Task PowerAttackOffHandFollowUp(Character player, Monster target, List<Monster> monsters, CombatResult result, bool hitRolled)
+    {
         // Follow up with off-hand attack if dual-wielding
         if (player.IsDualWielding)
         {
@@ -14754,16 +15204,25 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.off_hand_strike_at", MonsterNames.Display(offHandTarget)));
                 await Pacing.Wait(GetCombatDelay(500));
 
+                // 1.2.8: the off hand rolls to hit on its own
+                int hitNatural = 0;
+                if (hitRolled)
+                {
+                    var hitCheck = ResolvePlayerHit(player, offHandTarget, result, certain: player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden));
+                    if (!hitCheck.Lands) return;
+                    hitNatural = hitCheck.Natural;
+                }
+
                 // Off-hand follow-up does a FULL off-hand swing using the same formula as a normal
                 // off-hand basic attack (ComputePlayerSwingDamage), so a skill's off-hand strike no
                 // longer deals different damage than a normal off-hand attack (player report). The
                 // old bespoke STR + WeapPow + random(1,15) formula dropped proficiency, level/weapon
                 // scaling, crit, and all buffs, making it far weaker than a real off-hand swing.
-                long ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
+                long ohDamage = ComputePlayerSwingDamageRolled(player, offHandTarget, isOffHandAttack: true, 1, 1, hitNatural);
 
                 // Off-hand follow-up procs its enchants only if it actually connected (same evade
                 // gate + shared on-hit pipeline as the basic-attack off-hand swing).
-                if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
+                if (await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
                     ApplyPlayerSwingOnHitEffects(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), isOffHandAttack: true, result);   // v1.1.11
             }
         }
@@ -14779,8 +15238,17 @@ public partial class CombatEngine
         UIHelper.WriteRow(terminal, Loc.Get("combat.precise_strike_aim", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll; the careful aim needs PreciseStrikeNeededBonus less on the die. That is the
+        // strike's accuracy now, in place of the 25% cut of the target's Defence below.
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result, neededBonus: GameConfig.PreciseStrikeNeededBonus).Lands)
+        {
+            await Pacing.Wait(GetCombatDelay(800));
+            return;
+        }
+
         // Precise Strike: normal damage, +25% accuracy via reducing defense by 25%
-        long attackPower = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
+        long attackPower = player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow) + random.Next(1, 15);
 
         // Apply weapon configuration damage modifier (2H bonus)
         double damageModifier = GetWeaponConfigDamageModifier(player);
@@ -14790,7 +15258,8 @@ public partial class CombatEngine
         // ApplySingleMonsterDamage below subtracts armor itself; doing both double-taxed
         // Precise Strike against armored monsters (same fix as Power Attack).
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
-        defense = (long)(defense * 0.75);
+        if (!hitRolled)
+            defense = (long)(defense * 0.75);
 
         long damage = Math.Max(1, attackPower - defense);
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
@@ -14798,7 +15267,7 @@ public partial class CombatEngine
         terminal.SetColor("bright_cyan");
         UIHelper.WriteRow(terminal, Loc.Get("combat.precise_strike_hit", MonsterNames.Display(target), damage));
 
-        await ApplySingleMonsterDamage(target, damage, result, "precise strike", player);
+        await ApplySingleMonsterDamageChecked(target, damage, result, "precise strike", player, isSpellDamage: false, evasionChecked: hitRolled);
         await Pacing.Wait(GetCombatDelay(800));
     }
 
@@ -14868,15 +15337,20 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.smite_channel", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result).Lands)
+            return;
+
         // Smite: 150% damage + level bonus (with weapon soft cap)
-        long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.WeapPow)) * 1.5) + player.Level;
+        long smiteDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 1.5) + player.Level;
         smiteDamage += random.Next(10, 25);
         smiteDamage = DifficultySystem.ApplyPlayerDamageMultiplier(smiteDamage);
 
         terminal.SetColor("bright_white");
         UIHelper.WriteRow(terminal, Loc.Get("combat.smite_damage", smiteDamage, MonsterNames.Display(target))); // v1.1.1: missing target arg showed raw {1}
 
-        await ApplySingleMonsterDamage(target, smiteDamage, result, "smite", player);
+        await ApplySingleMonsterDamageChecked(target, smiteDamage, result, "smite", player, isSpellDamage: false, evasionChecked: hitRolled);
     }
 
     private async Task ExecuteRangedAttackMultiMonster(Character player, List<Monster> monsters, int? targetIndex, CombatResult result)
@@ -14898,6 +15372,11 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.ranged_fire", MonsterNames.Display(target)));
         await Pacing.Wait(GetCombatDelay(500));
 
+        // 1.2.8: the to-hit roll
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        if (hitRolled && !ResolvePlayerHit(player, target, result).Lands)
+            return;
+
         // Ranged damage: DEX-based + weapon power + level bonus (mirrors melee formula)
         long rangedDamage = player.Dexterity + (player.Level / 2) + random.Next(1, 21);
         if (player.WeapPow > 0)
@@ -14914,7 +15393,7 @@ public partial class CombatEngine
         terminal.SetColor("green");
         UIHelper.WriteRow(terminal, Loc.Get("combat.ranged_hit", MonsterNames.Display(target), rangedDamage)); // v1.1.1: multi-monster path drifted from the single-monster one (missing target arg)
 
-        await ApplySingleMonsterDamage(target, rangedDamage, result, "ranged attack", player);
+        await ApplySingleMonsterDamageChecked(target, rangedDamage, result, "ranged attack", player, isSpellDamage: false, evasionChecked: hitRolled);
     }
 
     private async Task ExecuteDisarmMultiMonster(Character player, List<Monster> monsters, int? targetIndex, CombatResult result)
@@ -15148,8 +15627,17 @@ public partial class CombatEngine
             or "entropy_aoe" or "singularity" or "abyssal_eruption"
             or "abyss_unchained";
 
+        // 1.2.8: a physical single-target ability rolls to hit (AbilityRollsToHit); from hiding it is certain.
+        // This path has no evasion check and gets none. A missed ability does nothing: no damage, no healing,
+        // no buff and no special effect; its off-hand follow-up still swings, with its own roll.
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        bool abilityMissed = hitRolled && target != null && target.IsAlive
+            && AbilityRollsToHit(ability, abilityResult, isAoEAbility)
+            && !player.HasStatus(StatusEffect.Hidden)
+            && !ShowPlayerHitRoll(player, target, result).Lands;
+
         // Apply damage
-        if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility)
+        if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility && !abilityMissed)
         {
             long actualDamage = abilityResult.Damage;
             bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
@@ -15230,7 +15718,7 @@ public partial class CombatEngine
                 // AoE abilities hit all monsters
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.ability_aoe_all"));
-                await ApplyAoEDamage(monsters, actualDamage, result, ability.DisplayName, attacker: player);
+                await ApplyAoEDamageCore(monsters, actualDamage, result, ability.DisplayName, false, player, null, notMelee: IsRangedAbility(ability));
                 // AoE confusion: confuse surviving monsters
                 if (abilityResult.SpecialEffect == "aoe_confusion")
                 {
@@ -15314,7 +15802,7 @@ public partial class CombatEngine
 
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
-                ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+                ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect), notMelee: IsRangedAbility(ability));
 
                 // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals the caster. Applied
                 // here so the heal fires even if the target died to the base damage (previously the
@@ -15405,14 +15893,29 @@ public partial class CombatEngine
                 // dual-wielding NPC keeps the lightweight off-hand formula: ComputePlayerSwingDamage
                 // emits player-perspective ("You") crit/proc lines and folds in player-only buffs,
                 // which must not fire for a teammate's swing (player/teammate attribution).
-                long ohDamage;
-                if (isPlayer)
+                // 1.2.8: the off-hand follow-up rolls to hit on its own (evasion first, then the roll)
+                int ohNatural = 0;
+                bool ohLands = true;
+                if (hitRolled)
                 {
-                    ohDamage = ComputePlayerSwingDamage(player, offHandTarget, isOffHandAttack: true, 1, 1);
+                    var ohCheck = ResolvePlayerHit(player, offHandTarget, result,
+                        certain: isPlayer && (player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden)));
+                    ohLands = ohCheck.Lands;
+                    ohNatural = ohCheck.Natural;
+                }
+
+                long ohDamage = 0;
+                if (!ohLands)
+                {
+                    // missed or evaded: no damage is worked out and nothing is drawn for it
+                }
+                else if (isPlayer)
+                {
+                    ohDamage = ComputePlayerSwingDamageRolled(player, offHandTarget, isOffHandAttack: true, 1, 1, ohNatural);
                 }
                 else
                 {
-                    ohDamage = player.Strength + GetEffectiveWeapPow(player.WeapPow) + random.Next(1, 15);
+                    ohDamage = player.Strength + GetEffectiveWeapPow(player.SwingWeapPow(offHand: true)) + random.Next(1, 15);
                     double ohMod = GetWeaponConfigDamageModifier(player, isOffHandAttack: true);
                     ohDamage = (long)(ohDamage * ohMod);
                     ohDamage = DifficultySystem.ApplyPlayerDamageMultiplier(ohDamage);
@@ -15420,13 +15923,13 @@ public partial class CombatEngine
 
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
                 // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
-                if (await ApplySingleMonsterDamage(offHandTarget, ohDamage, result, "off-hand strike", player))
+                if (ohLands && await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
                     ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);   // v1.1.11: riders scale from the boosted hit, as at every other caller
             }
         }
 
         // Apply healing (with ally targeting for CanTargetAlly abilities)
-        if (abilityResult.Healing > 0)
+        if (abilityResult.Healing > 0 && !abilityMissed)
         {
             // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
             abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monsters);
@@ -15506,7 +16009,7 @@ public partial class CombatEngine
         }
 
         // Apply buffs
-        if (abilityResult.AttackBonus > 0)
+        if (abilityResult.AttackBonus > 0 && !abilityMissed)
         {
             // Use the higher of current or new bonus (don't let weaker buff overwrite stronger)
             if (abilityResult.AttackBonus > player.TempAttackBonus)
@@ -15529,7 +16032,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_attack_up" : "combat.ability_attack_up_npc", actorName, abilityResult.AttackBonus, abilityResult.Duration));
         }
 
-        if (abilityResult.DefenseBonus > 0)
+        if (abilityResult.DefenseBonus > 0 && !abilityMissed)
         {
             // Use the higher of current or new bonus
             if (abilityResult.DefenseBonus > player.TempDefenseBonus || player.TempDefenseBonusDuration <= 0)
@@ -15544,7 +16047,7 @@ public partial class CombatEngine
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_defense_up" : "combat.ability_defense_up_npc", actorName, abilityResult.DefenseBonus, abilityResult.Duration));
         }
-        else if (abilityResult.DefenseBonus < 0)
+        else if (abilityResult.DefenseBonus < 0 && !abilityMissed)
         {
             // Rage reduces defense
             player.TempDefenseBonus = abilityResult.DefenseBonus;
@@ -15553,8 +16056,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_defense_down" : "combat.ability_defense_down_npc", actorName, -abilityResult.DefenseBonus));
         }
 
-        // Handle special effects
-        switch (abilityResult.SpecialEffect)
+        // Handle special effects (1.2.8: none after a missed to-hit roll; no case matches the empty effect)
+        switch (abilityMissed ? "" : abilityResult.SpecialEffect)
         {
             case "escape":
                 terminal.SetColor("magenta");
@@ -18869,7 +19372,7 @@ public partial class CombatEngine
 
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
-            int healPerPotion = 30 + player.Level * 5 + 20; // Average heal per potion
+            int healPerPotion = (int)PotionBonus.AverageHeal(player, targetAlly); // 1.2.8: scaled by the ally's MaxHP
             healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, monsters); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
@@ -18919,7 +19422,7 @@ public partial class CombatEngine
             for (int i = 0; i < potionsToUse && targetAlly.HP < targetAlly.MaxHP; i++)
             {
                 player.Healing--;
-                int healAmount = 30 + player.Level * 5 + random.Next(10, 30);
+                int healAmount = (int)PotionBonus.BaseHeal(player, random, receiver: targetAlly); // 1.2.8: at least 20% of the ally's MaxHP
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount, monsters); // v1.1.11: the giver's Infirmary
                 EvUse(player, CombatEventKind.Potion);   // 1.2.6
                 EvHeal(player, targetAlly, HealRoom(targetAlly, healAmount), CombatEventKind.Potion);
@@ -19292,8 +19795,13 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.teammate_attacks", teammate.DisplayName, MonsterNames.Display(target)));
                 await Pacing.Wait(GetCombatDelay(500));
 
+                // 1.2.8: the to-hit roll with the teammate's own stats, each swing on its own (evasion first)
+                bool hitRolled = GameConfig.PlayerHitRollEnabled;
+                if (hitRolled && !ResolvePlayerHit(teammate, target, result).Lands)
+                    continue;
+
                 // Calculate teammate attack damage (with weapon soft cap)
-                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.WeapPow) + random.Next(1, 16);
+                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.SwingWeapPow(isOffHandAttack)) + random.Next(1, 16);
                 attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
 
                 // Apply weapon configuration damage modifier (includes alignment bonuses, off-hand penalty)
@@ -19302,7 +19810,7 @@ public partial class CombatEngine
 
                 long damage = Math.Max(1, attackPower);
                 damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-                bool tmLanded = await ApplySingleMonsterDamage(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate);
+                bool tmLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
 
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
@@ -19586,7 +20094,7 @@ public partial class CombatEngine
         StatsFor(teammate).PotionsDrunk++;
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
-        int healAmount = 30 + teammate.Level * 5 + random.Next(10, 30);
+        int healAmount = (int)PotionBonus.BaseHeal(teammate, random, receiver: target); // 1.2.8: at least 20% of the target's MaxHP
         healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
@@ -20547,13 +21055,16 @@ public partial class CombatEngine
         var targetWeights = new List<(Character target, int weight)>();
 
         // Player base weight - squishy classes get lower weight (less likely to be targeted)
-        int playerWeight = GetTargetWeight(player);
+        // 1.2.8: Predator and Skirmisher families add their trait bonus (after the taunt check above, so a
+        // taunt still wins); 0 for every other family and whenever MonsterTactics is not active
+        bool traits = MonsterTacticsActive;
+        int playerWeight = GetTargetWeight(player) + (traits ? MonsterTactics.TraitBonus(monster, player) : 0);
         targetWeights.Add((player, playerWeight));
 
         // Add all alive teammates with their weights
         foreach (var teammate in aliveTeammates)
         {
-            int teammateWeight = GetTargetWeight(teammate);
+            int teammateWeight = GetTargetWeight(teammate) + (traits ? MonsterTactics.TraitBonus(monster, teammate) : 0);
             targetWeights.Add((teammate, teammateWeight));
         }
 
@@ -20806,16 +21317,20 @@ public partial class CombatEngine
 
         // Monster special abilities can also fire against companions
         bool shownAttackMessage = false;
-        if (monster.SpecialAbilities != null && monster.SpecialAbilities.Count > 0)
+        bool tactics = MonsterTacticsActive;   // 1.2.8: the same tactic as against the player
+        if (tactics ? MonsterTactics.HasAbilities(monster) : (monster.SpecialAbilities != null && monster.SpecialAbilities.Count > 0))
         {
             int abilityChance = 30 + (monster.Level / 5);
             if (random.Next(100) < abilityChance)
             {
-                string abilityName = monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
-                if (Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType)
+                string? abilityName = tactics
+                    ? MonsterTactics.Choose(monster, companion, result.CurrentRound, liveMonsterList, random)
+                    : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
+                if (abilityName != null
+                    && Enum.TryParse<MonsterAbilities.AbilityType>(abilityName, true, out var abilityType)
                     && !MonsterAbilities.FallsBackToNormalAttack(abilityType, monster, companion)) // v1.1.14: else the normal attack below
                 {
-                    var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, companion);
+                    var abilityResult = MonsterAbilities.ExecuteAbility(abilityType, monster, companion, tactics ? random : null);
                     // Show "attacks companion!" only if ability targets them (not self-only like Regeneration)
                     if (!abilityResult.IsSelfOnly)
                     {
@@ -20833,6 +21348,7 @@ public partial class CombatEngine
                         // Ability defense: Defence stat + 50% ArmPow (abilities partially bypass armor)
                         long abilityDefense = companion.Defence + (companion.ArmPow / 2);
                         long actualDmg = Math.Max(1, abilityResult.DirectDamage - abilityDefense);
+                        actualDmg = CommandedDamage(monster, result, actualDmg);   // 1.2.8
                         if (abilityDefense > 0)
                         {
                             terminal.SetColor("dark_gray");
@@ -20860,6 +21376,7 @@ public partial class CombatEngine
                         abilityDefense += companion.TempDefenseBonus;
                         long rawAbilityDmg = (long)(monster.GetAttackPower() * abilityResult.DamageMultiplier);
                         long dmg = Math.Max(1, rawAbilityDmg - abilityDefense);
+                        dmg = CommandedDamage(monster, result, dmg);   // 1.2.8
                         if (abilityDefense > 0)
                         {
                             terminal.SetColor("dark_gray");
@@ -21040,6 +21557,7 @@ public partial class CombatEngine
         // reason it does for the player — high-tank companions can't tank indefinitely.
         long minDamage = GetMinIncomingDamage(companion, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - companionDefense);
+        actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8: before the caps below
 
         // Show defense calculation
         if (companionDefense > 0 && companionDefense < monsterAttack)
@@ -21107,6 +21625,8 @@ public partial class CombatEngine
 
         terminal.SetColor(ColorRole.Notice);
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion_hp", actualDamage, companion.DisplayName, companion.HP, companion.MaxHP));
+        if (actualDamage > 0 && companion.IsAlive && EliteVenomLands(monster, companion))   // 1.2.8
+            ApplyEliteVenom(companion, isLeader: false);
 
         // Divine Mandate thorn reflect (v0.56.0, NPC tank)
         if (companion.TempThornReflectPercent > 0 && companion.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
@@ -21329,6 +21849,7 @@ public partial class CombatEngine
         if (result.Player != null && CouldHaveHelped(companion, result.Player))
         {
             companionSystem.ModifyLoyalty(companion.CompanionId.Value, -GameConfig.AbandonCompanionLoyaltyPenalty, "left to die with potions in hand");
+            companionSystem.RecordAbandonedGrievance("left a companion to die");   // 1.2.8: once per event
             terminal.WriteLine($"  {Loc.Get("combat.ally_death_could_have_helped", companion.DisplayName)}", "yellow");
             terminal.WriteLine($"  {Loc.Get("combat.companion_loyalty_drop", companion.DisplayName)}", "yellow");
         }
@@ -21353,9 +21874,12 @@ public partial class CombatEngine
         var npcId = npc.ID ?? "";
         var deathLocation = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
         bool wasPermadeath = false;
+        bool warded = false;   // v1.2.8 (H3)
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
+            // v1.2.8 (H3): asked before the team is cleared below: on the player's team, or in this party
+            warded = WardSystem.IsWarded(worldNpc, result.Teammates, GameEngine.Instance?.DungeonPartyNPCIds);
             // Temporarily clear team so MarkNPCDead doesn't trigger the world-sim
             // player-team protection (that guard is for background NPC-vs-NPC violence,
             // not real combat deaths)
@@ -21386,7 +21910,7 @@ public partial class CombatEngine
             // v1.2: an ally who dies in the player's party rolls the team rate (2 percent), not
             // the "player killed an NPC" rate (8 percent) this passed since v0.42.
             wasPermadeath = WorldSimulator.Instance?.MarkNPCDead(worldNpc, GameConfig.PermadeathChanceDungeonTeam,
-                killerName, deathLocation) ?? false;
+                killerName, deathLocation, atPlayersSide: true) ?? false;
             worldNpc.IsInConversation = savedEngaged;
             worldNpc.Team = savedTeam;
 
@@ -21402,6 +21926,12 @@ public partial class CombatEngine
             terminal.WriteLine("═══════════════════════════════════════════════════════════");
         terminal.WriteLine("");
         await Pacing.Wait(1500);
+
+        // v1.2.8 (H3): the ward. Not permanent: one row that the ward caught them. Permanent: the scene
+        // (the ward flares and breaks, a last line picked by a hash of the NPC's ID, the closing row) and
+        // the lasting memory. No random number is drawn here. The grief trigger below is as before.
+        if (warded)
+            await ShowWardOutcome(npc, npcId, wasPermadeath);
 
         // Mark the combat character reference as dead
         if (npc is NPC npcRef)
@@ -21462,7 +21992,14 @@ public partial class CombatEngine
             bool wasSpouse = romanceTracker.IsPlayerMarriedTo(npcId);
             bool wasLover = romanceTracker.IsPlayerInRelationshipWith(npcId);
 
-            if (wasSpouse)
+            // v1.2.8 (H3): a fall the ward caught shows the fallen banner and the caught row only; the rows of
+            // loss below are for a permanent fall (after the scene) and for an NPC that is not warded
+            bool caughtByWard = warded && !wasPermadeath;
+            if (caughtByWard)
+            {
+                // nothing more is shown: they are carried out and will mend
+            }
+            else if (wasSpouse)
             {
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get("combat.spouse_fallen", npc.DisplayName));
@@ -21481,8 +22018,14 @@ public partial class CombatEngine
             }
 
             // Always run the unified cleanup. Idempotent for non-romance NPCs.
-            romanceTracker.OnNPCPermadied(npcId);
-            NPCMarriageRegistry.Instance.OnNPCPermadied(npcId);
+            // v1.2.8 (H3): but not for a fall the ward caught: they will mend, so the marriage, the romance,
+            // the jealousy and an affair stay as they were. A permanent fall, an NPC that is not warded and
+            // the switch off run it as before.
+            if (!caughtByWard)
+            {
+                romanceTracker.OnNPCPermadied(npcId);
+                NPCMarriageRegistry.Instance.OnNPCPermadied(npcId);
+            }
         }
 
         terminal.WriteLine("");
@@ -21501,6 +22044,35 @@ public partial class CombatEngine
         // Prevent save cheesing — persist death outcomes immediately (both online and offline)
         if (GameEngine.Instance != null)
             _ = GameEngine.Instance.SaveCurrentGame();
+    }
+
+    /// <summary>
+    /// v1.2.8 (H3): what the ward did for a warded NPC that fell in the player's fight. The rows go through
+    /// the fight's terminal, so a grouped player who watches reads them from the same capture in their own
+    /// language (CapturedInLanguage); none of them addresses the player.
+    /// </summary>
+    private async Task ShowWardOutcome(Character npc, string npcId, bool wasPermadeath)
+    {
+        if (!wasPermadeath)
+        {
+            terminal.SetColor("cyan");
+            terminal.WriteLine(WardSystem.CaughtRow(npc.DisplayName));
+            terminal.WriteLine("");
+            await Pacing.Wait(1000);
+            return;
+        }
+
+        var rows = WardSystem.BreakSceneRows(npc.DisplayName, npcId);
+        for (int i = 0; i < rows.Length; i++)
+        {
+            terminal.SetColor(i == 2 ? "white" : i == rows.Length - 1 ? "dark_red" : "bright_cyan");
+            terminal.WriteLine(rows[i]);
+            await Pacing.Wait(i == rows.Length - 1 ? 1500 : 1200);
+        }
+        terminal.WriteLine("");
+
+        // the record that lasts: the player's memories of the fallen (saved with the grief memories)
+        UsurperRemake.Systems.GriefSystem.Instance.AddNpcMemory(npcId, npc.DisplayName, WardSystem.MemoryText(npc.DisplayName));
     }
 
     /// <summary>
@@ -21537,6 +22109,9 @@ public partial class CombatEngine
     /// </summary>
     private async Task HandleVictoryMultiMonster(CombatResult result, bool offerMonkEncounter)
     {
+        // 1.2.8: before any reward, loot screen or the victory autosave below
+        RunVictoryPreSaveHook(result);
+
         // MUD mode: broadcast boss kills only (regular kills too spammy)
         if (result.DefeatedMonsters.Count > 0)
         {
@@ -21595,7 +22170,7 @@ public partial class CombatEngine
             // Update quest progress for each monster killed
             // ONLY actual floor bosses count for boss-related tracking
             bool isBoss = monster.IsBoss;
-            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBoss, monster.TierName);
+            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBoss, monster.TierName, monster.IsMiniBoss);
 
             // Calculate exp reward based on level difference
             long baseExp = monster.Experience;
@@ -21611,6 +22186,13 @@ public partial class CombatEngine
 
             // Calculate gold reward
             long goldReward = monster.Gold + random.Next(0, (int)Math.Min(int.MaxValue - 1L, (long)(monster.Gold * 0.5))); // v1.1.1: no int overflow on huge purses
+
+            // 1.2.8: a fight whose caller pays a flat reward (Seth Able) pays nothing here
+            if (monster.CallerPaysReward)
+            {
+                expReward = 0;
+                goldReward = 0;
+            }
 
             totalExp += expReward;
             totalGold += goldReward;
@@ -21868,7 +22450,9 @@ public partial class CombatEngine
         // Display rewards
         terminal.SetColor("yellow");
         terminal.WriteLine(Loc.Get("combat.defeated_count", result.DefeatedMonsters.Count.ToString()));
-        terminal.WriteLine(Loc.Get("combat.xp_label", playerXPmm.ToString()));
+        bool callerPaysAll = result.DefeatedMonsters.All(m => m.CallerPaysReward);   // 1.2.8: the caller shows its own reward
+        if (!callerPaysAll)
+            terminal.WriteLine(Loc.Get("combat.xp_label", playerXPmm.ToString()));
 
         // v0.65.5 (T1-2): surface the spouse + divine-blessing XP bonuses (ported from the dead
         // HandleVictory path) so the married/blessed player sees the perk they are now actually getting.
@@ -21903,7 +22487,8 @@ public partial class CombatEngine
         ShowXPModifiersAndShare(terminal, xpMods, xpSharesMM[0], totalXPPotMM,
             result.Teammates != null && result.Teammates.Count > 0 && xpSharesMM[0] < 100);
 
-        terminal.WriteLine(Loc.Get("combat.gold_label", $"{adjustedGold:N0}"));
+        if (!callerPaysAll)
+            terminal.WriteLine(Loc.Get("combat.gold_label", $"{adjustedGold:N0}"));
         PrintPartyFightSummary(result); // v1.1.3 (council ruling 5)
 
         // Show bonus from world events if any
@@ -22261,8 +22846,8 @@ public partial class CombatEngine
 
         foreach (var monster in result.DefeatedMonsters)
         {
-            long baseExp = monster.Experience / 2; // Half exp for retreat
-            long goldReward = monster.Gold;
+            long baseExp = monster.CallerPaysReward ? 0 : monster.Experience / 2; // Half exp for retreat; 1.2.8: none when the caller pays
+            long goldReward = monster.CallerPaysReward ? 0 : monster.Gold;
 
             totalExp += baseExp;
             totalGold += goldReward;
@@ -22273,7 +22858,7 @@ public partial class CombatEngine
             result.Player.MKills++;
             RecordFirstKillFunnel(result.Player);
             result.Player.Statistics?.RecordMonsterKill(baseExp, goldReward, isBossPV, monster.IsUnique);
-            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBossPV, monster.TierName);
+            QuestSystem.OnMonsterKilled(result.Player, monster.Name, isBossPV, monster.TierName, monster.IsMiniBoss);
             ArchetypeTracker.Instance.RecordMonsterKill(monster.Level, monster.IsUnique);
         }
 
@@ -22817,6 +23402,7 @@ public partial class CombatEngine
                 result.Outcome = CombatOutcome.Victory;
             else
                 result.Outcome = CombatOutcome.PlayerEscaped;
+            WriteRescueRow(result);   // 1.2.8: the fight's row (fled; a Victory's row is the victory pipeline's)
             return;
         }
 
@@ -22824,7 +23410,10 @@ public partial class CombatEngine
         // rescues (Last Stand, Death's Door) and before anything death-related runs. Not for a
         // fight with no real death (arrest, exhibition) or a Mental collapse.
         if (await TryMortisMiracle(result))
+        {
+            WriteRescueRow(result);   // 1.2.8: as after Last Stand
             return;
+        }
 
         // v0.61.2: Last-Stand rescue did NOT fire, so the player is genuinely
         // entering the death pipeline. Mark the result so the outer Char.Combat.End
@@ -22857,6 +23446,7 @@ public partial class CombatEngine
             result.Outcome = CombatOutcome.PlayerEscaped;
             DebugLogger.Instance.LogInfo("ARREST",
                 $"{result.Player.Name} subdued by guards (no resurrection consumed).");
+            WriteFightRow(result, "death");   // 1.2.8: the fight was lost; the row keeps the HP the fight left
             return;
         }
 
@@ -22872,6 +23462,7 @@ public partial class CombatEngine
             result.Outcome = CombatOutcome.PlayerDied;
             DebugLogger.Instance.LogInfo("EXHIBITION",
                 $"{result.Player.Name} dropped in exhibition combat (no resurrection consumed).");
+            WriteFightRow(result, "death");   // 1.2.8: as the arrest loss
             return;
         }
 
@@ -22902,6 +23493,12 @@ public partial class CombatEngine
         bool isOnlinePermadeathMode = UsurperRemake.BBS.DoorMode.IsOnlineMode && GameConfig.OnlinePermadeathEnabled;
         if (isOnlinePermadeathMode && result.Player.Resurrections <= 0)
         {
+            // 1.2.8: the fight's row, before the erase. The erase removes the player's telemetry answer
+            // (DeleteGameData, TelemetryConsent.RemoveAnswer), and the queue append checks that answer again,
+            // so the append is awaited here; it never throws and its lock wait is bounded (LockTimeout).
+            WriteFightRow(result, "death");
+            var append = LastTelemetryAppend;
+            if (append != null) await append;
             await HandleExcessiveDeathsPermadeath(result);
             return;
         }
@@ -23818,7 +24415,7 @@ public partial class CombatEngine
         }
 
         long hpNeeded = player.MaxHP - player.HP;
-        int healPerPotion = 30 + player.Level * 5 + random.Next(10, 30);
+        int healPerPotion = (int)PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, result.Monsters); // v1.1.11: Infirmary, so potionsNeeded shrinks too
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -24203,7 +24800,7 @@ public partial class CombatEngine
 
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
-            ApplyPostHitEnchantments(player, monster, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect));
+            ApplyPostHitEnchantments(player, monster, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect), notMelee: IsRangedAbility(ability));
 
             // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals caster even on killing blow.
             if (abilityResult.SpecialEffect == "shadow_harvest" && actualDamage > 0)
@@ -26742,7 +27339,7 @@ public partial class CombatEngine
             return;
         }
 
-        long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.WeapPow) + random.Next(1, 16);
+        long attackPower = attacker.Strength + GetEffectiveWeapPow(attacker.SwingWeapPow(isOffHand)) + random.Next(1, 16);
 
         // Weapon config modifier; the off-hand flag applies the same reduced-power
         // off-hand multiplier the PvE path uses.
@@ -26861,7 +27458,7 @@ public partial class CombatEngine
             for (int i = 0; i < spells.Count; i++)
             {
                 var sp = spells[i];
-                terminal.WriteLine($"  [{i + 1}] {sp.DisplayName} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {sp.ManaCost})", "white");
+                terminal.WriteLine($"  [{i + 1}] {sp.DisplayName} ({Loc.Get("combat.level_label")} {sp.Level}, {Loc.Get("combat.cost_label")}: {SpellSystem.CalculateManaCost(sp, attacker)})", "white");   // 1.2.8: what the cast charges, not the template value
             }
 
             var choice = await terminal.GetInput(Loc.Get("combat.cast_which_spell"));
@@ -27211,7 +27808,7 @@ public partial class CombatEngine
         if (computer.HP < computer.MaxHP / 3 && computer.Healing > 0)
         {
             computer.Healing--;
-            long heal = 30 + computer.Level * 5 + random.Next(10, 30);
+            long heal = PotionBonus.BaseHeal(computer, random); // 1.2.8: at least 20% of MaxHP
             heal = PotionBonus.ApplyOwnerBonuses(computer, heal); // v1.1.11: the defender's own Infirmary
             heal = Math.Min(heal, computer.MaxHP - computer.HP);
             computer.HP += heal;
@@ -27329,7 +27926,7 @@ public partial class CombatEngine
             await Pacing.Wait(GetCombatDelay(800));
             return;
         }
-        long attackPower = computer.Strength + GetEffectiveWeapPow(computer.WeapPow) + random.Next(1, 16);
+        long attackPower = computer.Strength + GetEffectiveWeapPow(computer.SwingWeapPow(offHand: false)) + random.Next(1, 16);
 
         // Apply weapon configuration damage modifier
         double damageModifier = GetWeaponConfigDamageModifier(computer);
@@ -32047,7 +32644,7 @@ public partial class CombatEngine
                     monster.IsBoss, monster.IsUnique);
 
                 // Update quest progress for grouped player (kill quests, bounties, etc.)
-                QuestSystem.OnMonsterKilled(groupedPlayer, monster.Name, monster.IsBoss, monster.TierName);
+                QuestSystem.OnMonsterKilled(groupedPlayer, monster.Name, monster.IsBoss, monster.TierName, monster.IsMiniBoss);
             }
             groupedPlayer.Statistics.RecordGoldChange(groupedPlayer.Gold);
 
@@ -32213,7 +32810,13 @@ public partial class CombatEngine
     /// <summary>
     /// v1.2.2: a status as the lower-case word in the player's language, for the "is stunned and cannot act" line.
     /// </summary>
-    internal static string StatusWord(StatusEffect status) => StatusWord(status, GameConfig.Language);
+    internal static string StatusWord(StatusEffect status)
+    {
+        string word = StatusWord(status, GameConfig.Language);
+        // 1.2.8: while combat output is recorded for group members, the word follows the reader's language
+        Loc.RecordArgument(word, lang => StatusWord(status, lang));
+        return word;
+    }
 
     /// <summary>v1.2.2: an ability's cost in the ability menus, "10 stamina, 5 mana" in the player's language.</summary>
     internal static string AbilityCostText(ClassAbilitySystem.ClassAbility ability)
@@ -32249,7 +32852,8 @@ public partial class CombatEngine
     internal static string CapturedInLanguage(LocRecording? recording, string captured, string lang, string name)
     {
         // v1.2.4: English and unrecorded captures read as before: English, "You attack" made "Name attacks"
-        string english = ConvertToThirdPerson(recording?.Render(captured, "en") ?? captured, name);
+        // 1.2.8: the to-hit roll line opens with a bracket, out of reach of the "You verb" rule: it takes its key's third person form
+        string english = ConvertToThirdPerson(recording?.Render(captured, "en", (key, args) => BracketedThirdPersonLine("en", key, name, args)) ?? captured, name);
         if (recording == null) return ConvertToThirdPerson(captured, name);
         if (lang == "en") return english;
 
@@ -32273,7 +32877,18 @@ public partial class CombatEngine
         ["combat.defend_stance"] = "combat.defend_stance_third",
         ["combat.you_attack_target"] = "combat.you_attack_target_third",
         ["combat.you_miss"] = "combat.you_miss_third",
+        // 1.2.8: "You are stunned and cannot act!" reads "Name is stunned and cannot act!" for another reader
+        ["combat.you_status_prevented"] = "combat.teammate_status_prevented",
+        ["combat.cannot_act"] = "combat.teammate_status_prevented",
+        // 1.2.8: the to-hit roll line
+        ["combat.hit_roll"] = "combat.hit_roll_third",
+        ["combat.hit_roll_nat1"] = "combat.hit_roll_nat1_third",
+        ["combat.hit_roll_nat20"] = "combat.hit_roll_nat20_third",
     };
+
+    /// <summary>1.2.8: the third person form of a line that does not start with "You" in English (the to-hit roll line).</summary>
+    private static string? BracketedThirdPersonLine(string lang, string key, string name, object[] args)
+        => key.StartsWith("combat.hit_roll", StringComparison.Ordinal) ? ThirdPersonLine(lang, key, name, args) : null;
 
     private static string? ThirdPersonLine(string lang, string key, string name, object[] args)
     {

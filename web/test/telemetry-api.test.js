@@ -15,6 +15,13 @@ const DAY0 = Math.floor(T0 / DAY_MS);
 const OK = '{"ok":true}';
 const STOP = '{"stop":true}';
 
+// A JSON object text with one more key written first, right after its opening brace (the text must
+// start with that brace). Built by slicing at index 0, so the rest of the text is left as it is.
+function firstKey(objectText, member) {
+  assert.strictEqual(objectText[0], '{', 'an object text');
+  return '{' + member + objectText.slice(1);
+}
+
 // A fresh folder (with the remote file unless remote: false) and an endpoint over it.
 async function withEndpoint(fn, options = {}) {
   const dir = H.makeDir(options);
@@ -140,9 +147,9 @@ test('row 4: top level keys exactly schema, version, source, install_id, rows; v
     const bad = [];
     for (const k of Object.keys(good)) bad.push(['missing ' + k, without(k)]);
     bad.push(['unknown key', JSON.stringify(Object.assign({}, good, { extra: 1 }))]);
-    bad.push(['__proto__ key', bodyOf().replace('{', '{"__proto__":{"schema":1},')]);
-    bad.push(['constructor key', bodyOf().replace('{', '{"constructor":1,')]);
-    bad.push(['duplicate top key', bodyOf().replace('{', '{"source":2,')]);
+    bad.push(['__proto__ key', firstKey(bodyOf(), '"__proto__":{"schema":1},')]);
+    bad.push(['constructor key', firstKey(bodyOf(), '"constructor":1,')]);
+    bad.push(['duplicate top key', firstKey(bodyOf(), '"source":2,')]);
     for (const v of [0, 2, '1', null, true, [1]]) bad.push(['schema ' + JSON.stringify(v), bodyOf({ schema: v })]);
     for (const v of [[1, 2], [1, 2, 7, 0], [1, 2, 1001], [1, -1, 7], [1, '2', 7], '1.2.7', null, []]) bad.push(['version ' + JSON.stringify(v), bodyOf({ version: v })]);
     for (const v of [0, 5, '1', null]) bad.push(['source ' + JSON.stringify(v), bodyOf({ source: v })]);
@@ -261,8 +268,8 @@ test('row 7: integer literals only on the raw text; 2^53 minus 1 is the top; a d
       assert.strictEqual(r.status, 400, b.why);
     }
     // duplicate keys at both levels
-    assert.strictEqual((await post(t, bodyOf().replace(row, row.replace('{', '{"rounds":1,')))).status, 400, 'row key twice');
-    assert.strictEqual((await post(t, bodyOf().replace('{', '{"schema":1,'))).status, 400, 'top key twice');
+    assert.strictEqual((await post(t, bodyOf().replace(row, firstKey(row, '"rounds":1,')))).status, 400, 'row key twice');
+    assert.strictEqual((await post(t, firstKey(bodyOf(), '"schema":1,'))).status, 400, 'top key twice');
     // escapes and non-ASCII in a key
     assert.strictEqual((await post(t, bodyOf().replace('"rounds"', '"\\u0072ounds"'))).status, 400, 'escaped key');
     assert.strictEqual(H.remoteCount(dir.dbPath), 0);

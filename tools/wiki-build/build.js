@@ -337,7 +337,9 @@ function renderers(data) {
       );
     if (id === "spells")
       return table(
-        ["Spell", "Class", "Required level", "Mana", "Effect"],
+        // levelRequired is the level that opens the spell; manaCost is what a cast
+        // charges before the caster's Wisdom lowers it (WikiDataExporter.Spells)
+        ["Spell", "Class", "Required level", "Mana (before Wisdom)", "Effect"],
         rows.map((e) => [
           link("characters/spells", e),
           escape(e.classId),
@@ -699,14 +701,15 @@ function build(options = {}) {
         values(
           {
             catalogSlot: e.level,
-            levelRequired: e.levelRequired,
-            manaCost: e.manaCost,
+            requiredLevel: e.levelRequired,
+            manaBeforeWisdom: e.manaCost,
             magicWords: e.magicWords,
             isMultiTarget: e.isMultiTarget,
             spellType: e.spellType,
           },
-          "Spell template",
+          "Spell values",
         ) +
+        '<p>Wisdom lowers the mana a cast costs. See <a href="/wiki/en/characters/spells/#level-and-mana">level and mana</a>.</p>' +
         '<p><a href="/wiki/en/characters/spells/">All spells</a></p>',
       "Scripts/Systems/SpellSystem.cs",
     );

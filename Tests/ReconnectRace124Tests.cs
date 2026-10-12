@@ -169,7 +169,7 @@ public class ReconnectRace124Tests : IDisposable
         var src = File.ReadAllText(Path.Combine(dir!.FullName, "Scripts", "Server", "MudServer.cs"));
 
         Regex.IsMatch(src, @"ActiveSessions\.TryRemove\([^)]*out\s+_").Should().BeFalse("removal is by session reference only");
-        Regex.Matches(src, @"await KickStaleSessionAsync\(").Count.Should().Be(3, "trusted auth, interactive auth and the TryAdd race path");
+        Regex.Matches(src, @"await KickStaleSessionAsync\(").Count.Should().Be(4, "trusted auth, token auth (1.2.8), interactive auth and the TryAdd race path");
         src.Should().NotContain("await existingSession.DisconnectAsync(");
         src.Should().NotContain("await existingInteractive.DisconnectAsync(");
     }

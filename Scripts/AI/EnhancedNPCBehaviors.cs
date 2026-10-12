@@ -279,6 +279,7 @@ public static class EnhancedNPCBehaviors
         var availableNPCs = npcs.Where(n => 
             string.IsNullOrEmpty(n.Team) && 
             !n.King && 
+            WorldSimulator.MayJoinNpcTeam(n) &&   // v1.2.8 (H2): the surplus rule
             n.IsAlive).Take(3).ToList();
         
         foreach (var candidate in availableNPCs)
@@ -286,6 +287,7 @@ public static class EnhancedNPCBehaviors
             // v1.1.14: up to three recruits into a gang of three could make six; each one now takes a free
             // slot under the membership gate (TeamCornerLocation.TryNpcJoin)
             var existingMember = npcs.FirstOrDefault(n => n.Team == gangName);
+            if (!WorldSimulator.MayJoinNpcTeam(candidate)) continue;   // v1.2.8 (H2): the surplus rule
             if (random.Next(3) == 0 && TeamCornerLocation.TryNpcJoin(npcs, gangName, () =>
                 {
                     candidate.Team = gangName;

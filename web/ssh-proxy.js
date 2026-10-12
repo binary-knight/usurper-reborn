@@ -26,7 +26,8 @@ let bcrypt;
 try {
   bcrypt = require('bcryptjs');
 } catch (err) {
-  console.warn(`[usurper-web] bcryptjs not available, falling back to SHA256: ${err.message}`);
+  // 1.2.8: no fallback. Without bcryptjs the dashboard password cannot be changed or migrated.
+  console.warn(`[usurper-web] bcryptjs not available; dashboard password changes are refused: ${err.message}`);
 }
 
 const WS_PORT = 3000;
@@ -128,25 +129,44 @@ const SERVER_START_TIME = Date.now();
 
 const BCRYPT_ROUNDS = 12;
 
-// Legacy SHA256 hash (for migration detection)
-function hashPasswordSha256(password) {
-  return crypto.createHash('sha256').update(password).digest('hex');
+// --- Password hashing (1.2.8) ---
+// Game accounts: the game (SqlSaveBackend.HashPassword and VerifyPassword) stores players.password_hash
+// as PBKDF2-HMAC-SHA256 "base64(salt):base64(key)", a 16 byte salt, 100000 iterations, a 32 byte key.
+// A web reset writes that same form, so the player can log in with it (bcrypt or SHA256 never verified).
+const GAME_PBKDF2_ITERATIONS = 100000;
+const GAME_PBKDF2_SALT_BYTES = 16;
+const GAME_PBKDF2_KEY_BYTES = 32;
+
+function hashGamePassword(password) {
+  const salt = crypto.randomBytes(GAME_PBKDF2_SALT_BYTES);
+  const key = crypto.pbkdf2Sync(password, salt, GAME_PBKDF2_ITERATIONS, GAME_PBKDF2_KEY_BYTES, 'sha256');
+  return salt.toString('base64') + ':' + key.toString('base64');
 }
 
-// Hash password with bcrypt (preferred) or SHA256 (fallback)
-function hashPassword(password) {
-  if (bcrypt) return bcrypt.hashSync(password, BCRYPT_ROUNDS);
-  return hashPasswordSha256(password);
+// Dashboard password (balance_config.password_hash): bcrypt only. Without bcryptjs no new hash is
+// made; canHashBalancePassword() lets a change route refuse with a clear error first.
+function canHashBalancePassword() {
+  return !!bcrypt;
 }
 
-// Detect if a stored hash is legacy SHA256 (64 hex chars) vs bcrypt ($2a$/$2b$)
+function hashBalancePassword(password) {
+  if (!bcrypt) throw new Error('bcryptjs is not installed; the dashboard password cannot be hashed');
+  return bcrypt.hashSync(password, BCRYPT_ROUNDS);
+}
+
 function isBcryptHash(hash) {
-  return hash && (hash.startsWith('$2a$') || hash.startsWith('$2b$'));
+  return typeof hash === 'string' && (hash.startsWith('$2a$') || hash.startsWith('$2b$'));
 }
 
-// Get stored password hash from DB, or fall back to default
+// A dashboard hash from before bcrypt: unsalted SHA256, 64 hex characters. Read only by the
+// one-time migration below; nothing writes this form any more.
+function isLegacyBalanceHash(hash) {
+  return typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash);
+}
+
+// The stored dashboard hash, or null when none is stored (the default password is then in force).
 function getBalancePasswordHash() {
-  if (!dbWrite) return hashPasswordSha256(BALANCE_DEFAULT_PASS);
+  if (!dbWrite) return null;
   try {
     dbWrite.exec(`CREATE TABLE IF NOT EXISTS balance_config (
       key TEXT PRIMARY KEY,
@@ -157,7 +177,7 @@ function getBalancePasswordHash() {
   } catch (e) {
     console.error(`[usurper-web] Balance config read error: ${e.message}`);
   }
-  return hashPasswordSha256(BALANCE_DEFAULT_PASS);
+  return null;
 }
 
 function setBalancePasswordHash(hash) {
@@ -176,21 +196,34 @@ function setBalancePasswordHash(hash) {
   }
 }
 
+// Constant time compare of two strings (a different length is refused first).
+function passwordTextMatches(a, b) {
+  const x = Buffer.from(String(a), 'utf8');
+  const y = Buffer.from(String(b), 'utf8');
+  if (x.length !== y.length) return false;
+  return crypto.timingSafeEqual(x, y);
+}
+
 // v0.65.8 (audit T1-4): with no BALANCE_PASS env and the stored password still
 // the shipped default, the dashboards front /api/admin/nuke (full world wipe),
 // bans, and player edits wide open on any fresh self-hosted/Docker deploy.
 // While the default credential is active, every authenticated route EXCEPT
-// change-password is disabled -- the operator logs in with the default once,
+// change-password is disabled: the operator logs in with the default once,
 // is forced to set a real password, and only then does the dashboard unlock.
 // Cached because bcrypt.compareSync is ~100ms; invalidated on password change.
 //
 // v0.65.14 (security audit F2): the env check below used to be
-// `if (process.env.BALANCE_PASS) return false;` -- merely SETTING the variable
+// `if (process.env.BALANCE_PASS) return false;`, so merely SETTING the variable
 // disarmed the lock regardless of its value. docker-compose.yml ships
 // `BALANCE_PASS=changeme`, so every stock Docker deploy authenticated
 // admin/changeme straight through to /api/admin/nuke. The env bypass now
 // requires the operator's password to differ from the shipped default; setting
 // it to 'changeme' is treated as no password at all (fail closed).
+//
+// 1.2.8: the default is checked without hashing it. No stored hash means the default is in force;
+// a bcrypt hash is compared against the default (the 1.2.7 migration could store a bcrypt hash of
+// it); a legacy SHA256 hash, or a bcrypt hash with no bcryptjs to read it, counts as the default
+// (locked) until a login migrates it.
 let _defaultCredCache = null; // null = unknown, else boolean
 function isDefaultCredentialActive() {
   if (process.env.BALANCE_PASS) {
@@ -202,11 +235,12 @@ function isDefaultCredentialActive() {
   try {
     const storedHash = getBalancePasswordHash();
     let isDefault;
-    if (isBcryptHash(storedHash)) {
-      // Auto-migration can persist a bcrypt hash OF the default, so compare.
-      isDefault = bcrypt ? bcrypt.compareSync(BALANCE_DEFAULT_PASS, storedHash) : false;
+    if (storedHash === null) {
+      isDefault = true;
+    } else if (isBcryptHash(storedHash) && bcrypt) {
+      isDefault = bcrypt.compareSync(BALANCE_DEFAULT_PASS, storedHash);
     } else {
-      isDefault = storedHash === hashPasswordSha256(BALANCE_DEFAULT_PASS);
+      isDefault = true; // fail closed: a hash this server cannot read without migrating
     }
     _defaultCredCache = isDefault;
     return isDefault;
@@ -216,22 +250,28 @@ function isDefaultCredentialActive() {
   }
 }
 
-// Verify password — supports both bcrypt and legacy SHA256, auto-migrates to bcrypt
+// One-time migration of a legacy SHA256 dashboard hash: verified once, then replaced by bcrypt.
+// Refused without bcryptjs, and refused when the bcrypt hash cannot be stored.
+function migrateLegacyBalancePassword(password, storedHash) {
+  if (!bcrypt) {
+    console.error('[security] Legacy dashboard password hash found but bcryptjs is not installed; login refused until it is.');
+    return false;
+  }
+  const legacy = crypto.createHash('sha256').update(password).digest('hex');
+  if (!passwordTextMatches(legacy, storedHash)) return false;
+  if (!setBalancePasswordHash(bcrypt.hashSync(password, BCRYPT_ROUNDS))) return false;
+  console.log('[security] Migrated password hash from SHA256 to bcrypt');
+  return true;
+}
+
+// Verify the dashboard password: bcrypt; the default when nothing is stored; a legacy hash only
+// through the one-time migration.
 function verifyBalancePassword(password) {
+  if (typeof password !== 'string') return false;
   const storedHash = getBalancePasswordHash();
-  if (isBcryptHash(storedHash)) {
-    // Modern bcrypt hash
-    return bcrypt ? bcrypt.compareSync(password, storedHash) : false;
-  }
-  // Legacy SHA256 hash — verify then auto-migrate to bcrypt
-  if (hashPasswordSha256(password) === storedHash) {
-    if (bcrypt) {
-      const newHash = bcrypt.hashSync(password, BCRYPT_ROUNDS);
-      setBalancePasswordHash(newHash);
-      console.log('[security] Migrated password hash from SHA256 to bcrypt');
-    }
-    return true;
-  }
+  if (storedHash === null) return passwordTextMatches(password, BALANCE_DEFAULT_PASS);
+  if (isBcryptHash(storedHash)) return bcrypt ? bcrypt.compareSync(password, storedHash) : false;
+  if (isLegacyBalanceHash(storedHash)) return migrateLegacyBalancePassword(password, storedHash);
   return false;
 }
 
@@ -1996,6 +2036,9 @@ function balancePct(part, whole) {
 
 // Difficulty tab filters: a class name (letters and spaces) and a DifficultyMode value 0..3.
 const BALANCE_CLASS_RE = /^[A-Za-z][A-Za-z ]{0,39}$/;
+// 1.2.8: the class charts' ?levels= band, a whitelist bound as two integers (player_level is 1 to 100;
+// all spans every value, so the statement text is the same for every band).
+const BALANCE_LEVEL_BANDS = { 'all': [0, 1000000], '1-9': [1, 9], '10-19': [10, 19], '20-29': [20, 29], '30-39': [30, 39], '40+': [40, 100] };
 const BALANCE_DIFFICULTIES = ['0', '1', '2', '3'];
 
 // --- Balance Remote View (1.2.7) ---
@@ -2213,6 +2256,11 @@ async function handleBalanceRequest(req, res) {
 
   // POST /api/balance/change-password
   if (method === 'POST' && url === '/api/balance/change-password') {
+    // 1.2.8: bcrypt only; without bcryptjs the change is refused, never stored in a weaker form.
+    if (!canHashBalancePassword()) {
+      sendJson(res, 503, { error: 'Password change refused: bcryptjs is not installed on the server (run npm install in web/).' });
+      return true;
+    }
     try {
       const body = await readBody(req);
       if (!body.newPassword || body.newPassword.length < 6) {
@@ -2223,7 +2271,7 @@ async function handleBalanceRequest(req, res) {
         sendJson(res, 400, { error: 'New password must differ from the default' });
         return true;
       }
-      if (setBalancePasswordHash(hashPassword(body.newPassword))) {
+      if (setBalancePasswordHash(hashBalancePassword(body.newPassword))) {
         sendJson(res, 200, { success: true });
       } else {
         sendJson(res, 500, { error: 'Failed to save password' });
@@ -2261,6 +2309,14 @@ async function handleBalanceRequest(req, res) {
       return true;
     }
     if (BALANCE_SOURCES[s] !== null) remoteSource = s;
+  }
+
+  // 1.2.8: the class charts' ?levels= is checked before anything reads the database.
+  const levelsParam = query.get('levels');
+  if (method === 'GET' && url === '/api/balance/class-performance' && levelsParam !== null
+      && !Object.prototype.hasOwnProperty.call(BALANCE_LEVEL_BANDS, levelsParam)) {
+    sendJson(res, 400, { error: 'Unknown level band. Use one of: ' + Object.keys(BALANCE_LEVEL_BANDS).join(', ') });
+    return true;
   }
 
   let win = null;
@@ -2317,9 +2373,11 @@ async function handleBalanceRequest(req, res) {
 
   // GET /api/balance/class-performance
   if (method === 'GET' && url === '/api/balance/class-performance') {
+    const band = BALANCE_LEVEL_BANDS[levelsParam === null ? 'all' : levelsParam];
     try {
       const rows = db.prepare(`
         SELECT +player_class as player_class,
+          COUNT(DISTINCT player_name) as players,
           COUNT(*) as total,
           SUM(CASE WHEN outcome = 'victory' THEN 1 ELSE 0 END) as wins,
           SUM(CASE WHEN outcome = 'death' THEN 1 ELSE 0 END) as deaths,
@@ -2330,12 +2388,13 @@ async function handleBalanceRequest(req, res) {
           AVG(CASE WHEN outcome = 'victory' THEN rounds END) as avg_rounds,
           MAX(damage_dealt) as max_damage
         FROM combat_events
-        WHERE created_at >= ?
+        WHERE created_at >= ? AND player_level >= ? AND player_level <= ?
         GROUP BY +player_class
         ORDER BY total DESC, player_class
-      `).all(win.bound);
+      `).all(win.bound, band[0], band[1]);
       sendJson(res, 200, {
         window: balanceWindowJson(win),
+        levels: levelsParam === null ? 'all' : levelsParam,
         rows: rows.map(r => ({
           ...r,
           winRate: balancePct(r.wins, r.total),
@@ -3104,6 +3163,96 @@ async function getAdminDatabase() {
   return result;
 }
 
+// --- Admin SSL Certificate Probe (1.2.8) ---
+// Method 2 of the admin SSL card: a TLS connection to this machine's own HTTPS port that reads
+// the served certificate with validation on. The name checked is usurper-reborn.net (sent as
+// SNI), against the system's trusted roots. A certificate that fails validation (expired, wrong
+// name, untrusted chain) is the card's result, with its error code, and its expiry is reported as
+// unknown: Node does not hand over a rejected certificate, except on a name mismatch, where the
+// error carries it. Host and port are a seam for the tests and default to localhost:443; a hard
+// check refuses any host other than localhost or 127.0.0.1 before tls is touched. tls is passed
+// in, so the tests run this section with no require.
+const SSL_PROBE_DEFAULT_HOST = 'localhost';
+const SSL_PROBE_DEFAULT_PORT = 443;
+const SSL_PROBE_HOSTS = ['localhost', '127.0.0.1'];
+const SSL_PROBE_SERVERNAME = 'usurper-reborn.net';
+const SSL_PROBE_TIMEOUT_MS = 5000;
+
+// The host and port the probe connects to: the given ones, else localhost:443.
+function sslProbeTarget(options) {
+  const o = options || {};
+  return {
+    host: o.host === undefined ? SSL_PROBE_DEFAULT_HOST : o.host,
+    port: o.port === undefined ? SSL_PROBE_DEFAULT_PORT : o.port,
+  };
+}
+
+// The hard check: throws unless the host is exactly localhost or 127.0.0.1 and the port is a TCP port.
+function assertSslProbeTarget(target) {
+  if (typeof target.host !== 'string' || !SSL_PROBE_HOSTS.includes(target.host)) {
+    throw new Error('SSL probe refused: only localhost or 127.0.0.1 may be probed');
+  }
+  if (!Number.isInteger(target.port) || target.port < 1 || target.port > 65535) {
+    throw new Error('SSL probe refused: port out of range');
+  }
+}
+
+// options: { tls, host, port, timeoutMs }. Resolves to one of
+//   { status: 'valid', cert }                     validation passed, cert read from the socket
+//   { status: 'invalid', code, cert }             validation failed; cert is null unless the error carried it
+//   { status: 'unavailable', code }               no TLS session (refused, timeout, other error)
+// Throws, before any connection, for a host or port the hard check refuses.
+function probeSslCertificate(options) {
+  const o = options || {};
+  const target = sslProbeTarget(o);
+  assertSslProbeTarget(target);
+  const tls = o.tls;
+  const timeoutMs = o.timeoutMs === undefined ? SSL_PROBE_TIMEOUT_MS : o.timeoutMs;
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = (outcome) => { if (!settled) { settled = true; resolve(outcome); } };
+    const sock = tls.connect({
+      host: target.host,
+      port: target.port,
+      servername: SSL_PROBE_SERVERNAME,
+      rejectUnauthorized: true,
+    }, () => {
+      const cert = sock.getPeerCertificate();
+      sock.destroy();
+      finish({ status: 'valid', cert });
+    });
+    sock.setTimeout(timeoutMs, () => { sock.destroy(); finish({ status: 'unavailable', code: 'TIMEOUT' }); });
+    sock.on('error', (err) => {
+      // Node sets authorizationError on the socket when the certificate check is what failed.
+      if (sock.authorizationError) {
+        const cert = err && err.cert && err.cert.valid_to ? err.cert : null;
+        finish({ status: 'invalid', code: String(sock.authorizationError), cert });
+      } else {
+        finish({ status: 'unavailable', code: err && err.code ? String(err.code) : 'ERROR' });
+      }
+    });
+  });
+}
+
+// Writes a probe outcome into the card's result: expiry, days left and issuer when a certificate
+// was read; certValid true or false once a TLS session was reached; validationError on a failure.
+function applySslProbe(result, outcome, nowMs) {
+  if (!outcome || outcome.status === 'unavailable') return result;
+  result.certValid = outcome.status === 'valid';
+  if (outcome.status === 'invalid') result.validationError = outcome.code;
+  const cert = outcome.cert;
+  if (cert && cert.valid_to) {
+    const expires = new Date(cert.valid_to);
+    if (!isNaN(expires.getTime())) {
+      result.expiresAt = expires.toISOString();
+      result.daysRemaining = Math.floor((expires.getTime() - nowMs) / 86400000);
+      result.issuer = cert.issuer && cert.issuer.O ? cert.issuer.O : (cert.issuer ? JSON.stringify(cert.issuer) : 'Unknown');
+    }
+  }
+  return result;
+}
+// --- End Admin SSL Certificate Probe ---
+
 async function getAdminSsl() {
   const now = Date.now();
   if (adminSslCache && (now - adminSslCacheTime) < 3600000) return adminSslCache;
@@ -3134,24 +3283,11 @@ async function getAdminSsl() {
     parseSslOutput(out);
   } catch (e) { /* permission denied — expected for usurper user */ }
 
-  // Method 2: Connect to local HTTPS and read cert via Node.js TLS
+  // Method 2: connect to this machine's HTTPS port with certificate validation on (see the
+  // Admin SSL Certificate Probe section). A certificate that fails validation is the result.
   if (!result.expiresAt) {
     try {
-      const tls = require('tls');
-      const cert = await new Promise((resolve, reject) => {
-        const sock = tls.connect(443, 'localhost', { servername: 'usurper-reborn.net', rejectUnauthorized: false }, () => {
-          const peerCert = sock.getPeerCertificate();
-          sock.destroy();
-          resolve(peerCert);
-        });
-        sock.setTimeout(5000, () => { sock.destroy(); reject(new Error('timeout')); });
-        sock.on('error', reject);
-      });
-      if (cert && cert.valid_to) {
-        result.expiresAt = new Date(cert.valid_to).toISOString();
-        result.daysRemaining = Math.floor((new Date(cert.valid_to) - Date.now()) / 86400000);
-        result.issuer = cert.issuer && cert.issuer.O ? cert.issuer.O : (cert.issuer ? JSON.stringify(cert.issuer) : 'Unknown');
-      }
+      applySslProbe(result, await probeSslCertificate({ tls: require('tls') }), Date.now());
     } catch (e2) { /* both methods failed */ }
   }
 
@@ -3301,6 +3437,11 @@ async function handleAdminRequest(req, res) {
 
   // POST /api/admin/change-password — changes balance password (shared)
   if (method === 'POST' && url === '/api/admin/change-password') {
+    // 1.2.8: bcrypt only; without bcryptjs the change is refused, never stored in a weaker form.
+    if (!canHashBalancePassword()) {
+      sendJson(res, 503, { error: 'Password change refused: bcryptjs is not installed on the server (run npm install in web/).' });
+      return true;
+    }
     try {
       const body = await readBody(req);
       if (!body.newPassword || body.newPassword.length < 6) {
@@ -3311,7 +3452,7 @@ async function handleAdminRequest(req, res) {
         sendJson(res, 400, { error: 'New password must differ from the default' });
         return true;
       }
-      if (setBalancePasswordHash(hashPassword(body.newPassword))) {
+      if (setBalancePasswordHash(hashBalancePassword(body.newPassword))) {
         sendJson(res, 200, { success: true });
       } else {
         sendJson(res, 500, { error: 'Failed to save password' });
@@ -3941,6 +4082,11 @@ async function handleAdminRequest(req, res) {
       const banIp = body.banIp !== false;
 
       dbWrite.prepare("UPDATE players SET is_banned = 1, ban_reason = ? WHERE LOWER(username) = LOWER(?)").run(reason, playerUsername);
+      // 1.2.8: a ban ends every remember-me token of the account; a database without the table (game server
+      // not yet on 1.2.8) has none to end
+      try {
+        dbWrite.prepare("DELETE FROM login_tokens WHERE LOWER(username) = LOWER(?)").run(playerUsername);
+      } catch (e) { /* no login_tokens table yet */ }
 
       // Capture IP for ban (current online IP first, fall back to last_login_ip)
       let bannedIp = null;
@@ -4089,8 +4235,13 @@ async function handleAdminRequest(req, res) {
       if (!body.newPassword || body.newPassword.length < 4) {
         sendJson(res, 400, { error: 'Password must be at least 4 characters' }); return true;
       }
-      const hashed = hashPassword(body.newPassword);
+      // 1.2.8: the game's own PBKDF2 form; the bcrypt or SHA256 written before could never log in.
+      const hashed = hashGamePassword(body.newPassword);
       dbWrite.prepare("UPDATE players SET password_hash = ? WHERE LOWER(username) = LOWER(?)").run(hashed, playerUsername);
+      // 1.2.8: a reset ends every remember-me token of the account; a database without the table has none
+      try {
+        dbWrite.prepare("DELETE FROM login_tokens WHERE LOWER(username) = LOWER(?)").run(playerUsername);
+      } catch (e) { /* no login_tokens table yet */ }
 
       try {
         dbWrite.prepare("INSERT INTO wizard_log (wizard_name, action, target, details, created_at) VALUES (?, ?, ?, ?, datetime('now'))")
@@ -4176,7 +4327,7 @@ async function handleAdminRequest(req, res) {
 
       // Delete from all related tables
       // v1.1.14: wizard_flags (frozen, muted) are kept by account name through a delete and recreate
-      const tables = ['players', 'sleeping_players', 'online_players', 'pvp_log'];
+      const tables = ['players', 'sleeping_players', 'online_players', 'pvp_log', 'login_tokens'];
       for (const table of tables) {
         try {
           dbWrite.prepare(`DELETE FROM ${table} WHERE LOWER(username) = LOWER(?)`).run(playerUsername);
