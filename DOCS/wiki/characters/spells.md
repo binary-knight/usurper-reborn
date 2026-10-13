@@ -3,6 +3,7 @@ title: Spells
 path: /wiki/en/characters/spells/
 checked: 1.3.0
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs
+history: 1.3.1 | none
 history: 1.3.0 | The spell table shows the level at which each spell can be learned and cast and the mana a cast costs before Wisdom, and the Cure Critical and Judgment descriptions say that a cast removes Darkness first.
 history: 1.2.5 | Spell cast messages are shown in all five languages, and long spell messages wrap inside 79 columns.
 history: 1.2.4 | none

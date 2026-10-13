@@ -3,6 +3,7 @@ title: Mental health
 path: /wiki/en/characters/mental/
 checked: 1.3.0
 sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.1 | none
 history: 1.3.0 | none
 ---
 Mental measures how well your character is coping, separately from HP. Status shows your current Mental and band. It is saved with your character.
