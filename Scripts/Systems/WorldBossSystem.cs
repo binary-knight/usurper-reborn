@@ -1627,7 +1627,7 @@ namespace UsurperRemake.Systems
             // v1.1.4: one crit roll, the doubled one below; the base used to roll the ordinary crit too.
             long baseDamage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, allowCrit: false, terminal: terminal) * 0.8);
 
-            // Extra crit check — double the full crit chance (v1.3.1: every bonus counts), capped at 95%
+            // Extra crit check: double the full crit chance (v1.3.1: every bonus counts), capped at 95%
             int critChance = Math.Min(95, StatEffectsSystem.CritChance(player) * 2);
             if (rng.Next(100) < critChance)
             {
