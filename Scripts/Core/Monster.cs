@@ -524,7 +524,7 @@ public class Monster
     /// <summary>
     /// Get experience reward for defeating this monster
     /// Scaled to match the XP requirement curve (level^2.0 * 50)
-    /// Applies difficulty multiplier from DifficultySystem
+    /// Difficulty and the sysop multiplier are applied at the win, not here
     /// </summary>
     public long GetExperienceReward()
     {
@@ -550,9 +550,6 @@ public class Monster
             baseExp *= 5;
         }
 
-        // Apply difficulty modifier
-        baseExp = DifficultySystem.ApplyExperienceMultiplier(baseExp);
-
         return Math.Max(15, baseExp);
     }
     
@@ -561,7 +558,7 @@ public class Monster
     /// Scaled to provide meaningful gold progression through endgame
     /// Formula: (level^1.5) * 12 + random(10, 50)
     /// This provides gold that scales with equipment costs across all 100 levels
-    /// Applies difficulty multiplier from DifficultySystem
+    /// Difficulty and the sysop multiplier are applied at the win, not here
     /// </summary>
     public long GetGoldReward()
     {
@@ -602,9 +599,6 @@ public class Monster
         {
             baseGold *= 5; // Unique = 5x gold (stacks with boss)
         }
-
-        // Apply difficulty modifier
-        baseGold = DifficultySystem.ApplyGoldMultiplier(baseGold);
 
         return Math.Max(10, baseGold);
     }
