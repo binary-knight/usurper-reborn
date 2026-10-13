@@ -266,34 +266,37 @@ public static class StatEffectsSystem
         long effectiveDex = attacker.Dexterity + drugEffects.DexterityBonus;
         int critChance = GetCriticalHitChance(effectiveDex, attacker.GetEquipmentCritChanceBonus());
 
+        // v1.3.1: one ceiling for every bonus below, from the same Dexterity the base uses.
+        int ceiling = GetCriticalHitChanceCapped(effectiveDex);
+
         // Apply drug CritBonus directly to crit chance (e.g., QuickSilver: +15)
         if (drugEffects.CritBonus > 0)
-            critChance = Math.Clamp(critChance + drugEffects.CritBonus, 5, 50);
+            critChance = Math.Clamp(critChance + drugEffects.CritBonus, 5, ceiling);
 
         // Divine Boon crit bonus (from worshipped player-god)
         if (attacker.CachedBoonEffects?.CritPercent > 0)
-            critChance = Math.Clamp(critChance + (int)(attacker.CachedBoonEffects.CritPercent * 100), 5, 50);
+            critChance = Math.Clamp(critChance + (int)(attacker.CachedBoonEffects.CritPercent * 100), 5, ceiling);
 
         // v0.61.0 Druid's Shrines: Noctura attunement = +5% crit chance for 24h.
         // Same clamp as the other bonuses so the cap stays sane.
         if (attacker.IsAttunedTo("noctura"))
-            critChance = Math.Clamp(critChance + (int)GameConfig.ShrineNocturaCritChanceBonus, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + (int)GameConfig.ShrineNocturaCritChanceBonus, 5, ceiling);
 
         // v0.61.0 Beast Taming: Cave Spider active pet = +5% crit chance.
         // Stacks with Noctura attunement, capped via the same DEX-scaled limit.
         if (attacker.HasActivePet("cave_spider"))
-            critChance = Math.Clamp(critChance + 5, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + 5, 5, ceiling);
 
         // Alignment passive — Shadow Strike (Dark/Evil) / Righteous Fury (Good/Holy):
         // flat crit bonus for committing to a path. Same DEX-scaled cap so it can't
         // push past the ceiling. (NPC allies with strong alignment benefit too -- intended.)
         int alignCrit = UsurperRemake.Systems.AlignmentSystem.Instance.GetAlignmentCritBonus(attacker);
         if (alignCrit > 0)
-            critChance = Math.Clamp(critChance + alignCrit, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + alignCrit, 5, ceiling);
 
         // v1.1.10: this fight's bonus or penalty (an Old God's dialogue), under the same cap
         if (attacker.TempCritChanceBonus != 0)
-            critChance = Math.Clamp(critChance + attacker.TempCritChanceBonus, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + attacker.TempCritChanceBonus, 5, ceiling);
 
         return critChance;
     }
