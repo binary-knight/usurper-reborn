@@ -7154,7 +7154,10 @@ public abstract class BaseLocation
             || currentPlayer.Class == CharacterClass.Alchemist
             || currentPlayer.Class == CharacterClass.Paladin
             || currentPlayer.Class == CharacterClass.Magician
+            || currentPlayer.Class == CharacterClass.Bard
             || currentPlayer.Class == CharacterClass.Jester
+            || currentPlayer.Class == CharacterClass.Assassin
+            || currentPlayer.Class == CharacterClass.MysticShaman
             || currentPlayer.Class == CharacterClass.Cleric
             || currentPlayer.Class == CharacterClass.Tidesworn
             || currentPlayer.Class == CharacterClass.Wavecaller
@@ -7274,7 +7277,7 @@ public abstract class BaseLocation
             if (currentPlayer.Class == CharacterClass.Cyclebreaker)
             {
                 terminal.SetColor("bright_magenta");
-                WriteBuff(Loc.Get("base.buff_probability", (int)(GameConfig.CyclebreakerDebuffResistChance * 100)));
+                WriteBuff(Loc.Get("base.buff_probability", (int)(GameConfig.CyclebreakerDebuffResistChance * 100), GameConfig.CyclebreakerPassiveEvadePercent));
                 int cycle = StoryProgressionSystem.Instance?.CurrentCycle ?? 1;
                 float xpBonus = Math.Min(GameConfig.CyclebreakerCycleXPBonusCap, (cycle - 1) * GameConfig.CyclebreakerCycleXPBonus);
                 if (xpBonus > 0)

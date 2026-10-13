@@ -1706,11 +1706,11 @@ public static partial class GameConfig
     // Cleric Divine Grace
     public const float ClericDivineGraceBonus = 0.25f;       // Cleric: +25% healing from abilities and spells
     // Tidesworn Ocean's Blessing
-    public const float TideswornOceansBlessingBonus = 0.25f;  // Tidesworn: +25% healing from abilities and spells
+    public const float TideswornOceansBlessingBonus = 0.25f;  // Tidesworn: +25% healing from abilities
     public const float TideswornOceansResiliencePercent = 0.03f;       // Tidesworn: Regen 3% max HP/round (baseline)
     public const float TideswornOceansResilienceBelowHalfBonus = 0.02f;  // Tidesworn: additional 2% max HP/round when below 50% HP (5% total)
     // Wavecaller Harmonic Resonance
-    public const float WavecallerHarmonicResonanceBonus = 0.25f; // Wavecaller: +25% healing from abilities and spells
+    public const float WavecallerHarmonicResonanceBonus = 0.25f; // Wavecaller: +25% healing from abilities
     public const float WavecallerReflectionPercent = 0.15f;      // Wavecaller: 15% damage reflection when Reflecting
     public const float WavecallerOceansVoiceCritBonus = 0.20f;   // Wavecaller: +20% crit chance from Ocean's Voice
 

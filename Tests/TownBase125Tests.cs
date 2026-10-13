@@ -355,7 +355,7 @@ public class TownBase125Tests : IDisposable
     {
         string shown = Status("en", Buffed(CharacterClass.Wavecaller, 99f));
         var block = BuffBlock(shown, "en");
-        block.Should().Contain($"  - Harmonic Resonance: +{(int)(GameConfig.WavecallerHarmonicResonanceBonus * 100)}% healing from abilities and spells");
+        block.Should().Contain($"  - Harmonic Resonance: +{(int)(GameConfig.WavecallerHarmonicResonanceBonus * 100)}% healing from abilities");
         block.Should().Contain("  - Queen's Honor: " + $"+{(int)(GameConfig.KnightDamageBonus * 100)}% damage, +{(int)(GameConfig.KnightDefenseBonus * 100)}% defense (permanent)");
         string reflection = $"  - Damage Reflection: {(int)(GameConfig.WavecallerReflectionPercent * 100)}% damage reflected when Harmonic Shield or Empathic Link active";
         reflection.Length.Should().BeGreaterThan(MaxWidth, "this row was over 79 before 1.2.5");

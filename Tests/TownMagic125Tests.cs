@@ -298,9 +298,9 @@ public class TownMagic125Tests
     public async Task EnchantMenu_English_KeepsItsWords()
     {
         string shown = await Enchant("en", 100, 5, "Steel Helm");
-        foreach (var w in new[] { "Divine Blessing", "+3 to all stats", "Ocean's Touch", "+30 mana, +4 wisdom", "+20 magic resist, +2 defence",
+        foreach (var w in new[] { "Divine Blessing", "+3 str/dex/def/wis, weapon+armor power", "Ocean's Touch", "+6 intelligence, +4 wisdom", "+20 magic resist, +2 defence",
                      "Phoenix Fire", "+20 power + chance to slow enemies", "Weapon  ", "L.Ring", "Bag", "Enchanting: Steel Helm",
-                     "  Enchant Steel Helm with Divine Blessing (+3 to all stats)", "  WARNING: this item already carries 3 enchantments.",
+                     "  Enchant Steel Helm with Divine Blessing (+3 str/dex/def/wis, weapon+armor", "  power)", "  WARNING: this item already carries 3 enchantments.",
                      "  On failure: gold and materials are consumed, AND one of the", "  [0] Cancel" })
             shown.Should().Contain(w);
         string stat = await Enchant("en", 100, 2, "Steel Helm");
