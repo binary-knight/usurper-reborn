@@ -100,6 +100,25 @@ namespace UsurperRemake.Systems
         public bool HasCompletedGriefCycle => activeGrief.Values.Any(g => g.IsComplete) ||
                                                activeNpcGrief.Values.Any(g => g.IsComplete);
 
+        /// <summary>
+        /// 1.3.1: the Wisdom of completed griefs: 5 for each story companion whose grief reached
+        /// Acceptance. NPC griefs give none. Character.RecalculateStats adds it and Main Street shows it.
+        /// </summary>
+        public int CompletedGriefWisdom => activeGrief.Values.Count(g => g.IsComplete) * 5;
+
+        /// <summary>
+        /// 1.3.1: recalculate the session's player when its grief Wisdom is not the number above (a grief
+        /// completed, or a save was loaded). Does nothing for a GriefSystem that is not the session's own.
+        /// </summary>
+        private void RecalculatePlayerWisdom()
+        {
+            if (!ReferenceEquals(this, Instance)) return;
+            var player = GameEngine.Instance?.CurrentPlayer;
+            if (player == null || player is NPC) return;
+            if (Math.Max(0, player.GriefWisdom) == CompletedGriefWisdom) return;
+            player.RecalculateStats();
+        }
+
         public GriefSystem()
         {
             _fallbackInstance = this;
@@ -289,10 +308,8 @@ namespace UsurperRemake.Systems
             effects.DefenseModifier = Math.Max(-0.50f, effects.DefenseModifier);
             effects.AllStatModifier = Math.Max(-0.50f, effects.AllStatModifier);
 
-            // Also add permanent wisdom bonus from completed grief (both companions and NPCs)
-            int completedGriefs = activeGrief.Values.Count(g => g.IsComplete) +
-                                  activeNpcGrief.Values.Count(g => g.IsComplete);
-            effects.PermanentWisdomBonus = completedGriefs * 5;
+            // 1.3.1: the permanent Wisdom of completed companion griefs, the number the stat gains
+            effects.PermanentWisdomBonus = CompletedGriefWisdom;
 
             return effects;
         }
@@ -597,6 +614,7 @@ namespace UsurperRemake.Systems
             if (grief.CurrentStage == GriefStage.Acceptance && previousStage != GriefStage.Acceptance)
             {
                 grief.IsComplete = true;
+                RecalculatePlayerWisdom();   // 1.3.1: the grief Wisdom arrives at once
 
                 // Add acceptance memory
                 AddMemory(grief.CompanionId, grief.CompanionName,
@@ -632,6 +650,7 @@ namespace UsurperRemake.Systems
             if (grief.CurrentStage == GriefStage.Acceptance && previousStage != GriefStage.Acceptance)
             {
                 grief.IsComplete = true;
+                RecalculatePlayerWisdom();   // 1.3.1: the grief Wisdom arrives at once
 
                 // Add acceptance memory
                 AddNpcMemory(npcId, grief.CompanionName,
@@ -882,6 +901,7 @@ namespace UsurperRemake.Systems
             }
 
             memories = data.Memories ?? new List<CompanionMemory>();
+            RecalculatePlayerWisdom();   // 1.3.1: a loaded save's completed griefs count from the first load
         }
 
         /// <summary>
