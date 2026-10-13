@@ -1,8 +1,9 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.1 | none
 history: 1.3.0 | Physical single-target attack abilities roll to hit against monsters, and a dual-wielder's abilities count the main-hand weapon in full and the off-hand weapon at half.
 ---
 Abilities belong to particular classes and can require a weapon type, a shield or a valid target. Costs below are template costs; a description does not override an equipment requirement checked by the game.

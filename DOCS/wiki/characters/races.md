@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.1 | none
 history: 1.3.0 | The Gnoll Poisonous Bite poisons on melee hits only; it no longer comes from spells, magical abilities, ranged abilities or a swing made with a bow in hand.
 history: 1.2.7 | none
 history: 1.2.6 | none

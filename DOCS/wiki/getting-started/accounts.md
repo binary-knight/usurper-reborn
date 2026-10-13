@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md
+history: 1.3.1 | none
 history: 1.3.0 | Online Play in the standalone game saves a login token in place of your password when you choose to stay logged in, asks before the login is sent, and checks the server's identity key over SSH.
 history: 1.2.7 | The game can ask once whether to share combat data: single-player and Steam at start, BBS and server players after login when the operator allows it, and Preferences has a Share combat data line to change the answer.
 history: 1.2.6 | An unknown username and a wrong password get the same login message, a banned account sees its ban only after the right password, a refused registration counts toward the login throttle, and new character names cannot contain < > & or a double quote.
