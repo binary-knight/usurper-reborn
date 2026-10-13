@@ -121,7 +121,7 @@ public static class BeastData
             TameSuccessFlavor =
                 "You hold out a strip of dried bread. The goat considers it. Considers you.\n" +
                 "Accepts the bread. Decides you are now its problem.",
-            PassiveDescription = "-1 fatigue per dungeon descend"
+            PassiveDescription = "-1 fatigue for each new dungeon room"
         },
         new BeastDefinition
         {
