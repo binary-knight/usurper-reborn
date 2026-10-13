@@ -1,7 +1,7 @@
 ---
 title: The Music Shop
 path: /wiki/en/world/music-shop/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/MusicShopLocation.cs, Scripts/Data/EquipmentData.cs
 history: 1.3.0 | A companion of the shop who left you over resentment is away from the shop until forgiveness in the Temple's Faith room brings the companion back.
 history: 1.2.5 | Instrument names and the Electron menu labels are shown in the player's language, and long purchase messages wrap at 79 columns.

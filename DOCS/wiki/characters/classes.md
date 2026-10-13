@@ -137,11 +137,11 @@ A Heavy armor piece with no Strength requirement of its own needs Strength of 15
 
 ### Weapons and shields a class can use
 
-There is no rule that ties a weapon type to a class. The weapon and shield templates behind shop stock and dungeon loot each carry a class list or are open to every class. The table counts, for each class and type, the templates that class can use out of all templates of the type. Bows are not counted: the templates hold one set of bows for Rangers and one for every class, and four names are in both.
+There is one rule that ties a weapon type to a class: a Mystic Shaman can hold only a sword, axe, mace, hammer, flail or maul in its main hand. For every other class the limits come from class lists. The weapon and shield templates behind shop stock and dungeon loot each carry a class list or are open to every class. The table counts, for each class and type, the templates that class can use out of all templates of the type. Bows are not counted: the templates hold one set of bows for Rangers and one for every class, and four names are in both.
 
 The prestige classes skip every class list and the armor weight limits.
 
-The hand-written base items, the ones with their own [item pages](/wiki/en/items/weapons/), carry no class list. Level, Strength, alignment and armor weight are all that limit them.
+The hand-written base items, the ones with their own [item pages](/wiki/en/items/weapons/), carry no class list. Level, Strength, alignment and armor weight are all that limit them, and the Mystic Shaman's main hand rule applies to them too.
 
 {{table:class-equipment}}
 

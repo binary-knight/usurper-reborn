@@ -187,6 +187,17 @@ public class DataItems2125Tests
 
     private static readonly int[] Seeds = Enumerable.Range(0, 400).ToArray();
 
+    /// <summary>1.3.1: the seeds whose stored names are still the base capture's. A seed rolled for the Mystic
+    /// Shaman is left out: its drops now come from the lists that name the class (it was rolled as a prestige
+    /// class when the capture was made), so the capture no longer holds its names.</summary>
+    private static readonly int[] CapturedSeeds = Seeds
+        .Where(s => ((CharacterClass[])Enum.GetValues(typeof(CharacterClass)))[s % Enum.GetValues(typeof(CharacterClass)).Length] != CharacterClass.MysticShaman)
+        .ToArray();
+
+    /// <summary>1.3.1: the seeds rolled for the Mystic Shaman, left out of the base capture above. The two
+    /// properties are tested for them on the code as it is (the tests named "ADropRolledForAMysticShaman").</summary>
+    private static readonly int[] ShamanSeeds = Seeds.Except(CapturedSeeds).ToArray();
+
     private static string Stats(global::Item i) =>
         $"{i.Attack}/{i.Armor}/{i.Strength}/{i.Dexterity}/{i.Agility}/{i.Wisdom}/{i.Charisma}/{i.Defence}/{i.HP}/{i.Mana}/{i.Value}/" +
         $"{i.ShieldBonus}/{i.BlockChance}/{i.IsCursed}/{i.Rarity}/{i.Family}/" + string.Join(",", i.LootEffects.Select(e => $"{e.EffectType}:{e.Value}"));
@@ -249,7 +260,7 @@ public class DataItems2125Tests
     public void ANewDrop_IsStoredInEnglish_WhateverTheDroppersLanguage_ByteForByteAsBefore(string lang)
     {
         var baseNames = BaseNames();
-        foreach (var s in Seeds)
+        foreach (var s in CapturedSeeds)
         {
             var item = InLang(lang, () => Roll(s));
             item.Name.Should().Be(baseNames[("en", s)], $"seed {s} rolled in {lang} is stored as the English drop of 3b913e0");
@@ -270,7 +281,7 @@ public class DataItems2125Tests
     public void ANewDrop_ShowsInEachReadersLanguage_TheNameTheOldCodeStoredForThatLanguage()
     {
         var baseNames = BaseNames();
-        foreach (var s in Seeds)
+        foreach (var s in CapturedSeeds)
         {
             var item = InLang("hu", () => Roll(s));
             foreach (var lang in AllLanguages)
@@ -283,6 +294,56 @@ public class DataItems2125Tests
                 InLang(lang, () => ItemNames.Display(item)).Should().Be(expected);
             }
         }
+    }
+
+    [Fact]
+    public void TheSeedsLeftOutOfTheBaseCapture_AreTheMysticShamansOnly()
+    {
+        ShamanSeeds.Should().HaveCount(23);
+        CapturedSeeds.Should().HaveCount(377);
+        var classes = (CharacterClass[])Enum.GetValues(typeof(CharacterClass));
+        foreach (var s in ShamanSeeds)
+            classes[s % classes.Length].Should().Be(CharacterClass.MysticShaman, $"seed {s}");
+    }
+
+    [Theory]
+    [InlineData("es")] [InlineData("fr")] [InlineData("hu")] [InlineData("it")]
+    public void ADropRolledForAMysticShaman_IsStoredInEnglish_WhateverTheDroppersLanguage(string lang)
+    {
+        foreach (var s in ShamanSeeds)
+            InLang(lang, () => Roll(s)).Name.Should().Be(InLang("en", () => Roll(s)).Name, $"seed {s} rolled in {lang} is stored as its English drop");
+    }
+
+    [Fact]
+    public void ADropRolledForAMysticShaman_ShowsTheSameInEachReadersLanguage_WhicheverLanguageRolledIt()
+    {
+        foreach (var s in ShamanSeeds)
+        {
+            var english = InLang("en", () => Roll(s));
+            foreach (var roller in OtherLanguages)
+            {
+                var item = InLang(roller, () => Roll(s));
+                foreach (var lang in AllLanguages)
+                {
+                    string expected = ItemNames.DisplayIn(lang, english);
+                    ItemNames.DisplayIn(lang, item).Should().Be(expected, $"seed {s} rolled in {roller}, read in {lang}");
+                    InLang(lang, () => ItemNames.Display(item)).Should().Be(expected);
+                }
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(16, "Abyssal Insulated Ring of Charm", "Abyssal Szigetelt Báj Gyűrűje")]
+    [InlineData(84, "Mighty Runed Legguards", "Hatalmas Rúnás Lábvédők")]
+    [InlineData(152, "Abyssal Venomous Broadsword", "Abyssal Mérges Széles Kard")]
+    public void ADropRolledForAMysticShaman_HasThisStoredNameAndThisHungarianForm(int seed, string stored, string hungarian)
+    {
+        ShamanSeeds.Should().Contain(seed);
+        var item = InLang("hu", () => Roll(seed));
+        item.Name.Should().Be(stored);
+        ItemNames.DisplayIn("en", item).Should().Be(stored);
+        ItemNames.DisplayIn("hu", item).Should().Be(hungarian);
     }
 
     [Fact]

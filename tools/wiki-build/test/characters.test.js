@@ -89,18 +89,21 @@ test("class-equipment table: armor weights and usable templates per weapon type,
       assert.ok(w.usable >= 0 && w.usable <= w.total, `${c.id} ${w.type}`);
 });
 
-test("class-equipment and class-roles: the Mystic Shaman's equipment limits are left out", () => {
+test("class-equipment and class-roles: every class has its row, the Mystic Shaman with its own limits", () => {
   const data = load();
-  assert.ok(data.classes.some((c) => c.id === "MysticShaman"));
+  const shamanData = data.classes.find((c) => c.id === "MysticShaman");
+  assert.deepEqual(shamanData.equipment.armorWeights, ["Light", "Medium"]);
   const equipment = render("table:class-equipment", data);
-  assert.ok(!textOf(equipment).includes("Mystic Shaman"), "no Mystic Shaman row");
+  const shamanRow = row(equipment, "Mystic Shaman");
+  assert.ok(shamanRow, "a Mystic Shaman row");
+  assert.equal(shamanRow[0], "Light, Medium");
   assert.ok(row(equipment, "Warrior"));
-  assert.equal((equipment.match(/<tr>/g) || []).length - 1, data.classes.length - 1);
+  assert.equal((equipment.match(/<tr>/g) || []).length - 1, data.classes.length);
   const sections = render("table:class-roles", data).split("<h4 ").slice(1);
   const shaman = textOf("<h4 " + sections.find((s) => s.includes(">Mystic Shaman role numbers</h4>")));
   assert.match(shaman, /Mystic Shaman gains \d+ maximum HP/);
-  assert.ok(!shaman.includes("Armor weights"), "no armor weight line");
-  assert.equal(sections.filter((s) => s.includes("Armor weights it can wear")).length, data.classes.length - 1);
+  assert.ok(shaman.includes("Armor weights it can wear: Light, Medium."), "its armor weight line");
+  assert.equal(sections.filter((s) => s.includes("Armor weights it can wear")).length, data.classes.length);
 });
 
 test("weapon-templates: one heading per weapon type, each template with its class list", () => {

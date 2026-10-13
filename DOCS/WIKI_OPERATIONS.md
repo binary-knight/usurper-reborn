@@ -87,8 +87,7 @@ Numbers should come from directives, not copied tables:
 `weapon-templates` one section per weapon and shield type under a level-three
 heading. The
 `class-equipment` counts come from the game's own equip check on shop stock.
-Bows are left out of both equipment tables. The Mystic Shaman is left out of the
-`class-equipment` table and has no armor weight line in `class-roles`. The character constants a guide
+Bows are left out of both equipment tables. The character constants a guide
 can print are in the `constants` block of `characters.json` in the export.
 
 Other balance constants use their exact exported keys. Unknown entities,
