@@ -1062,6 +1062,17 @@ public class Equipment
         character.Mana = Math.Min(character.Mana, character.MaxMana);
     }
 
+    /// <summary>1.3.1: the main hand weapon types a Mystic Shaman may hold. The one list for the equip check,
+    /// the loot rule (LootGenerator.CanClassUseLootItem) and the weapon shop marks.</summary>
+    public static bool MysticShamanMainHandAllows(WeaponType type) =>
+        type == WeaponType.Sword || type == WeaponType.Axe || type == WeaponType.Mace ||
+        type == WeaponType.Hammer || type == WeaponType.Flail || type == WeaponType.Maul;
+
+    /// <summary>1.3.1: true when this is a main hand weapon the Mystic Shaman's own rule refuses that class.</summary>
+    public bool MysticShamanMainHandRefuses(CharacterClass characterClass) =>
+        characterClass == CharacterClass.MysticShaman && Slot == EquipmentSlot.MainHand &&
+        WeaponType != WeaponType.None && !MysticShamanMainHandAllows(WeaponType);
+
     /// <summary>
     /// Check if character meets requirements to equip this item
     /// </summary>
@@ -1096,8 +1107,10 @@ public class Equipment
             return false;
         }
 
-        // Prestige classes bypass all class and armor weight restrictions
-        bool isPrestige = character.Class >= CharacterClass.Tidesworn;
+        // Prestige classes bypass all class and armor weight restrictions.
+        // 1.3.1: the five prestige classes only (GameConfig.IsPrestigeClass). The Mystic Shaman is the last
+        // class value and was counted as one, so its lists, its main hand rule and its weight limit never ran.
+        bool isPrestige = GameConfig.IsPrestigeClass(character.Class);
         if (!isPrestige && ClassRestrictions.Count > 0 && !ClassRestrictions.Contains(character.Class))
         {
             reason = Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(character.Class));
@@ -1106,20 +1119,10 @@ public class Equipment
 
         // Mystic Shaman weapon restrictions: swords, axes, maces, mauls only.
         // Bows, staves, greatswords, greataxes, polearms, daggers, rapiers, scimitars, instruments are forbidden.
-        if (!isPrestige && character.Class == CharacterClass.MysticShaman &&
-            Slot == EquipmentSlot.MainHand && WeaponType != WeaponType.None)
+        if (!isPrestige && MysticShamanMainHandRefuses(character.Class))
         {
-            bool allowed = WeaponType == WeaponType.Sword ||
-                           WeaponType == WeaponType.Axe ||
-                           WeaponType == WeaponType.Mace ||
-                           WeaponType == WeaponType.Hammer ||
-                           WeaponType == WeaponType.Flail ||
-                           WeaponType == WeaponType.Maul;
-            if (!allowed)
-            {
-                reason = Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(character.Class));
-                return false;
-            }
+            reason = Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(character.Class));
+            return false;
         }
 
         // Companion weapon restrictions — each companion can only equip weapons matching their role

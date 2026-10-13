@@ -123,13 +123,20 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         foreach (var group in new[] { "weapons", "shields" })
             Assert.All(Class("Tidesworn").GetProperty("equipment").GetProperty(group).EnumerateArray(),
                 w => Assert.Equal(w.GetProperty("total").GetInt32(), w.GetProperty("usable").GetInt32()));
-        // The equip check (Items.cs:1100) treats every class from Tidesworn up in the enum as prestige, and
-        // Mystic Shaman is the last value, so the game applies no class list, weight limit or main hand rule to
-        // it. The export shows what the check answers; this pins it so a change to the check is seen here.
-        foreach (var group in new[] { "weapons", "shields" })
-            Assert.All(Class("MysticShaman").GetProperty("equipment").GetProperty(group).EnumerateArray(),
-                w => Assert.Equal(w.GetProperty("total").GetInt32(), w.GetProperty("usable").GetInt32()));
-        Assert.Equal(new[] { "Light", "Medium", "Heavy" }, Strings(Class("MysticShaman").GetProperty("equipment").GetProperty("armorWeights")));
+        // 1.3.1: Mystic Shaman is the last class value but not a prestige class (GameConfig.IsPrestigeClass), so
+        // the equip check applies its class lists, its main hand rule and its Medium limit. The export shows
+        // what the check answers; this pins it so a change to the check is seen here.
+        Assert.Equal(new[] { "Light", "Medium" }, Strings(Class("MysticShaman").GetProperty("equipment").GetProperty("armorWeights")));
+        Assert.Equal((8, 12), Count("MysticShaman", "weapons", "Sword"));
+        Assert.Equal((2, 4), Count("MysticShaman", "weapons", "Axe"));
+        Assert.Equal((4, 8), Count("MysticShaman", "weapons", "Mace"));
+        Assert.Equal((1, 1), Count("MysticShaman", "weapons", "Flail"));
+        Assert.Equal((5, 5), Count("MysticShaman", "weapons", "Maul"));
+        foreach (var refused in new[] { "Dagger", "Rapier", "Greatsword", "Greataxe", "Polearm", "Staff", "Instrument" })
+            Assert.Equal(0, Count("MysticShaman", "weapons", refused).usable);
+        Assert.Equal((9, 9), Count("MysticShaman", "shields", "Shield"));
+        Assert.Equal((9, 9), Count("MysticShaman", "shields", "Buckler"));
+        Assert.Equal((0, 5), Count("MysticShaman", "shields", "TowerShield"));
         // totals are the templates of that type, as the shop names the type; bows are left out
         var templates = LootGenerator.GetWeaponTemplates().Select(t => ShopItemGenerator.InferWeaponType(t.Name)).ToList();
         foreach (var w in Class("Warrior").GetProperty("equipment").GetProperty("weapons").EnumerateArray())

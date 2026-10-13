@@ -561,6 +561,11 @@ public class MusicShopLocation : BaseLocation
         await PurchaseInstrument(instruments[itemNum - 1]);
     }
 
+    /// <summary>1.3.1: a bought instrument is put on at the counter for a Bard and for the five prestige
+    /// classes (GameConfig.IsPrestigeClass). The Mystic Shaman, the last class value, is not one of them.</summary>
+    internal static bool CanEquipInstrument(CharacterClass characterClass) =>
+        characterClass == CharacterClass.Bard || GameConfig.IsPrestigeClass(characterClass);
+
     private async Task PurchaseInstrument(Equipment item)
     {
         // Instruments are bought for companions (Melodia) -- don't restrict by player level
@@ -596,8 +601,7 @@ public class MusicShopLocation : BaseLocation
         // Process city tax
         CityControlSystem.Instance.ProcessSaleTax(item.Value);
 
-        bool canEquipInstrument = currentPlayer.Class == CharacterClass.Bard ||
-                                  currentPlayer.Class >= CharacterClass.Tidesworn; // Prestige classes bypass restrictions
+        bool canEquipInstrument = CanEquipInstrument(currentPlayer.Class);
 
         if (canEquipInstrument)
         {
