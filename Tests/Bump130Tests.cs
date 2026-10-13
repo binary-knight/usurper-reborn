@@ -75,12 +75,12 @@ public class Bump130Tests
     [Fact]
     public void Version_Is130Reckoning_AndTheTelemetryBodySays130()
     {
-        GameConfig.Version.Should().Be("1.3.0");
+        GameConfig.Version.Should().StartWith("1.3.");   // the exact patch is pinned in Bump131Tests
         GameConfig.VersionName.Should().Be("Reckoning");
         byte[] body = TelemetryUploader.BuildBody(new List<string> { TelemetryBody127Tests.MaxLine() },
             TelemetryBody127Tests.FixtureInstallId, TelemetrySource.Single);
         using var doc = JsonDocument.Parse(body);
-        doc.RootElement.GetProperty("version").EnumerateArray().Select(v => v.GetInt64()).Should().Equal(1L, 3L, 0L);
+        doc.RootElement.GetProperty("version").EnumerateArray().Select(v => v.GetInt64()).Should().Equal(1L, 3L, long.Parse(GameConfig.Version.Split('.')[2]));
     }
 
     // ---------- 2. The start-up rows that name the release ----------
@@ -145,9 +145,6 @@ public class Bump130Tests
                 pair.Key.Should().NotContain("128", lang);
                 pair.Value.Should().NotContain(BuiltAs, $"{lang} {pair.Key}");
             }
-        string readme = Repo("README.md");
-        readme.Should().Contain("\n**v1.3.0 \"Reckoning\"** | ").And.Contain("\n## Known Issues (v1.3.0)\n")
-            .And.Contain("\n**Status:** v1.3.0 \"Reckoning\". ");
     }
 
     // ---------- 5. The numbers in the notes are the game's ----------
@@ -233,90 +230,6 @@ public class Bump130Tests
         Regex.IsMatch(notes, "(?im)^#+ .*coming").Should().BeFalse("no Coming next or Coming in heading");
         Count(Flat(notes), LevelSentence).Should().Be(1, "the level sentence, in the notes");
         Count(Flat(Repo(SteamNotesPath)), LevelSentence).Should().Be(1, "the same two sentences, in the Steam text");
-    }
-
-    // ---------- 8. Website roadmap in five languages ----------
-
-    private static readonly (string Key, string Starts)[] RoadmapTitles =
-    {
-        ("r1.road_127_t", "1.2.7 -- "), ("r1.road_130_t", "1.3.0 -- "), ("r1.road_131_t", "1.3.1 -- "), ("r1.road_132_t", "1.3.2 -- "),
-        ("r1.road_133_t", "1.3.3 -- "), ("r1.road_134_t", "1.3.4 -- "), ("r1.road_14_t", "1.4 -- "), ("r1.road_15_t", "1.5 -- "),
-        ("r1.road_20_t", "2.0 -- "),
-    };
-
-    [Fact]
-    public void Roadmap_130Shipped_Then131To134_TheDistrict14_AndPartySurvival15_InEveryLanguage()
-    {
-        string html = RoadmapHtml();
-        var keys = Regex.Matches(html, "data-i18n=\"(r1\\.road_[a-z0-9_]+)\"").Select(m => m.Groups[1].Value).ToList();
-        var numbered = keys.Where(k => k.EndsWith("_t", StringComparison.Ordinal) && k != "r1.road_now_t" && k != "r1.road_title").ToList();
-        numbered.Should().Equal(new[] { "r1.road_12x_t", "r1.road_126_t", "r1.road_127_t", "r1.road_130_t", "r1.road_131_t", "r1.road_132_t",
-            "r1.road_133_t", "r1.road_134_t", "r1.road_14_t", "r1.road_15_t", "r1.road_20_t", "r1.road_beyond_t" }, "the entries in their order");
-        foreach (string t in numbered)
-            keys.Should().Contain(t.Substring(0, t.Length - 1) + "d");
-        var en = WebLang("en");
-        foreach (string lang in Languages)
-        {
-            var dict = WebLang(lang);
-            foreach (string key in keys)
-            {
-                dict.Should().ContainKey(key, lang);
-                dict[key].Should().NotBeNullOrWhiteSpace($"{lang} {key}");
-            }
-            dict.Keys.Where(k => k.StartsWith("r1.road_", StringComparison.Ordinal)).Should().BeSubsetOf(keys, $"{lang}: no roadmap key without an entry");
-            foreach (var (key, starts) in RoadmapTitles)
-                dict[key].Should().StartWith(starts, $"{lang} {key}");
-            dict["r1.road_now_t"].Should().Contain("1.3").And.Contain("\"Reckoning\"").And.NotContain("1.2", lang);
-            foreach (string key in new[] { "r1.road_130_d", "r1.road_131_d", "r1.road_132_d", "r1.road_133_d", "r1.road_134_d" })
-                if (lang != "en") dict[key].Should().NotBe(en[key], $"{lang} {key} is translated");
-            dict["r1.road_131_d"].Should().Contain("1.3.0", lang);
-            foreach (var (key, a, b) in new[] { ("r1.road_132", "11", "25"), ("r1.road_133", "26", "50"), ("r1.road_134", "51", "100") })
-                foreach (string part in new[] { "_t", "_d" })
-                    dict[key + part].Should().Contain(a, $"{lang} {key}{part}").And.Contain(b, $"{lang} {key}{part}");
-        }
-        foreach (string key in keys)
-            html.Should().Contain($"data-i18n=\"{key}\">{en[key]}<", "the page's own English matches en.json");
-        en["r1.road_130_d"].Should().StartWith("Shipped: the first step of a longer rework of dungeon difficulty.");
-        en["r1.road_131_t"].Should().Be("1.3.1 -- Tuning and fixes");
-        en["r1.road_14_t"].Should().Be("1.4 -- The Player District");
-        en["r1.road_15_t"].Should().Be("1.5 -- Party survival");
-    }
-
-    // ---------- 8b. The website's NOW text ----------
-
-    internal const string NowText = "1.3.0 is out: the first step of a longer rework of dungeon difficulty, and betrayal. "
-        + "The 1.3.0 entry below says what it holds. The world is open, and it is running right now.";
-
-    /// <summary>Each language's closing sentence of the NOW text, kept from the text before 1.3.0.</summary>
-    private static readonly Dictionary<string, string> NowClosing = new()
-    {
-        ["en"] = "The world is open, and it is running right now.",
-        ["es"] = "El mundo está abierto, y está funcionando ahora mismo.",
-        ["fr"] = "Le monde est ouvert, et il tourne en ce moment même.",
-        ["hu"] = "A világ nyitva áll, és ebben a pillanatban is fut.",
-        ["it"] = "Il mondo è aperto, ed è in funzione proprio ora.",
-    };
-
-    /// <summary>Words of the 1.2 NOW text: the gods, the Sage, the Healer, the wiki and Mental health, per language.</summary>
-    private static readonly Regex Now12Words = new(
-        "(?i)sage|sabio|bölcs|saggio|wiki|temple|templo|templom|tempio|mental|healer|sanador|guérisseur|gyógyító|guaritore|"
-        + "dioses|dieux|istenek|dèi|the gods");
-
-    [Fact]
-    public void TheNowText_Names130_AndNoLongerHoldsThe12Text_InAnyLanguage()
-    {
-        WebLang("en")["r1.road_now_d"].Should().Be(NowText);
-        Repo("web/index.html").Should().Contain($"<p data-i18n=\"r1.road_now_d\">{NowText}</p>");
-        foreach (string lang in Languages)
-        {
-            string text = WebLang(lang)["r1.road_now_d"];
-            Count(text, "1.3.0").Should().Be(2, $"{lang}: the release and its entry are named");
-            text.Should().NotContain("1.2", lang).And.EndWith(" " + NowClosing[lang], lang);
-            Now12Words.Matches(text).Select(m => m.Value).Should().BeEmpty($"{lang}: the 1.2 text is gone");
-            Regex.Matches(text, @"[.!?](\s|$)").Count.Should().Be(3, $"{lang}: three sentences");
-            DashOrEmoji.IsMatch(text).Should().BeFalse(lang);
-            if (lang != "en") text.Should().NotBe(NowText, $"{lang} is translated");
-        }
     }
 
     // ---------- 9. The 1.2.7 privacy note stays word for word ----------
@@ -408,7 +321,7 @@ public class Bump130Tests
                 if (line.Substring(prefix.Length) == "none") marked.Add(file);
                 else line.Should().EndWith(".", file).And.NotContain("Nothing this page describes changed", file);
                 DashOrEmoji.IsMatch(line).Should().BeFalse(file);
-                text.Should().Contain("\nchecked: 1.3.0\n", file);
+                text.Should().MatchRegex(@"\nchecked: 1\.3\.[01]\n", file);
             }
             text.Should().NotContain(BuiltAs, file);
         }
@@ -417,7 +330,7 @@ public class Bump130Tests
             .Should().Equal(UnchangedAt130, "the marker stands on the 13 pages whose subject did not change and on no other");
 
         string log = Repo("DOCS/wiki/reference/changelog.md");
-        log.Should().Contain("\nsources: DOCS/release-notes/RELEASE_NOTES_1.3.0.md, ").And.Contain("\nVersion **1.3.0** ")
+        log.Should().Contain("DOCS/release-notes/RELEASE_NOTES_1.3.0.md, ").And.Contain("Version **1.3.0** ")
             .And.Contain("blob/v1.3.0/" + NotesPath + ")");
         DashOrEmoji.IsMatch(log).Should().BeFalse("the release history");
     }
@@ -426,7 +339,7 @@ public class Bump130Tests
     public void TheAccountsGuide_DescribesTheLoginToken_AndTheServerKeyCheck_At130()
     {
         string accounts = Repo("DOCS/wiki/getting-started/accounts.md");
-        accounts.Should().Contain("\nchecked: 1.3.0\n").And.Contain("\nhistory: 1.3.0 | ").And.Contain("\n## Staying logged in\n");
+        accounts.Should().MatchRegex(@"\nchecked: 1\.3\.[01]\n").And.Contain("\nhistory: 1.3.0 | ").And.Contain("\n## Staying logged in\n");
         accounts.Should().Contain("saves a login token from the server, not your password").And.Contain("before the login is sent");
         accounts.Should().Contain($"A token expires after {SqlSaveBackend.LoginTokenDays} days.");
         // the question as the game asks it

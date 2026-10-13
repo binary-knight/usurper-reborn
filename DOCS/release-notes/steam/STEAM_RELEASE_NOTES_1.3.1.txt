@@ -1,0 +1,8 @@
+[h1]Usurper Reborn 1.3.1[/h1]
+
+[list]
+[*]Loading: a current character could be handled as a save from before base stats existed. The load then replaced the character's base stats with its saved totals and equipped an item. A save that carries base stats is now always loaded as it was saved. No existing character is changed by this release.
+[*]Known: a party member or companion whose name holds a word in square brackets shows empty lines for its hit, miss and death lines in a fight.
+[/list]
+
+Full notes: DOCS/release-notes/RELEASE_NOTES_1.3.1.md
