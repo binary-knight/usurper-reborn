@@ -5939,8 +5939,13 @@ public partial class GameEngine
         player.BaseStamina = playerData.BaseStamina > 0 ? playerData.BaseStamina : playerData.Stamina;
         player.BaseAgility = playerData.BaseAgility > 0 ? playerData.BaseAgility : playerData.Agility;
 
-        // If this is an old save without equipment data, initialize from WeapPow/ArmPow
-        if ((playerData.EquippedItems == null || playerData.EquippedItems.Count == 0)
+        // If this is an old save without equipment data, initialize from WeapPow/ArmPow.
+        // 1.3.1: only a save that carries no base stats is an old save. The base stats and the
+        // equipped dictionary entered the save together, so a save that carries base stats is a
+        // current one: its restored base stats are kept and it gains no item, even when nothing
+        // is equipped and a power value is above 0.
+        if (!SaveCarriesBaseStats(playerData)
+            && (playerData.EquippedItems == null || playerData.EquippedItems.Count == 0)
             && (playerData.WeapPow > 0 || playerData.ArmPow > 0))
         {
             // Migration: Find best matching equipment based on WeapPow/ArmPow
@@ -6497,6 +6502,18 @@ public partial class GameEngine
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// 1.3.1: true when the save holds any of the eleven base stats. A save written before the
+    /// base stats existed has none of them, so all eleven read as 0.
+    /// </summary>
+    private static bool SaveCarriesBaseStats(PlayerData playerData)
+    {
+        return playerData.BaseStrength > 0 || playerData.BaseDexterity > 0 || playerData.BaseConstitution > 0
+            || playerData.BaseIntelligence > 0 || playerData.BaseWisdom > 0 || playerData.BaseCharisma > 0
+            || playerData.BaseMaxHP > 0 || playerData.BaseMaxMana > 0 || playerData.BaseDefence > 0
+            || playerData.BaseStamina > 0 || playerData.BaseAgility > 0;
     }
 
     /// <summary>
