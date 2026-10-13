@@ -1586,9 +1586,9 @@ namespace UsurperRemake.Systems
             double variance = 0.7 + rng.NextDouble() * 0.6;
             long damage = (long)(raw * variance);
 
-            // Real critical-hit chance (DEX + equipment crit bonus), matching the main combat engine
-            // so gear and DEX investment actually pay off here instead of the old flat 5-50% curve.
-            int critChance = StatEffectsSystem.GetCriticalHitChance(player.Dexterity, player.GetEquipmentCritChanceBonus());
+            // v1.3.1: the full critical-hit chance the main combat engine rolls on (DEX with a drug's bonus,
+            // equipment, drug, boon, shrine, pet, alignment, the fight's bonus), so every bonus pays off here.
+            int critChance = StatEffectsSystem.CritChance(player);
             bool crit = allowCrit && rng.Next(100) < critChance;
             if (crit)
                 damage = (long)(damage * 1.5);
@@ -1627,8 +1627,8 @@ namespace UsurperRemake.Systems
             // v1.1.4: one crit roll, the doubled one below; the base used to roll the ordinary crit too.
             long baseDamage = (long)(CalculatePlayerDamage(player, bossDef, bossData, rng, allowCrit: false, terminal: terminal) * 0.8);
 
-            // Extra crit check — double the real DEX/equipment crit chance, capped at 95%
-            int critChance = Math.Min(95, StatEffectsSystem.GetCriticalHitChance(player.Dexterity, player.GetEquipmentCritChanceBonus()) * 2);
+            // Extra crit check: double the full crit chance (v1.3.1: every bonus counts), capped at 95%
+            int critChance = Math.Min(95, StatEffectsSystem.CritChance(player) * 2);
             if (rng.Next(100) < critChance)
             {
                 baseDamage = (long)(baseDamage * 1.8);
