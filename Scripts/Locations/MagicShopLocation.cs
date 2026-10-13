@@ -1946,9 +1946,10 @@ public partial class MagicShopLocation : BaseLocation
             var capturedSlot = slot;
             enchantTargets.Add((slotName, equip, (newEq) =>
             {
+                // 1.3.1: the changed copy goes straight back into the slot it came from. A worn item
+                // stays worn whatever the equip check says of it now, and nothing else worn moves.
                 EquipmentDatabase.RegisterDynamic(newEq);
-                player.UnequipSlot(capturedSlot);
-                player.EquipItem(newEq, capturedSlot, out _);
+                player.EquippedItems[capturedSlot] = newEq.Id;
                 player.RecalculateStats();
             }));
         }
@@ -2624,9 +2625,9 @@ public partial class MagicShopLocation : BaseLocation
         // Frostbite are stripped too, and so is a stale tag on the base name)
         stripped.Name = StripEnchantTags(stripped.Name);
 
+        // 1.3.1: straight back into the slot it came from, as the enchant write does.
         EquipmentDatabase.RegisterDynamic(stripped);
-        player.UnequipSlot(rmSlot);
-        player.EquipItem(stripped, rmSlot, out _);
+        player.EquippedItems[rmSlot] = stripped.Id;
         player.RecalculateStats();
 
         DisplayMessage("");

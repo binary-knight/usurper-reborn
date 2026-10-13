@@ -1,7 +1,7 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.2.5
+checked: 1.3.0
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs
 history: 1.2.5 | Magic Shop enchant removal now returns an item to its base form, taking off every stat, effect, value and name tag its enchants added.
 history: 1.2.4 | The Magic Shop lets you haggle over rings and necklaces, 3 tries a day, and being thrown out bars you from it until the next day.
