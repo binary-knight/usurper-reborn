@@ -1,7 +1,7 @@
 ---
 title: Weapons and restrictions
 path: /wiki/en/items/weapons/
-checked: 1.2.5
+checked: 1.3.1
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs
 history: 1.2.5 | Weapon names show in your language, equipment rows mark weapons [1H] or [2H], and shop lists write weapon types in full, such as Greatsword.
 ---

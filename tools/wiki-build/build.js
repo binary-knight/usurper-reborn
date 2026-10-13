@@ -216,8 +216,8 @@ function renderers(data) {
     "eternal_vigil",
   ]);
   // The class healing bonus on abilities (ClassAbilitySystem.UseAbility), by class
-  // classes whose equipment limits the guides do not state yet
-  const heldEquipmentClasses = new Set(["MysticShaman"]);
+  // classes whose equipment limits the guides do not state yet (none now)
+  const heldEquipmentClasses = new Set([]);
   const classHealBonus = {
     Alchemist: "AlchemistPotionMasteryBonus",
     Cleric: "ClericDivineGraceBonus",

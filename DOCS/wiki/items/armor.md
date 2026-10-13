@@ -1,7 +1,7 @@
 ---
 title: Armor and accessories
 path: /wiki/en/items/armor/
-checked: 1.2.5
+checked: 1.3.1
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs
 history: 1.2.5 | Armor names show in your language, and shop and equipment rows mark armor weight as [Lgt], [Med] or [Hvy].
 ---
