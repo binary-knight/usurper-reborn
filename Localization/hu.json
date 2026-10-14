@@ -3650,6 +3650,7 @@
   "weapon_shop.gold_suffix": " arany.",
   "weapon_shop.align_discount": "  A(z) {0} jellemed miatt {1}% kedvezményt kapsz!",
   "weapon_shop.align_markup": "  A(z) {0} jellemed miatt az ár {1}%-kal magasabb.",
+  "weapon_shop.troll_discount": "  Trollként {0}% kedvezményt kapsz a fegyverekre!",
   "weapon_shop.world_discount": "  Világesemények: {0}% kedvezmény érvényes!",
   "weapon_shop.world_markup": "  Világesemények: {0}% áremelés érvényes!",
   "weapon_shop.bbs_one_hand": "Egykezes",

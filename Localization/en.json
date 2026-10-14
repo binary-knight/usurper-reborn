@@ -3650,6 +3650,7 @@
   "weapon_shop.gold_suffix": " gold.",
   "weapon_shop.align_discount": "  Your {0} alignment grants you a {1}% discount!",
   "weapon_shop.align_markup": "  Your {0} alignment causes a {1}% markup.",
+  "weapon_shop.troll_discount": "  As a Troll, you get a {0}% discount on weapons!",
   "weapon_shop.world_discount": "  World Events: {0}% discount active!",
   "weapon_shop.world_markup": "  World Events: {0}% price increase!",
   "weapon_shop.bbs_one_hand": "One-Hand",

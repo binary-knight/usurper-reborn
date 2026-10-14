@@ -252,11 +252,6 @@ test("the Characters guides print their numbers through the directives and keep 
     assert.match(ngPage, /<details[\s\S]*Lasting unlocks from a finished life[\s\S]*<\/details>/);
     assert.ok(!indexOf("/wiki/en/characters/new-game-plus/").text.includes("Lasting unlocks"));
     assert.ok(indexOf("/wiki/en/characters/new-game-plus/").text.includes("starts at level 5"));
-    // facts held back for a ruling are in no Characters guide
-    for (const p of result.pages.filter((x) => x.sourceFile && x.sourceFile.startsWith("DOCS/wiki/characters/"))) {
-      const text = textOf(p.body);
-      assert.doesNotMatch(text, /Troll[^.]*discount/i, p.path);
-    }
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }

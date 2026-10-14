@@ -21,6 +21,8 @@ Higher value is not a universal upgrade score. Compare nonzero bonuses with the 
 
 At the buy prompt in the Weapon and Armor shops, and for rings and necklaces in the Magic Shop, H haggles over the price. Each of the three shops gives you 3 tries a day. Haggle too hard and the shopkeeper throws you out, and that shop stays closed to you until the next day.
 
+A Troll pays 10 percent less for a weapon at the Weapon Shop, and the Weapon Shop does not haggle with a Troll.
+
 ## Magic services
 
 The Magic Shop offers class-relevant magic and services such as identification, curse removal and enchanting. These have different target and cost rules. Removing a curse from an owned item is not the same action as replacing its base template. Enchant removal (W) works on equipment you are wearing and returns the item to its base form: the stats, fire and frost effects, value and name tags its enchants added are taken off, and the enchant limit applies again from that form. If the item's base form is not on record, the shop refuses and charges nothing. An enchant or an enchant removal on a worn item puts the changed item straight back in the slot it came from, even when you could not equip that item now, and nothing else you wear moves.

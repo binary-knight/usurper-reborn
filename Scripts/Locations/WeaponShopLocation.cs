@@ -129,6 +129,14 @@ public class WeaponShopLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("weapon_shop.align_markup", alignText, (int)((alignmentModifier - 1.0f) * 100)));
         }
 
+        // 1.3.2: a Troll's discount on weapons (HagglingEngine.ApplyRaceDiscount), shown only to a Troll
+        long racePercent = 100 - HagglingEngine.ApplyRaceDiscount(currentPlayer, 100);
+        if (racePercent > 0)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("weapon_shop.troll_discount", racePercent));
+        }
+
         // Show world event price modifier
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
         if (Math.Abs(worldEventModifier - 1.0f) > 0.01f)
@@ -733,6 +741,9 @@ public class WeaponShopLocation : BaseLocation
 
         // Apply difficulty-based price multiplier
         adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+
+        // 1.3.2: a Troll pays 10 percent less, after every other modifier and before the tax
+        adjustedPrice = HagglingEngine.ApplyRaceDiscount(currentPlayer, adjustedPrice);
 
         // Calculate total with tax
         var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
@@ -1482,6 +1493,8 @@ public class WeaponShopLocation : BaseLocation
             adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
             // Apply difficulty-based price multiplier
             adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+            // 1.3.2: a Troll pays 10 percent less, after every other modifier and before the tax
+            adjustedPrice = HagglingEngine.ApplyRaceDiscount(currentPlayer, adjustedPrice);
 
             // Calculate total with tax
             var (abKingTax, abCityTax, abTotal) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);

@@ -3650,6 +3650,7 @@
   "weapon_shop.gold_suffix": " oro.",
   "weapon_shop.align_discount": "  Il tuo allineamento {0} ti concede uno sconto del {1}%!",
   "weapon_shop.align_markup": "  Il tuo allineamento {0} causa un sovrapprezzo del {1}%.",
+  "weapon_shop.troll_discount": "  Come Troll, ottieni uno sconto del {0}% sulle armi!",
   "weapon_shop.world_discount": "  Eventi Mondiali: sconto del {0}% attivo!",
   "weapon_shop.world_markup": "  Eventi Mondiali: aumento prezzi del {0}%!",
   "weapon_shop.bbs_one_hand": "Una Mano",

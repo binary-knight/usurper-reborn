@@ -3650,6 +3650,7 @@
   "weapon_shop.gold_suffix": " oro.",
   "weapon_shop.align_discount": "  ¡Tu alineación {0} te otorga un {1}% de descuento!",
   "weapon_shop.align_markup": "  Tu alineación {0} causa un {1}% de recargo.",
+  "weapon_shop.troll_discount": "  ¡Como Trol, obtienes un {0}% de descuento en armas!",
   "weapon_shop.world_discount": "  ¡Eventos mundiales: {0}% de descuento activo!",
   "weapon_shop.world_markup": "  ¡Eventos mundiales: {0}% de aumento de precio!",
   "weapon_shop.bbs_one_hand": "Una Mano",
