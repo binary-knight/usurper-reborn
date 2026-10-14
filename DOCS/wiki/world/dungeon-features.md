@@ -29,7 +29,7 @@ Monsters guard treasure and stairs, so a guarded room must be cleared first. A c
 Some rooms hold an event marked in the room view. Choose **Investigate the event** to face it. An event is used up by the choice you make, not by opening the prompt, so a mistyped key simply asks again. Event rooms can hold a treasure chest, a shrine, a stranger, a puzzle or riddle, a safe resting place or a mystery.
 
 :::spoiler Spoiler: how event rooms are rolled
-When a floor is generated, each ordinary room has a 60% chance of monsters, a 30% chance of an event and a 15% chance of a trap. An event room picks one of seven kinds with equal weight: treasure chest, shrine, trap, stranger, puzzle, resting place or mystery. A trap event becomes one of six small scenes instead: a chest, a potion cache, a shrine, a gambling ghost, a beggar or a wounded man.
+When a floor is generated, each ordinary room has a 60% chance of monsters, a 30% chance of an event and a 15% chance of a trap. An ordinary event room picks one of seven kinds with equal weight: treasure chest, shrine, trap, stranger, puzzle, resting place or mystery. A trap event becomes one of six small scenes instead: a chest, a potion cache, a shrine, a gambling ghost, a beggar or a wounded man.
 :::
 
 ## Treasure chests
