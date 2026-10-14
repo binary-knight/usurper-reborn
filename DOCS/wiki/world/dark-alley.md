@@ -62,7 +62,7 @@ P uses your daily thief attempts, {{balance:DefaultThiefAttempts}} a day. You pi
 
 ## Loan shark interest
 
-L visits the Loan Shark. You can borrow up to level x 500 gold, one loan at a time, due in 5 days. At each daily reset the balance grows {{percent:LoanSharkDailyInterest}} percent, and the same amount is added to the interest owed; to clear the loan you pay the balance plus the interest owed. A 1,000 gold loan needs 1,400 to clear after one day. Payments go to interest first.
+L visits the Loan Shark. You can borrow up to level x 500 gold, one loan at a time, due in 5 days. At each daily reset the interest owed grows by {{percent:LoanSharkDailyInterest}} percent of the whole amount owed, the loan plus the interest; to clear the loan you pay both. A 1,000 gold loan needs 1,200 to clear after one day and 1,440 after two. Payments go to interest first.
 
 When the loan is overdue, an enforcer meets you as you next enter the alley. Beat him and the loan is cleared. If you lose and live, he takes all your gold on hand and a quarter of your maximum HP (never below 1) and gives you 3 more days.
 

@@ -38,7 +38,7 @@ Online only, you can wire gold from your account to another player. The bank kee
 
 You have {{balance:DefaultBankRobberyAttempts}} robbery attempts a day, renewed at the daily reset. Any attempt sets your Chivalry to 0 and adds 100 Darkness and 5 wanted levels, win or lose.
 
-The robbery is a fight against a guard captain and guards, 4 in all, +1 with over 100,000 gold in the vault, +1 over 250,000, +2 over 500,000, +3 over 1,000,000 and +2 for each robbery attempted in the world that day, at most 12, plus 1 to 3 war hounds. They are built from your level. Losing the fight is an ordinary combat death.
+The robbery is a fight against a guard captain and guards, 4 in all, +1 with over 100,000 gold in the vault, +1 over 250,000, +2 over 500,000, +3 over 1,000,000 and +2 for each robbery attempted in the world that day, at most 12, plus 1 to 3 war hounds. They are built from your level. Losing the fight is not a death and uses no resurrection: you are left at 1 HP, and the bank takes all your gold on hand and up to level x 500 gold from your account.
 
 A won robbery takes a quarter of the vault that is not your own deposit, at most 250,000 gold. The vault starts at 500,000, grows 25,000 + {{balance:BankVaultRefillRatePercent}} percent a day and stops at 5,000,000. Online the vault is one pot shared by every player.
 
