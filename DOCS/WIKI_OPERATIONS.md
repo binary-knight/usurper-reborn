@@ -79,6 +79,13 @@ Numbers should come from directives, not copied tables:
 {{table:beasts}}
 {{table:companions}}
 {{table:ally-stances}}
+{{table:materials}}
+{{table:old-god-rewards}}
+{{table:enchants}}
+{{table:gear-sets}}
+{{table:loot-rarity}}
+{{table:home-upgrades}}
+{{table:herbs}}
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
@@ -97,6 +104,14 @@ level is the higher of its region's level and its own, and a companion's
 weapon types are the main hand types its own rule admits. The party constants
 in the `constants` block of `party.json` print the same way; a party constant
 may not reuse a name another dataset prints.
+`materials`, `old-god-rewards`, `enchants`, `gear-sets`, `loot-rarity`,
+`home-upgrades` and `herbs` come from `economy.json`. The enchant tiers, the
+loot rarity table and the Home upgrade prices are private to their game files
+and are read by reflection, so renaming one fails the export. A named enchant's
+effect is what the game's own enchant code adds to a bare item.
+`old-god-rewards` folds itself under a spoiler: it names each Old God's material
+and the artifacts. The economy constants print like the party constants and
+may not reuse a name either.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.

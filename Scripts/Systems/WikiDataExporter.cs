@@ -57,6 +57,7 @@ public static class WikiDataExporter
         Write(outputDir, "bosses", Bosses());
         Write(outputDir, "characters", Characters());
         Write(outputDir, "party", Party());
+        Write(outputDir, "economy", Economy());
 
         File.WriteAllText(Path.Combine(outputDir, "meta.json"), JsonSerializer.Serialize(new
         {
@@ -503,6 +504,235 @@ public static class WikiDataExporter
             constants[entry.Key] = entry.Value;
         return constants;
     }
+
+    /// <summary>
+    /// 1.3.2 wiki depth: items and the town economy. Crafting materials (GameConfig.CraftingMaterials) with what
+    /// spends them: the Magic Shop enchant tiers and the Inn's stat training. The enchant tiers, the loot rarity
+    /// table and the Home upgrade prices are private to their files, so they are read by reflection, as the party
+    /// export reads CompanionSystem: a renamed member fails the export. No game file is changed for this.
+    /// A named enchant's effect is what MagicShopLocation.ApplyNamedEnchant adds to a bare item.
+    /// </summary>
+    private static object Economy()
+    {
+        var enchants = Enchants();
+        var oldGods = OldGodsData.GetAllOldGods();
+        return new
+        {
+            materials = GameConfig.CraftingMaterials.Select(m => new
+            {
+                id = m.Id,
+                name = Names("material." + m.Id + ".name", m.Name),
+                floorMin = m.FloorMin,
+                floorMax = m.FloorMax,
+                enchants = enchants.Where(e => e.materials.Any(x => x.id == m.Id)).Select(e => e.number).ToArray(),
+                // the stat trainings at the Inn that take it, counted from 1 (InnLocation.GetTrainingMaterialRequirements)
+                statTrainings = Enumerable.Range(1, GameConfig.MaxStatTrainingsPerStat)
+                    .Where(n => InnLocation.GetTrainingMaterialRequirements(n - 1)?.Any(r => r.materialId == m.Id) == true)
+                    .ToArray()
+            }).ToArray(),
+            // spoiler: the Old God whose defeat or rescue gives each god's own material (OldGodBossSystem)
+            materialGods = oldGods.Select(g => (god: g, material: GameConfig.CraftingMaterials
+                    .FirstOrDefault(m => m.ThematicGod == g.Type.ToString())))
+                .Where(x => x.material != null)
+                .Select(x => new { god = x.god.Type.ToString(), floor = x.god.DungeonFloor, material = x.material!.Id })
+                .ToArray(),
+            enchants,
+            gearSets = GearSetRegistry.Sets.Select(s => new
+            {
+                id = s.Id,
+                name = Names(s.NameKey, Loc.GetIn("en", s.NameKey)),
+                families = s.Families,
+                tiers = s.Tiers.Select(t => new
+                {
+                    pieces = t.Pieces,
+                    bonuses = t.Bonuses.Select(b => new
+                    {
+                        stat = b.Stat,
+                        amount = b.Amount,
+                        text = Loc.GetIn("en", "item.set.bonus." + b.Stat.ToString().ToLowerInvariant(), b.Amount)
+                    }).ToArray()
+                }).ToArray()
+            }).ToArray(),
+            lootRarities = LootRarities(),
+            homeUpgrades = HomeUpgrades(),
+            herbs = Enum.GetValues<HerbType>().Where(h => h != HerbType.None).Select(h => new
+            {
+                id = h,
+                name = Names(null, HerbData.GetName(h)),
+                gardenLevel = HerbData.GetGardenLevelRequired(h),
+                maxCarry = GameConfig.HerbMaxCarry[(int)h],
+                effect = HerbData.GetDescription(h)
+            }).ToArray(),
+            artifacts = Artifacts(oldGods),
+            constants = EconomyConstants()
+        };
+    }
+
+    private const BindingFlags PrivateStatic = BindingFlags.NonPublic | BindingFlags.Static;
+
+    private static T PrivateStaticField<T>(Type type, string name) =>
+        (T)(type.GetField(name, PrivateStatic)?.GetValue(null) ?? throw new InvalidOperationException(type.Name + "." + name));
+
+    private sealed record EnchantMaterial(string id, int count);
+
+    private sealed record EnchantRow(int number, Dictionary<string, string> name, bool oneChosenStat, int statBonus,
+        SortedDictionary<string, object> effects, long baseCost, int costPerLevel, int minLevel, EnchantMaterial[] materials);
+
+    /// <summary>The Magic Shop enchant tiers in menu order (numbered from 1), with their materials.</summary>
+    private static EnchantRow[] Enchants()
+    {
+        var tiers = PrivateStaticField<(string name, int bonus, long baseCost, int levelScale, int minLevel, string description)[]>(
+            typeof(MagicShopLocation), "EnchantTiers");
+        var materials = PrivateStaticField<Dictionary<int, (string materialId, int count)[]>>(
+            typeof(MagicShopLocation), "EnchantMaterialRequirements");
+        return tiers.Select((t, index) =>
+        {
+            // a stat tier is the one whose description is the one-stat line; the player picks the stat
+            bool oneStat = t.description == "magic_shop.tier_desc_one_stat";
+            return new EnchantRow(index + 1, Names(t.name, Loc.GetIn("en", t.name)), oneStat, oneStat ? t.bonus : 0,
+                oneStat ? new SortedDictionary<string, object>() : NamedEnchantEffects(index + 1),
+                t.baseCost, t.levelScale, t.minLevel,
+                materials.TryGetValue(index, out var reqs) ? reqs.Select(r => new EnchantMaterial(r.materialId, r.count)).ToArray() : []);
+        }).ToArray();
+    }
+
+    /// <summary>Every number or flag on an item that MagicShopLocation.ApplyNamedEnchant changes, by property name.</summary>
+    private static SortedDictionary<string, object> NamedEnchantEffects(int tierChoice)
+    {
+        var bare = new Equipment();
+        var enchanted = new Equipment();
+        MagicShopLocation.ApplyNamedEnchant(enchanted, tierChoice);
+        var effects = new SortedDictionary<string, object>(StringComparer.Ordinal);
+        foreach (var p in typeof(Equipment).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            // stored fields only: a public getter and setter, no index (a computed total would count twice)
+            if (!p.CanRead || p.SetMethod?.IsPublic != true || p.GetIndexParameters().Length > 0) continue;
+            if (p.PropertyType != typeof(int) && p.PropertyType != typeof(long) && p.PropertyType != typeof(float)
+                && p.PropertyType != typeof(double) && p.PropertyType != typeof(bool)) continue;
+            var before = p.GetValue(bare);
+            var after = p.GetValue(enchanted);
+            if (Equals(before, after)) continue;
+            effects[p.Name] = p.PropertyType == typeof(bool) ? after! : Convert.ToDouble(after) - Convert.ToDouble(before);
+        }
+        return effects;
+    }
+
+    /// <summary>LootGenerator's rarity table: power and value multipliers, effect counts and curse chance.</summary>
+    private static object LootRarities()
+    {
+        var stats = PrivateStaticField<Dictionary<LootGenerator.ItemRarity, (float PowerMult, float ValueMult, int MinEffects, int MaxEffects, float CurseChance)>>(
+            typeof(LootGenerator), "RarityStats");
+        return stats.OrderBy(x => x.Key).Select(x => new
+        {
+            id = x.Key,
+            // the word a dropped item's name starts with, none for Common
+            namePrefix = LootGenerator.RarityPrefixKey(x.Key) is { } key ? Loc.GetIn("en", key) : null,
+            powerMultiplier = x.Value.PowerMult,
+            valueMultiplier = x.Value.ValueMult,
+            minEffects = x.Value.MinEffects,
+            maxEffects = x.Value.MaxEffects,
+            curseChance = x.Value.CurseChance
+        }).ToArray();
+    }
+
+    /// <summary>
+    /// The Home upgrades by level. A price is HomeLocation's own cost of going from the level below; the cost
+    /// methods are private instance methods that read no state, called on an object whose constructor never runs.
+    /// </summary>
+    private static object HomeUpgrades()
+    {
+        var home = (HomeLocation)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(HomeLocation));
+        long Cost(string method, int fromLevel)
+        {
+            var m = typeof(HomeLocation).GetMethod(method, BindingFlags.NonPublic | BindingFlags.Instance)
+                ?? throw new InvalidOperationException("HomeLocation." + method);
+            return (long)m.Invoke(home, [fromLevel])!;
+        }
+        return new
+        {
+            levels = Enumerable.Range(0, GameConfig.HomeRecoveryPercent.Length).Select(level => new
+            {
+                level,
+                livingQuartersCost = level == 0 ? (long?)null : Cost("GetLivingQuartersCost", level - 1),
+                restRecovery = GameConfig.HomeRecoveryPercent[level],
+                restsPerDay = GameConfig.HomeRestsPerDay[level],
+                bedCost = level == 0 ? (long?)null : Cost("GetBedCost", level - 1),
+                bedFertility = GameConfig.BedFertilityModifier[level],
+                chestCost = level == 0 ? (long?)null : Cost("GetChestUpgradeCost", level - 1),
+                chestCapacity = GameConfig.ChestCapacity[level],
+                hearthCost = level == 0 ? (long?)null : Cost("GetHearthCost", level - 1),
+                hearthBonus = GameConfig.HearthDamageBonus[level],
+                hearthFights = GameConfig.HearthCombatDuration[level],
+                gardenCost = level == 0 ? (long?)null : Cost("GetGardenCost", level - 1),
+                herbsPerDay = GameConfig.HerbsPerDay[level]
+            }).ToArray(),
+            // the Training Room: a level a time, each level +1 to six base attributes
+            trainingRoom = Enumerable.Range(1, 10).Select(level => new { level, cost = Cost("GetTrainingRoomCost", level - 1) })
+                .TakeWhile(x => x.cost != long.MaxValue).ToArray()
+        };
+    }
+
+    /// <summary>
+    /// The artifacts and what each grants when collected (ArtifactSystem.ArtifactStatGrants at the normal multiplier,
+    /// summed per stat, plus the weapon power, Chivalry and Darkness it keeps apart), with the Old God that gives it.
+    /// </summary>
+    private static object Artifacts(List<OldGodBossData> oldGods) => new ArtifactSystem().GetAllArtifacts()
+        .OrderBy(a => a.Type).Select(a =>
+        {
+            // the god whose defeat or rescue hands it over; Manwe gives none (OldGodBossSystem)
+            var god = oldGods.Where(g => g.Type != OldGodType.Manwe && g.ArtifactDropped == a.Type)
+                .OrderBy(g => g.DungeonFloor).FirstOrDefault();
+            int Kept(string key) => a.StatBonuses.FirstOrDefault(b => string.Equals(b.Key, key, StringComparison.OrdinalIgnoreCase)).Value;
+            return new
+            {
+                id = a.Type,
+                name = Names(null, a.Name),
+                oldGod = god?.Type.ToString(),
+                floor = god?.DungeonFloor,
+                grants = ArtifactSystem.ArtifactStatGrants(a, 1.0f).GroupBy(g => g.stat)
+                    .Select(g => new { stat = g.Key, amount = g.Sum(x => x.amount) }).ToArray(),
+                weaponPower = Kept("WeapPow"),
+                chivalry = Kept("Chivalry"),
+                darkness = Kept("Darkness")
+            };
+        }).ToArray();
+
+    private static SortedDictionary<string, object?> EconomyConstants() => Named(typeof(GameConfig), string.Empty,
+        nameof(GameConfig.MaterialDropChanceRegular), nameof(GameConfig.MaterialDropChanceMiniBoss),
+        nameof(GameConfig.MaterialDropChanceTreasure), nameof(GameConfig.MaterialDropCountBossMin),
+        nameof(GameConfig.MaterialDropCountBossMax), nameof(GameConfig.MaxEnchantments),
+        nameof(GameConfig.FourthEnchantFailChance), nameof(GameConfig.FifthEnchantFailChance),
+        nameof(GameConfig.FireEnchantProcChance), nameof(GameConfig.FireEnchantDamageMultiplier),
+        nameof(GameConfig.FrostEnchantProcChance), nameof(GameConfig.FrostEnchantDuration),
+        nameof(GameConfig.LootBaseDropChance), nameof(GameConfig.LootLevelDropScale),
+        nameof(GameConfig.LootPartyBonusPerMember), nameof(GameConfig.LootMaxDropChance),
+        nameof(GameConfig.LootTeammateTargetChance), nameof(GameConfig.ShopPriceMultiplier),
+        nameof(GameConfig.ShopPowerMultiplier), nameof(GameConfig.StatTrainingBaseCostPerLevel),
+        nameof(GameConfig.MaxStatTrainingsPerStat), nameof(GameConfig.HealingPotionBaseCost),
+        nameof(GameConfig.ManaPotionBaseCost), nameof(GameConfig.RehabBaseCost),
+        nameof(GameConfig.RehabPerAddictionCost), nameof(GameConfig.MaxWillowDraughts),
+        nameof(GameConfig.SongBuffDuration), nameof(GameConfig.SongWarMarchBonus),
+        nameof(GameConfig.SongIronLullabyBonus), nameof(GameConfig.SongFortuneBonus),
+        nameof(GameConfig.SongBattleHymnBonus), nameof(GameConfig.GuardSalaryPerLevel),
+        nameof(GameConfig.MinLevelForGuard), nameof(GameConfig.MaxDarknessForGuard),
+        nameof(GameConfig.DefaultBankRobberyAttempts), nameof(GameConfig.BankRobberyMaxTake),
+        nameof(GameConfig.BankVaultInitial), nameof(GameConfig.BankVaultDailyRefill),
+        nameof(GameConfig.BankVaultRefillRatePercent), nameof(GameConfig.BankVaultCap),
+        nameof(GameConfig.BankTransferFeePercent), nameof(GameConfig.InnRoomCostPerLevel),
+        nameof(GameConfig.MaxSleepGuards), nameof(GameConfig.GuardCostMultiplierPerExtra),
+        nameof(GameConfig.DormitorySleepCost), nameof(GameConfig.MaxDrinkingGamesPerDay),
+        nameof(GameConfig.HighLowPayoutMultiplier), nameof(GameConfig.GamblingMaxDoubleDown),
+        nameof(GameConfig.BlackjackPayoutMultiplier), nameof(GameConfig.BlackjackBonusPayout),
+        nameof(GameConfig.ArmWrestleBetPerLevel), nameof(GameConfig.MaxArmWrestlesPerDay),
+        nameof(GameConfig.SleeperGoldTheftPercent), nameof(GameConfig.SleeperXPLossPercent),
+        nameof(GameConfig.MaxSteroidShopPurchases), nameof(GameConfig.MaxAlchemistINTBoosts),
+        nameof(GameConfig.DrugOverdoseChance), nameof(GameConfig.BlackMarketGearMarkup),
+        nameof(GameConfig.BlackMarketFreelanceSurcharge), nameof(GameConfig.BlackMarketRankDiscount),
+        nameof(GameConfig.MaxPoisonVials), nameof(GameConfig.InformantCost),
+        nameof(GameConfig.LoanSharkDailyInterest), nameof(GameConfig.DefaultThiefAttempts),
+        nameof(GameConfig.StudyXPBonus), nameof(GameConfig.ServantsDailyGoldBase),
+        nameof(GameConfig.ServantsDailyGoldPerLevel), nameof(GameConfig.ReinforcedDoorCost),
+        nameof(GameConfig.MaxPlayerChildren));
 
     private static object Races() => GameConfig.RaceAttributes.OrderBy(x => x.Key)
         .Select(entry => new
