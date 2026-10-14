@@ -66,7 +66,7 @@ public static class DruidShrineData
             AttunementDescription =
                 "You kneel at the center stone. The mountain breathes once, slowly, beneath you.\n" +
                 "Terravok's strength settles into your bones.",
-            PassiveSummary = "+10% Max HP, +5 HP regen per combat round (24h)",
+            PassiveSummary = "+5 HP regen per combat round (24h)",
             ChivalryShift = 0
         },
         new DruidShrine
@@ -81,7 +81,7 @@ public static class DruidShrineData
             AttunementDescription =
                 "You drive your own blade hilt-first into the altar's stone, then pull it free.\n" +
                 "The edge sings with the memory of every weapon that came before.",
-            PassiveSummary = "+8% melee damage, +5% rage gain (24h)",
+            PassiveSummary = "+8% melee damage (24h)",
             ChivalryShift = -2
         },
         new DruidShrine
@@ -96,7 +96,7 @@ public static class DruidShrineData
             AttunementDescription =
                 "You cup the black water and let it run between your fingers. It feels like silk and silence.\n" +
                 "Your shadow stretches a little longer than it should.",
-            PassiveSummary = "+5% crit chance, +10% backstab damage (24h)",
+            PassiveSummary = "+5% crit chance (24h)",
             ChivalryShift = -3
         },
         new DruidShrine

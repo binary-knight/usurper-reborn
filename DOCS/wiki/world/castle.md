@@ -47,6 +47,6 @@ Executions and closing most of the town's businesses anger the people. The Castl
 
 ## Royal quests
 
-A royal quest from an audience asks you to kill monsters, reach or clear a dungeon floor, hunt a criminal or investigate. It has a time limit, pays part of the reward up front, and you can hold one at a time. The ruler's Quests screen shows the royal bounties, which you take at the [Quest Hall](/wiki/en/world/town/#guild-row).
+A royal quest from an audience asks you to kill monsters, reach or clear a dungeon floor, hunt a criminal or investigate. It has a time limit, pays an advance in gold and experience when you accept and 1,000 gold per level when you complete it, and you can hold one at a time. The ruler's Quests screen shows the royal bounties, which you take at the [Quest Hall](/wiki/en/world/town/#guild-row).
 
 See [crime and prison](/wiki/en/world/law/) for what happens to prisoners.

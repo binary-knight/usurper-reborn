@@ -442,6 +442,7 @@ public class DailySystemManager
         player.SettlementGoldClaimedToday = false;
         player.SettlementHerbClaimedToday = false;
         player.SettlementShrineUsedToday = false;
+        player.JailbreakAttemptedToday = false;   // 1.3.2
         player.SettlementCircleUsedToday = false;
         player.SettlementWorkshopUsedToday = false;
         player.ThroneChallengedToday = false;

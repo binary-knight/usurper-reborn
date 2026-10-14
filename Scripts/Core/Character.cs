@@ -772,6 +772,7 @@ public class Character
     public bool SettlementGoldClaimedToday { get; set; }
     public bool SettlementHerbClaimedToday { get; set; }
     public bool SettlementShrineUsedToday { get; set; }
+    public bool JailbreakAttemptedToday { get; set; }   // 1.3.2: one jailbreak at the prison grounds a day; cleared by the daily reset
     public bool SettlementCircleUsedToday { get; set; }
     public bool SettlementWorkshopUsedToday { get; set; }
     public bool ThroneChallengedToday { get; set; }

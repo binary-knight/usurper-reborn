@@ -361,9 +361,9 @@ public class King
             return false;
 
         // Stats scale quadratically at higher levels to make endgame guards formidable
-        long guardHP = 200 + (level * 50) + (level > 30 ? (level - 30) * 80 : 0);
-        long guardStr = 30 + (level * 5) + (level > 30 ? (level - 30) * 4 : 0);
-        long guardDef = 20 + (level * 3) + (level > 30 ? (level - 30) * 3 : 0);
+        long guardHP = MonsterGuardHP(level);
+        long guardStr = MonsterGuardStrength(level);
+        long guardDef = MonsterGuardDefence(level);
         int guardWeapPow = 15 + level * 3;
         int guardArmPow = 10 + level * 2;
 
@@ -378,12 +378,19 @@ public class King
             WeapPow = guardWeapPow,
             ArmPow = guardArmPow,
             PurchaseCost = actualCost,
-            DailyFeedingCost = 50 + (level * 10) + (level > 30 ? (level - 30) * 20 : 0)
+            DailyFeedingCost = MonsterGuardDailyFeeding(level)
         });
         court.Treasury -= actualCost;
 
         return true;
     }
+
+    // 1.3.2: a monster guard's numbers, shared by AddMonsterGuard and the monster market screen, which showed
+    // them without the terms above level 30.
+    internal static long MonsterGuardHP(int level) => 200 + (level * 50) + (level > 30 ? (level - 30) * 80 : 0);
+    internal static long MonsterGuardStrength(int level) => 30 + (level * 5) + (level > 30 ? (level - 30) * 4 : 0);
+    internal static long MonsterGuardDefence(int level) => 20 + (level * 3) + (level > 30 ? (level - 30) * 3 : 0);
+    internal static long MonsterGuardDailyFeeding(int level) => 50 + (level * 10) + (level > 30 ? (level - 30) * 20 : 0);
 
     /// <summary>
     /// Get total guard count (NPC + Monster)

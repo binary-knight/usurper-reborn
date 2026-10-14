@@ -1746,9 +1746,19 @@ public class AnchorRoadLocation : BaseLocation
     private async Task AttemptJailbreak()
     {
         terminal.WriteLine("");
+        // 1.3.2: one attempt a day, success or not (the gain is +50 Chivalry and nothing else limited it)
+        if (currentPlayer.JailbreakAttemptedToday)
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("anchor_road.jailbreak_done_today"));
+            terminal.WriteLine("");
+            terminal.SetColor("darkgray");
+            await terminal.PressAnyKey();
+            return;
+        }
+
         terminal.SetColor("red");
         terminal.WriteLine(Loc.Get("anchor_road.jailbreak_dangerous"));
-        terminal.WriteLine(Loc.Get("anchor_road.end_up_in_prison"));
         terminal.WriteLine("");
 
         terminal.SetColor("cyan");
@@ -1757,6 +1767,7 @@ public class AnchorRoadLocation : BaseLocation
         // v1.1.15: yesno-convert-a, strict (Y/N)
         if (await terminal.AskYesNoAsync(""))
         {
+            currentPlayer.JailbreakAttemptedToday = true;
             int successChance = 30 + currentPlayer.Level + (int)(currentPlayer.Agility / 5);
             bool success = random.Next(100) < successChance;
 
@@ -1779,7 +1790,7 @@ public class AnchorRoadLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("anchor_road.caught"));
                 terminal.WriteLine(Loc.Get("anchor_road.guards_spotted"));
 
-                // Damage and possible imprisonment
+                // Damage, Darkness and a chase; no imprisonment
                 long damage = currentPlayer.MaxHP / 5;
                 currentPlayer.HP = Math.Max(1, currentPlayer.HP - damage);
                 AlignmentSystem.Instance.ChangeAlignment(currentPlayer, 25, isGood: false, "anchor_road.escape_caught"); // v0.57.12: paired movement

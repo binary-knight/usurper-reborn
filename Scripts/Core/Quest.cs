@@ -205,31 +205,49 @@ public partial class Quest
     public long CalculateReward(int playerLevel)
     {
         if (Reward == 0) return 0;
-        
+
+        // 1.3.2: a Crown monster bounty stores its tier doubled (2, 4 or 6, QuestSystem.CreateGenericBounty), which
+        // the tiers below do not know. It pays twice the gold and XP of its base tier.
+        if (IsCrownMonsterBounty)
+        {
+            long basePay = PayForTier(CrownBaseTier, playerLevel);
+            return RewardType is QuestRewardType.Money or QuestRewardType.Experience ? basePay * 2 : basePay;
+        }
+        return PayForTier(Reward, playerLevel);
+    }
+
+    /// <summary>1.3.2: a Crown bounty to slay monsters (not one on an NPC or a player, which pay their own way).</summary>
+    private bool IsCrownMonsterBounty => Initiator == QuestSystem.CrownInitiator && QuestTarget == QuestTarget.Monster && !IsMercContract;
+
+    /// <summary>1.3.2: the base tier of a Crown monster bounty, its stored doubled tier halved back (1 to 3).</summary>
+    private int CrownBaseTier => Math.Clamp((Reward + 1) / 2, 1, 3);
+
+    private long PayForTier(int tier, int playerLevel)
+    {
         return RewardType switch
         {
-            QuestRewardType.Experience => Reward switch
+            QuestRewardType.Experience => tier switch
             {
                 1 => playerLevel * 100,   // Low exp
                 2 => playerLevel * 500,   // Medium exp
                 3 => playerLevel * 1000,  // High exp
                 _ => 0
             },
-            QuestRewardType.Money => Reward switch
+            QuestRewardType.Money => tier switch
             {
                 1 => playerLevel * 150,   // Low gold (~5-10 monster kills)
                 2 => playerLevel * 500,   // Medium gold (~15-25 monster kills)
                 3 => playerLevel * 1000,  // High gold (~30-50 monster kills)
                 _ => 0
             },
-            QuestRewardType.Potions => Reward switch
+            QuestRewardType.Potions => tier switch
             {
                 1 => 50,   // Low potions
                 2 => 100,  // Medium potions
                 3 => 200,  // High potions
                 _ => 0
             },
-            QuestRewardType.Darkness or QuestRewardType.Chivalry => Reward switch
+            QuestRewardType.Darkness or QuestRewardType.Chivalry => tier switch
             {
                 1 => 25,   // Low points
                 2 => 75,   // Medium points
@@ -385,7 +403,7 @@ public partial class Quest
         if (Reward == 0 || RewardType == QuestRewardType.Nothing)
             return Loc.Get("quest.reward.none");
 
-        string level = Reward switch
+        string level = (IsCrownMonsterBounty ? CrownBaseTier : Reward) switch
         {
             1 => Loc.Get("quest.reward.low"),
             2 => Loc.Get("quest.reward.medium"),

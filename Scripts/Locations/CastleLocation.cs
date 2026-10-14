@@ -101,7 +101,9 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("cyan");
         terminal.Write(Loc.Get("castle.guards_label"));
         terminal.SetColor("white");
-        terminal.WriteLine($"{currentKing.Guards.Count}/{GameConfig.MaxRoyalGuards}");
+        // 1.3.2: one list, two caps: the ruler hires while it holds fewer than King.MaxNPCGuards, others join while
+        // it holds fewer than GameConfig.MaxRoyalGuards
+        terminal.WriteLine(Loc.Get("castle.guards_caps", currentKing.Guards.Count, King.MaxNPCGuards, GameConfig.MaxRoyalGuards));
 
         // Prisoners
         terminal.SetColor("red");
@@ -664,9 +666,10 @@ public class CastleLocation : BaseLocation
         terminal.SetColor("bright_yellow");
         terminal.Write(Loc.Get("magic_shop.gold_short", $"{currentKing.Treasury:N0}"));
         terminal.SetColor("gray");
-        terminal.Write(Loc.Get("castle.bbs_guards", currentKing.Guards.Count, GameConfig.MaxRoyalGuards));
         terminal.Write(Loc.Get("castle.bbs_prisoners", currentKing.Prisoners.Count));
         terminal.WriteLine("");
+        // 1.3.2: the guards on their own row, with both caps (hiring and joining), which do not fit the row above
+        terminal.WriteLine(Loc.Get("castle.bbs_guards", currentKing.Guards.Count, King.MaxNPCGuards, GameConfig.MaxRoyalGuards));
         int unreadMail = royalMail.Count(m => !m.IsRead);
         if (unreadMail > 0)
         {
@@ -1022,7 +1025,7 @@ public class CastleLocation : BaseLocation
 
             terminal.WriteLine("");
             terminal.SetColor("white");
-            terminal.WriteLine(Loc.Get("castle.total_guards", currentKing.Guards.Count, GameConfig.MaxRoyalGuards));
+            terminal.WriteLine(Loc.Get("castle.total_guards", currentKing.Guards.Count, King.MaxNPCGuards, GameConfig.MaxRoyalGuards));   // 1.3.2: both caps
         }
 
         terminal.WriteLine("");
@@ -2802,15 +2805,15 @@ public class CastleLocation : BaseLocation
         foreach (var (name, level, cost) in sortedMonsters)
         {
             long actualCost = cost + (currentKing.MonsterGuards.Count * 500);
-            long feedingCost = 50 + (level * 10);
-            // Calculate stats using the same formula as AddMonsterGuard in King.cs
-            long hp = 200 + (level * 50);
-            long str = 30 + (level * 5);
-            long def = 20 + (level * 3);
+            // 1.3.2: King.cs's own formulas, so the row shows what is charged and what joins
+            long feedingCost = King.MonsterGuardDailyFeeding(level);
+            long hp = King.MonsterGuardHP(level);
+            long str = King.MonsterGuardStrength(level);
+            long def = King.MonsterGuardDefence(level);
 
             bool canAfford = currentKing.Treasury >= actualCost;
             terminal.SetColor(canAfford ? "white" : "darkgray");
-            terminal.WriteLine($"{i,-3} {MonsterNames.Display(name),-15} {level,-5} {hp,-7} {str,-6} {def,-6} {actualCost:N0,-10} {feedingCost:N0,-10}");
+            terminal.WriteLine($"{i,-3} {MonsterNames.Display(name),-15} {level,-5} {hp,-7} {str,-6} {def,-6} {actualCost.ToString("N0"),-10} {feedingCost.ToString("N0"),-10}");
             i++;
         }
 
@@ -7187,7 +7190,12 @@ public class CastleLocation : BaseLocation
                 terminal.SetColor("white");
                 terminal.WriteLine(Loc.Get("castle.quest_desc", Loc.Get($"castle.quest_type_{questType}")));
                 terminal.WriteLine(Loc.Get("castle.quest_difficulty", new string('*', difficulty + 1)));
-                terminal.WriteLine(Loc.Get("castle.quest_reward", goldReward, xpReward));
+                // 1.3.2: the offer shows what is paid: the advance now and the gold at completion (level x 1,000)
+                long advanceGold = goldReward / 4;
+                long advanceXP = xpReward / 4;
+                terminal.WriteLine(Loc.Get("castle.quest_reward", advanceGold, advanceXP));
+                terminal.WriteLine(Loc.Get("castle.quest_reward_completion", QuestSystem.RoyalQuestCompletionGold(1),
+                    QuestSystem.RoyalQuestCompletionGold(currentPlayer.Level), currentPlayer.Level));
                 terminal.WriteLine(Loc.Get("castle.quest_time_limit", 7 + difficulty * 2));
                 terminal.WriteLine("");
 
@@ -7205,9 +7213,7 @@ public class CastleLocation : BaseLocation
                         xpReward,
                         questDesc);
 
-                    // Give advance payment (25% of reward)
-                    long advanceGold = goldReward / 4;
-                    long advanceXP = xpReward / 4;
+                    // Give advance payment (as shown in the offer)
                     currentPlayer.Gold += advanceGold;
                     currentPlayer.Experience += advanceXP;
 

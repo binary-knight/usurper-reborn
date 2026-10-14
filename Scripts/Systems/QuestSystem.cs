@@ -2155,7 +2155,9 @@ public partial class QuestSystem
 
     #region King Bounty System
 
-    private static string KING_BOUNTY_INITIATOR => "The Crown";
+    /// <summary>1.3.2: the stored (English) initiator of every Crown bounty; Quest.CalculateReward reads it.</summary>
+    public const string CrownInitiator = "The Crown";
+    private static string KING_BOUNTY_INITIATOR => CrownInitiator;
 
     /// <summary>
     /// Get all bounties posted by the King
@@ -2355,7 +2357,7 @@ public partial class QuestSystem
         ));
 
         SetDefaultRewards(bounty);
-        bounty.Reward = (byte)Math.Min(255, bounty.Reward * 2); // King bounties pay double
+        bounty.Reward = (byte)Math.Min(255, bounty.Reward * 2); // King bounties pay double: Quest.CalculateReward halves it back to the base tier and doubles the gold and XP
 
         return bounty;
     }
@@ -2448,6 +2450,13 @@ public partial class QuestSystem
         return 3;
     }
 
+    /// <summary>1.3.2: the reward tier a royal audience quest stores (gold, paid at turn-in by Quest.CalculateReward).</summary>
+    public const byte RoyalQuestRewardTier = 3;
+
+    /// <summary>1.3.2: what completing a royal audience quest pays at this level, for the offer screen.</summary>
+    public static long RoyalQuestCompletionGold(int level) =>
+        new Quest { Reward = RoyalQuestRewardTier, RewardType = QuestRewardType.Money }.CalculateReward(level);
+
     public static Quest CreateRoyalAudienceQuest(Character player, string kingName, int difficulty,
         long goldReward, long xpReward, string questDescription)
     {
@@ -2523,7 +2532,7 @@ public partial class QuestSystem
             MinLevel = Math.Max(1, player.Level - 5),
             MaxLevel = player.Level + 20,
             DaysToComplete = 7 + difficulty * 2, // 9, 11, 13, 15 days
-            Reward = 3, // High reward tier
+            Reward = RoyalQuestRewardTier, // High reward tier
             RewardType = QuestRewardType.Money,
             // Pre-assign to this player
             Occupier = player.Name2,
