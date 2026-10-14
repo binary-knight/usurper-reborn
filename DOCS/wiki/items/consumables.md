@@ -1,7 +1,7 @@
 ---
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs
 history: 1.3.0 | A healing potion heals at least 20 percent of the drinker's maximum HP, and a potion given to an ally at least 20 percent of the ally's maximum HP.
 history: 1.2.7 | none

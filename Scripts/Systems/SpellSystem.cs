@@ -587,6 +587,21 @@ public static class SpellSystem
     }
 
     /// <summary>
+    /// 1.3.2: whether this spell restores hit points when cast as a heal. A spell is typed "Heal"
+    /// for other reasons too (it never fails its roll, it may be aimed at an ally), so the type
+    /// alone does not say that a cast heals. The Cleric's Purify (slot 3) is typed "Heal" and
+    /// sets no healing amount: it only cleanses. Anything that picks a heal for an injured party
+    /// member asks here. A test casts every "Heal" spell of every class and compares the healing
+    /// it sets with this answer, so a new such spell cannot slip through.
+    /// </summary>
+    public static bool RestoresHitPoints(CharacterClass characterClass, SpellInfo? spell)
+    {
+        if (spell == null || spell.SpellType != "Heal") return false;
+        if (characterClass == CharacterClass.Cleric && spell.Level == 3) return false; // Purify
+        return true;
+    }
+
+    /// <summary>
     /// Check if character can cast specific spell
     /// </summary>
     public static bool CanCastSpell(Character character, int spellLevel)

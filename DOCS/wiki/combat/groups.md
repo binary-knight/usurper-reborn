@@ -1,7 +1,7 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
 history: 1.3.0 | Teammates and companions roll to hit as you do, a healing potion given to an ally heals at least 20 percent of the ally's maximum HP, and a hired NPC or a friend in your party carries the oath-mark of your banner.
 history: 1.2.7 | none
