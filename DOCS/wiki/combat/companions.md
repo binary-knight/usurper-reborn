@@ -1,7 +1,7 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs
 history: 1.3.0 | Companions remember a murder they witness and a companion left to die: after a warning the least loyal one leaves, handing back its gear, and forgiveness in the Temple's Faith room brings it back.
 history: 1.2.5 | Companion descriptions, romance milestones, quest history and last words are shown in all five languages.

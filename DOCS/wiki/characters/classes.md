@@ -1,7 +1,7 @@
 ---
 title: Classes
 path: /wiki/en/characters/classes/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/Character.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs, Scripts/Data/SpecializationData.cs, Scripts/Data/EquipmentData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/TeamCornerLocation.cs
 history: 1.3.1 | none
 history: 1.3.0 | none
@@ -137,7 +137,7 @@ A Heavy armor piece with no Strength requirement of its own needs Strength of 15
 
 ### Weapons and shields a class can use
 
-There is one rule that ties a weapon type to a class: a Mystic Shaman can hold only a sword, axe, mace, hammer, flail or maul in its main hand. For every other class the limits come from class lists. The weapon and shield templates behind shop stock and dungeon loot each carry a class list or are open to every class. The table counts, for each class and type, the templates that class can use out of all templates of the type. Bows are not counted: the templates hold one set of bows for Rangers and one for every class, and four names are in both.
+There is one rule that ties a weapon type to a class: a Mystic Shaman can hold only a sword, axe, mace, hammer, flail or maul in its main hand. Every other limit comes from class lists, and those bind the Mystic Shaman too. The weapon and shield templates behind shop stock and dungeon loot each carry a class list or are open to every class. The table counts, for each class and type, the templates that class can use out of all templates of the type. Bows are not counted: the templates hold one set of bows for Rangers and one for every class, and four names are in both.
 
 The prestige classes skip every class list and the armor weight limits.
 

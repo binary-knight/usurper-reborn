@@ -1,7 +1,7 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs
 history: 1.3.0 | An elite monster with the Venomous trait can poison with its blows, and the lines that say you cannot act name the status in your language.
 history: 1.2.5 | The Healer's treatment labels in the graphical client and the cursed item names at Remove Curse are shown in the player's language.

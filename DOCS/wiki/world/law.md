@@ -1,7 +1,7 @@
 ---
 title: Crime, prison and the law
 path: /wiki/en/world/law/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs
 history: 1.3.0 | An NPC you beat in an honor duel keeps its HP and stays where it is and a kill contract on it is not paid, and town honor duels share the Inn duels' daily cap of 3 wins.
 history: 1.2.7 | none

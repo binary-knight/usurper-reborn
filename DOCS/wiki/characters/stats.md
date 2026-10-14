@@ -1,8 +1,8 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.3.0
-sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs
+checked: 1.3.1
+sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs
 history: 1.3.1 | none
 history: 1.3.0 | Physical attacks on monsters roll to hit, with Strength, Dexterity, level, weapon power and basic attack proficiency lowering the number needed against a monster more than 5 levels above you, and Status shows a dual-wielder the weapon power of each hand.
 history: 1.2.6 | none

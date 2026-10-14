@@ -1,7 +1,7 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs
 history: 1.3.0 | Your physical attacks on monsters roll a twenty-sided die to hit and show the roll and the number needed, and a dual-wielder's swings each use the weapon in their own hand.
 history: 1.2.7 | A monster's critical hit line no longer leaves an empty gap where a damage number used to be.

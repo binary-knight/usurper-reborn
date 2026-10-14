@@ -1,7 +1,7 @@
 ---
 title: Mental health
 path: /wiki/en/characters/mental/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs
 history: 1.3.1 | none
 history: 1.3.0 | none
