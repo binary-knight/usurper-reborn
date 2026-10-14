@@ -3650,6 +3650,7 @@
   "weapon_shop.gold_suffix": " or.",
   "weapon_shop.align_discount": "  Votre alignement {0} vous accorde un rabais de {1}%!",
   "weapon_shop.align_markup": "  Votre alignement {0} entraîne une majoration de {1}%.",
+  "weapon_shop.troll_discount": "  En tant que Troll, vous obtenez un rabais de {0}% sur les armes!",
   "weapon_shop.world_discount": "  Événements mondiaux : {0}% de rabais actif!",
   "weapon_shop.world_markup": "  Événements mondiaux : {0}% de majoration!",
   "weapon_shop.bbs_one_hand": "Une Main",

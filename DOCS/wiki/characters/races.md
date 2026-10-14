@@ -2,7 +2,7 @@
 title: Races
 path: /wiki/en/characters/races/
 checked: 1.3.1
-sources: Scripts/Core/GameConfig.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs
+sources: Scripts/Core/GameConfig.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
 history: 1.3.1 | none
 history: 1.3.0 | The Gnoll Poisonous Bite poisons on melee hits only; it no longer comes from spells, magical abilities, ranged abilities or a swing made with a bow in hand.
 history: 1.2.7 | none
@@ -52,6 +52,8 @@ Your class scales it again. The [Mental guide](/wiki/en/characters/mental/) show
 ## Race passives: Troll and Gnoll
 
 Two races have a passive of their own in a fight: the Troll regenerates and the Gnoll has a poisonous bite. The other eight races differ in their creation bonuses, their class limits and their Mental strain. Hobbits and Gnomes also cannot wear Heavy armor: see [equipment by class](/wiki/en/characters/classes/#equipment-by-class-armor-weight-weapons-and-shields).
+
+Out of a fight, a Troll also pays 10 percent less for a weapon at the Weapon Shop.
 
 ## Troll regeneration
 
