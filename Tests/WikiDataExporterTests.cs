@@ -405,6 +405,129 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(4, constants.GetProperty("WildernessMaxDailyExplorations").GetInt32());
     }
 
+    private JsonElement[] Economy(string list) => _export.Data("economy").GetProperty(list).EnumerateArray().ToArray();
+
+    private static JsonElement Find(JsonElement[] rows, string key, string id) =>
+        Assert.Single(rows.Where(r => r.GetProperty(key).ToString() == id));
+
+    [Fact]
+    public void EconomyMaterialsCarryTheirBandAndWhatSpendsThem()
+    {
+        // 1.3.2: the bands are GameConfig.CraftingMaterials; the uses are the Magic Shop enchant tiers and the Inn training
+        var materials = Economy("materials");
+        Assert.Equal(8, materials.Length);
+        var shard = Find(materials, "id", "crimson_war_shard");
+        Assert.Equal("Crimson War Shard", shard.GetProperty("name").GetProperty("en").GetString());
+        Assert.Equal(20, shard.GetProperty("floorMin").GetInt32());
+        Assert.Equal(35, shard.GetProperty("floorMax").GetInt32());
+        Assert.Equal(new[] { 13 }, shard.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        var heart = Find(materials, "id", "heart_of_the_ocean");
+        Assert.Equal(new[] { 11 }, heart.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        Assert.Equal(new[] { 4, 5 }, heart.GetProperty("statTrainings").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        var dust = Find(materials, "id", "fading_starlight_dust");
+        Assert.Equal(new[] { 10, 13, 14 }, dust.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        var petal = Find(materials, "id", "withered_heart_petal");
+        Assert.Equal(0, petal.GetProperty("enchants").GetArrayLength());
+        Assert.Equal(0, petal.GetProperty("statTrainings").GetArrayLength());
+        var gods = Economy("materialGods");
+        Assert.Equal(7, gods.Length);
+        Assert.Equal("crimson_war_shard", Find(gods, "god", "Maelketh").GetProperty("material").GetString());
+        Assert.Equal(25, Find(gods, "god", "Maelketh").GetProperty("floor").GetInt32());
+        Assert.Equal("eye_of_manwe", Find(gods, "god", "Manwe").GetProperty("material").GetString());
+    }
+
+    [Fact]
+    public void EconomyEnchantsReadTheShopTiersAndWhatANamedEnchantAdds()
+    {
+        var enchants = Economy("enchants");
+        Assert.Equal(14, enchants.Length);
+        var godforged = Find(enchants, "number", "12");
+        Assert.Equal("Godforged", godforged.GetProperty("name").GetProperty("en").GetString());
+        Assert.True(godforged.GetProperty("oneChosenStat").GetBoolean());
+        Assert.Equal(38, godforged.GetProperty("statBonus").GetInt32());
+        Assert.Equal(500000, godforged.GetProperty("baseCost").GetInt64());
+        Assert.Equal(5000, godforged.GetProperty("costPerLevel").GetInt32());
+        Assert.Equal(75, godforged.GetProperty("minLevel").GetInt32());
+        Assert.Equal(new[] { "eye_of_manwe", "terravoks_heartstone" },
+            godforged.GetProperty("materials").EnumerateArray().Select(m => m.GetProperty("id").GetString()).ToArray());
+        var blessing = Find(enchants, "number", "5");
+        Assert.False(blessing.GetProperty("oneChosenStat").GetBoolean());
+        var effects = blessing.GetProperty("effects").EnumerateObject().ToDictionary(p => p.Name, p => p.Value.GetDouble());
+        Assert.Equal(new[] { "ArmorClass", "DefenceBonus", "DexterityBonus", "StrengthBonus", "WeaponPower", "WisdomBonus" },
+            effects.Keys.OrderBy(k => k, StringComparer.Ordinal).ToArray());
+        Assert.All(effects.Values, v => Assert.Equal(3, v));
+        var ocean = Find(enchants, "number", "6").GetProperty("effects");
+        Assert.Equal(6, ocean.GetProperty("IntelligenceBonus").GetDouble());
+        Assert.Equal(4, ocean.GetProperty("WisdomBonus").GetDouble());
+        var phoenix = Find(enchants, "number", "13").GetProperty("effects");
+        Assert.True(phoenix.GetProperty("HasFireEnchant").GetBoolean());
+        Assert.Equal(20, phoenix.GetProperty("WeaponPower").GetDouble());
+        Assert.Equal(0, Find(enchants, "number", "1").GetProperty("materials").GetArrayLength());
+    }
+
+    [Fact]
+    public void EconomyGearSetsRarityHerbsAndHomeComeFromTheGame()
+    {
+        var sets = Economy("gearSets");
+        Assert.Equal(8, sets.Length);
+        var silk = Find(sets, "id", "silk");
+        Assert.Equal(new[] { 2, 4, 5 }, silk.GetProperty("tiers").EnumerateArray().Select(t => t.GetProperty("pieces").GetInt32()).ToArray());
+        var leather = Find(sets, "id", "leather").GetProperty("tiers")[0].GetProperty("bonuses")[0];
+        Assert.Equal("+10 Max HP", leather.GetProperty("text").GetString());
+
+        var rarities = Economy("lootRarities");
+        Assert.Equal(6, rarities.Length);
+        var legendary = Find(rarities, "id", "Legendary");
+        Assert.Equal(3.0, legendary.GetProperty("powerMultiplier").GetDouble(), 3);
+        Assert.Equal(20.0, legendary.GetProperty("valueMultiplier").GetDouble(), 3);
+        Assert.Equal(0.10, legendary.GetProperty("curseChance").GetDouble(), 3);
+        Assert.Equal("Legendary", legendary.GetProperty("namePrefix").GetString());
+        Assert.Equal("Mythic", Find(rarities, "id", "Artifact").GetProperty("namePrefix").GetString());
+        Assert.Equal(JsonValueKind.Null, Find(rarities, "id", "Common").GetProperty("namePrefix").ValueKind);
+
+        var herbs = Economy("herbs");
+        Assert.Equal(5, herbs.Length);
+        Assert.Equal(10, Find(herbs, "id", "HealingHerb").GetProperty("maxCarry").GetInt32());
+        Assert.Equal(4, Find(herbs, "id", "Swiftthistle").GetProperty("gardenLevel").GetInt32());
+
+        var home = _export.Data("economy").GetProperty("homeUpgrades");
+        var levels = home.GetProperty("levels").EnumerateArray().ToArray();
+        Assert.Equal(6, levels.Length);
+        Assert.Equal(JsonValueKind.Null, levels[0].GetProperty("livingQuartersCost").ValueKind);
+        Assert.Equal(25000, levels[1].GetProperty("livingQuartersCost").GetInt64());
+        Assert.Equal(2000000, levels[5].GetProperty("gardenCost").GetInt64());
+        Assert.Equal(100, levels[5].GetProperty("chestCapacity").GetInt32());
+        Assert.Equal(15, levels[5].GetProperty("hearthFights").GetInt32());
+        var training = home.GetProperty("trainingRoom").EnumerateArray().ToArray();
+        Assert.Equal(10, training.Length);
+        Assert.Equal(3500000, training[9].GetProperty("cost").GetInt64());
+    }
+
+    [Fact]
+    public void EconomyArtifactsGrantWhatTheGameGrants()
+    {
+        // 1.3.2: ArtifactSystem.ArtifactStatGrants: Intelligence is granted as half Wisdom and half Dexterity
+        var artifacts = Economy("artifacts");
+        Assert.Equal(7, artifacts.Length);
+        var eye = Find(artifacts, "id", "CreatorsEye");
+        Assert.Equal("Maelketh", eye.GetProperty("oldGod").GetString());
+        Assert.Equal(25, eye.GetProperty("floor").GetInt32());
+        var grants = eye.GetProperty("grants").EnumerateArray()
+            .ToDictionary(g => g.GetProperty("stat").GetString()!, g => g.GetProperty("amount").GetInt64());
+        Assert.Equal(new Dictionary<string, long> { ["Wisdom"] = 35, ["Dexterity"] = 25 }, grants);
+        var key = Find(artifacts, "id", "VoidKey");
+        Assert.Equal(JsonValueKind.Null, key.GetProperty("oldGod").ValueKind);
+        Assert.Equal(7, key.GetProperty("grants").GetArrayLength());
+        var blade = Find(artifacts, "id", "SunforgedBlade");
+        Assert.Equal(50, blade.GetProperty("weaponPower").GetInt32());
+        Assert.Equal(100, blade.GetProperty("chivalry").GetInt32());
+        Assert.Equal(85, blade.GetProperty("floor").GetInt32());
+        var constants = _export.Data("economy").GetProperty("constants");
+        Assert.Equal(0.03, constants.GetProperty("MaterialDropChanceRegular").GetDouble(), 3);
+        Assert.Equal(5, constants.GetProperty("MaxEnchantments").GetInt32());
+        Assert.Equal(0.20, constants.GetProperty("LootBaseDropChance").GetDouble(), 3);
+    }
+
     [Fact]
     public void MetaIdentifiesSchemaAndRelease()
     {

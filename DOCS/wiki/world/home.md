@@ -1,8 +1,8 @@
 ---
 title: Home and family
 path: /wiki/en/world/home/
-checked: 1.2.6
-sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs
+checked: 1.3.1
+sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/IntimacySystem.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/VisualNovelDialogueSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/CombatEngine.cs
 history: 1.2.6 | A child's name given at birth or at Home cannot contain < > & or a double quote; the child keeps its name instead.
 history: 1.2.5 | The Home screens are shown in all five languages, and long upgrade, trophy and pet rows wrap at 79 columns.
 history: 1.2.4 | Online your Home is private, and a spouse left alone for 21 days you were present writes you a letter.
@@ -17,12 +17,29 @@ Your Home is a private base with rest, storage, upgrades and family life. Online
 - **A and J:** gather and use herbs from your garden.
 - **U Upgrades:** buy home improvements.
 - **F, C, P, B:** your family, your children, your partner and the bedroom.
-- **X Resurrect:** raise a dead spouse or lover for gold.
+- **X Resurrect:** raise a dead spouse or lover for the dead character's level x 1,000 gold.
 - **T, Y, G, V, H, I, S:** trophies, tamed beasts, partner gear, party inventories, a healing potion, your inventory and status.
 
-## Upgrades
+## Home rest
 
-Living Quarters, Bed, Chest, Hearth and Garden each have several levels. A better bed raises the chance of children, the Hearth gives a damage bonus for your next few fights, and each Garden level adds a herb. A Training Room raises your base attributes one level at a time. One-time purchases include a Trophy Room, a Study for extra combat experience, Servants who earn gold each day, the Reinforced Door, a Legendary Armory and a Vitality Fountain. The Upgrades screen shows every price.
+A Home rest (E) heals a share of your maximum HP and mana set by your Living Quarters: 25 percent with none, up to 100 percent at level 5, with 1 to 5 rests a day. It also heals your whole party to full. With a Hearth, the rest gives a Well-Rested bonus to your attack and defence for your next few fights. The tables below give every level.
+
+## Home upgrades and prices
+
+Buy upgrades with U at Home, one level at a time. Living Quarters, Bed, Chest, Hearth and Herb Garden have 5 levels each and the Training Room has 10.
+
+{{table:home-upgrades}}
+
+A Bed level multiplies the chance of a child: 15 percent each time with a spouse and 5 percent with a lover, times the Bed's figure. Each Herb Garden level also unlocks the next [herb](/wiki/en/items/consumables/). Each Training Room level adds +1 to your base Strength, Dexterity, Constitution, Intelligence, Wisdom and Charisma; Agility and Stamina are not trained there.
+
+## One-time Home purchases
+
+- Trophy Room, 500,000 gold: shows your trophies (T).
+- Study, 750,000 gold: {{percent:StudyXPBonus}} percent more combat experience.
+- Servants' Quarters, 500,000 gold: {{balance:ServantsDailyGoldBase}} + level x {{balance:ServantsDailyGoldPerLevel}} gold each day.
+- Reinforced Door, 250,000 gold: online, lets you sleep at Home safely.
+- Legendary Armory, 2,500,000 gold: +5 permanent damage and +5 permanent defence.
+- Vitality Fountain, 5,000,000 gold: bonus maximum HP equal to 10 percent of your maximum HP when you buy it.
 
 ## Marriage
 
@@ -32,7 +49,7 @@ A living spouse adds combat experience and can join your dungeon party. The part
 
 ## Children
 
-A child can be conceived with a spouse or a lover, up to a limit of living children. Children grow up in real time and become adults after several real days. Until then each child gives you small bonuses to experience, HP, attributes and daily gold. Use C at Home to parent a child; your choices shape the child's character. You name a child when it is born and can rename it from C at Home. A name with < > & or a double quote is refused: a newborn keeps the name the game gave it, and a renamed child keeps its old name. An adult child becomes a townsperson and can join your team at a discount.
+A child can be conceived with a spouse or a lover, up to {{balance:MaxPlayerChildren}} living children; the chance is set by your Bed (see above). Children grow up in real time and become adults after several real days. Until then each child gives you small bonuses to experience, HP, attributes and daily gold. Use C at Home to parent a child; your choices shape the child's character. You name a child when it is born and can rename it from C at Home. A name with < > & or a double quote is refused: a newborn keeps the name the game gave it, and a renamed child keeps its old name. An adult child becomes a townsperson and can join your team at a discount.
 
 A child whose parents are both gone goes to the royal orphanage. Only the ruler adopts orphans.
 

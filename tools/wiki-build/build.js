@@ -111,6 +111,7 @@ function loadData(dir) {
     "bosses",
     "characters",
     "party",
+    "economy",
   ]) {
     const file = JSON.parse(
       fs.readFileSync(path.join(dir, kind + ".json"), "utf8"),
@@ -186,6 +187,40 @@ function loadData(dir) {
   for (const c of party.companions)
     if (!classes.has(c.combatClass))
       throw Error(`Unknown companion class: ${c.id}/${c.combatClass}`);
+  // 1.3.2: items and the town economy
+  const economy = data.economy;
+  for (const key of [
+    "materials",
+    "materialGods",
+    "enchants",
+    "gearSets",
+    "lootRarities",
+    "herbs",
+    "artifacts",
+  ])
+    if (!Array.isArray(economy[key]) || !economy[key].length)
+      throw Error(`Empty dataset: economy/${key}`);
+  if (
+    !economy.homeUpgrades ||
+    !economy.homeUpgrades.levels?.length ||
+    !economy.homeUpgrades.trainingRoom?.length
+  )
+    throw Error("Empty dataset: economy/homeUpgrades");
+  if (!economy.constants || !Object.keys(economy.constants).length)
+    throw Error("Empty dataset: economy/constants");
+  const materialIds = new Set(economy.materials.map((m) => m.id));
+  const enchantNumbers = new Set(economy.enchants.map((e) => e.number));
+  for (const e of economy.enchants)
+    for (const m of e.materials)
+      if (!materialIds.has(m.id))
+        throw Error(`Unknown enchant material: ${e.number}/${m.id}`);
+  for (const m of economy.materials)
+    for (const n of m.enchants)
+      if (!enchantNumbers.has(n))
+        throw Error(`Unknown material enchant: ${m.id}/${n}`);
+  for (const g of economy.materialGods)
+    if (!materialIds.has(g.material))
+      throw Error(`Unknown Old God material: ${g.god}/${g.material}`);
   return { meta, data };
 }
 function renderers(data) {
@@ -207,8 +242,12 @@ function renderers(data) {
     ...data.gods.favorRules,
     ...data.characters.constants,
   };
-  // 1.3.2: a party constant may not reuse a name another dataset already prints
+  // 1.3.2: a party or economy constant may not reuse a name another dataset already prints
   for (const [key, value] of Object.entries(data.party.constants)) {
+    if (key in constants) throw Error(`Duplicate constant: ${key}`);
+    constants[key] = value;
+  }
+  for (const [key, value] of Object.entries(data.economy.constants)) {
     if (key in constants) throw Error(`Duplicate constant: ${key}`);
     constants[key] = value;
   }
@@ -219,6 +258,32 @@ function renderers(data) {
       ? "Every class"
       : escape(t.classes.map(className).join(", "));
   const typeLabel = (type) => label(type);
+  // 1.3.2 economy tables
+  const num = (v) => Number(v).toLocaleString("en-US");
+  const ordinal = (n) =>
+    n + (n % 100 >= 11 && n % 100 <= 13 ? "th" : ["th", "st", "nd", "rd"][n % 10] || "th");
+  const enchantName = (n) =>
+    name(data.economy.enchants.find((e) => e.number === n));
+  // what a named enchant adds, by the item field it changes (MagicShopLocation.ApplyNamedEnchant)
+  const enchantFields = {
+    StrengthBonus: "Strength",
+    DexterityBonus: "Dexterity",
+    DefenceBonus: "Defence",
+    WisdomBonus: "Wisdom",
+    IntelligenceBonus: "Intelligence",
+    WeaponPower: "weapon power",
+    ArmorClass: "armor class",
+    MagicResistance: "magic resistance",
+    CriticalChanceBonus: "percent critical hit chance",
+    CriticalDamageBonus: "percent critical damage",
+    LifeSteal: "percent life steal",
+    HasFireEnchant: "a chance of extra fire damage on a hit",
+    HasFrostEnchant: "a chance to slow on a hit",
+  };
+  const enchantEffect = ([field, value]) => {
+    if (!(field in enchantFields)) throw Error(`Unknown enchant effect: ${field}`);
+    return value === true ? enchantFields[field] : `+${value} ${enchantFields[field]}`;
+  };
   // Abilities whose effect turns monsters onto the user: CombatEngine.ApplyAbilityEffectsMultiMonster
   // cases aoe_taunt, undertow, abyssal_anchor and eternal_vigil, and ApplyTankTauntAndBuff for the
   // three level 40 abilities. A list here, because the template holds only the effect name.
@@ -750,6 +815,174 @@ function renderers(data) {
         "Ally stances",
       );
     }
+    if (id === "materials")
+      return table(
+        ["Material", "Dungeon floors", "Spent on"],
+        data.economy.materials.map((m) => [
+          escape(name(m)),
+          `${m.floorMin} to ${m.floorMax}`,
+          escape(
+            [
+              ...m.enchants.map((n) => `${enchantName(n)} enchant`),
+              ...m.statTrainings.map((n) => `${ordinal(n)} Inn stat training`),
+            ].join(", ") || "Nothing spends it",
+          ),
+        ]),
+        "Crafting materials",
+      );
+    if (id === "old-god-rewards") {
+      const materialName = (id) =>
+        name(data.economy.materials.find((m) => m.id === id));
+      const grant = (g) => `+${g.amount} ${label(g.stat)}`;
+      return spoiler(
+        "Spoiler: what each Old God leaves",
+        table(
+          ["Old God", "Floor", "Material"],
+          data.economy.materialGods.map((g) => [
+            escape(g.god),
+            g.floor,
+            escape(materialName(g.material)),
+          ]),
+          "Old God materials",
+        ) +
+          table(
+            ["Artifact", "From", "Grants when collected"],
+            data.economy.artifacts.map((a) => [
+              escape(name(a)),
+              a.oldGod
+                ? `${escape(a.oldGod)}, floor ${a.floor}`
+                : "Appears when you hold the other six",
+              escape(
+                [
+                  ...a.grants.map(grant),
+                  a.weaponPower ? `+${a.weaponPower} weapon power` : "",
+                  a.chivalry ? `+${a.chivalry} Chivalry` : "",
+                  a.darkness ? `+${a.darkness} Darkness` : "",
+                ]
+                  .filter(Boolean)
+                  .join(", "),
+              ),
+            ]),
+            "Artifacts",
+          ),
+      );
+    }
+    if (id === "enchants")
+      return table(
+        ["Number", "Enchant", "Effect", "Cost before modifiers", "Level", "Materials"],
+        data.economy.enchants.map((e) => [
+          e.number,
+          escape(name(e)),
+          escape(
+            e.oneChosenStat
+              ? `+${e.statBonus} to one stat you choose`
+              : Object.entries(e.effects).map(enchantEffect).join(", "),
+          ),
+          `${num(e.baseCost)} + ${num(e.costPerLevel)} per level`,
+          e.minLevel,
+          escape(
+            e.materials
+              .map(
+                (m) =>
+                  `${m.count} ${name(data.economy.materials.find((x) => x.id === m.id))}`,
+              )
+              .join(", ") || "None",
+          ),
+        ]),
+        "Magic Shop enchants",
+      );
+    if (id === "gear-sets")
+      return table(
+        ["Set", "Bonuses by pieces worn", "Pieces that count"],
+        data.economy.gearSets.map((s) => [
+          escape(name(s)),
+          escape(
+            s.tiers
+              .map(
+                (t) =>
+                  `${t.pieces} pieces: ${t.bonuses.map((b) => b.text).join(", ")}`,
+              )
+              .join("; "),
+          ),
+          escape(s.families.join(", ")),
+        ]),
+        "Gear sets",
+      );
+    if (id === "loot-rarity")
+      return table(
+        [
+          "Rarity",
+          "Name starts with",
+          "Power multiplier",
+          "Value multiplier",
+          "Special effects",
+          "Chance to be cursed (%)",
+        ],
+        data.economy.lootRarities.map((r) => [
+          escape(r.id),
+          escape(r.namePrefix ?? "Nothing"),
+          r.powerMultiplier,
+          r.valueMultiplier,
+          r.minEffects === r.maxEffects
+            ? r.minEffects
+            : `${r.minEffects} to ${r.maxEffects}`,
+          Math.round(r.curseChance * 100),
+        ]),
+        "Dropped item rarity",
+      );
+    if (id === "home-upgrades") {
+      const h = data.economy.homeUpgrades;
+      const pct = (v) => Math.round(v * 100);
+      const cost = (v) => (v == null ? "Start" : num(v));
+      const part = (heading, headers, row) =>
+        `<h3 id="${slug(heading)}">${escape(heading)}</h3>` +
+        table(
+          ["Level", "Price", ...headers],
+          h.levels.map((l) => [l.level, ...row(l)]),
+          heading,
+        );
+      return (
+        part("Living Quarters", ["Rest heals (% of max HP and mana)", "Rests a day"], (l) => [
+          cost(l.livingQuartersCost),
+          pct(l.restRecovery),
+          l.restsPerDay,
+        ]) +
+        part("Bed", ["Chance of a child (x)"], (l) => [
+          cost(l.bedCost),
+          Math.round((1 + l.bedFertility) * 100) / 100,
+        ]) +
+        part("Chest", ["Items it holds"], (l) => [
+          cost(l.chestCost),
+          l.chestCapacity,
+        ]) +
+        part("Hearth", ["Well-Rested bonus (%)", "Fights it lasts"], (l) => [
+          cost(l.hearthCost),
+          pct(l.hearthBonus),
+          l.hearthFights,
+        ]) +
+        part("Herb Garden", ["Herbs a day"], (l) => [
+          cost(l.gardenCost),
+          l.herbsPerDay,
+        ]) +
+        `<h3 id="training-room">Training Room</h3>` +
+        table(
+          ["Level", "Price"],
+          h.trainingRoom.map((t) => [t.level, num(t.cost)]),
+          "Training Room",
+        )
+      );
+    }
+    if (id === "herbs")
+      return table(
+        ["Herb", "Garden level", "Most you can carry", "Effect"],
+        data.economy.herbs.map((e) => [
+          escape(name(e)),
+          e.gardenLevel,
+          e.maxCarry,
+          escape(e.effect),
+        ]),
+        "Herbs",
+      );
     if (id === "balance")
       return (
         values(data.balance.moddableDefaults, "Moddable balance defaults") +
