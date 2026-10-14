@@ -1,7 +1,7 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
 history: 1.3.0 | Rooms you cleared stay cleared after a disconnect or a save taken on the floor, your physical attacks roll to hit, and a healing potion heals at least 20 percent of your maximum HP.
 history: 1.2.5 | Level Master, Healer and dungeon screens are shown in all five languages, and long dungeon rows wrap inside 79 columns.
