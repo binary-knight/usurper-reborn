@@ -1005,7 +1005,9 @@ namespace UsurperRemake.Systems
         {
             foreach (var room in floor.Rooms)
             {
-                if (room.HasEvent && !room.IsBossRoom)
+                // 1.3.2: a room whose event the special pass set (outpost, secret boss, lore library, meditation
+                // chamber, memory room) keeps it; only a room still at None gets a random event.
+                if (room.HasEvent && !room.IsBossRoom && room.EventType == DungeonEventType.None)
                 {
                     room.EventType = GetRandomEventType(floor.Theme);
                 }
