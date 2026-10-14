@@ -181,7 +181,7 @@ public partial class CombatEngine
         // A caster is blamed only for a heal they could actually have cast.
         if (!ClassAbilitySystem.IsSpellcaster(owner.Class) || owner.Mana <= 0) return false;
         return SpellSystem.GetAvailableSpells(owner)
-            .Any(s => s.SpellType == "Heal" && SpellSystem.CalculateManaCost(s, owner) <= owner.Mana);
+            .Any(s => SpellSystem.RestoresHitPoints(owner.Class, s) && SpellSystem.CalculateManaCost(s, owner) <= owner.Mana);
     }
     internal Dictionary<string, int> CooldownsFor(Character actor)
     {
@@ -20160,7 +20160,8 @@ public partial class CombatEngine
         var disabledSpells = GetDisabledSpellsFor(caster);
 
         return spells
-            .Where(s => s.SpellType == "Heal" &&
+            // 1.3.2: only a spell that restores hit points is a heal for an injured party member
+            .Where(s => SpellSystem.RestoresHitPoints(caster.Class, s) &&
                         caster.Level >= SpellSystem.GetLevelRequired(caster.Class, s.Level) &&
                         // Affordability must use the real cast gate (CalculateManaCost +
                         // spell weapon), not the raw table ManaCost -- see TeammateHealWithSpell.
@@ -32179,7 +32180,7 @@ public partial class CombatEngine
             // v0.65.1: a pure healer (no Attack spell) pressing bare C casts their best heal
             // on the most-injured party member -- so "C = cast best spell" is true for healers.
             var bestHeal = spells
-                .Where(s => s.SpellType == "Heal")
+                .Where(s => SpellSystem.RestoresHitPoints(teammate.Class, s))
                 .OrderByDescending(s => s.Level)
                 .FirstOrDefault();
             if (bestHeal != null)
@@ -32231,7 +32232,7 @@ public partial class CombatEngine
             if (anyInjured && ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0)
             {
                 var castableHeal = SpellSystem.GetAvailableSpells(teammate)
-                    .Where(s => s.SpellType == "Heal" && teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
+                    .Where(s => SpellSystem.RestoresHitPoints(teammate.Class, s) && teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
                     .OrderByDescending(s => s.Level)
                     .FirstOrDefault();
                 if (castableHeal != null)
