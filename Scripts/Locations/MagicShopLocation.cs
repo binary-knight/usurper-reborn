@@ -910,7 +910,10 @@ public partial class MagicShopLocation : BaseLocation
 
             if (targetItem.Type == ObjType.Weapon)
                 targetItem.Attack = (int)(targetItem.Attack / 1.25f * purificationPenalty);
-            else if (targetItem.Type == ObjType.Body || targetItem.Type == ObjType.Shield)
+            else if (targetItem.Type is ObjType.Body or ObjType.Shield
+                     // 1.3.2: every armor slot's curse boosts Armor (LootGenerator.CreateArmorFromTemplate)
+                     or ObjType.Head or ObjType.Arms or ObjType.Hands or ObjType.Legs
+                     or ObjType.Feet or ObjType.Waist or ObjType.Face or ObjType.Abody)
                 targetItem.Armor = (int)(targetItem.Armor / 1.25f * purificationPenalty);
             else if (targetItem.Type == ObjType.Fingers || targetItem.Type == ObjType.Neck)
             {

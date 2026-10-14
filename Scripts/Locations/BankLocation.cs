@@ -1416,8 +1416,19 @@ public class BankLocation : BaseLocation
         await Pacing.Wait(1000);
 
         // Real interactive combat against the guards
+        // 1.3.2: a staged fight (IsExhibitionCombat, as the Pit and the Gauntlet): a loss returns PlayerDied
+        // at 1 HP with no death pipeline, so it reaches the bank's own outcome below (the fine)
         var combatEngine = new CombatEngine(terminal);
-        var result = await combatEngine.PlayerVsMonsters(currentPlayer, monsters, offerMonkEncounter: false);
+        CombatResult result;
+        try
+        {
+            currentPlayer.IsExhibitionCombat = true;
+            result = await combatEngine.PlayerVsMonsters(currentPlayer, monsters, offerMonkEncounter: false);
+        }
+        finally
+        {
+            currentPlayer.IsExhibitionCombat = false;
+        }
 
         if (result.Outcome == CombatOutcome.Victory)
         {

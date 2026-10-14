@@ -868,15 +868,16 @@ public class DailySystemManager
         {
             if (player != null && player.LoanAmount > 0)
             {
-                long interest = (long)(player.LoanAmount * GameConfig.LoanSharkDailyInterest);
+                // 1.3.2: interest goes to the interest owed only, on the whole amount owed (principal plus
+                // interest), so it compounds; the alley asks for the sum, so it was counted twice before
+                long interest = (long)((player.LoanAmount + player.LoanInterestAccrued) * GameConfig.LoanSharkDailyInterest);
                 player.LoanInterestAccrued += interest;
-                player.LoanAmount += interest;
                 player.LoanDaysRemaining--;
 
                 if (terminal != null)
                 {
                     terminal.SetColor("red");
-                    WriteRows(terminal, Loc.Get("daily.loan_interest", $"{interest:N0}", $"{player.LoanAmount:N0}", Math.Max(0, player.LoanDaysRemaining)));
+                    WriteRows(terminal, Loc.Get("daily.loan_interest", $"{interest:N0}", $"{player.LoanAmount + player.LoanInterestAccrued:N0}", Math.Max(0, player.LoanDaysRemaining)));
                 }
 
                 if (player.LoanDaysRemaining <= 0 && terminal != null)
@@ -1021,15 +1022,16 @@ public class DailySystemManager
             var loanPlayer = GameEngine.Instance?.CurrentPlayer;
             if (loanPlayer != null && loanPlayer.LoanAmount > 0)
             {
-                long interest = (long)(loanPlayer.LoanAmount * GameConfig.LoanSharkDailyInterest);
+                // 1.3.2: interest goes to the interest owed only, on the whole amount owed (principal plus
+                // interest), so it compounds; the alley asks for the sum, so it was counted twice before
+                long interest = (long)((loanPlayer.LoanAmount + loanPlayer.LoanInterestAccrued) * GameConfig.LoanSharkDailyInterest);
                 loanPlayer.LoanInterestAccrued += interest;
-                loanPlayer.LoanAmount += interest;
                 loanPlayer.LoanDaysRemaining--;
 
                 if (terminal != null)
                 {
                     terminal.SetColor("red");
-                    WriteRows(terminal, Loc.Get("daily.loan_interest", $"{interest:N0}", $"{loanPlayer.LoanAmount:N0}", Math.Max(0, loanPlayer.LoanDaysRemaining)));
+                    WriteRows(terminal, Loc.Get("daily.loan_interest", $"{interest:N0}", $"{loanPlayer.LoanAmount + loanPlayer.LoanInterestAccrued:N0}", Math.Max(0, loanPlayer.LoanDaysRemaining)));
                 }
 
                 if (loanPlayer.LoanDaysRemaining <= 0)
