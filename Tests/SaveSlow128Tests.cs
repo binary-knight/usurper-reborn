@@ -212,18 +212,20 @@ public class SaveSlow128Tests : IDisposable
     {
         var instant = new InstantBackend();
         SaveSystem.InitializeWithBackend(instant);
-        // warm (JIT done), four thousand items build in 1 to 2 ms; fifty thousand take about 40 ms,
-        // well over the 5 ms threshold, while the instant write stays at 0 ms
+        // Fifty thousand items take about 9 ms to build on a warm process with no garbage collection
+        // inside the build, and more when one lands. The timers count whole milliseconds, so a 5 ms
+        // threshold needed 6 ms, too thin a margin: a build of 5 ms or less logged nothing.
+        // A threshold of 0 is crossed by any build of 1 ms or more, while the instant write stays at 0 ms.
         var hero = Hero(items: 50_000);
-        SaveSystem.SlowSaveThresholdMs = 5;
+        SaveSystem.SlowSaveThresholdMs = 0;
 
         (await SaveSystem.Instance.AutoSave(hero, force: true)).Should().BeTrue();
 
         instant.Writes.Should().Be(1);
         var lines = SlowLines();
         lines.Should().ContainSingle();
-        Ms(lines[0], "build").Should().BeGreaterThan(5, "fifty thousand items take more than 5 ms to build");
-        Ms(lines[0], "write").Should().BeLessThanOrEqualTo(5, "the write returns at once, so only the build is over");
+        Ms(lines[0], "build").Should().BeGreaterThan(SaveSystem.SlowSaveThresholdMs, "fifty thousand items take more than the threshold to build");
+        Ms(lines[0], "write").Should().BeLessThanOrEqualTo(5, "the write returns at once, so only the build is slow");
     }
 
     // ---------- 4. the caller ----------
