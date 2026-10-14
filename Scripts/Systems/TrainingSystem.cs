@@ -678,12 +678,40 @@ public static class TrainingSystem
         if (skillId.StartsWith("sage_") && charClass == CharacterClass.Sage)
             return true;
 
+        // 1.3.2: the other casters' spells use the shared id "spell_spell_N" (GetSpellSkillId) and start at
+        // Average too. IsSpellcaster is the same list SpellSystem.HasSpells holds, keyed by class.
+        if (skillId.StartsWith("spell_spell_") && ClassAbilitySystem.IsSpellcaster(charClass)
+            && charClass != CharacterClass.Cleric && charClass != CharacterClass.Magician
+            && charClass != CharacterClass.Sage)
+            return true;
+
         // Check class abilities
         var ability = ClassAbilitySystem.GetAbility(skillId);
         if (ability != null && ability.AvailableToClasses.Contains(charClass))
             return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// 1.3.2: a saved spell of a class whose "spell_spell_N" spells now start at Average is raised to Average,
+    /// with that key's progress cleared. Never lowers, touches no other skill, no points and no gold.
+    /// Returns true when a value was raised. Called once when a player is restored from a save.
+    /// </summary>
+    internal static bool RaiseSavedSpellsToAverage(Character player)
+    {
+        bool changed = false;
+        foreach (var skillId in new List<string>(player.SkillProficiencies.Keys))
+        {
+            if (!skillId.StartsWith("spell_spell_") || !IsClassSkill(player.Class, skillId))
+                continue;
+            if (player.SkillProficiencies[skillId] >= ProficiencyLevel.Average)
+                continue;
+            player.SkillProficiencies[skillId] = ProficiencyLevel.Average;
+            player.SkillTrainingProgress.Remove(skillId);
+            changed = true;
+        }
+        return changed;
     }
 
     /// <summary>
