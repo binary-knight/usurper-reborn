@@ -446,7 +446,7 @@ public class ShamanEquip131Tests : IDisposable
             .ToList();
         markedButRefused.Should().OnlyContain(i => i.WeightClass == ArmorWeightClass.Heavy);
         markedButRefused.Select(i => i.Family).Distinct().OrderBy(n => n)
-            .Should().Equal("Mithril Boots", "Mithril Helm", "Steel Faceplate");
+            .Should().Equal("Mithril Boots", "Mithril Helm");
     }
 
     [Fact]

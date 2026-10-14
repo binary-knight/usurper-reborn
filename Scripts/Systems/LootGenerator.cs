@@ -832,7 +832,7 @@ public static class LootGenerator
             ("War Mask", new[] { "Warrior", "Barbarian", "MysticShaman" }, 25, 65, 18),
             ("Mystic Veil", new[] { "Magician", "Sage", "Cleric" }, 20, 65, 12),
             ("Forged Visor", new[] { "All" }, 35, 70, 24),
-            ("Steel Faceplate", new[] { "Warrior", "Paladin", "MysticShaman" }, 40, 80, 30),
+            ("Steel Faceplate", new[] { "Warrior", "Paladin" }, 40, 80, 30),
             ("Mithril Visor", new[] { "All" }, 55, 90, 42),
             ("Runed Mask", new[] { "All" }, 65, 100, 52),
             ("Death Mask", new[] { "Assassin" }, 50, 90, 38),
