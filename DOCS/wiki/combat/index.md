@@ -204,9 +204,9 @@ An ability's direct damage is reduced by your Defence + half your armor power + 
 
 ## Regeneration in combat
 
-At the end of each round every living member of the party regenerates combat stamina and, for a class with spells, mana:
+At the end of each round every living member of the party regenerates combat stamina and, for a class with mana, mana:
 
-- **Mana:** 2 plus a tenth of Wisdom, at most 15 a round (Wisdom 130). Arcanus's boon adds to it. The Mystic Shaman does not regain mana this way.
+- **Mana:** 2 plus a tenth of Wisdom, at most 15 a round (Wisdom 130). Arcanus's boon adds to it. A Mystic Shaman regains mana this way too.
 - **Combat stamina:** 3 plus a fifteenth of Stamina, plus 2 in light armor or with no armor, or 1 in medium armor. Combat stamina is full at the start of every fight; mana is not.
 
 {{table:combat-regeneration}}

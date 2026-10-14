@@ -33,13 +33,13 @@ In an Old God fight, after you drink a healing or mana potion you cannot drink a
 
 ### Difficulty and potions
 
-On Easy a healing potion that auto-combat drinks heals 25 percent more, and on Nightmare 25 percent less. A potion you drink with I, give to an ally, or drink after a fight heals the same on every difficulty.
+On Easy every healing potion you or your party drink heals 25 percent more, and on Nightmare 25 percent less, in a fight or out of it. The multiplier comes before Potion Mastery and the Infirmary, and the heal and the number of potions to full HP that a menu shows include it. An opponent's potion in a fight against another player is not changed.
 
 ### Auto-combat and Auto Heal
 
 Auto-combat drinks one healing potion when your HP is at or below your threshold: {{balance:AutoCombatHealPercentDefault}} percent by default, set from {{balance:AutoCombatHealPercentMin}} to {{balance:AutoCombatHealPercentMax}} in steps of 10.
 
-With Auto Heal on, after a fight you drink healing potions until the HP you are missing is less than half an average potion. The average potion is 50 + 5 x your level, or 20 percent of your maximum HP when that is more (with Potion Mastery, 50 percent more). A class with spells does the same with mana potions, by 30 + 5 x level.
+With Auto Heal on, after a fight you drink healing potions until the HP you are missing is less than half an average potion. The average potion is 50 + 5 x your level, or 20 percent of your maximum HP when that is more, times the difficulty multiplier above (with Potion Mastery, 50 percent more). A class with mana does the same with mana potions, by 30 + 5 x level.
 
 Willow Draught stops at your ordinary Mental cap and is kept if there is nothing to restore. Addiction and Broken require their own treatment decisions.
 

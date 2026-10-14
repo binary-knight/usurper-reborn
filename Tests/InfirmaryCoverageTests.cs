@@ -205,7 +205,7 @@ public class InfirmaryCoverageTests
     public void TheHomePotion_PutsTheInfirmaryInsideTheFloor()
     {
         MethodBody("Scripts/Locations/HomeLocation.cs", "UseHealingPotion")
-            .Should().Contain("Math.Max(50, PotionBonus.ApplyOwnerBonuses(currentPlayer, currentPlayer.MaxHP / 4))");
+            .Should().Contain("Math.Max(50, PotionBonus.ApplyOwnerBonuses(currentPlayer, DifficultySystem.ApplyHealingMultiplier(currentPlayer.MaxHP / 4)))");
     }
 
     // Behaviour.
