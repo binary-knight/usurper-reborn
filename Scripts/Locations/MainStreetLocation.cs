@@ -2130,6 +2130,14 @@ public partial class MainStreetLocation : BaseLocation
             };
             terminal.SetColor("bright_green");
             terminal.WriteLine($"  {Loc.Get("main_street.grief_label")} {griefStatus}");
+
+            // 1.3.2: the Wisdom of completed griefs shows with or without a live grief
+            int completedWisdom = grief.GetCurrentEffects().PermanentWisdomBonus;
+            if (completedWisdom > 0)
+            {
+                terminal.SetColor("gray");
+                terminal.WriteLine(Loc.Get("main_street.grief_combat_effects", Loc.Get("main_street.grief_wisdom", completedWisdom)));
+            }
         }
         terminal.WriteLine("");
 

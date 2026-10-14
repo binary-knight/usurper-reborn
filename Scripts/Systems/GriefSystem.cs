@@ -709,7 +709,6 @@ namespace UsurperRemake.Systems
                 },
                 GriefStage.Acceptance => new GriefEffects
                 {
-                    PermanentWisdomBonus = 5,
                     Description = Loc.Get("grief.effect_acceptance")
                 },
                 _ => new GriefEffects()
