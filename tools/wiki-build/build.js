@@ -112,6 +112,7 @@ function loadData(dir) {
     "characters",
     "party",
     "economy",
+    "combat",
   ]) {
     const file = JSON.parse(
       fs.readFileSync(path.join(dir, kind + ".json"), "utf8"),
@@ -221,6 +222,16 @@ function loadData(dir) {
   for (const g of economy.materialGods)
     if (!materialIds.has(g.material))
       throw Error(`Unknown Old God material: ${g.god}/${g.material}`);
+  // 1.3.2: combat: statuses, monster target weights by class, regeneration and the combat constants
+  const combat = data.combat;
+  for (const key of ["statuses", "targetWeights", "regeneration"])
+    if (!Array.isArray(combat[key]) || !combat[key].length)
+      throw Error(`Empty dataset: combat/${key}`);
+  if (!combat.constants || !Object.keys(combat.constants).length)
+    throw Error("Empty dataset: combat/constants");
+  for (const w of combat.targetWeights)
+    if (!classes.has(w.classId))
+      throw Error(`Unknown target weight class: ${w.classId}`);
   return { meta, data };
 }
 function renderers(data) {
@@ -248,6 +259,10 @@ function renderers(data) {
     constants[key] = value;
   }
   for (const [key, value] of Object.entries(data.economy.constants)) {
+    if (key in constants) throw Error(`Duplicate constant: ${key}`);
+    constants[key] = value;
+  }
+  for (const [key, value] of Object.entries(data.combat.constants)) {
     if (key in constants) throw Error(`Duplicate constant: ${key}`);
     constants[key] = value;
   }
@@ -982,6 +997,68 @@ function renderers(data) {
           escape(e.effect),
         ]),
         "Herbs",
+      );
+    if (id === "statuses") {
+      // the damage one tick does at a level, as "min to max", or the single number when they are equal
+      const tick = (s, level) => {
+        const d = s.damagePerRound.find((x) => x.level === level);
+        if (!d) return "None";
+        return d.min === d.max ? `${d.min}` : `${d.min} to ${d.max}`;
+      };
+      const levels = data.combat.statuses.find((s) => s.damagePerRound.length)
+        .damagePerRound.map((d) => d.level);
+      return table(
+        [
+          "Status",
+          "Kind",
+          "Stops you acting",
+          "Stops spells",
+          ...levels.map((l) => `Damage per round at level ${l}`),
+          "Ends by itself",
+        ],
+        data.combat.statuses.map((s) => [
+          escape(label(s.id)),
+          escape(label(s.category)),
+          s.preventsAction ? "Yes" : "No",
+          s.preventsSpellcasting ? "Yes" : "No",
+          ...levels.map((l) => tick(s, l)),
+          s.countsDownEachRound ? "Yes" : "No",
+        ]),
+        "Combat statuses",
+      );
+    }
+    if (id === "target-weights")
+      return table(
+        ["Class", "Weight", "Weight while you Defend"],
+        [...data.combat.targetWeights]
+          .sort((a, b) => b.weight - a.weight || a.classId.localeCompare(b.classId))
+          .map((w) => [
+            link(
+              "characters/classes",
+              data.classes.find((c) => c.id === w.classId),
+            ),
+            w.weight,
+            w.weightWhileDefending,
+          ]),
+        "Monster target weight by class",
+      );
+    if (id === "combat-regeneration")
+      return table(
+        [
+          "Stat",
+          "Mana per round (Wisdom)",
+          "Combat stamina per round (Stamina), light or no armor",
+          "Medium armor",
+          "Heavy armor",
+        ],
+        data.combat.regeneration.map((r) => [
+          r.stat,
+          r.manaPerRound,
+          r.staminaPerRoundLight,
+          r.staminaPerRoundMedium,
+          r.staminaPerRoundHeavy,
+        ]),
+        "Mana and combat stamina regained at the end of each round",
       );
     if (id === "balance")
       return (

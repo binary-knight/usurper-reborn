@@ -320,7 +320,7 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     public void BalanceContainsModdableAndFixedValues()
     {
         var data = _export.Data("balance");
-        Assert.Equal(GameConfig.CriticalHitChance, data.GetProperty("moddableDefaults").GetProperty("criticalHitChance").GetInt32());
+        Assert.Equal(GameConfig.BossPotionCooldownRounds, data.GetProperty("moddableDefaults").GetProperty("bossPotionCooldownRounds").GetInt32());
         Assert.Equal(GameConfig.GodBoonTerranMaxHpPct, data.GetProperty("godConstants").GetProperty("GodBoonTerranMaxHpPct").GetInt32());
         Assert.Equal(GameConfig.SpecializationUnlockLevel, data.GetProperty("characterConstants").GetProperty("SpecializationUnlockLevel").GetInt32());
     }
@@ -526,6 +526,95 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(0.03, constants.GetProperty("MaterialDropChanceRegular").GetDouble(), 3);
         Assert.Equal(5, constants.GetProperty("MaxEnchantments").GetInt32());
         Assert.Equal(0.20, constants.GetProperty("LootBaseDropChance").GetDouble(), 3);
+    }
+
+    /// <summary>1.3.2: the balance export leaves out the six values no live code reads (CriticalHitChance and
+    /// CriticalHitMultiplier: StatEffectsSystem decides crits; BackstabMultiplier: read only by the dead
+    /// ExecuteBackstab; Berserk, Doom rounds and the tank's AoE share: no reader).</summary>
+    [Fact]
+    public void BalanceLeavesOutTheValuesNoCodeReads()
+    {
+        var data = _export.Data("balance");
+        var moddable = data.GetProperty("moddableDefaults");
+        foreach (var gone in new[] { "criticalHitChance", "criticalHitMultiplier", "backstabMultiplier", "berserkMultiplier",
+                     "bossDoomDefaultRounds", "bossTankAoEAbsorption" })
+            Assert.False(moddable.TryGetProperty(gone, out _), gone);
+        var combat = data.GetProperty("combatConstants");
+        foreach (var gone in new[] { "CriticalHitChance", "CriticalHitMultiplier", "BackstabMultiplier", "BerserkMultiplier" })
+            Assert.False(combat.TryGetProperty(gone, out _), gone);
+        // every other moddable default is still there, under the property's own name
+        Assert.Equal(typeof(UsurperRemake.Data.BalanceConfig).GetProperties().Length - 6, moddable.EnumerateObject().Count());
+        Assert.Equal(GameConfig.BossEnrageExtraAttacks, moddable.GetProperty("bossEnrageExtraAttacks").GetInt32());
+    }
+
+    private JsonElement[] Combat(string list) => _export.Data("combat").GetProperty(list).EnumerateArray().ToArray();
+
+    [Fact]
+    public void CombatStatusesCarryTheGamesFlagsAndTickDamage()
+    {
+        var statuses = Combat("statuses");
+        Assert.Equal(Enum.GetValues<StatusEffect>().Length - 1, statuses.Length);
+        foreach (var s in statuses)
+        {
+            var status = Enum.Parse<StatusEffect>(s.GetProperty("id").GetString()!);
+            Assert.Equal(status.PreventsAction(), s.GetProperty("preventsAction").GetBoolean());
+            Assert.Equal(status.PreventsSpellcasting(), s.GetProperty("preventsSpellcasting").GetBoolean());
+            Assert.Equal(status.GetCategory().ToString(), s.GetProperty("category").GetString());
+            // Stoneskin and Shielded are the two a round's tick does not count down
+            Assert.Equal(status is not (StatusEffect.Stoneskin or StatusEffect.Shielded), s.GetProperty("countsDownEachRound").GetBoolean());
+            var ticks = s.GetProperty("damagePerRound").EnumerateArray().ToArray();
+            if (Character.StatusDamagePerTurn(status, 1) == null) { Assert.Empty(ticks); continue; }
+            Assert.Equal(new[] { 1, 25, 50, 100 }, ticks.Select(t => t.GetProperty("level").GetInt32()));
+            foreach (var t in ticks)
+            {
+                var (min, max) = Character.StatusDamagePerTurn(status, t.GetProperty("level").GetInt32())!.Value;
+                Assert.Equal(min, t.GetProperty("min").GetInt32());
+                Assert.Equal(max, t.GetProperty("max").GetInt32());
+            }
+        }
+        var poison = statuses.Single(s => s.GetProperty("id").GetString() == "Poisoned").GetProperty("damagePerRound")[3];
+        Assert.Equal(12, poison.GetProperty("min").GetInt32());   // 2 + 100 / 10
+        Assert.Equal(15, poison.GetProperty("max").GetInt32());
+    }
+
+    [Fact]
+    public void CombatTargetWeightsAreTheGamesClassWeights()
+    {
+        var weights = Combat("targetWeights").ToDictionary(w => w.GetProperty("classId").GetString()!);
+        Assert.Equal(Enum.GetValues<CharacterClass>().Length, weights.Count);
+        Assert.Equal(180, weights["Paladin"].GetProperty("weight").GetInt32());
+        Assert.Equal(190, weights["Tidesworn"].GetProperty("weight").GetInt32());
+        Assert.Equal(60, weights["Magician"].GetProperty("weight").GetInt32());
+        Assert.Equal(120, weights["MysticShaman"].GetProperty("weight").GetInt32());
+        foreach (var w in weights.Values)
+            Assert.Equal(w.GetProperty("weight").GetInt32() + 40, w.GetProperty("weightWhileDefending").GetInt32());
+    }
+
+    [Fact]
+    public void CombatRegenerationFollowsTheRoundEndRules()
+    {
+        var rows = Combat("regeneration");
+        Assert.NotEmpty(rows);
+        foreach (var r in rows)
+        {
+            int stat = r.GetProperty("stat").GetInt32();
+            Assert.Equal(StatEffectsSystem.GetManaRegenPerRound(stat), r.GetProperty("manaPerRound").GetInt32());
+            Assert.Equal(Math.Min(15, 2 + stat / 10), r.GetProperty("manaPerRound").GetInt32());
+            Assert.Equal(3 + stat / 15 + GameConfig.LightArmorStaminaRegen, r.GetProperty("staminaPerRoundLight").GetInt32());
+            Assert.Equal(3 + stat / 15 + GameConfig.MediumArmorStaminaRegen, r.GetProperty("staminaPerRoundMedium").GetInt32());
+            Assert.Equal(3 + stat / 15 + GameConfig.HeavyArmorStaminaRegen, r.GetProperty("staminaPerRoundHeavy").GetInt32());
+        }
+    }
+
+    [Fact]
+    public void CombatConstantsComeFromTheGame()
+    {
+        var constants = _export.Data("combat").GetProperty("constants");
+        Assert.Equal(GameConfig.PlayerHitMinNeeded, constants.GetProperty("PlayerHitMinNeeded").GetInt32());
+        Assert.Equal(GameConfig.MonsterAccuracyMaxNeededAtLevel, constants.GetProperty("MonsterAccuracyMaxNeededAtLevel").GetInt32());
+        Assert.Equal(EliteAffixes.VenomChancePercent, constants.GetProperty("VenomChancePercent").GetInt32());
+        Assert.Equal(MonsterTactics.PredatorBonus, constants.GetProperty("PredatorBonus").GetInt32());
+        Assert.Equal(GameConfig.RiteOfReturnBaseCost, constants.GetProperty("RiteOfReturnBaseCost").GetInt64());
     }
 
     [Fact]

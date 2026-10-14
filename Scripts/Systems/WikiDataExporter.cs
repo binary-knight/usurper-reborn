@@ -58,6 +58,7 @@ public static class WikiDataExporter
         Write(outputDir, "characters", Characters());
         Write(outputDir, "party", Party());
         Write(outputDir, "economy", Economy());
+        Write(outputDir, "combat", Combat());
 
         File.WriteAllText(Path.Combine(outputDir, "meta.json"), JsonSerializer.Serialize(new
         {
@@ -734,6 +735,117 @@ public static class WikiDataExporter
         nameof(GameConfig.ServantsDailyGoldPerLevel), nameof(GameConfig.ReinforcedDoorCost),
         nameof(GameConfig.MaxPlayerChildren));
 
+    /// <summary>
+    /// 1.3.2 wiki depth: combat. The statuses with what the game's own code does with each: its category, whether
+    /// it stops acting or casting (StatusEffectExtensions), the damage one tick does at sample levels
+    /// (Character.StatusDamagePerTurn) and whether a round's tick counts it down (Character.ProcessStatusEffects
+    /// on a probe). The weight a monster gives each class when it picks whom to hit (CombatEngine.GetTargetWeight,
+    /// a private instance method that reads only the character and the fight's leader, called on an object whose
+    /// constructor never runs, with the probe as the leader and its armor power and maximum HP in the bands that
+    /// add nothing). The mana and combat stamina regained at the end of a round, from the game's own functions.
+    /// </summary>
+    private static object Combat() => new
+    {
+        statuses = Enum.GetValues<StatusEffect>().Where(s => s != StatusEffect.None).Select(s => new
+        {
+            id = s,
+            category = s.GetCategory(),
+            preventsAction = s.PreventsAction(),
+            preventsSpellcasting = s.PreventsSpellcasting(),
+            countsDownEachRound = StatusCountsDown(s),
+            damagePerRound = StatusTickLevels.Select(level => Character.StatusDamagePerTurn(s, level) is { } d
+                ? new { level, min = d.min, max = d.max } : null).Where(x => x != null).ToArray()
+        }).ToArray(),
+        targetWeights = GameConfig.ClassStartingAttributes.Keys.OrderBy(c => c).Select(c => new
+        {
+            classId = c,
+            weight = TargetWeight(c, defending: false),
+            weightWhileDefending = TargetWeight(c, defending: true)
+        }).ToArray(),
+        regeneration = RegenStatSamples.Select(stat => new
+        {
+            stat,
+            manaPerRound = StatEffectsSystem.GetManaRegenPerRound(stat),
+            staminaPerRoundLight = StaminaRegen(stat, ArmorWeightClass.Light),
+            staminaPerRoundMedium = StaminaRegen(stat, ArmorWeightClass.Medium),
+            staminaPerRoundHeavy = StaminaRegen(stat, ArmorWeightClass.Heavy)
+        }).ToArray(),
+        constants = CombatConstants()
+    };
+
+    private static readonly int[] StatusTickLevels = [1, 25, 50, 100];
+    private static readonly int[] RegenStatSamples = [10, 15, 20, 30, 40, 50, 60, 75, 100, 130, 150, 200];
+
+    /// <summary>Whether one round's tick lowers the status's rounds left, as ProcessStatusEffects does it.</summary>
+    private static bool StatusCountsDown(StatusEffect status)
+    {
+        var probe = new Character { Level = 1, MaxHP = 1000, HP = 1000 };
+        probe.ApplyStatus(status, 2);
+        probe.ProcessStatusEffects();
+        return !probe.ActiveStatuses.TryGetValue(status, out var left) || left < 2;
+    }
+
+    /// <summary>A monster's weight for the fight's leader of this class (not an ally: no stance applies).</summary>
+    private static int TargetWeight(CharacterClass characterClass, bool defending)
+    {
+        var engine = (CombatEngine)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(CombatEngine));
+        var probe = new Character { Class = characterClass, ArmPow = 20, MaxHP = 200, HP = 200, IsDefending = defending };
+        (typeof(CombatEngine).GetField("currentPlayer", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("CombatEngine.currentPlayer")).SetValue(engine, probe);
+        var method = typeof(CombatEngine).GetMethod("GetTargetWeight", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("CombatEngine.GetTargetWeight");
+        return (int)method.Invoke(engine, [probe])!;
+    }
+
+    /// <summary>Combat stamina regained in one round at this Stamina, wearing one armor piece of the weight
+    /// class (none for Light: an unarmored character counts as Light), by Character.RegenerateCombatStamina.</summary>
+    private static int StaminaRegen(int stamina, ArmorWeightClass weight)
+    {
+        var probe = new Character { Level = GameConfig.MaxLevel, Stamina = stamina, CurrentCombatStamina = 0 };
+        if (weight != ArmorWeightClass.Light)
+        {
+            var armor = EquipmentDatabase.GetAllArmor().OrderBy(e => e.Id).First(e => e.WeightClass == weight);
+            probe.EquippedItems[armor.Slot] = armor.Id;
+        }
+        if (probe.GetArmorWeightTier() != weight) throw new InvalidOperationException("armor weight probe: " + weight);
+        return probe.RegenerateCombatStamina();
+    }
+
+    private static SortedDictionary<string, object?> CombatConstants()
+    {
+        var constants = Named(typeof(GameConfig), string.Empty,
+            nameof(GameConfig.PlayerHitMinNeeded), nameof(GameConfig.PlayerHitMaxNeededAbove),
+            nameof(GameConfig.AtLevelAccuracyGap), nameof(GameConfig.PreciseStrikeNeededBonus),
+            nameof(GameConfig.MonsterAccuracyMinNeeded), nameof(GameConfig.MonsterAccuracyMaxNeededAtLevel),
+            nameof(GameConfig.MonsterAccuracyMaxNeededWeak), nameof(GameConfig.TwoHandedDamageBonus),
+            nameof(GameConfig.BossFirstRoundsDamageCapPercent), nameof(GameConfig.BossFirstRoundsDamageCapRounds),
+            nameof(GameConfig.OldGodTeammateDamageCapPercent), nameof(GameConfig.MaxEquipmentLifeStealPercent),
+            nameof(GameConfig.MaxTotalLifestealPercent), nameof(GameConfig.StunImmunityRoundsAfterRecovery),
+            nameof(GameConfig.MaxStunDurationNormal), nameof(GameConfig.MaxStunDurationBoss),
+            nameof(GameConfig.BossStunResistChance), nameof(GameConfig.BossSoftControlResistPercent),
+            nameof(GameConfig.StunDRWindowRounds), nameof(GameConfig.CharmSkipAttackChance),
+            nameof(GameConfig.KnightDamageBonus), nameof(GameConfig.GrandChampionDamageBonus),
+            nameof(GameConfig.FatigueCostCombat), nameof(GameConfig.FatigueTiredThreshold),
+            nameof(GameConfig.FatigueExhaustedThreshold), nameof(GameConfig.FatigueReductionHomeRest),
+            nameof(GameConfig.FatigueReductionInnRest), nameof(GameConfig.FatigueReductionDungeonRest),
+            nameof(GameConfig.AutoCombatHealPercentDefault), nameof(GameConfig.AutoCombatHealPercentMin),
+            nameof(GameConfig.AutoCombatHealPercentMax), nameof(GameConfig.ScaledPotionMaxHPFraction),
+            nameof(GameConfig.LightArmorDodgeBonus), nameof(GameConfig.MediumArmorDodgeBonus),
+            nameof(GameConfig.LightArmorStaminaBonus), nameof(GameConfig.MediumArmorStaminaBonus),
+            nameof(GameConfig.PvPBlindedMissPercent), nameof(GameConfig.CreatorsEyeCritBonus),
+            nameof(GameConfig.MiracleCritMultiplier), nameof(GameConfig.DivineFavorBaseChance),
+            nameof(GameConfig.DivineFavorMaxChance), nameof(GameConfig.RiteOfReturnBaseCost),
+            nameof(GameConfig.RiteOfReturnCostPerLevelSquared), nameof(GameConfig.RiteOfReturnCooldownHours),
+            nameof(GameConfig.EliteMinFloor));
+        // the Venomous elite's poison and the monster target preferences, under their own names
+        foreach (var entry in Named(typeof(EliteAffixes), string.Empty, nameof(EliteAffixes.VenomChancePercent), nameof(EliteAffixes.VenomRounds)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(MonsterTactics), string.Empty, nameof(MonsterTactics.PredatorHpPercent),
+                     nameof(MonsterTactics.PredatorBonus), nameof(MonsterTactics.SkirmisherBonus)))
+            constants[entry.Key] = entry.Value;
+        return constants;
+    }
+
     private static object Races() => GameConfig.RaceAttributes.OrderBy(x => x.Key)
         .Select(entry => new
         {
@@ -832,14 +944,35 @@ public static class WikiDataExporter
         constants = Constants("Mental")
     };
 
-    private static object Balance() => new
+    /// <summary>
+    /// 1.3.2: balance values no live code reads are not exported, so the wiki cannot print them as rules. The crit
+    /// chance and multiplier come from StatEffectsSystem; Backstab's live multiplier is a literal in
+    /// ExecuteBackstabMultiMonster (the moddable one is read only by the dead single-monster ExecuteBackstab);
+    /// Berserk, Doom rounds and the tank's AoE share have no reader. A server's balance.json still loads them.
+    /// </summary>
+    private static readonly string[] UnreadBalanceValues =
+    [
+        nameof(BalanceConfig.CriticalHitChance), nameof(BalanceConfig.CriticalHitMultiplier),
+        nameof(BalanceConfig.BackstabMultiplier), nameof(BalanceConfig.BerserkMultiplier),
+        nameof(BalanceConfig.BossDoomDefaultRounds), nameof(BalanceConfig.BossTankAoEAbsorption)
+    ];
+
+    private static object Balance()
     {
-        moddableDefaults = new BalanceConfig(),
-        characterConstants = Constants("Specialization"),
-        combatConstants = Constants("CriticalHit", "Backstab", "Berserk", "BaseMonster", "EarlyFloor"),
-        godConstants = Constants("GodBoon", "GodWard", "GodDeed", "GodTaboo"),
-        mentalConstants = Constants("Mental")
-    };
+        var defaults = new BalanceConfig();
+        var moddable = new Dictionary<string, object?>();
+        foreach (var property in typeof(BalanceConfig).GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                     .Where(p => !UnreadBalanceValues.Contains(p.Name)).OrderBy(p => p.MetadataToken))
+            moddable[JsonNamingPolicy.CamelCase.ConvertName(property.Name)] = property.GetValue(defaults);
+        return new
+        {
+            moddableDefaults = moddable,
+            characterConstants = Constants("Specialization"),
+            combatConstants = Constants("BaseMonster", "EarlyFloor"),
+            godConstants = Constants("GodBoon", "GodWard", "GodDeed", "GodTaboo"),
+            mentalConstants = Constants("Mental")
+        };
+    }
 
     private static SortedDictionary<string, object?> Constants(params string[] prefixes) =>
         new(typeof(GameConfig).GetFields(BindingFlags.Public | BindingFlags.Static)

@@ -2,7 +2,7 @@
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
 checked: 1.3.1
-sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/MentalSystem.cs
+sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs
 history: 1.3.0 | A healing potion heals at least 20 percent of the drinker's maximum HP, and a potion given to an ally at least 20 percent of the ally's maximum HP.
 history: 1.2.7 | none
 history: 1.2.6 | none
@@ -13,15 +13,39 @@ Consumables solve particular problems. Healing supplies restore HP, mana supplie
 
 ## Use the correct supply
 
-Check the combat and room menus for available consumable actions. Boss potion cooldowns and fight context can limit repeated use. Herbs and potions can interact with healing bonuses; the final amount is not always the raw item label.
+Check the combat and room menus for available consumable actions. Herbs and potions can interact with healing bonuses; the final amount is not always the raw item label.
 
-A healing potion heals a flat amount that grows with level, or 20 percent of the drinker's maximum HP when that is more. A potion given to an ally uses the ally's maximum HP.
+## How much a healing potion heals
+
+A healing potion heals 30 + 5 x your level + a random 10 to 29, or {{percent:ScaledPotionMaxHPFraction}} percent of the drinker's maximum HP when that is more. At level 10 with 800 maximum HP the flat part is 90 to 109 and 20 percent is 160, so a potion heals 160. It never heals more than the HP you are missing. A potion given to an ally uses the ally's maximum HP for the 20 percent. Outside a fight in the dungeon the random part is 10 to 30.
+
+### Potion Mastery (Alchemist)
+
+An Alchemist's healing potions heal {{percent:AlchemistPotionMasteryBonus}} percent more, also when the Alchemist gives one to an ally. Mana potions do not get the bonus.
+
+## Potions in a fight
+
+In a fight, I drinks healing potions: as many as it takes to fill your HP, all in one action, each healing the same rolled amount. With both kinds of potion and HP and mana both missing, I asks which kind. A mana potion restores 30 + 5 x your level mana, one per action. Drinking is your action for the round. H heals an ally with a potion or a spell.
+
+### Potion cooldown in Old God fights
+
+In an Old God fight, after you drink a healing or mana potion you cannot drink another for {{balance:bossPotionCooldownRounds}} round; trying spends your action. Ordinary fights and floor bosses have no potion cooldown, and herbs have none anywhere.
+
+### Difficulty and potions
+
+On Easy a healing potion that auto-combat drinks heals 25 percent more, and on Nightmare 25 percent less. A potion you drink with I, give to an ally, or drink after a fight heals the same on every difficulty.
+
+### Auto-combat and Auto Heal
+
+Auto-combat drinks one healing potion when your HP is at or below your threshold: {{balance:AutoCombatHealPercentDefault}} percent by default, set from {{balance:AutoCombatHealPercentMin}} to {{balance:AutoCombatHealPercentMax}} in steps of 10.
+
+With Auto Heal on, after a fight you drink healing potions until the HP you are missing is less than half an average potion. The average potion is 50 + 5 x your level, or 20 percent of your maximum HP when that is more (with Potion Mastery, 50 percent more). A class with spells does the same with mana potions, by 30 + 5 x level.
 
 Willow Draught stops at your ordinary Mental cap and is kept if there is nothing to restore. Addiction and Broken require their own treatment decisions.
 
 ## Healing potion price and how many you can carry
 
-A healing potion costs {{balance:HealingPotionBaseCost}} + level squared / 2 gold before tax: 300 at level 20, 1,350 at level 50 and 5,100 at level 100. You can carry 20 + (level - 1) healing potions: 39 at level 20. The Healer (B) and the Magic Shop (H) both sell them; the Magic Shop puts its own price modifiers on the same base price.
+A healing potion costs {{balance:HealingPotionBaseCost}} + level squared / 2 gold before tax: 300 at level 20, 1,350 at level 50 and 5,100 at level 100. You can carry 20 + (level - 1) healing potions: 39 at level 20. That is also how many the Healer and the Magic Shop let you buy up to. At the daily maintenance, when you carry 2 or more healing potions above 20, half of those above 20 spoil. The Healer (B) and the Magic Shop (H) both sell them; the Magic Shop puts its own price modifiers on the same base price.
 
 ## Mana potion
 
