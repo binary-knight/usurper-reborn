@@ -12236,7 +12236,7 @@ public class DungeonLocation : BaseLocation
                 potions = player is Player pp ? pp.Healing : 0,
                 maxPotions = player is Player pp2 ? pp2.MaxPotions : 0,
                 gold = player.Gold,
-                healAmount = PotionBonus.ApplyOwnerBonuses(player, player.MaxHP / 4), // v1.1.11: Infirmary
+                healAmount = PotionBonus.ApplyOwnerBonuses(player, DifficultySystem.ApplyHealingMultiplier(player.MaxHP / 4)), // v1.1.11: Infirmary; 1.3.2: the difficulty multiplier first
                 potionCost = 50 + (player.Level * 10),
                 teammates = memberData,
             });
@@ -12302,6 +12302,7 @@ public class DungeonLocation : BaseLocation
 
             // Calculate heal amount (potions heal 25% of max HP)
             long healAmount = player.MaxHP / 4;
+            healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
 
             terminal.SetColor("white");
@@ -13002,6 +13003,7 @@ public class DungeonLocation : BaseLocation
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
         int healPerPotion = (int)PotionBonus.AverageHeal(player, target); // 1.2.8: scaled by the teammate's MaxHP
+        healPerPotion = (int)DifficultySystem.ApplyHealingMultiplier(healPerPotion); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -13067,6 +13069,7 @@ public class DungeonLocation : BaseLocation
         {
             player.Healing--;
             int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, target); // 1.2.8: at least 20% of the teammate's MaxHP
+            healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
@@ -13107,7 +13110,8 @@ public class DungeonLocation : BaseLocation
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
         // 1.2.8: the estimate per receiver, scaled by that receiver's MaxHP; v1.1.11: the giver's Infirmary
-        int HealPerPotion(Character receiver) => (int)PotionBonus.ApplyOwnerBonuses(player, PotionBonus.AverageHeal(player, receiver));
+        // 1.3.2: the difficulty multiplier before the owner bonuses, so the count matches the heal
+        int HealPerPotion(Character receiver) => (int)PotionBonus.ApplyOwnerBonuses(player, DifficultySystem.ApplyHealingMultiplier(PotionBonus.AverageHeal(player, receiver)));
         int totalPotionsUsed = 0;
         long totalHealing = 0;
 
@@ -13190,6 +13194,7 @@ public class DungeonLocation : BaseLocation
                 player.Healing--;
                 totalPotionsUsed++;
                 int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
+                healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
                 player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             }
@@ -13210,6 +13215,7 @@ public class DungeonLocation : BaseLocation
                     player.Healing--;
                     totalPotionsUsed++;
                     int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, companion); // 1.2.8: at least 20% of the companion's MaxHP
+                    healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
                     healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }
@@ -13266,6 +13272,7 @@ public class DungeonLocation : BaseLocation
         // Use one potion
         player.Healing--;
         long healAmount = player.MaxHP / 4;
+        healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
         long oldHP = player.HP;
         player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
@@ -13306,6 +13313,7 @@ public class DungeonLocation : BaseLocation
         }
 
         long healAmount = player.MaxHP / 4;
+        healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, so potionsNeeded matches
         int potionsNeeded = (int)Math.Ceiling((double)(player.MaxHP - player.HP) / healAmount);
         int potionsToUse = Math.Min(potionsNeeded, (int)player.Healing);
@@ -19451,6 +19459,7 @@ public class DungeonLocation : BaseLocation
         {
             long oldHP = player.HP;
             int healAmount = (int)PotionBonus.BaseHeal(player, Random.Shared, 31); // 1.2.8: at least 20% of MaxHP
+            healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the follower's own Infirmary
             player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             long actualHeal = player.HP - oldHP;

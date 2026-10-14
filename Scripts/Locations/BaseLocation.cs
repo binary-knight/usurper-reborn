@@ -4233,6 +4233,7 @@ public abstract class BaseLocation
 
         // Use one potion
         long healAmount = PotionBonus.BaseHeal(currentPlayer, Random.Shared); // 1.2.8: at least 20% of MaxHP
+        healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = PotionBonus.ApplyOwnerBonuses(currentPlayer, healAmount); // v1.1.11: Infirmary, before the cap
         healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
         currentPlayer.HP += healAmount;

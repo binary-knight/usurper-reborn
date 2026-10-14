@@ -1811,6 +1811,7 @@ namespace UsurperRemake.Systems
             qty = Math.Min(qty, available);
 
             long perPotion = (long)(player.MaxHP * 0.3);
+            perPotion = DifficultySystem.ApplyHealingMultiplier(perPotion); // 1.3.2: the difficulty multiplier, before the owner bonuses
             // v1.1.11: Infirmary, before the cap; 1.2.0: the boss as the foe, so Solarius's potion boon sees an undead boss
             perPotion = PotionBonus.ApplyOwnerBonuses(player, perPotion, new[] { AsFoe(bossDef) });
             long totalHealed = 0;

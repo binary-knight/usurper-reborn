@@ -4407,6 +4407,7 @@ public partial class CombatEngine
             // Regular heal - ask how many potions to use for full control
             long missingHP = player.MaxHP - player.HP;
             long avgHealPerPotion = PotionBonus.AverageHeal(player);  // 1.2.8: the scaled average heal
+            avgHealPerPotion = DifficultySystem.ApplyHealingMultiplier(avgHealPerPotion); // 1.3.2: the difficulty multiplier, before the owner bonuses, so the count matches the heal
             avgHealPerPotion = PotionBonus.ApplyOwnerBonuses(player, avgHealPerPotion, result.Monsters); // v1.1.11: Infirmary
             int potionsToFullHeal = (int)Math.Ceiling((double)missingHP / avgHealPerPotion);
             potionsToFullHeal = Math.Min(potionsToFullHeal, (int)player.Healing);
@@ -9843,6 +9844,7 @@ public partial class CombatEngine
         // Don't waste a potion if the deficit is trivial — only auto-heal
         // when missing at least half a potion's average healing value
         long avgPotionHeal = PotionBonus.AverageHeal(player); // 1.2.8: the scaled average heal
+        avgPotionHeal = DifficultySystem.ApplyHealingMultiplier(avgPotionHeal); // 1.3.2: the difficulty multiplier, before the owner bonuses
         avgPotionHeal = PotionBonus.ApplyOwnerBonuses(player, avgPotionHeal); // v1.1.11: Infirmary
         long hpDeficit = player.MaxHP - player.HP;
         if (hpDeficit < avgPotionHeal / 2)
@@ -9858,6 +9860,7 @@ public partial class CombatEngine
                 break;
 
             long healAmount = PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
+            healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
             healAmount = Math.Min(healAmount, player.MaxHP - player.HP);
             player.HP += healAmount;
@@ -9884,8 +9887,8 @@ public partial class CombatEngine
         if (player.ManaPotions <= 0 || player.Mana >= player.MaxMana)
             return;
 
-        // Only auto-use for characters who have spells
-        if (!SpellSystem.HasSpells(player))
+        // Only auto-use for characters with mana (1.3.2: IsManaClass, so a Mystic Shaman too)
+        if (!player.IsManaClass)
             return;
 
         long manaPerPotion = 30 + player.Level * 5;
@@ -19389,6 +19392,7 @@ public partial class CombatEngine
             // Calculate how much HP is missing
             long missingHP = targetAlly.MaxHP - targetAlly.HP;
             int healPerPotion = (int)PotionBonus.AverageHeal(player, targetAlly); // 1.2.8: scaled by the ally's MaxHP
+            healPerPotion = (int)DifficultySystem.ApplyHealingMultiplier(healPerPotion); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, monsters); // v1.1.11: the giver's Infirmary
 
             // Ask if player wants to fully heal or use 1 potion
@@ -19439,6 +19443,7 @@ public partial class CombatEngine
             {
                 player.Healing--;
                 int healAmount = (int)PotionBonus.BaseHeal(player, random, receiver: targetAlly); // 1.2.8: at least 20% of the ally's MaxHP
+                healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount, monsters); // v1.1.11: the giver's Infirmary
                 EvUse(player, CombatEventKind.Potion);   // 1.2.6
                 EvHeal(player, targetAlly, HealRoom(targetAlly, healAmount), CombatEventKind.Potion);
@@ -20206,6 +20211,7 @@ public partial class CombatEngine
 
         // Potion heals a fixed amount plus some randomness (same formula as player potions)
         int healAmount = (int)PotionBonus.BaseHeal(teammate, random, receiver: target); // 1.2.8: at least 20% of the target's MaxHP
+        healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = (int)PotionBonus.ApplyOwnerBonuses(potionOwner, healAmount, result.Monsters); // v1.1.11: the potion owner's Infirmary
         long oldHP = target.HP;
         target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
@@ -24528,6 +24534,7 @@ public partial class CombatEngine
 
         long hpNeeded = player.MaxHP - player.HP;
         int healPerPotion = (int)PotionBonus.BaseHeal(player, random); // 1.2.8: at least 20% of MaxHP
+        healPerPotion = (int)DifficultySystem.ApplyHealingMultiplier(healPerPotion); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion, result.Monsters); // v1.1.11: Infirmary, so potionsNeeded shrinks too
         int potionsNeeded = (int)Math.Ceiling((double)hpNeeded / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -26866,7 +26873,7 @@ public partial class CombatEngine
     /// <summary>
     /// 1.3.2: round-end stamina and mana for every living party member other than the leader, by the
     /// leader's own formula on that member's stats (RegenerateCombatStamina; GetManaRegenPerRound with
-    /// the god boon, for a class with spells). Silent. The leader is skipped by reference and each member
+    /// the god boon, for a class with mana). Silent. The leader is skipped by reference and each member
     /// is visited once, so nobody regains twice in a round. A companion's mana lives on its combat
     /// wrapper (CompanionSystem keeps no mana), and a mercenary's is synced back with its HP when hit.
     /// </summary>
@@ -26878,7 +26885,7 @@ public partial class CombatEngine
         {
             if (tm == null || !tm.IsAlive || ReferenceEquals(tm, leader) || !done.Add(tm)) continue;
             tm.RegenerateCombatStamina();
-            if (SpellSystem.HasSpells(tm) && tm.Mana < tm.MaxMana)
+            if (tm.IsManaClass && tm.Mana < tm.MaxMana) // 1.3.2: IsManaClass, so a Mystic Shaman too
             {
                 long manaRegen = GodBoonSystem.ManaRegen(tm, StatEffectsSystem.GetManaRegenPerRound(tm.Wisdom));
                 tm.Mana = Math.Min(tm.MaxMana, tm.Mana + manaRegen);
@@ -26899,8 +26906,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.recover_stamina", staminaRegen, player.CurrentCombatStamina, player.MaxCombatStamina));
         }
 
-        // Regenerate mana for spellcasters each round
-        if (SpellSystem.HasSpells(player) && player.Mana < player.MaxMana)
+        // Regenerate mana for every class with mana each round (1.3.2: IsManaClass, so a Mystic Shaman too)
+        if (player.IsManaClass && player.Mana < player.MaxMana)
         {
             // 1.2.0 Temple gods piece 2: Arcanus's boon on mana regeneration
             int manaRegen = (int)Math.Min(GodBoonSystem.ManaRegen(player, StatEffectsSystem.GetManaRegenPerRound(player.Wisdom)), int.MaxValue);
