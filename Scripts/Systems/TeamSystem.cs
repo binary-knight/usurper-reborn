@@ -1000,6 +1000,20 @@ public partial class TeamSystem
     public static long GetDailyWage(NPC npc) => GetDailyWage(npc.Level);
 
     /// <summary>
+    /// 1.3.2 wiki depth: the wage and companion team constants the party guides print, as a new dictionary
+    /// keyed by the constant names. Read only by the wiki export and its tests; nothing in play reads it.
+    /// </summary>
+    internal static SortedDictionary<string, object?> WikiPartyConstants() => new()
+    {
+        [nameof(GameConfig.NpcDailyWagePerLevel)] = GameConfig.NpcDailyWagePerLevel,
+        [nameof(GameConfig.NpcDailyWagePerLevelSquared)] = GameConfig.NpcDailyWagePerLevelSquared,
+        [nameof(GameConfig.TeamBetrayalPointsPerEvent)] = GameConfig.TeamBetrayalPointsPerEvent,
+        [nameof(GameConfig.TeamBetrayalWarningPoints)] = GameConfig.TeamBetrayalWarningPoints,
+        [nameof(GameConfig.TeamBetrayalKindnessMinGain)] = GameConfig.TeamBetrayalKindnessMinGain,
+        [nameof(GameConfig.TeamBetrayalRejoinLoyalty)] = GameConfig.TeamBetrayalRejoinLoyalty,
+    };
+
+    /// <summary>
     /// v0.57.11: final recruitment cost (base × relationship multiplier). Returns
     /// -1 when the NPC refuses at any price (Enemy / Hate / romantic partner).
     /// Callers should check `band` separately and render refusal / hidden states

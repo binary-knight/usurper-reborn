@@ -352,6 +352,60 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     }
 
     [Fact]
+    public void PartyBeastsMeetTheRegionAndTheBeastLevel()
+    {
+        // 1.3.2: a sighting needs the region's level (WildernessLocation) and the beast's own (BeastData)
+        var beasts = _export.Data("party").GetProperty("beasts").EnumerateArray().ToArray();
+        Assert.Equal(8, beasts.Length);
+        JsonElement Beast(string id) => Assert.Single(beasts.Where(b => b.GetProperty("id").GetString() == id));
+        Assert.Equal(12, Beast("marsh_toad").GetProperty("beastMinLevel").GetInt32());
+        Assert.Equal(20, Beast("marsh_toad").GetProperty("region").GetProperty("minLevel").GetInt32());
+        Assert.Equal(20, Beast("marsh_toad").GetProperty("sightedFromLevel").GetInt32());
+        Assert.Equal(30, Beast("tidepool_sprite").GetProperty("sightedFromLevel").GetInt32());
+        Assert.Equal(10, Beast("forest_hawk").GetProperty("sightedFromLevel").GetInt32());
+        Assert.Equal(50, Beast("storm_eagle").GetProperty("sightedFromLevel").GetInt32());
+        Assert.Equal("Combat", Beast("dire_wolf").GetProperty("role").GetString());
+        Assert.Equal(80, Beast("dire_wolf").GetProperty("combatBase").GetProperty("hp").GetInt32());
+        Assert.Equal(JsonValueKind.Null, Beast("forest_hawk").GetProperty("combatBase").ValueKind);
+    }
+
+    [Fact]
+    public void PartyCompanionsCarryTheirFightingClassAndWeaponRule()
+    {
+        var companions = _export.Data("party").GetProperty("companions").EnumerateArray().ToArray();
+        Assert.Equal(new[] { "Aldric", "Lyris", "Melodia", "Mira", "Vex" },
+            companions.Select(c => c.GetProperty("id").GetString()).ToArray());
+        JsonElement Companion(string id) => Assert.Single(companions.Where(c => c.GetProperty("id").GetString() == id));
+        string[] Types(string id) => Companion(id).GetProperty("mainHandWeaponTypes").EnumerateArray()
+            .Select(t => t.GetString()!).ToArray();
+        // Lyris grows as Damage but fights as a Ranger
+        Assert.Equal("Damage", Companion("Lyris").GetProperty("role").GetString());
+        Assert.Equal("Ranger", Companion("Lyris").GetProperty("combatClass").GetString());
+        Assert.Equal(new[] { "Sword", "Dagger", "Bow" }, Types("Lyris"));
+        Assert.Equal(new[] { "Mace", "Hammer", "Flail", "Staff" }, Types("Mira"));
+        Assert.Equal("Cleric", Companion("Mira").GetProperty("combatClass").GetString());
+        Assert.Equal(10, Companion("Aldric").GetProperty("recruitLevel").GetInt32());
+        Assert.Equal(350, Companion("Aldric").GetProperty("baseStats").GetProperty("hp").GetInt32());
+        Assert.True(Companion("Melodia").GetProperty("romanceAvailable").GetBoolean());
+        Assert.False(Companion("Vex").GetProperty("romanceAvailable").GetBoolean());
+    }
+
+    [Fact]
+    public void PartyStancesAndConstantsComeFromTheGame()
+    {
+        var party = _export.Data("party");
+        var cautious = Assert.Single(party.GetProperty("stances").EnumerateArray()
+            .Where(s => s.GetProperty("id").GetString() == "Cautious"));
+        Assert.False(cautious.GetProperty("mayTaunt").GetBoolean());
+        Assert.Equal(0.70, cautious.GetProperty("targetWeightMultiplier").GetDouble(), 3);
+        var constants = party.GetProperty("constants");
+        Assert.Equal(8, constants.GetProperty("BeastEncounterChancePercent").GetInt32());
+        Assert.Equal(8, constants.GetProperty("BeastMaxRosterSize").GetInt32());
+        Assert.Equal(4, constants.GetProperty("MaxActiveCompanions").GetInt32());
+        Assert.Equal(4, constants.GetProperty("WildernessMaxDailyExplorations").GetInt32());
+    }
+
+    [Fact]
     public void MetaIdentifiesSchemaAndRelease()
     {
         using var document = JsonDocument.Parse(File.ReadAllText(Path.Combine(_export.DirectoryPath, "meta.json")));
@@ -420,6 +474,33 @@ public class WikiDataExporterIsolationTests
                 if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
         }
     }
+
+    [Fact]
+    public void ExportReadsCompanionDefinitionsAndLeavesTheSharedCompanionsAlone()
+    {
+        // 1.3.2: the export reads the five companions as the game defines them, not the shared system a
+        // recruitment has scaled, and does not replace that shared system
+        var dir = Path.Combine(Path.GetTempPath(), "usurper-wiki-companions-" + Guid.NewGuid().ToString("N"));
+        var shared = CompanionSystem.Instance;
+        var aldric = shared.GetCompanion(CompanionId.Aldric)!;
+        var oldHp = aldric.BaseStats.HP;
+        try
+        {
+            aldric.BaseStats.HP = oldHp + 999;
+            WikiDataExporter.Export(dir);
+            Assert.Same(shared, CompanionSystem.Instance);
+            var exported = Entry(dir, "party", "companions", "Aldric");
+            Assert.Equal(350, exported.GetProperty("baseStats").GetProperty("hp").GetInt32());
+        }
+        finally
+        {
+            aldric.BaseStats.HP = oldHp;
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    private static JsonElement Entry(string dir, string file, string list, string id) => Data(dir, file)
+        .GetProperty(list).EnumerateArray().Single(e => e.GetProperty("id").GetString() == id);
 
     [Theory]
     [InlineData(new object[] { new[] { "--export-wiki" } })]

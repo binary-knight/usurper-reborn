@@ -76,6 +76,9 @@ Numbers should come from directives, not copied tables:
 {{table:secret-bosses}}
 {{table:achievements}}
 {{table:balance}}
+{{table:beasts}}
+{{table:companions}}
+{{table:ally-stances}}
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
@@ -89,6 +92,11 @@ heading. The
 `class-equipment` counts come from the game's own equip check on shop stock.
 Bows are left out of both equipment tables. The character constants a guide
 can print are in the `constants` block of `characters.json` in the export.
+`beasts`, `companions` and `ally-stances` come from `party.json`: a beast's
+level is the higher of its region's level and its own, and a companion's
+weapon types are the main hand types its own rule admits. The party constants
+in the `constants` block of `party.json` print the same way; a party constant
+may not reuse a name another dataset prints.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.

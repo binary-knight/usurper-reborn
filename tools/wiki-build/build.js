@@ -110,6 +110,7 @@ function loadData(dir) {
     "achievements",
     "bosses",
     "characters",
+    "party",
   ]) {
     const file = JSON.parse(
       fs.readFileSync(path.join(dir, kind + ".json"), "utf8"),
@@ -175,6 +176,16 @@ function loadData(dir) {
       !Array.isArray(c.equipment.armorWeights)
     )
       throw Error(`Missing class equipment: ${c.id}`);
+  // 1.3.2: the party: beasts, story companions, ally stances and the constants the party guides print
+  const party = data.party;
+  for (const key of ["beasts", "companions", "stances"])
+    if (!Array.isArray(party[key]) || !party[key].length)
+      throw Error(`Empty dataset: party/${key}`);
+  if (!party.constants || !Object.keys(party.constants).length)
+    throw Error("Empty dataset: party/constants");
+  for (const c of party.companions)
+    if (!classes.has(c.combatClass))
+      throw Error(`Unknown companion class: ${c.id}/${c.combatClass}`);
   return { meta, data };
 }
 function renderers(data) {
@@ -196,6 +207,11 @@ function renderers(data) {
     ...data.gods.favorRules,
     ...data.characters.constants,
   };
+  // 1.3.2: a party constant may not reuse a name another dataset already prints
+  for (const [key, value] of Object.entries(data.party.constants)) {
+    if (key in constants) throw Error(`Duplicate constant: ${key}`);
+    constants[key] = value;
+  }
   const className = (id) => name(data.classes.find((c) => c.id === id));
   // "All" in a template's class list means no class list; every class may use it
   const templateClasses = (t) =>
@@ -649,6 +665,91 @@ function renderers(data) {
           .map((e) => `<h2>${escape(name(e))}</h2>${boss(e, 3)}`)
           .join(""),
       );
+    if (id === "beasts")
+      return table(
+        [
+          "Beast",
+          "Species",
+          "Kind",
+          "Region",
+          "Level to meet it",
+          "Taming difficulty",
+          "Base HP / attack / defence",
+        ],
+        data.party.beasts.map((b) => [
+          escape(name(b)),
+          escape(b.species.en),
+          b.role === "Combat" ? "Fights with you" : "Passive bonus",
+          `${escape(b.region.name.en)} (${escape(String(b.region.direction).toLowerCase())})`,
+          b.sightedFromLevel ?? "Never",
+          b.tameDifficulty,
+          b.combatBase
+            ? `${b.combatBase.hp} / ${b.combatBase.attack} / ${b.combatBase.defence}`
+            : "None",
+        ]),
+        "Tameable beasts",
+      );
+    if (id === "companions")
+      return (
+        table(
+          [
+            "Companion",
+            "Title",
+            "Role",
+            "Fights as",
+            "Recruit level",
+            "Main hand weapon types",
+            "Romance",
+          ],
+          data.party.companions.map((c) => [
+            escape(name(c)),
+            escape(c.title.en),
+            escape(c.role),
+            link(
+              "characters/classes",
+              data.classes.find((x) => x.id === c.combatClass),
+            ),
+            c.recruitLevel,
+            escape(c.mainHandWeaponTypes.map(typeLabel).join(", ")),
+            c.romanceAvailable ? "Yes" : "No",
+          ]),
+          "Story companions",
+        ) +
+        table(
+          ["Companion", "HP", "Attack", "Defence", "Magic", "Speed", "Healing"],
+          data.party.companions.map((c) => [
+            escape(name(c)),
+            ...["hp", "attack", "defence", "magic", "speed", "healing"].map(
+              (k) => c.baseStats[k],
+            ),
+          ]),
+          "Story companion starting values at level 1",
+        )
+      );
+    if (id === "ally-stances") {
+      const pct = (v) => Math.round(v * 100);
+      return table(
+        [
+          "Stance",
+          "Drinks its own potion first below (% HP)",
+          "Gives a potion to the most hurt member below (% HP)",
+          "Uses a defensive ability first below (% HP)",
+          "Braces below (% HP)",
+          "Starts a taunt",
+          "Weight as a monster's target (%)",
+        ],
+        data.party.stances.map((s) => [
+          escape(s.id),
+          pct(s.emergencySelfPotion),
+          pct(s.potionMostInjured),
+          pct(s.defensiveFirst),
+          pct(s.brace),
+          s.mayTaunt ? "Yes" : "No",
+          pct(s.targetWeightMultiplier),
+        ]),
+        "Ally stances",
+      );
+    }
     if (id === "balance")
       return (
         values(data.balance.moddableDefaults, "Moddable balance defaults") +
