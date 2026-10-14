@@ -1238,7 +1238,14 @@ public class Telemetry127Tests : IDisposable
         OperatorOn();
         var store = Store(TelemetrySource.Server);
         store.SetPlayerAnswer(TelemetryConsent.CurrentLoginName(), true).Should().BeTrue();
-        Character Mortal(long hp) { var h = Hero(hp: hp); h.Resurrections = 3; return h; }
+        Character Mortal(long hp)
+        {
+            var h = Hero(hp: hp);
+            h.Resurrections = 3;
+            // at the use cap the swing draws no improvement roll, so these seeded fights keep their course
+            TrainingSystem.SetSkillProficiency(h, "basic_attack", TrainingSystem.ProficiencyLevel.Good);
+            return h;
+        }
         var outcomes = new List<long>();
         int drainDeaths = 0;
         async Task One(Fight f, long outcome, string what)

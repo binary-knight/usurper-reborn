@@ -857,13 +857,20 @@ public class EliteAffixes128Tests
     /// and the rounds.</summary>
     private static readonly Dictionary<string, string> GoldenFights = new()
     {
-        ["floor 7 pair, solo"] = "172:09EB7427C6AB97E1:Victory in 16",
-        ["floor 7 pair, solo, ambush"] = "213:82155C9BF2B6A93B:Victory in 17",
-        ["floor 35 trio, level 35 hero, two teammates"] = "313:4DA34D34AC5EFC84:Victory in 13",
-        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "134:DA250FA26CDC7AB6:Victory in 7",
-        ["floor 50 four, level 50 hero, two teammates"] = "350:A0CF5F0EA02FF184:Victory in 13",
-        ["floor 80 five, level 80 cleric, ambush"] = "287:BE78FA1F04EAA7B7:Victory in 13",
-        ["floor 3 single"] = "30:7F3EE6DA0B8B932B:Victory in 5",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 7 pair, solo"] = "219:98FAB99B740A4523:Victory in 17",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 7 pair, solo, ambush"] = "192:190A3A98554F5796:Victory in 14",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 35 trio, level 35 hero, two teammates"] = "295:CDE6A01BDD9FE458:Victory in 12",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "194:A8954DD7709CECA8:Victory in 8",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 50 four, level 50 hero, two teammates"] = "410:76583E31955CEF88:Victory in 15",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 80 five, level 80 cleric, ambush"] = "360:BF41C6A919273092:Victory in 17",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["floor 3 single"] = "51:25D2351E15E63BF7:Victory in 6",
     };
 
     [Theory]

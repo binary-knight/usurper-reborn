@@ -759,23 +759,34 @@ public class HitRoll128Tests
     /// before the piece: the draws up to the last foe's death, a hash of them, the outcome and the rounds.</summary>
     private static readonly Dictionary<string, string> GoldenFights = new()
     {
-        ["solo, floor 7 pair"] = "172:09EB7427C6AB97E1:Victory in 16",
-        ["solo, floor 20 trio, level 20 hero"] = "236:92DDB918DF2B3297:Victory in 16",
-        ["solo, dual wield, floor 12 pair"] = "219:B81D531085732DE8:Victory in 13",
-        ["one teammate, floor 7 pair"] = "167:7AEB06910EB5C40C:Victory in 11",
-        ["two teammates, floor 35 trio, level 35 hero"] = "196:7A90196A8DDE9163:Victory in 9",
-        ["boss context, solo"] = "390:B5F1D953200E5375:Victory in 50",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["solo, floor 7 pair"] = "219:98FAB99B740A4523:Victory in 17",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["solo, floor 20 trio, level 20 hero"] = "234:CE26AF68DAD82D5A:Victory in 16",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["solo, dual wield, floor 12 pair"] = "251:86DA09A12ABFEAFC:Victory in 14",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["one teammate, floor 7 pair"] = "160:1459B417B511A08C:Victory in 10",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["two teammates, floor 35 trio, level 35 hero"] = "201:C067CCE442CFA4F3:Victory in 9",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["boss context, solo"] = "328:A34EFE8FBC897BB6:Victory in 41",
         // 1.3.2: party members regain stamina and mana at round end, which changes this long fight's draws
-        ["boss context, one teammate"] = "541:DF2FE6F8FCCB189D:Victory in 47",
+        // 1.3.2: the basic attack improves by use, which changes this fight's draws
+        ["boss context, one teammate"] = "566:6B5C3CA3A6097AB2:Victory in 48",
     };
 
     /// <summary>Written there too: thirty of each action on a seeded engine, the draws, a hash of them and the damage done.</summary>
     private static readonly Dictionary<string, string> GoldenActions = new()
     {
-        ["basic swing"] = "120:CE4A9DC8BB244B77:damage 3092",
-        ["basic swing, dual wield"] = "355:3D0303E6A7D807A5:damage 8202",
-        ["basic swing, evasive foe"] = "133:1E89B74D806F72F5:damage 1519",
-        ["basic swing, hidden"] = "60:6B3D890660EC3F4B:damage 5508",
+        // 1.3.2: the basic attack improves by use, which changes this action's draws
+        ["basic swing"] = "150:CA52554576B5D96C:damage 3186",
+        // 1.3.2: the basic attack improves by use, which changes this action's draws
+        ["basic swing, dual wield"] = "378:ADD4EBAA1D6B7E0F:damage 8358",
+        // 1.3.2: the basic attack improves by use, which changes this action's draws
+        ["basic swing, evasive foe"] = "165:657CF96804694AC8:damage 1631",
+        // 1.3.2: the basic attack improves by use, which changes this action's draws
+        ["basic swing, hidden"] = "90:A8724F7D6EA0574C:damage 5413",
         ["power attack, dual wield"] = "302:5D59C1911EC791CC:damage 12082",
         ["precise strike"] = "60:8B6AC522FECD9C30:damage 1121",
         ["smite"] = "60:835BA8452318FE9E:damage 3541",

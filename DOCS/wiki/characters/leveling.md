@@ -42,11 +42,11 @@ Every ability and spell has its own proficiency, in nine tiers. The effect multi
 
 {{table:proficiency}}
 
-Your class abilities and your spells start at Average. Raising one skill from Average to Legendary costs 165 training points in all.
+Your basic attack, your class abilities and your spells start at Average. Raising one skill from Average to Legendary costs 165 training points in all.
 
 ### Does using a skill train it
 
-Yes, up to a point. Each use of an ability or cast of a spell has the chance in the table to add one step of progress. A tier needs 1 step at Untrained, 2 at Poor and 3 at Average. An ability stops improving by use once it is Good, and so does a spell cast that fails. A spell that is cast with success can keep improving by use at the chances in the table.
+Yes, up to a point. Each use of an ability, cast of a spell or Attack action against monsters has the chance in the table to add one step of progress. An Attack action counts once however many swings it makes, and it counts when its swings miss. A tier needs 1 step at Untrained, 2 at Poor and 3 at Average. An ability and the basic attack stop improving by use once they are Good, and so does a spell cast that fails. A spell that is cast with success can keep improving by use at the chances in the table. Power Attack and the other special attacks do not train the basic attack.
 
 ### Companions and NPC teammates
 
