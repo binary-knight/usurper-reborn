@@ -3164,7 +3164,7 @@ public partial class GameEngine
             // Failsafe: if player beat Manwe but the ending sequence didn't complete (whether
             // they disconnected mid-sequence OR something downstream crashed before the ending
             // could fire), re-trigger the ending sequence on login.
-            // v0.57.16: dropped the `hasEndingFlag` precondition. Spudman report — the
+            // v0.57.16: dropped the `hasEndingFlag` precondition. Player report: the
             // post-Manwe Noctura betrayal NRE'd before any ending flag got set, leaving the
             // player permanently stuck (Manwe resolved, no immortality, no ending recorded,
             // no NG+ option, no way to retrigger). Now Manwe-resolved + not-immortal +

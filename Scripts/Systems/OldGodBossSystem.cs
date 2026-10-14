@@ -1316,7 +1316,7 @@ namespace UsurperRemake.Systems
             // === NOCTURA BETRAYAL — Post-Manwe surprise boss fight ===
             if (boss.Type == OldGodType.Manwe && StoryProgressionSystem.Instance.HasStoryFlag("noctura_ally"))
             {
-                // v0.57.16: wrap the betrayal in a try/catch. Spudman report — the betrayal
+                // v0.57.16: wrap the betrayal in a try/catch. Player report: the betrayal
                 // combat NRE'd mid-fight, so HandleNocturaBetrayal never returned, the
                 // post-betrayal flags never got set, and the caller never got back to fire
                 // the post-Manwe ending sequence. The player ended up immortal-soft-locked:

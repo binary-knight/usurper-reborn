@@ -4265,7 +4265,7 @@ public partial class CombatEngine
         // v0.57.13: was `actualDamage * ShamanEnchantPower / 100.0`, which scaled the FINAL attack
         // damage (weapon + STR + crit + passives + buffs + rolls) by `ShamanEnchantPower` =
         // `20 + INT*3`. At endgame INT (500-1000) that's a 15-30× multiplier on every hit,
-        // producing 400k-800k elemental procs per swing and one-shotting Old Gods (Rozro report).
+        // producing 400k-800k elemental procs per swing and one-shotting Old Gods (player report).
         // Now scales the ENCHANT RIDER off raw weapon power of the hitting hand — matches what
         // "+3% elemental damage per INT point" was always meant to mean (a rider on weapon power,
         // not a multiplier of the whole attack).
@@ -30038,8 +30038,8 @@ public partial class CombatEngine
         // Mystic Shaman Windfury Totem: chance for extra attack
         // v0.57.13: was silent — now emits a flavor line on proc so the player can see it fire,
         // and sets windfuryProcced so the caller routes the bonus swing to main-hand instead of
-        // off-hand tail (Rozro report: "Doesn't look like it does much, not even an extra
-        // mainhand attack"). Message is suppressed for teammates so it doesn't spam.
+        // off-hand tail (a player reported that it seemed to do little and gave no extra
+        // main-hand attack). Message is suppressed for teammates so it doesn't spam.
         if (attacker.ActiveTotemType == 4 && attacker.ActiveTotemRounds > 0)
         {
             if (random.Next(100) < attacker.ActiveTotemPower)   // v1.1.14: the engine RNG

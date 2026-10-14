@@ -2013,7 +2013,7 @@ public static partial class GameConfig
     /// <summary>
     /// v0.64.1: Early-game XP multiplier. Post-deploy telemetry showed
     /// the path from Lv 1 to Lv 10 took ~200 combats (engaged players hit
-    /// the wall here -- Rozro played 345 hours and only reached Lv 14
+    /// the wall here -- a player played 345 hours and only reached Lv 14
     /// before quitting). Combat win rate is 95-100% at low levels so
     /// difficulty isn't the issue; the issue is XP rewards are tiny when
     /// fighting under-leveled monsters on low floors. This multiplier
