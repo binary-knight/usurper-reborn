@@ -184,12 +184,14 @@ test("text inside the dungeon guides' spoiler blocks never reaches the search in
   const features = pages.find((p) => p.path === `${W}world/dungeon-features/`);
   assert.match(features.text, /Search for Traps is free/, "public feature text is indexed");
   let checked = 0;
-  for (const file of ["world/dungeon-features.md", "world/rare-encounters.md"])
+  // 1.3.2: plain trap, chest, shrine and rare encounter numbers left the folds (the user's ruling A7);
+  // the folds that remain hold the story: guardian, seal and secret boss floors and the Old God fights
+  for (const file of ["world/dungeon-features.md", "world/dungeon.md", "monsters/bosses.md"])
     for (const sentence of spoilerSentences(file)) {
       assert.ok(!indexed.includes(sentence), `${file}: ${sentence}`);
       checked++;
     }
-  assert.ok(checked >= 40, `${checked} spoiler sentences checked`);
+  assert.ok(checked >= 15, `${checked} spoiler sentences checked`);
 });
 
 test("the index marks hand-written guides and only those", () => {

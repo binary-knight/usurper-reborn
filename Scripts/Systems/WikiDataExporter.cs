@@ -59,6 +59,7 @@ public static class WikiDataExporter
         Write(outputDir, "party", Party());
         Write(outputDir, "economy", Economy());
         Write(outputDir, "combat", Combat());
+        Write(outputDir, "world", World());
 
         File.WriteAllText(Path.Combine(outputDir, "meta.json"), JsonSerializer.Serialize(new
         {
@@ -846,6 +847,350 @@ public static class WikiDataExporter
         return constants;
     }
 
+    /// <summary>
+    /// 1.3.2 wiki depth: the dungeon and the world beyond the town. What each monster ability does, from the
+    /// game's own MonsterAbilities.ExecuteAbility on a probe monster; the floor boss of each floor (the private
+    /// DungeonLocation.GetBossName and DungeonGenerator.GetThemeForLevel, read by reflection); the dungeon outposts
+    /// with the prices DungeonLocation's own private price methods give on their floor; the wilderness regions and
+    /// druid shrines (WildernessData, DruidShrineData); the Gauntlet tiers and champions (GauntletChampionData); the
+    /// Sellsword Hall ranks (GameConfig) and contracts (the private QuestSystem.MercTemplatesSlice1, by reflection).
+    /// Private members are read as the economy export reads them: a rename fails the export. No game file changes.
+    /// </summary>
+    private static object World() => new
+    {
+        monsterAbilities = MonsterAbilityRows(),
+        floors = Enumerable.Range(1, GameConfig.MaxDungeonLevel).Select(floor => new
+        {
+            floor,
+            theme = FloorTheme(floor),
+            boss = FloorBossName(floor),
+            // the floor as DungeonGenerator.GenerateFloor builds it (the same layout every visit)
+            rooms = DungeonGenerator.GenerateFloor(floor).Rooms.Count
+        }).ToArray(),
+        outposts = DungeonSettlementData.Settlements.Values.OrderBy(s => s.Floor).Select(s =>
+        {
+            var dungeon = DungeonAt(s.Floor);
+            return new
+            {
+                id = s.Id,
+                name = Names(null, s.Name),
+                floor = s.Floor,
+                healing = s.HasHealing,
+                trading = s.HasTrading,
+                lore = s.HasLore,
+                healCost = s.HasHealing ? (long?)InvokePrivate<long>(dungeon, "CalculateSettlementHealCost", null, s) : null,
+                healShareOfMissing = s.HasHealing ? (float?)s.HealEffectiveness : null,
+                goods = s.HasTrading
+                    ? InvokePrivate<List<(string id, string name, long cost)>>(dungeon, "GetSettlementTradeItems", s)
+                        .Select(g => new { id = g.id, name = g.name, price = g.cost }).ToArray()
+                    : []
+            };
+        }).ToArray(),
+        wildernessRegions = WildernessData.Regions.Select(r => new
+        {
+            id = r.Id,
+            name = Names("wilderness.region." + r.Id + ".name", r.Name),
+            direction = Names("wilderness.direction." + r.DirectionKey, r.Direction),
+            minLevel = r.MinLevel,
+            monsters = r.MonsterNames,
+            foraging = r.ForagingResults.Select(f => new { name = f.name, effect = f.effect }).ToArray(),
+            discoveries = r.Discoveries.OrderBy(d => d.MinLevel).Select(d => new
+            {
+                id = d.Id,
+                name = Names("wilderness.discovery." + d.Id + ".name", d.Name),
+                kind = d.EncounterType,
+                minLevel = d.MinLevel
+            }).ToArray()
+        }).ToArray(),
+        druidShrines = DruidShrineData.Shrines.Select(s => new
+        {
+            id = s.Id,
+            name = Names("shrine." + s.Id + ".name", s.Name),
+            god = Names("shrine." + s.Id + ".god", s.GodPatron),
+            region = WildernessData.GetRegionByKey(s.RegionDirectionKey)?.Id
+                ?? throw new InvalidOperationException("shrine region: " + s.Id),
+            passive = Loc.GetIn("en", "shrine." + s.Id + ".passive"),
+            chivalryShift = s.ChivalryShift
+        }).ToArray(),
+        gauntletTiers = Enum.GetValues<GauntletChampionData.ArenaTier>().Where(t => t != GauntletChampionData.ArenaTier.None)
+            .Select(t =>
+            {
+                var levels = Enumerable.Range(GameConfig.GauntletMinLevel, GameConfig.MaxLevel - GameConfig.GauntletMinLevel + 1)
+                    .Where(l => GauntletChampionData.GetTierForLevel(l) == t).ToArray();
+                var rewards = GauntletChampionData.GetTierRewards(t);
+                return new
+                {
+                    id = t,
+                    title = GauntletChampionData.GetTierTitle(t),
+                    minLevel = levels.Min(),
+                    maxLevel = levels.Max(),
+                    goldPerLevel = rewards.GoldMultiplierPerLevel,
+                    experiencePerLevel = rewards.XpMultiplierPerLevel,
+                    fame = rewards.FameBonus
+                };
+            }).ToArray(),
+        // the champions fill the last waves in order (AnchorRoadLocation: Champions[wave - 4] from wave 4)
+        gauntletChampions = GauntletChampionData.Champions.Select((c, i) => new
+        {
+            id = c.Id,
+            name = Names(null, c.Name),
+            title = c.Title,
+            wave = GameConfig.GauntletWaveCount - GauntletChampionData.Champions.Length + 1 + i,
+            role = c.Role,
+            levelBonus = c.LevelBonus,
+            hpMultiplier = c.HpMultiplier,
+            attackMultiplier = c.AttackMultiplier,
+            defenseMultiplier = c.DefenseMultiplier,
+            abilities = c.SpecialAbilities,
+            dropSlot = c.Drop.SlotHint
+        }).ToArray(),
+        mercRanks = Enum.GetValues<AlignmentSystem.MercRank>().Select(rank => new
+        {
+            id = rank,
+            name = Names("merc.rank_" + rank.ToString().ToLowerInvariant(), rank.ToString()),
+            contractsRequired = GameConfig.MercRankContractsRequired[(int)rank],
+            contractsPerFaction = GameConfig.MercRankSlotsPerFaction[(int)rank],
+            payMultiplier = GameConfig.MercRankPayMultiplier[(int)rank]
+        }).ToArray(),
+        mercContracts = MercContracts(),
+        constants = WorldConstants()
+    };
+
+    private static DungeonTheme FloorTheme(int floor) =>
+        (DungeonTheme)(typeof(DungeonGenerator).GetMethod("GetThemeForLevel", PrivateStatic)
+            ?? throw new InvalidOperationException("DungeonGenerator.GetThemeForLevel")).Invoke(null, [floor])!;
+
+    /// <summary>A DungeonLocation whose constructor never runs, standing on the floor: the price and boss name
+    /// methods read only the floor and the localization tables.</summary>
+    private static DungeonLocation DungeonAt(int floor)
+    {
+        var dungeon = (DungeonLocation)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(DungeonLocation));
+        (typeof(DungeonLocation).GetField("currentDungeonLevel", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("DungeonLocation.currentDungeonLevel")).SetValue(dungeon, floor);
+        return dungeon;
+    }
+
+    private static string FloorBossName(int floor) => InvokePrivate<string>(DungeonAt(floor), "GetBossName", FloorTheme(floor));
+
+    private static T InvokePrivate<T>(object target, string method, params object?[] args) =>
+        (T)((target.GetType().GetMethod(method, BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException(target.GetType().Name + "." + method)).Invoke(target, args))!;
+
+    /// <summary>The Sellsword Hall contract kinds (QuestSystem.MercTemplatesSlice1), with the title the board shows.</summary>
+    private static object MercContracts()
+    {
+        var templates = (Array)(typeof(QuestSystem).GetField("MercTemplatesSlice1", PrivateStatic)?.GetValue(null)
+            ?? throw new InvalidOperationException("QuestSystem.MercTemplatesSlice1"));
+        object Field(object t, string name) => (t.GetType().GetField(name) ?? throw new InvalidOperationException("MercTemplate." + name)).GetValue(t)!;
+        return templates.Cast<object>().Select(t => new
+        {
+            id = (string)Field(t, "Id"),
+            title = Names("merc.contract." + (string)Field(t, "Id") + ".title", (string)Field(t, "Id")),
+            faction = Field(t, "Faction").ToString(),
+            tier = (int)Field(t, "Tier"),
+            objective = Field(t, "ObjectiveType").ToString(),
+            target = (string)Field(t, "TargetId"),
+            baseCount = (int)Field(t, "BaseProgress"),
+            payMultiplier = (float)Field(t, "PayoutMultiplier")
+        }).ToArray();
+    }
+
+    // ---- monster abilities ----
+
+    /// <summary>The probe monster's level; its stats are the plain level 20 sample of the monsters export.</summary>
+    internal const int AbilityProbeLevel = 20;
+    private const int AbilityProbeRuns = 100;
+    /// <summary>The probe's target: its HP, mana and Strength (Possess hits for half the target's Strength).</summary>
+    internal const int AbilityProbeTargetHP = 1000;
+    internal const int AbilityProbeTargetStrength = 100;
+
+    /// <summary>
+    /// Every ability a monster can be given: the tiers' ability and signature lists (MonsterFamilies), the Shaman
+    /// spells of mixed groups (MonsterGenerator.CasterSpells), the wilderness monsters (WildernessData.MonsterProfiles)
+    /// and the Gauntlet champions. Each with who uses it and what MonsterAbilities.ExecuteAbility does with it.
+    /// </summary>
+    private static object MonsterAbilityRows()
+    {
+        var users = new SortedDictionary<string, List<(string name, string kind)>>(StringComparer.Ordinal);
+        void Add(string ability, string name, string kind)
+        {
+            if (!Enum.TryParse<MonsterAbilities.AbilityType>(ability, true, out var parsed))
+                throw new InvalidOperationException("monster ability: " + ability);
+            var key = parsed.ToString();
+            if (!users.TryGetValue(key, out var list)) users[key] = list = new();
+            if (!list.Contains((name, kind))) list.Add((name, kind));
+        }
+        foreach (var family in MonsterFamilies.GetBuiltInFamilies())
+            foreach (var tier in family.Tiers)
+            {
+                foreach (var a in tier.SpecialAbilities) Add(a, tier.Name, "monster");
+                foreach (var a in tier.SignatureAbilities) Add(a, tier.Name, "signature");
+            }
+        foreach (var caster in MonsterGenerator.CasterSpells) Add(caster.Value, caster.Key, "shaman");
+        foreach (var profile in WildernessData.MonsterProfiles) foreach (var a in profile.Value.Abilities) Add(a, profile.Key, "wilderness");
+        foreach (var champion in GauntletChampionData.Champions) foreach (var a in champion.SpecialAbilities) Add(a, champion.Name, "gauntlet");
+
+        return users.Select(entry =>
+        {
+            var ability = Enum.Parse<MonsterAbilities.AbilityType>(entry.Key);
+            var usual = AbilityEffects(ability, 0.5, 1.0, 1);
+            string Json(object o) => JsonSerializer.Serialize(o, JsonOptions);
+            return new
+            {
+                id = entry.Key,
+                effects = usual,
+                // the same probe with the monster at a tenth of its HP, with its target at a tenth, and a second use
+                changesWhenMonsterHurt = Json(AbilityEffects(ability, 0.1, 1.0, 1)) != Json(usual),
+                changesWhenTargetHurt = Json(AbilityEffects(ability, 0.5, 0.1, 1)) != Json(usual),
+                changesOnSecondUse = Json(AbilityEffects(ability, 0.5, 1.0, 2)) != Json(usual),
+                users = entry.Value.OrderBy(u => u.kind, StringComparer.Ordinal).ThenBy(u => u.name, StringComparer.Ordinal)
+                    .Select(u => new { u.name, u.kind }).ToArray()
+            };
+        }).ToArray();
+    }
+
+    /// <summary>
+    /// What one use of the ability does, over a fixed set of seeds: the fields of its result the combat engine
+    /// reads (CombatEngine.TryMonsterSpecialAbility and MonsterAttacksCompanion) and every number or flag of the
+    /// monster itself the ability changes (its HP as a percent of its maximum). A field that is the same in every
+    /// run is one value; one that varies is its lowest and highest.
+    /// </summary>
+    private static SortedDictionary<string, object> AbilityEffects(MonsterAbilities.AbilityType ability, double monsterHp, double targetHp, int uses)
+    {
+        var runs = new List<Dictionary<string, object>>();
+        var stats = MonsterGenerator.GetWikiStats(AbilityProbeLevel, 1.0f);
+        for (int seed = 0; seed < AbilityProbeRuns; seed++)
+        {
+            var monster = new Monster
+            {
+                Name = "Probe", FamilyName = "Probe", Level = AbilityProbeLevel,
+                MaxHP = stats.HP, HP = (long)(stats.HP * monsterHp), Strength = stats.Strength, Defence = (int)stats.Defence,
+                Punch = stats.Punch, WeapPow = stats.WeaponPower, ArmPow = stats.ArmorPower
+            };
+            var target = new Character
+            {
+                Level = AbilityProbeLevel, MaxHP = AbilityProbeTargetHP, HP = (long)(AbilityProbeTargetHP * targetHp),
+                MaxMana = AbilityProbeTargetHP, Mana = AbilityProbeTargetHP, Strength = AbilityProbeTargetStrength
+            };
+            var rng = new Random(seed);
+            AbilityResult result = null!;
+            Dictionary<string, double> before = null!;
+            for (int use = 0; use < uses; use++)
+            {
+                before = MonsterState(monster);
+                result = MonsterAbilities.ExecuteAbility(ability, monster, target, rng);
+            }
+            var run = new Dictionary<string, object>
+            {
+                ["attackPowerMultiplier"] = Math.Round((double)result.DamageMultiplier, 2),
+                ["directDamage"] = (double)result.DirectDamage,
+                ["lifeStealPercent"] = (double)result.LifeStealPercent,
+                ["manaDrain"] = (double)result.ManaDrain,
+                ["endsTurn"] = result.SkipNormalAttack,
+                ["summons"] = result.SummonMonsters ? (double)result.SummonCount : 0.0
+            };
+            if (result.InflictStatus != StatusEffect.None && result.StatusChance > 0)
+            {
+                run["status"] = result.InflictStatus.ToString();
+                run["statusChance"] = (double)result.StatusChance;
+                run["statusRounds"] = (double)result.StatusDuration;
+            }
+            // the numbers of the monster the ability changed (its once-a-fight flags show as a change on a second use)
+            var after = MonsterState(monster);
+            foreach (var (key, value) in after)
+            {
+                if (Equals(before[key], value)) continue;
+                run["monster" + key] = key == nameof(Monster.HP)
+                    ? Math.Round((value - before[key]) * 100.0 / monster.MaxHP)
+                    : value - before[key];
+            }
+            runs.Add(run);
+        }
+        var effects = new SortedDictionary<string, object>(StringComparer.Ordinal);
+        foreach (var key in runs.SelectMany(r => r.Keys).Distinct())
+        {
+            var values = runs.Select(r => r.TryGetValue(key, out var v) ? v : null).ToList();
+            if (values.All(v => v is string))
+            {
+                var distinct = values.Cast<string>().Distinct().OrderBy(s => s, StringComparer.Ordinal).ToArray();
+                effects[key] = distinct.Length == 1 ? distinct[0] : distinct;
+            }
+            else if (values.All(v => v is bool or null))
+            {
+                if (values.Any(v => v is true)) effects[key] = values.All(v => v is true) ? true : "sometimes";
+            }
+            else
+            {
+                var numbers = values.Select(v => v is double d ? d : 0.0).ToArray();
+                if (numbers.All(n => n == 0) && key != "attackPowerMultiplier") continue;
+                effects[key] = numbers.Min() == numbers.Max() ? numbers[0] : new { min = numbers.Min(), max = numbers.Max() };
+            }
+        }
+        return effects;
+    }
+
+    /// <summary>Every public number of the monster that has a public setter (no index).</summary>
+    private static Dictionary<string, double> MonsterState(Monster monster)
+    {
+        var state = new Dictionary<string, double>(StringComparer.Ordinal);
+        foreach (var p in typeof(Monster).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            if (!p.CanRead || p.SetMethod?.IsPublic != true || p.GetIndexParameters().Length > 0) continue;
+            var value = p.GetValue(monster);
+            if (value is int or long or float or double or byte or short) state[p.Name] = Convert.ToDouble(value);
+        }
+        return state;
+    }
+
+    private static SortedDictionary<string, object?> WorldConstants()
+    {
+        var constants = Named(typeof(GameConfig), string.Empty,
+            nameof(GameConfig.EliteChanceFloors3To10), nameof(GameConfig.EliteChanceFloors11To30),
+            nameof(GameConfig.EliteChanceFloors31Plus), nameof(GameConfig.EliteSecondAffixFloor),
+            nameof(GameConfig.EliteHpMultiplier), nameof(GameConfig.EliteDamageMultiplier),
+            nameof(GameConfig.EliteDefenceMultiplier), nameof(GameConfig.EliteExperienceMultiplier),
+            nameof(GameConfig.EliteGoldMultiplier), nameof(GameConfig.StragglerEncounterChance),
+            nameof(GameConfig.StragglerMinFloor), nameof(GameConfig.DungeonFeatureRewardMultiplier),
+            nameof(GameConfig.WildernessMaxDailyRevisits), nameof(GameConfig.WildernessTimeCostMinutes),
+            nameof(GameConfig.WildernessFatigueCost), nameof(GameConfig.SettlementMinNPCs),
+            nameof(GameConfig.SettlementMaxNPCs), nameof(GameConfig.SettlementEndorsementCost),
+            nameof(GameConfig.SettlementGambleMaxBet), nameof(GameConfig.SettlementBuffDuration),
+            nameof(GameConfig.SettlementProposalDeliberationTicks), nameof(GameConfig.SettlementProposalCooldownTicks),
+            nameof(GameConfig.GauntletMinLevel),
+            nameof(GameConfig.GauntletWaveCount), nameof(GameConfig.GauntletEntryFeeQuadraticCoefficient),
+            nameof(GameConfig.GauntletGoldPerWavePerLevel), nameof(GameConfig.GauntletXPPerWave),
+            nameof(GameConfig.GauntletHealBetweenWaves), nameof(GameConfig.GauntletManaRestoreBetweenWaves),
+            nameof(GameConfig.GauntletDeathChancePercent), nameof(GameConfig.GauntletDragoutXPLossPercent),
+            nameof(GameConfig.GauntletDragoutFameLossPenalty), nameof(GameConfig.GrandChampionDefenseBonus),
+            nameof(GameConfig.MaxMercContractsPerDay), nameof(GameConfig.MaxDailyMercStandingGain),
+            nameof(GameConfig.MercContractBaseGoldTier1), nameof(GameConfig.MercContractStaleDays),
+            nameof(GameConfig.MaxQuestsPerDay), nameof(GameConfig.MaxAvailableQuestsShown),
+            nameof(GameConfig.DefaultQuestDays), nameof(GameConfig.ShrineTerravokHpRegenPerRound),
+            nameof(GameConfig.ShrineMaelkethMeleeBonus), nameof(GameConfig.ShrineNocturaCritChanceBonus),
+            nameof(GameConfig.ShrineAurelionHolyDamageBonus), nameof(GameConfig.ShrineAurelionHolyProcBonus),
+            nameof(GameConfig.ShrineVeloraReactionBonus), nameof(GameConfig.Floor1MonsterStatMultiplier),
+            nameof(GameConfig.Floor2MonsterStatMultiplier), nameof(GameConfig.Floor3MonsterStatMultiplier),
+            nameof(GameConfig.Floor4MonsterStatMultiplier), nameof(GameConfig.Floor5MonsterStatMultiplier),
+            nameof(GameConfig.Floor6MonsterStatMultiplier));
+        // the elite traits' numbers (the Venomous ones are combat constants)
+        foreach (var entry in Named(typeof(EliteAffixes), string.Empty, nameof(EliteAffixes.FrenzyBelowHpPercent),
+                     nameof(EliteAffixes.FrenzyStrengthMultiplier), nameof(EliteAffixes.CommandDamageMultiplier),
+                     nameof(EliteAffixes.MendBelowHpPercent), nameof(EliteAffixes.MendHealPercent), nameof(EliteAffixes.MendEveryRounds)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(RareEncounters), string.Empty, nameof(RareEncounters.RareEncounterChance)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(DruidShrineData), "Shrine", nameof(DruidShrineData.AttunementHours)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(DungeonFloorState), "Floor", nameof(DungeonFloorState.RESPAWN_HOURS)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(MonsterTactics), string.Empty, nameof(MonsterTactics.SignatureMinLevel)))
+            constants[entry.Key] = entry.Value;
+        constants[nameof(AbilityProbeLevel)] = AbilityProbeLevel;
+        constants[nameof(AbilityProbeTargetHP)] = AbilityProbeTargetHP;
+        constants[nameof(AbilityProbeTargetStrength)] = AbilityProbeTargetStrength;
+        return constants;
+    }
+
     private static object Races() => GameConfig.RaceAttributes.OrderBy(x => x.Key)
         .Select(entry => new
         {
@@ -1011,6 +1356,9 @@ public static class WikiDataExporter
                     a.StatusDuration, a.IsAoE, a.IsUnavoidable, a.SelfHealPercent, a.Kind
                 }).ToArray()).ToArray()
         }).ToArray();
+        // 1.3.2: a secret boss as SecretBossManager.CreateBossMonster builds it reads only the level, HP, attack and
+        // defence; its magic power, speed, critical chance and ability list reach no fight and are not exported.
+        // The win pays RewardXP and RewardGold (SecretBossManager.HandleVictory); RequiresChoice asks a question first.
         var manager = SecretBossManager.Instance;
         var secret = Enum.GetValues<SecretBossType>().Select(type => manager.GetBoss(type))
             .Where(b => b != null).Select(b => new
@@ -1018,9 +1366,9 @@ public static class WikiDataExporter
                 id = b!.Type.ToString(), kind = "secret", spoiler = true,
                 name = Names(null, b.Name), b.Title, b.FloorLevel, b.BaseLevel,
                 baseHP = b.Stats.HP, baseAttack = b.Stats.Attack,
-                baseDefense = b.Stats.Defense, baseMagicPower = b.Stats.MagicPower,
-                baseSpeed = b.Stats.Speed, baseCritChance = b.Stats.CritChance,
-                b.Abilities
+                baseDefense = b.Stats.Defense,
+                rewardXP = b.RewardXP, rewardGold = b.RewardGold,
+                asksQuestion = b.RequiresChoice
             }).ToArray();
         return new { oldGods, world, secret };
     }
