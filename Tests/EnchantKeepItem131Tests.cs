@@ -378,7 +378,7 @@ public class EnchantKeepItem131Tests : IDisposable
             .Should().Be((was.Slot, was.Handedness, was.WeaponType, was.ArmorType, was.WeightClass));
     }
 
-    // ---------- 7. a cursed item: written back once, still cursed ----------
+    // ---------- 7. a cursed item: refused by removal (1.3.2), nothing written back ----------
 
     public static IEnumerable<object[]> CursedShapes() => new[]
     {
@@ -390,7 +390,7 @@ public class EnchantKeepItem131Tests : IDisposable
 
     [Theory]
     [MemberData(nameof(CursedShapes))]
-    public async Task Removal_WritesACursedItemBackOnce_StillCursed(EquipmentSlot slot, bool bothHands)
+    public async Task Removal_RefusesACursedItem_NothingChanges(EquipmentSlot slot, bool bothHands)
     {
         var hero = Hero();
         if (slot == EquipmentSlot.Head) Wear(hero, slot, Cap());
@@ -402,18 +402,18 @@ public class EnchantKeepItem131Tests : IDisposable
         hero.GetEquipment(slot)!.IsCursed = true;
         hero.RecalculateStats();
         var before = Counts(hero);
-        string others = string.Join(",", WornIds(hero).Split(',').Where(p => !p.StartsWith($"{slot}:")));
-        long gold = hero.Gold, price = RemovalPrice(hero);
+        string ids = WornIds(hero), stats = Stats(hero);
+        long gold = hero.Gold;
 
         await Strip(hero, slot);
 
-        Counts(hero).Should().Be(before, "exactly one item stands where one stood, none added to the pack");
-        string.Join(",", WornIds(hero).Split(',').Where(p => !p.StartsWith($"{slot}:"))).Should().Be(others);
+        Counts(hero).Should().Be(before);
+        WornIds(hero).Should().Be(ids, "the same items are worn");
         var worn = hero.GetEquipment(slot)!;
-        worn.GetEnchantmentCount().Should().Be(0, "the item in the slot is the stripped one");
-        worn.IsCursed.Should().BeTrue("removing an enchant does not lift a curse");
-        (gold - hero.Gold).Should().Be(price);
-        Stats(hero).Should().Be(Fresh(hero));
+        worn.GetEnchantmentCount().Should().Be(1, "the enchant stays");
+        worn.IsCursed.Should().BeTrue();
+        hero.Gold.Should().Be(gold, "nothing is charged");
+        Stats(hero).Should().Be(stats);
     }
 
     [Fact]
