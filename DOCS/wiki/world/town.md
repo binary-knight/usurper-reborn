@@ -1,7 +1,7 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs
 history: 1.3.0 | Team Corner's hire list shows the NPCs nearest your level first, hiring costs less below level 25, and the town keeps a pool of low-level NPCs to hire.
 history: 1.2.6 | A new team's name at Team Corner cannot contain < > & or a double quote.
