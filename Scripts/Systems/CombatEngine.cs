@@ -2082,6 +2082,11 @@ public partial class CombatEngine
                 ProcessEndOfRoundAbilityEffects(player);
                 ProcessShamanTotemEffects(player, monsters, result);
             }
+            else
+            {
+                // 1.3.2: grouped players fighting on after the leader falls still regain stamina and mana
+                RegeneratePartyAtRoundEnd(player);
+            }
 
             // Process totem effects for NPC teammates (Shaman NPCs can place totems too)
             if (result.Teammates != null)
@@ -26850,6 +26855,29 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// 1.3.2: round-end stamina and mana for every living party member other than the leader, by the
+    /// leader's own formula on that member's stats (RegenerateCombatStamina; GetManaRegenPerRound with
+    /// the god boon, for a class with spells). Silent. The leader is skipped by reference and each member
+    /// is visited once, so nobody regains twice in a round. A companion's mana lives on its combat
+    /// wrapper (CompanionSystem keeps no mana), and a mercenary's is synced back with its HP when hit.
+    /// </summary>
+    private void RegeneratePartyAtRoundEnd(Character leader)
+    {
+        if (currentTeammates == null) return;
+        var done = new HashSet<Character>(ReferenceEqualityComparer.Instance);
+        foreach (var tm in currentTeammates)
+        {
+            if (tm == null || !tm.IsAlive || ReferenceEquals(tm, leader) || !done.Add(tm)) continue;
+            tm.RegenerateCombatStamina();
+            if (SpellSystem.HasSpells(tm) && tm.Mana < tm.MaxMana)
+            {
+                long manaRegen = GodBoonSystem.ManaRegen(tm, StatEffectsSystem.GetManaRegenPerRound(tm.Wisdom));
+                tm.Mana = Math.Min(tm.MaxMana, tm.Mana + manaRegen);
+            }
+        }
+    }
+
+    /// <summary>
     /// Process end-of-round ability effects: decrement cooldowns and buff durations
     /// </summary>
     private void ProcessEndOfRoundAbilityEffects(Character player)
@@ -26871,6 +26899,9 @@ public partial class CombatEngine
             terminal.SetColor("bright_magenta");
             terminal.WriteLine(Loc.Get("combat.recover_mana", manaRegen, player.Mana, player.MaxMana));
         }
+
+        // 1.3.2: every other living party member regains stamina and mana the same way
+        RegeneratePartyAtRoundEnd(player);
 
         // Tidesworn Ocean's Resilience (v0.56.0): baseline 3% MaxHP/round + additional 2% when below 50% HP
         if (player.Class == CharacterClass.Tidesworn && player.HP > 0 && player.HP < player.MaxHP)
