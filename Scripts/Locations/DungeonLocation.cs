@@ -1782,11 +1782,10 @@ public class DungeonLocation : BaseLocation
                 }
             }
 
-            // Update teammates list - keep only affordable ones
-            teammates.Clear();
-            foreach (var npc in affordableTeammates)
+            // Only the fee NPCs gold cannot cover stay behind; allies that pay no fee come along
+            foreach (var (npc, _) in unaffordableTeammates)
             {
-                teammates.Add(npc);
+                teammates.Remove(npc);
             }
 
             if (unaffordableTeammates.Count > 0)

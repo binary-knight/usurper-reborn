@@ -1,7 +1,7 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs
 history: 1.3.0 | Rooms you cleared stay cleared after a disconnect, a reconnect or a save taken on the floor, a beaten boss included, and from floor 3 a room's monsters can include an elite, announced when the fight starts.
 history: 1.2.5 | Monster names in rooms, merchant wares and crafting materials are shown in the player's language, and long merchant and material rows wrap at 79 columns.

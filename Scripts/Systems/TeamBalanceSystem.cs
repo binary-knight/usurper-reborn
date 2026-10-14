@@ -37,8 +37,8 @@ namespace UsurperRemake.Systems
         // Relationship discount rates
         public const float SpouseDiscount = 0.50f;        // 50% off for spouse
         public const float LoverDiscount = 0.25f;         // 25% off for lover
-        public const float HighRelationDiscount = 0.15f;  // 15% off for high relationship (75+)
-        public const float LowRelationSurcharge = 0.25f;  // 25% surcharge for low relationship (<25)
+        public const float HighRelationDiscount = 0.15f;  // 15% off for a friendly relationship (Friendship or closer)
+        public const float LowRelationSurcharge = 0.25f;  // 25% surcharge for a hostile relationship (Anger or worse)
 
         public TeamBalanceSystem()
         {
@@ -149,11 +149,12 @@ namespace UsurperRemake.Systems
 
             // Check relationship level via RelationshipSystem
             var relationship = RelationshipSystem.GetRelationshipStatus(player, npc);
-            if (relationship >= 75)
+            // The relation scale runs lower = friendlier (Married 10 up to Hate 110)
+            if (relationship <= GameConfig.RelationFriendship)
             {
                 discount = Math.Max(discount, HighRelationDiscount);
             }
-            else if (relationship < 25 && discount == 0)
+            else if (relationship >= GameConfig.RelationAnger && discount == 0)
             {
                 // Low relationship surcharge (only if no other bonus)
                 discount = -LowRelationSurcharge;

@@ -1,7 +1,7 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs
 history: 1.3.0 | Rooms you cleared stay cleared after a disconnect or a save taken on the floor, floors 4 to 10 mix monster families in groups of up to three, and elite monsters appear from floor 3.
 history: 1.2.5 | Monster names in rooms and group summaries and the dungeon merchant's wares are shown in each player's language, and long dungeon rows wrap at 79 columns.

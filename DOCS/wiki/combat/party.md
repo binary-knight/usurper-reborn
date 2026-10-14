@@ -16,9 +16,9 @@ On a dungeon floor's overview, T opens party management. A adds an NPC ally: an 
 
 ## Dungeon entry fee
 
-An NPC ally more than 5 levels above you charges a fee each time you enter the dungeon: the levels above you minus 5 (at most 20), times 100, times 1 plus a tenth of its level rounded down. Example: you are level 10 and the NPC level 30, so 15 times 100 times 4 is 6,000 gold. Your spouse pays half that fee and a lover 25 percent less. Story companions, beasts, player echoes and mercenaries charge nothing.
+An NPC ally more than 5 levels above you charges a fee each time you enter the dungeon: the levels above you minus 5 (at most 20), times 100, times 1 plus a tenth of its level rounded down. Example: you are level 10 and the NPC level 30, so 15 times 100 times 4 is 6,000 gold. Your spouse pays half that fee and a lover 25 percent less. Otherwise an NPC whose relation to you is Friendship or closer charges 15 percent less, and one at Anger or worse 25 percent more; a lover who is also a friend still pays 25 percent less. Story companions, beasts, player echoes and mercenaries charge nothing.
 
-The game shows the fees and asks you to pay them. If you say no, every NPC ally with a fee stays at the entrance. If your gold does not cover them all, the game goes through the NPC allies from the dearest down and keeps each one whose fee your remaining gold still covers; you are asked to pay for those, and the others stay at the entrance. Saying no then leaves every NPC ally with a fee behind.
+The game shows the fees and asks you to pay them. If you say no, every NPC ally with a fee stays at the entrance. If your gold does not cover them all, the game goes through the NPC allies from the dearest down and keeps each one whose fee your remaining gold still covers; you are asked to pay for those, and the others stay at the entrance. Your story companions, your beast, player echoes, mercenaries and allies without a fee come along either way. Saying no then leaves every NPC ally with a fee behind.
 
 ## Experience in a party
 
