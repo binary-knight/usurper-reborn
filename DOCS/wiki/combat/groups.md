@@ -21,7 +21,7 @@ A teammate or companion makes the same [hit roll](/wiki/en/combat/#the-hit-roll)
 
 ## The oath-mark
 
-An NPC hired for your team, and an NPC friend who joins your dungeon party, carries the oath-mark of your banner; story companions do not. The game says so when you hire, in your team view and when someone joins the party. The chance that a fall at your side is permanent is the same as before. When one of them falls in your fight and will recover, the game says the oath-mark held. When one is lost for good, a short scene plays. If the one who fell and will recover is your spouse, lover or affair partner, the marriage or romance is not ended.
+An NPC hired for your team, and an NPC friend who joins your dungeon party, carries the oath-mark of your banner; story companions do not. The game says so when you hire, in your team view and when someone joins the party. The oath-mark does not change the chance that a fall at your side is permanent: see [when an ally falls](/wiki/en/combat/party/#when-an-ally-falls). When one of them falls in your fight and will recover, the game says the oath-mark held. When one is lost for good, a short scene plays. If the one who fell and will recover is your spouse, lover or affair partner, the marriage or romance is not ended.
 
 ## Mental in a group
 
@@ -33,4 +33,4 @@ A follower who collapses may leave the group for rescue or die in deeper floors.
 
 Living grouped players earn their own god's qualifying victory deeds, within their own daily cap. A Miracle is also personal to the player who can call it.
 
-Read [teams and guilds](/wiki/en/online/teams/) for the social side and [companions](/wiki/en/combat/companions/) for story followers.
+Read [party and allies](/wiki/en/combat/party/) for party size, fees, experience and stances, [teams and guilds](/wiki/en/online/teams/) for the social side and [companions](/wiki/en/combat/companions/) for story followers.

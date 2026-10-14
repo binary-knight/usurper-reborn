@@ -56,6 +56,7 @@ public static class WikiDataExporter
         Write(outputDir, "achievements", Achievements());
         Write(outputDir, "bosses", Bosses());
         Write(outputDir, "characters", Characters());
+        Write(outputDir, "party", Party());
 
         File.WriteAllText(Path.Combine(outputDir, "meta.json"), JsonSerializer.Serialize(new
         {
@@ -367,6 +368,141 @@ public static class WikiDataExporter
             if (field == null || !field.IsLiteral) throw new InvalidOperationException(type.Name + "." + n);
             return field.GetRawConstantValue();
         }));
+
+    /// <summary>
+    /// 1.3.2 wiki depth: the party. Beasts from BeastData.Beasts, each with the level that meets both gates of a
+    /// sighting: the region's own level (WildernessLocation.ExploreRegion refuses a region below it) and the beast's
+    /// (asked of BeastData.PickEligibleBeast). The five story companions as a new CompanionSystem defines them, each
+    /// with the class it fights as (CompanionSystem.BuildCombatCharacter) and the main hand weapon types its own rule
+    /// admits (Equipment.CanEquip on a bare weapon of each type, so no class list, level or Strength decides). The
+    /// ally stances (TeammateStances.PolicyFor) and the named constants the party guides print.
+    /// </summary>
+    private static object Party() => new
+    {
+        beasts = BeastData.Beasts.Select(b =>
+        {
+            var region = WildernessData.GetRegionByKey(b.RegionDirectionKey)
+                ?? throw new InvalidOperationException("beast region: " + b.Id);
+            return new
+            {
+                id = b.Id,
+                name = Names(null, b.Name),   // a beast's name stays English (BeastData.LocSpecies)
+                species = Names("dungeon.beast." + b.Id + ".species", b.Species),
+                role = b.Role,
+                region = new
+                {
+                    id = region.Id,
+                    name = Names("wilderness.region." + region.Id + ".name", region.Name),
+                    direction = region.Direction,
+                    minLevel = region.MinLevel
+                },
+                beastMinLevel = b.MinPlayerLevel,
+                sightedFromLevel = BeastSightedFromLevel(b, region),
+                tameDifficulty = b.TameDifficulty,
+                combatBase = b.Role == BeastData.BeastRole.Combat
+                    ? new { hp = b.CombatBaseHP, attack = b.CombatBaseAttack, defence = b.CombatBaseDefence }
+                    : null
+            };
+        }).ToArray(),
+        companions = BuiltInCompanions().OrderBy(c => c.RecruitLevel).ThenBy(c => c.Name, StringComparer.Ordinal)
+            .Select(c => new
+            {
+                id = c.Id.ToString(),
+                name = Names(null, c.Name),
+                title = Names(c.KeyBase + ".title", c.Title),
+                role = c.CombatRole,
+                combatClass = CompanionSystem.BuildCombatCharacter(c).Class,
+                recruitLevel = c.RecruitLevel,
+                romanceAvailable = c.RomanceAvailable,
+                baseStats = new
+                {
+                    hp = c.BaseStats.HP, attack = c.BaseStats.Attack, defence = c.BaseStats.Defense,
+                    magic = c.BaseStats.MagicPower, speed = c.BaseStats.Speed, healing = c.BaseStats.HealingPower
+                },
+                mainHandWeaponTypes = CompanionMainHandTypes(c)
+            }).ToArray(),
+        stances = Enum.GetValues<TeammateStance>().Select(s =>
+        {
+            var p = TeammateStances.PolicyFor(s);
+            return new
+            {
+                id = s,
+                p.EmergencySelfPotion, p.PotionMostInjured, p.DefensiveFirst, p.Brace,
+                p.MayTaunt, p.TargetWeightMultiplier
+            };
+        }).ToArray(),
+        constants = PartyConstants()
+    };
+
+    /// <summary>The lowest level at which a sighting in the beast's region can pick it, or null if none.</summary>
+    private static int? BeastSightedFromLevel(BeastData.BeastDefinition beast, WildernessRegion region)
+    {
+        // owning every other beast leaves this one as the only candidate the game's own pick can return
+        var others = BeastData.Beasts.Where(b => b.Id != beast.Id).Select(b => b.Id).ToArray();
+        for (int level = region.MinLevel; level <= GameConfig.MaxLevel; level++)
+            if (BeastData.PickEligibleBeast(region.DirectionKey, level, new Random(0), others)?.Id == beast.Id)
+                return level;
+        return null;
+    }
+
+    /// <summary>
+    /// The five companions as CompanionSystem.InitializeCompanions defines them, before a recruitment scales their
+    /// stats. Built on an object whose constructor never runs: the constructor makes the new system the shared
+    /// fallback (CompanionSystem.Instance) that other code and tests read, and the export must not replace it.
+    /// </summary>
+    private static List<Companion> BuiltInCompanions()
+    {
+        const BindingFlags own = BindingFlags.NonPublic | BindingFlags.Instance;
+        var blank = (CompanionSystem)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(CompanionSystem));
+        var field = typeof(CompanionSystem).GetField("companions", own)
+            ?? throw new InvalidOperationException("CompanionSystem.companions");
+        var init = typeof(CompanionSystem).GetMethod("InitializeCompanions", own)
+            ?? throw new InvalidOperationException("CompanionSystem.InitializeCompanions");
+        field.SetValue(blank, new Dictionary<CompanionId, Companion>());
+        init.Invoke(blank, null);
+        return blank.GetAllCompanions().ToList();
+    }
+
+    /// <summary>The main hand weapon types the companion's own rule in Equipment.CanEquip admits.</summary>
+    private static WeaponType[] CompanionMainHandTypes(Companion companion)
+    {
+        var probe = CompanionSystem.BuildCombatCharacter(companion);
+        probe.IsCompanion = true;            // as CompanionSystem.GetCompanionsAsCharacters marks a fighting companion
+        probe.CompanionId = companion.Id;
+        probe.Level = GameConfig.MaxLevel;
+        probe.Strength = int.MaxValue;
+        return Enum.GetValues<WeaponType>().Where(t => t != WeaponType.None
+            && new Equipment { Slot = EquipmentSlot.MainHand, WeaponType = t }.CanEquip(probe, out _)).ToArray();
+    }
+
+    private static SortedDictionary<string, object?> PartyConstants()
+    {
+        var constants = Named(typeof(GameConfig), string.Empty,
+            nameof(GameConfig.WildernessMaxDailyExplorations), nameof(GameConfig.ShrineVeloraCharismaBonus),
+            nameof(GameConfig.AbandonCompanionLoyaltyPenalty), nameof(GameConfig.CompanionLossPerMurder),
+            nameof(GameConfig.MaxRoyalMercenaries), nameof(GameConfig.MercenaryBaseCost),
+            nameof(GameConfig.MercenaryCostPerLevel), nameof(GameConfig.PermadeathChanceDungeonTeam),
+            nameof(GameConfig.PermadeathLevelReduction), nameof(GameConfig.PermadeathPopulationFloor),
+            nameof(GameConfig.PermadeathRaceFloor), nameof(GameConfig.NpcRecruitmentCostPerLevel),
+            nameof(GameConfig.NpcRecruitmentCostPerLevelSquared), nameof(GameConfig.RecruitAboveLevelPercentPerLevel),
+            nameof(GameConfig.RecruitAboveLevelMaxPercent), nameof(GameConfig.RecruitPriceFriendship),
+            nameof(GameConfig.RecruitPriceTrust), nameof(GameConfig.RecruitPriceRespect),
+            nameof(GameConfig.RecruitPriceNormal), nameof(GameConfig.RecruitPriceSuspicious),
+            nameof(GameConfig.RecruitPriceAnger), nameof(GameConfig.AdultChildRecruitmentDiscount),
+            nameof(GameConfig.RecruitPoolPerBand), nameof(GameConfig.RecruitPoolSize),
+            nameof(GameConfig.GroupMaxSize), nameof(GameConfig.MaxTeamFacilityLevel));
+        // BeastMaxRosterSize, BeastTameAttempts, and the encounter chance under its own name
+        foreach (var entry in Named(typeof(BeastData), "Beast", nameof(BeastData.MaxRosterSize), nameof(BeastData.TameAttempts)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(BeastData), string.Empty, nameof(BeastData.BeastEncounterChancePercent)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(CompanionSystem), string.Empty, nameof(CompanionSystem.MaxActiveCompanions)))
+            constants[entry.Key] = entry.Value;
+        // the daily wage and the companion team constants, through the one file that reads the wage constants
+        foreach (var entry in TeamSystem.WikiPartyConstants())
+            constants[entry.Key] = entry.Value;
+        return constants;
+    }
 
     private static object Races() => GameConfig.RaceAttributes.OrderBy(x => x.Key)
         .Select(entry => new

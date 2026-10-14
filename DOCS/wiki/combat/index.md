@@ -41,4 +41,4 @@ Recover before resources are exhausted. [Fleeing](/wiki/en/combat/fleeing/) can 
 
 ## Fight types
 
-[Groups and support](/wiki/en/combat/groups/), [companions and beasts](/wiki/en/combat/companions/), [PvP](/wiki/en/combat/pvp/) and [bosses](/wiki/en/monsters/bosses/) have rules that differ from an ordinary solo monster fight.
+[Groups and support](/wiki/en/combat/groups/), [party and allies](/wiki/en/combat/party/), [companions and beasts](/wiki/en/combat/companions/), [PvP](/wiki/en/combat/pvp/) and [bosses](/wiki/en/monsters/bosses/) have rules that differ from an ordinary solo monster fight.
