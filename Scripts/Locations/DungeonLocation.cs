@@ -5454,6 +5454,7 @@ public class DungeonLocation : BaseLocation
         {
             case 0:
                 var pitDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
+                pitDmg = ApplyTrapResistBuff(player, pitDmg);   // 1.3.2: the Prison buff, before the stat check
                 if (TrapMitigationCheck(player, player.Agility, "ui.stat_agility")) pitDmg /= 2;
                 player.HP = Math.Max(1, player.HP - pitDmg);
                 terminal.SetColor("red");
@@ -5463,6 +5464,7 @@ public class DungeonLocation : BaseLocation
 
             case 1:
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
+                dartDmg = ApplyTrapResistBuff(player, dartDmg);
                 bool dartShrugged = TrapMitigationCheck(player, player.Constitution, "ui.stat_constitution");
                 if (dartShrugged) dartDmg /= 2;
                 player.HP = Math.Max(1, player.HP - dartDmg);
@@ -5483,6 +5485,7 @@ public class DungeonLocation : BaseLocation
 
             case 2:
                 var fireDmg = currentDungeonLevel * 4 + dungeonRandom.Next(12);
+                fireDmg = ApplyTrapResistBuff(player, fireDmg);
                 if (TrapMitigationCheck(player, player.Dexterity, "ui.stat_dexterity")) fireDmg /= 2;
                 player.HP = Math.Max(1, player.HP - fireDmg);
                 terminal.SetColor("red");
@@ -8984,7 +8987,7 @@ public class DungeonLocation : BaseLocation
                     switch (trapType)
                     {
                         case 0:
-                            var poisonDmg = currentDungeonLevel * 5;
+                            var poisonDmg = ApplyTrapResistBuff(currentPlayer, currentDungeonLevel * 5);   // 1.3.2: the Prison buff
                             currentPlayer.HP = Math.Max(1, currentPlayer.HP - poisonDmg);
                             terminal.WriteLine(Loc.Get("dungeon.chest_poison_gas", poisonDmg));
                             // v0.61.1 Marsh Toad rolls to absorb.
@@ -9000,7 +9003,7 @@ public class DungeonLocation : BaseLocation
                             }
                             break;
                         case 1:
-                            var spikeDmg = currentDungeonLevel * 8;
+                            var spikeDmg = ApplyTrapResistBuff(currentPlayer, currentDungeonLevel * 8);
                             currentPlayer.HP = Math.Max(1, currentPlayer.HP - spikeDmg);
                             terminal.WriteLine(Loc.Get("dungeon.chest_spikes", spikeDmg));
                             break;
@@ -9663,6 +9666,8 @@ public class DungeonLocation : BaseLocation
     /// runes). This helper centralises the mitigation so all five damaging
     /// sites stay in sync and the buff actually does what its description
     /// says. Each call that mitigates decrements the buff charge.
+    /// 1.3.2: those sites were the dead TrapEncounter; the live room traps (TriggerTrap: pit, darts, fire) and
+    /// chest traps (gas, spikes) now call it too. Gold and experience losses are not damage and are not reduced.
     /// </summary>
     private int ApplyTrapResistBuff(Character player, int rawDamage)
     {
@@ -14821,8 +14826,9 @@ public class DungeonLocation : BaseLocation
         int difficulty = Math.Min(5, 1 + (currentDungeonLevel / 20));
         var riddle = RiddleDatabase.Instance.GetRandomRiddle(difficulty, currentFloor?.Theme);
 
-        // Present the riddle using the full system
-        var result = await RiddleDatabase.Instance.PresentRiddle(riddle, player, terminal);
+        // Present the riddle using the full system. 1.3.2: a failure is charged once, there, the riddle's own
+        // damage with the Settlement Prison buff applied; fleeing costs only what the riddle's flee rule says.
+        var result = await RiddleDatabase.Instance.PresentRiddle(riddle, player, terminal, dmg => ApplyTrapResistBuff(player, dmg));
 
         if (result.Solved)
         {
@@ -14862,15 +14868,6 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("dungeon.gate_sealed"));
-
-            // Take damage on failure (Settlement Prison TrapResist applies)
-            int damage = riddle.FailureDamage * currentDungeonLevel / 5;
-            damage = ApplyTrapResistBuff(player, damage);
-            if (damage > 0)
-            {
-                player.HP = Math.Max(1, player.HP - damage);
-                terminal.WriteLine(Loc.Get("dungeon.trap_activates", damage));
-            }
         }
 
         await terminal.PressAnyKey();

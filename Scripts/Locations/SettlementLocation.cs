@@ -1026,8 +1026,7 @@ public class SettlementLocation : BaseLocation
             return;
         }
 
-        currentPlayer.SettlementCircleUsedToday = true;
-
+        // 1.3.2: the day is spent only when something is restored; a full refusal leaves it for later
         if (currentPlayer.IsManaClass)
         {
             if (currentPlayer.Mana >= currentPlayer.MaxMana)
@@ -1038,6 +1037,7 @@ public class SettlementLocation : BaseLocation
                 return;
             }
 
+            currentPlayer.SettlementCircleUsedToday = true;
             long restoreAmount = (long)(currentPlayer.MaxMana * GameConfig.SettlementManaRestorePercent);
             currentPlayer.Mana = Math.Min(currentPlayer.MaxMana, currentPlayer.Mana + restoreAmount);
 
@@ -1058,6 +1058,7 @@ public class SettlementLocation : BaseLocation
                 return;
             }
 
+            currentPlayer.SettlementCircleUsedToday = true;
             long restoreAmount = (long)(currentPlayer.MaxHP * GameConfig.SettlementManaRestorePercent);
             currentPlayer.HP = Math.Min(currentPlayer.MaxHP, currentPlayer.HP + restoreAmount);
 
@@ -1160,21 +1161,22 @@ public class SettlementLocation : BaseLocation
             return;
         }
 
-        // Give a random herb
-        var herbTypes = Enum.GetValues(typeof(HerbType)).Cast<HerbType>().Where(h => h != HerbType.None).ToArray();
-        var herb = herbTypes[Random.Shared.Next(herbTypes.Length)];
+        // Give a random herb among those below their carrying limit. 1.3.2: a herb at its limit used to give
+        // nothing without spending the day, so the player tried again until one fit; the draw is now made among
+        // the herbs that fit (the same odds, no retry), and only a pouch with every herb at its limit is refused.
+        var herbTypes = Enum.GetValues(typeof(HerbType)).Cast<HerbType>()
+            .Where(h => h != HerbType.None && currentPlayer.GetHerbCount(h) < GameConfig.HerbMaxCarry[(int)h])
+            .ToArray();
 
-        // Check if player can carry more
-        int currentCount = currentPlayer.GetHerbCount(herb);
-        int maxCarry = GameConfig.HerbMaxCarry[(int)herb];
-
-        if (currentCount >= maxCarry)
+        if (herbTypes.Length == 0)
         {
             terminal.SetColor("yellow");
-            terminal.WriteLine(Loc.Get("settlement.herbalist_max_carry", HerbData.LocName(herb)));
+            terminal.WriteLine(Loc.Get("settlement.herbalist_all_full"));
             await terminal.PressAnyKey();
             return;
         }
+
+        var herb = herbTypes[Random.Shared.Next(herbTypes.Length)];
 
         // Add herb
         currentPlayer.AddHerb(herb);

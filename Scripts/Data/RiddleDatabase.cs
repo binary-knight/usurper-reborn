@@ -59,9 +59,11 @@ namespace UsurperRemake.Data
         }
 
         /// <summary>
-        /// Present a riddle to the player
+        /// Present a riddle to the player. A failure charges the riddle's FailureDamage once; failureDamageFilter,
+        /// when given, adjusts that charge first (1.3.2: the dungeon passes the Settlement Prison buff).
         /// </summary>
-        public async Task<RiddleResult> PresentRiddle(Riddle riddle, Character player, TerminalEmulator terminal)
+        public async Task<RiddleResult> PresentRiddle(Riddle riddle, Character player, TerminalEmulator terminal,
+            Func<int, int>? failureDamageFilter = null)
         {
             terminal.Clear();
 
@@ -85,6 +87,7 @@ namespace UsurperRemake.Data
 
             int attempts = riddle.MaxAttempts;
             bool solved = false;
+            int damageTaken = 0;
 
             while (attempts > 0 && !solved)
             {
@@ -131,7 +134,7 @@ namespace UsurperRemake.Data
 
             if (!solved)
             {
-                await DisplayFailure(riddle, player, terminal);
+                damageTaken = await DisplayFailure(riddle, player, terminal, failureDamageFilter);
             }
 
             return new RiddleResult
@@ -139,7 +142,7 @@ namespace UsurperRemake.Data
                 Solved = solved,
                 Attempts = riddle.MaxAttempts - attempts,
                 XPEarned = solved ? riddle.RewardXP : 0,
-                DamageTaken = solved ? 0 : riddle.FailureDamage
+                DamageTaken = damageTaken
             };
         }
 
@@ -216,15 +219,17 @@ namespace UsurperRemake.Data
             await terminal.PressAnyKey();
         }
 
-        private async Task DisplayFailure(Riddle riddle, Character player, TerminalEmulator terminal)
+        private async Task<int> DisplayFailure(Riddle riddle, Character player, TerminalEmulator terminal, Func<int, int>? failureDamageFilter)
         {
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("riddle.failure_wit"), "red");
             terminal.WriteLine("");
 
+            int damage = 0;
             if (riddle.FailureDamage > 0)
             {
-                int damage = Math.Min(riddle.FailureDamage, (int)player.HP - 1);
+                int charge = failureDamageFilter != null ? failureDamageFilter(riddle.FailureDamage) : riddle.FailureDamage;
+                damage = Math.Max(0, Math.Min(charge, (int)player.HP - 1));
                 player.HP -= damage;
                 terminal.WriteLine(Loc.Get("riddle.failure_damage", damage), "bright_red");
             }
@@ -233,6 +238,7 @@ namespace UsurperRemake.Data
             terminal.WriteLine(Loc.Get("riddle.answer_was", riddle.LocAnswer()), "gray");
 
             await terminal.PressAnyKey();
+            return damage;
         }
 
         private async Task ApplyFleeConsequence(Riddle riddle, Character player, TerminalEmulator terminal)

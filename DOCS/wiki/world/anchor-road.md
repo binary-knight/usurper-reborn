@@ -56,7 +56,7 @@ Each wave is to the death {{balance:GauntletDeathChancePercent}} percent of the 
 
 ## Sellsword Hall contracts
 
-The Crown, the Shadows and the Faith each post contracts on the board, which refreshes once a day; an unclaimed contract leaves after {{balance:MercContractStaleDays}} days. You can claim {{balance:MaxMercContractsPerDay}} contracts a day and have 7 days to finish each one.
+The Crown, the Shadows and the Faith each post contracts on the board, which refreshes once a day; an unclaimed contract leaves after {{balance:MercContractStaleDays}} days. You can claim {{balance:MaxMercContractsPerDay}} contracts a day and have 7 days to finish each one, 14 for Bandits on the Trade Road.
 
 ### Sellsword ranks
 
@@ -66,7 +66,7 @@ Your rank comes from the contracts you have completed, and it sets how many cont
 
 ### Sellsword contract pay
 
-A contract pays your level x {{balance:MercContractBaseGoldTier1}} x the contract's pay factor in gold, times your rank's pay factor when you turn it in. Its count is the contract's base count + your level / 5. At level 30, Unhallowed Dead (pay factor 1.0, base count 3) pays 4,500 gold for 9 Zombie kills before your rank's factor.
+A contract pays your level x {{balance:MercContractBaseGoldTier1}} x the contract's pay factor in gold, times your rank's pay factor when you turn it in. Its count is the contract's base count + your level / 5, except Bandits on the Trade Road, which needs 3 kills at any level of the Bandit Scouts and Mountain Bandits of the [wilderness](/wiki/en/world/wilderness/). At level 30, Unhallowed Dead (pay factor 1.0, base count 3) pays 4,500 gold for 9 Zombie kills before your rank's factor.
 
 {{table:merc-contracts}}
 
