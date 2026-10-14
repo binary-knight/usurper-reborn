@@ -14680,6 +14680,7 @@
   "inn.cursed_label": " (MALEDETTO)",
   "inn.no_abilities_yet": "Nessuna abilità di combattimento disponibile ancora.",
   "dungeon.teammate_arrested": "{0} è stato arrestato mentre eri via e non può rientrare nel gruppo.",
+  "dungeon.teammate_dead": "{0} è morto e non può ancora rientrare nel gruppo.",
   "inn.skills_abilities_header": "ABILITÀ",
   "inn.skills_spells_header": "INCANTESIMI",
   "inn.all_abilities_enabled": "Tutte le abilità e gli incantesimi attivati!",

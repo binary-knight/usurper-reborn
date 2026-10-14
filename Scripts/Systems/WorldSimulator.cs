@@ -87,6 +87,53 @@ public class WorldSimulator
     }
 
     /// <summary>
+    /// 1.3.2: the NPC's ID is in the player's saved dungeon party, in town as well as in the dungeon. Read from
+    /// InstanceIfAny so the sim thread never creates an engine. Online the sim thread has no session, so no
+    /// session's party is seen here (IsInConversation is the online signal while the party is in the dungeon).
+    /// The list is edited on the game thread; a read that races an edit is caught by SimulateStep's per-NPC catch.
+    /// </summary>
+    internal static bool IsInPlayerDungeonParty(NPC npc)
+    {
+        var ids = GameEngine.InstanceIfAny?.DungeonPartyNPCIds;
+        return ids != null && !string.IsNullOrEmpty(npc.ID) && ids.Contains(npc.ID);
+    }
+
+    /// <summary>1.3.2: the NPC is the player's spouse or lover (single-player; online the sim thread's tracker
+    /// is the fallback one, which no session writes).</summary>
+    internal static bool IsPlayerSpouseOrLover(NPC npc)
+    {
+        var romance = RomanceTracker.Instance;
+        if (romance == null || string.IsNullOrEmpty(npc.ID)) return false;
+        return romance.Spouses?.Any(s => s.NPCId == npc.ID) == true
+            || romance.CurrentLovers?.Any(l => l.NPCId == npc.ID) == true;
+    }
+
+    /// <summary>
+    /// 1.3.2, the attack and death guard: no world sim attack, team war blow or world sim death touches an NPC on
+    /// a player's team, in conversation, or in the player's dungeon party. A spouse or lover outside the party
+    /// is not covered (they can still be attacked in town).
+    /// </summary>
+    internal static bool IsShieldedFromWorldSimHarm(NPC npc) =>
+        IsPlayerTeam(npc.Team) || npc.IsInConversation || IsInPlayerDungeonParty(npc);
+
+    /// <summary>
+    /// 1.3.2, the activity guard: the NPC runs none of its own world sim activities (shopping, moves, dungeon runs
+    /// and the rest): a player team member, a member of the player's dungeon party, an NPC in conversation. The
+    /// spouse and lovers are not held here: they keep their activities and go home to the player (NPCGoHome).
+    /// </summary>
+    internal static bool IsOutOfActivityPass(NPC npc) =>
+        IsPlayerTeam(npc.Team) || npc.IsInConversation || IsInPlayerDungeonParty(npc);
+
+    /// <summary>
+    /// 1.3.2, the gear guard: the world sim never changes this NPC's equipment or gear power, and never sends it
+    /// to a shop for it: everything the activity guard holds, plus the player's spouse and lovers. Checked at
+    /// every site that changes gear, before any move that site makes. Only the player's own actions change such
+    /// an NPC's gear.
+    /// </summary>
+    internal static bool IsGearPlayerOnly(NPC npc) =>
+        IsOutOfActivityPass(npc) || IsPlayerSpouseOrLover(npc);
+
+    /// <summary>
     /// v1.2.8 (F5): the mark a refresh takes BEFORE it reads the store: registrations made after it are newer
     /// than what the read can have seen. Pass it to ReplaceStorePlayerTeams with the names read.
     /// </summary>
@@ -957,12 +1004,15 @@ public class WorldSimulator
             return false;
         }
 
-        // NPCs on a player's team are protected from world sim kills
-        if (IsPlayerTeam(npc.Team))
+        // NPCs on a player's team are protected from world sim kills.
+        // 1.3.2: so is an NPC in the player's dungeon party (IsShieldedFromWorldSimHarm), for a world sim death
+        // only: a fall in the player's own fight (atPlayersSide) is a real death, and CombatEngine removes the ID
+        // from the party list only after this call.
+        if (IsPlayerTeam(npc.Team) || (!atPlayersSide && IsShieldedFromWorldSimHarm(npc)))
         {
-            // Heal them back up instead of killing — they're an active team member
+            // Heal them back up instead of killing, they're an active team or party member
             npc.HP = Math.Max(1, npc.MaxHP / 4);
-            DebugLogger.Instance.LogInfo("WORLDSIM", $"Skipping death for {npc.Name} — on player team '{npc.Team}'");
+            DebugLogger.Instance.LogInfo("WORLDSIM", $"Skipping death for {npc.Name}: on player team '{npc.Team}' or in the player's dungeon party");
             return false;
         }
 
@@ -2871,7 +2921,8 @@ public class WorldSimulator
     {
         // Player team NPCs don't do autonomous activities (dungeon runs, shopping, etc.)
         // They could die in simulated dungeon combat, causing the "disappeared from team" bug
-        if (IsPlayerTeam(npc.Team)) return;
+        // 1.3.2: nor does a dungeon party member or an NPC in conversation (the spouse and lovers do, gear aside)
+        if (IsOutOfActivityPass(npc)) return;
 
         // Chance per tick to do something interesting
         // Online: 5% (was 15%) — more realistic pacing for persistent server
@@ -3056,7 +3107,7 @@ public class WorldSimulator
 
     private void BrainV2ProcessActivities(NPC npc, WorldState world)
     {
-        if (IsPlayerTeam(npc.Team)) return;
+        if (IsOutOfActivityPass(npc)) return;   // 1.3.2: the team, the dungeon party, conversation
 
         double activityChance = UsurperRemake.BBS.DoorMode.IsOnlineMode ? 0.05 : 0.15;
         if (random.NextDouble() > activityChance) return;
@@ -5083,6 +5134,10 @@ public class WorldSimulator
     /// </summary>
     private void NPCGoShopping(NPC npc)
     {
+        // 1.3.2: the gear of a team member, a dungeon party member, an NPC in conversation and the player's spouse
+        // or lover is changed only by the player, whatever path reaches this; checked before the move to a shop
+        if (IsGearPlayerOnly(npc)) return;
+
         EquipmentDatabase.Initialize();
 
         // Initialize EquippedItems if needed
@@ -5109,19 +5164,22 @@ public class WorldSimulator
         {
             npc.UpdateLocation("Weapon Shop");
 
-            // Get current weapon power
-            int currentWeaponPower = 0;
-            if (npc.EquippedItems.TryGetValue(EquipmentSlot.MainHand, out int weaponId))
-            {
-                var currentWeapon = EquipmentDatabase.GetById(weaponId);
-                if (currentWeapon != null)
-                    currentWeaponPower = currentWeapon.WeaponPower;
-            }
+            // Get current weapon power. 1.3.2: a main hand holding an ID that does not resolve is left alone
+            // (it was counted as empty and replaced), and an off hand that does not resolve is not dropped for
+            // a two-handed weapon.
+            var (mainKnown, currentWeapon) = SlotItem(npc, EquipmentSlot.MainHand);
+            var (offKnown, currentOffHand) = SlotItem(npc, EquipmentSlot.OffHand);
+            int currentWeaponPower = currentWeapon?.WeaponPower ?? 0;
+            long currentWeaponValue = currentWeapon?.Value ?? 0;
 
-            // Find a better weapon within budget
-            var betterWeapon = EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded)
+            // Find a better weapon within budget. 1.3.2: one this NPC can equip, of a type its class uses
+            // (NpcCanUseShopItem), with more power AND more value than the one it holds (a loot item's value
+            // carries its rarity and so its effects; a plain shop item never replaces a better drop).
+            var betterWeapon = !mainKnown ? null : EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.OneHanded)
                 .Concat(EquipmentDatabase.GetWeaponsByHandedness(WeaponHandedness.TwoHanded))
-                .Where(w => w.Value <= spendingBudget && w.WeaponPower > currentWeaponPower)
+                .Where(w => w.Value <= spendingBudget && w.WeaponPower > currentWeaponPower && w.Value > currentWeaponValue)
+                .Where(w => offKnown || w.Handedness != WeaponHandedness.TwoHanded)
+                .Where(w => NpcCanUseShopItem(npc, w))
                 .OrderByDescending(w => w.WeaponPower)
                 .FirstOrDefault();
 
@@ -5137,11 +5195,13 @@ public class WorldSimulator
                 npc.SpendGold((int)weaponTotal);
                 CityControlSystem.Instance.ProcessSaleTax(betterWeapon.Value);
                 npc.EquippedItems[EquipmentSlot.MainHand] = betterWeapon.Id;
+                KeepReplaced(npc, currentWeapon);   // 1.3.2: to the NPC's own stock, no longer destroyed
 
                 // If new weapon is two-handed, remove off-hand item
                 if (betterWeapon.Handedness == WeaponHandedness.TwoHanded)
                 {
                     npc.EquippedItems.Remove(EquipmentSlot.OffHand);
+                    KeepReplaced(npc, currentOffHand);
                 }
 
                 boughtSomething = true;
@@ -5163,18 +5223,16 @@ public class WorldSimulator
             };
             var targetSlot = armorSlots[random.Next(armorSlots.Length)];
 
-            // Get current armor in that slot
-            int currentArmorAC = 0;
-            if (npc.EquippedItems.TryGetValue(targetSlot, out int armorId))
-            {
-                var currentArmor = EquipmentDatabase.GetById(armorId);
-                if (currentArmor != null)
-                    currentArmorAC = currentArmor.ArmorClass;
-            }
+            // Get current armor in that slot. 1.3.2: a slot holding an ID that does not resolve is left alone.
+            var (armorKnown, currentArmor) = SlotItem(npc, targetSlot);
+            int currentArmorAC = currentArmor?.ArmorClass ?? 0;
+            long currentArmorValue = currentArmor?.Value ?? 0;
 
-            // Find better armor for that slot within budget
-            var betterArmor = EquipmentDatabase.GetBySlot(targetSlot)
-                .Where(a => a.Value <= spendingBudget && a.ArmorClass > currentArmorAC)
+            // Find better armor for that slot within budget. 1.3.2: one this NPC can equip, with more armor AND
+            // more value than the piece it wears.
+            var betterArmor = !armorKnown ? null : EquipmentDatabase.GetBySlot(targetSlot)
+                .Where(a => a.Value <= spendingBudget && a.ArmorClass > currentArmorAC && a.Value > currentArmorValue)
+                .Where(a => NpcCanUseShopItem(npc, a))
                 .OrderByDescending(a => a.ArmorClass)
                 .FirstOrDefault();
 
@@ -5190,6 +5248,7 @@ public class WorldSimulator
                 npc.SpendGold((int)armorTotal);
                 CityControlSystem.Instance.ProcessSaleTax(betterArmor.Value);
                 npc.EquippedItems[targetSlot] = betterArmor.Id;
+                KeepReplaced(npc, currentArmor);   // 1.3.2
                 boughtSomething = true;
                 itemBought = betterArmor.Name;
                 npc.RecalculateStats();
@@ -5209,6 +5268,41 @@ public class WorldSimulator
             npc.Brain?.MarkActivity("shop_fruitless");
 
         // GD.Print($"[WorldSim] {npc.Name} went shopping" + (boughtSomething ? $" and bought {itemBought}" : " but couldn't afford anything"));
+    }
+
+    /// <summary>
+    /// 1.3.2: a shop item this NPC may buy: it passes the item's own equip check (level, strength, alignment,
+    /// class list, armor weight), and a weapon is of a type every weapon-bound ability of the class and the
+    /// class's spell weapon allow, the rule the combat loot pickup uses for teammates. A Ranger buys only bows.
+    /// </summary>
+    internal static bool NpcCanUseShopItem(NPC npc, Equipment item)
+    {
+        if (!item.CanEquip(npc, out _)) return false;
+        if (item.Slot != EquipmentSlot.MainHand || item.WeaponType == WeaponType.None) return true;
+        var abilities = ClassAbilitySystem.GetClassAbilities(npc.Class);
+        if (abilities != null && abilities.Any(a => a.RequiredWeaponTypes != null && a.RequiredWeaponTypes.Length > 0
+                && !a.RequiredWeaponTypes.Contains(item.WeaponType)))
+            return false;
+        var spellWeapon = SpellSystem.GetSpellWeaponRequirement(npc.Class);
+        return spellWeapon == null || item.WeaponType == spellWeapon.Value;
+    }
+
+    /// <summary>1.3.2: what a slot holds. known is false when it holds an ID that does not resolve.</summary>
+    private static (bool known, Equipment? item) SlotItem(NPC npc, EquipmentSlot slot)
+    {
+        if (!npc.EquippedItems.TryGetValue(slot, out int id)) return (true, null);
+        var item = EquipmentDatabase.GetById(id);
+        return (item != null, item);
+    }
+
+    /// <summary>1.3.2: a replaced item goes to the NPC's own stock (MarketInventory, sold at the fence and the
+    /// Auction House) while it has room; when it is full the item is lost, as every replaced item was before.</summary>
+    private static void KeepReplaced(NPC npc, Equipment? old)
+    {
+        if (old == null) return;
+        npc.MarketInventory ??= new List<global::Item>();
+        if (npc.MarketInventory.Count < npc.MaxMarketInventory)
+            npc.MarketInventory.Add(npc.ConvertEquipmentToLegacyItem(old));
     }
 
     /// <summary>
@@ -5293,6 +5387,7 @@ public class WorldSimulator
     /// </summary>
     private void NPCVisitMaster(NPC npc)
     {
+        bool gearPlayerOnly = IsGearPlayerOnly(npc);   // 1.3.2: read before the move; the level is gained, the gear raise is not
         npc.UpdateLocation("Level Master");
         long expNeeded = GameConfig.GetExperienceForLevel(npc.Level + 1);
         if (npc.Experience >= expNeeded && npc.Level < 100)
@@ -5308,10 +5403,14 @@ public class WorldSimulator
             // pace with the dungeons they're meant to clear. Bump the Base
             // values so the gear power survives the next RecalculateStats()
             // call; live WeapPow/ArmPow also bumped for immediate effect.
-            npc.BaseWeapPow += 5;
-            npc.BaseArmPow += 4;
-            npc.WeapPow += 5;
-            npc.ArmPow += 4;
+            // 1.3.2: not for an NPC whose gear only the player changes
+            if (!gearPlayerOnly)
+            {
+                npc.BaseWeapPow += 5;
+                npc.BaseArmPow += 4;
+                npc.WeapPow += 5;
+                npc.ArmPow += 4;
+            }
 
             // v0.63.2: grant a class-keyed mana bump on level-up so casters
             // don't stagnate at their initial spawn-time pool. Pre-v0.63.2
@@ -5983,6 +6082,10 @@ public class WorldSimulator
     /// </summary>
     private void NPCVisitMarketplace(NPC npc)
     {
+        // 1.3.2: a buy here sets the NPC's weapon or armor power, so an NPC whose gear only the player changes does
+        // not go to the Auction House at all (checked before the move)
+        if (IsGearPlayerOnly(npc)) return;
+
         npc.UpdateLocation("Auction House");
 
         if (SqlBackend != null)
@@ -6461,11 +6564,9 @@ public class WorldSimulator
         var target = world.GetNPCById(targetId);
         if (target == null || target.CurrentLocation != npc.CurrentLocation || !target.IsAlive) return;
 
-        // Don't attack NPCs engaged with a player (in conversation, dungeon party, etc.)
-        if (target.IsInConversation || npc.IsInConversation) return;
-
-        // Don't attack NPCs on a player's team, and don't let player team NPCs start brawls
-        if (IsPlayerTeam(target.Team) || IsPlayerTeam(npc.Team)) return;
+        // Don't attack NPCs engaged with a player (in conversation), on a player's team or (1.3.2) in the
+        // player's dungeon party, and don't let such NPCs start brawls
+        if (IsShieldedFromWorldSimHarm(target) || IsShieldedFromWorldSimHarm(npc)) return;
 
         // Multi-round combat simulation (like a real fight, not a single punch)
         int rounds = 0;
@@ -7291,7 +7392,7 @@ public class WorldSimulator
             // Team 1 attacks team 2
             foreach (var attacker in team1.Where(m => m.IsAlive))
             {
-                var target = team2.Where(m => m.IsAlive).OrderBy(_ => random.Next()).FirstOrDefault();
+                var target = team2.Where(m => m.IsAlive && !IsShieldedFromWorldSimHarm(m)).OrderBy(_ => random.Next()).FirstOrDefault();   // 1.3.2
                 if (target == null) break;
 
                 long damage = Math.Max(1, attacker.Strength + attacker.WeapPow - target.Defence - target.ArmPow);
@@ -7307,7 +7408,7 @@ public class WorldSimulator
             // Team 2 attacks team 1
             foreach (var attacker in team2.Where(m => m.IsAlive))
             {
-                var target = team1.Where(m => m.IsAlive).OrderBy(_ => random.Next()).FirstOrDefault();
+                var target = team1.Where(m => m.IsAlive && !IsShieldedFromWorldSimHarm(m)).OrderBy(_ => random.Next()).FirstOrDefault();   // 1.3.2
                 if (target == null) break;
 
                 long damage = Math.Max(1, attacker.Strength + attacker.WeapPow - target.Defence - target.ArmPow);

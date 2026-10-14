@@ -14680,6 +14680,7 @@
   "inn.cursed_label": " (MALDITO)",
   "inn.no_abilities_yet": "No hay habilidades de combate disponibles aún.",
   "dungeon.teammate_arrested": "{0} fue arrestado mientras estabas fuera y no puede reunirse con el grupo.",
+  "dungeon.teammate_dead": "{0} está muerto y aún no puede volver al grupo.",
   "inn.skills_abilities_header": "HABILIDADES",
   "inn.skills_spells_header": "HECHIZOS",
   "inn.all_abilities_enabled": "¡Todas las habilidades y hechizos activados!",

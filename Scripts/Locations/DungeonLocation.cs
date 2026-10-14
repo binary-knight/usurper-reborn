@@ -1298,6 +1298,7 @@ public class DungeonLocation : BaseLocation
         int restoredCount = 0;
         int skippedCount = 0;
         var arrestedNames = new List<string>();
+        var deadNames = new List<string>();   // 1.3.2
         const int maxPartySize = 4;
 
         foreach (var npcId in savedNPCIds)
@@ -1310,7 +1311,17 @@ public class DungeonLocation : BaseLocation
             }
 
             var npc = npcSystem.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId && n.IsAlive);
-            if (npc != null && !teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npcId))
+
+            // 1.3.2: a saved ally who is dead stays in the saved party (as before) and rejoins after coming back to
+            // life; say so instead of leaving them out without a word
+            if (npc == null)
+            {
+                var fallen = npcSystem.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
+                if (fallen != null) deadNames.Add(fallen.DisplayName);
+                continue;
+            }
+
+            if (!teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npcId))
             {
                 // v0.57.11 (Coosh report): teammates arrested between sessions
                 // (via Castle imprisonment, King's orders, etc.) must not silently
@@ -1337,6 +1348,17 @@ public class DungeonLocation : BaseLocation
             term.SetColor("yellow");
             foreach (var name in arrestedNames)
                 term.WriteLine(Loc.Get("dungeon.teammate_arrested", name));
+            term.WriteLine("");
+            await Pacing.Wait(1500);
+        }
+
+        // 1.3.2: beside the arrested line, one line for each saved ally who is dead
+        if (deadNames.Count > 0)
+        {
+            term.WriteLine("");
+            term.SetColor("yellow");
+            foreach (var name in deadNames)
+                term.WriteLine(Loc.Get("dungeon.teammate_dead", name));
             term.WriteLine("");
             await Pacing.Wait(1500);
         }
