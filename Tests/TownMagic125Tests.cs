@@ -95,13 +95,13 @@ public class TownMagic125Tests
         if (!string.IsNullOrEmpty(dir)) File.WriteAllText(Path.Combine(dir, name), text);
     }
 
-    // A framed box (WriteBoxHeader) is drawn exactly 80 columns wide; every other row fits in 79.
+    // 1.3.2: a framed box of the Magic Shop is drawn exactly 79 columns wide; every other row fits in 79.
     private static void EveryRowFits(string text, string screen)
     {
         foreach (var row in Rows(text))
         {
             if (row.Length > 0 && "╔║╚".IndexOf(row[0]) >= 0)
-                row.Length.Should().Be(MaxWidth + 1, $"the {screen} box keeps its width: \"{row}\"");
+                row.Length.Should().Be(MaxWidth, $"the {screen} box keeps its width: \"{row}\"");
             else
                 row.Length.Should().BeLessOrEqualTo(MaxWidth, $"every row of the {screen} fits in {MaxWidth} columns: \"{row}\"");
         }
