@@ -617,6 +617,176 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(GameConfig.RiteOfReturnBaseCost, constants.GetProperty("RiteOfReturnBaseCost").GetInt64());
     }
 
+    // ---------- 1.3.2 wiki depth: the dungeon and the world beyond the town (world.json) ----------
+
+    private JsonElement[] World(string list) => _export.Data("world").GetProperty(list).EnumerateArray().ToArray();
+
+    private static JsonElement One(JsonElement[] rows, string id, string field = "id") =>
+        Assert.Single(rows.Where(r => r.GetProperty(field).ToString() == id));
+
+    [Fact]
+    public void WorldMonsterAbilitiesCoverEveryAbilityAMonsterCarries()
+    {
+        var abilities = World("monsterAbilities");
+        var ids = abilities.Select(a => a.GetProperty("id").GetString()!).ToHashSet();
+        var carried = MonsterFamilies.GetBuiltInFamilies().SelectMany(f => f.Tiers).SelectMany(t => t.SpecialAbilities.Concat(t.SignatureAbilities))
+            .Concat(MonsterGenerator.CasterSpells.Values)
+            .Concat(WildernessData.MonsterProfiles.Values.SelectMany(p => p.Abilities))
+            .Concat(UsurperRemake.Data.GauntletChampionData.Champions.SelectMany(c => c.SpecialAbilities))
+            .Select(a => Enum.Parse<MonsterAbilities.AbilityType>(a, true).ToString()).ToHashSet();
+        Assert.Equal(carried.OrderBy(x => x), ids.OrderBy(x => x));
+
+        // the numbers MonsterAbilities.ExecuteAbility gives
+        var crushing = One(abilities, "CrushingBlow").GetProperty("effects");
+        Assert.Equal(2.0, crushing.GetProperty("attackPowerMultiplier").GetDouble());
+        Assert.Equal("Stunned", crushing.GetProperty("status").GetString());
+        Assert.Equal(25, crushing.GetProperty("statusChance").GetInt32());
+        Assert.Equal(2, crushing.GetProperty("statusRounds").GetInt32());
+        var venom = One(abilities, "VenomousBite").GetProperty("effects");
+        Assert.Equal(0.8, venom.GetProperty("attackPowerMultiplier").GetDouble());
+        Assert.Equal(60, venom.GetProperty("statusChance").GetInt32());
+        Assert.Equal(50, One(abilities, "LifeDrain").GetProperty("effects").GetProperty("lifeStealPercent").GetInt32());
+        // a breath: (level x 3 + Strength / 2) x 1.5 + 5 to 14, from the level 20 sample monster
+        var stats = MonsterGenerator.GetWikiStats(WikiDataExporter.AbilityProbeLevel, 1.0f);
+        long breath = (long)((WikiDataExporter.AbilityProbeLevel * 3 + stats.Strength / 2) * 1.5f);
+        var fire = One(abilities, "FireBreath").GetProperty("effects").GetProperty("directDamage");
+        Assert.InRange(fire.GetProperty("min").GetInt64(), breath + 5, breath + 14);
+        Assert.InRange(fire.GetProperty("max").GetInt64(), breath + 5, breath + 14);
+        // extra attacks are not read by any fight, so Multiattack is one plain hit
+        Assert.Equal(1.0, One(abilities, "Multiattack").GetProperty("effects").GetProperty("attackPowerMultiplier").GetDouble());
+        Assert.False(One(abilities, "Multiattack").GetProperty("effects").TryGetProperty("extraAttacks", out _));
+        // the conditional ones are marked
+        Assert.True(One(abilities, "Devour").GetProperty("changesWhenTargetHurt").GetBoolean());
+        Assert.True(One(abilities, "Rebirth").GetProperty("changesWhenMonsterHurt").GetBoolean());
+        Assert.True(One(abilities, "Stoneskin").GetProperty("changesOnSecondUse").GetBoolean());
+        Assert.False(One(abilities, "CrushingBlow").GetProperty("changesOnSecondUse").GetBoolean());
+        // who uses it
+        var users = One(abilities, "FireBreath").GetProperty("users").EnumerateArray()
+            .Select(u => u.GetProperty("name").GetString() + "/" + u.GetProperty("kind").GetString()).ToArray();
+        Assert.Contains("Drake/monster", users);
+        Assert.Contains("Wyvern Hatchling/wilderness", users);
+        Assert.Contains("Goblin/signature", One(abilities, "Rally").GetProperty("users").EnumerateArray()
+            .Select(u => u.GetProperty("name").GetString() + "/" + u.GetProperty("kind").GetString()));
+    }
+
+    [Fact]
+    public void WorldFloorsAreTheGeneratedFloorsWithTheirBoss()
+    {
+        var floors = World("floors");
+        Assert.Equal(GameConfig.MaxDungeonLevel, floors.Length);
+        for (int f = 1; f <= floors.Length; f++)
+        {
+            var row = floors[f - 1];
+            Assert.Equal(f, row.GetProperty("floor").GetInt32());
+            var generated = DungeonGenerator.GenerateFloor(f);
+            Assert.Equal(generated.Theme.ToString(), row.GetProperty("theme").GetString());
+            Assert.Equal(generated.Rooms.Count, row.GetProperty("rooms").GetInt32());
+        }
+        Assert.Equal(15, floors[0].GetProperty("rooms").GetInt32());
+        Assert.Equal(20, floors[39].GetProperty("rooms").GetInt32());
+        Assert.Equal(25, floors[99].GetProperty("rooms").GetInt32());
+        // the boss name is the theme's list at floor % 5
+        Assert.Equal("Skull Revenant", floors[6].GetProperty("boss").GetString());
+        Assert.Equal("Bone Lord", floors[9].GetProperty("boss").GetString());
+        Assert.Equal("Sludge Abomination", floors[19].GetProperty("boss").GetString());
+        Assert.Equal("Void Horror", floors[99].GetProperty("boss").GetString());
+    }
+
+    [Fact]
+    public void WorldOutpostsPriceAsTheDungeonDoes()
+    {
+        var outposts = World("outposts");
+        Assert.Equal(new[] { 10, 20, 35, 65 }, outposts.Select(o => o.GetProperty("floor").GetInt32()));
+        // (10 + floor x 5) x the outpost's factor
+        Assert.Equal(30, One(outposts, "10", "floor").GetProperty("healCost").GetInt64());
+        Assert.Equal(JsonValueKind.Null, One(outposts, "20", "floor").GetProperty("healCost").ValueKind);
+        Assert.Equal(74, One(outposts, "35", "floor").GetProperty("healCost").GetInt64());
+        Assert.Equal(201, One(outposts, "65", "floor").GetProperty("healCost").GetInt64());
+        Assert.Equal(0.4, One(outposts, "35", "floor").GetProperty("healShareOfMissing").GetDouble(), 3);
+        // base price x (1 + floor / 10)
+        var goods = One(outposts, "65", "floor").GetProperty("goods").EnumerateArray().ToArray();
+        Assert.Equal(25 * 7, One(goods, "heal_potion").GetProperty("price").GetInt64());
+        Assert.Equal(60 * 7, One(goods, "firebloom").GetProperty("price").GetInt64());
+    }
+
+    [Fact]
+    public void WorldWildernessRegionsAndShrinesComeFromTheData()
+    {
+        var regions = World("wildernessRegions");
+        Assert.Equal(new[] { 1, 10, 20, 30 }, regions.Select(r => r.GetProperty("minLevel").GetInt32()));
+        var forest = One(regions, "forest");
+        Assert.Equal(5, forest.GetProperty("foraging").GetArrayLength());
+        Assert.Contains(forest.GetProperty("foraging").EnumerateArray(), f => f.GetProperty("effect").GetString() == "herb_ironbark");
+        Assert.Equal(new[] { 1, 3 }, forest.GetProperty("discoveries").EnumerateArray().Select(d => d.GetProperty("minLevel").GetInt32()));
+        Assert.Equal(8, forest.GetProperty("monsters").GetArrayLength());
+        var shrines = World("druidShrines");
+        Assert.Equal(5, shrines.Length);
+        Assert.Equal("mountains", One(shrines, "terravok").GetProperty("region").GetString());
+        Assert.Equal(-3, One(shrines, "noctura").GetProperty("chivalryShift").GetInt32());
+        Assert.Equal(5, One(shrines, "aurelion").GetProperty("chivalryShift").GetInt32());
+        Assert.Equal(UsurperRemake.Systems.Loc.GetIn("en", "shrine.maelketh.passive"), One(shrines, "maelketh").GetProperty("passive").GetString());
+    }
+
+    [Fact]
+    public void WorldGauntletTiersAndChampions()
+    {
+        var tiers = World("gauntletTiers");
+        Assert.Equal(5, tiers.Length);
+        var hopeful = One(tiers, "Hopeful");
+        Assert.Equal(GameConfig.GauntletMinLevel, hopeful.GetProperty("minLevel").GetInt32());
+        Assert.Equal(19, hopeful.GetProperty("maxLevel").GetInt32());
+        Assert.Equal(200, hopeful.GetProperty("goldPerLevel").GetInt32());
+        var grand = One(tiers, "GrandChampion");
+        Assert.Equal(80, grand.GetProperty("minLevel").GetInt32());
+        Assert.Equal(150, grand.GetProperty("fame").GetInt32());
+        var champions = World("gauntletChampions");
+        Assert.Equal(new[] { 4, 5, 6, 7, 8, 9, 10 }, champions.Select(c => c.GetProperty("wave").GetInt32()));
+        Assert.Equal(14, champions[6].GetProperty("levelBonus").GetInt32());
+        Assert.Equal(4.0, champions[6].GetProperty("hpMultiplier").GetDouble(), 3);
+    }
+
+    [Fact]
+    public void WorldSellswordRanksAndContracts()
+    {
+        var ranks = World("mercRanks");
+        Assert.Equal(new[] { 0, 1, 10, 30, 75, 150 }, ranks.Select(r => r.GetProperty("contractsRequired").GetInt32()));
+        Assert.Equal("Legend", One(ranks, "Legend").GetProperty("name").GetProperty("en").GetString());
+        Assert.Equal(1.15, One(ranks, "Legend").GetProperty("payMultiplier").GetDouble(), 3);
+        var contracts = World("mercContracts");
+        Assert.Equal(12, contracts.Length);
+        Assert.Equal(6, contracts.Count(c => c.GetProperty("tier").GetInt32() == 2));
+        var undead = One(contracts, "faith_purge_undead");
+        Assert.Equal("Unhallowed Dead", undead.GetProperty("title").GetProperty("en").GetString());
+        Assert.Equal("Zombie", undead.GetProperty("target").GetString());
+        Assert.Equal(3, undead.GetProperty("baseCount").GetInt32());
+    }
+
+    [Fact]
+    public void SecretBossesCarryTheirRewardAndOnlyTheStatsAFightReads()
+    {
+        var secret = _export.Data("bosses").GetProperty("secret").EnumerateArray().ToArray();
+        var first = One(secret, "TheFirstWave");
+        Assert.Equal(10000, first.GetProperty("rewardXP").GetInt32());
+        Assert.Equal(5000, first.GetProperty("rewardGold").GetInt32());
+        Assert.False(first.GetProperty("asksQuestion").GetBoolean());
+        Assert.True(One(secret, "TheForgottenEighth").GetProperty("asksQuestion").GetBoolean());
+        Assert.Equal(0, One(secret, "TheOceanSpeaks").GetProperty("rewardGold").GetInt32());
+        foreach (var gone in new[] { "baseMagicPower", "baseSpeed", "baseCritChance", "abilities" })
+            Assert.False(first.TryGetProperty(gone, out _), gone);
+    }
+
+    [Fact]
+    public void WorldConstantsComeFromTheGame()
+    {
+        var constants = _export.Data("world").GetProperty("constants");
+        Assert.Equal(GameConfig.EliteChanceFloors3To10, constants.GetProperty("EliteChanceFloors3To10").GetDouble());
+        Assert.Equal(GameConfig.GauntletDeathChancePercent, constants.GetProperty("GauntletDeathChancePercent").GetInt32());
+        Assert.Equal(EliteAffixes.MendHealPercent, constants.GetProperty("MendHealPercent").GetInt32());
+        Assert.Equal(GameConfig.Floor2MonsterStatMultiplier, constants.GetProperty("Floor2MonsterStatMultiplier").GetSingle());
+        Assert.Equal(RareEncounters.RareEncounterChance, constants.GetProperty("RareEncounterChance").GetDouble());
+        Assert.Equal(DungeonFloorState.RESPAWN_HOURS, constants.GetProperty("FloorRESPAWN_HOURS").GetInt32());
+    }
+
     [Fact]
     public void MetaIdentifiesSchemaAndRelease()
     {

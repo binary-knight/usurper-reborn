@@ -89,6 +89,15 @@ Numbers should come from directives, not copied tables:
 {{table:statuses}}
 {{table:target-weights}}
 {{table:combat-regeneration}}
+{{table:monster-abilities}}
+{{table:dungeon-floors}}
+{{table:outposts}}
+{{table:wilderness-regions}}
+{{table:druid-shrines}}
+{{table:gauntlet-tiers}}
+{{table:gauntlet-champions}}
+{{table:merc-ranks}}
+{{table:merc-contracts}}
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
@@ -124,6 +133,19 @@ the game's own round-end mana and combat stamina rule, with one armor piece of
 each weight. The balance table leaves out the six values no game code reads.
 The combat constants print like the party constants and may not reuse a name
 either.
+`monster-abilities`, `dungeon-floors`, `outposts`, `wilderness-regions`,
+`druid-shrines`, `gauntlet-tiers`, `gauntlet-champions`, `merc-ranks` and
+`merc-contracts` come from `world.json`. A monster ability's numbers are what
+the game's own ability code does over a fixed set of seeds, for a level 20
+monster at half its HP: the fields of its result the combat engine reads, and
+every number of the monster it changes; a number that varies prints as a range,
+and the export also marks an ability that changes when the monster or the
+target is badly hurt or on a second use. Only abilities some monster carries
+are listed. A floor's rooms are the game's own generated floor, and its boss
+name, the outposts' prices and the Sellsword contracts are read from private
+game members by reflection, so renaming one fails the export. The world
+constants print like the party constants and may not reuse a name either.
+A secret boss carries its reward and only the stats its fight reads.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.

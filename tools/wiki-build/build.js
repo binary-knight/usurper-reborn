@@ -113,6 +113,7 @@ function loadData(dir) {
     "party",
     "economy",
     "combat",
+    "world",
   ]) {
     const file = JSON.parse(
       fs.readFileSync(path.join(dir, kind + ".json"), "utf8"),
@@ -232,6 +233,27 @@ function loadData(dir) {
   for (const w of combat.targetWeights)
     if (!classes.has(w.classId))
       throw Error(`Unknown target weight class: ${w.classId}`);
+  // 1.3.2: the dungeon and the world beyond the town
+  const world = data.world;
+  for (const key of [
+    "monsterAbilities",
+    "floors",
+    "outposts",
+    "wildernessRegions",
+    "druidShrines",
+    "gauntletTiers",
+    "gauntletChampions",
+    "mercRanks",
+    "mercContracts",
+  ])
+    if (!Array.isArray(world[key]) || !world[key].length)
+      throw Error(`Empty dataset: world/${key}`);
+  if (!world.constants || !Object.keys(world.constants).length)
+    throw Error("Empty dataset: world/constants");
+  const regionIds = new Set(world.wildernessRegions.map((r) => r.id));
+  for (const s of world.druidShrines)
+    if (!regionIds.has(s.region))
+      throw Error(`Unknown shrine region: ${s.id}/${s.region}`);
   return { meta, data };
 }
 function renderers(data) {
@@ -263,6 +285,10 @@ function renderers(data) {
     constants[key] = value;
   }
   for (const [key, value] of Object.entries(data.combat.constants)) {
+    if (key in constants) throw Error(`Duplicate constant: ${key}`);
+    constants[key] = value;
+  }
+  for (const [key, value] of Object.entries(data.world.constants)) {
     if (key in constants) throw Error(`Duplicate constant: ${key}`);
     constants[key] = value;
   }
@@ -298,6 +324,59 @@ function renderers(data) {
   const enchantEffect = ([field, value]) => {
     if (!(field in enchantFields)) throw Error(`Unknown enchant effect: ${field}`);
     return value === true ? enchantFields[field] : `+${value} ${enchantFields[field]}`;
+  };
+  // 1.3.2 world tables. The words for each monster ability effect the export probes (WikiDataExporter.
+  // AbilityEffects), in column order; null marks a field shown in its own column. A new field fails the build.
+  // a probed range whose lowest value is 0 happens only some of the time
+  const upTo = (v, n) => (typeof v === "object" && v.min === 0 ? `up to ${num(v.max)}` : n(v));
+  const abilityEffectLabels = {
+    attackPowerMultiplier: null,
+    directDamage: null,
+    status: null,
+    statusChance: null,
+    statusRounds: null,
+    lifeStealPercent: (v, n) => `heals ${upTo(v, n)} percent of the damage it deals`,
+    manaDrain: (v, n) => `drains ${n(v)} of your mana`,
+    summons: (v, n) => `calls ${n(v)} more monsters`,
+    endsTurn: (v) => (v === true ? "ends its turn" : "sometimes ends its turn"),
+    monsterHP: (v, n) =>
+      typeof v === "number" && v < 0
+        ? `loses ${num(-v)} percent of its maximum HP`
+        : `heals ${upTo(v, n)} percent of its maximum HP`,
+    monsterStrength: (v, n) => (typeof v === "number" ? `+${num(v)} Strength` : `Strength changes by ${n(v)}`),
+    monsterArmPow: (v, n) => (typeof v === "number" ? `+${num(v)} armor` : `armor changes by ${n(v)}`),
+    monsterEvasionMissChance: (v, n, e) =>
+      `${upTo(v, n)} percent of attacks on it miss for ${upTo(e.monsterEvasionRounds, n)} rounds`,
+    monsterEvasionRounds: null,
+  };
+  const abilityUserKinds = {
+    monster: "",
+    signature: " (signature)",
+    shaman: " Shaman",
+    wilderness: " (wilderness)",
+    gauntlet: " (Gauntlet)",
+  };
+  // the foraging results of WildernessLocation.ApplyForagingResult, by effect token
+  const forageEffects = {
+    herb_healing: "a herb",
+    herb_ironbark: "a herb",
+    herb_firebloom: "a herb",
+    herb_starbloom: "a herb",
+    herb_swift: "a herb",
+    heal_small: "small heal",
+    heal_medium: "medium heal",
+    gold_small: "small gold",
+    gold_medium: "medium gold",
+    gold_large: "large gold",
+    nothing: "nothing",
+  };
+  const discoveryKinds = { combat: "fight", shrine: "shrine", ruins: "ruins", traveler: "traveller" };
+  // what a Sellsword contract objective asks (QuestObjectiveType), with its target
+  const mercObjectives = {
+    KillSpecificMonster: (t) => `slay ${t} monsters`,
+    KillMonsters: () => "slay any monsters",
+    ExploreRooms: () => "explore new dungeon rooms",
+    VisitLocation: (t) => `visit the ${label(t)}`,
   };
   // Abilities whose effect turns monsters onto the user: CombatEngine.ApplyAbilityEffectsMultiMonster
   // cases aoe_taunt, undertow, abyssal_anchor and eternal_vigil, and ApplyTankTauntAndBuff for the
@@ -452,9 +531,15 @@ function renderers(data) {
       Object.entries(e).filter(
         ([k]) =>
           k.startsWith("base") ||
-          ["attacksPerRound", "dungeonFloor", "floorLevel", "element"].includes(
-            k,
-          ),
+          [
+            "attacksPerRound",
+            "dungeonFloor",
+            "floorLevel",
+            "element",
+            "rewardXP",
+            "rewardGold",
+            "asksQuestion",
+          ].includes(k),
       ),
     );
     const phases = e.phases
@@ -464,7 +549,7 @@ function renderers(data) {
               `<h${heading}>Phase ${i + 1}</h${heading}><ul>${p.map((a) => `<li>${escape(typeof a === "string" ? a : a.name + ": " + a.description)}</li>`).join("")}</ul>`,
           )
           .join("")
-      : `<pre>${escape(JSON.stringify(e.abilities, null, 2))}</pre>`;
+      : "";
     return (
       `<p>${escape(e.title)}. These are base definitions, not a guarantee of encounter stats.</p>` +
       values(fields, "Boss base definition") +
@@ -1059,6 +1144,180 @@ function renderers(data) {
           r.staminaPerRoundHeavy,
         ]),
         "Mana and combat stamina regained at the end of each round",
+      );
+    // 1.3.2: the dungeon and the world beyond the town (world.json)
+    if (id === "monster-abilities") {
+      // a probed number: one value, or the lowest and highest of the runs
+      const n = (v) =>
+        v == null ? null : typeof v === "object" && !Array.isArray(v) ? `${num(v.min)} to ${num(v.max)}` : num(v);
+      return table(
+        [
+          "Ability",
+          "Hit (x attack power)",
+          "Direct damage",
+          "Status inflicted",
+          "Other effects",
+          "Changes when",
+          "Used by",
+        ],
+        data.world.monsterAbilities.map((a) => {
+          const e = a.effects;
+          for (const key of Object.keys(e))
+            if (!(key in abilityEffectLabels)) throw Error(`Unknown monster ability effect: ${a.id}/${key}`);
+          const other = Object.entries(abilityEffectLabels)
+            .filter(([key, f]) => f && key in e)
+            .map(([key, f]) => f(e[key], n, e))
+            .join(", ");
+          // a fixed direct damage replaces the hit (CombatEngine.TryMonsterSpecialAbility)
+          const direct =
+            typeof e.directDamage === "number" ? e.directDamage > 0 : e.directDamage?.min > 0;
+          const changes = [
+            a.changesWhenMonsterHurt ? "the monster is badly hurt" : "",
+            a.changesWhenTargetHurt ? "the target is badly hurt" : "",
+            a.changesOnSecondUse ? "it is used again" : "",
+          ].filter(Boolean);
+          return [
+            escape(label(a.id)),
+            direct ? "No" : e.attackPowerMultiplier === 0 ? "None" : `x${n(e.attackPowerMultiplier)}`,
+            e.directDamage ? n(e.directDamage) : "None",
+            e.status
+              ? escape(
+                  `${[].concat(e.status).map(label).join(" or ")}, ${n(e.statusChance)} percent, ${n(e.statusRounds)} rounds`,
+                )
+              : "None",
+            escape(other || "None"),
+            escape(changes.join(", ") || "No"),
+            escape(
+              a.users
+                .map((u) => `${u.name}${abilityUserKinds[u.kind] ?? (() => { throw Error(`Unknown ability user kind: ${u.kind}`); })()}`)
+                .join(", "),
+            ),
+          ];
+        }),
+        "Monster special abilities",
+      );
+    }
+    if (id === "dungeon-floors")
+      return table(
+        ["Floor", "Theme", "Rooms", "Floor boss"],
+        data.world.floors.map((f) => [
+          f.floor,
+          escape(label(f.theme)),
+          f.rooms,
+          escape(f.boss),
+        ]),
+        "Dungeon floors",
+      );
+    if (id === "outposts")
+      return table(
+        ["Floor", "Outpost", "Healing", "Supplies", "Lore"],
+        data.world.outposts.map((o) => [
+          o.floor,
+          escape(name(o)),
+          o.healing
+            ? escape(`${num(o.healCost)} gold, restores ${Math.round(o.healShareOfMissing * 100)} percent of missing HP and mana`)
+            : "None",
+          escape(o.goods.map((g) => `${g.name} ${num(g.price)}`).join(", ") || "None"),
+          o.lore ? "Yes" : "No",
+        ]),
+        "Dungeon outposts",
+      );
+    if (id === "wilderness-regions")
+      return table(
+        ["Region", "Direction", "Level needed", "Monsters", "Foraging (one of five)", "Discoveries"],
+        data.world.wildernessRegions.map((r) => [
+          escape(name(r)),
+          escape(r.direction.en),
+          r.minLevel,
+          escape(r.monsters.join(", ")),
+          escape(
+            r.foraging
+              .map((f) => {
+                if (!(f.effect in forageEffects)) throw Error(`Unknown foraging effect: ${r.id}/${f.effect}`);
+                return f.effect === "nothing" ? "nothing" : `${f.name} (${forageEffects[f.effect]})`;
+              })
+              .join(", "),
+          ),
+          escape(
+            r.discoveries
+              .map((d) => {
+                if (!(d.kind in discoveryKinds)) throw Error(`Unknown discovery kind: ${d.id}/${d.kind}`);
+                return `${name(d)} (level ${d.minLevel}, ${discoveryKinds[d.kind]})`;
+              })
+              .join(", "),
+          ),
+        ]),
+        "Wilderness regions",
+      );
+    if (id === "druid-shrines")
+      return table(
+        ["Shrine", "Region", "Attunement", "Alignment per visit"],
+        data.world.druidShrines.map((sh) => [
+          escape(name(sh)),
+          escape(name(data.world.wildernessRegions.find((r) => r.id === sh.region))),
+          escape(sh.passive),
+          sh.chivalryShift > 0
+            ? `${sh.chivalryShift} toward Chivalry`
+            : sh.chivalryShift < 0
+              ? `${-sh.chivalryShift} toward Darkness`
+              : "None",
+        ]),
+        "Druid shrines",
+      );
+    if (id === "gauntlet-tiers")
+      return table(
+        ["Title", "Your level", "Gold (x level)", "Experience (x level)", "Fame"],
+        data.world.gauntletTiers.map((t) => [
+          escape(t.title),
+          `${t.minLevel} to ${t.maxLevel}`,
+          num(t.goldPerLevel),
+          num(t.experiencePerLevel),
+          t.fame,
+        ]),
+        "Gauntlet final bonus by level",
+      );
+    if (id === "gauntlet-champions")
+      return table(
+        ["Wave", "Champion", "Role", "Level", "HP", "Strength", "Defence", "Abilities", "Drop"],
+        data.world.gauntletChampions.map((c) => [
+          c.wave,
+          escape(`${name(c)}, ${c.title}`),
+          escape(label(c.role)),
+          `your level + ${c.levelBonus}`,
+          `x${c.hpMultiplier}`,
+          `x${c.attackMultiplier}`,
+          `x${c.defenseMultiplier}`,
+          escape(c.abilities.map(label).join(", ")),
+          escape(label(c.dropSlot)),
+        ]),
+        "Gauntlet champions",
+      );
+    if (id === "merc-ranks")
+      return table(
+        ["Rank", "Contracts completed", "Contracts per faction", "Pay factor"],
+        data.world.mercRanks.map((r) => [
+          escape(name(r)),
+          r.contractsRequired,
+          r.contractsPerFaction,
+          `x${r.payMultiplier}`,
+        ]),
+        "Sellsword ranks",
+      );
+    if (id === "merc-contracts")
+      return table(
+        ["Contract", "Faction", "Tier", "Objective", "Count", "Pay factor"],
+        data.world.mercContracts.map((c) => {
+          if (!(c.objective in mercObjectives)) throw Error(`Unknown contract objective: ${c.id}/${c.objective}`);
+          return [
+            escape(c.title.en),
+            escape(label(c.faction.replace(/^The/, ""))),
+            c.tier,
+            escape(mercObjectives[c.objective](c.target)),
+            `${c.baseCount} + your level / 5`,
+            `x${c.payMultiplier}`,
+          ];
+        }),
+        "Sellsword Hall contracts",
       );
     if (id === "balance")
       return (
