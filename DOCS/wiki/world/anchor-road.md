@@ -26,7 +26,7 @@ With a team you can press C to claim the town for your team, or F to give up tow
 
 ## Prison grounds
 
-P leads to the prison grounds outside the cells. You can view the prisoners, or try a jailbreak. A successful jailbreak is a daring good deed that raises Chivalry and makes the news. A failed one costs a share of your HP and adds Darkness.
+P leads to the prison grounds outside the cells. You can view the prisoners, or try a jailbreak once a day. A successful jailbreak is a daring good deed that raises Chivalry and makes the news. A failed one costs a share of your HP and adds Darkness.
 
 ## Status and return
 

@@ -6182,6 +6182,7 @@ public partial class GameEngine
         player.SettlementGoldClaimedToday = playerData.SettlementGoldClaimedToday;
         player.SettlementHerbClaimedToday = playerData.SettlementHerbClaimedToday;
         player.SettlementShrineUsedToday = playerData.SettlementShrineUsedToday;
+        player.JailbreakAttemptedToday = playerData.JailbreakAttemptedToday;
         player.SettlementCircleUsedToday = playerData.SettlementCircleUsedToday;
         player.SettlementWorkshopUsedToday = playerData.SettlementWorkshopUsedToday;
         player.WorkshopBuffCombats = playerData.WorkshopBuffCombats;
