@@ -42,7 +42,7 @@ Every ability and spell has its own proficiency, in nine tiers. The effect multi
 
 {{table:proficiency}}
 
-Your class abilities start at Average, and so do the spells of a Cleric, a Magician and a Sage. Raising one skill from Average to Legendary costs 165 training points in all.
+Your class abilities and your spells start at Average. Raising one skill from Average to Legendary costs 165 training points in all.
 
 ### Does using a skill train it
 

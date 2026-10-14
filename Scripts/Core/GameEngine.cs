@@ -5994,6 +5994,9 @@ public partial class GameEngine
         {
             player.SkillTrainingProgress = new Dictionary<string, int>(playerData.SkillTrainingProgress);
         }
+        // 1.3.2: the prestige classes' spells start at Average; a saved value below it is raised
+        if (TrainingSystem.RaiseSavedSpellsToAverage(player))
+            DebugLogger.Instance.LogInfo("MIGRATION", $"Spells below Average raised to Average for {player.Name2}");
 
         // v0.57.14: restore per-channel chat mutes
         if (playerData.MutedChannels != null && playerData.MutedChannels.Count > 0)
