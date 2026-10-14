@@ -1,7 +1,7 @@
 ---
 title: Leveling and training
 path: /wiki/en/characters/leveling/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Locations/LevelMasterLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Core/GameConfig.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/CombatEngine.cs
 history: 1.3.1 | none
 history: 1.3.0 | none

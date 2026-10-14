@@ -1,7 +1,7 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.3.0
+checked: 1.3.1
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs
 history: 1.3.0 | A betrayal scene now plays once before one late story fight, and the Temple's Faith room can settle a betrayal afterwards.
 history: 1.2.6 | none
@@ -38,7 +38,7 @@ In order: Maelketh on floor 25, Veloura on floor 40, Thorgrim on floor 55, Noctu
 :::
 
 :::spoiler Spoiler: ending conditions
-Destroying most of the gods or a very dark alignment leads to the Usurper ending. Saving several gods or a very good alignment leads to the Savior ending. Anything else is the Defiant ending. The True Ending needs all seven seals, the full Awakening, a lived experience of grief, at least two gods spared and a balanced alignment. A secret ending opens only on a later cycle, after several endings, with the full Awakening, all Wave Fragments and the truth of who you are.
+Destroying most of the gods or a very dark alignment leads to the Usurper ending. Saving several gods or a very good alignment leads to the Savior ending. Anything else is the Defiant ending. The True Ending needs all seven seals, the full Awakening, a lived experience of grief, at least two gods spared and a balanced alignment. Awakening Terravok when you face him counts as saving him, for the Savior ending and for the True Ending, and beating Noctura after she turns on you counts as destroying her. A secret ending opens only on a later cycle, after several endings, with the full Awakening, all Wave Fragments and the truth of who you are.
 :::
 
 Secret boss definitions are in the [boss reference](/wiki/en/monsters/bosses/).
