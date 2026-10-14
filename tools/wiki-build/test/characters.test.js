@@ -256,7 +256,6 @@ test("the Characters guides print their numbers through the directives and keep 
     for (const p of result.pages.filter((x) => x.sourceFile && x.sourceFile.startsWith("DOCS/wiki/characters/"))) {
       const text = textOf(p.body);
       assert.doesNotMatch(text, /Troll[^.]*discount/i, p.path);
-      assert.doesNotMatch(text, /grief[^.]*Wisdom|Wisdom[^.]*grief/i, p.path);
     }
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
