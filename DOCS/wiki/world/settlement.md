@@ -45,11 +45,11 @@ Each is listed with what it needs to be proposed and the tier its service needs.
 
 - **Arena** (needs 8 settlers; service when Upgraded): a damage buff. No fight reads it at present, so it changes no damage.
 - **Thieves' Den** (needs no Watchtower Built yet; Upgraded): +15 percent gold from fights.
-- **Mystic Circle** (needs a Shrine Foundation; Upgraded): once a day, 30 percent of your maximum mana, or of your maximum HP for a class without mana.
-- **Prison** (needs a Palisade Built; Upgraded): halves the damage of failed dungeon riddles and puzzles, for the next 5 times. It does not reduce room trap damage.
+- **Mystic Circle** (needs a Shrine Foundation; Upgraded): once a day, 30 percent of your maximum mana, or of your maximum HP for a class without mana. When that is already full it restores nothing and the day is not spent.
+- **Prison** (needs a Palisade Built; Upgraded): halves the damage of dungeon room traps, chest traps and failed riddles and puzzles, for the next 5 times. The gold and experience a trap takes are not reduced.
 - **Scouts' Lodge** (needs a Watchtower Foundation; Upgraded): a sample monster for 3 floors in a row.
 - **Library** (needs a Council Hall Foundation; Upgraded): +5 percent experience from fights, and the day's learning Mental recovery.
-- **Herbalist Hut** (needs 6 settlers; Built): one random herb a day. When that herb is already at its carrying limit you get nothing and can try again.
+- **Herbalist Hut** (needs 6 settlers; Built): one random herb a day, drawn among the herbs you carry fewer of than their limit. When every herb is at its limit it gives nothing and the day is not spent.
 - **Gambling Hall** (needs a Tavern Built; Built): bet up to {{balance:SettlementGambleMaxBet}} gold; you win double the bet back 50 percent of the time.
 - **Oracle's Sanctum** (needs a Mystic Circle Built; Upgraded): a hint about the dungeon.
 - **Memorial** (always possible): no service. When it passes, settler gifts are 25 percent larger for 10 steps.

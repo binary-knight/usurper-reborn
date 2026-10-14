@@ -54,7 +54,7 @@ Search for Traps is free and can be used once per chest. The search chance is (D
 
 ### Chest traps
 
-A chest trap you open first gives you the room trap evade roll (below). If it hits, it is one of three with equal weight: poison gas for floor x 5 damage and poison for 5 + floor / 5 rounds unless you resist the poison, spikes for floor x 8 damage, or acid that takes a tenth of your gold. Chest traps never take you below 1 HP.
+A chest trap you open first gives you the room trap evade roll (below). If it hits, it is one of three with equal weight: poison gas for floor x 5 damage and poison for 5 + floor / 5 rounds unless you resist the poison, spikes for floor x 8 damage, or acid that takes a tenth of your gold. The Outskirts Prison buff halves the gas and spike damage. Chest traps never take you below 1 HP.
 
 ### Mimic
 
@@ -70,7 +70,7 @@ The evade chance is Agility / 3, at most 75%, minus 1 point per 5 floors. Assass
 
 ### Trap damage by type
 
-A trap you do not evade is one of six with equal weight. Most then allow a follow up check on a stat: that stat / 3, at most 70%, minus 1 point per 6 floors, kept between 5% and 80%.
+A trap you do not evade is one of six with equal weight. Most then allow a follow up check on a stat: that stat / 3, at most 70%, minus 1 point per 6 floors, kept between 5% and 80%. The Outskirts Prison buff halves the pit, dart and fire damage before that check.
 
 - **Pit:** floor x 3 + 0 to 9 damage; an Agility check halves it.
 - **Poison darts:** floor x 2 + 0 to 7 damage and poison for 5 + floor / 5 rounds; a Constitution check halves the damage and stops the poison, and resisting poison also stops it.
@@ -132,7 +132,7 @@ A puzzle event is a riddle 50% of the time and a mechanical puzzle 50% of the ti
 
 ### Riddles
 
-A riddle allows 3 attempts. You type the answer; alternate phrasings are accepted, and a hint is whispered after the first wrong answer. Riddle difficulty is 1 + floor / 20, at most 5. A solved riddle pays floor x 50 + difficulty x floor x 20 gold and 15 x floor^1.5 x (1 + 0.5 x difficulty) experience: 1,800 gold and 2,683 experience on floor 20. A failed riddle costs its own damage (10 to 60) and then that damage x floor / 5 more. Typing quit, flee or leave gives up and still costs the second part. At difficulty 3 or more a solved riddle has a 30% chance to reveal a lore fragment.
+A riddle allows 3 attempts. You type the answer; alternate phrasings are accepted, and a hint is whispered after the first wrong answer. Riddle difficulty is 1 + floor / 20, at most 5. A solved riddle pays floor x 50 + difficulty x floor x 20 gold and 15 x floor^1.5 x (1 + 0.5 x difficulty) experience: 1,800 gold and 2,683 experience on floor 20. A failed riddle costs its own damage (10 to 60), never below 1 HP, and the Outskirts Prison buff halves it. Typing quit, flee or leave gives up and costs nothing. At difficulty 3 or more a solved riddle has a 30% chance to reveal a lore fragment.
 
 ### Mechanical puzzles
 
