@@ -14688,6 +14688,7 @@
   "inn.cursed_label": " (ÁTKOZOTT)",
   "inn.no_abilities_yet": "Még nem érhető el harci képesség.",
   "dungeon.teammate_arrested": "{0}-t letartóztatták, amíg távol voltál, és nem csatlakozhat újra a csapathoz.",
+  "dungeon.teammate_dead": "{0} halott, és még nem csatlakozhat újra a csapathoz.",
   "inn.skills_abilities_header": "KÉPESSÉGEK",
   "inn.skills_spells_header": "VARÁZSLATOK",
   "inn.all_abilities_enabled": "Minden képesség és varázslat engedélyezve!",

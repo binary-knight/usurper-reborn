@@ -14680,6 +14680,7 @@
   "inn.cursed_label": " (MAUDIT)",
   "inn.no_abilities_yet": "Aucune aptitude de combat disponible pour l’instant.",
   "dungeon.teammate_arrested": "{0} a été arrêté pendant votre absence et ne peut pas rejoindre le groupe.",
+  "dungeon.teammate_dead": "{0} est mort et ne peut pas encore rejoindre le groupe.",
   "inn.skills_abilities_header": "APTITUDES",
   "inn.skills_spells_header": "SORTS",
   "inn.all_abilities_enabled": "Toutes les aptitudes et sorts activés !",

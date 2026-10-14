@@ -14894,6 +14894,7 @@
   "inn.cursed_label": " (CURSED)",
   "inn.no_abilities_yet": "No combat abilities available yet.",
   "dungeon.teammate_arrested": "{0} was arrested while you were away and can't rejoin the party.",
+  "dungeon.teammate_dead": "{0} is dead and cannot rejoin the party yet.",
   "inn.all_abilities_enabled": "All abilities and spells enabled!",
   "inn.skills_abilities_header": "ABILITIES",
   "inn.skills_spells_header": "SPELLS",

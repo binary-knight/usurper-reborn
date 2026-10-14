@@ -60,6 +60,10 @@ When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a
 
 A rest at Home, a night at the Inn and the daily reset refill the potions of your active companions and of every NPC on your team or in your dungeon party, and the rest at Home and the night at the Inn also heal all of them to full. An NPC ally that casts spells is filled to 2 healing potions plus half its level, any other to 5 plus half its level, never above 5 plus its level; a caster also gets 3 mana potions plus a third of its level, never above 3 plus half its level. A refill never lowers what an NPC ally already carries. Companion potions are on [companions and beasts](/wiki/en/combat/companions/#companion-potions-and-rest).
 
+## Party gear
+
+NPCs in your party keep the gear you give them. The world does not re-gear or sell from an NPC on your team, an NPC in your dungeon party, your spouse or your lovers: only your own actions change their gear. NPCs on your team or in your dungeon party also stay out of the town's errands; your spouse and lovers still go about town and come home to you, but never to buy gear. Other NPCs do not attack an NPC on your team or in your dungeon party; a spouse or lover who is not in your dungeon party can still be attacked in town. Online, this covers your team, and your dungeon party while it is in the dungeon. NPCs outside a party shop for gear their class can use and replace a piece only with one that is stronger and worth more; the piece they replace goes to their stock for sale.
+
 ## Hiring NPCs
 
 At Team Corner, N hires an NPC who is not on a team onto your own team. You need a team first, and it holds at most 5 members counting you (see [teams](/wiki/en/online/teams/)). Hiring works in single-player and online.
@@ -97,7 +101,7 @@ A companion who falls in a fight is dead for good: see [when a companion dies](/
 
 ### NPC ally
 
-An NPC ally, spouse or lover who falls in your fight dies for good with a chance of {{percent:PermadeathChanceDungeonTeam}} percent times 1 minus {{balance:PermadeathLevelReduction}} per level of the NPC, never under 1 percent: 1.4 percent at level 20. No NPC death is permanent while fewer than {{balance:PermadeathPopulationFloor}} NPCs are alive or {{balance:PermadeathRaceFloor}} or fewer of its race are alive, and story NPCs are exempt. An ally who does not die for good comes back to life after a short while; Team Corner can raise a fallen member of your team for 1,000 gold per level. If you held a potion or a heal and did not aid it while it was below half HP, its opinion of you worsens. A permanent death of your spouse, a lover or a friend starts grief: see [Mental](/wiki/en/characters/mental/). The oath-mark is on [groups](/wiki/en/combat/groups/#the-oath-mark).
+An NPC ally, spouse or lover who falls in your fight dies for good with a chance of {{percent:PermadeathChanceDungeonTeam}} percent times 1 minus {{balance:PermadeathLevelReduction}} per level of the NPC, never under 1 percent: 1.4 percent at level 20. No NPC death is permanent while fewer than {{balance:PermadeathPopulationFloor}} NPCs are alive or {{balance:PermadeathRaceFloor}} or fewer of its race are alive, and story NPCs are exempt. An ally who does not die for good comes back to life after a short while; if a saved party member is dead when you enter the dungeon, a line tells you, and it rejoins on a later entry once it is alive again; Team Corner can raise a fallen member of your team for 1,000 gold per level. If you held a potion or a heal and did not aid it while it was below half HP, its opinion of you worsens. A permanent death of your spouse, a lover or a friend starts grief: see [Mental](/wiki/en/characters/mental/). The oath-mark is on [groups](/wiki/en/combat/groups/#the-oath-mark).
 
 ### Royal mercenary
 
