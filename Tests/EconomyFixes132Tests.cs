@@ -136,6 +136,7 @@ public class EconomyFixes132Tests : IDisposable
     public async Task Loan_APayment_ClearsInterestFirst_ThenPrincipal()
     {
         var hero = Hero();
+        hero.Achievements.Unlock("dark_alley_debt_free"); // already earned, so the payoff's gold is only the payment
         hero.Gold = 10_000;
         hero.LoanAmount = 1000;
         hero.LoanDaysRemaining = 3;
