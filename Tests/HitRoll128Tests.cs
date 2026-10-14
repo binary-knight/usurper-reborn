@@ -765,7 +765,8 @@ public class HitRoll128Tests
         ["one teammate, floor 7 pair"] = "167:7AEB06910EB5C40C:Victory in 11",
         ["two teammates, floor 35 trio, level 35 hero"] = "196:7A90196A8DDE9163:Victory in 9",
         ["boss context, solo"] = "390:B5F1D953200E5375:Victory in 50",
-        ["boss context, one teammate"] = "496:F484960F59CC372E:Victory in 46",
+        // 1.3.2: party members regain stamina and mana at round end, which changes this long fight's draws
+        ["boss context, one teammate"] = "541:DF2FE6F8FCCB189D:Victory in 47",
     };
 
     /// <summary>Written there too: thirty of each action on a seeded engine, the draws, a hash of them and the damage done.</summary>
