@@ -214,7 +214,7 @@ public class SaveSlow128Tests : IDisposable
         SaveSystem.InitializeWithBackend(instant);
         // Fifty thousand items take about 9 ms to build on a warm process with no garbage collection
         // inside the build, and more when one lands. The timers count whole milliseconds, so a 5 ms
-        // threshold needed 6 ms, too thin a margin: a faster machine built it in 5 and logged nothing.
+        // threshold needed 6 ms, too thin a margin: a build of 5 ms or less logged nothing.
         // A threshold of 0 is crossed by any build of 1 ms or more, while the instant write stays at 0 ms.
         var hero = Hero(items: 50_000);
         SaveSystem.SlowSaveThresholdMs = 0;
