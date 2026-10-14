@@ -18337,6 +18337,8 @@ public partial class CombatEngine
             // override branch and the leader's existing AllyTargetIndex branch.
             void ApplyHealTo(Character tgt)
             {
+                // 1.3.2: Purify aimed at an ally cures that ally's poison and disease
+                if (SpellSystem.IsPurify(player.Class, spellInfo)) PurifyAlly(tgt);
                 if (spellResult.Healing > 0)
                 {
                     spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
@@ -19466,7 +19468,9 @@ public partial class CombatEngine
         else // spell
         {
             // Check if target is already at full health
-            if (targetAlly.HP >= targetAlly.MaxHP)
+            // 1.3.2: Purify passes for an ally at full health who is poisoned or diseased
+            bool menuPurify = SpellSystem.IsPurify(player.Class, selectedSpell);
+            if (targetAlly.HP >= targetAlly.MaxHP && !(menuPurify && HasPurifyAffliction(targetAlly)))
             {
                 terminal.WriteLine(Loc.Get("combat.aid_full_health", targetAlly.DisplayName), "yellow");
                 await Pacing.Wait(GetCombatDelay(1000));
@@ -19480,7 +19484,9 @@ public partial class CombatEngine
             terminal.WriteLine("");
             terminal.SetColor("bright_magenta");
             UIHelper.WriteRow(terminal, Loc.Get("combat.cast_spell_on_ally", selectedSpell.DisplayName, targetAlly.DisplayName));
-            foreach (var row in SpellSystem.MessageRows(spellResult.Message)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
+            // 1.3.2: Purify's cast message names the caster as cleansed; on an ally only the incantation shows
+            var menuMessage = menuPurify && spellResult.Success && spellResult.CastLine.Length > 0 ? spellResult.CastLine : spellResult.Message;
+            foreach (var row in SpellSystem.MessageRows(menuMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
             if (spellResult.Success && spellResult.Healing > 0)
             {
@@ -19505,6 +19511,10 @@ public partial class CombatEngine
                 // the combat cast (ApplyHealTo) and a teammate's single-target heal.
                 if (spellResult.ProtectionBonus > 0)
                     WardAlly(targetAlly, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
+            }
+            else if (menuPurify && spellResult.Success)
+            {
+                PurifyAlly(targetAlly);   // 1.3.2: the ally's poison and disease
             }
             else if (!spellResult.Success)
             {
@@ -19537,9 +19547,12 @@ public partial class CombatEngine
     /// Prompt player to select heal target (self or ally)
     /// Returns null for self, or index into currentTeammates
     /// </summary>
-    private async Task<int?> SelectHealTarget(Character player)
+    private Task<int?> SelectHealTarget(Character player) => SelectHealTargetFor(player, purify: false);
+
+    /// <summary>1.3.2: for Purify the list also holds an ally who is poisoned or diseased at full health.</summary>
+    private async Task<int?> SelectHealTargetFor(Character player, bool purify)
     {
-        var injuredAllies = currentTeammates?.Where(t => t.IsAlive && t.HP < t.MaxHP)
+        var injuredAllies = currentTeammates?.Where(t => t.IsAlive && (t.HP < t.MaxHP || (purify && HasPurifyAffliction(t))))
             .OrderBy(t => t.MaxHP > 0 ? (double)t.HP / t.MaxHP : 1.0)
             .ToList() ?? new List<Character>();
 
@@ -19844,7 +19857,8 @@ public partial class CombatEngine
 
         if (mostInjured == null)
         {
-            return false; // No one needs healing
+            // No one needs healing. 1.3.2: a party Cleric cures a poisoned or diseased member instead.
+            return await TryTeammatePurify(teammate, allPartyMembers, result);
         }
 
         double injuredPercent = (double)mostInjured.HP / mostInjured.MaxHP;
@@ -19921,6 +19935,11 @@ public partial class CombatEngine
             return await TeammateHealWithPotion(teammate, teammate, result);
         }
 
+        // 1.3.2: nobody needs a heal now, so a party Cleric cures a poisoned or diseased member
+        // (heal, cure, attack)
+        if (await TryTeammatePurify(teammate, allPartyMembers, result))
+            return true;
+
         // Mana self-recovery: if teammate has mana potions and is below 30% mana, drink one
         if (teammate.ManaPotions > 0 && teammate.MaxMana > 0 && teammate.Mana < teammate.MaxMana * 0.30)
         {
@@ -19928,6 +19947,84 @@ public partial class CombatEngine
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// 1.3.2: the afflictions a Purify cures on a party member other than the caster: the statuses
+    /// Poisoned and Diseased and the lasting poison counter with its turns.
+    /// </summary>
+    internal static bool HasPurifyAffliction(Character c) =>
+        c.ActiveStatuses.ContainsKey(StatusEffect.Poisoned) || c.ActiveStatuses.ContainsKey(StatusEffect.Diseased) || c.Poison > 0;
+
+    /// <summary>
+    /// 1.3.2: removes those afflictions from <paramref name="c"/> and says whether it removed any. The
+    /// one routine for the cure on an ally and for the same part of a Purify cast on oneself.
+    /// </summary>
+    internal static bool RemovePurifyAfflictions(Character c)
+    {
+        bool removed = false;
+        if (c.ActiveStatuses.ContainsKey(StatusEffect.Diseased)) { c.RemoveStatus(StatusEffect.Diseased); removed = true; }
+        if (c.ActiveStatuses.ContainsKey(StatusEffect.Poisoned)) { c.RemoveStatus(StatusEffect.Poisoned); removed = true; }
+        if (c.Poison > 0) { c.Poison = 0; c.PoisonTurns = 0; removed = true; }
+        return removed;
+    }
+
+    /// <summary>
+    /// 1.3.2: a Purify landing on an ally: cures it and says so by the ally's name; a companion is
+    /// synced the way a teammate's heal syncs it.
+    /// </summary>
+    private void PurifyAlly(Character ally)
+    {
+        bool cured = RemovePurifyAfflictions(ally);
+        UIHelper.WriteRow(terminal, cured
+            ? Loc.Get("combat.spell_purified", ally.DisplayName)
+            : Loc.Get("combat.spell_already_healthy", ally.DisplayName), cured ? "bright_green" : "cyan");
+        if (ally.IsCompanion && ally.CompanionId.HasValue)
+            CompanionSystem.Instance.SyncCompanionHP(ally);
+    }
+
+    /// <summary>
+    /// 1.3.2: a Cleric party member who knows Purify, can pay for it and has not got it switched off
+    /// casts it on one living party member who is poisoned or diseased. Called after the heal decision,
+    /// so a member under the heal threshold is healed first. One cast a turn; nobody afflicted, no cast.
+    /// </summary>
+    private async Task<bool> TryTeammatePurify(Character teammate, List<Character> allPartyMembers, CombatResult result)
+    {
+        var purify = SpellSystem.GetAllSpellsForClass(teammate.Class).FirstOrDefault(s => SpellSystem.IsPurify(teammate.Class, s));
+        if (purify == null
+            || teammate.Level < SpellSystem.GetLevelRequired(teammate.Class, purify.Level)
+            || !SpellSystem.CanCastSpell(teammate, purify.Level)
+            || GetDisabledSpellsFor(teammate).Contains(purify.Name))
+            return false;
+
+        // Pick order: the leader first, then the lowest share of hit points. This order is the
+        // lead's default for 1.3.2, not a rule the player chose.
+        var target = allPartyMembers
+            .Where(m => m.IsAlive && HasPurifyAffliction(m))
+            .OrderBy(m => m == currentPlayer ? 0 : 1)
+            .ThenBy(m => (double)m.HP / Math.Max(1, m.MaxHP))
+            .FirstOrDefault();
+        if (target == null) return false;
+
+        var spellResult = SpellSystem.CastSpell(teammate, purify.Level, null);
+        terminal.WriteLine("");
+        terminal.SetColor("bright_cyan");
+        string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
+        UIHelper.WriteRow(terminal, Loc.Get("combat.teammate_casts_on", teammate.DisplayName, purify.DisplayName, targetName));
+        if (spellResult.Success)
+        {
+            PurifyAlly(target);
+            result.CombatLog.Add($"{teammate.DisplayName} casts {purify.Name} on {target.DisplayName}.");
+        }
+        else
+        {
+            terminal.SetColor("yellow");
+            terminal.WriteLine(Loc.Get("combat.spell_fizzles"));
+            result.CombatLog.Add($"{teammate.DisplayName}'s Purify fizzles.");
+        }
+
+        await Pacing.Wait(GetCombatDelay(800));
+        return true;
     }
 
     /// <summary>
@@ -28717,19 +28814,9 @@ public partial class CombatEngine
 
             case "cure_disease":
                 // Purify spell - cleanse disease and minor poisons
-                bool curedAnything = false;
-
-                // Clear status effect diseases
-                if (caster.ActiveStatuses.ContainsKey(StatusEffect.Diseased))
-                {
-                    caster.RemoveStatus(StatusEffect.Diseased);
-                    curedAnything = true;
-                }
-                if (caster.ActiveStatuses.ContainsKey(StatusEffect.Poisoned))
-                {
-                    caster.RemoveStatus(StatusEffect.Poisoned);
-                    curedAnything = true;
-                }
+                // 1.3.2: the statuses and the poison counter through the routine a cure on an ally uses;
+                // a cast on oneself also clears the disease flags below.
+                bool curedAnything = RemovePurifyAfflictions(caster);
 
                 // Clear boolean disease flags
                 if (caster.Blind) { caster.Blind = false; curedAnything = true; }
@@ -28738,9 +28825,6 @@ public partial class CombatEngine
                 if (caster.Measles) { caster.Measles = false; curedAnything = true; }
                 if (caster.Leprosy) { caster.Leprosy = false; curedAnything = true; }
                 if (caster.LoversBane) { caster.LoversBane = false; curedAnything = true; }
-
-                // Clear poison counter
-                if (caster.Poison > 0) { caster.Poison = 0; caster.PoisonTurns = 0; curedAnything = true; }
 
                 if (curedAnything)
                 {
@@ -30593,9 +30677,12 @@ public partial class CombatEngine
                 // Multi-target buff/heal (e.g. Alethia's Grace, Tidecall Barrier) — skip target prompt
                 if (!spellInfo.IsMultiTarget && currentTeammates?.Any(t => t.IsAlive) == true)
                 {
-                    if (spellInfo.SpellType == "Heal" && currentTeammates.Any(t => t.IsAlive && t.HP < t.MaxHP))
+                    // 1.3.2: Purify also prompts for an ally who is poisoned or diseased at full health
+                    bool qbPurify = SpellSystem.IsPurify(player.Class, spellInfo);
+                    if (spellInfo.SpellType == "Heal"
+                        && currentTeammates.Any(t => t.IsAlive && (t.HP < t.MaxHP || (qbPurify && HasPurifyAffliction(t)))))
                     {
-                        allyTarget = await SelectHealTarget(player);
+                        allyTarget = await SelectHealTargetFor(player, qbPurify);
                     }
                     else if (spellInfo.SpellType == "Buff")
                     {

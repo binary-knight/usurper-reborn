@@ -597,9 +597,13 @@ public static class SpellSystem
     public static bool RestoresHitPoints(CharacterClass characterClass, SpellInfo? spell)
     {
         if (spell == null || spell.SpellType != "Heal") return false;
-        if (characterClass == CharacterClass.Cleric && spell.Level == 3) return false; // Purify
+        if (IsPurify(characterClass, spell)) return false;
         return true;
     }
+
+    /// <summary>1.3.2: the Cleric's Purify (slot 3), by class and slot so a server rename cannot hide it.</summary>
+    public static bool IsPurify(CharacterClass characterClass, SpellInfo? spell) =>
+        spell != null && characterClass == CharacterClass.Cleric && spell.Level == 3;
 
     /// <summary>
     /// Check if character can cast specific spell
