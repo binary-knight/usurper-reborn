@@ -32,7 +32,7 @@ A service opens when its building reaches the tier below. You can hold only one 
 - **Council Hall (Built):** once a day, 10 percent of (the treasury x your share of all player contributions), at least 50 gold and at most the treasury; with no contribution of yours, 50 gold. Terran's boon can add to it.
 - **Shrine (Upgraded):** once a day, heals 30 percent of your maximum HP.
 - **Palisade (Upgraded):** +5 percent defence.
-- **Workshop (Upgraded):** once a day, sharpens your weapon for 10 fights. No fight reads this sharpening at present, so it changes no damage.
+- **Workshop (Upgraded):** once a day, sharpens your weapon for 10 fights: +20 percent damage on your basic attacks, not on spells or class abilities.
 - **Watchtower (Upgraded):** scouts any dungeon floor from 1 to 100 room by room, showing each room's monsters, traps, treasure, events, stairs and special rooms, with a sample monster.
 
 ## Settlement proposals
@@ -43,7 +43,7 @@ Once 3 core buildings stand at Foundation or better and at least 3 settlers live
 
 Each is listed with what it needs to be proposed and the tier its service needs.
 
-- **Arena** (needs 8 settlers; service when Upgraded): a damage buff. No fight reads it at present, so it changes no damage.
+- **Arena** (needs 8 settlers; service when Upgraded): +10 percent damage on your basic attacks for 5 fights, not on spells or class abilities.
 - **Thieves' Den** (needs no Watchtower Built yet; Upgraded): +15 percent gold from fights.
 - **Mystic Circle** (needs a Shrine Foundation; Upgraded): once a day, 30 percent of your maximum mana, or of your maximum HP for a class without mana. When that is already full it restores nothing and the day is not spent.
 - **Prison** (needs a Palisade Built; Upgraded): halves the damage of dungeon room traps, chest traps and failed riddles and puzzles, for the next 5 times. The gold and experience a trap takes are not reduced.

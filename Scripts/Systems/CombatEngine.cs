@@ -14281,6 +14281,12 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * player.GodSlayerDamageBonus);
                         if (player.HasDarkPactBuff)
                             attackPower += (long)(attackPower * player.DarkPactDamageBonus);
+                        // 1.3.2: the Outskirts Workshop sharpening (+20 percent, 10 fights) and the Outskirts Arena
+                        // damage buff, read here as on the old single-monster path, which no fight runs
+                        if (player.WorkshopBuffCombats > 0)
+                            attackPower += (long)(attackPower * 0.20);
+                        if (player.HasSettlementBuff && player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.DamageBonus)
+                            attackPower += (long)(attackPower * player.SettlementBuffValue);
                         // Fatigue damage penalty (single-player only, multi-monster path): v1.1.15, taken with Grief and Mental above
                         if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
@@ -19012,6 +19018,7 @@ public partial class CombatEngine
                     if (target.IsEnraged)
                     {
                         target.IsEnraged = false;
+                        TakeBackEnrage(target);   // 1.3.2: the enrage's Strength, Defence and extra attacks go too
                         dispelled = true;
                     }
                     if (target.IsPhysicalImmune || target.IsMagicalImmune)
@@ -31102,9 +31109,16 @@ public partial class CombatEngine
         {
             ctx.IsEnraged = true;
             bossMonster.IsEnraged = true;
+            // 1.3.2: kept on the monster for the fight so Dispel Evil can take the enrage back (TakeBackEnrage)
+            bossMonster.EnrageStrengthBefore = bossMonster.Strength;
+            bossMonster.EnrageDefenceBefore = bossMonster.Defence;
             bossMonster.Strength = (long)(bossMonster.Strength * GameConfig.ModBossEnrageDamageMultiplier);
             bossMonster.Defence = (int)(bossMonster.Defence * GameConfig.ModBossEnrageDefenseMultiplier);
             ctx.AttacksPerRound += GameConfig.ModBossEnrageExtraAttacks;
+            bossMonster.EnrageStrengthAfter = bossMonster.Strength;
+            bossMonster.EnrageDefenceAfter = bossMonster.Defence;
+            bossMonster.EnrageExtraAttacks = GameConfig.ModBossEnrageExtraAttacks;
+            bossMonster.EnrageHeld = true;
 
             terminal.WriteLine("");
             terminal.SetColor("bright_red");
@@ -31120,6 +31134,28 @@ public partial class CombatEngine
                 terminal.WriteLine("  ╚═══════════════════════════════════════════════╝");
             }
         }
+    }
+
+    /// <summary>
+    /// 1.3.2: Dispel Evil on an enraged boss takes back what CheckBossEnrage gave it. Strength and Defence are
+    /// scaled by their value before the enrage over their value after it, as TickPowerSurge takes back a surge,
+    /// so with nothing in between they return exactly and a cut landed while enraged keeps its share. The
+    /// extra attacks come off the fight's attack count. The fight's own IsEnraged stays set, so the enrage
+    /// does not come again. A monster the enrage never touched is left as it is.
+    /// </summary>
+    private void TakeBackEnrage(Monster monster)
+    {
+        if (!monster.EnrageHeld) return;
+        if (monster.EnrageStrengthAfter > 0)
+            monster.Strength = Math.Max(0, (long)Math.Round((double)monster.Strength * monster.EnrageStrengthBefore / monster.EnrageStrengthAfter));
+        if (monster.EnrageDefenceAfter > 0)
+            monster.Defence = Math.Max(0, (int)Math.Round((double)monster.Defence * monster.EnrageDefenceBefore / monster.EnrageDefenceAfter));
+        if (BossContext != null)
+            BossContext.AttacksPerRound = Math.Max(1, BossContext.AttacksPerRound - monster.EnrageExtraAttacks);
+        monster.EnrageHeld = false;
+        monster.EnrageStrengthBefore = monster.EnrageStrengthAfter = 0;
+        monster.EnrageDefenceBefore = monster.EnrageDefenceAfter = 0;
+        monster.EnrageExtraAttacks = 0;
     }
 
     /// <summary>

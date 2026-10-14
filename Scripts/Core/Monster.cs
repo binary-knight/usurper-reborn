@@ -215,6 +215,21 @@ public class Monster
     public bool IsMagicalImmune { get; set; } = false;     // Immune to magical damage (phase mechanic)
     public int PhaseImmunityRounds { get; set; } = 0;      // Rounds remaining for phase immunity
     public bool IsEnraged { get; set; } = false;           // Boss enrage timer expired — stats doubled
+    /// <summary>1.3.2: what the boss enrage (CombatEngine.CheckBossEnrage) changed, so Dispel Evil can take it back:
+    /// Strength and Defence before and after it, and the attacks it added. Dispel scales the current values by
+    /// before over after, so a cut landed while enraged keeps its share. Combat only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EnrageHeld { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public long EnrageStrengthBefore { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public long EnrageStrengthAfter { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnrageDefenceBefore { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnrageDefenceAfter { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnrageExtraAttacks { get; set; } = 0;
 
     // Per-round status tick tracking — prevents boss multi-attacks from ticking statuses multiple times
     public bool StatusTickedThisRound { get; set; } = false;
