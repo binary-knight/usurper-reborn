@@ -14847,6 +14847,15 @@ public partial class CombatEngine
                         // Attack fires the identical pipeline.
                         ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, damage), isOffHandAttack, result);   // v1.1.11: riders scale from the hit, Armory included
                     }
+
+                    // 1.3.2: the attack action can improve basic attack proficiency, once an action, up to Good
+                    int basicProfCap = Math.Min(TrainingSystem.GetProficiencyCapForCharacter(player), (int)TrainingSystem.ProficiencyLevel.Good);
+                    if (TrainingSystem.TryImproveFromUse(player, "basic_attack", random, basicProfCap))
+                    {
+                        terminal.SetColor("bright_yellow");
+                        UIHelper.WriteRow(terminal, Loc.Get("combat.proficiency_up",
+                            TrainingSystem.GetProficiencyName(TrainingSystem.GetSkillProficiency(player, "basic_attack"))));
+                    }
                 }
                 break;
 
