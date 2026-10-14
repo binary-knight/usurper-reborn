@@ -86,6 +86,9 @@ Numbers should come from directives, not copied tables:
 {{table:loot-rarity}}
 {{table:home-upgrades}}
 {{table:herbs}}
+{{table:statuses}}
+{{table:target-weights}}
+{{table:combat-regeneration}}
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
@@ -112,6 +115,15 @@ effect is what the game's own enchant code adds to a bare item.
 `old-god-rewards` folds itself under a spoiler: it names each Old God's material
 and the artifacts. The economy constants print like the party constants and
 may not reuse a name either.
+`statuses`, `target-weights` and `combat-regeneration` come from `combat.json`.
+A status's flags and its damage per round are the game's own status rules,
+and whether it ends by itself is tested on a character the export makes. A
+class's target weight is the game's own targeting weight for a fight leader
+of that class whose armor power and maximum HP add nothing. Regeneration is
+the game's own round-end mana and combat stamina rule, with one armor piece of
+each weight. The balance table leaves out the six values no game code reads.
+The combat constants print like the party constants and may not reuse a name
+either.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.

@@ -25,7 +25,7 @@ Dexterity:
 - Critical hit chance: 5 percent plus one percent per 10 Dexterity, plus equipment. The ceiling is 50 percent, raised by one percent per 30 Dexterity up to 75 percent.
 - Critical damage: 1.5 times, plus 0.02 per point above 10, plus equipment, at most 3 times.
 - Your armor class against monster attacks, which makes their swings miss more often.
-- Fleeing a monster fight: 40 percent plus half your Dexterity plus a third of your level. A Ranger or an Assassin adds 15 and a Jester or a Bard adds 10. The chance is never more than 75 percent. Bosses use their own odds.
+- Fleeing a monster fight: 40 percent plus half your Dexterity plus a third of your level. A Ranger or an Assassin adds 15 and a Jester or a Bard adds 10. The chance is never more than 75 percent. Floor bosses use the same chance; an Old God fight has its own (see [fleeing an Old God](/wiki/en/combat/fleeing/#fleeing-an-old-god)).
 - Backstab, Hide and Disarm success, many dungeon traps and several street and Dark Alley checks.
 - A smaller share of attack ability scaling.
 - The [hit roll](/wiki/en/combat/#the-hit-roll) of a physical attack, only against a monster more than 5 levels above you: Dexterity lowers the number you need.
