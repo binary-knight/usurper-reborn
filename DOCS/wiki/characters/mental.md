@@ -2,7 +2,7 @@
 title: Mental health
 path: /wiki/en/characters/mental/
 checked: 1.3.1
-sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs
+sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs
 history: 1.3.1 | none
 history: 1.3.0 | none
 ---
@@ -106,6 +106,8 @@ Grief begins when a story companion, an NPC teammate, a spouse or a lover dies. 
 - Acceptance: the grief is over and no penalty remains.
 
 Online, each stage lasts 1 day and every number above is halved. In single-player the penalties of several griefs add up, to at most 50 percent; online only the worst one counts.
+
+Each grief for a story companion that reaches Acceptance adds 5 to your Wisdom. A grief for an NPC teammate, a spouse or a lover adds none.
 
 ### Mental lost to grief
 
