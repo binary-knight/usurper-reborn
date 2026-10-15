@@ -12,7 +12,7 @@ Use the Notice Board for news and World Events, and the status-oriented menus fo
 
 In single-player each new game day has a 30 percent chance to start a world event, drawn from the events the season and the town's state allow. Every 7th day also forces a Tournament Day, a Merchant Caravan or a Harvest Festival, and every 30th day a Royal Festival, a Royal Bounty, a Gold Rush or an Ancient Relic. Each event lasts its number of days, counted down at each new day.
 
-Online the server's daily reset does not start or count down world events. The one event online play adds is The Realm Celebrates, after a world boss falls, and it does not count down either.
+Online the server's daily reset at 7 PM Eastern does the same once a day for the whole world: it counts every event down and has a 30 percent chance to start one. The 7th and 30th day events are single-player only. Online play also has The Realm Celebrates, which a world boss kill starts; it lasts until the next daily reset, and another kill before then keeps that one celebration instead of adding a second.
 
 ## What does each world event do
 
