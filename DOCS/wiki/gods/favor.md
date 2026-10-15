@@ -42,7 +42,7 @@ Daily Temple prayer gives {{balance:GodFavorPrayerGain}} Favor and, from a Templ
 - the damage of each monster hit on you is cut by 3 + 5 x the god's power percent, rounded down;
 - your experience from a won monster fight rises by 5 + 10 x the god's power percent, rounded down.
 
-A god's power is its divine experience on a scale of 0.1 to 1.0: the logarithm (base 10) of its experience divided by 7. A Temple god starts with 5,000 to 20,000 experience, a power of about 0.53 to 0.61, so its blessing cuts 5 or 6 percent of the damage and adds 10 or 11 percent experience. The blessing also carries a damage bonus of the same size as the cut, but only a world boss fight reads it: the attacks of a monster fight do not.
+A god's power is its divine experience on a scale of 0.1 to 1.0: the logarithm (base 10) of its experience divided by 7. A Temple god starts with 5,000 to 20,000 experience, a power of about 0.53 to 0.61, so its blessing cuts 5 or 6 percent of the damage and adds 10 or 11 percent experience. The blessing also carries a damage bonus of the same size as the cut on your basic swings.
 
 Prayer to a player-god takes the larger of the damage and defence percent of that god's configured Favors, doubles it, and gives it as a blessing that raises both your attack and your defence by that much for {{balance:GodPrayerBlessingCombats}} fights, twice as many at Zealot and Chosen. Favors of 10 percent damage give a 20 percent blessing. A god with no damage or defence Favor gives no blessing. See [player-gods](/wiki/en/gods/player-gods/#favors).
 
@@ -52,7 +52,7 @@ A gold offering of 100 gold or more to your own Temple god also gives a blessing
 
 - **Solarius, Valorian, Amara, Judicar, Terran and Sylvana:** the damage of monster hits on you is cut by 5 + strength x god's power x 10 percent.
 - **Arcanus:** experience from won fights rises by 10 + strength x god's power x 15 percent.
-- **Umbrath, Mortis and Discordia:** a damage bonus of 5 + strength x god's power x 10 percent, which only a world boss fight reads.
+- **Umbrath, Mortis and Discordia:** a damage bonus of 5 + strength x god's power x 10 percent on your basic swings.
 
 1,000 gold has a strength of 1.5: to a good god of power 0.5 it gives 12 percent less damage for 52 minutes. You hold one blessing at a time: a sacrifice blessing replaces an active prayer blessing, and a prayer replaces a sacrifice blessing.
 

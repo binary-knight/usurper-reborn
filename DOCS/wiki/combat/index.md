@@ -76,7 +76,7 @@ Your critical hit chance on a basic swing is 5 percent plus 1 percent per 10 Dex
 
 ### Other crit chance bonuses
 
-Besides Dexterity and gear: a drug's crit bonus, a player-god's crit boon, the Noctura shrine attunement (+5), the Cave Spider as active pet (+5), and alignment (Dark or Good +3, Evil or Holy +5). The Creator's Eye artifact adds {{balance:CreatorsEyeCritBonus}}.
+Besides Dexterity and gear: a drug's crit bonus, a player-god's crit boon, the Noctura shrine attunement (+5), the Cave Spider as active pet (+5), alignment (Dark or Good +3, Evil or Holy +5), and Umbrath's boon on a basic swing. The Creator's Eye artifact adds {{balance:CreatorsEyeCritBonus}}.
 
 :::spoiler Spoiler: the Creator's Eye late in the story
 The Creator's Eye bonus doubles in the fight with Manwe while you hold the Void Key.
@@ -88,7 +88,7 @@ A basic swing's power is Strength + Strength / 4 + your level, plus the weapon t
 
 - **Weapon term:** with W = the weapon power of that hand + your level / 10, the swing adds W plus a random 0 to W. A weapon of 100 at level 20 adds 102 to 204.
 - **Statuses** change only the Strength and level part: Rage and Power Attack's stance x1.5, Blessed + level / 5 + 2, the King's blessing x1.10, Weakened - (4 + level / 10).
-- Then the swing is multiplied, in order, by your [weapon setup](#weapon-setup-two-handed-dual-wield-and-shields), your basic attack proficiency (0.50 at Untrained, 1.00 at Average, 2.00 at Legendary: see the [proficiency table](/wiki/en/characters/leveling/)), the crit, difficulty, and the Grief, Mental and Fatigue penalty, then by the King's +10 percent, your buffs (well-rested, herbs, food, songs, blessings, poison coating, Knight +5 percent, Grand Champion +3 percent and others) and your god's boon.
+- Then the swing is multiplied, in order, by your [weapon setup](#weapon-setup-two-handed-dual-wield-and-shields), your basic attack proficiency (0.50 at Untrained, 1.00 at Average, 2.00 at Legendary: see the [proficiency table](/wiki/en/characters/leveling/)), the crit, difficulty, and the Grief, Mental and Fatigue penalty, then by the King's +10 percent, your god's damage boons and a Temple blessing's damage bonus, your buffs (well-rested, herbs, food, songs, blessings, poison coating, Knight +5 percent, Grand Champion +3 percent and others), a Blood Price or divine wrath cut, a boss slayer item's +10 percent against a boss or mini-boss, and your god's boon.
 
 ### Weapon power cap
 

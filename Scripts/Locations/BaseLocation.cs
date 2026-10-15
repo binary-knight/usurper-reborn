@@ -7172,23 +7172,24 @@ public abstract class BaseLocation
             // v1.2.5: a buff row past 79 columns wraps, its later rows under the text after "  - ".
             void WriteBuff(string row) { foreach (var r in BuffRows(row)) terminal.WriteLine(r); }
 
-            // Blood Price debuffs (murder weight consequences)
+            // Blood Price debuffs (murder weight consequences). 1.3.2: the lines name only the damage cut the
+            // live swing applies; no shop or healer reads the murder weight, so no markup is listed
             if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
             {
                 terminal.SetColor("dark_red");
-                WriteBuff(Loc.Get("base.buff_blood_price_3", (int)(GameConfig.MurderWeightTier3CombatPenalty * 100), (int)(GameConfig.MurderWeightTier3ShopMarkup * 100), (int)(GameConfig.MurderWeightTier3HealPenalty * 100)));
+                WriteBuff(Loc.Get("base.buff_blood_price_3", (int)(GameConfig.MurderWeightTier3CombatPenalty * 100)));
                 WriteBuff(Loc.Get("base.buff_murder_weight", $"{currentPlayer.MurderWeight:F1}"));
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
             {
                 terminal.SetColor("red");
-                WriteBuff(Loc.Get("base.buff_blood_price_2", (int)(GameConfig.MurderWeightTier2CombatPenalty * 100), (int)(GameConfig.MurderWeightTier2ShopMarkup * 100)));
+                WriteBuff(Loc.Get("base.buff_blood_price_2", (int)(GameConfig.MurderWeightTier2CombatPenalty * 100)));
                 WriteBuff(Loc.Get("base.buff_murder_weight", $"{currentPlayer.MurderWeight:F1}"));
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
             {
                 terminal.SetColor("yellow");
-                WriteBuff(Loc.Get("base.buff_blood_price_1", (int)(GameConfig.MurderWeightShopMarkupPercent * 100)));
+                WriteBuff(Loc.Get("base.buff_blood_price_1", (int)GameConfig.MurderWeightTier2Threshold));
                 WriteBuff(Loc.Get("base.buff_murder_weight", $"{currentPlayer.MurderWeight:F1}"));
             }
 

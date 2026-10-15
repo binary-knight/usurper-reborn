@@ -123,7 +123,7 @@ The game reads six alignment types, checked in this order:
 5. **Balanced:** both above 100 and within 100 of each other.
 6. **Neutral:** anything else.
 
-The type sets shop prices (see [alignment prices](/wiki/en/items/shops/#alignment-prices)), whether the Church lets you in, and these effects in a fight:
+The type sets shop prices (see [alignment prices](/wiki/en/items/shops/#alignment-prices)), whether the Church and the Sanctum let you in, and these effects in a fight:
 
 {{table:alignment-types}}
 

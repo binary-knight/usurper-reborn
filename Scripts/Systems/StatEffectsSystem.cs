@@ -256,6 +256,23 @@ public static class StatEffectsSystem
     public static bool RollCriticalHit(Character attacker, Random? rng = null) => (rng ?? _random).Next(100) < CritChance(attacker);
 
     /// <summary>
+    /// 1.3.2: the live basic swing's crit roll, with Umbrath's crit points (DivineBlessingSystem.GetCriticalHitBonus)
+    /// added under the same ceiling as every other bonus. Only that roll passes them: a world boss hit rolls
+    /// Umbrath's crit on its own (WorldBossSystem.ApplyDivineAttack), so CritChance(attacker) leaves it out.
+    /// </summary>
+    public static bool RollCriticalHit(Character attacker, Random? rng, int divineCritPoints) =>
+        (rng ?? _random).Next(100) < CritChance(attacker, divineCritPoints);
+
+    /// <summary>1.3.2: CritChance plus divine crit points, held to the Dexterity ceiling; never lower than CritChance.</summary>
+    internal static int CritChance(Character attacker, int divineCritPoints)
+    {
+        int critChance = CritChance(attacker);
+        if (divineCritPoints <= 0) return critChance;
+        long effectiveDex = attacker.Dexterity + DrugSystem.GetDrugEffects(attacker).DexterityBonus;
+        return Math.Max(critChance, Math.Min(critChance + divineCritPoints, GetCriticalHitChanceCapped(effectiveDex)));
+    }
+
+    /// <summary>
     /// The crit chance RollCriticalHit rolls against, with every bonus stacked. v1.1.10: split out so
     /// it can be read, and it now carries the fight's TempCritChanceBonus (an Old God's dialogue).
     /// </summary>

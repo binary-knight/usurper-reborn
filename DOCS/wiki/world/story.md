@@ -58,7 +58,7 @@ A god killed or saved leaves 2 of its crafting material, and each of the first s
 
 **Noctura's betrayal fight.** You first regain half your missing HP. She fights from 300,000 base HP with one attack a round. A win pays 300,000 experience, 100,000 gold and 100 Fame; a loss lets her escape with her power.
 
-**Your god and the Old Gods.** A Zealot or Chosen of a Temple god deals {{balance:GodEchoDamagePct}} percent more spell damage to the Old God that god echoes: Solarius Aurelion, Valorian Maelketh, Amara Veloura, Judicar Thorgrim, Umbrath Noctura, Terran Terravok and Arcanus Manwe. A player-god echoes through the Temple god of its domain.
+**Your god and the Old Gods.** A Zealot or Chosen of a Temple god deals {{balance:GodEchoDamagePct}} percent more spell and basic swing damage to the Old God that god echoes: Solarius Aurelion, Valorian Maelketh, Amara Veloura, Judicar Thorgrim, Umbrath Noctura, Terran Terravok and Arcanus Manwe. A player-god echoes through the Temple god of its domain.
 :::
 
 :::spoiler Spoiler: ending conditions
