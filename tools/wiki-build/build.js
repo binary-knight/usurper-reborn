@@ -1334,7 +1334,7 @@ function renderers(data) {
       );
     if (id === "merc-contracts")
       return table(
-        ["Contract", "Faction", "Tier", "Objective", "Count", "Pay factor"],
+        ["Contract", "Faction", "Tier", "Objective", "Count", "Days", "Pay factor"],
         data.world.mercContracts.map((c) => {
           if (!(c.objective in mercObjectives)) throw Error(`Unknown contract objective: ${c.id}/${c.objective}`);
           return [
@@ -1342,7 +1342,8 @@ function renderers(data) {
             escape(label(c.faction.replace(/^The/, ""))),
             c.tier,
             escape(mercObjectives[c.objective](c.target)),
-            `${c.baseCount} + your level / 5`,
+            c.flatProgress ? `${c.baseCount}` : `${c.baseCount} + your level / 5`,
+            c.days,
             `x${c.payMultiplier}`,
           ];
         }),

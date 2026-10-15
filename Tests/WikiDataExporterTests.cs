@@ -759,6 +759,12 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal("Unhallowed Dead", undead.GetProperty("title").GetProperty("en").GetString());
         Assert.Equal("Zombie", undead.GetProperty("target").GetString());
         Assert.Equal(3, undead.GetProperty("baseCount").GetInt32());
+        Assert.False(undead.GetProperty("flatProgress").GetBoolean());
+        Assert.Equal(7, undead.GetProperty("days").GetInt32());
+        var bandits = One(contracts, "crown_bandit_purge");
+        Assert.True(bandits.GetProperty("flatProgress").GetBoolean());
+        Assert.Equal(14, bandits.GetProperty("days").GetInt32());
+        Assert.Equal(1, contracts.Count(c => c.GetProperty("flatProgress").GetBoolean()));
     }
 
     [Fact]

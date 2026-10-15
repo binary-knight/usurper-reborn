@@ -992,6 +992,10 @@ public static class WikiDataExporter
             objective = Field(t, "ObjectiveType").ToString(),
             target = (string)Field(t, "TargetId"),
             baseCount = (int)Field(t, "BaseProgress"),
+            // a flat contract asks baseCount at every level; the others add the player's level / 5 (CreateMercContract)
+            flatProgress = (bool)Field(t, "FlatProgress"),
+            // the days to complete; a template's 0 means the 7 CreateMercContract gives
+            days = (int)Field(t, "Days") > 0 ? (int)Field(t, "Days") : 7,
             payMultiplier = (float)Field(t, "PayoutMultiplier")
         }).ToArray();
     }
