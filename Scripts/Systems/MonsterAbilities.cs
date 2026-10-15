@@ -377,6 +377,9 @@ public static class MonsterAbilities
             case AbilityType.Thorns:
                 result.DamageMultiplier = 0; // Passive reflect — no direct damage
                 result.ReflectDamagePercent = 25;
+                // 1.3.2: the reflect lives on the monster for 3 rounds (CombatEngine.ReflectMonsterThorns)
+                monster.ThornsRounds = 3;
+                monster.ThornsPercent = 25;
                 result.Message = Loc.Get("mability.thorns", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
                 break;

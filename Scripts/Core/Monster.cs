@@ -155,6 +155,13 @@ public class Monster
     public int EvasionRounds { get; set; } = 0;
     public int EvasionMissChance { get; set; } = 0;  // 0-100 percent
 
+    // 1.3.2: the Thorns ability persists on the monster as the evasion buff does. While ThornsRounds
+    // is above 0, a melee hit on the monster costs the attacker ThornsPercent of the damage it dealt
+    // (at least 1, never below 1 HP); spells and ranged hits are exempt. ThornsRounds counts down once
+    // per monster-action cycle. In memory only, not saved.
+    public int ThornsRounds { get; set; } = 0;
+    public int ThornsPercent { get; set; } = 0;  // 0-100 percent
+
     // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
     // application increments RecentStunCount and resets RoundsSinceLastStun. The
     // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to

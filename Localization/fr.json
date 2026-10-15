@@ -847,6 +847,7 @@
   "combat.solid_hit": "Coup solide!",
   "combat.thorns_kill": "{0} tombe sous vos ronces!",
   "combat.thorns_reflect": "Les ronces renvoient {0} dégâts à {1}! (Représailles)",
+  "combat.monster_thorns_wound": "La carapace épineuse de {0} blesse l'assaillant : {1} dégâts !",
   "combat.worldstone_absorbs": "La Pierre‑Monde absorbe l’impact! (-{0})",
   "combat.you_take_damage": "Vous subissez {0} dégâts!",
   "combat.you_take_damage_heals": "Vous subissez {0} dégâts! {1} soigne {2}!",

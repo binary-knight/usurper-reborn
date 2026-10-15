@@ -372,6 +372,9 @@ function renderers(data) {
     monsterEvasionMissChance: (v, n, e) =>
       `${upTo(v, n)} percent of attacks on it miss for ${upTo(e.monsterEvasionRounds, n)} rounds`,
     monsterEvasionRounds: null,
+    monsterThornsPercent: (v, n, e) =>
+      `melee hits on it cost the attacker ${upTo(v, n)} percent of their damage for ${upTo(e.monsterThornsRounds, n)} rounds`,
+    monsterThornsRounds: null,
   };
   const abilityUserKinds = {
     monster: "",

@@ -847,6 +847,7 @@
   "combat.solid_hit": "Stabil találat!",
   "combat.thorns_kill": "{0} elesett a töviseid miatt!",
   "combat.thorns_reflect": "A tövisek {0} sebzést vernek vissza {1}-re! (Visszavágás)",
+  "combat.monster_thorns_wound": "{0} tüskés bőre {1} sebzést okoz a támadónak!",
   "combat.worldstone_absorbs": "A Világkő elnyeli a becsapódást! (-{0})",
   "combat.you_take_damage": "{0} sebzést szenvedtél el!",
   "combat.you_take_damage_heals": "{0} sebzést szenvedtél el! {1} {2}-t gyógyul!",
