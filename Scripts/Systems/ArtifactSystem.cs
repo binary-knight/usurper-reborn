@@ -443,6 +443,23 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.3.2 one-time load grant. Before 1.3.2 an alliance with Noctura handed over no artifact, so a
+        /// save allied with her lacks the Shadow Crown. Read from the save being loaded: with noctura_ally
+        /// set and the Crown not in its collected list, the Crown is granted with GrantArtifactIfMissing
+        /// (the list and its lasting stats, no screen). The next save holds the Crown, so a second load
+        /// grants nothing. Returns true when it granted.
+        /// </summary>
+        public static bool GrantNocturaAllianceCrown(Character player, StorySystemsData? savedStory)
+        {
+            if (player == null || savedStory == null) return false;
+            if (savedStory.StoryFlags == null || !savedStory.StoryFlags.TryGetValue("noctura_ally", out bool allied) || !allied)
+                return false;
+            if (savedStory.CollectedArtifacts != null && savedStory.CollectedArtifacts.Contains((int)ArtifactType.ShadowCrown))
+                return false;
+            return Instance.GrantArtifactIfMissing(player, ArtifactType.ShadowCrown);
+        }
+
+        /// <summary>
         /// 1.2.0 one-time login restore. Before 1.2.0 an artifact's stats were wiped by the
         /// recalculation at the end of ApplyArtifactBonuses, so no save holds them. For a character
         /// loaded from such a save (ArtifactStatsApplied false) this grants the stats of every artifact
@@ -467,6 +484,21 @@ namespace UsurperRemake.Systems
                 player.Mana = Math.Min(mana, player.MaxMana);
             }
             player.ArtifactStatsApplied = true;
+            return true;
+        }
+
+        /// <summary>
+        /// 1.3.2: run at every location entry. With six or more artifacts and no Void Key (an allied
+        /// save given the Shadow Crown at load, which shows no screen) the Void Key appears on this
+        /// terminal. Stateless: the held Void Key stops it from running again. Reads only this
+        /// session's story. Returns true when it ran.
+        /// </summary>
+        public async Task<bool> CheckVoidKeyOnEntry(Character player, TerminalEmulator terminal)
+        {
+            if (player == null || terminal == null) return false;
+            var story = StoryProgressionSystem.Instance;
+            if (story.CollectedArtifacts.Count < 6 || story.CollectedArtifacts.Contains(ArtifactType.VoidKey)) return false;
+            await TriggerVoidKeyAppearance(player, terminal);
             return true;
         }
 
