@@ -406,6 +406,10 @@ public class LocationManager
             player.Fatigue = Math.Min(100, player.Fatigue + GameConfig.FatigueCostTravel);
         }
 
+        // 1.3.2: six artifacts and no Void Key (the Shadow Crown granted at load) opens the Void Key here
+        try { await ArtifactSystem.Instance.CheckVoidKeyOnEntry(player, terminal); }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("ARTIFACT", $"Void Key entry check failed: {ex.Message}"); }
+
         // Enter the location
         try
         {

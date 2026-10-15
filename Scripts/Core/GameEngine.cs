@@ -5378,6 +5378,7 @@ public partial class GameEngine
     /// 1.2.0: one-time login restores of lasting stats that older versions lost, read from the save
     /// being loaded (not the live story singleton, which can hold another character's state). Each is
     /// guarded by its own saved flag, so it runs once per character and a second login changes nothing.
+    /// 1.3.2: the Shadow Crown for a Noctura alliance, guarded by the saved collected list.
     /// </summary>
     internal static void RunStatRewardMigrations(Character? player, StorySystemsData? story)
     {
@@ -5395,6 +5396,13 @@ public partial class GameEngine
                 DebugLogger.Instance.LogInfo("MIGRATION", $"NG+ cycle bonus backfilled for {player.Name2}: +{cycleBonus} Strength, Defence, Stamina");
         }
         catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"NG+ cycle bonus backfill failed: {ex.Message}"); }
+        try
+        {
+            // 1.3.2: after the artifact stat restore, so the Crown's stats are never granted twice
+            if (ArtifactSystem.GrantNocturaAllianceCrown(player, story))
+                DebugLogger.Instance.LogInfo("MIGRATION", $"Shadow Crown granted for the Noctura alliance: {player.Name2}");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Noctura alliance Crown grant failed: {ex.Message}"); }
     }
 
     private Character RestorePlayerFromSaveData(PlayerData playerData)

@@ -69,5 +69,5 @@ The Master Trainer at the Inn (W) sells +1 to an attribute 5 times per attribute
 {{table:old-god-rewards}}
 
 :::spoiler Spoiler: how artifacts work
-Each Old God you defeat or save hands over one artifact, except Manwe, who gives none; the seventh artifact appears once you hold the other six. An artifact's grants are permanent and come once. An Intelligence bonus on an artifact is granted as half Wisdom and half Dexterity, and an all-stats bonus raises Strength, Defence, Stamina, Agility, Charisma, Dexterity and Wisdom; the table shows what you receive. The Artifact Hunter bonus of a later life multiplies every grant by 1.5.
+Each Old God you defeat or save hands over one artifact, except Manwe, who gives none, and an alliance with Noctura hands over hers as well; the seventh artifact appears once you hold the other six. An artifact's grants are permanent and come once. An Intelligence bonus on an artifact is granted as half Wisdom and half Dexterity, and an all-stats bonus raises Strength, Defence, Stamina, Agility, Charisma, Dexterity and Wisdom; the table shows what you receive. The Artifact Hunter bonus of a later life multiplies every grant by 1.5.
 :::

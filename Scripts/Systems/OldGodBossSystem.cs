@@ -344,16 +344,7 @@ namespace UsurperRemake.Systems
                 // Check if dialogue led to non-combat resolution
                 var story = StoryProgressionSystem.Instance;
                 if (story.HasStoryFlag($"{type.ToString().ToLower()}_ally"))
-                {
-                    story.UpdateGodState(type, GodStatus.Allied);
-                    return new BossEncounterResult
-                    {
-                        Success = true,
-                        Outcome = BossOutcome.Allied,
-                        God = type,
-                        ApproachType = "allied"
-                    };
-                }
+                    return await HandleBossAllied(player, boss, terminal);
 
                 if (story.HasStoryFlag($"{type.ToString().ToLower()}_spared"))
                 {
@@ -1141,6 +1132,34 @@ namespace UsurperRemake.Systems
         // These are now handled by CombatEngine's standard combat loop with boss-specific hooks.
 
         /// <summary>
+        /// 1.3.2: an alliance made in the dialogue. Noctura's alliance also hands over the Shadow Crown,
+        /// through the call the saved and the defeated paths use, so the Void Key is reachable whichever
+        /// way she is dealt with. Manwe drops no artifact, so his alliance grants none.
+        /// </summary>
+        private async Task<BossEncounterResult> HandleBossAllied(
+            Character player, OldGodBossData boss, TerminalEmulator terminal)
+        {
+            StoryProgressionSystem.Instance.UpdateGodState(boss.Type, GodStatus.Allied);
+
+            if (boss.Type == OldGodType.Noctura)
+            {
+                terminal.WriteLine("");
+                foreach (var row in UIHelper.WordWrap(Loc.Get("old_god.ally_gives_crown"), 77))
+                    terminal.WriteLine($"  {row}", "bright_magenta");
+                await Pacing.Wait(2000);
+                await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+            }
+
+            return new BossEncounterResult
+            {
+                Success = true,
+                Outcome = BossOutcome.Allied,
+                God = boss.Type,
+                ApproachType = "allied"
+            };
+        }
+
+        /// <summary>
         /// Handle boss being saved
         /// </summary>
         private async Task<BossEncounterResult> HandleBossSaved(
@@ -1181,10 +1200,14 @@ namespace UsurperRemake.Systems
             AlignmentSystem.Instance.ChangeAlignment(player, 100, isGood: true, "old_god.saved");
             terminal.WriteLine(Loc.Get("old_god.saved_chivalry"), "bright_green");
 
-            // Saved gods give their artifact as a gift (instead of looting from their corpse)
-            terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get("old_god.entrusts_relic", boss.LocName())}", "bright_magenta");
-            await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+            // Saved gods give their artifact as a gift (instead of looting from their corpse).
+            // 1.3.2: Manwe has none of his own (his ArtifactDropped is unset), so a saved Manwe gives nothing
+            if (boss.Type != OldGodType.Manwe)
+            {
+                terminal.WriteLine("");
+                terminal.WriteLine($"  {Loc.Get("old_god.entrusts_relic", boss.LocName())}", "bright_magenta");
+                await ArtifactSystem.Instance.CollectArtifact(player, boss.ArtifactDropped, terminal);
+            }
 
             // Award thematic crafting materials (same as defeat)
             var thematicMaterial = GameConfig.CraftingMaterials.FirstOrDefault(
