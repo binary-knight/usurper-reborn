@@ -1968,6 +1968,10 @@ function build(options = {}) {
         ),
       text,
     );
+  const foldTitles = (body) =>
+    [...body.matchAll(/<details class="spoiler"><summary>([\s\S]*?)<\/summary>/g)].map(
+      (m) => textOf(m[1]),
+    );
   const search = pages.map((p) => ({
     title: redact(p.title),
     path: p.path,
@@ -1977,6 +1981,11 @@ function build(options = {}) {
     text: redact(textOf(p.body)),
     // Hand-written guides from DOCS/wiki rank above generated entity pages.
     ...(p.sourceFile ? { guide: true } : {}),
+    // A guide's spoiler folds by their summary line only, so search and the bot can point to
+    // a fold without its text ever entering the index.
+    ...(p.sourceFile && foldTitles(p.body).length
+      ? { folds: foldTitles(p.body).map(redact) }
+      : {}),
   }));
   const strings = JSON.parse(
     fs.readFileSync(path.join(root, "web/lang/en.json"), "utf8"),
