@@ -361,6 +361,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.mana_drain", MonsterNames.Display(monster), result.ManaDrain);
                 result.MessageColor = "bright_blue";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.Regeneration:
@@ -508,6 +509,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.summon_minions", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.Explosion:
@@ -515,6 +517,7 @@ public static class MonsterAbilities
                 result.OnDeathDamage = (int)(monster.MaxHP / 2);
                 result.Message = Loc.Get("mability.explosion", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.SoulReap:
@@ -557,6 +560,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.call_for_help", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.Enrage:
@@ -590,6 +594,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.flee", MonsterNames.Display(monster));
                 result.MessageColor = "yellow";
+                result.DamageMultiplier = 0;
                 break;
 
             // --- Monster Family Abilities ---
@@ -623,6 +628,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.command_army", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
+                result.DamageMultiplier = 0;
                 break;
 
             // Undead
@@ -957,6 +963,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.splits", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.Engulf:
@@ -1038,6 +1045,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.summon_spiders", MonsterNames.Display(monster));
                 result.MessageColor = "white";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.DeadlyVenom:
@@ -1174,6 +1182,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.animate_trees", MonsterNames.Display(monster));
                 result.MessageColor = "bright_green";
+                result.DamageMultiplier = 0;
                 break;
 
             case AbilityType.RootEntangle:
@@ -1291,6 +1300,7 @@ public static class MonsterAbilities
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.resurrect", MonsterNames.Display(monster));
                 result.MessageColor = "bright_white";
+                result.DamageMultiplier = 0;
                 break;
 
             // Shadow
