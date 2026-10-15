@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.2 | Dispel Evil on an enraged boss takes back its enrage, floors keep their secret boss rooms, and Boss Slayer gear adds its damage against bosses and mini bosses.
 history: 1.2.5 | Boss names, titles, world boss elements and Old God ability names are shown in the player's language, and Old God names on the wiki come in all five languages.
 history: 1.2.4 | In group combat, a secret boss's battle cry is shown in each player's own language.
 ---
@@ -53,7 +54,7 @@ Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 
 
 **Phases.** An Old God enters phase 2 at half its HP and phase 3 at a fifth (Manwe at a tenth). Each phase adds its abilities to those it draws from; it uses one on 70 percent of its turns. Potions in an Old God fight have a cooldown of 1 round.
 
-**Enrage.** At its enrage round, with warnings at half and three quarters of it, the god's Strength doubles ({{balance:BossEnrageDamageMultiplier}} times), its Defence rises {{balance:BossEnrageDefenseMultiplier}} times and it attacks {{balance:BossEnrageExtraAttacks}} more times a round for the rest of the fight. A Dispel Evil clears the enrage mark but not those numbers.
+**Enrage.** At its enrage round, with warnings at half and three quarters of it, the god's Strength doubles ({{balance:BossEnrageDamageMultiplier}} times), its Defence rises {{balance:BossEnrageDefenseMultiplier}} times and it attacks {{balance:BossEnrageExtraAttacks}} more times a round for the rest of the fight. A Dispel Evil takes the enrage back: its Strength and Defence fall back by the factor the enrage raised them, its extra attacks end, and it does not enrage again that fight.
 
 **Area attacks and channels.** From round 2, on every round that is a multiple of its number, the god strikes everyone in the party for its area damage less 3 x the square root of each target's Defence. A taunting teammate, or a Warrior, Paladin, Barbarian or Tidesworn you play, takes the hit for the others: the others take 40 percent and the tank 130 percent. A channel starts the same way and lands two rounds later on everyone, for its damage less 3 x the square root of Defence. A teammate with Agility plus half Dexterity of 80 or more may interrupt it; a Dispel Evil ends it too, and also ends a phase immunity and cuts the god's Defence by 20 percent.
 

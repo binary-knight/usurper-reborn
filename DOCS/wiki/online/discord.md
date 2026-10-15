@@ -1,8 +1,9 @@
 ---
 title: Discord wiki help
 path: /wiki/en/online/discord/
-checked: 1.3.1
+checked: 1.3.2
 sources: web/wiki-bot.js
+history: 1.3.2 | Search finds a page by a word in its path, a reply names a matching spoiler fold without stating it, and replies show no link previews.
 history: 1.2.5 | Suggest now accepts a trusted helper who holds any one of several helper roles the owner configures.
 ---
 The Discord bot can answer from the published English wiki in channels enabled by the server owner. Mention the bot and ask a focused question, for example: `@UsurperBot how does Favor work?`

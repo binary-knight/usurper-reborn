@@ -1,8 +1,9 @@
 ---
 title: The Outskirts settlement
 path: /wiki/en/world/settlement/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Locations/SettlementLocation.cs, Scripts/Systems/SettlementSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.2 | The Workshop and Arena damage buffs apply to your attacks in fights, the Prison buff also halves trap damage, the Herbalist Hut gives only herbs below their limit, and the Mystic Circle spends its day only when it gives something.
 history: 1.2.5 | Watchtower scout reports name monsters in the player's language, and the Electron settlement menu labels are translated into all five languages.
 history: 1.2.4 | none
 history: 1.2.3 | The settlement workshop, the watchtower scout report and settlement news are translated into all five languages, and long scout report rows wrap.

@@ -1,8 +1,9 @@
 ---
 title: Death and resurrection
 path: /wiki/en/combat/death/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.3.2 | none
 ---
 This page is about dying in a monster fight. Player fights have their own rules: see [PvP](/wiki/en/combat/pvp/). For allies who fall see [when an ally falls](/wiki/en/combat/party/#when-an-ally-falls) and [when a companion dies](/wiki/en/combat/companions/#when-a-companion-dies).
 

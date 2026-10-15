@@ -1,8 +1,9 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.2 | Backstab and Smite are shown on the combat menus of the classes that can use them, Smite spends one of the day's charges, and a Ranger's bow abilities deal 4 more damage.
 history: 1.3.1 | none
 history: 1.3.0 | Physical single-target attack abilities roll to hit against monsters, and a dual-wielder's abilities count the main-hand weapon in full and the off-hand weapon at half.
 ---

@@ -1,8 +1,9 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.2 | Crown monster bounties pay twice their tier's gold and experience, and the Bandits on the Trade Road contract can be finished.
 history: 1.3.0 | One kill or one defeat advances each quest objective once, and the Quest Hall quest to slay a monster type's champion shows the champion's own name and is completed by killing that champion in the dungeon.
 history: 1.2.5 | A player in any language can no longer take a second royal quest, and royal quests to clear a dungeon floor are now floor quests.
 ---

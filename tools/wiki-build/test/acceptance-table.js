@@ -584,7 +584,7 @@ module.exports = [
   ["F36","what does each ending give in ng+","/wiki/en/characters/new-game-plus/","Spoiler: which ending unlocks which prestige class","fold"],
   ["F37","how much harder is ng+","/wiki/en/characters/new-game-plus/","1.2 times on cycle 2, 1.56 times on cycle 3","first"],
   ["F40","what is the blood price","/wiki/en/world/law/","A permanent killing of a townsperson adds to your Blood Price","first"],
-  ["F41","why are shop prices higher after a murder","/wiki/en/world/law/","The Status screen also lists shop markups and a damage cut","miss: fact outside the excerpt"],
+  ["F41","why are shop prices higher after a murder","/wiki/en/world/law/","No shop and no healer charges more for a Blood Price","first"],
   ["F42","how do i remove the blood price","/wiki/en/world/law/","It falls by 0.1 for each full real day","first"],
   ["F43","do companions care if i murder","/wiki/en/world/law/","every companion with you loses 15 loyalty","miss: combat/companions/ ranks first"],
   ["F45","favor tiers","/wiki/en/gods/favor/","Tier Minimum Favor Boon strength (%) Follower 0 33 Devout 25 67","first"],

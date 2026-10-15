@@ -1,8 +1,9 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.2 | Loot for a Mystic Shaman follows its own class rules, and the Steel Faceplate no longer lists the Mystic Shaman.
 history: 1.2.3 | Shop rings and necklaces that had only armor now also give a small stat: Dexterity on rings and Wisdom on necklaces, +1, or +2 from level 30.
 ---
 This catalog lists fixed built-in equipment templates. Shops can generate stock that is not in this list, and server mods can replace definitions. A catalog entry does not promise a drop source or current stock. Shop rings and necklaces with no stat of their own give +1 Dexterity (rings) or +1 Wisdom (necklaces), +2 from item level 30.

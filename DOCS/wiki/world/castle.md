@@ -1,8 +1,9 @@
 ---
 title: Castle, king and throne
 path: /wiki/en/world/castle/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Locations/CastleLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/King.cs, Scripts/Systems/ChallengeSystem.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.2 | Crown monster bounties pay twice their tier's gold and experience, the royal quest offer shows its advance and pay, and the monster market shows the costs and stats the King charges and gives.
 history: 1.3.0 | An NPC on a player's team is no longer picked to challenge an NPC ruler or to be crowned on an empty throne, and one kill advances a royal quest objective once.
 history: 1.2.5 | A player in any language can no longer take a second royal quest, and a royal quest to clear a dungeon floor now asks you to clear a floor.
 history: 1.2.4 | none
