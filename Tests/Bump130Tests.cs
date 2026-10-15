@@ -321,7 +321,7 @@ public class Bump130Tests
                 if (line.Substring(prefix.Length) == "none") marked.Add(file);
                 else line.Should().EndWith(".", file).And.NotContain("Nothing this page describes changed", file);
                 DashOrEmoji.IsMatch(line).Should().BeFalse(file);
-                text.Should().MatchRegex(@"\nchecked: 1\.3\.[01]\n", file);
+                text.Should().MatchRegex(@"\nchecked: 1\.3\.[012]\n", file);
             }
             text.Should().NotContain(BuiltAs, file);
         }
@@ -339,7 +339,7 @@ public class Bump130Tests
     public void TheAccountsGuide_DescribesTheLoginToken_AndTheServerKeyCheck_At130()
     {
         string accounts = Repo("DOCS/wiki/getting-started/accounts.md");
-        accounts.Should().MatchRegex(@"\nchecked: 1\.3\.[01]\n").And.Contain("\nhistory: 1.3.0 | ").And.Contain("\n## Staying logged in\n");
+        accounts.Should().MatchRegex(@"\nchecked: 1\.3\.[012]\n").And.Contain("\nhistory: 1.3.0 | ").And.Contain("\n## Staying logged in\n");
         accounts.Should().Contain("saves a login token from the server, not your password").And.Contain("before the login is sent");
         accounts.Should().Contain($"A token expires after {SqlSaveBackend.LoginTokenDays} days.");
         // the question as the game asks it
