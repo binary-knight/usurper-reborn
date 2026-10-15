@@ -11,7 +11,7 @@ namespace UsurperReborn.Tests;
 
 /// <summary>
 /// 1.3.2: the version, its release notes in the Changelist form (one line per change, Fixed, Adjusted or Improved,
-/// no Known issues section), the Steam text, the README lines and bullet, and the website roadmap in five languages,
+/// under nine group headings, no Known issues section), the Steam text, the README lines and bullet, and the website roadmap in five languages,
 /// where 1.3.2 is shipped and 1.3.3 is dungeon floors 25 to 100. Nothing here touches the network.
 /// </summary>
 public class Bump132Tests
@@ -21,6 +21,9 @@ public class Bump132Tests
     private const string SteamPath = "DOCS/release-notes/steam/STEAM_RELEASE_NOTES_1.3.2.txt";
     private static readonly Regex DashOrEmoji = new(@"[\u2013\u2014]|[\u2600-\u27BF]|\uFE0F|[\uD83C-\uD83E][\uDC00-\uDFFF]");
     private static readonly Regex ChangeLine = new(@"^\u2022 (Fixed|Adjusted|Improved) [^:\n]+[^.\n]$");
+
+    private static readonly string[] Groups = { "Classes", "Combat", "Monsters and difficulty", "Dungeon and Outskirts",
+        "Gods and story", "Town, shops and items", "Party and NPCs", "Online", "Wiki and Discord bot" };
 
     private static string Repo(string relative) => Bump130Tests.Repo(relative);
 
@@ -42,17 +45,19 @@ public class Bump132Tests
     }
 
     [Fact]
-    public void Notes_AreOneChangelist_OfShortLines_WithNoKnownIssues()
+    public void Notes_AreOneChangelist_OfShortLines_InGroups_WithNoKnownIssues()
     {
         string notes = Repo(NotesPath);
         notes.Split('\n').Where(l => l.Length > 0).Take(2).Should().Equal("# Usurper Reborn v1.3.2", "## Changelist");
-        Regex.Matches(notes, "(?m)^#+ ").Count.Should().Be(2, "the title and the Changelist heading only");
+        Regex.Matches(notes, "(?m)^#{1,2} ").Count.Should().Be(2, "the title and the Changelist heading only");
+        Regex.Matches(notes, "(?m)^### (.+)$").Select(m => m.Groups[1].Value).Should().Equal(Groups);
         notes.Should().NotContain("Known issues").And.NotContain("Known Issues");
         string[] bullets = Bullets(notes);
         bullets.Length.Should().Be(72);
         foreach (string b in bullets) ChangeLine.IsMatch(b).Should().BeTrue(b);
         bullets.Distinct().Count().Should().Be(bullets.Length);
-        notes.Split('\n').Where(l => l.Length > 0).Skip(2).Should().OnlyContain(l => l.StartsWith("\u2022 ", StringComparison.Ordinal));
+        notes.Split('\n').Where(l => l.Length > 0).Skip(2).Should().OnlyContain(l =>
+            l.StartsWith("\u2022 ", StringComparison.Ordinal) || l.StartsWith("### ", StringComparison.Ordinal));
         Repo("DOCS/release-notes/README.md").Should().Contain("\n- [v1.3.2](RELEASE_NOTES_1.3.2.md)\n- [v1.3.1](RELEASE_NOTES_1.3.1.md)\n");
     }
 
@@ -62,6 +67,8 @@ public class Bump132Tests
         string steam = Repo(SteamPath);
         steam.Should().StartWith("[h1]Usurper Reborn 1.3.2[/h1]\n").And.Contain("\n[h2]Changelist[/h2]\n")
             .And.Contain("\nFull notes: " + NotesPath + "\n");
+        Regex.Matches(steam, @"\[h3\](.+)\[/h3\]\n\[list\]\n").Select(m => m.Groups[1].Value).Should().Equal(Groups);
+        Regex.Matches(steam, @"\[/list\]").Count.Should().Be(Groups.Length);
         var items = steam.Split('\n').Where(l => l.StartsWith("[*]", StringComparison.Ordinal)).Select(l => l.Substring(3)).ToArray();
         var notes = Bullets(Repo(NotesPath)).Select(b => b.Substring(2).Replace("[K]", "(K)").Replace("[Z]", "(Z)")).ToArray();
         items.Should().Equal(notes);
