@@ -533,6 +533,13 @@ internal static partial class RecruitPoolRuns
         int seed = int.Parse(arg);
         SilenceNews();
         using var w = new RecruitPoolWorld(seed, online: false);
+        // With no player, the simulator reads the wall clock's hour (DailySystemManager.GetCurrentGameHour), and from
+        // 23:00 to 05:00 shopping is weighted down (WorldSimulator.ApplyTimeOfDayWeights). A player at a fixed afternoon
+        // hour pins the game hour, so the result does not depend on when the test runs.
+        var savedPlayer = GameEngine.Instance.CurrentPlayer;
+        GameEngine.Instance.CurrentPlayer = new Character { Name2 = "ng132_clock", GameTimeMinutes = NgCatchUpHour * 60 };
+        try
+        {
         EquipmentDatabase.Initialize();
         var pool = w.Npcs.Where(n => n.IsAlive && !n.IsDead && string.IsNullOrEmpty(n.Team) && !n.IsSpecialNPC && !n.IsStoryNPC && !n.King)
             .OrderBy(n => n.Name2, StringComparer.Ordinal).Take(9).ToList();
@@ -576,5 +583,10 @@ internal static partial class RecruitPoolRuns
             : "changed:" + string.Join(";", group.Where(n => Gear(n) != before[n]).Select(n => $"{n.Name2} {before[n]} -> {Gear(n)}"));
         string freeResult = free.Any(n => Gear(n) != before[n]) ? "upgraded" : "none";
         return $"team={Kept(members)} party={Kept(new[] { partyNpc })} spouse={Kept(new[] { spouse })} lover={Kept(new[] { lover })} free={freeResult}";
+        }
+        finally { GameEngine.Instance.CurrentPlayer = savedPlayer; }
     }
+
+    /// <summary>The game hour NgCatchUpGear runs at: an afternoon hour, outside the night weighting.</summary>
+    internal const int NgCatchUpHour = 14;
 }
