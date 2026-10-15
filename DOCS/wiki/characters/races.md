@@ -2,7 +2,7 @@
 title: Races
 path: /wiki/en/characters/races/
 checked: 1.3.1
-sources: Scripts/Core/GameConfig.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
+sources: Scripts/Core/GameConfig.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
 history: 1.3.1 | none
 history: 1.3.0 | The Gnoll Poisonous Bite poisons on melee hits only; it no longer comes from spells, magical abilities, ranged abilities or a swing made with a bow in hand.
 history: 1.2.7 | none
@@ -15,7 +15,11 @@ Race contributes bonuses at character creation and limits some class choices. Ra
 
 {{table:races}}
 
-Open a race page for its creation ranges. Appearance fields are generator settings, not combat bonuses. NPC lifespan is a world-simulation value, not a countdown for a player.
+Open a race page for its creation ranges. Appearance fields are generator settings, not combat bonuses.
+
+## How long does an NPC of each race live
+
+The table also shows each race's NPC lifespan. An NPC ages one game year every {{balance:NpcLifecycleHoursPerYear}} real hours and dies of old age at its race's lifespan: an Elf NPC lives 200 game years, about 80 real days from its birth. Your own character does not age this way. [NPC life](/wiki/en/online/npcs/#how-long-does-an-npc-live-lifespan-by-race) has the whole life cycle.
 
 ## Creation bonuses
 

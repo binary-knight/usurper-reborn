@@ -2,7 +2,7 @@
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
 checked: 1.3.1
-sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs
+sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/AlignmentSystem.cs
 history: 1.3.1 | none
 history: 1.3.0 | Physical attacks on monsters roll to hit, with Strength, Dexterity, level, weapon power and basic attack proficiency lowering the number needed against a monster more than 5 levels above you, and Status shows a dual-wielder the weapon power of each hand.
 history: 1.2.6 | none
@@ -110,9 +110,32 @@ A new character starts at level 1 with {{balance:DefaultStartingGold}} gold and 
 
 ## Alignment
 
-Alignment comes from your Chivalry and Darkness. Every new character starts with both at 0; no race or class adds to either. Your deeds change them, and so do two Cleric spells (see [spells](/wiki/en/characters/spells/#spells-that-move-alignment)).
+Alignment comes from your Chivalry and Darkness, each from 0 to {{balance:AlignmentCap}}. Every new character starts with both at 0; no race or class adds to either. Your deeds change them, and so do two Cleric spells (see [spells](/wiki/en/characters/spells/#spells-that-move-alignment)).
 
-When Chivalry and Darkness are both 0, or their shares of the total differ by less than 20 percentage points, you are Neutral. Otherwise the larger one makes you Good or Evil. Each level-up adds a small bonus by alignment:
+### Alignment types: how much Chivalry to be Holy
+
+The game reads six alignment types, checked in this order:
+
+1. **Holy:** 800 Chivalry or more with Darkness under 100.
+2. **Evil:** 800 Darkness or more with Chivalry under 100.
+3. **Good:** Chivalry at least 400 above Darkness.
+4. **Dark:** Darkness at least 400 above Chivalry.
+5. **Balanced:** both above 100 and within 100 of each other.
+6. **Neutral:** anything else.
+
+The type sets shop prices (see [alignment prices](/wiki/en/items/shops/#alignment-prices)), whether the Church lets you in, and these effects in a fight:
+
+{{table:alignment-types}}
+
+The healing and fear come from your own melee hits; the extra damage hits undead and demon monsters; the HP comes back at the end of each round while you are hurt. A fear lasts 2 rounds and never takes a boss or mini-boss.
+
+### Why is Chivalry so slow to gain at high values
+
+A gain shrinks as the scale it raises grows: in full below 500, 75 percent from 500, 50 percent from 700, 25 percent from 850 and 10 percent from 950, never below 1. Each gain also lowers the opposite scale by half the unscaled amount, at least 1. A deed worth 20 Chivalry at 600 Chivalry gives 15 and takes 10 Darkness. One Church donation or blessing gives at most {{balance:MaxChivalryGainPerChurchAction}} Chivalry, and one Temple offering moves you at most {{balance:MaxAlignmentGainPerTempleSacrifice}}.
+
+### The level-up bonus by alignment
+
+Levelling up uses a simpler reading. When Chivalry and Darkness are both 0, or their shares of the total differ by less than 20 percentage points, you count as Neutral. Otherwise the larger one counts as Good or Evil. Each level-up adds a small bonus:
 
 - Good: 1 Wisdom, 1 Charisma and 2 maximum HP.
 - Evil: 1 Strength, 1 Constitution and 1 maximum HP.

@@ -2,23 +2,54 @@
 title: Crime, prison and the law
 path: /wiki/en/world/law/
 checked: 1.3.1
-sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs
+sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/PrisonWalkLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/SocialInfluenceSystem.cs, Scripts/Core/NPC.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
 history: 1.3.0 | An NPC you beat in an honor duel keeps its HP and stays where it is and a kill contract on it is not paid, and town honor duels share the Inn duels' daily cap of 3 wins.
 history: 1.2.7 | none
 history: 1.2.5 | Prison activity effects now show what each one gives (for example "+1 Strength" for pushups), and a prisoner using a screen reader gets the screen reader prison menu.
 history: 1.2.4 | An enraged avenger in a murder grudge fight really has the extra HP the box shows, and the townsperson's own HP is no longer raised.
 history: 1.2.3 | none
 ---
-Crime has consequences in town. Theft and murder can be taboos for your god, and a high Darkness makes you a wanted character. The ruler at the [Castle](/wiki/en/world/castle/) controls the prison.
+Crime has consequences in town. Theft and murder can be taboos for your god, and a Darkness above 100 makes you a wanted character. The ruler at the [Castle](/wiki/en/world/castle/) controls the prison.
 
-## How you get arrested
+## How much Darkness before guards arrest me
 
-- **Guard patrols.** A wanted character can meet guards on Main Street and near the Castle. You can surrender and pay a fine, fight the guard captain, try to run, or offer a bribe. Losing the fight or failing to run means a longer sentence than surrendering.
-- **The Dark Alley.** A badly failed pickpocket attempt or an undercover guard can send you to prison.
-- **Murder.** Guards come for a murderer. A captured murderer may be executed; otherwise the character loses gold and serves a sentence without escape or bail.
-- **The ruler.** A ruler can imprison characters, within daily limits.
+You are wanted when your Darkness is above 100. A guard patrol can stop a wanted character on Main Street and near the Castle; a Crown faction member is let pass. The patrol offers:
+
+- **Surrender (S):** 1 day in prison and a fine of a quarter of your gold on hand plus 50.
+- **Fight (F) the guard captain,** a warrior of your level + 3: win and you go free with 30 more Darkness; lose and survive and you get 3 days and 30 more Darkness.
+- **Bribe (B):** 100 gold, if you carry it, and you go free.
+- **Run (R):** you get away with a chance of 40 + your Dexterity percent; if caught, 2 days.
+
+A badly failed pickpocket attempt or an undercover guard in the Dark Alley can also send you to prison. A ruler can imprison characters, within daily limits.
+
+## What happens if I murder someone in town
+
+After a murder in town that is not a bounty kill, 5 royal guards of your level + 5 come for you. You can surrender or fight. Win the fight and you go free with 100 more Darkness. Lose it, or surrender, and a coin is flipped: on one side you are executed, on the other you go to prison. Execution kills the character; in single-player the normal death and resurrection choices follow. Prison for murder takes half your gold on hand and lasts 2 days with no escape attempt, no bail and no demand for release.
 
 Self-defense against a street attacker is not murder. Neither is an honor duel: the NPC you beat keeps the HP it had before the fight and stays where it is. Honor duels in town and duels at the Inn share one daily cap of 3 wins.
+
+## Blood Price (murder weight)
+
+A permanent killing of a townsperson adds to your Blood Price, a weight carried with your character:
+
+- a murder in the street with no bounty behind it: {{balance:MurderWeightPerDeliberateMurder}};
+- a kill by dark magic: {{balance:MurderWeightPerDarkMagicKill}};
+- a Shadows contract kill: {{balance:MurderWeightPerShadowContract}}, and none at all {{percent:ShadowContractBloodPriceSkipChance}} percent of the time;
+- a Crown or bounty board kill: none.
+
+A victim the town liked (an average impression above 0.3) adds {{balance:MurderWeightLikedNPCBonus}} more. Each kill that adds weight also adds 10 Darkness per point of weight, and every companion with you loses {{balance:CompanionLossPerMurder}} loyalty.
+
+### What the Blood Price does
+
+- Rest at Home, at the Inn and in a dungeon camp heals 75 percent as much at a weight of 3 or more and half as much at 6 or more.
+- Gossip about you spreads more easily while you carry any weight.
+- Further effects belong to the story; see its [endings spoiler](/wiki/en/world/story/#endings-how-to-get-each-ending).
+
+The Status screen also lists shop markups and a damage cut for a weight of 5, 8 and 15, but no shop and no monster fight reads them, so they change nothing.
+
+### How do I remove the Blood Price
+
+It falls by {{balance:MurderWeightDecayPerRealDay}} for each full real day, counted at the daily reset. At the Church, confession with a weight to carry offers blood absolution: it costs {{balance:BloodConfessionBaseCost}} + {{balance:BloodConfessionCostPerWeight}} gold per point of weight and removes up to {{balance:MurderWeightConfessionReduction}}. A weight of 6.0 costs 1,700 gold and leaves 3.5.
 
 ## Life in prison
 
@@ -29,21 +60,30 @@ While you have days left, every trip ends at the prison. Its menu offers:
 - **E** escape;
 - **B** pay bail;
 - **P** petition the ruler for bail or a pardon;
-- **D** demand release, and **O** open the cell door when someone has rescued you.
+- **D** demand release, and **O** walk out through an open cell door.
 
 Only chat commands work from a cell. Jailed characters do not follow the normal Mental collapse path.
 
-## Prison activities
+## What do prison activities give
 
-You can do a few activities a day. Pushups, yoga, reading, meditation, stretching and planning each raise an attribute a little; some also restore HP or mana. Shadow boxing restores combat stamina. Praying adds Chivalry or Darkness, whichever is already higher.
+You can do 3 activities a day. Each one but Shadow Boxing raises an attribute by 1 for good:
 
-## Getting out
+- **Pushups:** Strength.
+- **Yoga:** Dexterity, and half the time Agility as well.
+- **Reading:** Intelligence, and 5 mana back.
+- **Meditation:** Wisdom, and a tenth of your maximum HP back.
+- **Stretching:** Stamina, and a twentieth of your maximum HP back.
+- **Planning:** Charisma.
+- **Shadow Boxing:** 10 combat stamina back, up to 100.
+- **Praying:** 10 to 20 Chivalry when your Chivalry is higher than your Darkness, otherwise 10 to 20 Darkness.
 
-- **Serve the sentence.** When it ends you return to Main Street with some HP restored and some Darkness removed.
-- **Bail.** Pay the bail set by the ruler, or petition for it. The money goes to the royal treasury.
-- **Pardon.** Petition the ruler. A human ruler receives your request as a message.
-- **Escape.** Each attempt uses one of your escape attempts, which refill daily. Failure adds a day and makes the news; the odds are not shown.
-- **An open door.** If someone has opened your cell door, O lets you walk out.
+## Getting out of prison
+
+- **Serve the sentence.** When it ends you return to Main Street with your HP raised to at least half your maximum and up to 75 Darkness removed.
+- **Escape: chance to escape prison.** An attempt succeeds at 40 + Dexterity / 3 + level / 2 percent, held between 30 and 80 percent: 60 percent with Dexterity 30 at level 20. A success frees you with full HP and leaves your Darkness as it was. A failure adds a day and makes the news. You regain 1 attempt at each daily reset, up to {{balance:MaxPrisonEscapeAttempts}}; a murder convict regains none.
+- **Bail.** Pay the bail set by the ruler. Petitioning an NPC ruler for bail sets it at 1,000 + 500 x your level gold. The money goes to the royal treasury.
+- **Clemency.** A plea to an NPC ruler frees you at 10 + Chivalry / 50 percent, held between 5 and 40 percent (22 percent at 600 Chivalry), and you can plead again at once. A human ruler receives your request as a message.
+- **An open door.** O lets you walk out when your cell door is open; no action in the game opens another player's cell door.
 
 ## Bounties
 

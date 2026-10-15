@@ -787,6 +787,212 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(DungeonFloorState.RESPAWN_HOURS, constants.GetProperty("FloorRESPAWN_HOURS").GetInt32());
     }
 
+    // ---------- 1.3.2 wiki depth: gods, the institutions, online play and the NPC world (realm.json) ----------
+
+    private JsonElement[] Realm(string list) => _export.Data("realm").GetProperty(list).EnumerateArray().ToArray();
+
+    [Fact]
+    public void RealmGodRanksFollowThePantheonRules()
+    {
+        var ranks = Realm("godRanks");
+        Assert.Equal(GameConfig.GodMaxLevel, ranks.Length);
+        for (int rank = 1; rank <= ranks.Length; rank++)
+        {
+            var row = ranks[rank - 1];
+            Assert.Equal(rank, row.GetProperty("rank").GetInt32());
+            Assert.Equal(GameConfig.GodExpThresholds[rank - 1], row.GetProperty("experience").GetInt64());
+            Assert.Equal(PantheonLocation.GetDeedsPerDay(rank), row.GetProperty("deedsPerDay").GetInt32());
+            Assert.Equal(rank * GameConfig.GodBelieverExpPerLevel, row.GetProperty("experiencePerBeliever").GetInt32());
+            Assert.Equal(rank * GameConfig.GodBoonBudgetPerLevel, row.GetProperty("favorBudget").GetInt32());
+            Assert.Equal(rank * GameConfig.GodBoonBudgetPerLevel + GameConfig.GodBoonConcentrationMax,
+                row.GetProperty("favorBudgetNoBelievers").GetInt32());
+        }
+        Assert.Equal("Lesser Spirit", ranks[0].GetProperty("title").GetProperty("en").GetString());
+        Assert.Equal(15, ranks[8].GetProperty("deedsPerDay").GetInt32());
+        Assert.Equal(1_000_000, ranks[8].GetProperty("experience").GetInt64());
+    }
+
+    [Fact]
+    public void RealmDivineBoonsAreTheRegistryTiers()
+    {
+        var boons = Realm("divineBoons");
+        Assert.Equal(DivineBoonRegistry.AllBoons.Count, boons.Length);
+        var fury = One(boons, "warrior_fury");
+        Assert.Equal(new[] { "Light", "Balance" }, fury.GetProperty("alignments").EnumerateArray().Select(a => a.GetString()));
+        var third = fury.GetProperty("tiers")[2];
+        Assert.Equal(3, third.GetProperty("tier").GetInt32());
+        Assert.Equal(24, third.GetProperty("cost").GetInt32());
+        Assert.Equal(0.15, third.GetProperty("effects").GetProperty("DamagePercent").GetDouble(), 4);
+        Assert.Single(third.GetProperty("effects").EnumerateObject());
+        Assert.Equal(10, One(boons, "ironhide").GetProperty("tiers")[2].GetProperty("effects").GetProperty("FlatDefense").GetInt32());
+        Assert.Empty(One(boons, "battle_rage").GetProperty("alignments").EnumerateArray());
+    }
+
+    [Fact]
+    public void RealmAlignmentTypesAreWhatAlignmentSystemGives()
+    {
+        var types = Realm("alignmentTypes");
+        Assert.Equal(Enum.GetValues<AlignmentSystem.AlignmentType>().Length, types.Length);
+        var evil = One(types, "Evil");
+        var probe = new Character { Darkness = 900 };
+        var (attack, defence) = AlignmentSystem.Instance.GetCombatModifiers(probe);
+        Assert.Equal(Math.Round((double)attack, 2), evil.GetProperty("attackMultiplier").GetDouble());
+        Assert.Equal(Math.Round((double)defence, 2), evil.GetProperty("defenceMultiplier").GetDouble());
+        Assert.Equal(1.2, evil.GetProperty("attackMultiplier").GetDouble());
+        Assert.Equal(5, evil.GetProperty("critChanceBonus").GetInt32());
+        Assert.Equal(6, evil.GetProperty("soulDrainPercent").GetDouble());
+        Assert.Equal(10, evil.GetProperty("fearOnHitPercent").GetInt32());
+        var holy = One(types, "Holy");
+        Assert.Equal(4, holy.GetProperty("regenPercentPerRound").GetDouble());
+        Assert.Equal(10, holy.GetProperty("holySmitePercent").GetDouble());
+        Assert.Equal(0, One(types, "Balanced").GetProperty("critChanceBonus").GetInt32());
+    }
+
+    [Fact]
+    public void RealmFactionRanksAndBonusesFollowTheRankRules()
+    {
+        var ranks = Realm("factionRanks");
+        Assert.Equal(new[] { 0, 100, 250, 500, 800, 1200, 2000, 3000, 5000 }, ranks.Select(r => r.GetProperty("reputation").GetInt32()));
+        Assert.Equal("Prince-Regent", ranks[8].GetProperty("titles").GetProperty("TheCrown").GetString());
+        Assert.Equal("Voice of the Seven", ranks[8].GetProperty("titles").GetProperty("TheFaith").GetString());
+        var bonuses = Realm("factionBonuses");
+        Assert.Equal(ranks.Length, bonuses.Length);
+        var top = bonuses[8];
+        Assert.Equal(15, top.GetProperty("crownShopDiscountPercent").GetDouble());
+        Assert.Equal(60, top.GetProperty("crownGuardHelpPercent").GetDouble());
+        Assert.Equal(GameConfig.CrownTaxExemptionRate * 100, top.GetProperty("crownDeathGoldKeptPercent").GetDouble(), 2);
+        Assert.Equal(30, top.GetProperty("shadowsSellBonusPercent").GetDouble());
+        Assert.Equal(45, top.GetProperty("shadowsFleeBonus").GetInt32());
+        Assert.Equal(GameConfig.BlackMarketRankDiscount * 8 * 100, top.GetProperty("shadowsBlackMarketDiscountPercent").GetDouble(), 2);
+        Assert.Equal(1.75, top.GetProperty("faithBlessingLengthMultiplier").GetDouble());
+        Assert.Equal(GameConfig.DivineFavorMaxChance * 100, top.GetProperty("faithRescueChancePercent").GetDouble(), 2);
+        var first = bonuses[0];
+        Assert.Equal(5, first.GetProperty("crownShopDiscountPercent").GetDouble());
+        Assert.Equal(15, first.GetProperty("shadowsFleeBonus").GetInt32());
+        Assert.Equal(0, first.GetProperty("shadowsBlackMarketDiscountPercent").GetDouble());
+    }
+
+    [Fact]
+    public void RealmWorldEventsComeFromTheEventRules()
+    {
+        var events = Realm("worldEvents");
+        Assert.Equal(Enum.GetValues<WorldEventSystem.EventType>().Length, events.Length);
+        var inflation = One(events, "Inflation");
+        Assert.Equal(2.0, inflation.GetProperty("price").GetDouble());
+        Assert.Equal(5, inflation.GetProperty("minDays").GetInt32());
+        Assert.Equal(9, inflation.GetProperty("maxDays").GetInt32());
+        Assert.Empty(inflation.GetProperty("randomSeasons").EnumerateArray());
+        var tournament = One(events, "TournamentDay");
+        Assert.Equal(1.3, tournament.GetProperty("experience").GetDouble());
+        Assert.Equal(new[] { 1 }, tournament.GetProperty("randomSeasons").EnumerateArray().Select(s => s.GetInt32()));
+        Assert.Equal(JsonValueKind.Null, tournament.GetProperty("price").ValueKind);
+        Assert.Equal(new[] { 0, 1, 2, 3 }, One(events, "EconomyBoom").GetProperty("randomSeasons").EnumerateArray().Select(s => s.GetInt32()));
+        var holy = One(events, "HolyDay");
+        Assert.Equal(1, holy.GetProperty("minDays").GetInt32());
+        Assert.Equal(1, holy.GetProperty("maxDays").GetInt32());
+        Assert.Empty(One(events, "WorldBossVictory").GetProperty("randomSeasons").EnumerateArray());
+    }
+
+    [Fact]
+    public void RealmOldGodMechanicsAreTheFightSetup()
+    {
+        var gods = Realm("oldGodMechanics");
+        Assert.Equal(UsurperRemake.Data.OldGodsData.GetAllOldGods().Count, gods.Length);
+        var maelketh = One(gods, "Maelketh");
+        Assert.Equal(40, maelketh.GetProperty("enrageRound").GetInt32());
+        Assert.Equal(0, maelketh.GetProperty("areaEveryRounds").GetInt32());
+        // every Old God marks Doom in phase 3: the context's own default when the god sets none
+        Assert.Equal(new BossCombatContext().DoomRounds, maelketh.GetProperty("doomRounds").GetInt32());
+        var manwe = One(gods, "Manwe");
+        Assert.Equal(2, manwe.GetProperty("areaEveryRounds").GetInt32());
+        Assert.Equal(1500, manwe.GetProperty("areaDamage").GetInt32());
+        Assert.Equal(3, manwe.GetProperty("channelEveryRounds").GetInt32());
+        Assert.Equal(4000, manwe.GetProperty("channelDamage").GetInt32());
+        Assert.Equal(2, manwe.GetProperty("doomRounds").GetInt32());
+        Assert.True(manwe.GetProperty("physicalImmunityPhase").GetBoolean());
+        Assert.True(manwe.GetProperty("magicalImmunityPhase").GetBoolean());
+        Assert.Equal(10, manwe.GetProperty("phase3AtHpPercent").GetInt32());
+        Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), manwe.GetProperty("unenchantedDamageCutPercent").GetInt32());
+        var noctura = One(gods, "Noctura");
+        Assert.True(noctura.GetProperty("physicalImmunityPhase").GetBoolean());
+        Assert.Equal(35, noctura.GetProperty("corruptionPerStack").GetInt32());
+        Assert.Equal(GameConfig.BossPotionCooldownRounds, noctura.GetProperty("potionCooldownRounds").GetInt32());
+    }
+
+    [Fact]
+    public void RealmMonsterGuardsUseTheKingsFormulas()
+    {
+        var guards = Realm("monsterGuards");
+        Assert.Equal(MonsterGuardTypes.AvailableMonsters.Length, guards.Length);
+        Assert.Equal(guards.Select(g => g.GetProperty("level").GetInt32()).OrderBy(l => l), guards.Select(g => g.GetProperty("level").GetInt32()));
+        foreach (var g in guards)
+        {
+            int level = g.GetProperty("level").GetInt32();
+            Assert.Equal(King.MonsterGuardHP(level), g.GetProperty("hp").GetInt64());
+            Assert.Equal(King.MonsterGuardDailyFeeding(level), g.GetProperty("dailyFeeding").GetInt64());
+        }
+        var drake = One(guards, "elder_drake");
+        Assert.Equal(3000, drake.GetProperty("hp").GetInt64());
+        Assert.Equal(650, drake.GetProperty("dailyFeeding").GetInt64());
+        Assert.Equal(100_000, drake.GetProperty("price").GetInt64());
+    }
+
+    [Fact]
+    public void RealmWorldBossRewardsAreWorldBossMath()
+    {
+        var rewards = Realm("worldBossRewards");
+        var thirty = One(rewards, "30", "level");
+        Assert.Equal(WorldBossMath.KillGold(30, 1.0, 1), thirty.GetProperty("fullScoreGold").GetInt64());
+        Assert.Equal(24_648, thirty.GetProperty("fullScoreGold").GetInt64());
+        Assert.Equal(WorldBossMath.KillXP(30, GameConfig.WorldBossQualifyScore, 1), thirty.GetProperty("qualifyingScoreExperience").GetInt64());
+        var hundred = One(rewards, "100", "level");
+        Assert.Equal(450_000, hundred.GetProperty("fullScoreExperience").GetInt64());
+    }
+
+    [Fact]
+    public void RealmConstantsComeFromTheGame()
+    {
+        var constants = _export.Data("realm").GetProperty("constants");
+        Assert.Equal(GameConfig.MurderWeightPerDeliberateMurder, constants.GetProperty("MurderWeightPerDeliberateMurder").GetSingle());
+        Assert.Equal(GameConfig.WorldBossSpawnHourEastern, constants.GetProperty("WorldBossSpawnHourEastern").GetInt32());
+        Assert.Equal(King.MaxNPCGuards, constants.GetProperty("MaxNPCGuards").GetInt32());
+        Assert.Equal(CycleSystem.CycleStatBonusPerCycle, constants.GetProperty("CycleStatBonusPerCycle").GetInt32());
+        Assert.Equal(GuildSystem.GuildCreationCost, constants.GetProperty("GuildCreationCost").GetInt32());
+        Assert.Equal(GameConfig.NpcLifecycleHoursPerYear, constants.GetProperty("NpcLifecycleHoursPerYear").GetDouble());
+        // a constant no game code reads is not exported
+        Assert.False(constants.TryGetProperty("MurderWeightTier3HealPenalty", out _));
+        Assert.False(constants.TryGetProperty("GodBoonPrayerDurationMinutes", out _));
+    }
+
+    [Fact]
+    public void RealmExportLeavesTheSharedFactionAndEventSystemsAlone()
+    {
+        // the faction and world event probes are objects whose constructors never run
+        var dir = Path.Combine(Path.GetTempPath(), "usurper-wiki-realm-" + Guid.NewGuid().ToString("N"));
+        var factions = FactionSystem.Instance;
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            WikiDataExporter.Export(dir);
+            Assert.Same(factions, FactionSystem.Instance);
+            Assert.Same(events, WorldEventSystem.Instance);
+            Assert.True(File.Exists(Path.Combine(dir, "realm.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void RacesCarryTheNpcLifespan()
+    {
+        var races = _export.Data("races").EnumerateArray().ToArray();
+        Assert.Equal(GameConfig.RaceLifespan[CharacterRace.Elf], One(races, "Elf").GetProperty("npcLifespanYears").GetInt32());
+        Assert.Equal(200, One(races, "Elf").GetProperty("npcLifespanYears").GetInt32());
+        Assert.Equal(50, One(races, "Gnoll").GetProperty("npcLifespanYears").GetInt32());
+    }
+
     [Fact]
     public void MetaIdentifiesSchemaAndRelease()
     {
