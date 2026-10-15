@@ -258,6 +258,8 @@ test("LLM answers lose foreign URLs and gain the bot's own source links", async 
   for (const bad of ["evil.example.com", "phish.invalid", "bad-site.org", "discord.gg", "ftp://"])
     assert.ok(!out.includes(bad), bad);
   assert.match(out, /^Wiki answer \(AI summary/);
+  // 1.3.2: SUPPRESS_EMBEDS (1 << 2): the source links send no link previews.
+  assert.equal(f.sent[0].flags, 4);
   assert.match(out, /See here,/);
   assert.match(
     out,
@@ -446,6 +448,7 @@ test("LLM input stays bounded for the largest pages", () => {
     path: `/wiki/en/${"a".repeat(180)}${i}/`,
     headings: [],
     text: "Favor ".repeat(2000),
+    folds: ["Spoiler: ".repeat(40), "Fold ".repeat(40)],
   }));
   const params = buildLlmRequest("Favor? ".repeat(200), pages, ORIGIN, "9".repeat(500));
   const content = params.messages[0].content;
@@ -486,6 +489,8 @@ test("A decline omits source links and the marker never reaches Discord", async 
   const out = f.sent[0].content;
   assert.ok(!out.includes(LLM_DECLINE_MARKER));
   assert.match(out, /^Wiki answer \(AI summary/);
+  // 1.3.2: SUPPRESS_EMBEDS (1 << 2): the source links send no link previews.
+  assert.equal(f.sent[0].flags, 4);
   assert.match(out, /Favor rises with prayer\./);
   assert.match(out, /\n\nSources \(wiki for game 1\.2\.0\):\nhttps:\/\/usurper-reborn\.net\/wiki\/en\/gods\/favor\//);
   assert.equal(rows(f.db)[0].outcome, "answered");

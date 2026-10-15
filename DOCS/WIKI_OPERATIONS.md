@@ -222,8 +222,10 @@ Content the player chooses to reveal.
 
 Do not nest disclosures. Secret boss pages are not generated separately.
 Disclosure text and headings are excluded from the search index, page
-descriptions and Discord answers. Known secret names are also redacted from
-public search text. Spoilers are discoverable by viewing page HTML; this is a
+descriptions and Discord answers. A guide's index entry lists its disclosures
+by their summary line only, so search can find the page and Ask can say that
+the answer is behind that spoiler on the linked page without stating it. Known
+secret names are also redacted from public search text. Spoilers are discoverable by viewing page HTML; this is a
 reader preference, not access control.
 
 ## Drift check
@@ -313,7 +315,9 @@ mention in the gossip channel or any message while no wiki channel is set, goes
 through gossip routing unchanged. Use a wiki channel separate from the gossip
 channel. If the wiki bot fails to start, mentions in the wiki channels are
 dropped rather than relayed. Ask reads only the built public index, returns
-excerpts and links, and says when no match exists. No GitHub token is used.
+excerpts and links, and says when no match exists. Its replies set Discord's
+suppress embeds flag, so the wiki links show no link previews. No GitHub token
+is used.
 Unless the optional Claude API path below is enabled, no model is used either.
 Ask permits one request per user per ten seconds and at most thirty handled
 requests per minute globally, with a 300-character question cap.
@@ -329,7 +333,8 @@ It uses the model `claude-sonnet-5-5` at effort `low` through the official
   no-match reply.
 - The model sees a fixed system prompt, the top five excerpts from the public
   index, one per page and at most 1,500 characters each (spoilers and secret
-  names are already excluded there), and the question, capped at 300 characters and wrapped as untrusted data. No tools,
+  names are already excluded there; a page's spoiler summary lines are listed
+  after its excerpt), and the question, capped at 300 characters and wrapped as untrusted data. No tools,
   no conversation history, and no player or database data are sent.
 - The prompt limits answers to the excerpts, says to admit when they do not
   cover the question, to decline anything not about Usurper Reborn with a
