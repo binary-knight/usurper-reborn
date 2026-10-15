@@ -847,6 +847,7 @@
   "combat.solid_hit": "Colpo solido!",
   "combat.thorns_kill": "{0} cade sotto le tue spine!",
   "combat.thorns_reflect": "Le spine riflettono {0} danni su {1}! (Ritorsione)",
+  "combat.monster_thorns_wound": "La pelle spinosa di {0} ferisce l'aggressore: {1} danni!",
   "combat.worldstone_absorbs": "La Pietra del Mondo assorbe l'impatto! (-{0})",
   "combat.you_take_damage": "Subisci {0} danni!",
   "combat.you_take_damage_heals": "Subisci {0} danni! {1} guarisce {2}!",

@@ -847,6 +847,7 @@
   "combat.solid_hit": "Solid hit!",
   "combat.thorns_kill": "{0} falls to your thorns!",
   "combat.thorns_reflect": "Thorns reflect {0} damage back at {1}! (Retaliation)",
+  "combat.monster_thorns_wound": "{0}'s thorny hide wounds the attacker for {1} damage!",
   "combat.worldstone_absorbs": "The Worldstone absorbs the impact! (-{0})",
   "combat.you_take_damage": "You take {0} damage!",
   "combat.you_take_damage_heals": "You take {0} damage! {1} heals {2}!",

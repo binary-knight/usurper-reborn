@@ -847,6 +847,7 @@
   "combat.solid_hit": "¡Buen golpe!",
   "combat.thorns_kill": "¡{0} cae por tus espinas!",
   "combat.thorns_reflect": "¡Las espinas reflejan {0} de daño a {1}! (Represalia)",
+  "combat.monster_thorns_wound": "¡La piel espinosa de {0} hiere al atacante: {1} de daño!",
   "combat.worldstone_absorbs": "¡La Piedra del Mundo absorbe el impacto! (-{0})",
   "combat.you_take_damage": "¡Recibes {0} de daño!",
   "combat.you_take_damage_heals": "¡Recibes {0} de daño! ¡{1} cura {2}!",

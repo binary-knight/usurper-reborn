@@ -5091,6 +5091,15 @@ public partial class CombatEngine
         if (TickPowerSurgeOncePerRound(monster))
             terminal.WriteLine(Loc.Get("combat.monster_power_surge_fades", MonsterNames.Display(monster)), "gray");
 
+        // 1.3.2: Thorns counts down once per monster-action cycle, here, before a hold can skip the turn,
+        // so a held monster's thorns still end after their rounds.
+        if (firstActionThisRound && monster.ThornsRounds > 0)
+        {
+            monster.ThornsRounds--;
+            if (monster.ThornsRounds <= 0)
+                monster.ThornsPercent = 0;
+        }
+
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
         // based on the IsBurning flag -- so casting Roast (fire) on a poisoned
@@ -8724,6 +8733,38 @@ public partial class CombatEngine
         return !string.IsNullOrEmpty(specialEffect) && MagicalAbilityEffects.Contains(specialEffect);
     }
 
+    /// <summary>1.3.2: what a monster's Thorns costs the attacker for a melee hit that dealt `dealt`: percent of
+    /// it, at least 1, and never so much that the attacker drops below 1 HP (an attacker at 1 HP loses nothing).</summary>
+    internal static long ThornsReflectAmount(long dealt, int percent, long attackerHP)
+    {
+        if (dealt <= 0 || percent <= 0 || attackerHP <= 1) return 0;
+        long reflect = Math.Max(1, dealt * percent / 100);
+        return Math.Min(reflect, attackerHP - 1);
+    }
+
+    /// <summary>1.3.2: a melee hit on a monster with Thorns up (MonsterAbilities, Thorns) wounds the attacker, the
+    /// player, a teammate or a companion alike. Called by the live melee hits only: the weapon swing and the melee
+    /// abilities; spells and ranged hits never call it. No random draw.</summary>
+    private void ReflectMonsterThorns(Character? attacker, Monster? target, long dealt)
+    {
+        if (attacker == null || target == null || !attacker.IsAlive) return;
+        if (target.ThornsRounds <= 0 || target.ThornsPercent <= 0) return;
+        long reflect = ThornsReflectAmount(dealt, target.ThornsPercent, attacker.HP);
+        if (reflect <= 0) return;
+        attacker.HP -= reflect; // hq-armory: out (monster thorns, derived from the attacker's own hit) hq-barracks: out (monster thorns, derived from the attacker's own hit)
+        EvHurt(attacker, reflect, CombatEventKind.Basic);
+        UIHelper.WriteRow(terminal, Loc.Get("combat.monster_thorns_wound", MonsterNames.Display(target), reflect), "yellow");
+    }
+
+    /// <summary>1.3.2: a hit through ApplySingleMonsterDamage is a melee one unless it is a spell, the Ranged
+    /// Attack, or a swing of a bow (the same bow rule as the Gnoll bite).</summary>
+    private static bool IsMeleeSingleHit(Character? attacker, string damageSource, bool isSpellDamage)
+    {
+        if (attacker == null || isSpellDamage || damageSource == "ranged attack") return false;
+        var slot = damageSource.Contains("off-hand") ? EquipmentSlot.OffHand : EquipmentSlot.MainHand;
+        return attacker.GetEquipment(slot)?.WeaponType != WeaponType.Bow;
+    }
+
     /// <summary>
     /// Consolidates lifesteal, elemental procs, sunforged healing, and poison coating.
     /// Set isSpellDamage=true to skip weapon-based enchantments (lifedrinker, elemental procs, poison coating).
@@ -8800,6 +8841,9 @@ public partial class CombatEngine
 
         ApplyPostHitEnchantments(player, target, actualDamage, result,
             notMelee: IsMagicalAbilityEffect(abilityResult.SpecialEffect) || IsRangedAbility(abilityResult.AbilityUsed));   // the Gnoll bite is melee only
+
+        if (!IsMagicalAbilityEffect(abilityResult.SpecialEffect) && !IsRangedAbility(abilityResult.AbilityUsed))
+            ReflectMonsterThorns(player, target, actualDamage);   // 1.3.2: a melee ability hit on Thorns
 
         return actualDamage;
     }
@@ -13743,6 +13787,9 @@ public partial class CombatEngine
             if (enchantAttacker != null)
                 ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage, notMelee: notMelee);
 
+            if (!isSpellDamage && !notMelee)
+                ReflectMonsterThorns(attacker, monster, actualDamage);   // 1.3.2: a melee area hit on Thorns
+
             if (monster.HP <= 0)
             {
                 monster.HP = 0;
@@ -14007,6 +14054,9 @@ public partial class CombatEngine
 
             await Pacing.Wait(GetCombatDelay(800));
         }
+
+        if (IsMeleeSingleHit(attacker, damageSource, isSpellDamage))
+            ReflectMonsterThorns(attacker, target, actualDamage);   // 1.3.2: a melee swing on Thorns
 
         result.CombatLog.Add($"{target.Name} took {actualDamage} damage from {damageSource}");
         return true; // attack landed -- caller may apply post-hit effects
@@ -15955,6 +16005,9 @@ public partial class CombatEngine
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
                 ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect), notMelee: IsRangedAbility(ability));
 
+                if (!IsMagicalAbilityEffect(abilityResult.SpecialEffect) && !IsRangedAbility(ability))
+                    ReflectMonsterThorns(player, target, actualDamage);   // 1.3.2: a melee ability hit on Thorns
+
                 // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals the caster. Applied
                 // here so the heal fires even if the target died to the base damage (previously the
                 // post-damage handler skipped entirely on target.IsAlive=false).
@@ -16718,6 +16771,7 @@ public partial class CombatEngine
                         result.Player?.Statistics.RecordDamageDealt(frenzyDmg, false);
                         terminal.SetColor("red");
                         terminal.WriteLine(Loc.Get("combat.ability_frenzy_strike", i + 1, frenzyDmg));
+                        ReflectMonsterThorns(player, target, frenzyDmg);   // 1.3.2: each frenzy strike is a melee hit
                         if (target.HP <= 0)
                         {
                             target.HP = 0;
