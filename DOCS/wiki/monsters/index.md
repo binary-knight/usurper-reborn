@@ -16,10 +16,10 @@ The Orc has 90 percent of the power it had before 1.3.0; as a floor boss it keep
 
 ## How monster HP, Strength and Defence are worked out
 
-A monster's stats follow its level L. Above level 50 the HP and attack formulas use E = 50 + 60 percent of the levels above 50 (level 100 counts as 80); up to 50, E = L. Then:
+A monster's stats follow its level L, at every level from 1 to 100:
 
-- HP = 50 x E + 15 x E^1.2
-- Strength = 2 x E + 1.5 x E^1.05
+- HP = 50 x L + 15 x L^1.2
+- Strength = 2 x L + 1.5 x L^1.05
 - Defence = L + 0.5 x L^1.02
 
 Each is multiplied by the tier's power and then by {{balance:BaseMonsterDifficultyScale}}. A level 20 monster of power 1.0 has 3,478 HP, 166 Strength and 67 Defence.
@@ -34,7 +34,7 @@ Monster HP is multiplied by 0.85 on Easy, 1.0 on Normal, 1.2 on Hard and 1.4 on 
 
 ## How many monsters are in a fight
 
-Outside floors 4 to 10 a regular dungeon group holds, by the monsters' level, 1 or 2 monsters at level 1 to 10, 1 to 3 at 11 to 30, 2 to 4 at 31 to 60 and 3 to 5 at 61 and above, each size equally likely. 70 percent of these groups are one family and one tier; otherwise each monster is drawn on its own and families can mix.
+Outside floors 4 to 10 a regular dungeon group holds, by the monsters' level, 1 or 2 monsters at level 1 to 10 and 1 to 3 at 11 to 24, each size equally likely. From level 25 the average group grows a little each level: 2 monsters at 25, 2.6 at 35, 3.5 at 50 and 4 from 61, never fewer than 1 or more than 5. A whole average draws three sizes equally often: 1 to 3 at 25 and 3 to 5 from 61. 70 percent of these groups are one family and one tier; otherwise each monster is drawn on its own and families can mix.
 
 ### Encounters on dungeon floors 4 to 10
 

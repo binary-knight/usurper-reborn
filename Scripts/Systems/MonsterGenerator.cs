@@ -245,9 +245,9 @@ public static class MonsterGenerator
         float damageTotal = powerMultiplier * damageMultiplier;
         float defenseTotal = powerMultiplier * defenseMultiplier;
 
-        // Soft cap: full formula up to floor 50, then diminishing growth beyond
-        // This prevents monster offense from exponentially outpacing player stats at high floors
-        int effectiveLevel = level <= 50 ? level : 50 + (int)((level - 50) * 0.6);
+        // Growth past floor 50 (v0.54.0 soft cap at 0.6 a floor; 1.3.3: MonsterLevelSlopePast50, 1.0, so deep
+        // monsters keep growing with the floor as they do up to 50)
+        int effectiveLevel = level <= 50 ? level : 50 + (int)((level - 50) * MonsterLevelSlopePast50);
 
         // REBALANCED HP (v0.47.5: +45% so fights last 4-8 hits; v0.54.0: soft-capped past floor 50)
         // Formula: 50*level + level^1.2 * 15, using effectiveLevel for offensive stats
@@ -511,6 +511,30 @@ public static class MonsterGenerator
         return 1.0;
     }
 
+    /// <summary>1.3.3: how fast monster HP, Strength, punch and weapon power grow per floor past floor 50, as a
+    /// share of a floor (was 0.6 from v0.54.0). Defence and armour always use the floor itself.</summary>
+    public const double MonsterLevelSlopePast50 = 1.0;
+
+    /// <summary>1.3.3: the first floor whose regular group size follows DeepGroupMean.</summary>
+    public const int DeepGroupMinFloor = 25;
+
+    /// <summary>1.3.3: the mean size of a regular untemplated group on a floor from 25: 2.0 on floor 25 (today's
+    /// 1-3), rising evenly to 3.5 on floor 50 and 4.0 on floor 61, then 4.0 (today's 3-5). Below floor 25 it is
+    /// the 1-3 draw's mean, 2.0.</summary>
+    public static double DeepGroupMean(int floor)
+    {
+        if (floor <= DeepGroupMinFloor) return 2.0;
+        if (floor <= 50) return 2.0 + 1.5 * (floor - DeepGroupMinFloor) / 25.0;
+        if (floor <= 61) return 3.5 + 0.5 * (floor - 50) / 11.0;
+        return 4.0;
+    }
+
+    /// <summary>1.3.3: a group size from one uniform draw u in [0, 1): the mean rounded after a spread of three, so a
+    /// whole mean m gives m - 1, m and m + 1 at a third each (mean 2 is 1-3, mean 4 is 3-5), and the size's mean is
+    /// the floor's DeepGroupMean. Kept within 1 to 5.</summary>
+    public static int DeepGroupSize(int floor, double u)
+        => Math.Clamp((int)Math.Floor(DeepGroupMean(floor) + 3 * u - 1.0), 1, 5);
+
     /// <summary>1.2.8: the dungeon floors with encounter templates (GameConfig.EncounterTemplatesEnabled).</summary>
     public const int TemplateMinFloor = 4;
     public const int TemplateMaxFloor = 10;
@@ -606,12 +630,12 @@ public static class MonsterGenerator
         // Regular encounter - 1 to 5 monsters
         // Higher levels tend toward more monsters
         // 1.2.8: a templated dungeon floor rolls its own sizes (one draw, as before)
+        // 1.3.3: from floor 25 the size follows DeepGroupMean, which grows a little each floor (no step at 31 or 61)
         int groupSize = templates ? TemplateGroupSize(random.NextDouble()) : dungeonLevel switch
         {
             <= 10 => random.Next(1, 3),   // 1-2 monsters early game
-            <= 30 => random.Next(1, 4),   // 1-3 monsters mid-early
-            <= 60 => random.Next(2, 5),   // 2-4 monsters mid-late
-            _ => random.Next(3, 6)        // 3-5 monsters late game
+            < DeepGroupMinFloor => random.Next(1, 4),   // 1-3 monsters mid-early
+            _ => DeepGroupSize(dungeonLevel, random.NextDouble())
         };
 
         // Generate monsters (usually same family for thematic encounters)
