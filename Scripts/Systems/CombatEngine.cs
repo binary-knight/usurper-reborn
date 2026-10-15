@@ -198,6 +198,13 @@ public partial class CombatEngine
     // Current player reference for combat speed setting
     private Character currentPlayer;
 
+    /// <summary>
+    /// 1.3.2: divine wrath's cut for this fight, in percent: the fight's player deals this much less with a
+    /// basic swing and has this much less defence against a monster's hit. The dungeon sets it on the engine
+    /// it starts the fight with (10, 20 or 30, as the wrath screen states); the fight-start reset leaves it.
+    /// </summary>
+    public int DivineWrathPct { get; set; }
+
     // Current teammates for healing/support actions
     private List<Character> currentTeammates;
     private int _droppedEquipmentPartyIdx = 0;
@@ -5784,6 +5791,10 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * defBoons.DefensePercent);
             playerDefense += defBoons.FlatDefense;
         }
+
+        // 1.3.2: divine wrath's defence cut for this fight, the fight's own player only
+        if (DivineWrathPct > 0 && ReferenceEquals(player, currentPlayer))
+            playerDefense -= playerDefense * DivineWrathPct / 100;
 
         // Fear the Throne (NG+ perk): enemies deal -10% damage (intimidation)
         int fearReduction = MetaProgressionSystem.Instance.GetMonsterFleeReduction();
@@ -14356,7 +14367,9 @@ public partial class CombatEngine
                             terminal.WriteLine(Loc.Get("combat.stealth_crit"), "bright_yellow");
                         }
                         bool isCrit = !miracleCrit && !stealthCrit && (hitNatural > 0 ? hitNatural == 20 : random.Next(1, 21) == 20); // natural 20
-                        bool dexCrit = !miracleCrit && !stealthCrit && !isCrit && StatEffectsSystem.RollCriticalHit(player, random);
+                        // 1.3.2: Umbrath's crit points join this roll, under the same ceiling
+                        bool dexCrit = !miracleCrit && !stealthCrit && !isCrit
+                            && StatEffectsSystem.RollCriticalHit(player, random, DivineBlessingSystem.Instance.GetCriticalHitBonus(player));
                         if (isCrit)
                         {
                             rollMult = 1.5f + (float)(random.NextDouble() * 0.5); // 1.5-2.0
@@ -14415,6 +14428,12 @@ public partial class CombatEngine
                         if (player is Player attackingKing && attackingKing.King)
                             attackPower = (long)(attackPower * GameConfig.KingCombatStrengthBonus);
 
+                        // 1.3.2: the divine blessing damage (the temporary blessing, Solarius against undead and demons,
+                        // Valorian below the HP threshold, the Old God echo), at the old single-monster path's step
+                        int divineBonusDamage = DivineBlessingSystem.Instance.CalculateBonusDamage(player, target, (int)Math.Min(attackPower, int.MaxValue));
+                        if (divineBonusDamage > 0)
+                            attackPower += divineBonusDamage;
+
                         // Buff bonuses (well-rested, god slayer, lover's bliss, divine blessing, poison coating, herbs)
                         if (player.WellRestedCombats > 0 && player.WellRestedBonus > 0f)
                             attackPower += (long)(attackPower * player.WellRestedBonus);
@@ -14428,6 +14447,14 @@ public partial class CombatEngine
                             attackPower += (long)(attackPower * 0.20);
                         if (player.HasSettlementBuff && player.SettlementBuffType == (int)UsurperRemake.Systems.SettlementBuffType.DamageBonus)
                             attackPower += (long)(attackPower * player.SettlementBuffValue);
+                        // 1.3.2: the Blood Price damage cut by murder weight tier, as on the old single-monster path
+                        if (player.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
+                            attackPower -= (long)(attackPower * GameConfig.MurderWeightTier3CombatPenalty);
+                        else if (player.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
+                            attackPower -= (long)(attackPower * GameConfig.MurderWeightTier2CombatPenalty);
+                        // 1.3.2: divine wrath's damage cut for this fight, the fight's own player only
+                        if (DivineWrathPct > 0 && ReferenceEquals(player, currentPlayer))
+                            attackPower -= attackPower * DivineWrathPct / 100;
                         // Fatigue damage penalty (single-player only, multi-monster path): v1.1.15, taken with Grief and Mental above
                         if (player.LoversBlissCombats > 0 && player.LoversBlissBonus > 0f)
                             attackPower += (long)(attackPower * player.LoversBlissBonus);
@@ -14453,6 +14480,10 @@ public partial class CombatEngine
                         // v0.61.0 Druid's Shrines: Maelketh attunement = +8% melee damage.
                         if (player.IsAttunedTo("maelketh"))
                             attackPower += (long)(attackPower * GameConfig.ShrineMaelkethMeleeBonus);
+                        // 1.3.2: BossSlayer (world boss loot) +10 percent against a boss or mini-boss, as on the old path
+                        if ((target.IsBoss || target.IsMiniBoss)
+                            && WorldBossSystem.HasSpecialEffect(player, LootGenerator.SpecialEffect.BossSlayer))
+                            attackPower += (long)(attackPower * 0.10);
 
                         // Divine boon damage bonus (multi-monster path)
                         var mmBoons = player.CachedBoonEffects;

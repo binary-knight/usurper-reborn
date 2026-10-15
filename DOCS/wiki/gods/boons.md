@@ -12,11 +12,11 @@ A Devout follower of Amara heals {{balance:GodBoonAmaraHealPct}} x {{balance:God
 
 ## Fighting and healing boons
 
-- **[Solarius](/wiki/en/gods/solarius/):** {{balance:GodBoonSolariusHealPct}} percent more healing from your spells, abilities, potions and the healing herb while you fight at least one living undead or demon. The boon also lists {{balance:GodBoonSolariusUndeadDamagePct}} percent more damage against undead and demons; only a world boss fight reads that part, not the attacks of a monster fight.
-- **[Valorian](/wiki/en/gods/valorian/):** {{balance:GodBoonValorianLowHpDamagePct}} percent more damage while you are below {{balance:GodBoonValorianHpThresholdPct}} percent of your maximum HP. Only a world boss fight reads it, not the attacks of a monster fight.
+- **[Solarius](/wiki/en/gods/solarius/):** {{balance:GodBoonSolariusHealPct}} percent more healing from your spells, abilities, potions and the healing herb while you fight at least one living undead or demon. It also gives {{balance:GodBoonSolariusUndeadDamagePct}} percent more damage on your basic swings against undead and demons.
+- **[Valorian](/wiki/en/gods/valorian/):** {{balance:GodBoonValorianLowHpDamagePct}} percent more damage while you are below {{balance:GodBoonValorianHpThresholdPct}} percent of your maximum HP, on your basic swings.
 - **[Amara](/wiki/en/gods/amara/):** {{balance:GodBoonAmaraHealPct}} percent more healing from every heal you cast (spells, abilities and songs, on yourself or an ally) and {{balance:GodBoonAmaraHealPct}} percent stronger party wards you raise.
 - **[Judicar](/wiki/en/gods/judicar/):** {{balance:GodBoonJudicarDefencePct}} percent less damage from each monster hit, always leaving at least 1, and {{balance:GodBoonJudicarBountyPct}} percent more gold from bounties you collect.
-- **[Umbrath](/wiki/en/gods/umbrath/):** {{balance:GodBoonUmbrathTheftPct}} percentage points on your Dark Alley pickpocket chance and its cap. The boon also lists {{balance:GodBoonUmbrathCritPct}} points of critical hit chance; only a world boss fight reads that part.
+- **[Umbrath](/wiki/en/gods/umbrath/):** {{balance:GodBoonUmbrathTheftPct}} percentage points on your Dark Alley pickpocket chance and its cap. It also adds {{balance:GodBoonUmbrathCritPct}} points of critical hit chance on your basic swings, under the same ceiling as every other crit bonus.
 - **[Arcanus](/wiki/en/gods/arcanus/):** {{balance:GodBoonArcanusSpellPct}} percent more spell damage and {{balance:GodBoonArcanusManaRegenPct}} percent more mana regained each combat round. A larger mana pool is a different effect.
 - **[Discordia](/wiki/en/gods/discordia/):** {{balance:GodBoonDiscordiaPvpDamagePct}} percent more damage against players, and each monster has a {{balance:GodBoonDiscordiaFirstActionFailPct}} percent chance that its first action of the fight fails.
 

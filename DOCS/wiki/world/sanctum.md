@@ -5,7 +5,7 @@ checked: 1.3.1
 sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs
 history: 1.2.5 | Honor tournament champions and their drops are shown in each player's language, and the daily cost row is translated into all five languages.
 ---
-The Sanctum offers charity and the honor tournament. It is separate from the Temple and the Castle's political menu. Open it from Main Street in the Castle Grounds district with S. Any alignment may enter.
+The Sanctum offers charity and the honor tournament. It is separate from the Temple and the Castle's political menu. Open it from Main Street in the Castle Grounds district with S. Its holy wards turn an Evil character away at the door, as the Church's do; every other alignment may enter.
 
 ## How much do alms cost
 

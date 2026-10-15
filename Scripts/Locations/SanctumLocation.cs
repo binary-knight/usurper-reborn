@@ -37,6 +37,44 @@ namespace UsurperRemake.Locations
             PossibleExits.Add(GameLocation.MainStreet);
         }
 
+        /// <summary>
+        /// 1.3.2: the ward at the door, as the Church keeps it: AlignmentSystem.CanAccessLocation bars an Evil
+        /// character, who is shown the refusal and sent back to Main Street. Every other alignment enters.
+        /// </summary>
+        public override async Task EnterLocation(Character player, TerminalEmulator term)
+        {
+            var (canAccess, reason) = AlignmentSystem.Instance.CanAccessLocation(player, GameLocation.Sanctum);
+
+            if (!canAccess)
+            {
+                term.ClearScreen();
+                term.SetColor("bright_red");
+                if (player.ScreenReaderMode)
+                {
+                    term.WriteLine(Loc.Get("church.entry_denied"));
+                }
+                else
+                {
+                    term.WriteLine("╔══════════════════════════════════════════════════════════════════════════════╗");
+                    { string t = Loc.Get("church.entry_denied"); int l = (78 - t.Length) / 2, r = 78 - t.Length - l; term.WriteLine($"║{new string(' ', l)}{t}{new string(' ', r)}║"); }
+                    term.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
+                }
+                term.WriteLine("");
+                term.SetColor("red");
+                term.WriteLine(reason);
+                term.WriteLine("");
+                term.SetColor("gray");
+                term.WriteLine(Loc.Get("church.holy_wards"));
+                term.WriteLine(Loc.Get("church.cleanse_soul"));
+                term.WriteLine("");
+                term.SetColor("yellow");
+                await term.PressAnyKey(Loc.Get("church.press_return"));
+                throw new LocationExitException(GameLocation.MainStreet);
+            }
+
+            await base.EnterLocation(player, term);
+        }
+
         protected override void DisplayLocation()
         {
             if (GameConfig.ScreenReaderMode)

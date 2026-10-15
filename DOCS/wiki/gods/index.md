@@ -41,7 +41,7 @@ Divine wrath strikes before a dungeon fight. Each time a fight starts, the chanc
 - **Level 2:** you lose a quarter of your current HP, never below 1.
 - **Level 3:** you lose half your current HP, never below 1, and half your mana, and half the time you are struck blind or catch the plague or measles.
 
-The screen also names a cut to your damage and defence of 10, 20 or 30 percent for that fight, but the fight clears it as it starts, so it changes nothing. After striking, level 3 drops to level 1, and levels 1 and 2 are cleared.
+Then your basic swings deal 10, 20 or 30 percent less and your defence against monster hits is 10, 20 or 30 percent lower for that fight, as the screen states. After striking, level 3 drops to level 1, and levels 1 and 2 are cleared.
 
 Wrath that has not struck fades: each fight start that does not strike counts down from 50 + 20 x the level last recorded, and at 0 the level falls by one and the count restarts at 30.
 

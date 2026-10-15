@@ -41,11 +41,12 @@ A victim the town liked (an average impression above 0.3) adds {{balance:MurderW
 
 ### What the Blood Price does
 
+- At a weight of 8 or more your basic swings deal 10 percent less damage, and at 15 or more 20 percent less.
 - Rest at Home, at the Inn and in a dungeon camp heals 75 percent as much at a weight of 3 or more and half as much at 6 or more.
 - Gossip about you spreads more easily while you carry any weight.
 - Further effects belong to the story; see its [endings spoiler](/wiki/en/world/story/#endings-how-to-get-each-ending).
 
-The Status screen also lists shop markups and a damage cut for a weight of 5, 8 and 15, but no shop and no monster fight reads them, so they change nothing.
+From a weight of 5 the Status screen names your Blood Price standing, and from 8 its damage cut. No shop and no healer charges more for a Blood Price.
 
 ### How do I remove the Blood Price
 

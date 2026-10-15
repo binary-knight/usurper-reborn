@@ -5783,18 +5783,11 @@ public class DungeonLocation : BaseLocation
         // Check for divine punishment before combat
         var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(player!);
 
-        // Apply temporary combat penalties from divine wrath
-        int originalTempAttackBonus = player.TempAttackBonus;
-        int originalTempDefenseBonus = player.TempDefenseBonus;
-        if (punishmentApplied)
-        {
-            // Convert percentage modifier to stat penalty (rough approximation)
-            player.TempAttackBonus -= Math.Abs(damageModifier) * 2;
-            player.TempDefenseBonus -= Math.Abs(defenseModifier) * 2;
-        }
-
         // Combat
         var combatEngine = new CombatEngine(terminal);
+        // 1.3.2: divine wrath's cut holds for this fight at the percent the screen states (the fight-start
+        // reset cleared the old TempAttackBonus and TempDefenseBonus cut); damage and defence are the same size
+        combatEngine.DivineWrathPct = punishmentApplied ? Math.Abs(damageModifier) : 0;
         // 1.2.8: the room's cleared state is set at the win, before the victory autosave and the loot
         // screens, so a save there (or the disconnect save of a player who drops at them) keeps the
         // room cleared; the check after the fight then sets nothing twice
@@ -5818,13 +5811,6 @@ public class DungeonLocation : BaseLocation
         };
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
-
-        // Restore original temp bonuses after combat
-        if (punishmentApplied)
-        {
-            player.TempAttackBonus = originalTempAttackBonus;
-            player.TempDefenseBonus = originalTempDefenseBonus;
-        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -7903,26 +7889,14 @@ public class DungeonLocation : BaseLocation
         // Check for divine punishment before combat
         var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(currentPlayer);
 
-        // Apply temporary combat penalties from divine wrath
-        int originalTempAttackBonus = currentPlayer.TempAttackBonus;
-        int originalTempDefenseBonus = currentPlayer.TempDefenseBonus;
-        if (punishmentApplied)
-        {
-            currentPlayer.TempAttackBonus -= Math.Abs(damageModifier) * 2;
-            currentPlayer.TempDefenseBonus -= Math.Abs(defenseModifier) * 2;
-        }
+        // 1.3.2: divine wrath's cut holds for this fight at the percent the screen states (the fight-start
+        // reset cleared the old TempAttackBonus and TempDefenseBonus cut); damage and defence are the same size
+        combatEngine.DivineWrathPct = punishmentApplied ? Math.Abs(damageModifier) : 0;
 
         // Use new PlayerVsMonsters method - ALL monsters fight at once!
         // Monk will appear after ALL monsters are defeated
         var combatResult = await combatEngine.PlayerVsMonsters(currentPlayer, monsters, teammates, offerMonkEncounter: true);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
-
-        // Restore original temp bonuses after combat
-        if (punishmentApplied)
-        {
-            currentPlayer.TempAttackBonus = originalTempAttackBonus;
-            currentPlayer.TempDefenseBonus = originalTempDefenseBonus;
-        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
