@@ -40,7 +40,7 @@ Then it changes:
 
 A monster's normal attack on a teammate or companion makes no hit roll and cannot be dodged: it lands unless the monster is distracted (25 percent miss for an ordinary distraction, at most 60) or the ally has Blur (20 percent miss).
 
-- **Ally defence:** the ally's Defence + a random 0 to Defence / 8 + a random 0 to 5 x the square root of its armor power, plus a ward and any temporary defence. Armor power 400 absorbs 0 to 100.
+- **Ally defence:** the ally's Defence + a random 0 to Defence / 8 + a random 0 to 5 x the square root of its armor power, plus a ward, any temporary defence and 2 while a living Paladin is in the party. Armor power 400 absorbs 0 to 100. A Barbarian or Mystic Shaman ally then takes 2 less, never below the minimum.
 - **Several hits in one round:** the second hit on the same ally that round does 25 percent less and every later one 50 percent less.
 - **Minimum and caps:** a hit does at least the larger of 1, 5 percent of the attack and 0.25 percent of the ally's maximum HP, and at most 75 percent of its maximum HP (85 percent from a boss, {{percent:BossFirstRoundsDamageCapPercent}} percent in a boss fight's first {{balance:BossFirstRoundsDamageCapRounds}} rounds). An ally that defends takes half.
 - **Bosses:** a boss's hit on an ally does at least 1.5 x the boss's level before the cut for several hits in a round. In an Old God fight no single hit on an ally takes more than {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP.
