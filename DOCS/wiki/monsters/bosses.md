@@ -17,7 +17,7 @@ The boss's name comes from the floor's theme and floor number, so a floor always
 
 ### Floor boss escorts
 
-The boss room draws a group as any room does, without elites, stragglers or the floor 4 to 10 rules, and the boss takes the first place in it. The boss therefore fights alone or with the rest of that group: no escort or one on floors 1 to 10, up to 2 escorts on floors 11 to 30, 1 to 3 on 31 to 60 and 2 to 4 from 61. When the draw was a champion, the boss fights alone.
+The boss room draws a group as any room does, without elites, stragglers or the floor 4 to 10 rules, and the boss takes the first place in it. The boss therefore fights alone or with the rest of that group: no escort or one on floors 1 to 10 and up to 2 escorts on floors 11 to 24; from floor 25 the number of escorts is one fewer than the floor's group size above, on average 1 on floor 25, 2.5 on floor 50 and 3 from floor 61, at most 4. When the draw was a champion, the boss fights alone.
 
 ### Floor boss rewards
 
