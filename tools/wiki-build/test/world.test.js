@@ -134,9 +134,12 @@ test("Sellsword ranks and contracts", () => {
     "1",
     "slay Zombie monsters",
     "3 + your level / 5",
+    "7",
     "x1",
   ]);
   assert.equal(row(contracts, "Deep Survey")[2], "explore new dungeon rooms");
+  // the Trade Road Bandits contract asks 3 kills at every level and gives 14 days
+  assert.deepEqual(row(contracts, "Bandits on the Trade Road").slice(3, 5), ["3", "14"]);
 });
 
 test("secret bosses show their reward and no unused stats", () => {
