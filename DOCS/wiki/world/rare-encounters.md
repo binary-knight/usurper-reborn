@@ -1,8 +1,9 @@
 ---
 title: Rare dungeon encounters
 path: /wiki/en/world/rare-encounters/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Systems/RareEncounters.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs
+history: 1.3.2 | none
 history: 1.3.0 | none
 history: 1.2.5 | The Arena Portal champion's name is stored in English and shown in each player's language.
 history: 1.2.4 | none

@@ -1,8 +1,9 @@
 ---
 title: Armor and accessories
 path: /wiki/en/items/armor/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Systems/GearSetSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/InventorySystem.cs
+history: 1.3.2 | A Mystic Shaman follows its own armor weight limit.
 history: 1.2.5 | Armor names show in your language, and shop and equipment rows mark armor weight as [Lgt], [Med] or [Hvy].
 ---
 Armor class, defence bonuses, resistances and block effects are different fields. More expensive equipment can trade one kind of protection for another. Your class's armor rules still apply.

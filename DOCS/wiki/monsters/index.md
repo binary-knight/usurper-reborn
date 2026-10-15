@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.2 | Thorns costs a melee attacker a quarter of the damage dealt for 3 rounds, summon, flee and drain abilities no longer land a hit, and difficulty multiplies kill experience and gold once.
 history: 1.3.0 | Monsters choose their abilities with more sense and five early monsters gain a signature ability, dungeon floors 4 to 10 mix families in groups of up to three with a possible Shaman, elite monsters with named traits appear from floor 3, and the Orc is weaker except as a floor boss.
 ---
 Ordinary monsters are organized into 15 families with 5 level tiers each. A dungeon monster is drawn from the families that have a tier covering its level, each family equally likely, and takes that family's tier for the level. The generated family pages show normal non-boss stat samples at each tier's endpoints.
