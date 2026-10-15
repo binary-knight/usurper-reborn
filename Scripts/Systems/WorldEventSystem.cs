@@ -825,9 +825,26 @@ namespace UsurperRemake.Systems
             var evt = CreateEvent(type, day);
             if (evt != null)
             {
-                ActivateEvent(evt);
+                // 1.3.2: a second world boss kill refreshes the celebration that runs (no second entry, no
+                // second headline), so its bonus never multiplies
+                var running = RunningCelebration(evt);
+                if (running != null) KeepOneCelebration(running, evt);
+                else ActivateEvent(evt);
                 RecalculateGlobalModifiers();
             }
+        }
+
+        /// <summary>1.3.2: the running Realm Celebrates when evt is another one, else null.</summary>
+        private WorldEvent? RunningCelebration(WorldEvent evt) =>
+            evt.Type == EventType.WorldBossVictory ? _activeEvents.FirstOrDefault(e => e.Type == EventType.WorldBossVictory) : null;
+
+        /// <summary>1.3.2: one celebration kept from two: the most days left, the later start, the effects of either.</summary>
+        private static void KeepOneCelebration(WorldEvent running, WorldEvent other)
+        {
+            running.DaysRemaining = Math.Max(running.DaysRemaining, other.DaysRemaining);
+            running.StartDay = Math.Max(running.StartDay, other.StartDay);
+            foreach (var effect in other.Effects)
+                running.Effects[effect.Key] = effect.Value;
         }
 
         /// <summary>
@@ -913,6 +930,10 @@ namespace UsurperRemake.Systems
                         evt.Effects[effectKey] = ConvertToSingle(param.Value);
                     }
                 }
+
+                // 1.3.2: several stored celebrations restore as one
+                var running = RunningCelebration(evt);
+                if (running != null) { KeepOneCelebration(running, evt); continue; }
 
                 _activeEvents.Add(evt);
                 // GD.Print($"[WorldEvent] Restored: {evt.Title} ({evt.DaysRemaining} days remaining)");

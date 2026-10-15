@@ -318,6 +318,7 @@ internal static partial class RecruitPoolRuns
         sb.AppendLine($"digest: {w.Digest()}");
         if (server)
         {
+            WorldEventSystem.Instance.ClearAllEvents();   // 1.3.2: the world daily reset rolls world events
             OnlineStateManager.SimCourtStore = null;
             Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
             try { File.Delete(dbPath!); } catch { }

@@ -2511,14 +2511,34 @@ namespace UsurperRemake.Systems
             };
         }
 
-        private List<WorldEventData> SerializeCurrentWorldEvents()
+        /// <summary>
+        /// The world events as stored in world_state: the global state entry (flags and decree), then each event
+        /// with its effects as Effect_&lt;key&gt; parameters. 1.3.2: the world sim and the sessions write the same
+        /// list (a session's save had dropped the effects and the flags).
+        /// </summary>
+        internal static List<WorldEventData> SerializeCurrentWorldEvents()
         {
-            var eventDataList = new List<WorldEventData>();
-            var activeEvents = WorldEventSystem.Instance.GetActiveEvents();
-
-            foreach (var evt in activeEvents)
+            var events = WorldEventSystem.Instance;
+            var eventDataList = new List<WorldEventData>
             {
-                eventDataList.Add(new WorldEventData
+                new WorldEventData
+                {
+                    Id = "global_state",
+                    Type = "GlobalState",
+                    Title = "Global State",
+                    Description = events.CurrentKingDecree,
+                    Parameters = new Dictionary<string, object>
+                    {
+                        ["PlaguActive"] = events.PlaguActive,
+                        ["WarActive"] = events.WarActive,
+                        ["FestivalActive"] = events.FestivalActive
+                    }
+                }
+            };
+
+            foreach (var evt in events.GetActiveEvents())
+            {
+                var eventData = new WorldEventData
                 {
                     Id = Guid.NewGuid().ToString(),
                     Type = evt.Type.ToString(),
@@ -2531,7 +2551,10 @@ namespace UsurperRemake.Systems
                         ["DaysRemaining"] = evt.DaysRemaining,
                         ["StartDay"] = evt.StartDay
                     }
-                });
+                };
+                foreach (var effect in evt.Effects)
+                    eventData.Parameters[$"Effect_{effect.Key}"] = effect.Value;
+                eventDataList.Add(eventData);
             }
 
             return eventDataList;
