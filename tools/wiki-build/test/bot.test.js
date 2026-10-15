@@ -59,6 +59,8 @@ test("Ask uses cited excerpts, disables mentions, and consumes bot questions", a
   );
   assert.match(f.sent[0].content, /Prayer at the Temple/);
   assert.deepEqual(f.sent[0].allowedMentions.parse, []);
+  // 1.3.2: SUPPRESS_EMBEDS (1 << 2), so the wiki links in a reply send no link previews.
+  assert.equal(f.sent[0].flags, 4);
   assert.equal(await f.bot.handle(f.message("ordinary gossip"), "123"), false);
   assert.equal(f.sent.length, 1);
 });
@@ -326,6 +328,13 @@ test("Untrusted index paths and oversized submissions are rejected", async () =>
       }),
     );
     assert.throws(() => loadIndex(file), /Invalid wiki index/);
+    // Fold titles are optional; when present they must be a list of strings.
+    for (const folds of ["Spoiler: endings", [1], [{}]]) {
+      fs.writeFileSync(file, JSON.stringify({ ...index, pages: [{ ...index.pages[0], folds }] }));
+      assert.throws(() => loadIndex(file), /Invalid wiki index/, JSON.stringify(folds));
+    }
+    fs.writeFileSync(file, JSON.stringify({ ...index, pages: [{ ...index.pages[0], folds: ["Spoiler: endings"] }] }));
+    assert.deepEqual(loadIndex(file).pages[0].folds, ["Spoiler: endings"]);
   } finally {
     fs.rmSync(temp, { recursive: true, force: true });
   }
