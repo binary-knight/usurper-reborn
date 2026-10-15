@@ -396,14 +396,16 @@ public static class TrainingSystem
     public static RollResult RollMonsterAttack(
         Monster monster,
         Character target,
-        Random? random = null)
+        Random? random = null,
+        int armourClassBonus = 0)
     {
         random ??= Random.Shared;
 
         // Monster attack modifier (v0.41.4: Level/3 → Level/2 so monsters hit more reliably)
         int monsterMod = monster.Level / 2 + (int)((monster.Strength - 10) / 3);
 
-        int playerAC = CalculatePlayerHitRollAC(target);
+        // 1.3.2: armourClassBonus is the side's Paladin aura (CombatEngine.SideAuraBonus), before the clamp below
+        int playerAC = CalculatePlayerHitRollAC(target) + armourClassBonus;
 
         // v0.65.0 (1.0-prep B2): bounded accuracy vs at-level threats. Player
         // AC scales with DEX/3 + ArmPow/25 while monster accuracy scales with

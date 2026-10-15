@@ -15307,6 +15307,8 @@
   "combat.bloodthirsty_rage": "Vous entrez dans une rage sanguinaire!",
   "combat.smite_no_effect": "Châtiment sans effet dans ce combat!",
   "combat.out_of_smites": "Vous n’avez plus de charges de châtiment!",
+  "combat.backstab_label": "Attaque sournoise",
+  "combat.smite_label": "Châtiment ({0} restants)",
   "combat.nothing_to_disarm": "Rien à désarmer!",
   "combat.disarm_failed": "Échec de la tentative de désarmement!",
   "combat.hide_shadows": "Vous vous fondez dans les ombres, prêt à frapper!",

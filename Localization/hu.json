@@ -15315,6 +15315,8 @@
   "combat.bloodthirsty_rage": "Vérszomjas dühbe gurulsz!",
   "combat.smite_no_effect": "A lesújtásnak nincs hatása ebben a harcban!",
   "combat.out_of_smites": "Elfogyott a lesújtásod!",
+  "combat.backstab_label": "Orvtámadás",
+  "combat.smite_label": "Sújtás ({0} maradt)",
   "combat.nothing_to_disarm": "Nincs mit lefegyverezni!",
   "combat.disarm_failed": "A lefegyverzés kudarcot vallott!",
   "combat.hide_shadows": "Beleolvadsz az árnyakba, készen a lecsapásra!",

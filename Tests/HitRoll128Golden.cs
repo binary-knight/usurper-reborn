@@ -302,7 +302,8 @@ internal static class HitRoll128Golden
         ("basic swing, hidden", () => Repeat(Hero(), A(CombatActionType.Attack), before: (r, i) => r.Hero.ApplyStatus(StatusEffect.Hidden, 2))),
         ("power attack, dual wield", () => Repeat(Hero(cls: CharacterClass.Assassin, main: 40, off: 35), A(CombatActionType.PowerAttack))),
         ("precise strike", () => Repeat(Hero(), A(CombatActionType.PreciseStrike), foe: Dummy(10, 40))),
-        ("smite", () => Repeat(Hero(cls: CharacterClass.Paladin), A(CombatActionType.Smite))),
+        // 1.3.2: each Smite spends a daily charge, so the hero has one before each of the thirty
+        ("smite", () => Repeat(Hero(cls: CharacterClass.Paladin), A(CombatActionType.Smite), before: (r, i) => r.Hero.SmiteChargesRemaining = 1)),
         ("backstab", () => Repeat(Hero(cls: CharacterClass.Assassin), A(CombatActionType.Backstab))),
         ("ranged attack", () => Repeat(Hero(cls: CharacterClass.Ranger, main: 30, mainType: WeaponType.Bow), A(CombatActionType.RangedAttack))),
         ("soul strike", () => Repeat(Hero(cls: CharacterClass.Paladin), A(CombatActionType.SoulStrike))),
