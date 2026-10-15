@@ -1641,8 +1641,8 @@ public static class WikiDataExporter
 
     /// <summary>
     /// 1.3.2: balance values no live code reads are not exported, so the wiki cannot print them as rules. The crit
-    /// chance and multiplier come from StatEffectsSystem; Backstab's live multiplier is a literal in
-    /// ExecuteBackstabMultiMonster (the moddable one is read only by the dead single-monster ExecuteBackstab);
+    /// chance and multiplier come from StatEffectsSystem; Backstab's live multiplier is the Assassin's class value
+    /// (Character.GetClassCombatModifiers; the moddable one is read only by the dead single-monster ExecuteBackstab);
     /// Berserk, Doom rounds and the tank's AoE share have no reader. A server's balance.json still loads them.
     /// </summary>
     private static readonly string[] UnreadBalanceValues =

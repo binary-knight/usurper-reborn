@@ -115,6 +115,16 @@ With Void Hunger every monster killed heals a Voidreaver for {{percent:Voidreave
 
 A Ranger or an Assassin adds 15 to the chance to flee a monster fight, and a Jester or a Bard adds 10. The whole chance is under [Dexterity](/wiki/en/characters/stats/#strength-dexterity-and-agility).
 
+### Class combat bonuses
+
+Six classes carry a bonus in every fight. It holds for you and for a teammate or companion of that class; the Backstab, Smite and Rage keys are yours.
+
+- **Warrior:** each basic swing adds level / 5 to its attack power: 2 at level 10, 20 at level 100.
+- **Assassin:** each melee hit an Assassin lands on a monster has a 5 percent chance to poison it for 3 rounds, unless it is already poisoned. It does not come from spells, from magical abilities, from ranged abilities, or from a swing made with a bow in hand. Only an Assassin can [Backstab](/wiki/en/combat/#backstab-k-assassin).
+- **Barbarian and Mystic Shaman:** a monster's normal attack does 2 less damage, never below the minimum; its special abilities do their full damage. A Barbarian can [Rage](/wiki/en/combat/#rage-g-barbarian).
+- **Paladin:** while a living Paladin is in the party, monsters need 2 more on the die to hit you, and teammates and companions have 2 more Defence; two Paladins do not add up. A Paladin has 1 + level / 10 charges a day for [Smite](/wiki/en/combat/#smite-z-paladin).
+- **Ranger:** a swing with a bow, a bow ability and the ranged attack each add 4 to their damage.
+
 ### Interrupting a boss's channel
 
 Only a companion or NPC teammate tries to interrupt a boss that is channeling; you do not roll for it yourself. The teammate needs Agility plus half its Dexterity of at least {{balance:BossChannelInterruptSpeedThreshold}}. The chance is then {{percent:BossChannelInterruptChance}} percent, plus 20 percentage points for an Assassin or a Ranger and 15 for a Voidreaver.

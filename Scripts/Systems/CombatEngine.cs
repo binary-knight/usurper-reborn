@@ -2976,6 +2976,12 @@ public partial class CombatEngine
         row.Item("[W]", "bright_yellow", Loc.Get("combat.disarm_label"), "darkgray");
         row.Item("[L]", "bright_yellow", Loc.Get("combat.hide_label"), "darkgray");
 
+        // 1.3.2: the class keys (a group follower's input has neither)
+        if (!isFollower && CanBackstab(player))
+            row.Item("[K]", "bright_yellow", Loc.Get("combat.backstab_label") + " ", "darkgray");
+        if (!isFollower && CanSmite(player))
+            row.Item("[Z]", "bright_yellow", Loc.Get("combat.smite_label", player.SmiteChargesRemaining) + " ", "bright_white");
+
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
             row.Item("[B]", "bright_yellow", Loc.Get("combat.bbs_poison", player.PoisonVials) + " ", "dark_green");
@@ -3344,6 +3350,12 @@ public partial class CombatEngine
         if (player.TotalHerbCount > 0)
             terminal.WriteLine($"  J - {Loc.Get("combat.herb_pouch_short", player.TotalHerbCount)}");
 
+        // 1.3.2: the class keys (a group follower's input has neither)
+        if (!isFollower && CanBackstab(player))
+            terminal.WriteLine($"  K - {Loc.Get("combat.backstab_label")}");
+        if (!isFollower && CanSmite(player))
+            terminal.WriteLine($"  Z - {Loc.Get("combat.smite_label", player.SmiteChargesRemaining)}");
+
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
             terminal.WriteLine(Loc.Get("combat.menu_save_boss"));
@@ -3497,6 +3509,28 @@ public partial class CombatEngine
             terminal.WriteLine("║");
         }
 
+        // 1.3.2: the class keys (a group follower's input has neither)
+        if (!isFollower && CanBackstab(player))
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[K] ");
+            terminal.SetColor("darkgray");
+            terminal.Write($"{Loc.Get("combat.backstab_label"),-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+        if (!isFollower && CanSmite(player))
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[Z] ");
+            terminal.SetColor("bright_white");
+            terminal.Write($"{Loc.Get("combat.smite_label", player.SmiteChargesRemaining),-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
         // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
         if (miracle != GodDomain.None)
         {
@@ -3560,6 +3594,12 @@ public partial class CombatEngine
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
     }
+
+    /// <summary>1.3.2: [K] Backstab is for a class whose BackstabMultiplier is above 1 (the Assassin).</summary>
+    internal static bool CanBackstab(Character player) => player.GetClassCombatModifiers().BackstabMultiplier > 1f;
+
+    /// <summary>1.3.2: [Z] Smite is for a class with daily smite charges (the Paladin), while one is left.</summary>
+    internal static bool CanSmite(Character player) => player.GetClassCombatModifiers().SmiteCharges > 0 && player.SmiteChargesRemaining > 0;
 
     /// <summary>
     /// Parse combat action from input
@@ -5477,7 +5517,8 @@ public partial class CombatEngine
 
         // === D20 ROLL SYSTEM FOR MONSTER ATTACK ===
         // Roll monster attack against player AC
-        var monsterRoll = TrainingSystem.RollMonsterAttack(monster, player, random);
+        // 1.3.2: a living Paladin on the player's side raises the armour class this roll is against (AuraBonus)
+        var monsterRoll = TrainingSystem.RollMonsterAttack(monster, player, random, SideAuraBonus(result, player));
 
         // Distraction penalty: scaled to hit roll (Vicious Mockery, etc.)
         if (monster.Distracted)
@@ -5746,6 +5787,7 @@ public partial class CombatEngine
         long minDamage = GetMinIncomingDamage(player, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - playerDefense);
         actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8: before the caps below
+        actualDamage = ClassDamageReduction(player, actualDamage, minDamage);   // 1.3.2: Barbarian and Mystic Shaman
 
         // Show defense calculation only when armor actually reduced the damage (and didn't
         // fully absorb it). v0.60.10 (druidah report): pre-fix this fired unconditionally,
@@ -8979,6 +9021,54 @@ public partial class CombatEngine
             target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
             terminal.WriteLine(Loc.Get("combat.gnoll_bite_poison", MonsterNames.Display(target)), "dark_green");
         }
+
+        // 1.3.2: the class poison (CombatModifiers.PoisonChance, the Assassin's): the same 3-round poison on a landed
+        // melee hit. The chance is read first, so a class without one draws nothing here.
+        int classPoison = attacker.GetClassCombatModifiers().PoisonChance;
+        if (classPoison > 0 && !isSpellDamage && !notMelee && attacker.GetEquipment(weaponSlot)?.WeaponType != WeaponType.Bow && target.IsAlive && !target.Poisoned && random.Next(100) < classPoison)
+        {
+            target.Poisoned = true;
+            target.PoisonRounds = Math.Max(target.PoisonRounds, 3);
+            terminal.WriteLine(Loc.Get("combat.ability_poisoned", MonsterNames.Display(target)), "dark_green");
+        }
+    }
+
+    /// <summary>
+    /// 1.3.2: the class combat modifiers of a landed swing (CombatModifiers): the Warrior's AttackBonus, and the
+    /// Ranger's RangedBonus when the hand that swings holds a bow. Added with the temporary attack bonus.
+    /// </summary>
+    internal static int ClassSwingBonus(Character attacker, bool isOffHandAttack)
+    {
+        var mods = attacker.GetClassCombatModifiers();
+        int bonus = mods.AttackBonus;
+        if (mods.RangedBonus > 0 && attacker.GetEquipment(isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand)?.WeaponType == WeaponType.Bow)
+            bonus += mods.RangedBonus;
+        return bonus;
+    }
+
+    /// <summary>
+    /// 1.3.2: the flat DamageReduction of the class that takes a monster's basic hit (Barbarian, Mystic Shaman),
+    /// never below the hit's minimum damage.
+    /// </summary>
+    internal static long ClassDamageReduction(Character target, long damage, long minDamage)
+    {
+        int reduction = target.GetClassCombatModifiers().DamageReduction;
+        return reduction > 0 ? Math.Max(minDamage, damage - reduction) : damage;
+    }
+
+    /// <summary>
+    /// 1.3.2: the Paladin aura of a side: the largest AuraBonus of a living member (the player given, the fight's
+    /// player and the teammates). Auras do not stack.
+    /// </summary>
+    internal static int SideAuraBonus(CombatResult? result, Character? player)
+    {
+        int best = 0;
+        void Take(Character? c) { if (c != null && c.IsAlive) best = Math.Max(best, c.GetClassCombatModifiers().AuraBonus); }
+        Take(player);
+        Take(result?.Player);
+        if (result?.Teammates != null)
+            foreach (var t in result.Teammates) Take(t);
+        return best;
     }
 
     /// <summary>
@@ -14173,6 +14263,7 @@ public partial class CombatEngine
 
                         // Temporary attack bonus from abilities
                         attackPower += player.TempAttackBonus;
+                        attackPower += ClassSwingBonus(player, isOffHandAttack);   // 1.3.2: Warrior AttackBonus, Ranger bow RangedBonus
 
                         // Weapon configuration modifier (2H bonus, dual-wield off-hand penalty)
                         double damageModifier = GetWeaponConfigDamageModifier(player, isOffHandAttack);
@@ -14739,10 +14830,35 @@ public partial class CombatEngine
                     return (action, false);
 
                 case "K":
+                    // 1.3.2: Backstab is the class's whose BackstabMultiplier is above 1 (the Assassin's)
+                    if (!CanBackstab(player))
+                    {
+                        terminal.WriteLine(Loc.Get("combat.invalid_action"), "yellow");
+                        await Pacing.Wait(GetCombatDelay(1000));
+                        continue;
+                    }
                     action.Type = CombatActionType.Backstab;
                     action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
                     if (action.TargetIndex == TargetCancelled) continue;
                     return (action, false);
+
+                case "Z":
+                    // 1.3.2: Smite, for a class with daily smite charges (the Paladin), while one is left
+                    if (player.GetClassCombatModifiers().SmiteCharges > 0)
+                    {
+                        if (player.SmiteChargesRemaining > 0)
+                        {
+                            action.Type = CombatActionType.Smite;
+                            action.TargetIndex = await GetTargetSelection(monsters, allowRandom: true);
+                            if (action.TargetIndex == TargetCancelled) continue;
+                            return (action, false);
+                        }
+                        terminal.WriteLine(Loc.Get("combat.out_of_smites"), "gray");
+                    }
+                    else
+                        terminal.WriteLine(Loc.Get("combat.invalid_action"), "yellow");
+                    await Pacing.Wait(GetCombatDelay(1000));
+                    continue;
 
                 case "T":
                     action.Type = CombatActionType.Taunt;
@@ -14761,7 +14877,7 @@ public partial class CombatEngine
                     return (action, false);
 
                 case "G":
-                    if (player.Class == CharacterClass.Barbarian && !player.IsRaging)
+                    if (player.GetClassCombatModifiers().RageAvailable && !player.IsRaging)   // 1.3.2: the class modifier decides
                     {
                         action.Type = CombatActionType.Rage;
                         return (action, false);
@@ -15061,7 +15177,8 @@ public partial class CombatEngine
                 return;
             }
 
-            long backstabDamage = (player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * 3;
+            // 1.3.2: the class's BackstabMultiplier (the Assassin's 3)
+            long backstabDamage = (long)((player.Strength + GetEffectiveWeapPow(player.AbilityWeapPow)) * (double)player.GetClassCombatModifiers().BackstabMultiplier);
             backstabDamage += random.Next(1, 20);
             backstabDamage = DifficultySystem.ApplyPlayerDamageMultiplier(backstabDamage);
 
@@ -15355,6 +15472,15 @@ public partial class CombatEngine
         var target = targetIndex.HasValue ? monsters[targetIndex.Value] : GetRandomLivingMonster(monsters);
         if (target == null || !target.IsAlive) return;
 
+        // 1.3.2: a Smite spends one of the day's charges (DailySystemManager fills them); with none left it does not happen
+        if (player.SmiteChargesRemaining <= 0)
+        {
+            terminal.WriteLine(Loc.Get("combat.out_of_smites"), "gray");
+            await Pacing.Wait(GetCombatDelay(800));
+            return;
+        }
+        player.SmiteChargesRemaining--;
+
         terminal.WriteLine("");
         terminal.SetColor("bright_white");
         terminal.WriteLine(Loc.Get("combat.smite_channel", MonsterNames.Display(target)));
@@ -15408,6 +15534,7 @@ public partial class CombatEngine
         // Apply weapon configuration damage modifier (2H bonus for bows)
         double damageModifier = GetWeaponConfigDamageModifier(player);
         rangedDamage = (long)(rangedDamage * damageModifier);
+        rangedDamage += player.GetClassCombatModifiers().RangedBonus;   // 1.3.2: the Ranger's RangedBonus
 
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         rangedDamage = Math.Max(1, rangedDamage - defense);
@@ -15663,6 +15790,7 @@ public partial class CombatEngine
         if (abilityResult.Damage > 0 && target != null && target.IsAlive && !isAoEAbility && !abilityMissed)
         {
             long actualDamage = abilityResult.Damage;
+            if (IsRangedAbility(ability)) actualDamage += player.GetClassCombatModifiers().RangedBonus;   // 1.3.2: the Ranger's bow ability
             bool abilityAlreadyCrit = false; // Guaranteed-crit abilities skip the follow-up crit roll
 
             // Two-handed weapons hit harder per swing. The basic attack gets this via
@@ -19842,6 +19970,7 @@ public partial class CombatEngine
                 // Calculate teammate attack damage (with weapon soft cap)
                 long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.SwingWeapPow(isOffHandAttack)) + random.Next(1, 16);
                 attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
+                attackPower += ClassSwingBonus(teammate, isOffHandAttack);   // 1.3.2: Warrior AttackBonus, Ranger bow RangedBonus
 
                 // Apply weapon configuration damage modifier (includes alignment bonuses, off-hand penalty)
                 double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
@@ -21677,12 +21806,15 @@ public partial class CombatEngine
         // Apply buff spell bonuses (protection spells, Time Stop, etc.)
         companionDefense += companion.MagicACBonus;
         companionDefense += companion.TempDefenseBonus;
+        // 1.3.2: a teammate takes no d20, so the side's Paladin aura is Defence here (AuraBonus)
+        companionDefense += SideAuraBonus(result, null);
 
         // v0.57.14: companion incoming-damage floor scales with companion MaxHP for the same
         // reason it does for the player — high-tank companions can't tank indefinitely.
         long minDamage = GetMinIncomingDamage(companion, monsterAttack);
         long actualDamage = Math.Max(minDamage, monsterAttack - companionDefense);
         actualDamage = CommandedDamage(monster, result, actualDamage);   // 1.2.8: before the caps below
+        actualDamage = ClassDamageReduction(companion, actualDamage, minDamage);   // 1.3.2: Barbarian and Mystic Shaman
 
         // Show defense calculation
         if (companionDefense > 0 && companionDefense < monsterAttack)

@@ -84,7 +84,7 @@ The Creator's Eye bonus doubles in the fight with Manwe while you hold the Void 
 
 ## Basic attack damage
 
-A basic swing's power is Strength + Strength / 4 + your level, plus the weapon term, plus a random 1 to 20 (from level 44, 1 to level / 2 - 1), plus any temporary attack bonus from an ability. A Bard or Jester uses Charisma in place of Strength.
+A basic swing's power is Strength + Strength / 4 + your level, plus the weapon term, plus a random 1 to 20 (from level 44, 1 to level / 2 - 1), plus any temporary attack bonus from an ability, plus a Warrior's level / 5 and a Ranger's 4 on a swing with a bow. A Bard or Jester uses Charisma in place of Strength.
 
 - **Weapon term:** with W = the weapon power of that hand + your level / 10, the swing adds W plus a random 0 to W. A weapon of 100 at level 20 adds 102 to 204.
 - **Statuses** change only the Strength and level part: Rage and Power Attack's stance x1.5, Blessed + level / 5 + 2, the King's blessing x1.10, Weakened - (4 + level / 10).
@@ -123,7 +123,7 @@ When you dual wield, every swing past the first (and past a Warrior's extra swin
 
 ## Tactical actions
 
-These actions work for any class unless stated, and each one ends your turn, even when it fails; only Rage from a class that cannot rage asks again. Type the key at the combat prompt. The compact combat menu lists P, E, T, W and L; the standard menu does not list them, but the keys work there too.
+These actions work for any class unless stated, and each one ends your turn, even when it fails; only Backstab, Smite or Rage from a class that cannot use it, and Smite with no charge left, ask again. Type the key at the combat prompt. The compact combat menu lists P, E, T, W and L; the standard menu does not list them, but the keys work there too. Every combat menu lists Backstab for an Assassin and Smite for a Paladin with a charge left; none lists Rage.
 
 ### Power Attack (P)
 
@@ -133,9 +133,13 @@ Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + lev
 
 Precise Strike needs {{balance:PreciseStrikeNeededBonus}} less on the hit die and costs nothing. Its damage is Strength + weapon power + a random 1 to 14, times your weapon setup, minus the monster's Defence and armor. It never crits. It only helps against a monster more than {{balance:AtLevelAccuracyGap}} levels above you.
 
-### Backstab (K)
+### Backstab (K, Assassin)
 
 Backstab succeeds 50 percent of the time plus half your Dexterity, at most 95 percent, then rolls to hit. It deals (Strength + weapon power) x 3 + a random 1 to 19, minus the monster's armor. It never crits.
+
+### Smite (Z, Paladin)
+
+A Paladin has 1 + level / 10 smite charges a day. Smite spends one, then rolls to hit, and deals (Strength + weapon power) x 1.5 + your level + a random 10 to 24, minus the monster's armor. It never crits.
 
 ### Hide (L)
 
@@ -163,7 +167,7 @@ Defend halves every monster basic attack on you for the rest of the round, round
 
 A monster no more than {{balance:AtLevelAccuracyGap}} levels below you hits you 25 to 90 percent of the time: it needs {{balance:MonsterAccuracyMinNeeded}} to {{balance:MonsterAccuracyMaxNeededAtLevel}} on a twenty-sided die. A weaker monster needs at most {{balance:MonsterAccuracyMaxNeededWeak}}, so it still hits at least 10 percent of the time, and a natural 20 always hits.
 
-The number it needs is your armor class minus its modifier. Your armor class is 10 + (Dexterity - 10) / 3 + armor power / 25 + level / 10, plus a ward spell's bonus / 25, plus 10 under Blur or Haste and 5 while Hidden. The monster's modifier is its level / 2 + (its Strength - 10) / 3.
+The number it needs is your armor class minus its modifier. Your armor class is 10 + (Dexterity - 10) / 3 + armor power / 25 + level / 10, plus a ward spell's bonus / 25, plus 10 under Blur or Haste and 5 while Hidden, and 2 more while a living Paladin is in your party, you included; two Paladins do not add up. The monster's modifier is its level / 2 + (its Strength - 10) / 3.
 
 ### Dodge, Blur and block
 
@@ -181,7 +185,7 @@ A monster's hit is its Strength + weapon power + punch, plus a random 0 to 9 (0 
 
 ### Your defence
 
-Your defence against a monster's hit is your Defence + a ward spell's bonus + 75 to 100 percent of your armor power, times your weapon setup (two-handed 0.85, dual wield 0.90), then Blessed +2, the King's blessing +10 percent, Rage -4, the Grief, Mental and Fatigue penalty, and your buffs: King +10 percent, Knight +5 percent, Grand Champion +3 percent and others. The hit does its damage minus your defence.
+Your defence against a monster's hit is your Defence + a ward spell's bonus + 75 to 100 percent of your armor power, times your weapon setup (two-handed 0.85, dual wield 0.90), then Blessed +2, the King's blessing +10 percent, Rage -4, the Grief, Mental and Fatigue penalty, and your buffs: King +10 percent, Knight +5 percent, Grand Champion +3 percent and others. The hit does its damage minus your defence. A Barbarian or Mystic Shaman then takes 2 less, never below the minimum.
 
 ### Minimum damage
 

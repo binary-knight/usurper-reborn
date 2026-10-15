@@ -562,7 +562,12 @@ public class HitRoll128Tests
     {
         foreach (var (type, cls) in new[] { (CombatActionType.Backstab, CharacterClass.Assassin), (CombatActionType.Smite, CharacterClass.Paladin), (CombatActionType.RangedAttack, CharacterClass.Ranger) })
         {
-            Character Hero() => Fighter(cls, dexterity: 200, main: cls == CharacterClass.Ranger ? 30 : null, mainType: cls == CharacterClass.Ranger ? WeaponType.Bow : WeaponType.Sword);
+            Character Hero()
+            {
+                var h = Fighter(cls, dexterity: 200, main: cls == CharacterClass.Ranger ? 30 : null, mainType: cls == CharacterClass.Ranger ? WeaponType.Bow : WeaponType.Sword);
+                h.SmiteChargesRemaining = 100;   // 1.3.2: each Smite spends a daily charge
+                return h;
+            }
             var missed = Do(Hero(), G.A(type), PlainMissOn2(Hero()), new DieRandom(128, i => 2), times: 30);
             missed.RollRows.Should().BeGreaterThan(20, "{0} rolls", type);
             missed.MissRows.Should().Be(missed.RollRows);
@@ -760,11 +765,13 @@ public class HitRoll128Tests
     private static readonly Dictionary<string, string> GoldenFights = new()
     {
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["solo, floor 7 pair"] = "219:98FAB99B740A4523:Victory in 17",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["solo, floor 7 pair"] = "194:A57481E5A1449B5A:Victory in 15",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["solo, floor 20 trio, level 20 hero"] = "234:CE26AF68DAD82D5A:Victory in 16",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["solo, dual wield, floor 12 pair"] = "251:86DA09A12ABFEAFC:Victory in 14",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["solo, dual wield, floor 12 pair"] = "215:8981886161B1269B:Victory in 11",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["one teammate, floor 7 pair"] = "160:1459B417B511A08C:Victory in 10",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
@@ -773,30 +780,39 @@ public class HitRoll128Tests
         ["boss context, solo"] = "328:A34EFE8FBC897BB6:Victory in 41",
         // 1.3.2: party members regain stamina and mana at round end, which changes this long fight's draws
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["boss context, one teammate"] = "566:6B5C3CA3A6097AB2:Victory in 48",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["boss context, one teammate"] = "558:FC26FC8BBDF4CA88:Victory in 47",
     };
 
     /// <summary>Written there too: thirty of each action on a seeded engine, the draws, a hash of them and the damage done.</summary>
     private static readonly Dictionary<string, string> GoldenActions = new()
     {
         // 1.3.2: the basic attack improves by use, which changes this action's draws
-        ["basic swing"] = "150:CA52554576B5D96C:damage 3186",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["basic swing"] = "150:CA52554576B5D96C:damage 3251",
         // 1.3.2: the basic attack improves by use, which changes this action's draws
-        ["basic swing, dual wield"] = "378:ADD4EBAA1D6B7E0F:damage 8358",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["basic swing, dual wield"] = "403:4A5D867513649765:damage 8854",
         // 1.3.2: the basic attack improves by use, which changes this action's draws
-        ["basic swing, evasive foe"] = "165:657CF96804694AC8:damage 1631",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["basic swing, evasive foe"] = "165:657CF96804694AC8:damage 1665",
         // 1.3.2: the basic attack improves by use, which changes this action's draws
-        ["basic swing, hidden"] = "90:A8724F7D6EA0574C:damage 5413",
-        ["power attack, dual wield"] = "302:5D59C1911EC791CC:damage 12082",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["basic swing, hidden"] = "90:A8724F7D6EA0574C:damage 5529",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["power attack, dual wield"] = "332:F37E220FCDAF133F:damage 13063",
         ["precise strike"] = "60:8B6AC522FECD9C30:damage 1121",
         ["smite"] = "60:835BA8452318FE9E:damage 3541",
         ["backstab"] = "70:4AFA56909D17EF9D:damage 3807",
-        ["ranged attack"] = "90:DFBCE467FB180184:damage 3258",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["ranged attack"] = "90:DFBCE467FB180184:damage 3378",
         ["soul strike"] = "60:53AEE4521E492843:damage 2127",
         ["ability, power strike"] = "89:72BF8C2FBED1B85A:damage 4626",
-        ["ability, execute, dual wield"] = "240:F8BD0ED1EE3A9A46:damage 22979",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["ability, execute, dual wield"] = "276:E14AD76ACABEFF7E:damage 22692",
         ["ability, whirlwind (area)"] = "89:72BF8C2FBED1B85A:damage 11095",
-        ["teammate swings"] = "121:C7A66D3991FB6491:damage 2125",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["teammate swings"] = "121:C7A66D3991FB6491:damage 2173",
     };
 
     /// <summary>The actions whose draws the roll must not change even when it is on.</summary>

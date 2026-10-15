@@ -858,7 +858,8 @@ public class EliteAffixes128Tests
     private static readonly Dictionary<string, string> GoldenFights = new()
     {
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["floor 7 pair, solo"] = "219:98FAB99B740A4523:Victory in 17",
+        // 1.3.2: the class combat modifiers apply, which changes this fight's draws
+        ["floor 7 pair, solo"] = "194:A57481E5A1449B5A:Victory in 15",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["floor 7 pair, solo, ambush"] = "192:190A3A98554F5796:Victory in 14",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws

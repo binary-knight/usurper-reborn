@@ -15521,6 +15521,8 @@
   "combat.bloodthirsty_rage": "You fly into a bloodthirsty rage!",
   "combat.smite_no_effect": "Smite has no effect in this combat!",
   "combat.out_of_smites": "You are out of smite charges!",
+  "combat.backstab_label": "Backstab",
+  "combat.smite_label": "Smite ({0} left)",
   "combat.nothing_to_disarm": "Nothing to disarm!",
   "combat.disarm_failed": "Disarm attempt failed!",
   "combat.hide_shadows": "You melt into the shadows, ready to strike!",

@@ -15307,6 +15307,8 @@
   "combat.bloodthirsty_rage": "¡Te lanzas en una furia sanguinaria!",
   "combat.smite_no_effect": "¡Castigar no tiene efecto en este combate!",
   "combat.out_of_smites": "¡Te quedaste sin cargas de castigar!",
+  "combat.backstab_label": "Puñalada",
+  "combat.smite_label": "Castigo ({0} restantes)",
   "combat.nothing_to_disarm": "¡Nada que desarmar!",
   "combat.disarm_failed": "¡Intento de desarme fallido!",
   "combat.hide_shadows": "¡Te fundes con las sombras, listo para atacar!",

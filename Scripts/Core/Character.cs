@@ -3089,7 +3089,7 @@ public class Character
         return Class switch
         {
             CharacterClass.Warrior => new CombatModifiers { AttackBonus = Level / 5, ExtraAttacks = Math.Min(3, Level / 10) },
-            CharacterClass.Assassin => new CombatModifiers { BackstabMultiplier = 3.0f, PoisonChance = 25 },
+            CharacterClass.Assassin => new CombatModifiers { BackstabMultiplier = 3.0f, PoisonChance = 5 },   // 1.3.2: 5 (15 and 10 measured too strong in boss rooms)
             CharacterClass.Barbarian => new CombatModifiers { DamageReduction = 2, RageAvailable = true },
             CharacterClass.Paladin => new CombatModifiers { SmiteCharges = 1 + Level / 10, AuraBonus = 2 },
             CharacterClass.Ranger => new CombatModifiers { RangedBonus = 4, Tracking = true },
