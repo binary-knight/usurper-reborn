@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.2 | Class combat bonuses, divine damage bonuses, the Blood Price cut and the world boss Boss Slayer bonus apply on your swings, a monster's Thorns costs a melee attacker a quarter of the damage dealt, and every party member regains stamina and mana at round end.
 history: 1.3.0 | Your physical attacks on monsters roll a twenty-sided die to hit and show the roll and the number needed, and a dual-wielder's swings each use the weapon in their own hand.
 history: 1.2.7 | A monster's critical hit line no longer leaves an empty gap where a damage number used to be.
 history: 1.2.6 | none

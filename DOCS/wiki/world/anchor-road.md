@@ -1,8 +1,9 @@
 ---
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Data/GauntletChampionData.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.2 | The Bandits on the Trade Road contract counts the wilderness bandits, needs 3 kills and lasts 14 days, and a jailbreak can be tried once a day.
 history: 1.3.1 | none
 history: 1.3.0 | none
 history: 1.2.7 | none

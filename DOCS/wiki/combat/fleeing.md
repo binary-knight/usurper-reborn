@@ -1,8 +1,9 @@
 ---
 title: Fear, retreat and fleeing
 path: /wiki/en/combat/fleeing/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.2 | none
 history: 1.3.0 | none
 history: 1.2.7 | none
 history: 1.2.6 | none

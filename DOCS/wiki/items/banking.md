@@ -1,8 +1,9 @@
 ---
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
-checked: 1.3.1
+checked: 1.3.2
 sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs
+history: 1.3.2 | A bank robbery you lose leaves you at 1 HP and the bank takes its fine, with no death.
 history: 1.2.5 | Bank screens, bank news and the bank's guards are shown in all five languages.
 history: 1.2.4 | The Bank's count of robbery attempts for the day is kept across server restarts.
 ---
