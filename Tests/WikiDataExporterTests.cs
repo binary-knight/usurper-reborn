@@ -971,26 +971,6 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     }
 
     [Fact]
-    public void RealmExportLeavesTheSharedFactionAndEventSystemsAlone()
-    {
-        // the faction and world event probes are objects whose constructors never run
-        var dir = Path.Combine(Path.GetTempPath(), "usurper-wiki-realm-" + Guid.NewGuid().ToString("N"));
-        var factions = FactionSystem.Instance;
-        var events = WorldEventSystem.Instance;
-        try
-        {
-            WikiDataExporter.Export(dir);
-            Assert.Same(factions, FactionSystem.Instance);
-            Assert.Same(events, WorldEventSystem.Instance);
-            Assert.True(File.Exists(Path.Combine(dir, "realm.json")));
-        }
-        finally
-        {
-            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
-        }
-    }
-
-    [Fact]
     public void RacesCarryTheNpcLifespan()
     {
         var races = _export.Data("races").EnumerateArray().ToArray();
@@ -1025,6 +1005,26 @@ public class WikiDataExporterIsolationTests
 
     private static JsonElement Entry(string dir, string file, string id) => Data(dir, file).EnumerateArray()
         .Single(e => e.GetProperty("id").GetString() == id);
+
+    [Fact]
+    public void RealmExportLeavesTheSharedFactionAndEventSystemsAlone()
+    {
+        // the faction and world event probes are objects whose constructors never run
+        var dir = Path.Combine(Path.GetTempPath(), "usurper-wiki-realm-" + Guid.NewGuid().ToString("N"));
+        var factions = FactionSystem.Instance;
+        var events = WorldEventSystem.Instance;
+        try
+        {
+            WikiDataExporter.Export(dir);
+            Assert.Same(factions, FactionSystem.Instance);
+            Assert.Same(events, WorldEventSystem.Instance);
+            Assert.True(File.Exists(Path.Combine(dir, "realm.json")));
+        }
+        finally
+        {
+            if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true);
+        }
+    }
 
     [Fact]
     public void ExportIgnoresDifficultyServerMultiplierAndLoadedOverrides()
