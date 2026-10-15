@@ -1039,6 +1039,7 @@ namespace UsurperRemake.Systems
                 SettlementGoldClaimedToday = player.SettlementGoldClaimedToday,
                 SettlementHerbClaimedToday = player.SettlementHerbClaimedToday,
                 SettlementShrineUsedToday = player.SettlementShrineUsedToday,
+                JailbreakAttemptedToday = player.JailbreakAttemptedToday,
                 SettlementCircleUsedToday = player.SettlementCircleUsedToday,
                 SettlementWorkshopUsedToday = player.SettlementWorkshopUsedToday,
                 WorkshopBuffCombats = player.WorkshopBuffCombats,

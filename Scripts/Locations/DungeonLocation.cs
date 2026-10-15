@@ -1298,6 +1298,7 @@ public class DungeonLocation : BaseLocation
         int restoredCount = 0;
         int skippedCount = 0;
         var arrestedNames = new List<string>();
+        var deadNames = new List<string>();   // 1.3.2
         const int maxPartySize = 4;
 
         foreach (var npcId in savedNPCIds)
@@ -1310,7 +1311,17 @@ public class DungeonLocation : BaseLocation
             }
 
             var npc = npcSystem.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId && n.IsAlive);
-            if (npc != null && !teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npcId))
+
+            // 1.3.2: a saved ally who is dead stays in the saved party (as before) and rejoins after coming back to
+            // life; say so instead of leaving them out without a word
+            if (npc == null)
+            {
+                var fallen = npcSystem.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
+                if (fallen != null) deadNames.Add(fallen.DisplayName);
+                continue;
+            }
+
+            if (!teammates.Any(t => t is NPC existingNpc && existingNpc.ID == npcId))
             {
                 // v0.57.11 (Coosh report): teammates arrested between sessions
                 // (via Castle imprisonment, King's orders, etc.) must not silently
@@ -1337,6 +1348,17 @@ public class DungeonLocation : BaseLocation
             term.SetColor("yellow");
             foreach (var name in arrestedNames)
                 term.WriteLine(Loc.Get("dungeon.teammate_arrested", name));
+            term.WriteLine("");
+            await Pacing.Wait(1500);
+        }
+
+        // 1.3.2: beside the arrested line, one line for each saved ally who is dead
+        if (deadNames.Count > 0)
+        {
+            term.WriteLine("");
+            term.SetColor("yellow");
+            foreach (var name in deadNames)
+                term.WriteLine(Loc.Get("dungeon.teammate_dead", name));
             term.WriteLine("");
             await Pacing.Wait(1500);
         }
@@ -1782,11 +1804,10 @@ public class DungeonLocation : BaseLocation
                 }
             }
 
-            // Update teammates list - keep only affordable ones
-            teammates.Clear();
-            foreach (var npc in affordableTeammates)
+            // Only the fee NPCs gold cannot cover stay behind; allies that pay no fee come along
+            foreach (var (npc, _) in unaffordableTeammates)
             {
-                teammates.Add(npc);
+                teammates.Remove(npc);
             }
 
             if (unaffordableTeammates.Count > 0)
@@ -5433,6 +5454,7 @@ public class DungeonLocation : BaseLocation
         {
             case 0:
                 var pitDmg = currentDungeonLevel * 3 + dungeonRandom.Next(10);
+                pitDmg = ApplyTrapResistBuff(player, pitDmg);   // 1.3.2: the Prison buff, before the stat check
                 if (TrapMitigationCheck(player, player.Agility, "ui.stat_agility")) pitDmg /= 2;
                 player.HP = Math.Max(1, player.HP - pitDmg);
                 terminal.SetColor("red");
@@ -5442,6 +5464,7 @@ public class DungeonLocation : BaseLocation
 
             case 1:
                 var dartDmg = currentDungeonLevel * 2 + dungeonRandom.Next(8);
+                dartDmg = ApplyTrapResistBuff(player, dartDmg);
                 bool dartShrugged = TrapMitigationCheck(player, player.Constitution, "ui.stat_constitution");
                 if (dartShrugged) dartDmg /= 2;
                 player.HP = Math.Max(1, player.HP - dartDmg);
@@ -5462,6 +5485,7 @@ public class DungeonLocation : BaseLocation
 
             case 2:
                 var fireDmg = currentDungeonLevel * 4 + dungeonRandom.Next(12);
+                fireDmg = ApplyTrapResistBuff(player, fireDmg);
                 if (TrapMitigationCheck(player, player.Dexterity, "ui.stat_dexterity")) fireDmg /= 2;
                 player.HP = Math.Max(1, player.HP - fireDmg);
                 terminal.SetColor("red");
@@ -5759,18 +5783,11 @@ public class DungeonLocation : BaseLocation
         // Check for divine punishment before combat
         var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(player!);
 
-        // Apply temporary combat penalties from divine wrath
-        int originalTempAttackBonus = player.TempAttackBonus;
-        int originalTempDefenseBonus = player.TempDefenseBonus;
-        if (punishmentApplied)
-        {
-            // Convert percentage modifier to stat penalty (rough approximation)
-            player.TempAttackBonus -= Math.Abs(damageModifier) * 2;
-            player.TempDefenseBonus -= Math.Abs(defenseModifier) * 2;
-        }
-
         // Combat
         var combatEngine = new CombatEngine(terminal);
+        // 1.3.2: divine wrath's cut holds for this fight at the percent the screen states (the fight-start
+        // reset cleared the old TempAttackBonus and TempDefenseBonus cut); damage and defence are the same size
+        combatEngine.DivineWrathPct = punishmentApplied ? Math.Abs(damageModifier) : 0;
         // 1.2.8: the room's cleared state is set at the win, before the victory autosave and the loot
         // screens, so a save there (or the disconnect save of a player who drops at them) keeps the
         // room cleared; the check after the fight then sets nothing twice
@@ -5794,13 +5811,6 @@ public class DungeonLocation : BaseLocation
         };
         var combatResult = await combatEngine.PlayerVsMonsters(player, monsters, teammates, offerMonkEncounter: true, isAmbush: isAmbush);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
-
-        // Restore original temp bonuses after combat
-        if (punishmentApplied)
-        {
-            player.TempAttackBonus = originalTempAttackBonus;
-            player.TempDefenseBonus = originalTempDefenseBonus;
-        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -7879,26 +7889,14 @@ public class DungeonLocation : BaseLocation
         // Check for divine punishment before combat
         var (punishmentApplied, damageModifier, defenseModifier) = await CheckDivinePunishment(currentPlayer);
 
-        // Apply temporary combat penalties from divine wrath
-        int originalTempAttackBonus = currentPlayer.TempAttackBonus;
-        int originalTempDefenseBonus = currentPlayer.TempDefenseBonus;
-        if (punishmentApplied)
-        {
-            currentPlayer.TempAttackBonus -= Math.Abs(damageModifier) * 2;
-            currentPlayer.TempDefenseBonus -= Math.Abs(defenseModifier) * 2;
-        }
+        // 1.3.2: divine wrath's cut holds for this fight at the percent the screen states (the fight-start
+        // reset cleared the old TempAttackBonus and TempDefenseBonus cut); damage and defence are the same size
+        combatEngine.DivineWrathPct = punishmentApplied ? Math.Abs(damageModifier) : 0;
 
         // Use new PlayerVsMonsters method - ALL monsters fight at once!
         // Monk will appear after ALL monsters are defeated
         var combatResult = await combatEngine.PlayerVsMonsters(currentPlayer, monsters, teammates, offerMonkEncounter: true);
         DropFallenGroupedPlayers(); // v1.2 (design item B)
-
-        // Restore original temp bonuses after combat
-        if (punishmentApplied)
-        {
-            currentPlayer.TempAttackBonus = originalTempAttackBonus;
-            currentPlayer.TempDefenseBonus = originalTempDefenseBonus;
-        }
 
         // Check if player should return to temple after resurrection
         if (combatResult.ShouldReturnToTemple)
@@ -8963,7 +8961,7 @@ public class DungeonLocation : BaseLocation
                     switch (trapType)
                     {
                         case 0:
-                            var poisonDmg = currentDungeonLevel * 5;
+                            var poisonDmg = ApplyTrapResistBuff(currentPlayer, currentDungeonLevel * 5);   // 1.3.2: the Prison buff
                             currentPlayer.HP = Math.Max(1, currentPlayer.HP - poisonDmg);
                             terminal.WriteLine(Loc.Get("dungeon.chest_poison_gas", poisonDmg));
                             // v0.61.1 Marsh Toad rolls to absorb.
@@ -8979,7 +8977,7 @@ public class DungeonLocation : BaseLocation
                             }
                             break;
                         case 1:
-                            var spikeDmg = currentDungeonLevel * 8;
+                            var spikeDmg = ApplyTrapResistBuff(currentPlayer, currentDungeonLevel * 8);
                             currentPlayer.HP = Math.Max(1, currentPlayer.HP - spikeDmg);
                             terminal.WriteLine(Loc.Get("dungeon.chest_spikes", spikeDmg));
                             break;
@@ -9642,6 +9640,8 @@ public class DungeonLocation : BaseLocation
     /// runes). This helper centralises the mitigation so all five damaging
     /// sites stay in sync and the buff actually does what its description
     /// says. Each call that mitigates decrements the buff charge.
+    /// 1.3.2: those sites were the dead TrapEncounter; the live room traps (TriggerTrap: pit, darts, fire) and
+    /// chest traps (gas, spikes) now call it too. Gold and experience losses are not damage and are not reduced.
     /// </summary>
     private int ApplyTrapResistBuff(Character player, int rawDamage)
     {
@@ -12237,7 +12237,7 @@ public class DungeonLocation : BaseLocation
                 potions = player is Player pp ? pp.Healing : 0,
                 maxPotions = player is Player pp2 ? pp2.MaxPotions : 0,
                 gold = player.Gold,
-                healAmount = PotionBonus.ApplyOwnerBonuses(player, player.MaxHP / 4), // v1.1.11: Infirmary
+                healAmount = PotionBonus.ApplyOwnerBonuses(player, DifficultySystem.ApplyHealingMultiplier(player.MaxHP / 4)), // v1.1.11: Infirmary; 1.3.2: the difficulty multiplier first
                 potionCost = 50 + (player.Level * 10),
                 teammates = memberData,
             });
@@ -12303,6 +12303,7 @@ public class DungeonLocation : BaseLocation
 
             // Calculate heal amount (potions heal 25% of max HP)
             long healAmount = player.MaxHP / 4;
+            healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
 
             terminal.SetColor("white");
@@ -13003,6 +13004,7 @@ public class DungeonLocation : BaseLocation
         // Calculate potions needed
         long missingHP = target.MaxHP - target.HP;
         int healPerPotion = (int)PotionBonus.AverageHeal(player, target); // 1.2.8: scaled by the teammate's MaxHP
+        healPerPotion = (int)DifficultySystem.ApplyHealingMultiplier(healPerPotion); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healPerPotion = (int)PotionBonus.ApplyOwnerBonuses(player, healPerPotion); // v1.1.11: the giver's Infirmary
         int potionsNeeded = (int)Math.Ceiling((double)missingHP / healPerPotion);
         potionsNeeded = Math.Min(potionsNeeded, (int)player.Healing);
@@ -13068,6 +13070,7 @@ public class DungeonLocation : BaseLocation
         {
             player.Healing--;
             int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, target); // 1.2.8: at least 20% of the teammate's MaxHP
+            healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
             target.HP = Math.Min(target.MaxHP, target.HP + healAmount);
         }
@@ -13108,7 +13111,8 @@ public class DungeonLocation : BaseLocation
     private async Task HealEntireParty(Character player, List<Character> companions)
     {
         // 1.2.8: the estimate per receiver, scaled by that receiver's MaxHP; v1.1.11: the giver's Infirmary
-        int HealPerPotion(Character receiver) => (int)PotionBonus.ApplyOwnerBonuses(player, PotionBonus.AverageHeal(player, receiver));
+        // 1.3.2: the difficulty multiplier before the owner bonuses, so the count matches the heal
+        int HealPerPotion(Character receiver) => (int)PotionBonus.ApplyOwnerBonuses(player, DifficultySystem.ApplyHealingMultiplier(PotionBonus.AverageHeal(player, receiver)));
         int totalPotionsUsed = 0;
         long totalHealing = 0;
 
@@ -13191,6 +13195,7 @@ public class DungeonLocation : BaseLocation
                 player.Healing--;
                 totalPotionsUsed++;
                 int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31); // 1.2.8: at least 20% of MaxHP
+                healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
                 healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary
                 player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             }
@@ -13211,6 +13216,7 @@ public class DungeonLocation : BaseLocation
                     player.Healing--;
                     totalPotionsUsed++;
                     int healAmount = (int)PotionBonus.BaseHeal(player, dungeonRandom, 31, companion); // 1.2.8: at least 20% of the companion's MaxHP
+                    healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
                     healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the giver's Infirmary
                     companion.HP = Math.Min(companion.MaxHP, companion.HP + healAmount);
                 }
@@ -13267,6 +13273,7 @@ public class DungeonLocation : BaseLocation
         // Use one potion
         player.Healing--;
         long healAmount = player.MaxHP / 4;
+        healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, before the cap
         long oldHP = player.HP;
         player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
@@ -13307,6 +13314,7 @@ public class DungeonLocation : BaseLocation
         }
 
         long healAmount = player.MaxHP / 4;
+        healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: Infirmary, so potionsNeeded matches
         int potionsNeeded = (int)Math.Ceiling((double)(player.MaxHP - player.HP) / healAmount);
         int potionsToUse = Math.Min(potionsNeeded, (int)player.Healing);
@@ -14792,8 +14800,9 @@ public class DungeonLocation : BaseLocation
         int difficulty = Math.Min(5, 1 + (currentDungeonLevel / 20));
         var riddle = RiddleDatabase.Instance.GetRandomRiddle(difficulty, currentFloor?.Theme);
 
-        // Present the riddle using the full system
-        var result = await RiddleDatabase.Instance.PresentRiddle(riddle, player, terminal);
+        // Present the riddle using the full system. 1.3.2: a failure is charged once, there, the riddle's own
+        // damage with the Settlement Prison buff applied; fleeing costs only what the riddle's flee rule says.
+        var result = await RiddleDatabase.Instance.PresentRiddle(riddle, player, terminal, dmg => ApplyTrapResistBuff(player, dmg));
 
         if (result.Solved)
         {
@@ -14833,15 +14842,6 @@ public class DungeonLocation : BaseLocation
             terminal.SetColor("red");
             terminal.WriteLine("");
             terminal.WriteLine(Loc.Get("dungeon.gate_sealed"));
-
-            // Take damage on failure (Settlement Prison TrapResist applies)
-            int damage = riddle.FailureDamage * currentDungeonLevel / 5;
-            damage = ApplyTrapResistBuff(player, damage);
-            if (damage > 0)
-            {
-                player.HP = Math.Max(1, player.HP - damage);
-                terminal.WriteLine(Loc.Get("dungeon.trap_activates", damage));
-            }
         }
 
         await terminal.PressAnyKey();
@@ -19452,6 +19452,7 @@ public class DungeonLocation : BaseLocation
         {
             long oldHP = player.HP;
             int healAmount = (int)PotionBonus.BaseHeal(player, Random.Shared, 31); // 1.2.8: at least 20% of MaxHP
+            healAmount = (int)DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
             healAmount = (int)PotionBonus.ApplyOwnerBonuses(player, healAmount); // v1.1.11: the follower's own Infirmary
             player.HP = Math.Min(player.MaxHP, player.HP + healAmount);
             long actualHeal = player.HP - oldHP;

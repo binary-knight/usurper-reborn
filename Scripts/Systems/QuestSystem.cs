@@ -567,6 +567,8 @@ public partial class QuestSystem
         public int BaseProgress;             // baseline RequiredProgress, scaled by playerLevel at create time
         public float PayoutMultiplier;       // contract-kind multiplier on base gold (0.85 = easy job pays less, 1.25 = harder pays more)
         public int Tier;                     // 1-5; slice 1 ships only tier 1
+        public bool FlatProgress;            // 1.3.2: BaseProgress at every level, not scaled by playerLevel
+        public int Days;                     // 1.3.2: days to complete; 0 = the default 7
     }
 
     // Slice 1: 2 contracts per faction at tier 1.
@@ -580,7 +582,7 @@ public partial class QuestSystem
     // Tiers 3-5 + Legend's Pick stay deferred.
     private static readonly MercTemplate[] MercTemplatesSlice1 = new[]
     {
-        new MercTemplate { Id = "crown_bandit_purge",    Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Bandit",     BaseProgress = 3, PayoutMultiplier = 1.00f, Tier = 1 },
+        new MercTemplate { Id = "crown_bandit_purge",    Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.KillSpecificMonster, TargetId = "Bandit",     BaseProgress = 3, PayoutMultiplier = 1.00f, Tier = 1, FlatProgress = true, Days = 14 },
         new MercTemplate { Id = "crown_guard_relief",    Faction = UsurperRemake.Systems.Faction.TheCrown,   ObjectiveType = QuestObjectiveType.ExploreRooms,        TargetId = "",           BaseProgress = 10, PayoutMultiplier = 0.85f, Tier = 1 },
         new MercTemplate { Id = "shadows_fence_run",     Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.VisitLocation,       TargetId = "DarkAlley",  BaseProgress = 1, PayoutMultiplier = 0.90f, Tier = 1 },
         new MercTemplate { Id = "shadows_jailbreak",     Faction = UsurperRemake.Systems.Faction.TheShadows, ObjectiveType = QuestObjectiveType.VisitLocation,       TargetId = "Prison",     BaseProgress = 1, PayoutMultiplier = 0.90f, Tier = 1 },
@@ -650,7 +652,7 @@ public partial class QuestSystem
     private static Quest CreateMercContract(MercTemplate tpl, int playerLevel)
     {
         // Required progress scales with player level so the contract isn't trivially easy at endgame.
-        int required = tpl.BaseProgress + (playerLevel / 5);
+        int required = tpl.FlatProgress ? tpl.BaseProgress : tpl.BaseProgress + (playerLevel / 5);
 
         // Gold scales on PLAYER LEVEL only (NOT player wealth -- can't compound into a printer).
         long goldReward = (long)(playerLevel * GameConfig.MercContractBaseGoldTier1 * tpl.PayoutMultiplier);
@@ -685,7 +687,7 @@ public partial class QuestSystem
             QuestType = QuestType.SingleQuest,
             QuestTarget = QuestTarget.Monster, // closest legacy target; objectives are the real tracking
             Difficulty = (byte)Math.Max(1, tpl.Tier),
-            DaysToComplete = 7,
+            DaysToComplete = tpl.Days > 0 ? tpl.Days : 7,
             MinLevel = Math.Max(1, playerLevel - 5),
             MaxLevel = playerLevel + 15,
             Reward = GameConfig.QuestRewardMedium,
@@ -1515,8 +1517,17 @@ public partial class QuestSystem
         }
     }
 
+    /// <summary>
+    /// 1.3.2: the bandits a player can meet, both in the wilderness. The Sellsword contract "Bandits on the Trade
+    /// Road" stores the target "Bandit", which no monster is named; a kill of either counts for that target.
+    /// </summary>
+    internal static readonly string[] BanditMonsters = { "Bandit Scout", "Mountain Bandit" };
+    internal const string BanditTargetId = "bandit";
+
     public static void OnMonsterKilled(Character player, string monsterName, bool isBoss = false, string tierName = "", bool isMiniBoss = false)
     {
+        bool isBandit = BanditMonsters.Any(b => string.Equals(b, monsterName, StringComparison.OrdinalIgnoreCase)
+            || string.Equals(b, tierName, StringComparison.OrdinalIgnoreCase));
         var playerQuests = GetPlayerQuests(player.Name2);
         string nameId = monsterName.ToLower().Replace(" ", "_");
         // TierName is the base monster type (e.g. "Zombie") even for champion variants ("Zombie Champion")
@@ -1529,6 +1540,10 @@ public partial class QuestSystem
             // The kill counts for an objective that names the monster or its base tier (champion and boss
             // variants count for their tier). One kill ticks each objective once, also one with no target.
             quest.UpdateObjectiveProgress(QuestObjectiveType.KillSpecificMonster, 1, nameId, tierId);
+            // An objective naming "bandit" matched neither id above (the bandits' ids are their own names), so this
+            // ticks it once and ticks nothing twice.
+            if (isBandit)
+                quest.UpdateTargetedObjectiveProgress(QuestObjectiveType.KillSpecificMonster, 1, BanditTargetId);
 
             // Update boss kill objectives
             if (isBoss)
@@ -2155,7 +2170,9 @@ public partial class QuestSystem
 
     #region King Bounty System
 
-    private static string KING_BOUNTY_INITIATOR => "The Crown";
+    /// <summary>1.3.2: the stored (English) initiator of every Crown bounty; Quest.CalculateReward reads it.</summary>
+    public const string CrownInitiator = "The Crown";
+    private static string KING_BOUNTY_INITIATOR => CrownInitiator;
 
     /// <summary>
     /// Get all bounties posted by the King
@@ -2355,7 +2372,7 @@ public partial class QuestSystem
         ));
 
         SetDefaultRewards(bounty);
-        bounty.Reward = (byte)Math.Min(255, bounty.Reward * 2); // King bounties pay double
+        bounty.Reward = (byte)Math.Min(255, bounty.Reward * 2); // King bounties pay double: Quest.CalculateReward halves it back to the base tier and doubles the gold and XP
 
         return bounty;
     }
@@ -2448,6 +2465,13 @@ public partial class QuestSystem
         return 3;
     }
 
+    /// <summary>1.3.2: the reward tier a royal audience quest stores (gold, paid at turn-in by Quest.CalculateReward).</summary>
+    public const byte RoyalQuestRewardTier = 3;
+
+    /// <summary>1.3.2: what completing a royal audience quest pays at this level, for the offer screen.</summary>
+    public static long RoyalQuestCompletionGold(int level) =>
+        new Quest { Reward = RoyalQuestRewardTier, RewardType = QuestRewardType.Money }.CalculateReward(level);
+
     public static Quest CreateRoyalAudienceQuest(Character player, string kingName, int difficulty,
         long goldReward, long xpReward, string questDescription)
     {
@@ -2523,7 +2547,7 @@ public partial class QuestSystem
             MinLevel = Math.Max(1, player.Level - 5),
             MaxLevel = player.Level + 20,
             DaysToComplete = 7 + difficulty * 2, // 9, 11, 13, 15 days
-            Reward = 3, // High reward tier
+            Reward = RoyalQuestRewardTier, // High reward tier
             RewardType = QuestRewardType.Money,
             // Pre-assign to this player
             Occupier = player.Name2,

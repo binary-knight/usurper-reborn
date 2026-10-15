@@ -396,7 +396,8 @@ public class MailSpam125Tests : IDisposable
         Row("System", "Ranger", "throne_lost", 40);
         Row("Mage", "Ranger", "mail", 40);
         long before = Mail();
-        typeof(WorldSimService).GetMethod("ProcessWorldDailyReset", Priv)!.Invoke(new WorldSimService(_db), null);
+        try { typeof(WorldSimService).GetMethod("ProcessWorldDailyReset", Priv)!.Invoke(new WorldSimService(_db), null); }
+        finally { WorldEventSystem.Instance.ClearAllEvents(); }   // 1.3.2: the reset rolls world events; none is left for later tests
         Count("SELECT COUNT(*) FROM messages WHERE from_player = 'System';").Should().Be(0, "the daily reset runs the cap");
         Mail().Should().Be(before - 1, "nothing new was mailed");
         Count("SELECT COUNT(*) FROM messages WHERE from_player = 'Mage';").Should().Be(1);

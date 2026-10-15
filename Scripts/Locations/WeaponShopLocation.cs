@@ -129,6 +129,14 @@ public class WeaponShopLocation : BaseLocation
                 terminal.WriteLine(Loc.Get("weapon_shop.align_markup", alignText, (int)((alignmentModifier - 1.0f) * 100)));
         }
 
+        // 1.3.2: a Troll's discount on weapons (HagglingEngine.ApplyRaceDiscount), shown only to a Troll
+        long racePercent = 100 - HagglingEngine.ApplyRaceDiscount(currentPlayer, 100);
+        if (racePercent > 0)
+        {
+            terminal.SetColor("bright_green");
+            terminal.WriteLine(Loc.Get("weapon_shop.troll_discount", racePercent));
+        }
+
         // Show world event price modifier
         var worldEventModifier = WorldEventSystem.Instance.GlobalPriceModifier;
         if (Math.Abs(worldEventModifier - 1.0f) > 0.01f)
@@ -443,9 +451,7 @@ public class WeaponShopLocation : BaseLocation
         {
             bool canAfford = currentPlayer.Gold >= item.Value;
             bool meetsLevel = currentPlayer.Level >= item.MinLevel;
-            bool isPrestige = currentPlayer.Class >= CharacterClass.Tidesworn;
-            bool meetsClass = isPrestige || item.ClassRestrictions == null || item.ClassRestrictions.Count == 0
-                || item.ClassRestrictions.Contains(currentPlayer.Class);
+            bool meetsClass = MeetsClass(currentPlayer.Class, item);
             bool canBuy = canAfford && meetsLevel && meetsClass;
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
@@ -572,6 +578,17 @@ public class WeaponShopLocation : BaseLocation
 
     // v1.2.5: the class tag is shown through keys (ClassRestrictionTag); the restriction itself stays the enum list
     private static string GetClassTag(Equipment item) => ClassRestrictionTag(item);
+
+    /// <summary>1.3.1: the item's class list admits the class. Only the five prestige classes pass every list
+    /// (GameConfig.IsPrestigeClass); the Mystic Shaman, the last class value, follows the lists.</summary>
+    internal static bool MeetsClassList(CharacterClass characterClass, Equipment item) =>
+        GameConfig.IsPrestigeClass(characterClass) || item.ClassRestrictions == null
+        || item.ClassRestrictions.Count == 0 || item.ClassRestrictions.Contains(characterClass);
+
+    /// <summary>1.3.1: the class mark of a shop row: the class list and the Mystic Shaman's main hand rule,
+    /// as the equip check has them (Equipment.CanEquip).</summary>
+    internal static bool MeetsClass(CharacterClass characterClass, Equipment item) =>
+        MeetsClassList(characterClass, item) && !item.MysticShamanMainHandRefuses(characterClass);
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
@@ -725,6 +742,9 @@ public class WeaponShopLocation : BaseLocation
         // Apply difficulty-based price multiplier
         adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
 
+        // 1.3.2: a Troll pays 10 percent less, after every other modifier and before the tax
+        adjustedPrice = HagglingEngine.ApplyRaceDiscount(currentPlayer, adjustedPrice);
+
         // Calculate total with tax
         var (kingTax, cityTax, totalWithTax) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
 
@@ -745,12 +765,16 @@ public class WeaponShopLocation : BaseLocation
         bool canEquipPersonally = true;
         string cantEquipReason = "";
 
-        if (currentPlayer.Class < CharacterClass.Tidesworn
-            && item.ClassRestrictions != null && item.ClassRestrictions.Count > 0
-            && !item.ClassRestrictions.Contains(currentPlayer.Class))
+        if (!MeetsClassList(currentPlayer.Class, item))
         {
             canEquipPersonally = false;
             cantEquipReason = Loc.Get("weapon_shop.class_restriction", GetClassTag(item));
+        }
+        else if (item.MysticShamanMainHandRefuses(currentPlayer.Class))
+        {
+            // 1.3.1: the Mystic Shaman's main hand rule, with the equip check's own line
+            canEquipPersonally = false;
+            cantEquipReason = Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(currentPlayer.Class));
         }
         else if (item.RequiresGood && currentPlayer.Chivalry <= currentPlayer.Darkness)
         {
@@ -1469,6 +1493,8 @@ public class WeaponShopLocation : BaseLocation
             adjustedPrice = (long)(adjustedPrice * FactionSystem.Instance.GetShopPriceModifier());
             // Apply difficulty-based price multiplier
             adjustedPrice = DifficultySystem.ApplyShopPriceMultiplier(adjustedPrice);
+            // 1.3.2: a Troll pays 10 percent less, after every other modifier and before the tax
+            adjustedPrice = HagglingEngine.ApplyRaceDiscount(currentPlayer, adjustedPrice);
 
             // Calculate total with tax
             var (abKingTax, abCityTax, abTotal) = CityControlSystem.CalculateTaxedPrice(adjustedPrice);
@@ -1681,7 +1707,6 @@ public class WeaponShopLocation : BaseLocation
         int startIndex = currentPage * ItemsPerPage;
         var pageItems = items.Skip(startIndex).Take(ItemsPerPage).ToList();
         int totalPages = (items.Count + ItemsPerPage - 1) / ItemsPerPage;
-        bool isPrestige = player.Class >= CharacterClass.Tidesworn;
 
         var browseItems = new List<ElectronBridge.ShopBrowseItem>();
         for (int i = 0; i < pageItems.Count; i++)
@@ -1689,8 +1714,7 @@ public class WeaponShopLocation : BaseLocation
             var item = pageItems[i];
             bool canAfford = player.Gold >= item.Value;
             bool meetsLevel = player.Level >= item.MinLevel;
-            bool meetsClass = isPrestige || item.ClassRestrictions == null || item.ClassRestrictions.Count == 0
-                || item.ClassRestrictions.Contains(player.Class);
+            bool meetsClass = MeetsClass(player.Class, item);
 
             var bonuses = new Dictionary<string, int>();
             if (item.StrengthBonus != 0) bonuses["STR"] = item.StrengthBonus;

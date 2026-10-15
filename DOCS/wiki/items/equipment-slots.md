@@ -1,8 +1,9 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.3.0
+checked: 1.3.2
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
+history: 1.3.2 | A Mystic Shaman follows its own main hand and armor weight rules.
 history: 1.3.0 | When you dual wield, each swing uses the weapon in its own hand and Status shows the weapon power of each hand, and the loot comparison for a shield warns when the shield would take off the weapon your spells or abilities need.
 history: 1.2.7 | none
 history: 1.2.6 | none

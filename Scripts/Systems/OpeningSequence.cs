@@ -549,7 +549,7 @@ namespace UsurperRemake.Systems
             int savedGods = 0;
             if (story.HasStoryFlag("veloura_saved")) savedGods++;
             if (story.HasStoryFlag("aurelion_saved")) savedGods++;
-            if (story.HasStoryFlag("terravok_awakened")) savedGods++;
+            if (story.HasStoryFlag("terravok_saved")) savedGods++;
             if (savedGods < 2) return false;
 
             // Must have allied with Noctura

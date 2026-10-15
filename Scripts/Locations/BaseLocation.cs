@@ -4233,6 +4233,7 @@ public abstract class BaseLocation
 
         // Use one potion
         long healAmount = PotionBonus.BaseHeal(currentPlayer, Random.Shared); // 1.2.8: at least 20% of MaxHP
+        healAmount = DifficultySystem.ApplyHealingMultiplier(healAmount); // 1.3.2: the difficulty multiplier, before the owner bonuses
         healAmount = PotionBonus.ApplyOwnerBonuses(currentPlayer, healAmount); // v1.1.11: Infirmary, before the cap
         healAmount = Math.Min(healAmount, currentPlayer.MaxHP - currentPlayer.HP);
         currentPlayer.HP += healAmount;
@@ -7154,7 +7155,10 @@ public abstract class BaseLocation
             || currentPlayer.Class == CharacterClass.Alchemist
             || currentPlayer.Class == CharacterClass.Paladin
             || currentPlayer.Class == CharacterClass.Magician
+            || currentPlayer.Class == CharacterClass.Bard
             || currentPlayer.Class == CharacterClass.Jester
+            || currentPlayer.Class == CharacterClass.Assassin
+            || currentPlayer.Class == CharacterClass.MysticShaman
             || currentPlayer.Class == CharacterClass.Cleric
             || currentPlayer.Class == CharacterClass.Tidesworn
             || currentPlayer.Class == CharacterClass.Wavecaller
@@ -7168,23 +7172,24 @@ public abstract class BaseLocation
             // v1.2.5: a buff row past 79 columns wraps, its later rows under the text after "  - ".
             void WriteBuff(string row) { foreach (var r in BuffRows(row)) terminal.WriteLine(r); }
 
-            // Blood Price debuffs (murder weight consequences)
+            // Blood Price debuffs (murder weight consequences). 1.3.2: the lines name only the damage cut the
+            // live swing applies; no shop or healer reads the murder weight, so no markup is listed
             if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier3Threshold)
             {
                 terminal.SetColor("dark_red");
-                WriteBuff(Loc.Get("base.buff_blood_price_3", (int)(GameConfig.MurderWeightTier3CombatPenalty * 100), (int)(GameConfig.MurderWeightTier3ShopMarkup * 100), (int)(GameConfig.MurderWeightTier3HealPenalty * 100)));
+                WriteBuff(Loc.Get("base.buff_blood_price_3", (int)(GameConfig.MurderWeightTier3CombatPenalty * 100)));
                 WriteBuff(Loc.Get("base.buff_murder_weight", $"{currentPlayer.MurderWeight:F1}"));
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightTier2Threshold)
             {
                 terminal.SetColor("red");
-                WriteBuff(Loc.Get("base.buff_blood_price_2", (int)(GameConfig.MurderWeightTier2CombatPenalty * 100), (int)(GameConfig.MurderWeightTier2ShopMarkup * 100)));
+                WriteBuff(Loc.Get("base.buff_blood_price_2", (int)(GameConfig.MurderWeightTier2CombatPenalty * 100)));
                 WriteBuff(Loc.Get("base.buff_murder_weight", $"{currentPlayer.MurderWeight:F1}"));
             }
             else if (currentPlayer.MurderWeight >= GameConfig.MurderWeightShopMarkupThreshold)
             {
                 terminal.SetColor("yellow");
-                WriteBuff(Loc.Get("base.buff_blood_price_1", (int)(GameConfig.MurderWeightShopMarkupPercent * 100)));
+                WriteBuff(Loc.Get("base.buff_blood_price_1", (int)GameConfig.MurderWeightTier2Threshold));
                 WriteBuff(Loc.Get("base.buff_murder_weight", $"{currentPlayer.MurderWeight:F1}"));
             }
 
@@ -7274,7 +7279,7 @@ public abstract class BaseLocation
             if (currentPlayer.Class == CharacterClass.Cyclebreaker)
             {
                 terminal.SetColor("bright_magenta");
-                WriteBuff(Loc.Get("base.buff_probability", (int)(GameConfig.CyclebreakerDebuffResistChance * 100)));
+                WriteBuff(Loc.Get("base.buff_probability", (int)(GameConfig.CyclebreakerDebuffResistChance * 100), GameConfig.CyclebreakerPassiveEvadePercent));
                 int cycle = StoryProgressionSystem.Instance?.CurrentCycle ?? 1;
                 float xpBonus = Math.Min(GameConfig.CyclebreakerCycleXPBonusCap, (cycle - 1) * GameConfig.CyclebreakerCycleXPBonus);
                 if (xpBonus > 0)

@@ -381,9 +381,7 @@ public class ArmorShopLocation : BaseLocation
         {
             bool canAfford = currentPlayer.Gold >= item.Value;
             bool meetsLevel = currentPlayer.Level >= item.MinLevel;
-            bool isPrestige = currentPlayer.Class >= CharacterClass.Tidesworn;
-            bool meetsClass = isPrestige || item.ClassRestrictions == null || item.ClassRestrictions.Count == 0
-                || item.ClassRestrictions.Contains(currentPlayer.Class);
+            bool meetsClass = MeetsClass(currentPlayer.Class, item);
             bool canBuy = canAfford && meetsLevel && meetsClass;
 
             terminal.SetColor(canBuy ? "bright_cyan" : "darkgray");
@@ -504,6 +502,13 @@ public class ArmorShopLocation : BaseLocation
 
     // v1.2.5: the class tag is shown through keys (ClassRestrictionTag); the restriction itself stays the enum list
     private static string GetClassTag(Equipment item) => ClassRestrictionTag(item);
+
+    /// <summary>1.3.1: the class mark of a shop row: the item's class list admits the class. Only the five
+    /// prestige classes pass every list (GameConfig.IsPrestigeClass); the Mystic Shaman, the last class value,
+    /// follows the lists.</summary>
+    internal static bool MeetsClass(CharacterClass characterClass, Equipment item) =>
+        GameConfig.IsPrestigeClass(characterClass) || item.ClassRestrictions == null
+        || item.ClassRestrictions.Count == 0 || item.ClassRestrictions.Contains(characterClass);
 
     protected override async Task<bool> ProcessChoice(string choice)
     {
@@ -656,9 +661,7 @@ public class ArmorShopLocation : BaseLocation
         bool canEquipPersonally = true;
         string cantEquipReason = "";
 
-        if (currentPlayer.Class < CharacterClass.Tidesworn
-            && item.ClassRestrictions != null && item.ClassRestrictions.Count > 0
-            && !item.ClassRestrictions.Contains(currentPlayer.Class))
+        if (!MeetsClass(currentPlayer.Class, item))
         {
             canEquipPersonally = false;
             cantEquipReason = Loc.Get("armor_shop.class_restriction", GetClassTag(item));

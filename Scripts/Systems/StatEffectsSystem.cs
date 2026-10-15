@@ -256,6 +256,23 @@ public static class StatEffectsSystem
     public static bool RollCriticalHit(Character attacker, Random? rng = null) => (rng ?? _random).Next(100) < CritChance(attacker);
 
     /// <summary>
+    /// 1.3.2: the live basic swing's crit roll, with Umbrath's crit points (DivineBlessingSystem.GetCriticalHitBonus)
+    /// added under the same ceiling as every other bonus. Only that roll passes them: a world boss hit rolls
+    /// Umbrath's crit on its own (WorldBossSystem.ApplyDivineAttack), so CritChance(attacker) leaves it out.
+    /// </summary>
+    public static bool RollCriticalHit(Character attacker, Random? rng, int divineCritPoints) =>
+        (rng ?? _random).Next(100) < CritChance(attacker, divineCritPoints);
+
+    /// <summary>1.3.2: CritChance plus divine crit points, held to the Dexterity ceiling; never lower than CritChance.</summary>
+    internal static int CritChance(Character attacker, int divineCritPoints)
+    {
+        int critChance = CritChance(attacker);
+        if (divineCritPoints <= 0) return critChance;
+        long effectiveDex = attacker.Dexterity + DrugSystem.GetDrugEffects(attacker).DexterityBonus;
+        return Math.Max(critChance, Math.Min(critChance + divineCritPoints, GetCriticalHitChanceCapped(effectiveDex)));
+    }
+
+    /// <summary>
     /// The crit chance RollCriticalHit rolls against, with every bonus stacked. v1.1.10: split out so
     /// it can be read, and it now carries the fight's TempCritChanceBonus (an Old God's dialogue).
     /// </summary>
@@ -266,34 +283,37 @@ public static class StatEffectsSystem
         long effectiveDex = attacker.Dexterity + drugEffects.DexterityBonus;
         int critChance = GetCriticalHitChance(effectiveDex, attacker.GetEquipmentCritChanceBonus());
 
+        // v1.3.1: one ceiling for every bonus below, from the same Dexterity the base uses.
+        int ceiling = GetCriticalHitChanceCapped(effectiveDex);
+
         // Apply drug CritBonus directly to crit chance (e.g., QuickSilver: +15)
         if (drugEffects.CritBonus > 0)
-            critChance = Math.Clamp(critChance + drugEffects.CritBonus, 5, 50);
+            critChance = Math.Clamp(critChance + drugEffects.CritBonus, 5, ceiling);
 
         // Divine Boon crit bonus (from worshipped player-god)
         if (attacker.CachedBoonEffects?.CritPercent > 0)
-            critChance = Math.Clamp(critChance + (int)(attacker.CachedBoonEffects.CritPercent * 100), 5, 50);
+            critChance = Math.Clamp(critChance + (int)(attacker.CachedBoonEffects.CritPercent * 100), 5, ceiling);
 
         // v0.61.0 Druid's Shrines: Noctura attunement = +5% crit chance for 24h.
         // Same clamp as the other bonuses so the cap stays sane.
         if (attacker.IsAttunedTo("noctura"))
-            critChance = Math.Clamp(critChance + (int)GameConfig.ShrineNocturaCritChanceBonus, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + (int)GameConfig.ShrineNocturaCritChanceBonus, 5, ceiling);
 
         // v0.61.0 Beast Taming: Cave Spider active pet = +5% crit chance.
         // Stacks with Noctura attunement, capped via the same DEX-scaled limit.
         if (attacker.HasActivePet("cave_spider"))
-            critChance = Math.Clamp(critChance + 5, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + 5, 5, ceiling);
 
         // Alignment passive — Shadow Strike (Dark/Evil) / Righteous Fury (Good/Holy):
         // flat crit bonus for committing to a path. Same DEX-scaled cap so it can't
         // push past the ceiling. (NPC allies with strong alignment benefit too -- intended.)
         int alignCrit = UsurperRemake.Systems.AlignmentSystem.Instance.GetAlignmentCritBonus(attacker);
         if (alignCrit > 0)
-            critChance = Math.Clamp(critChance + alignCrit, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + alignCrit, 5, ceiling);
 
         // v1.1.10: this fight's bonus or penalty (an Old God's dialogue), under the same cap
         if (attacker.TempCritChanceBonus != 0)
-            critChance = Math.Clamp(critChance + attacker.TempCritChanceBonus, 5, GetCriticalHitChanceCapped(attacker.Dexterity));
+            critChance = Math.Clamp(critChance + attacker.TempCritChanceBonus, 5, ceiling);
 
         return critChance;
     }

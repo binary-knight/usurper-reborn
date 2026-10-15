@@ -287,6 +287,7 @@ function historySite() {
     favor,
     fs
       .readFileSync(favor, "utf8")
+      .replace(/^history: .*\n/gm, "")
       .replace(
         /^(sources: .*)$/m,
         `$1\nhistory: 1.1.9 | Oldest qxoldword note.\nhistory: ${version} | Newest qxhistoryword note with <b>tags</b> & "quotes".\nhistory: 1.1.10 | Middle note.\nhistory: 1.2.1 | none`,
@@ -313,7 +314,7 @@ test("history section: newest first, escaped, none hidden, labelled, only where 
   assert.ok(!/>none</.test(section[0]));
   // Inside main, after the body and before the footer.
   assert.ok(page.indexOf("</section><footer>") > page.indexOf('id="main"'));
-  for (const p of ["/wiki/en/gods/boons/", "/wiki/en/items/1000/", "/wiki/en/"])
+  for (const p of ["/wiki/en/world/", "/wiki/en/items/1000/", "/wiki/en/"])
     assert.ok(!html(p).includes('class="history"'), p);
 });
 test("history section: a guide with only none markers shows no section", () => {
@@ -322,7 +323,7 @@ test("history section: a guide with only none markers shows no section", () => {
   const favor = path.join(content, "gods/favor.md");
   fs.writeFileSync(
     favor,
-    fs.readFileSync(favor, "utf8").replace(/^(sources: .*)$/m, "$1\nhistory: 1.2.0 | none\nhistory: 1.2.1 | none"),
+    fs.readFileSync(favor, "utf8").replace(/^history: .*\n/gm, "").replace(/^(sources: .*)$/m, "$1\nhistory: 1.2.0 | none\nhistory: 1.2.1 | none"),
   );
   const out = path.join(temp, "history-none-site");
   build({ dataDir, contentDir: content, outDir: out });

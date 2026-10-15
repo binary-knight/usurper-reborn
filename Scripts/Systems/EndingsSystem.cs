@@ -59,27 +59,7 @@ namespace UsurperRemake.Systems
             long alignment = player.Chivalry - player.Darkness;
 
             // Count saved vs destroyed gods (all 6 Old Gods)
-            int savedGods = 0;
-            int destroyedGods = 0;
-
-            // Veloura - Goddess of Illusions
-            if (story.HasStoryFlag("veloura_saved")) savedGods++;
-            if (story.HasStoryFlag("veloura_destroyed")) destroyedGods++;
-            // Aurelion - God of Light
-            if (story.HasStoryFlag("aurelion_saved")) savedGods++;
-            if (story.HasStoryFlag("aurelion_destroyed")) destroyedGods++;
-            // Terravok - God of Earth
-            if (story.HasStoryFlag("terravok_awakened")) savedGods++;
-            if (story.HasStoryFlag("terravok_destroyed")) destroyedGods++;
-            // Noctura - Goddess of Night
-            if (story.HasStoryFlag("noctura_ally")) savedGods++;
-            if (story.HasStoryFlag("noctura_destroyed")) destroyedGods++;
-            // Maelketh - God of Chaos
-            if (story.HasStoryFlag("maelketh_saved")) savedGods++;
-            if (story.HasStoryFlag("maelketh_destroyed")) destroyedGods++;
-            // Thorgrim - God of War
-            if (story.HasStoryFlag("thorgrim_saved")) savedGods++;
-            if (story.HasStoryFlag("thorgrim_destroyed")) destroyedGods++;
+            var (savedGods, destroyedGods) = CountGodsByFlags(story);
 
             // Determine ending based on choices
             if (alignment < -300 || destroyedGods >= 5)
@@ -138,7 +118,7 @@ namespace UsurperRemake.Systems
             if (story.HasStoryFlag("veloura_saved")) sparedGods++;
             if (story.HasStoryFlag("aurelion_saved")) sparedGods++;
             if (story.HasStoryFlag("noctura_ally")) sparedGods++;
-            if (story.HasStoryFlag("terravok_awakened")) sparedGods++;
+            if (story.HasStoryFlag("terravok_saved")) sparedGods++;
             if (sparedGods < 2)
                 return false;
 
@@ -965,22 +945,48 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// 1.3.1: the saved and destroyed counts over the six Old Gods (Manwe is not counted), read from the
+        /// story flags. DetermineEnding and the ending screen's world impact both use it, so the screen shows
+        /// the gods the ending was chosen by. A god is saved on "&lt;god&gt;_saved" (Noctura on "noctura_ally")
+        /// and destroyed on "&lt;god&gt;_destroyed"; Noctura is also destroyed when she was defeated after her
+        /// betrayal ("noctura_betrayal_defeated"), counted once.
+        /// </summary>
+        internal static (int Saved, int Destroyed) CountGodsByFlags(StoryProgressionSystem story)
+        {
+            int savedGods = 0;
+            int destroyedGods = 0;
+
+            // Veloura - Goddess of Illusions
+            if (story.HasStoryFlag("veloura_saved")) savedGods++;
+            if (story.HasStoryFlag("veloura_destroyed")) destroyedGods++;
+            // Aurelion - God of Light
+            if (story.HasStoryFlag("aurelion_saved")) savedGods++;
+            if (story.HasStoryFlag("aurelion_destroyed")) destroyedGods++;
+            // Terravok - God of Earth
+            if (story.HasStoryFlag("terravok_saved")) savedGods++;
+            if (story.HasStoryFlag("terravok_destroyed")) destroyedGods++;
+            // Noctura - Goddess of Night
+            if (story.HasStoryFlag("noctura_ally")) savedGods++;
+            if (story.HasStoryFlag("noctura_destroyed") || story.HasStoryFlag("noctura_betrayal_defeated")) destroyedGods++;
+            // Maelketh - God of Chaos
+            if (story.HasStoryFlag("maelketh_saved")) savedGods++;
+            if (story.HasStoryFlag("maelketh_destroyed")) destroyedGods++;
+            // Thorgrim - God of War
+            if (story.HasStoryFlag("thorgrim_saved")) savedGods++;
+            if (story.HasStoryFlag("thorgrim_destroyed")) destroyedGods++;
+
+            return (savedGods, destroyedGods);
+        }
+
+        /// <summary>
         /// Show the impact of the player's choices on the world
         /// </summary>
         private async Task ShowWorldImpact(Character player, EndingType ending, StoryProgressionSystem story, TerminalEmulator terminal)
         {
             await Pacing.Wait(100);
 
-            // Count gods saved vs destroyed
-            int savedGods = 0;
-            int destroyedGods = 0;
-            foreach (var godState in story.OldGodStates.Values)
-            {
-                if (godState.Status == GodStatus.Saved || godState.Status == GodStatus.Awakened)
-                    savedGods++;
-                else if (godState.Status == GodStatus.Defeated)
-                    destroyedGods++;
-            }
+            // Count gods saved vs destroyed: the same flags the ending was chosen by
+            var (savedGods, destroyedGods) = CountGodsByFlags(story);
 
             if (savedGods > destroyedGods)
             {

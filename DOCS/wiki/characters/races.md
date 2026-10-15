@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.3.1
-sources: Scripts/Core/GameConfig.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs
+checked: 1.3.2
+sources: Scripts/Core/GameConfig.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
+history: 1.3.2 | A Troll pays 10 percent less for a weapon at the Weapon Shop.
 history: 1.3.1 | none
 history: 1.3.0 | The Gnoll Poisonous Bite poisons on melee hits only; it no longer comes from spells, magical abilities, ranged abilities or a swing made with a bow in hand.
 history: 1.2.7 | none
@@ -15,7 +16,11 @@ Race contributes bonuses at character creation and limits some class choices. Ra
 
 {{table:races}}
 
-Open a race page for its creation ranges. Appearance fields are generator settings, not combat bonuses. NPC lifespan is a world-simulation value, not a countdown for a player.
+Open a race page for its creation ranges. Appearance fields are generator settings, not combat bonuses.
+
+## How long does an NPC of each race live
+
+The table also shows each race's NPC lifespan. An NPC ages one game year every {{balance:NpcLifecycleHoursPerYear}} real hours and dies of old age at its race's lifespan: an Elf NPC lives 200 game years, about 80 real days from its birth. Your own character does not age this way. [NPC life](/wiki/en/online/npcs/#how-long-does-an-npc-live-lifespan-by-race) has the whole life cycle.
 
 ## Creation bonuses
 
@@ -48,6 +53,16 @@ Race scales the Mental strain you take in the dungeon:
 - Human and Dwarf: 100 percent.
 
 Your class scales it again. The [Mental guide](/wiki/en/characters/mental/) shows how the two combine.
+
+## Race passives: Troll and Gnoll
+
+Two races have a passive of their own in a fight: the Troll regenerates and the Gnoll has a poisonous bite. The other eight races differ in their creation bonuses, their class limits and their Mental strain. Hobbits and Gnomes also cannot wear Heavy armor: see [equipment by class](/wiki/en/characters/classes/#equipment-by-class-armor-weight-weapons-and-shields).
+
+Out of a fight, a Troll also pays 10 percent less for a weapon at the Weapon Shop.
+
+## Troll regeneration
+
+A Troll you play regains 2 percent of maximum HP at the end of each combat round, and never less than 3 HP, while below full HP. A drug that raises Constitution adds one tenth of that bonus to the amount.
 
 ## Gnoll Poisonous Bite
 

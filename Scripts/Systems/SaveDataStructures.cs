@@ -700,6 +700,7 @@ namespace UsurperRemake.Systems
         public bool SettlementGoldClaimedToday { get; set; }
         public bool SettlementHerbClaimedToday { get; set; }
         public bool SettlementShrineUsedToday { get; set; }
+        public bool JailbreakAttemptedToday { get; set; }   // 1.3.2: absent in an older save, which loads false
         public bool SettlementCircleUsedToday { get; set; }
         public bool SettlementWorkshopUsedToday { get; set; }
         public int WorkshopBuffCombats { get; set; } = 0;

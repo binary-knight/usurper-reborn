@@ -59,6 +59,12 @@ Numbers should come from directives, not copied tables:
 ```text
 {{table:items slot=MainHand}}
 {{table:classes}}
+{{table:class-roles}}
+{{table:class-equipment}}
+{{table:weapon-templates}}
+{{table:proficiency}}
+{{table:xp-levels}}
+{{table:mental-recovery}}
 {{table:races}}
 {{table:spells classId=Cleric}}
 {{table:abilities}}
@@ -70,10 +76,100 @@ Numbers should come from directives, not copied tables:
 {{table:secret-bosses}}
 {{table:achievements}}
 {{table:balance}}
+{{table:beasts}}
+{{table:companions}}
+{{table:ally-stances}}
+{{table:materials}}
+{{table:old-god-rewards}}
+{{table:enchants}}
+{{table:gear-sets}}
+{{table:loot-rarity}}
+{{table:home-upgrades}}
+{{table:herbs}}
+{{table:statuses}}
+{{table:target-weights}}
+{{table:combat-regeneration}}
+{{table:monster-abilities}}
+{{table:dungeon-floors}}
+{{table:outposts}}
+{{table:wilderness-regions}}
+{{table:druid-shrines}}
+{{table:gauntlet-tiers}}
+{{table:gauntlet-champions}}
+{{table:merc-ranks}}
+{{table:merc-contracts}}
+{{table:god-ranks}}
+{{table:divine-boons}}
+{{table:alignment-types}}
+{{table:faction-ranks}}
+{{table:faction-bonuses}}
+{{table:world-events}}
+{{table:old-god-mechanics}}
+{{table:monster-guards}}
+{{table:world-boss-rewards}}
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
+{{percent:ClericDivineGraceBonus}}
 ```
+
+`{{percent:Key}}` prints a fraction constant as a whole percent: 0.25 prints 25.
+`class-roles` writes one section per class under a level-four heading, and
+`weapon-templates` one section per weapon and shield type under a level-three
+heading. The
+`class-equipment` counts come from the game's own equip check on shop stock.
+Bows are left out of both equipment tables. The character constants a guide
+can print are in the `constants` block of `characters.json` in the export.
+`beasts`, `companions` and `ally-stances` come from `party.json`: a beast's
+level is the higher of its region's level and its own, and a companion's
+weapon types are the main hand types its own rule admits. The party constants
+in the `constants` block of `party.json` print the same way; a party constant
+may not reuse a name another dataset prints.
+`materials`, `old-god-rewards`, `enchants`, `gear-sets`, `loot-rarity`,
+`home-upgrades` and `herbs` come from `economy.json`. The enchant tiers, the
+loot rarity table and the Home upgrade prices are private to their game files
+and are read by reflection, so renaming one fails the export. A named enchant's
+effect is what the game's own enchant code adds to a bare item.
+`old-god-rewards` folds itself under a spoiler: it names each Old God's material
+and the artifacts. The economy constants print like the party constants and
+may not reuse a name either.
+`statuses`, `target-weights` and `combat-regeneration` come from `combat.json`.
+A status's flags and its damage per round are the game's own status rules,
+and whether it ends by itself is tested on a character the export makes. A
+class's target weight is the game's own targeting weight for a fight leader
+of that class whose armor power and maximum HP add nothing. Regeneration is
+the game's own round-end mana and combat stamina rule, with one armor piece of
+each weight. The balance table leaves out the six values no game code reads.
+The combat constants print like the party constants and may not reuse a name
+either.
+`monster-abilities`, `dungeon-floors`, `outposts`, `wilderness-regions`,
+`druid-shrines`, `gauntlet-tiers`, `gauntlet-champions`, `merc-ranks` and
+`merc-contracts` come from `world.json`. A monster ability's numbers are what
+the game's own ability code does over a fixed set of seeds, for a level 20
+monster at half its HP: the fields of its result the combat engine reads, and
+every number of the monster it changes; a number that varies prints as a range,
+and the export also marks an ability that changes when the monster or the
+target is badly hurt or on a second use. Only abilities some monster carries
+are listed. A floor's rooms are the game's own generated floor, and its boss
+name, the outposts' prices and the Sellsword contracts are read from private
+game members by reflection, so renaming one fails the export. The world
+constants print like the party constants and may not reuse a name either.
+A secret boss carries its reward and only the stats its fight reads.
+`god-ranks`, `divine-boons`, `alignment-types`, `faction-ranks`,
+`faction-bonuses`, `world-events`, `old-god-mechanics`, `monster-guards` and
+`world-boss-rewards` come from `realm.json`. A god rank's numbers are the
+Pantheon's own rank functions. An alignment type's effects are what the game's
+alignment code gives a character of that type. A faction's rank needs the
+reputation the game's private rank-up rule asks for, and its bonuses are the
+game's own rank-scaled getters, read on an object whose constructor never runs,
+so the shared faction system is left alone. A world event's days and factors
+are the game's own private event maker over a fixed set of seeds, and its
+seasons are the ones in which the game's own daily roll draws it.
+`old-god-mechanics` folds itself under a spoiler: it names the Old Gods and
+their fight setup, read from the game's private boss setup. The monster guards
+use the King's own formulas, and the world boss pay is the game's own reward
+math for one player. The races table also shows the NPC lifespan. The realm
+constants print like the party constants and may not reuse a name either.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.
@@ -126,8 +222,10 @@ Content the player chooses to reveal.
 
 Do not nest disclosures. Secret boss pages are not generated separately.
 Disclosure text and headings are excluded from the search index, page
-descriptions and Discord answers. Known secret names are also redacted from
-public search text. Spoilers are discoverable by viewing page HTML; this is a
+descriptions and Discord answers. A guide's index entry lists its disclosures
+by their summary line only, so search can find the page and Ask can say that
+the answer is behind that spoiler on the linked page without stating it. Known
+secret names are also redacted from public search text. Spoilers are discoverable by viewing page HTML; this is a
 reader preference, not access control.
 
 ## Drift check
@@ -217,7 +315,9 @@ mention in the gossip channel or any message while no wiki channel is set, goes
 through gossip routing unchanged. Use a wiki channel separate from the gossip
 channel. If the wiki bot fails to start, mentions in the wiki channels are
 dropped rather than relayed. Ask reads only the built public index, returns
-excerpts and links, and says when no match exists. No GitHub token is used.
+excerpts and links, and says when no match exists. Its replies set Discord's
+suppress embeds flag, so the wiki links show no link previews. No GitHub token
+is used.
 Unless the optional Claude API path below is enabled, no model is used either.
 Ask permits one request per user per ten seconds and at most thirty handled
 requests per minute globally, with a 300-character question cap.
@@ -233,7 +333,8 @@ It uses the model `claude-sonnet-5-5` at effort `low` through the official
   no-match reply.
 - The model sees a fixed system prompt, the top five excerpts from the public
   index, one per page and at most 1,500 characters each (spoilers and secret
-  names are already excluded there), and the question, capped at 300 characters and wrapped as untrusted data. No tools,
+  names are already excluded there; a page's spoiler summary lines are listed
+  after its excerpt), and the question, capped at 300 characters and wrapped as untrusted data. No tools,
   no conversation history, and no player or database data are sent.
 - The prompt limits answers to the excerpts, says to admit when they do not
   cover the question, to decline anything not about Usurper Reborn with a

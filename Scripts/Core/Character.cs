@@ -656,6 +656,11 @@ public class Character
     /// <summary>v1.1.12: this player's own awakening stage, stamped by their session (-1 = not stamped). Run time only.</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public int AwakeningStage { get; set; } = -1;
+    /// <summary>1.3.1: the Wisdom of this player's own completed companion griefs, stamped by their own session at
+    /// every recalculation (-1 = not stamped). Run time only, like AwakeningStage: it travels with a grouped
+    /// follower into the leader's session, whose own griefs never reach the follower.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int GriefWisdom { get; set; } = -1;
 
     // Herb pouch inventory (v0.48.5)
     public int HerbHealing { get; set; }        // Healing Herbs (garden lv1)
@@ -767,6 +772,7 @@ public class Character
     public bool SettlementGoldClaimedToday { get; set; }
     public bool SettlementHerbClaimedToday { get; set; }
     public bool SettlementShrineUsedToday { get; set; }
+    public bool JailbreakAttemptedToday { get; set; }   // 1.3.2: one jailbreak at the prison grounds a day; cleared by the daily reset
     public bool SettlementCircleUsedToday { get; set; }
     public bool SettlementWorkshopUsedToday { get; set; }
     public bool ThroneChallengedToday { get; set; }
@@ -1754,6 +1760,20 @@ public class Character
     }
 
     /// <summary>
+    /// 1.3.1: the grief Wisdom that applies to this character. Only a player has griefs: an NPC gets none.
+    /// The session's own player reads its own GriefSystem and stamps the number; any other character
+    /// (a grouped follower in the leader's session) keeps its stamp; an unstamped one (a companion, an
+    /// echo, a PvP or group snapshot) gets none.
+    /// </summary>
+    private int GriefWisdomNow()
+    {
+        if (this is NPC) return 0;
+        if (ReferenceEquals(this, GameEngine.Instance?.CurrentPlayer))
+            GriefWisdom = UsurperRemake.Systems.GriefSystem.Instance.CompletedGriefWisdom;
+        return Math.Max(0, GriefWisdom);
+    }
+
+    /// <summary>
     /// Recalculate all stats from base values plus equipment bonuses
     /// Now applies stat-based bonuses from the StatEffectsSystem
     /// </summary>
@@ -1821,6 +1841,9 @@ public class Character
         // v1.1.12: the awakening's Wisdom, added like gear Wisdom so it flows into mana; never stored
         int awakeningStage = UsurperRemake.Systems.AwakeningBonus.StageOf(this);
         Wisdom += UsurperRemake.Systems.AwakeningBonus.WisdomAt(awakeningStage);
+
+        // 1.3.1: the Wisdom of completed companion griefs, added the same way; never stored
+        Wisdom += GriefWisdomNow();
 
         // Apply stat-based bonuses AFTER equipment (stats may have been modified)
         // Constitution bonus to HP
@@ -3066,7 +3089,7 @@ public class Character
         return Class switch
         {
             CharacterClass.Warrior => new CombatModifiers { AttackBonus = Level / 5, ExtraAttacks = Math.Min(3, Level / 10) },
-            CharacterClass.Assassin => new CombatModifiers { BackstabMultiplier = 3.0f, PoisonChance = 25 },
+            CharacterClass.Assassin => new CombatModifiers { BackstabMultiplier = 3.0f, PoisonChance = 5 },   // 1.3.2: 5 (15 and 10 measured too strong in boss rooms)
             CharacterClass.Barbarian => new CombatModifiers { DamageReduction = 2, RageAvailable = true },
             CharacterClass.Paladin => new CombatModifiers { SmiteCharges = 1 + Level / 10, AuraBonus = 2 },
             CharacterClass.Ranger => new CombatModifiers { RangedBonus = 4, Tracking = true },

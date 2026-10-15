@@ -2,7 +2,7 @@
 (function (root) {
   "use strict";
   const stop = new Set(
-    "a about all an and any anything are as at be can do does explain for get got have help how i in info information is it know many me much my of on or please s something tell the there to what when where which who why will with work works you your".split(
+    "a about all an and any anything are as at be can do does explain for get got have help how i in info information is it know many me much my of on or please s something tell the there to what when where which who why wiki will with work works you your".split(
       " ",
     ),
   );
@@ -85,6 +85,13 @@
     const body = new Map();
     for (const w of words(page.text)) body.set(w, (body.get(w) || 0) + 1);
     const titleWords = words(page.title);
+    // A guide's own path segment, such as "changelog" for the page titled "Release history":
+    // a word players use for the page even when its title and text do not.
+    const slug = page.guide
+      ? words(String(page.path).split("/").filter(Boolean).pop() || "").filter(
+          (w) => !/^\d+$/.test(w) && w !== "en" && w !== "wiki",
+        )
+      : [];
     // Adjacent word pairs within each field, so a query phrase can match as a phrase.
     const pairs = new Set();
     for (const field of [page.title, ...(page.headings || []), page.text]) {
@@ -95,6 +102,9 @@
       title: new Set(titleWords),
       titleWords,
       headings: new Set(words((page.headings || []).join(" "))),
+      // A spoiler fold's title counts like a heading; its text is never in the index.
+      folds: new Set(words((page.folds || []).join(" "))),
+      slug: new Set(slug),
       body,
       pairs,
     };
@@ -108,7 +118,13 @@
     df = new Map();
     for (const page of pages) {
       const p = prepare(page);
-      for (const w of new Set([...p.title, ...p.headings, ...p.body.keys()]))
+      for (const w of new Set([
+        ...p.title,
+        ...p.headings,
+        ...p.folds,
+        ...p.slug,
+        ...p.body.keys(),
+      ]))
         df.set(w, (df.get(w) || 0) + 1);
     }
     frequencies.set(pages, df);
@@ -128,6 +144,8 @@
   const HEADING_WEIGHT = 3;
   const GUIDE_WEIGHT = 2.5;
   const PHRASE_WEIGHT = 3;
+  // Below the title, so a page titled with the word outranks one that only has it in its path.
+  const PATH_WEIGHT = 2;
   function search(pages, query, limit = 8) {
     const terms = queryTerms(query);
     if (!terms.length) return [];
@@ -152,16 +170,18 @@
         let fieldMatch = named;
         for (const term of terms) {
           const inTitle = p.title.has(term);
-          const inHeading = p.headings.has(term);
+          const inHeading = p.headings.has(term) || p.folds.has(term);
+          const inPath = p.slug.has(term);
           const count = p.body.get(term) || 0;
-          if (!inTitle && !inHeading && !count) continue;
+          if (!inTitle && !inHeading && !inPath && !count) continue;
           matched++;
-          if (inTitle || inHeading) fieldMatch = true;
+          if (inTitle || inHeading || inPath) fieldMatch = true;
           const idf = Math.log(1 + total / (df.get(term) || 1));
           score +=
             idf *
             ((inTitle ? titleWeight : 0) +
               (inHeading ? HEADING_WEIGHT : 0) +
+              (inPath && !inTitle ? PATH_WEIGHT : 0) +
               (count ? (count >= 3 ? 1.5 : 1) : 0));
         }
         // A query phrase found as adjacent words on the page counts like a heading match
@@ -204,7 +224,24 @@
       );
     return first.concat(rest.slice(0, limit - first.length));
   }
-  // Picks the window of the page text that covers the most distinct query terms.
+  // Where each heading starts in the page text. Headings are part of the text, in order.
+  function sectionStarts(text, headings) {
+    const starts = [];
+    let from = 0;
+    for (const h of headings || []) {
+      const heading = String(h).replace(/\s+/g, " ").trim();
+      const at = heading ? text.indexOf(heading, from) : -1;
+      if (at < 0) continue;
+      starts.push({ at, words: new Set(words(heading)) });
+      from = at + heading.length;
+    }
+    return starts;
+  }
+  // Picks the part of the page text that answers the query. A query word counts more when
+  // it is rare on the page, so "dodge" decides a window on the combat page and "combat" does
+  // not. A section whose heading holds a query word is shown from its heading when it scores
+  // at least as well as the best free window, so the excerpt opens on the heading and its
+  // numbers instead of cutting in mid sentence.
   function excerpt(page, query, max = 360) {
     const text = String(page.text).replace(/\s+/g, " ").trim();
     const terms = new Set(queryTerms(query));
@@ -215,28 +252,59 @@
     }
     let start = 0;
     if (hits.length) {
+      const seen = new Map();
+      for (const h of hits) seen.set(h.w, (seen.get(h.w) || 0) + 1);
+      const weight = (w) => Math.log(1 + hits.length / seen.get(w));
       const span = Math.max(40, max - 120);
       const counts = new Map();
-      let best = { distinct: 0, hits: 0, at: hits[0].at };
+      let windowScore = 0;
+      let best = { score: 0, hits: 0, at: hits[0].at };
       for (let lo = 0, hi = 0; lo < hits.length; lo++) {
         while (hi < hits.length && hits[hi].at - hits[lo].at <= span) {
-          counts.set(hits[hi].w, (counts.get(hits[hi].w) || 0) + 1);
+          const c = counts.get(hits[hi].w) || 0;
+          if (!c) windowScore += weight(hits[hi].w);
+          counts.set(hits[hi].w, c + 1);
           hi++;
         }
-        const distinct = counts.size;
         const n = hi - lo;
-        if (distinct > best.distinct || (distinct === best.distinct && n > best.hits))
-          best = { distinct, hits: n, at: hits[lo].at };
+        if (
+          windowScore > best.score + 1e-9 ||
+          (Math.abs(windowScore - best.score) <= 1e-9 && n > best.hits)
+        )
+          best = { score: windowScore, hits: n, at: hits[lo].at };
         const c = counts.get(hits[lo].w) - 1;
         if (c) counts.set(hits[lo].w, c);
-        else counts.delete(hits[lo].w);
+        else {
+          counts.delete(hits[lo].w);
+          windowScore -= weight(hits[lo].w);
+        }
+      }
+      // Sections: the heading's query words count twice, the words shown below it once.
+      let section = null;
+      const starts = sectionStarts(text, page.headings);
+      for (let i = 0; i < starts.length; i++) {
+        const s = starts[i];
+        const headed = [...terms].filter((w) => s.words.has(w));
+        if (!headed.length) continue;
+        const end = Math.min(
+          s.at + max - 40,
+          i + 1 < starts.length ? starts[i + 1].at + max / 3 : text.length,
+        );
+        const shown = new Set(
+          hits.filter((h) => h.at >= s.at && h.at < end).map((h) => h.w),
+        );
+        let score = 0;
+        for (const w of shown) score += weight(w);
+        for (const w of headed) score += weight(w);
+        if (!section || score > section.score + 1e-9) section = { score, at: s.at };
       }
       const sentence = Math.max(
         text.lastIndexOf(". ", best.at),
         text.lastIndexOf("! ", best.at),
         text.lastIndexOf("? ", best.at),
       );
-      if (best.at <= 120) start = 0;
+      if (section && section.score + 1e-9 >= best.score) start = section.at;
+      else if (best.at <= 120) start = 0;
       else if (sentence >= 0 && best.at - sentence <= 120) start = sentence + 2;
       else {
         // Start on a word boundary a little before the first hit.
@@ -249,7 +317,14 @@
       chunk = chunk.slice(0, chunk.lastIndexOf(" ")) + "...";
     return (start ? "..." : "") + chunk;
   }
-  const api = { search, excerpt, words, stem, queryTerms };
+  // The spoiler fold titles of a page that share a word with the query.
+  function foldsFor(page, query) {
+    const terms = new Set(queryTerms(query));
+    return (page.folds || []).filter((title) =>
+      words(title).some((w) => terms.has(w)),
+    );
+  }
+  const api = { search, excerpt, words, stem, queryTerms, foldsFor };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   else root.WikiSearch = api;
 })(typeof globalThis !== "undefined" ? globalThis : this);

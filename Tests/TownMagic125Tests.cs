@@ -95,13 +95,13 @@ public class TownMagic125Tests
         if (!string.IsNullOrEmpty(dir)) File.WriteAllText(Path.Combine(dir, name), text);
     }
 
-    // A framed box (WriteBoxHeader) is drawn exactly 80 columns wide; every other row fits in 79.
+    // 1.3.2: a framed box of the Magic Shop is drawn exactly 79 columns wide; every other row fits in 79.
     private static void EveryRowFits(string text, string screen)
     {
         foreach (var row in Rows(text))
         {
             if (row.Length > 0 && "╔║╚".IndexOf(row[0]) >= 0)
-                row.Length.Should().Be(MaxWidth + 1, $"the {screen} box keeps its width: \"{row}\"");
+                row.Length.Should().Be(MaxWidth, $"the {screen} box keeps its width: \"{row}\"");
             else
                 row.Length.Should().BeLessOrEqualTo(MaxWidth, $"every row of the {screen} fits in {MaxWidth} columns: \"{row}\"");
         }
@@ -298,9 +298,9 @@ public class TownMagic125Tests
     public async Task EnchantMenu_English_KeepsItsWords()
     {
         string shown = await Enchant("en", 100, 5, "Steel Helm");
-        foreach (var w in new[] { "Divine Blessing", "+3 to all stats", "Ocean's Touch", "+30 mana, +4 wisdom", "+20 magic resist, +2 defence",
+        foreach (var w in new[] { "Divine Blessing", "+3 str/dex/def/wis, weapon+armor power", "Ocean's Touch", "+6 intelligence, +4 wisdom", "+20 magic resist, +2 defence",
                      "Phoenix Fire", "+20 power + chance to slow enemies", "Weapon  ", "L.Ring", "Bag", "Enchanting: Steel Helm",
-                     "  Enchant Steel Helm with Divine Blessing (+3 to all stats)", "  WARNING: this item already carries 3 enchantments.",
+                     "  Enchant Steel Helm with Divine Blessing (+3 str/dex/def/wis, weapon+armor", "  power)", "  WARNING: this item already carries 3 enchantments.",
                      "  On failure: gold and materials are consumed, AND one of the", "  [0] Cancel" })
             shown.Should().Contain(w);
         string stat = await Enchant("en", 100, 2, "Steel Helm");

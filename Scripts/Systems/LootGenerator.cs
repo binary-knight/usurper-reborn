@@ -832,7 +832,7 @@ public static class LootGenerator
             ("War Mask", new[] { "Warrior", "Barbarian", "MysticShaman" }, 25, 65, 18),
             ("Mystic Veil", new[] { "Magician", "Sage", "Cleric" }, 20, 65, 12),
             ("Forged Visor", new[] { "All" }, 35, 70, 24),
-            ("Steel Faceplate", new[] { "Warrior", "Paladin", "MysticShaman" }, 40, 80, 30),
+            ("Steel Faceplate", new[] { "Warrior", "Paladin" }, 40, 80, 30),
             ("Mithril Visor", new[] { "All" }, 55, 90, 42),
             ("Runed Mask", new[] { "All" }, 65, 100, 52),
             ("Death Mask", new[] { "Assassin" }, 50, 90, 38),
@@ -1208,7 +1208,7 @@ public static class LootGenerator
         {
             // Find appropriate weapon templates
             // NG+ prestige classes can use any weapon
-            bool isPrestige = playerClass >= CharacterClass.Tidesworn;
+            bool isPrestige = GameConfig.IsPrestigeClass(playerClass);   // 1.3.1: not the Mystic Shaman
             var candidates = WeaponTemplates
                 .Where(w => dungeonLevel >= w.MinLevel && dungeonLevel <= w.MaxLevel)
                 .Where(w => isPrestige || w.Classes.Contains("All") || w.Classes.Contains(playerClass.ToString()))
@@ -1246,7 +1246,7 @@ public static class LootGenerator
             if (objType == ObjType.Shield)
                 return GenerateShield(dungeonLevel, rarity);
 
-            bool isPrestige = playerClass >= CharacterClass.Tidesworn;
+            bool isPrestige = GameConfig.IsPrestigeClass(playerClass);   // 1.3.1: not the Mystic Shaman
             var candidates = slotTemplates
                 .Where(a => dungeonLevel >= a.MinLevel && dungeonLevel <= a.MaxLevel)
                 .Where(a => isPrestige || a.Classes.Contains("All") || a.Classes.Contains(playerClass.ToString()))
@@ -2471,8 +2471,15 @@ public static class LootGenerator
                 return (true, null);
 
             // NG+ prestige classes can use any weapon/shield
-            if (playerClass >= CharacterClass.Tidesworn)
+            // 1.3.1: the five prestige classes only; the Mystic Shaman follows the lists like any base class
+            if (GameConfig.IsPrestigeClass(playerClass))
                 return (true, null);
+
+            // 1.3.1: the Mystic Shaman's main hand rule, as the equip check has it (Equipment.CanEquip); the
+            // weapon type is read from the name, as the loot conversion reads it
+            if (playerClass == CharacterClass.MysticShaman && lootItem.Type == ObjType.Weapon
+                && !Equipment.MysticShamanMainHandAllows(ShopItemGenerator.InferWeaponType(lootItem.Name)))
+                return (false, Loc.Get("ui.cannot_use_class", GameConfig.GetLocalizedClassName(playerClass)));
 
             // Build a combined list of all weapon + shield templates with their class arrays
             // Sort by longest name first to avoid false matches (e.g., "Bastard Sword" before "Sword")

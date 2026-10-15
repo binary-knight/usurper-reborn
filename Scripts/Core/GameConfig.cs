@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.3.1";
+    public const string Version = "1.3.2";
     public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -1706,11 +1706,11 @@ public static partial class GameConfig
     // Cleric Divine Grace
     public const float ClericDivineGraceBonus = 0.25f;       // Cleric: +25% healing from abilities and spells
     // Tidesworn Ocean's Blessing
-    public const float TideswornOceansBlessingBonus = 0.25f;  // Tidesworn: +25% healing from abilities and spells
+    public const float TideswornOceansBlessingBonus = 0.25f;  // Tidesworn: +25% healing from abilities
     public const float TideswornOceansResiliencePercent = 0.03f;       // Tidesworn: Regen 3% max HP/round (baseline)
     public const float TideswornOceansResilienceBelowHalfBonus = 0.02f;  // Tidesworn: additional 2% max HP/round when below 50% HP (5% total)
     // Wavecaller Harmonic Resonance
-    public const float WavecallerHarmonicResonanceBonus = 0.25f; // Wavecaller: +25% healing from abilities and spells
+    public const float WavecallerHarmonicResonanceBonus = 0.25f; // Wavecaller: +25% healing from abilities
     public const float WavecallerReflectionPercent = 0.15f;      // Wavecaller: 15% damage reflection when Reflecting
     public const float WavecallerOceansVoiceCritBonus = 0.20f;   // Wavecaller: +20% crit chance from Ocean's Voice
 
@@ -2013,7 +2013,7 @@ public static partial class GameConfig
     /// <summary>
     /// v0.64.1: Early-game XP multiplier. Post-deploy telemetry showed
     /// the path from Lv 1 to Lv 10 took ~200 combats (engaged players hit
-    /// the wall here -- Rozro played 345 hours and only reached Lv 14
+    /// the wall here -- a player played 345 hours and only reached Lv 14
     /// before quitting). Combat win rate is 95-100% at low levels so
     /// difficulty isn't the issue; the issue is XP rewards are tiny when
     /// fighting under-leveled monsters on low floors. This multiplier

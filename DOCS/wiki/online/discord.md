@@ -1,8 +1,9 @@
 ---
 title: Discord wiki help
 path: /wiki/en/online/discord/
-checked: 1.2.5
+checked: 1.3.2
 sources: web/wiki-bot.js
+history: 1.3.2 | Search finds a page by a word in its path, a reply names a matching spoiler fold without stating it, and replies show no link previews.
 history: 1.2.5 | Suggest now accepts a trusted helper who holds any one of several helper roles the owner configures.
 ---
 The Discord bot can answer from the published English wiki in channels enabled by the server owner. Mention the bot and ask a focused question, for example: `@UsurperBot how does Favor work?`
@@ -14,7 +15,9 @@ Ask searches the published wiki for pages that match your question. How it answe
 - **With the Claude API enabled.** The bot sends the best matching wiki excerpts and your question to Claude, a language model, and replies with a short plain-language answer of about 120 words, followed by links to the pages it used. The model may use only those excerpts. If they do not cover your question, the answer says so.
 - **Without it.** The bot replies with short excerpts and links from the matching pages.
 
-If no page matches, the bot says so and makes no model call. Ask never inspects player saves or private game data, and spoiler disclosure text is left out of what it can see.
+When a matching page has a spoiler fold whose title matches your question, the reply names that fold and links the page; it does not state what the fold holds.
+
+If no page matches, the bot says so and makes no model call. Ask never inspects player saves or private game data, and spoiler disclosure text is left out of what it can see; it sees only the title of each fold. Replies show no link previews.
 
 Questions that are not about Usurper Reborn, such as other games, programming or general chat, are declined without source links.
 

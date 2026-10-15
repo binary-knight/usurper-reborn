@@ -403,12 +403,23 @@ public partial class MagicShopLocation : BaseLocation
         }
     }
 
+    /// <summary>1.3.2: the inside width of this shop's framed headers; with the two edges the box is 79 columns.</summary>
+    internal const int BoxInside = 77;
+
+    /// <summary>1.3.2: a framed header 79 columns wide (the shared default drew 80). A title longer than the
+    /// inside is cut with "..." so the box keeps its shape.</summary>
+    private void WriteShopBox(string title, string color)
+    {
+        if (title.Length > BoxInside - 2) title = title.Substring(0, BoxInside - 5) + "...";
+        WriteBoxHeader(title, color, BoxInside);
+    }
+
     private void DisplayMagicShopMenu(Character player)
     {
         terminal.ClearScreen();
 
         // Shop header - standardized format
-        WriteBoxHeader(Loc.Get("magic_shop.header"), "bright_cyan");
+        WriteShopBox(Loc.Get("magic_shop.header"), "bright_cyan");
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.run_by", _ownerName), "gray");
         DisplayMessage("");
@@ -899,7 +910,10 @@ public partial class MagicShopLocation : BaseLocation
 
             if (targetItem.Type == ObjType.Weapon)
                 targetItem.Attack = (int)(targetItem.Attack / 1.25f * purificationPenalty);
-            else if (targetItem.Type == ObjType.Body || targetItem.Type == ObjType.Shield)
+            else if (targetItem.Type is ObjType.Body or ObjType.Shield
+                     // 1.3.2: every armor slot's curse boosts Armor (LootGenerator.CreateArmorFromTemplate)
+                     or ObjType.Head or ObjType.Arms or ObjType.Hands or ObjType.Legs
+                     or ObjType.Feet or ObjType.Waist or ObjType.Face or ObjType.Abody)
                 targetItem.Armor = (int)(targetItem.Armor / 1.25f * purificationPenalty);
             else if (targetItem.Type == ObjType.Fingers || targetItem.Type == ObjType.Neck)
             {
@@ -1906,7 +1920,7 @@ public partial class MagicShopLocation : BaseLocation
     private async Task EnchantEquipment(Character player)
     {
         terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("magic_shop.enchant_header"), "magenta");
+        WriteShopBox(Loc.Get("magic_shop.enchant_header"), "magenta");
         terminal.WriteLine("");
         terminal.SetColor("gray");
         terminal.Write($"  {Loc.Get("magic_shop.enchant_examine", _ownerName)}");
@@ -1946,9 +1960,10 @@ public partial class MagicShopLocation : BaseLocation
             var capturedSlot = slot;
             enchantTargets.Add((slotName, equip, (newEq) =>
             {
+                // 1.3.1: the changed copy goes straight back into the slot it came from. A worn item
+                // stays worn whatever the equip check says of it now, and nothing else worn moves.
                 EquipmentDatabase.RegisterDynamic(newEq);
-                player.UnequipSlot(capturedSlot);
-                player.EquipItem(newEq, capturedSlot, out _);
+                player.EquippedItems[capturedSlot] = newEq.Id;
                 player.RecalculateStats();
             }));
         }
@@ -2074,7 +2089,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Show enchantment options
         terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("magic_shop.enchanting_title", ItemNames.Display(selectedEquip)), "magenta");
+        WriteShopBox(Loc.Get("magic_shop.enchanting_title", ItemNames.Display(selectedEquip)), "magenta");
         terminal.WriteLine("");
 
         terminal.SetColor("gray");
@@ -2562,7 +2577,8 @@ public partial class MagicShopLocation : BaseLocation
             if (equip != null && equip.GetEnchantmentCount() > 0)
             {
                 enchantedItems.Add((slot, equip));
-                DisplayMessage($"  ({idx}) {slot}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]", equip.GetRarityColor());
+                string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
+                DisplayMessage($"  ({idx}) {slot}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]{cursedTag}", equip.IsCursed ? "red" : equip.GetRarityColor());
                 idx++;
             }
         }
@@ -2587,6 +2603,16 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         var (rmSlot, rmEquip) = enchantedItems[choice - 1];
+        // 1.3.2: a cursed item is refused here as it is for enchanting: nothing is charged or changed.
+        if (rmEquip.IsCursed)
+        {
+            DisplayMessage("");
+            DisplayMessage(Loc.Get("magic_shop.cursed_no_enchant"), "red");
+            DisplayMessage(Loc.Get("magic_shop.remove_curse_first"), "cyan");
+            await terminal.WaitForKey();
+            return;
+        }
+
         // v1.2.5: removal returns the item to its base form; when that form is not known, nothing is done
         // and nothing is charged (clearing the count but keeping the powers would let enchants stack).
         var baseForm = EnchantBaseOf(rmEquip);
@@ -2624,9 +2650,9 @@ public partial class MagicShopLocation : BaseLocation
         // Frostbite are stripped too, and so is a stale tag on the base name)
         stripped.Name = StripEnchantTags(stripped.Name);
 
+        // 1.3.1: straight back into the slot it came from, as the enchant write does.
         EquipmentDatabase.RegisterDynamic(stripped);
-        player.UnequipSlot(rmSlot);
-        player.EquipItem(stripped, rmSlot, out _);
+        player.EquippedItems[rmSlot] = stripped.Id;
         player.RecalculateStats();
 
         DisplayMessage("");
@@ -3434,7 +3460,7 @@ public partial class MagicShopLocation : BaseLocation
             int endIdx = Math.Min(startIdx + perPage, filtered.Count);
 
             terminal.ClearScreen();
-            WriteBoxHeader(title, "magenta");
+            WriteShopBox(title, "magenta");
 
             if (searchFilter != null)
             {
@@ -3571,7 +3597,7 @@ public partial class MagicShopLocation : BaseLocation
     private async Task CastLoveSpell(Character player)
     {
         terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("magic_shop.romance_header"), "magenta");
+        WriteShopBox(Loc.Get("magic_shop.romance_header"), "magenta");
         terminal.WriteLine("");
         WrappedLine($"  {Loc.Get("magic_shop.love_intro_vials", _ownerName)}", "gray");
         WrappedLine($"  {Loc.Get("magic_shop.love_intro_power")}", "cyan");
@@ -3864,7 +3890,7 @@ public partial class MagicShopLocation : BaseLocation
     private async Task CastDeathSpell(Character player)
     {
         terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("magic_shop.dark_arts_header"), "red");
+        WriteShopBox(Loc.Get("magic_shop.dark_arts_header"), "red");
         terminal.WriteLine("");
         WrappedLine($"  {Loc.Get("magic_shop.dark_eyes", _ownerName)}", "gray");
         WrappedLine($"  {Loc.Get("magic_shop.dark_price")}", "cyan");
@@ -4003,7 +4029,7 @@ public partial class MagicShopLocation : BaseLocation
         int darkShiftAmount = isGood ? selected.darkShift * 2 : selected.darkShift;
 
         terminal.ClearScreen();
-        WriteBoxHeader(Loc.Get("magic_shop.dark_confirm_title", Loc.Get(selected.name)), "red");
+        WriteShopBox(Loc.Get("magic_shop.dark_confirm_title", Loc.Get(selected.name)), "red");
         terminal.WriteLine("");
 
         terminal.SetColor("white");

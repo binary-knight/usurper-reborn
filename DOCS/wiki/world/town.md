@@ -1,8 +1,9 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.3.0
-sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs
+checked: 1.3.2
+sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MarketplaceSystem.cs, Scripts/Locations/BaseLocation.cs
+history: 1.3.2 | Main Street shows the Wisdom a finished story companion grief gives whenever it applies.
 history: 1.3.0 | Team Corner's hire list shows the NPCs nearest your level first, hiring costs less below level 25, and the town keeps a pool of low-level NPCs to hire.
 history: 1.2.6 | A new team's name at Team Corner cannot contain < > & or a double quote.
 history: 1.2.5 | Main Street, the Dormitory, the Level Master, Team Corner and the Marketplace are shown in all five languages, and Dormitory murder mail reaches the victim in the victim's language.
@@ -40,7 +41,7 @@ Online only: press O, then W Who's Online, C Chat, A [Arena](/wiki/en/online/are
 
 ## Lodging
 
-Lodging is the Dormitory. You can list and examine the other sleepers and sleep there. In single-player sleeping is free, restores you fully and starts a new day. Online it costs a little gold, saves and logs you out, and leaves you open to attack while you sleep. Online you can also attack a sleeper for gold.
+Lodging is the Dormitory. You can list and examine the other sleepers and sleep there. In single-player sleeping is free, restores you fully and starts a new day. Online a Dormitory bed costs {{balance:DormitorySleepCost}} gold; sleeping saves and logs you out, and leaves you open to attack while you sleep. Online you can also attack a sleeper for gold. The Inn also rents rooms online; see [the Inn](/wiki/en/world/rest/).
 
 ## Level Master
 
@@ -56,6 +57,6 @@ Create, join or leave a team, recruit NPCs for a daily wage, equip and resurrect
 
 ## Auction House and News
 
-Offline, the Auction House lets you list an item at your own price and buy other listings; listings expire. Online, listings run for a chosen time and have a listing fee. News is the town's newsboard, newest first.
+Offline, the Auction House lets you list an item at your own price and buy other listings; a listing expires after 30 real days. Online, a listing runs 12, 24, 48 or 72 hours for a fee of 5, 4, 3 or 2 percent of the price plus the king's tax. The [shops guide](/wiki/en/items/shops/) has the details. News is the town's newsboard, newest first.
 
 The Gym from older versions was removed and cannot be reached.

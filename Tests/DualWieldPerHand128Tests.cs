@@ -271,6 +271,7 @@ public class DualWieldPerHand128Tests : IDisposable
         async Task<long> FirstHit(Character c)
         {
             var rig = NewRig(c, new FixedRandom(low: true));
+            c.SmiteChargesRemaining = 1;   // 1.3.2: a Smite spends a daily charge
             await Call(rig.Engine, method, c, rig.Monsters, (int?)0, rig.Result);
             var hits = rig.Amounts(CombatSide.Player);
             hits.Should().NotBeEmpty(method);

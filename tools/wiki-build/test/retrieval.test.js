@@ -184,12 +184,14 @@ test("text inside the dungeon guides' spoiler blocks never reaches the search in
   const features = pages.find((p) => p.path === `${W}world/dungeon-features/`);
   assert.match(features.text, /Search for Traps is free/, "public feature text is indexed");
   let checked = 0;
-  for (const file of ["world/dungeon-features.md", "world/rare-encounters.md"])
+  // 1.3.2: plain trap, chest, shrine and rare encounter numbers left the folds (the user's ruling A7);
+  // the folds that remain hold the story: guardian, seal and secret boss floors and the Old God fights
+  for (const file of ["world/dungeon-features.md", "world/dungeon.md", "monsters/bosses.md"])
     for (const sentence of spoilerSentences(file)) {
       assert.ok(!indexed.includes(sentence), `${file}: ${sentence}`);
       checked++;
     }
-  assert.ok(checked >= 40, `${checked} spoiler sentences checked`);
+  assert.ok(checked >= 15, `${checked} spoiler sentences checked`);
 });
 
 test("the index marks hand-written guides and only those", () => {
@@ -291,4 +293,109 @@ test("a warm query stays fast on the full index", () => {
   for (let i = 0; i < 20; i++) search(pages, good[i % good.length][0], 5);
   const ms = Number(process.hrtime.bigint() - started) / 1e6 / 20;
   assert.ok(ms < 17, `${ms.toFixed(2)} ms per query`);
+});
+
+// 1.3.2 (W8): a guide's own path segment is a search word below its title, so a question about
+// a changelog finds the page at reference/changelog/ (titled "Release history"); "wiki" is a
+// stop word, so with no such page the question returns nothing instead of the home page.
+test("a guide's path word finds it, and a title still outranks a path word", () => {
+  for (const question of ["does the wiki have a changelog", "changelog", "is there a changelog"])
+    assert.equal(top(question, 1)[0], `${W}reference/changelog/`, `${question}: ${top(question, 5).join(" ")}`);
+  const without = pages.filter((p) => p.path !== `${W}reference/changelog/`);
+  assert.deepEqual(search(without, "does the wiki have a changelog", 5).map((p) => p.path), []);
+  assert.deepEqual(top("wiki", 5), []);
+  const synthetic = [
+    { path: "/wiki/en/reference/changelog/", title: "History", headings: [], text: "notes", guide: true },
+    { path: "/wiki/en/reference/history/", title: "Changelog", headings: [], text: "notes", guide: true },
+    { path: "/wiki/en/items/1/", title: "Item", headings: [], text: "notes" },
+  ];
+  assert.deepEqual(search(synthetic, "changelog", 5).map((p) => p.path), [
+    "/wiki/en/reference/history/",
+    "/wiki/en/reference/changelog/",
+  ]);
+  // Generated entity pages have numeric IDs in their path; those never count.
+  assert.deepEqual(search(synthetic, "1", 5).map((p) => p.path), []);
+});
+
+// 1.3.2 (W8): the excerpt opens on the heading of the section that answers the question and
+// keeps its numbers, instead of a window chosen by words common on the whole page.
+test("the excerpt opens on the answering section and keeps its numbers", () => {
+  const combat = pages.find((p) => p.path === `${W}combat/`);
+  assert.match(excerpt(combat, "what is my dodge chance", 1500), /Dodge: 5 percent plus 1 percent per 2 Agility above 10, at most 35 percent/);
+  assert.match(excerpt(combat, "what does power attack do", 420), /^\.\.\.Power Attack \(P\) /);
+  assert.match(excerpt(combat, "what does power attack do", 420), /Power Attack costs 15 combat stamina/);
+  const consumables = pages.find((p) => p.path === `${W}items/consumables/`);
+  assert.match(excerpt(consumables, "how many potions can i carry", 1500), /You can carry 20 \+ \(level - 1\) healing potions/);
+});
+
+// 1.3.2 (W8): spoiler folds. The index carries each guide's fold titles (the summary line
+// only); the fold's text stays out of the index and so out of the bot prompt.
+const { buildLlmRequest, createWikiBot, LLM_SYSTEM_PROMPT, SUPPRESS_EMBEDS } = require("../../../web/wiki-bot");
+const ORIGIN = "https://usurper-reborn.net";
+const FOLD_NOTE = "[Spoiler folds on this page, text not given: ";
+const foldFiles = ["world/story.md", "world/dungeon.md", "world/dungeon-features.md", "monsters/bosses.md", "characters/new-game-plus.md", "gods/player-gods.md", "items/materials.md"];
+const foldSentences = () => foldFiles.flatMap(spoilerSentences);
+test("the index lists each guide's spoiler fold titles and nothing else from the fold", () => {
+  const story = pages.find((p) => p.path === `${W}world/story/`);
+  assert.deepEqual(story.folds, [
+    "Spoiler: seal floors and the Old Gods",
+    "Spoiler: what each answer and outcome gives",
+    "Spoiler: ending conditions",
+    "Spoiler: story chapters and the moral choices",
+  ]);
+  assert.equal(pages.find((p) => p.path === `${W}combat/companions/`).folds, undefined);
+  for (const p of pages) if (p.folds) assert.ok(p.guide, `${p.path} has folds but is not a guide`);
+  const titles = pages.flatMap((p) => p.folds || []).join("\n");
+  for (const sentence of foldSentences()) assert.ok(!titles.includes(sentence), sentence);
+});
+
+const table = require("./acceptance-table");
+const foldRows = table.filter((r) => r[4] === "fold");
+test("a FOLD question links the fold's page and the prompt names the fold, never its text", () => {
+  assert.ok(foldRows.length >= 10, `${foldRows.length} fold rows`);
+  assert.match(LLM_SYSTEM_PROMPT, /behind that spoiler fold on the linked page/);
+  const hidden = foldSentences();
+  for (const [id, question, page, title] of foldRows) {
+    const matches = search(pages, question, 5);
+    assert.ok(matches.some((p) => p.path === page), `${id}: ${matches.map((p) => p.path).join(" ")}`);
+    const content = buildLlmRequest(question, matches, ORIGIN, "1.3.1").messages[0].content;
+    const block = content.split("<excerpt ").find((b) => b.startsWith(`title=`) && b.includes(`url="${ORIGIN}${page}"`));
+    assert.ok(block, `${id}: page sent to the model`);
+    assert.ok(block.includes(FOLD_NOTE) && block.includes(title), `${id}: fold ${title} named`);
+    for (const sentence of hidden) assert.ok(!content.includes(sentence), `${id}: ${sentence}`);
+  }
+});
+test("the excerpt reply points to the fold, links its page and sends no link previews", async () => {
+  const sent = [];
+  const bot = createWikiBot({ channels: ["wiki"], index: { schemaVersion: 1, gameVersion: "1.3.1", pages }, logger: { error() {}, log() {} } });
+  const ask = (content) => bot.handle({ id: "1", guildId: "g", channelId: "wiki", content: `<@9> ${content}`, author: { id: "u" + sent.length, bot: false }, channel: { send: async (m) => sent.push(m) } }, "9");
+  await ask("how do i get each ending");
+  assert.match(sent[0].content, /behind the spoiler fold Spoiler: ending conditions on this page/);
+  assert.ok(sent[0].content.includes(`${ORIGIN}${W}world/story/`));
+  assert.equal(sent[0].flags, SUPPRESS_EMBEDS);
+  for (const sentence of foldSentences()) assert.ok(!sent[0].content.includes(sentence), sentence);
+  // Companion recruitment is open text (no fold): the bot claims no fold for it.
+  await ask("where do i recruit companions");
+  const block = sent[1].content.split("\n\n").find((b) => b.endsWith(`${ORIGIN}${W}combat/companions/`));
+  assert.ok(block, sent[1].content);
+  assert.doesNotMatch(block, /spoiler fold/);
+  const companions = buildLlmRequest("where do i recruit companions", search(pages, "where do i recruit companions", 5), ORIGIN, "1.3.1").messages[0].content
+    .split("<excerpt ").find((b) => b.includes(`${W}combat/companions/"`));
+  assert.ok(companions && !companions.includes(FOLD_NOTE));
+});
+
+// The acceptance set: every "first" row ranks its page first with the fact in its excerpt.
+test("acceptance set: each answered question ranks its page first and its excerpt holds the fact", () => {
+  assert.equal(table.length, 659);
+  const first = table.filter((r) => r[4] === "first");
+  const failed = [];
+  for (const [id, question, page, fact] of first) {
+    const at = top(question, 1)[0];
+    const text = at === page ? excerpt(pages.find((p) => p.path === page), question, 1500).replace(/\s+/g, " ") : "";
+    if (at !== page || !text.includes(fact)) failed.push(`${id} ${question}: ${at}`);
+  }
+  assert.deepEqual(failed, []);
+  assert.ok(first.length >= 374, `${first.length} rows first`);
+  const by = (re) => table.filter((r) => re.test(r[4])).length;
+  console.log(`acceptance: ${first.length} first, ${foldRows.length} fold, ${by(/ranks first$/)} ranked lower, ${by(/outside the excerpt/)} excerpt misses, ${by(/fold page/)} fold misses, ${by(/^gap/)} gaps`);
 });

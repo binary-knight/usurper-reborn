@@ -3164,7 +3164,7 @@ public partial class GameEngine
             // Failsafe: if player beat Manwe but the ending sequence didn't complete (whether
             // they disconnected mid-sequence OR something downstream crashed before the ending
             // could fire), re-trigger the ending sequence on login.
-            // v0.57.16: dropped the `hasEndingFlag` precondition. Spudman report — the
+            // v0.57.16: dropped the `hasEndingFlag` precondition. Player report: the
             // post-Manwe Noctura betrayal NRE'd before any ending flag got set, leaving the
             // player permanently stuck (Manwe resolved, no immortality, no ending recorded,
             // no NG+ option, no way to retrigger). Now Manwe-resolved + not-immortal +
@@ -5378,6 +5378,7 @@ public partial class GameEngine
     /// 1.2.0: one-time login restores of lasting stats that older versions lost, read from the save
     /// being loaded (not the live story singleton, which can hold another character's state). Each is
     /// guarded by its own saved flag, so it runs once per character and a second login changes nothing.
+    /// 1.3.2: the Shadow Crown for a Noctura alliance, guarded by the saved collected list.
     /// </summary>
     internal static void RunStatRewardMigrations(Character? player, StorySystemsData? story)
     {
@@ -5395,6 +5396,13 @@ public partial class GameEngine
                 DebugLogger.Instance.LogInfo("MIGRATION", $"NG+ cycle bonus backfilled for {player.Name2}: +{cycleBonus} Strength, Defence, Stamina");
         }
         catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"NG+ cycle bonus backfill failed: {ex.Message}"); }
+        try
+        {
+            // 1.3.2: after the artifact stat restore, so the Crown's stats are never granted twice
+            if (ArtifactSystem.GrantNocturaAllianceCrown(player, story))
+                DebugLogger.Instance.LogInfo("MIGRATION", $"Shadow Crown granted for the Noctura alliance: {player.Name2}");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Noctura alliance Crown grant failed: {ex.Message}"); }
     }
 
     private Character RestorePlayerFromSaveData(PlayerData playerData)
@@ -5994,6 +6002,9 @@ public partial class GameEngine
         {
             player.SkillTrainingProgress = new Dictionary<string, int>(playerData.SkillTrainingProgress);
         }
+        // 1.3.2: the prestige classes' spells start at Average; a saved value below it is raised
+        if (TrainingSystem.RaiseSavedSpellsToAverage(player))
+            DebugLogger.Instance.LogInfo("MIGRATION", $"Spells below Average raised to Average for {player.Name2}");
 
         // v0.57.14: restore per-channel chat mutes
         if (playerData.MutedChannels != null && playerData.MutedChannels.Count > 0)
@@ -6179,6 +6190,7 @@ public partial class GameEngine
         player.SettlementGoldClaimedToday = playerData.SettlementGoldClaimedToday;
         player.SettlementHerbClaimedToday = playerData.SettlementHerbClaimedToday;
         player.SettlementShrineUsedToday = playerData.SettlementShrineUsedToday;
+        player.JailbreakAttemptedToday = playerData.JailbreakAttemptedToday;
         player.SettlementCircleUsedToday = playerData.SettlementCircleUsedToday;
         player.SettlementWorkshopUsedToday = playerData.SettlementWorkshopUsedToday;
         player.WorkshopBuffCombats = playerData.WorkshopBuffCombats;

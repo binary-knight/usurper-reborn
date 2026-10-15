@@ -1082,49 +1082,8 @@ namespace UsurperRemake.Systems
         {
             try
             {
-                var activeEvents = WorldEventSystem.Instance.GetActiveEvents();
-                var eventDataList = new List<WorldEventData>();
-
-                // Save global state flags
-                eventDataList.Add(new WorldEventData
-                {
-                    Id = "global_state",
-                    Type = "GlobalState",
-                    Title = "Global State",
-                    Description = WorldEventSystem.Instance.CurrentKingDecree,
-                    Parameters = new Dictionary<string, object>
-                    {
-                        ["PlaguActive"] = WorldEventSystem.Instance.PlaguActive,
-                        ["WarActive"] = WorldEventSystem.Instance.WarActive,
-                        ["FestivalActive"] = WorldEventSystem.Instance.FestivalActive
-                    }
-                });
-
-                foreach (var evt in activeEvents)
-                {
-                    var eventData = new WorldEventData
-                    {
-                        Id = Guid.NewGuid().ToString(),
-                        Type = evt.Type.ToString(),
-                        Title = evt.Title,
-                        Description = evt.Description,
-                        StartTime = DateTime.Now.AddDays(-evt.StartDay),
-                        EndTime = DateTime.Now.AddDays(evt.DaysRemaining),
-                        Parameters = new Dictionary<string, object>
-                        {
-                            ["DaysRemaining"] = evt.DaysRemaining,
-                            ["StartDay"] = evt.StartDay
-                        }
-                    };
-
-                    // Save effects as Effect_<key> parameters
-                    foreach (var effect in evt.Effects)
-                    {
-                        eventData.Parameters[$"Effect_{effect.Key}"] = effect.Value;
-                    }
-
-                    eventDataList.Add(eventData);
-                }
+                // 1.3.2: one serializer for the world sim and the sessions
+                var eventDataList = OnlineStateManager.SerializeCurrentWorldEvents();
 
                 var json = JsonSerializer.Serialize(eventDataList, jsonOptions);
                 await sqlBackend.SaveWorldState(OnlineStateManager.KEY_WORLD_EVENTS, json);
@@ -1956,6 +1915,10 @@ namespace UsurperRemake.Systems
                 // Persist to world_state so it survives server restarts
                 var json = JsonSerializer.Serialize(resetBoundary, jsonOptions);
                 sqlBackend.SaveWorldState("last_daily_reset", json).GetAwaiter().GetResult();
+
+                // 1.3.2: the day's events are saved at once, so a login before the next world save does not
+                // restore the events from before the reset
+                SaveWorldEventsState().GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -2015,8 +1978,9 @@ namespace UsurperRemake.Systems
                 if (CastleLocation.GetCurrentKing()?.IsActive == true)
                     ProcessCourtDailyAsync().GetAwaiter().GetResult();
 
-                // Process world events
-                WorldEventSystem.Instance.ProcessDailyEvents(0);
+                // Process world events. 1.3.2: on the world day; with 0 the same-day guard (0 == 0) skipped
+                // every online countdown and roll
+                WorldEventSystem.Instance.ProcessDailyEvents(DailySystemManager.WorldDayAt(DateTime.UtcNow)).GetAwaiter().GetResult();
 
                 // Process quest maintenance
                 QuestSystem.ProcessDailyQuestMaintenance();

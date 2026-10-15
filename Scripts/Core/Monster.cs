@@ -155,6 +155,13 @@ public class Monster
     public int EvasionRounds { get; set; } = 0;
     public int EvasionMissChance { get; set; } = 0;  // 0-100 percent
 
+    // 1.3.2: the Thorns ability persists on the monster as the evasion buff does. While ThornsRounds
+    // is above 0, a melee hit on the monster costs the attacker ThornsPercent of the damage it dealt
+    // (at least 1, never below 1 HP); spells and ranged hits are exempt. ThornsRounds counts down once
+    // per monster-action cycle. In memory only, not saved.
+    public int ThornsRounds { get; set; } = 0;
+    public int ThornsPercent { get; set; } = 0;  // 0-100 percent
+
     // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
     // application increments RecentStunCount and resets RoundsSinceLastStun. The
     // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to
@@ -215,6 +222,21 @@ public class Monster
     public bool IsMagicalImmune { get; set; } = false;     // Immune to magical damage (phase mechanic)
     public int PhaseImmunityRounds { get; set; } = 0;      // Rounds remaining for phase immunity
     public bool IsEnraged { get; set; } = false;           // Boss enrage timer expired — stats doubled
+    /// <summary>1.3.2: what the boss enrage (CombatEngine.CheckBossEnrage) changed, so Dispel Evil can take it back:
+    /// Strength and Defence before and after it, and the attacks it added. Dispel scales the current values by
+    /// before over after, so a cut landed while enraged keeps its share. Combat only, never saved.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EnrageHeld { get; set; } = false;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public long EnrageStrengthBefore { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public long EnrageStrengthAfter { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnrageDefenceBefore { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnrageDefenceAfter { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public int EnrageExtraAttacks { get; set; } = 0;
 
     // Per-round status tick tracking — prevents boss multi-attacks from ticking statuses multiple times
     public bool StatusTickedThisRound { get; set; } = false;
@@ -524,7 +546,7 @@ public class Monster
     /// <summary>
     /// Get experience reward for defeating this monster
     /// Scaled to match the XP requirement curve (level^2.0 * 50)
-    /// Applies difficulty multiplier from DifficultySystem
+    /// Difficulty and the sysop multiplier are applied at the win, not here
     /// </summary>
     public long GetExperienceReward()
     {
@@ -550,9 +572,6 @@ public class Monster
             baseExp *= 5;
         }
 
-        // Apply difficulty modifier
-        baseExp = DifficultySystem.ApplyExperienceMultiplier(baseExp);
-
         return Math.Max(15, baseExp);
     }
     
@@ -561,7 +580,7 @@ public class Monster
     /// Scaled to provide meaningful gold progression through endgame
     /// Formula: (level^1.5) * 12 + random(10, 50)
     /// This provides gold that scales with equipment costs across all 100 levels
-    /// Applies difficulty multiplier from DifficultySystem
+    /// Difficulty and the sysop multiplier are applied at the win, not here
     /// </summary>
     public long GetGoldReward()
     {
@@ -602,9 +621,6 @@ public class Monster
         {
             baseGold *= 5; // Unique = 5x gold (stacks with boss)
         }
-
-        // Apply difficulty modifier
-        baseGold = DifficultySystem.ApplyGoldMultiplier(baseGold);
 
         return Math.Max(10, baseGold);
     }

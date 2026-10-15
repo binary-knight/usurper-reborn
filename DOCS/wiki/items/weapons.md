@@ -1,8 +1,9 @@
 ---
 title: Weapons and restrictions
 path: /wiki/en/items/weapons/
-checked: 1.2.5
+checked: 1.3.2
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs
+history: 1.3.2 | A Mystic Shaman follows its own main hand weapon rule.
 history: 1.2.5 | Weapon names show in your language, equipment rows mark weapons [1H] or [2H], and shop lists write weapon types in full, such as Greatsword.
 ---
 Weapon power is only one input to damage. Weapon type, handedness, class compatibility and ability requirements can change whether a weapon fits your build.
