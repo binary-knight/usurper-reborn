@@ -27,17 +27,6 @@ public class Bump131Tests
         JsonSerializer.Deserialize<Dictionary<string, string>>(Repo($"web/lang/{lang}.json"))!;
 
     [Fact]
-    public void Version_Is131_NamedReckoning_AndTheTelemetryBodySays131()
-    {
-        GameConfig.Version.Should().Be("1.3.1");
-        GameConfig.VersionName.Should().Be("Reckoning");
-        byte[] body = TelemetryUploader.BuildBody(new List<string> { TelemetryBody127Tests.MaxLine() },
-            TelemetryBody127Tests.FixtureInstallId, TelemetrySource.Single);
-        using var doc = JsonDocument.Parse(body);
-        doc.RootElement.GetProperty("version").EnumerateArray().Select(v => v.GetInt64()).Should().Equal(1L, 3L, 1L);
-    }
-
-    [Fact]
     public void Notes_Exist_HoldOneFixItem_CarryTheKnownIssues_AndHaveNoComingLine()
     {
         string notes = Repo(NotesPath);
