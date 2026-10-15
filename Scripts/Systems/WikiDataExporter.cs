@@ -60,6 +60,7 @@ public static class WikiDataExporter
         Write(outputDir, "economy", Economy());
         Write(outputDir, "combat", Combat());
         Write(outputDir, "world", World());
+        Write(outputDir, "realm", Realm());
 
         File.WriteAllText(Path.Combine(outputDir, "meta.json"), JsonSerializer.Serialize(new
         {
@@ -1188,6 +1189,351 @@ public static class WikiDataExporter
         constants[nameof(AbilityProbeLevel)] = AbilityProbeLevel;
         constants[nameof(AbilityProbeTargetHP)] = AbilityProbeTargetHP;
         constants[nameof(AbilityProbeTargetStrength)] = AbilityProbeTargetStrength;
+        return constants;
+    }
+
+    /// <summary>
+    /// 1.3.2 wiki depth: gods, the town's institutions, online play and the NPC world. The player-god ranks
+    /// (GameConfig and PantheonLocation's own rank functions), the divine boons a player-god configures
+    /// (DivineBoonRegistry.AllBoons), the alignment types with the combat effects AlignmentSystem gives a
+    /// character of each, the faction ranks and the rank-scaled faction bonuses (FactionSystem's own getters
+    /// and its private rank-up rule, on an object whose constructor never runs: the constructor makes the new
+    /// system the shared fallback), the world events (WorldEventSystem's private CreateEvent and
+    /// GenerateRandomEvent, by reflection, over a fixed set of seeds), the Old God fight mechanics
+    /// (OldGodBossSystem's private ConfigureBossPartyMechanics and GetDivineArmorReduction, by reflection),
+    /// the monster guards a ruler buys (MonsterGuardTypes with King.cs's formulas) and the world boss kill pay
+    /// (WorldBossMath). Private members are read as the economy and world exports read them: a rename fails
+    /// the export. No game file changes.
+    /// </summary>
+    private static object Realm() => new
+    {
+        godRanks = Enumerable.Range(1, GameConfig.GodMaxLevel).Select(rank => new
+        {
+            rank,
+            title = Names("god.title." + rank, GameConfig.GodTitles[rank - 1]),
+            // the divine experience the rank needs: what PantheonLocation asks of the rank below it
+            experience = rank == 1 ? 0 : PantheonLocation.GetNextLevelExp(rank - 1),
+            deedsPerDay = PantheonLocation.GetDeedsPerDay(rank),
+            experiencePerBeliever = PantheonLocation.DailyBelieverExp(1, rank),
+            // the Favors budget with no believers, and with enough believers that the concentration bonus is gone
+            favorBudgetNoBelievers = DivineBoonRegistry.CalculateBudget(rank, 0),
+            favorBudget = DivineBoonRegistry.CalculateBudget(rank, GameConfig.GodBoonConcentrationMax / GameConfig.GodBoonConcentrationPerBeliever)
+        }).ToArray(),
+        divineBoons = DivineBoonRegistry.AllBoons.Select(b => new
+        {
+            id = b.Id,
+            name = Names("boon." + b.Id + ".name", b.Name),
+            category = b.Category,
+            alignments = b.Alignments,
+            costPerTier = b.CostPerTier,
+            tiers = Enumerable.Range(0, b.MaxTier).Select(i => BoonTier(b, i)).ToArray()
+        }).ToArray(),
+        alignmentTypes = AlignmentProbes.Select(p =>
+        {
+            var probe = new Character { Chivalry = p.chivalry, Darkness = p.darkness };
+            var alignment = AlignmentSystem.Instance;
+            var type = alignment.GetAlignment(probe);
+            if (type != p.type) throw new InvalidOperationException("alignment probe: " + p.type);
+            var (attack, defence) = alignment.GetCombatModifiers(probe);
+            return new
+            {
+                id = type,
+                name = Names("alignment." + type.ToString().ToLowerInvariant(), type.ToString()),
+                attackMultiplier = Math.Round((double)attack, 2),
+                defenceMultiplier = Math.Round((double)defence, 2),
+                critChanceBonus = alignment.GetAlignmentCritBonus(probe),
+                soulDrainPercent = Math.Round(alignment.GetSoulDrainPercent(probe) * 100.0, 1),
+                fearOnHitPercent = alignment.GetFearOnHitChance(probe),
+                regenPercentPerRound = Math.Round(alignment.GetBlessedRegenPercent(probe) * 100.0, 1),
+                holySmitePercent = Math.Round(alignment.GetHolySmiteBonus(probe) * 100.0, 1)
+            };
+        }).ToArray(),
+        factionRanks = Enumerable.Range(0, FactionSystem.Factions[Faction.TheCrown].Ranks.Length).Select(rank => new
+        {
+            rank,
+            reputation = FactionRankReputation(rank),
+            titles = Enum.GetValues<Faction>().ToDictionary(f => f.ToString(), f => FactionSystem.Factions[f].Ranks[rank])
+        }).ToArray(),
+        factionBonuses = Enumerable.Range(0, FactionSystem.Factions[Faction.TheCrown].Ranks.Length).Select(rank =>
+        {
+            var crown = FactionProbe(Faction.TheCrown, rank, 0);
+            var shadows = FactionProbe(Faction.TheShadows, rank, 0);
+            var faith = FactionProbe(Faction.TheFaith, rank, 0);
+            return new
+            {
+                rank,
+                crownShopDiscountPercent = Math.Round((1.0 - crown.GetShopPriceModifier()) * 100.0, 2),
+                crownGuardHelpPercent = Math.Round(crown.GetGuardInterventionChance() * 100.0, 2),
+                crownDeathGoldKeptPercent = Math.Round(crown.GetTaxExemptionRate() * 100.0, 2),
+                shadowsSellBonusPercent = Math.Round((shadows.GetFencePriceModifier() - 1.0) * 100.0, 2),
+                shadowsFleeBonus = shadows.GetEscapeChanceBonus(),
+                shadowsBlackMarketDiscountPercent = Math.Round(shadows.GetBlackMarketDiscount() * 100.0, 2),
+                faithBlessingLengthMultiplier = Math.Round((double)faith.GetBlessingDurationMultiplier(), 3),
+                faithRescueChancePercent = Math.Round(faith.GetDivineFavorChance() * 100.0, 2)
+            };
+        }).ToArray(),
+        worldEvents = WorldEventRows(),
+        oldGodMechanics = OldGodsData.GetAllOldGods().OrderBy(g => g.DungeonFloor).Select(g =>
+        {
+            var ctx = new BossCombatContext();
+            var bosses = (OldGodBossSystem)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(OldGodBossSystem));
+            InvokePrivate<object?>(bosses, "ConfigureBossPartyMechanics", ctx, g.Type);
+            return new
+            {
+                id = g.Type.ToString(),
+                name = Names(MonsterNames.KeyOf(g.Name), g.Name),
+                floor = g.DungeonFloor,
+                phase2AtHpPercent = (int)Math.Round(g.Phase2Threshold * 100),
+                phase3AtHpPercent = (int)Math.Round(g.Phase3Threshold * 100),
+                enrageRound = ctx.EnrageRound,
+                areaEveryRounds = ctx.AoEFrequency,
+                areaDamage = ctx.AoEDamage,
+                channelEveryRounds = ctx.ChannelFrequency,
+                channelDamage = ctx.ChannelDamage,
+                corruptionPerStack = ctx.CorruptionDamagePerStack,
+                doomRounds = ctx.DoomRounds,
+                physicalImmunityPhase = ctx.HasPhysicalImmunityPhase,
+                magicalImmunityPhase = ctx.HasMagicalImmunityPhase,
+                potionCooldownRounds = ctx.PotionCooldownRounds,
+                // the cut to your damage with no weapon at all (any enchantment halves it, an artifact weapon removes it)
+                unenchantedDamageCutPercent = (int)Math.Round(InvokePrivate<double>(bosses, "GetDivineArmorReduction", g.Type, new Character()) * 100)
+            };
+        }).ToArray(),
+        monsterGuards = MonsterGuardTypes.AvailableMonsters.OrderBy(m => m.Level).Select(m => new
+        {
+            id = MonsterNames.IdOf(m.Name),
+            name = Names(MonsterNames.KeyOf(m.Name), m.Name),
+            level = m.Level,
+            price = m.Cost,
+            hp = King.MonsterGuardHP(m.Level),
+            strength = King.MonsterGuardStrength(m.Level),
+            defence = King.MonsterGuardDefence(m.Level),
+            dailyFeeding = King.MonsterGuardDailyFeeding(m.Level)
+        }).ToArray(),
+        // a kill's pay for one player at its level, as WorldBossMath pays it
+        worldBossRewards = WorldBossRewardLevels.Select(level => new
+        {
+            level,
+            fullScoreExperience = WorldBossMath.KillXP(level, 1.0, 1),
+            fullScoreGold = WorldBossMath.KillGold(level, 1.0, 1),
+            qualifyingScoreExperience = WorldBossMath.KillXP(level, GameConfig.WorldBossQualifyScore, 1),
+            qualifyingScoreGold = WorldBossMath.KillGold(level, GameConfig.WorldBossQualifyScore, 1),
+            experienceCap = (long)Math.Round(WorldBossMath.NextLevelCost(level) * GameConfig.WorldBossXPCapOfNextLevel)
+        }).ToArray(),
+        constants = RealmConstants()
+    };
+
+    /// <summary>A Chivalry and Darkness for each alignment type, checked against AlignmentSystem.GetAlignment.</summary>
+    private static readonly (AlignmentSystem.AlignmentType type, long chivalry, long darkness)[] AlignmentProbes =
+    [
+        (AlignmentSystem.AlignmentType.Holy, 900, 0), (AlignmentSystem.AlignmentType.Good, 500, 0),
+        (AlignmentSystem.AlignmentType.Balanced, 300, 300), (AlignmentSystem.AlignmentType.Neutral, 0, 0),
+        (AlignmentSystem.AlignmentType.Dark, 0, 500), (AlignmentSystem.AlignmentType.Evil, 0, 900)
+    ];
+
+    private static readonly int[] WorldBossRewardLevels = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+
+    /// <summary>One tier's effects of a divine boon: every effect field that is not 0, by its name.</summary>
+    private static object BoonTier(BoonDefinition boon, int index)
+    {
+        var effects = new SortedDictionary<string, double>(StringComparer.Ordinal);
+        foreach (var p in typeof(BoonDefinition).GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            object? value = p.GetValue(boon);
+            double v = value switch { float[] f => f[index], int[] n => n[index], _ => 0 };
+            if (v != 0) effects[p.Name] = Math.Round(v, 4);
+        }
+        return new { tier = index + 1, cost = boon.CostPerTier * (index + 1), effects };
+    }
+
+    /// <summary>A member of the faction at the rank (and reputation), on an object whose constructor never runs.</summary>
+    private static FactionSystem FactionProbe(Faction faction, int rank, int reputation)
+    {
+        var probe = (FactionSystem)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(FactionSystem));
+        void Set(string name, object value) => (typeof(FactionSystem).GetProperty(name)?.GetSetMethod(true)
+            ?? throw new InvalidOperationException("FactionSystem." + name)).Invoke(probe, [value]);
+        Set(nameof(FactionSystem.PlayerFaction), faction);
+        Set(nameof(FactionSystem.FactionRank), rank);
+        Set(nameof(FactionSystem.FactionReputation), reputation);
+        return probe;
+    }
+
+    /// <summary>The lowest reputation in your faction at which its private rank-up rule gives the rank.</summary>
+    private static int FactionRankReputation(int rank)
+    {
+        if (rank == 0) return 0;
+        var rankUp = typeof(FactionSystem).GetMethod("CheckRankUp", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("FactionSystem.CheckRankUp");
+        for (int reputation = 0; reputation <= 100_000; reputation++)
+        {
+            var probe = FactionProbe(Faction.TheCrown, 0, reputation);
+            rankUp.Invoke(probe, null);
+            if (probe.FactionRank >= rank) return reputation;
+        }
+        throw new InvalidOperationException("faction rank: " + rank);
+    }
+
+    private const int WorldEventSeeds = 200;
+
+    /// <summary>
+    /// Every world event the game can make: its length in days and its price, experience and gold factors from
+    /// WorldEventSystem's own CreateEvent over a fixed set of seeds, and the seasons in which its own daily roll
+    /// (GenerateRandomEvent) can draw it, over every season and every war, plague and festival state.
+    /// </summary>
+    private static object WorldEventRows()
+    {
+        var create = typeof(WorldEventSystem).GetMethod("CreateEvent", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("WorldEventSystem.CreateEvent");
+        var draw = typeof(WorldEventSystem).GetMethod("GenerateRandomEvent", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("WorldEventSystem.GenerateRandomEvent");
+        var randomField = typeof(WorldEventSystem).GetField("_random", BindingFlags.NonPublic | BindingFlags.Instance)
+            ?? throw new InvalidOperationException("WorldEventSystem._random");
+        WorldEventSystem Fresh(int seed, bool war = false, bool plague = false, bool festival = false)
+        {
+            var system = (WorldEventSystem)System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(typeof(WorldEventSystem));
+            randomField.SetValue(system, new Random(seed));
+            foreach (var (name, on) in new[] { (nameof(WorldEventSystem.WarActive), war), (nameof(WorldEventSystem.PlaguActive), plague),
+                         (nameof(WorldEventSystem.FestivalActive), festival) })
+                (typeof(WorldEventSystem).GetProperty(name)?.GetSetMethod(true) ?? throw new InvalidOperationException("WorldEventSystem." + name))
+                    .Invoke(system, [on]);
+            return system;
+        }
+        // the seasons (game day / 91 within the year) in which the daily roll drew each type
+        var seasons = new Dictionary<WorldEventSystem.EventType, SortedSet<int>>();
+        for (int season = 0; season < 4; season++)
+            for (int state = 0; state < 8; state++)
+                for (int seed = 0; seed < WorldEventSeeds; seed++)
+                {
+                    var evt = (WorldEventSystem.WorldEvent)draw.Invoke(Fresh(seed, (state & 1) != 0, (state & 2) != 0, (state & 4) != 0), [season * 91 + 1])!;
+                    if (!seasons.TryGetValue(evt.Type, out var set)) seasons[evt.Type] = set = new SortedSet<int>();
+                    set.Add(season);
+                }
+        return Enum.GetValues<WorldEventSystem.EventType>().Select(type =>
+        {
+            var made = Enumerable.Range(0, WorldEventSeeds)
+                .Select(seed => (WorldEventSystem.WorldEvent)create.Invoke(Fresh(seed), [type, 1])!).ToList();
+            double? Factor(string key)
+            {
+                var values = made.Select(e => e.Effects.TryGetValue(key, out float f) ? (double?)Math.Round(f, 2) : null).Distinct().ToList();
+                if (values.Count != 1) throw new InvalidOperationException("world event factor varies: " + type + "/" + key);
+                return values[0];
+            }
+            return new
+            {
+                id = type,
+                name = Names(WorldEventSystem.EventKey(type, "title"), WorldEventSystem.StoredText(type, "title")),
+                minDays = made.Min(e => e.DaysRemaining),
+                maxDays = made.Max(e => e.DaysRemaining),
+                price = Factor("price"),
+                experience = Factor("xp"),
+                gold = Factor("gold"),
+                randomSeasons = seasons.TryGetValue(type, out var s) ? s.ToArray() : []
+            };
+        }).ToArray();
+    }
+
+    private static SortedDictionary<string, object?> RealmConstants()
+    {
+        var constants = Named(typeof(GameConfig), string.Empty,
+            // gods and player-gods
+            nameof(GameConfig.GodNeglectGraceDays), nameof(GameConfig.GodNeglectDailyLoss),
+            nameof(GameConfig.GodNpcFollowerStanding), nameof(GameConfig.GodDesecrationStandingPenalty),
+            nameof(GameConfig.GodStandingWeekDays), nameof(GameConfig.GodWeeklyXpBonusPct),
+            nameof(GameConfig.GodEchoDamagePct), nameof(GameConfig.MiracleBanishBossDamagePct),
+            nameof(GameConfig.MiracleBindRounds), nameof(GameConfig.MiracleConfuseRounds),
+            nameof(GameConfig.GodPrayerBlessingZealotMultiplier), nameof(GameConfig.GodPrayerBlessingCombats),
+            nameof(GameConfig.GodPlayerBoonFloorPct), nameof(GameConfig.GodPlayerBoonCapPct),
+            nameof(GameConfig.GodPlayerInactiveDays), nameof(GameConfig.GodPlayerInactiveDecayPctPerDay),
+            nameof(GameConfig.GodBelieverExpPerLevel), nameof(GameConfig.GodRecruitPaganExp),
+            nameof(GameConfig.GodRecruitStealExp), nameof(GameConfig.GodBlessExp), nameof(GameConfig.GodSmiteExp),
+            nameof(GameConfig.GodPoisonRelationshipExp), nameof(GameConfig.GodFreePrisonerExp),
+            nameof(GameConfig.GodProclamationExp), nameof(GameConfig.GodRecruitPaganChance),
+            nameof(GameConfig.GodBlessCombatDuration), nameof(GameConfig.GodBlessBonusFollower),
+            nameof(GameConfig.GodBlessBonusDevout), nameof(GameConfig.GodBlessBonusZealot), nameof(GameConfig.GodBlessBonusNpc),
+            nameof(GameConfig.GodBlessFavorGain), nameof(GameConfig.GodBlessFavorDailyCap),
+            nameof(GameConfig.GodChastiseFavorLoss), nameof(GameConfig.GodSmiteMinPercent), nameof(GameConfig.GodSmiteMaxPercent),
+            nameof(GameConfig.GodRecruitPlayerMultiplier), nameof(GameConfig.GodRecruitPlayerExpMultiplier),
+            nameof(GameConfig.GodBlessPlayerExpMultiplier), nameof(GameConfig.GodSmitePlayerExpMultiplier),
+            nameof(GameConfig.GodSmitePlayerCooldownMinutes), nameof(GameConfig.GodPoisonRelationshipChance),
+            nameof(GameConfig.GodBelieverKillXPPercent), nameof(GameConfig.GodMaxLevel),
+            // the Blood Price and alignment
+            nameof(GameConfig.MurderWeightPerDeliberateMurder), nameof(GameConfig.MurderWeightPerDarkMagicKill),
+            nameof(GameConfig.MurderWeightPerShadowContract), nameof(GameConfig.ShadowContractBloodPriceSkipChance),
+            nameof(GameConfig.MurderWeightLikedNPCBonus), nameof(GameConfig.MurderWeightDecayPerRealDay),
+            nameof(GameConfig.MurderWeightConfessionReduction), nameof(GameConfig.MurderWeightEndingBlock),
+            nameof(GameConfig.MurderWeightAwakeningBlock), nameof(GameConfig.BloodConfessionBaseCost),
+            nameof(GameConfig.BloodConfessionCostPerWeight), nameof(GameConfig.AlignmentCap),
+            nameof(GameConfig.MaxChivalryGainPerChurchAction), nameof(GameConfig.MaxAlignmentGainPerTempleSacrifice),
+            // the Castle, the court and the prison
+            nameof(GameConfig.MinLevelKing), nameof(GameConfig.KingChallengeLevelRange),
+            nameof(GameConfig.KingDefenderHPBonus), nameof(GameConfig.KingDefenderDefBonus),
+            nameof(GameConfig.KingCombatStrengthBonus), nameof(GameConfig.KingCombatDefenseBonus),
+            nameof(GameConfig.KingCombatHPBonus), nameof(GameConfig.KingDailyStipend), nameof(GameConfig.KingStipendPerLevel),
+            nameof(GameConfig.DefaultRoyalTreasury), nameof(GameConfig.NPCMinLevelToChallenge),
+            nameof(GameConfig.NPCChallengeLevelRange), nameof(GameConfig.MaxNPCChallengesPerDay),
+            nameof(GameConfig.NPCMinAmbitionToChallenge), nameof(GameConfig.BaseCourtMaintenance),
+            nameof(GameConfig.DefaultTaxRateNew), nameof(GameConfig.KingTaxIncomeMultiplier),
+            nameof(GameConfig.BaseGuardSalary), nameof(GameConfig.GuardSalaryPerGuardLevel),
+            nameof(GameConfig.GuardRecruitmentCost), nameof(GameConfig.MaxRoyalGuards),
+            nameof(GameConfig.MaxRoyalOrphans), nameof(GameConfig.OrphanCareCost), nameof(GameConfig.OrphanCommissionAge),
+            nameof(GameConfig.OrphanCommissionCost), nameof(GameConfig.DailyMagicReplenishment), nameof(GameConfig.MaxMagicBudget),
+            nameof(GameConfig.RoyalLoanChivalryLossEarly), nameof(GameConfig.RoyalLoanChivalryLossMid),
+            nameof(GameConfig.RoyalLoanChivalryLossLate), nameof(GameConfig.ArrestTrialCost), nameof(GameConfig.PromoteCost),
+            nameof(GameConfig.BribeBaseCost), nameof(GameConfig.RoyalBlessingDuration),
+            nameof(GameConfig.DailyPrisonSentences), nameof(GameConfig.DailyExecutions), nameof(GameConfig.KnightDefenseBonus),
+            nameof(GameConfig.CrownTaxExemptionRate),
+            nameof(GameConfig.MaxPrisonEscapeAttempts),
+            // the Church, the Temple and the Sanctum
+            nameof(GameConfig.MarriageCost), nameof(GameConfig.ConfessionBaseCost), nameof(GameConfig.ConfessionCostPerDarkness),
+            nameof(GameConfig.FreeBlessingMinRenownChivalry), nameof(GameConfig.InnerSanctumCost),
+            nameof(GameConfig.AlmsGoldPerLevel), nameof(GameConfig.OrphanageGoldPerLevel), nameof(GameConfig.HospiceGoldPerLevel),
+            nameof(GameConfig.MaxAlmsPerDay), nameof(GameConfig.MaxOrphanageGiftsPerDay), nameof(GameConfig.MaxHospiceTithesPerDay),
+            nameof(GameConfig.AlmsChivalryReward), nameof(GameConfig.OrphanageChivalryReward), nameof(GameConfig.HospiceChivalryReward),
+            nameof(GameConfig.SanctumFaithMemberDiscount),
+            // the NPC world
+            nameof(GameConfig.NpcLifecycleHoursPerYear), nameof(GameConfig.RecruitOldAgeGraceDays),
+            nameof(GameConfig.PermadeathChanceDungeonSolo), nameof(GameConfig.PermadeathChanceNPCvsNPC),
+            nameof(GameConfig.PermadeathChanceTeamWar), nameof(GameConfig.MaxNPCPopulation),
+            // the Arena
+            nameof(GameConfig.MaxPvPAttacksPerDay), nameof(GameConfig.MinPvPLevel), nameof(GameConfig.PvPLevelRangeLimit),
+            nameof(GameConfig.PvPGoldStealPercent), nameof(GameConfig.PvPGoldPerFightCapPerLevel),
+            nameof(GameConfig.PvPAltGoldStealBase), nameof(GameConfig.PvPAltGoldStealPerLevel),
+            // New Game Plus
+            nameof(GameConfig.NGPlusCycle2MonsterBuff), nameof(GameConfig.NGPlusCycle3MonsterBuff),
+            nameof(GameConfig.NGPlusCycle4MonsterBuff), nameof(GameConfig.NGPlusCycle2GoldBuff), nameof(GameConfig.NGPlusCycle4GoldBuff),
+            // the Old Gods
+            nameof(GameConfig.OldGodSoloDamageBonus), nameof(GameConfig.OldGodSoloPlayerDamageReduction),
+            nameof(GameConfig.OldGodDefeatXPPerLevel), nameof(GameConfig.OldGodDefeatGoldPerLevel),
+            nameof(GameConfig.OldGodDialogueBossDamageCap), nameof(GameConfig.BossEnrageDamageMultiplier),
+            nameof(GameConfig.BossEnrageDefenseMultiplier), nameof(GameConfig.BossEnrageExtraAttacks),
+            nameof(GameConfig.BossCorruptionMaxStacks), nameof(GameConfig.BossPhaseImmunityResidual),
+            // the world boss
+            nameof(GameConfig.WorldBossSpawnHourEastern), nameof(GameConfig.WorldBossWindowHours),
+            nameof(GameConfig.WorldBossActiveDays), nameof(GameConfig.WorldBossPickLevelSlack),
+            nameof(GameConfig.WorldBossKillBudgetPlayers), nameof(GameConfig.WorldBossPerRoundCapPercent),
+            nameof(GameConfig.WorldBossUnavoidableCapPercent), nameof(GameConfig.WorldBossRallyIdleMinutes),
+            nameof(GameConfig.WorldBossRallyRegenPerTick), nameof(GameConfig.WorldBossNightRegenFraction),
+            nameof(GameConfig.WorldBossMaxNights), nameof(GameConfig.WorldBossRetreatCooldownSeconds),
+            nameof(GameConfig.WorldBossFallCooldownSeconds), nameof(GameConfig.WorldBossQualifyScore),
+            nameof(GameConfig.WorldBossXPCapOfNextLevel), nameof(GameConfig.WorldBossTogetherBonusPerAlly),
+            nameof(GameConfig.WorldBossTogetherBonusCap), nameof(GameConfig.WorldBossFameQualified),
+            nameof(GameConfig.WorldBossFameMvpExtra), nameof(GameConfig.WorldBossWithdrawalPayFraction),
+            nameof(GameConfig.WorldBossMvpLegendaryMinHumans), nameof(GameConfig.WorldBossNoticeHoursBefore),
+            nameof(GameConfig.WorldBossTelegraphAnsweredPercent), nameof(GameConfig.WorldBossTelegraphUnansweredPercent),
+            nameof(GameConfig.WorldBossInterruptsMax), nameof(GameConfig.WorldBossChallengeHoldSeconds),
+            nameof(GameConfig.WorldBossFocusMultiplier), nameof(GameConfig.WorldBossOffFocusMultiplier),
+            nameof(GameConfig.WorldBossMinLevel), nameof(GameConfig.WorldBossMaxRoundsPerSession),
+            nameof(GameConfig.WorldBossPhase2Threshold), nameof(GameConfig.WorldBossPhase3Threshold),
+            nameof(GameConfig.WorldBossStaggerSeconds));
+        // the ruler's guard caps, the NG+ cycle stat bonus and the guild rules, under their own names
+        foreach (var entry in Named(typeof(King), string.Empty, nameof(King.MaxNPCGuards), nameof(King.MaxMonsterGuards)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(CycleSystem), string.Empty, nameof(CycleSystem.CycleStatBonusPerCycle)))
+            constants[entry.Key] = entry.Value;
+        foreach (var entry in Named(typeof(GuildSystem), string.Empty, nameof(GuildSystem.GuildCreationCost),
+                     nameof(GuildSystem.MaxGuildMembers), nameof(GuildSystem.GuildXPBonusPerMember), nameof(GuildSystem.MaxGuildXPBonus),
+                     nameof(GuildSystem.OfficerGoldWithdrawLimit), nameof(GuildSystem.MaxBankItems)))
+            constants[entry.Key] = entry.Value;
         return constants;
     }
 

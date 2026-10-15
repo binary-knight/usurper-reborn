@@ -98,6 +98,15 @@ Numbers should come from directives, not copied tables:
 {{table:gauntlet-champions}}
 {{table:merc-ranks}}
 {{table:merc-contracts}}
+{{table:god-ranks}}
+{{table:divine-boons}}
+{{table:alignment-types}}
+{{table:faction-ranks}}
+{{table:faction-bonuses}}
+{{table:world-events}}
+{{table:old-god-mechanics}}
+{{table:monster-guards}}
+{{table:world-boss-rewards}}
 {{god:Solarius}}
 {{monster-family:Undead}}
 {{balance:MentalInnSleepGain}}
@@ -146,6 +155,21 @@ name, the outposts' prices and the Sellsword contracts are read from private
 game members by reflection, so renaming one fails the export. The world
 constants print like the party constants and may not reuse a name either.
 A secret boss carries its reward and only the stats its fight reads.
+`god-ranks`, `divine-boons`, `alignment-types`, `faction-ranks`,
+`faction-bonuses`, `world-events`, `old-god-mechanics`, `monster-guards` and
+`world-boss-rewards` come from `realm.json`. A god rank's numbers are the
+Pantheon's own rank functions. An alignment type's effects are what the game's
+alignment code gives a character of that type. A faction's rank needs the
+reputation the game's private rank-up rule asks for, and its bonuses are the
+game's own rank-scaled getters, read on an object whose constructor never runs,
+so the shared faction system is left alone. A world event's days and factors
+are the game's own private event maker over a fixed set of seeds, and its
+seasons are the ones in which the game's own daily roll draws it.
+`old-god-mechanics` folds itself under a spoiler: it names the Old Gods and
+their fight setup, read from the game's private boss setup. The monster guards
+use the King's own formulas, and the world boss pay is the game's own reward
+math for one player. The races table also shows the NPC lifespan. The realm
+constants print like the party constants and may not reuse a name either.
 
 Other balance constants use their exact exported keys. Unknown entities,
 directives, filters, source paths, local links and anchors fail the build.

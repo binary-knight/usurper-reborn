@@ -2,7 +2,7 @@
 title: Boss reference
 path: /wiki/en/monsters/bosses/
 checked: 1.3.1
-sources: Scripts/Data/WorldBossData.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
 history: 1.2.5 | Boss names, titles, world boss elements and Old God ability names are shown in the player's language, and Old God names on the wiki come in all five languages.
 history: 1.2.4 | In group combat, a secret boss's battle cry is shown in each player's own language.
 ---
@@ -26,9 +26,13 @@ Beating the boss room pays a bonus on top of the kills: floor x 500 gold plus 0 
 
 Some floors have a guardian that must be dealt with before you can go deeper; see [how deep you can go](/wiki/en/world/dungeon/#how-deep-you-can-go), whose spoiler names those floors. How those fights scale is in a spoiler below.
 
+### Old God fights: enrage, channels and marks
+
+Old Gods enrage after a set number of rounds, channel attacks that hit the whole party and mark party members with lasting harm, so a healer teammate and a fast teammate who can interrupt matter. The numbers for each are in the spoilers below.
+
 ## World bosses
 
-World bosses belong to the shared online system. See the [online guide](/wiki/en/online/) for the distinction from a personal dungeon fight. Daily Miracles do not work in world boss fights.
+World bosses belong to the shared online system: when they spawn, how the fight works and what a kill pays are on [the world boss](/wiki/en/online/world-boss/). Daily Miracles do not work in world boss fights.
 
 {{table:bosses}}
 
@@ -46,6 +50,24 @@ The floor 50 boss asks you a question first. The right answer is the fourth; any
 An Old God's HP, Strength and Defence in the table below are multiplied by {{balance:BaseMonsterDifficultyScale}} in the fight; its Strength is then split evenly into Strength and weapon power, and its Defence into Defence and armor. Each artifact you hold adds 10 percent to its HP (at most 40 percent) and 5 percent to its damage (at most 20 percent).
 
 Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 25, 35 and 50 percent lower. Any enchantment on your main hand or off hand weapon halves that reduction, and a weapon whose name holds Artifact, Godforged, Sunforged or Voidtouched removes it.
+
+**Phases.** An Old God enters phase 2 at half its HP and phase 3 at a fifth (Manwe at a tenth). Each phase adds its abilities to those it draws from; it uses one on 70 percent of its turns. Potions in an Old God fight have a cooldown of 1 round.
+
+**Enrage.** At its enrage round, with warnings at half and three quarters of it, the god's Strength doubles ({{balance:BossEnrageDamageMultiplier}} times), its Defence rises {{balance:BossEnrageDefenseMultiplier}} times and it attacks {{balance:BossEnrageExtraAttacks}} more times a round for the rest of the fight. A Dispel Evil clears the enrage mark but not those numbers.
+
+**Area attacks and channels.** From round 2, on every round that is a multiple of its number, the god strikes everyone in the party for its area damage less 3 x the square root of each target's Defence. A taunting teammate, or a Warrior, Paladin, Barbarian or Tidesworn you play, takes the hit for the others: the others take 40 percent and the tank 130 percent. A channel starts the same way and lands two rounds later on everyone, for its damage less 3 x the square root of Defence. A teammate with Agility plus half Dexterity of 80 or more may interrupt it; a Dispel Evil ends it too, and also ends a phase immunity and cuts the god's Defence by 20 percent.
+
+**Corruption and Doom.** From phase 2 a god with corruption has a 30 percent chance each round to put a stack on a random party member, 2 stacks in phase 3, up to {{balance:BossCorruptionMaxStacks}}; each stack deals its damage every round. In phase 3 every Old God has a 15 percent chance each round to mark a member without Doom, who dies outright when the count reaches 0. Only a healer teammate (Cleric, Paladin, Bard, Wavecaller, Abysswarden or a healer specialization) clears them: first the Doom closest to landing, otherwise 3 + its level / 20 stacks from a member holding 3 or more. You cannot clear them yourself.
+
+**Immunity.** At phase 2 Noctura, Terravok and Manwe become immune to physical damage for 4 rounds and Aurelion to magical damage; Manwe adds magical immunity for 4 rounds at phase 3. Damage of the blocked kind is cut to {{percent:BossPhaseImmunityResidual}} percent.
+
+**Fighting alone.** With no living NPC teammate or companion, an Old God's named abilities deal {{percent:OldGodSoloDamageBonus}} percent more damage and you then take {{percent:OldGodSoloPlayerDamageReduction}} percent less, 0.92 times in all. Manwe's own abilities skip this.
+
+**Most damage from one hit.** An Old God's area attack and channel have no cap on the damage to you; a teammate takes at most {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP from one hit. Manwe's own abilities take at most 85 percent of your maximum HP from the first round, without the lower cap of the first rounds.
+
+**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you below a fifth of your HP unless you hold the Worldstone.
 :::
+
+{{table:old-god-mechanics}}
 
 {{table:secret-bosses}}

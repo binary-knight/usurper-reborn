@@ -12,6 +12,14 @@ Teams support adventuring relationships and group participation. Guilds are a se
 
 A new team or guild name cannot contain < > & or a double quote. The game says so, creates nothing and takes no fee. Existing team and guild names are kept.
 
+## Guilds: cost, size and experience bonus
+
+Guilds exist only online. Founding a guild costs {{balance:GuildCreationCost}} gold. A guild holds at most {{balance:MaxGuildMembers}} members and {{balance:MaxBankItems}} items in its bank. Each member gains {{percent:GuildXPBonusPerMember}} percent more combat experience for each member of the guild, at most {{percent:MaxGuildXPBonus}} percent: a guild of 5 or more gives the full bonus.
+
+### Guild ranks
+
+The ranks are Leader, Officer and Member. The Leader and Officers can take gold from the guild bank, an Officer at most {{balance:OfficerGoldWithdrawLimit}} gold in one withdrawal; a Member cannot. Only the Leader removes or promotes members.
+
 ## Team size
 
 A team holds at most 5 members, you included. Players on the team count, and so does a dead NPC member until you remove it, unless it can never come back.

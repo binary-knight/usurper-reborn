@@ -114,6 +114,7 @@ function loadData(dir) {
     "economy",
     "combat",
     "world",
+    "realm",
   ]) {
     const file = JSON.parse(
       fs.readFileSync(path.join(dir, kind + ".json"), "utf8"),
@@ -254,6 +255,25 @@ function loadData(dir) {
   for (const s of world.druidShrines)
     if (!regionIds.has(s.region))
       throw Error(`Unknown shrine region: ${s.id}/${s.region}`);
+  // 1.3.2: gods, the town's institutions, online play and the NPC world
+  const realm = data.realm;
+  for (const key of [
+    "godRanks",
+    "divineBoons",
+    "alignmentTypes",
+    "factionRanks",
+    "factionBonuses",
+    "worldEvents",
+    "oldGodMechanics",
+    "monsterGuards",
+    "worldBossRewards",
+  ])
+    if (!Array.isArray(realm[key]) || !realm[key].length)
+      throw Error(`Empty dataset: realm/${key}`);
+  if (!realm.constants || !Object.keys(realm.constants).length)
+    throw Error("Empty dataset: realm/constants");
+  if (realm.factionRanks.length !== realm.factionBonuses.length)
+    throw Error("Faction ranks and bonuses differ in length");
   return { meta, data };
 }
 function renderers(data) {
@@ -289,6 +309,10 @@ function renderers(data) {
     constants[key] = value;
   }
   for (const [key, value] of Object.entries(data.world.constants)) {
+    if (key in constants) throw Error(`Duplicate constant: ${key}`);
+    constants[key] = value;
+  }
+  for (const [key, value] of Object.entries(data.realm.constants)) {
     if (key in constants) throw Error(`Duplicate constant: ${key}`);
     constants[key] = value;
   }
@@ -702,14 +726,19 @@ function renderers(data) {
           "Strength bonus",
           "Defence bonus",
           "Stamina bonus",
+          "NPC lifespan (game years)",
+          "NPC lifespan (real days)",
         ],
         rows.map((e) => [
           link("characters/races", e),
           ...["hpBonus", "strengthBonus", "defenceBonus", "staminaBonus"].map(
             (k) => e.bonusesAndCreationRanges[k],
           ),
+          e.npcLifespanYears,
+          // a game year of an NPC is NpcLifecycleHoursPerYear real hours (WorldSimulator.ProcessNPCAging)
+          num(Math.round((e.npcLifespanYears * constants.NpcLifecycleHoursPerYear) / 24)),
         ]),
-        "Race creation bonuses",
+        "Race creation bonuses and NPC lifespans",
       );
     if (id === "monsters")
       return table(
@@ -1318,6 +1347,216 @@ function renderers(data) {
           ];
         }),
         "Sellsword Hall contracts",
+      );
+    // 1.3.2 realm tables (realm.json): gods, the town's institutions, online play and the NPC world
+    if (id === "god-ranks")
+      return table(
+        [
+          "Rank",
+          "Title",
+          "Divine experience needed",
+          "Deeds a day",
+          "Experience per believer a day",
+          "Favors budget (no believers)",
+          "Favors budget (10 or more believers)",
+        ],
+        data.realm.godRanks.map((r) => [
+          `Rank ${r.rank}`,
+          escape(r.title.en),
+          num(r.experience),
+          r.deedsPerDay,
+          r.experiencePerBeliever,
+          r.favorBudgetNoBelievers,
+          r.favorBudget,
+        ]),
+        "Player-god ranks",
+      );
+    if (id === "divine-boons") {
+      // the words for each effect field of a divine boon (DivineBoonRegistry.BoonDefinition); a new field fails the build
+      const boonWords = {
+        DamagePercent: (v) => `+${Math.round(v * 100)} percent damage`,
+        DefensePercent: (v) => `+${Math.round(v * 100)} percent defence`,
+        CritPercent: (v) => `+${Math.round(v * 100)} critical hit chance`,
+        LifestealPercent: (v) => `heals ${Math.round(v * 100)} percent of damage dealt`,
+        XPPercent: (v) => `+${Math.round(v * 100)} percent combat experience`,
+        GoldPercent: (v) => `+${Math.round(v * 100)} percent combat gold`,
+        ShopDiscountPercent: (v) => `${Math.round(v * 100)} percent off at the Weapon and Armor shops`,
+        MaxHPPercent: (v) => `+${Math.round(v * 100)} percent maximum HP`,
+        MaxManaPercent: (v) => `+${Math.round(v * 100)} percent maximum mana`,
+        FleePercent: (v) => `+${Math.round(v * 100)} flee chance`,
+        LuckPercent: (v) => `+${Math.round(v * 100)} to a monster's equipment drop chance`,
+        FlatAttack: (v) => `+${v} attack`,
+        FlatDefense: (v) => `+${v} defence`,
+      };
+      const tierText = (t) =>
+        Object.entries(t.effects)
+          .map(([k, v]) => {
+            if (!(k in boonWords)) throw Error(`Unknown divine boon effect: ${k}`);
+            return boonWords[k](v);
+          })
+          .join(", ");
+      return table(
+        ["Favor", "Group", "Alignments", "Points a tier", "Tier 1", "Tier 2", "Tier 3"],
+        data.realm.divineBoons.map((b) => [
+          escape(name(b)),
+          escape(b.category),
+          escape(b.alignments.length ? b.alignments.join(", ") : "Any"),
+          b.costPerTier,
+          ...b.tiers.map((t) => escape(tierText(t))),
+        ]),
+        "Favors a player-god can give",
+      );
+    }
+    if (id === "alignment-types")
+      return table(
+        [
+          "Alignment",
+          "Attack",
+          "Defence",
+          "Critical hit chance",
+          "Melee heals you (% of damage)",
+          "Fear on a hit (%)",
+          "HP regained a round (% of max)",
+          "Extra damage to undead and demons (%)",
+        ],
+        data.realm.alignmentTypes.map((a) => [
+          escape(name(a)),
+          `x${a.attackMultiplier}`,
+          `x${a.defenceMultiplier}`,
+          a.critChanceBonus ? `+${a.critChanceBonus}` : "None",
+          a.soulDrainPercent || "None",
+          a.fearOnHitPercent || "None",
+          a.regenPercentPerRound || "None",
+          a.holySmitePercent || "None",
+        ]),
+        "Alignment effects in combat",
+      );
+    if (id === "faction-ranks")
+      return table(
+        ["Rank", "Reputation needed", "The Crown", "The Shadows", "The Faith"],
+        data.realm.factionRanks.map((r) => [
+          `Rank ${r.rank}`,
+          num(r.reputation),
+          escape(r.titles.TheCrown),
+          escape(r.titles.TheShadows),
+          escape(r.titles.TheFaith),
+        ]),
+        "Faction ranks",
+      );
+    if (id === "faction-bonuses")
+      return table(
+        [
+          "Rank",
+          "Crown: shop discount (%)",
+          "Crown: guard help (%)",
+          "Shadows: sell price bonus (%)",
+          "Shadows: flee bonus",
+          "Shadows: Black Market discount (%)",
+          "Faith: blessing length",
+          "Faith: rescue from death (%)",
+        ],
+        data.realm.factionBonuses.map((r) => [
+          `Rank ${r.rank}`,
+          r.crownShopDiscountPercent,
+          r.crownGuardHelpPercent,
+          r.shadowsSellBonusPercent,
+          `+${r.shadowsFleeBonus}`,
+          r.shadowsBlackMarketDiscountPercent,
+          `x${r.faithBlessingLengthMultiplier}`,
+          r.faithRescueChancePercent,
+        ]),
+        "Faction bonuses by rank",
+      );
+    if (id === "world-events") {
+      const seasonNames = ["spring", "summer", "autumn", "winter"];
+      const factor = (v) => (v == null ? "None" : `x${v}`);
+      return table(
+        ["Event", "Days", "Shop prices", "Kill experience", "Kill gold", "Drawn by the daily roll"],
+        data.realm.worldEvents.map((e) => [
+          escape(name(e)),
+          e.minDays === e.maxDays ? e.minDays : `${e.minDays} to ${e.maxDays}`,
+          factor(e.price),
+          factor(e.experience),
+          factor(e.gold),
+          !e.randomSeasons.length
+            ? "No"
+            : e.randomSeasons.length === 4
+              ? "Any season"
+              : escape(e.randomSeasons.map((n) => seasonNames[n]).join(", ")),
+        ]),
+        "World events",
+      );
+    }
+    if (id === "old-god-mechanics") {
+      const every = (n, dmg) => (n ? `every ${n} rounds, ${num(dmg)}` : "None");
+      const immune = (g) =>
+        [g.physicalImmunityPhase ? "physical" : "", g.magicalImmunityPhase ? "magical" : ""]
+          .filter(Boolean)
+          .join(", ") || "None";
+      return spoiler(
+        "Spoiler: Old God fight mechanics",
+        table(
+          [
+            "Old God",
+            "Phase 2 at HP (%)",
+            "Phase 3 at HP (%)",
+            "Enrages at round",
+            "Area attack",
+            "Channel (lands 2 rounds later)",
+            "Corruption per stack a round",
+            "Doom rounds (phase 3)",
+            "Immunity phases",
+            "Cut to unenchanted damage (%)",
+          ],
+          data.realm.oldGodMechanics.map((g) => [
+            escape(name(g)),
+            g.phase2AtHpPercent,
+            g.phase3AtHpPercent,
+            g.enrageRound,
+            every(g.areaEveryRounds, g.areaDamage),
+            every(g.channelEveryRounds, g.channelDamage),
+            g.corruptionPerStack || "None",
+            g.doomRounds || "None",
+            immune(g),
+            g.unenchantedDamageCutPercent || "None",
+          ]),
+          "Old God fight mechanics",
+        ),
+      );
+    }
+    if (id === "monster-guards")
+      return table(
+        ["Monster guard", "Level", "Price", "HP", "Strength", "Defence", "Feeding a day"],
+        data.realm.monsterGuards.map((m) => [
+          escape(name(m)),
+          m.level,
+          num(m.price),
+          num(m.hp),
+          num(m.strength),
+          num(m.defence),
+          num(m.dailyFeeding),
+        ]),
+        "Monster guards",
+      );
+    if (id === "world-boss-rewards")
+      return table(
+        [
+          "Your level",
+          "Experience at full score",
+          "Gold at full score",
+          "Experience at the qualifying score",
+          "Gold at the qualifying score",
+          "Experience cap",
+        ],
+        data.realm.worldBossRewards.map((r) => [
+          `Level ${r.level}`,
+          num(r.fullScoreExperience),
+          num(r.fullScoreGold),
+          num(r.qualifyingScoreExperience),
+          num(r.qualifyingScoreGold),
+          num(r.experienceCap),
+        ]),
+        "World boss kill pay for one player",
       );
     if (id === "balance")
       return (

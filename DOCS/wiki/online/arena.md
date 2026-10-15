@@ -2,7 +2,7 @@
 title: The Arena
 path: /wiki/en/online/arena/
 checked: 1.3.1
-sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs
+sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
 history: 1.3.1 | none
 history: 1.3.0 | In an Arena fight a dual-wielder's swing uses the weapon in its own hand; before, every swing used both weapons' power added together.
 history: 1.2.7 | none
@@ -29,13 +29,23 @@ Press A to attack. The list of targets leaves out:
 - a player who lost a PvP fight today and has not logged in since;
 - a player asleep at home or resting in the Shadows safe house.
 
-There is a minimum level to fight, a daily attack limit and a maximum level difference between you and the target.
+## What level for the Arena
+
+You need level {{balance:MinPvPLevel}} to fight, you can attack {{balance:MaxPvPAttacksPerDay}} times a day, and the target must be within {{balance:PvPLevelRangeLimit}} levels of you.
 
 ## Winning and losing
 
-A win takes a share of the target's gold, with a cap based on your level and a lower cap against alternate characters. A win can also salvage gold from the target's worn weapon (30% chance) and armor (25% chance) at half their value, and salvage counts toward the same level cap. It also claims any bounty on the target and adds Fame.
+### How much gold do I win in the Arena
 
-A loss costs experience, a larger share of your gold and some Fame, and you revive at the Inn with half your HP. The defender then also takes a share of the gold you have left.
+A win takes {{percent:PvPGoldStealPercent}} percent of the gold the target carries, at most {{balance:PvPGoldPerFightCapPerLevel}} gold x your level in one fight; an alternate character's take is capped at {{balance:PvPAltGoldStealBase}} + {{balance:PvPAltGoldStealPerLevel}} x its level. A level 20 main can take up to 100,000 gold and a level 20 alt up to 3,000. A win can also salvage gold from the target's worn weapon (30% chance) and armor (25% chance) at half their value, and salvage counts toward the same cap. The win also pays 10 to 29 x the target's level in bonus gold, claims any bounty on the target and adds 10 Fame. If the target logs in during the fight, the gold taken from them is voided; the win, experience and bounty stand.
+
+### How much experience for a PvP win
+
+A win pays 50 x the target's level x (1 + 0.15 x the target's level minus yours) experience, with the level factor held between 0.25 and 2, at least 10. Beating a level 24 target at level 20: 1,200 x 1.6 = 1,920 experience. A team's Training headquarters adds to it.
+
+### What do I lose if I lose in the Arena
+
+A loss costs 10 percent of your experience, 25 percent of your gold and 5 Fame, and you revive at the Inn with half your maximum HP. The defender then also takes {{percent:PvPGoldStealPercent}} percent of the gold you have left, under the same cap at the defender's level.
 
 ## Records
 

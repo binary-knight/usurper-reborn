@@ -35,14 +35,17 @@ A few lifetime records do survive: completed sellsword contracts, lifetime chari
 
 ## Cycle bonuses
 
-A new character on a later cycle starts with:
+A new character on a later cycle starts with, for each completed cycle:
 
-- extra Strength, Defence and Stamina for each completed cycle;
-- extra starting gold for each completed cycle;
-- an experience multiplier that grows with each cycle;
-- a higher starting level if a previous life finished at a high level.
+- {{balance:CycleStatBonusPerCycle}} more Strength, Defence and Stamina, for good;
+- 500 more starting gold;
+- 10 percent more experience from monster fights.
 
-The ending you reached adds its own bonus on top. Monsters also grow stronger and drop more gold on later cycles, so the cycle is not only an easier replay.
+On cycle 3, with 2 cycles completed, that is 10 more of each stat, 1,000 gold and 1.2 times the experience. A previous life that finished at a high level also raises the starting level (below). The ending you reached adds its own bonus on top.
+
+### How much harder is NG+
+
+Monsters grow stronger on later cycles: their HP, Strength, Defence, punch, weapon power and armor are {{balance:NGPlusCycle2MonsterBuff}} times on cycle 2, 1.56 times on cycle 3 ({{balance:NGPlusCycle2MonsterBuff}} x {{balance:NGPlusCycle3MonsterBuff}}) and 2.34 times from cycle 4 (x {{balance:NGPlusCycle4MonsterBuff}} more). Their gold is {{balance:NGPlusCycle2GoldBuff}} times on cycles 2 and 3 and 3 times from cycle 4 (x {{balance:NGPlusCycle4GoldBuff}} more), so the cycle is not only an easier replay.
 
 ### NG+ starting level
 
@@ -55,7 +58,7 @@ Five prestige classes can be chosen at character creation on NG+: Tidesworn, Wav
 :::spoiler Spoiler: which ending unlocks which prestige class
 The Savior ending unlocks Tidesworn and Wavecaller. The Defiant ending unlocks Cyclebreaker. The Usurper ending unlocks Abysswarden and Voidreaver. The True Ending and the secret ending unlock all five.
 
-Ending bonuses for the next cycle: Usurper adds Strength and Darkness; Savior adds Chivalry and knowledge of artifact locations; Defiant adds experience and an ancient key; the True Ending adds all three base stats, artifact knowledge, the key and more experience.
+Ending bonuses for the next cycle: Usurper adds 10 Strength and 100 Darkness; Savior adds 100 Chivalry and knowledge of artifact locations; Defiant adds 0.25 to the experience multiplier and an ancient key; the True Ending adds 15 Strength, Defence and Stamina, artifact knowledge, the key and 0.5 to the experience multiplier.
 
 Lasting unlocks from a finished life: after the Usurper ending, a monster's attack is cut by 10 percent before your Defence is taken off it. After a life that ended with all 7 artifacts collected, the stats an artifact grants are 50 percent larger.
 

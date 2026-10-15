@@ -189,7 +189,7 @@ A monster hit that lands does at least the larger of 1, 5 percent of the hit bef
 
 ### Most damage from one hit
 
-An ordinary monster's hit can take at most 75 percent of your maximum HP and a boss's 85 percent. In rounds 1 to {{balance:BossFirstRoundsDamageCapRounds}} of a fight a boss's hit takes at most {{percent:BossFirstRoundsDamageCapPercent}} percent. The same caps apply to monster abilities. "Boss" here means floor bosses, Old Gods and the other boss fights.
+An ordinary monster's hit can take at most 75 percent of your maximum HP and a boss's 85 percent. In rounds 1 to {{balance:BossFirstRoundsDamageCapRounds}} of a fight a boss's hit takes at most {{percent:BossFirstRoundsDamageCapPercent}} percent. The same caps apply to monster abilities, except in Old God fights, which have rules of their own (in a spoiler on the [boss reference](/wiki/en/monsters/bosses/)). "Boss" here means floor bosses, Old Gods and the other boss fights.
 
 ### Monster special abilities
 
