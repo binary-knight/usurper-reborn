@@ -34,10 +34,15 @@ public class AllyAbandonmentTests
 
     private static CombatAction Attack() => new CombatAction { Type = CombatActionType.Attack };
 
+    /// <summary>1.3.3 party survival: an ally in scope is lost only at a finish, from Downed; the question
+    /// became "Downed at the owner's turn start, a potion held, no Rescue".</summary>
+    private static Character DownedAlly() { var a = Ally(0); a.Lifecycle = AllyLifecycle.Downed; return a; }
+
     [Fact]
-    public void PotionsAndALowAllyAndAnAttack_IsAnOpportunity()
+    public void PotionsAndADownedAllyAndAnAttack_IsAnOpportunity()
     {
-        var owner = Owner(); var ally = Ally(40);
+        // 1.3.3: was a low ally (40 of 100); an ally in scope now counts only when Downed at the turn start
+        var owner = Owner(); var ally = DownedAlly();
         var engine = EngineFor(owner);
         engine.NoteOwnerTurn(owner, new List<Character> { ally }, Attack());
         engine.CouldHaveHelped(ally, owner).Should().BeTrue();
@@ -53,16 +58,17 @@ public class AllyAbandonmentTests
     }
 
     [Fact]
-    public void ACastableHeal_CountsLikeAPotion()
+    public void ACastableHeal_DoesNotCount_ForADownedAlly()
     {
+        // 1.3.3: no spell lifts a Downed ally (Rescue takes a potion), so a castable heal no longer blames
         var owner = Owner(potions: 0, mana: 20, cls: CharacterClass.Cleric); owner.Level = 1;
         owner.Spell = new List<List<bool>> { new() { true } }; // Cure Light (level 1) learned; base cost 15
-        var ally = Ally(40);
+        var ally = DownedAlly();
         var engine = EngineFor(owner);
         engine.NoteOwnerTurn(owner, new List<Character> { ally }, Attack());
-        engine.CouldHaveHelped(ally, owner).Should().BeTrue("a Cleric who has learned Cure Light and has the mana for it could have cast it");
-        owner.Mana = 5;
-        engine.CouldHaveHelped(ally, owner).Should().BeFalse("not enough mana for the cheapest heal");
+        engine.CouldHaveHelped(ally, owner).Should().BeFalse("a Cleric's Cure Light cannot pick up a Downed ally");
+        owner.Healing = 1;
+        engine.CouldHaveHelped(ally, owner).Should().BeTrue("a potion could have");
     }
 
     [Fact]
@@ -117,7 +123,7 @@ public class AllyAbandonmentTests
     public void AFollowersTurn_DoesNotOverwriteTheOwnersSnapshot()
     {
         var owner = Owner(); var follower = Ally(100); follower.GroupPlayerUsername = "beta"; follower.RemoteTerminal = new TerminalEmulator();
-        var ally = Ally(40);
+        var ally = DownedAlly();   // 1.3.3: Downed, was low (40 of 100)
         var engine = EngineFor(owner);
         engine.NoteOwnerTurn(owner, new List<Character> { ally, follower }, Attack());
         engine.NoteOwnerTurn(follower, new List<Character> { ally, follower }, new CombatAction { Type = CombatActionType.HealAlly });

@@ -924,7 +924,7 @@ namespace UsurperRemake.Systems
         /// Check if any companion can sacrifice to save the player
         /// Returns the companion willing to sacrifice, or null
         /// </summary>
-        public Companion? CheckForSacrifice(Character player, int incomingDamage)
+        public Companion? CheckForSacrifice(Character player, int incomingDamage, IReadOnlyCollection<CompanionId>? standingInFight = null)
         {
             // Only trigger if damage would kill the player
             if (player.HP - incomingDamage > 0)
@@ -933,6 +933,8 @@ namespace UsurperRemake.Systems
             foreach (var companion in GetActiveCompanions())
             {
                 if (companion == null || companion.IsDead) continue;
+                // 1.3.3 party survival: the caller names the companions standing in the fight; a Downed one is left out
+                if (standingInFight != null && !standingInFight.Contains(companion.Id)) continue;
 
                 // Check if companion has Sacrifice ability
                 bool canSacrifice = companion.Id == CompanionId.Aldric || companion.LoyaltyLevel >= 90;

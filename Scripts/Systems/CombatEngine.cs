@@ -103,6 +103,8 @@ public partial class CombatEngine
                 : s.PotionsDrunk.ToString();
             terminal.SetColor(!ally.IsAlive ? "red" : (ally.HP * 10 < ally.MaxHP * 3 ? "yellow" : "white"));
             terminal.WriteLine($"  {Loc.Get("combat.party_summary_line", ally.DisplayName, ally.HP, ally.MaxHP, s.Targeted, s.HitsLanded, s.HpLost, potions)}");
+            if (s.Downs > 0)   // 1.3.3 party survival
+                terminal.WriteLine($"    {Loc.Get(s.Finished ? "combat.party_summary_downs_fell" : "combat.party_summary_downs", s.Downs, s.Rescues)}");
         }
     }
 
@@ -115,6 +117,8 @@ public partial class CombatEngine
     {
         public int Targeted, HitsLanded, PotionsDrunk, PotionsFromPlayer;
         public long HpLost;
+        public int Downs, Rescues;   // 1.3.3 party survival
+        public bool Finished;
     }
     private readonly Dictionary<Character, AllyFightStats> _allyStats = new();
     internal AllyFightStats StatsFor(Character ally)
@@ -162,10 +166,15 @@ public partial class CombatEngine
     {
         if (_combatOwner != null && !ReferenceEquals(actor, _combatOwner)) return;
         _lowAlliesAtTurnStart.Clear();
+        _downedAtTurnStart.Clear();
         if (teammates != null)
             foreach (var t in teammates)
+            {
                 if (t.IsAlive && t.MaxHP > 0 && t.HP * 2 < t.MaxHP) _lowAlliesAtTurnStart.Add(t);
-        _ownerAidedThisTurn = action.Type == CombatActionType.HealAlly || action.FromAidMenu;
+                if (t.IsDowned) _downedAtTurnStart.Add(t);   // 1.3.3: Downed when the owner chose
+            }
+        _ownerRescuedThisTurn = action.Type == CombatActionType.Rescue;
+        _ownerAidedThisTurn = action.Type == CombatActionType.HealAlly || action.FromAidMenu || _ownerRescuedThisTurn;
     }
 
     /// <summary>Could <paramref name="owner"/> have saved <paramref name="ally"/>: the ally was
@@ -175,6 +184,11 @@ public partial class CombatEngine
     {
         if (ally.IsEcho || ally.IsMercenary || ally.IsGroupedPlayer) return false;
         if (owner.IsExhibitionCombat || owner.IsArrestCombat) return false;
+        // 1.3.3 party survival: an ally in scope is lost only at a finish, so the question is "did not
+        // pick up": Downed at the owner's last turn start, a healing potion held, and no Rescue chosen.
+        if (IsDownable(ally))
+            return _downedAtTurnStart.Contains(ally) && !_ownerRescuedThisTurn
+                && owner.Healing > 0 && owner.PotionCooldownRounds <= 0;
         if (!_lowAlliesAtTurnStart.Contains(ally) || _ownerAidedThisTurn) return false;
         bool potion = owner.Healing > 0 && owner.PotionCooldownRounds <= 0;
         if (potion) return true;
@@ -1196,6 +1210,7 @@ public partial class CombatEngine
         _saidWhy.Clear();
         _allyStats.Clear();
         _borrowedThisFight = 0;
+        ResetPartySurvival();   // 1.3.3 party survival
 
         // Ensure equipment stat bonuses are current before combat begins.
         // Equipment changes (equip/unequip, loot pickup, NPC sync) can leave
@@ -2141,6 +2156,10 @@ public partial class CombatEngine
                 result.DefeatedMonsters.Add(m);
         }
 
+        // 1.3.3 party survival: every ally still Downed gets up at half HP, before the outcome branch, so
+        // victory, escape, Death's Door and the player's death all see it standing. A fight's end never finishes.
+        ResolveDownedAtFightEnd(result);
+
         EndFightEvents(player);   // 1.2.6: the HP the fight left, before any outcome handling
 
         // 1.2.0 Temple gods piece 5: Sylvana's beast was this fight's only; it leaves before the
@@ -2475,6 +2494,7 @@ public partial class CombatEngine
             ConsumeCombatBuffs(player);
             GodBoonSystem.ApplyPendingBoonRecalc(player);   // 1.2.0: the fight's player only, never a teammate (their own session applies theirs)
             player.EndIronRationsFight();   // 1.2.1: no-op unless an early exit skipped the normal close; removes the recorded bonus
+            ResolveDownedAtFightEnd(result);   // 1.3.3: no-op after the normal end; a fight left by a throw leaves no ally Downed
             EndFightEvents(player);   // 1.2.6: no-op after the normal end; closes a fight left by a throw
             _eventTally = null;
         }
@@ -2965,6 +2985,10 @@ public partial class CombatEngine
         if (hasTeammatesNeedingAid && canHealAlly)
             row.Item("[H]", "bright_yellow", HotkeyLabel('H', "combat.bbs_heal_ally") + " ", "green");
 
+        // 1.3.3 party survival: Rescue, the combat owner's only, while an ally is Downed and a potion is held
+        if (!isFollower && RescueOffered(player))
+            row.Item("[U]", "bright_yellow", HotkeyLabel('U', "combat.rescue_menu") + " ", "bright_red");
+
         // Quickbar skills summary
         if (classInfo.Count > 0)
         {
@@ -3335,6 +3359,10 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.menu_aid_ally_none"));
         }
 
+        // 1.3.3 party survival: Rescue a Downed ally
+        if (!isFollower && RescueOffered(player))
+            terminal.WriteLine(Loc.Get("combat.rescue_menu_sr"));
+
         // Quickbar slots
         if (classInfo.Count > 0)
         {
@@ -3438,6 +3466,18 @@ public partial class CombatEngine
             terminal.Write("[I] ");
             terminal.SetColor("darkgray");
             terminal.Write($"{Loc.Get("combat.use_item_none_short"),-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
+
+        // 1.3.3 party survival: Rescue a Downed ally
+        if (!isFollower && RescueOffered(player))
+        {
+            terminal.Write("║ ");
+            terminal.SetColor("bright_yellow");
+            terminal.Write("[U] ");
+            terminal.SetColor("bright_red");
+            terminal.Write($"{Loc.Get("combat.rescue_menu"),-34}");
             terminal.SetColor("green");
             terminal.WriteLine("║");
         }
@@ -5072,6 +5112,14 @@ public partial class CombatEngine
     /// </summary>
     private async Task ProcessMonsterAction(Monster monster, Character player, CombatResult result, List<Monster>? liveMonsterList = null)
     {
+        // 1.3.3 party survival: a finisher whose first action of the round never reached the finish gate
+        // (a stun, sleep, fear, freeze, a confused stumble, a sluggish slow) was held and loses its finish.
+        // The body is deliberately not re-indented to keep the diff reviewable.
+        bool holdsFinish = !monster.StatusTickedThisRound && monster.IsAlive && HasPendingFinish(monster);
+        bool mends = ReferenceEquals(_eliteMendedThisTurn, monster);
+        _finishGateReached = false;
+        try
+        {
         if (!monster.IsAlive) return;
 
         terminal.SetColor("red");
@@ -5426,6 +5474,12 @@ public partial class CombatEngine
             _eliteMendedThisTurn = null;
             return;
         }
+
+        // 1.3.3 party survival: on its first action of the round a finisher finishes the ally it announced
+        // (in a later round), or a predator or boss announces a finish on the earliest Downed ally. Either
+        // spends the action.
+        if (firstActionThisRound && await TryFinishOrAnnounce(monster, result))
+            return;
 
         // Check if player will dodge the next attack
         if (player.DodgeNextAttack)
@@ -6059,6 +6113,11 @@ public partial class CombatEngine
         // so it protects against ALL monster attacks in the round, not just the first one
 
         await Pacing.Wait(GetCombatDelay(2000));
+        }
+        finally
+        {
+            if (holdsFinish && !_finishGateReached && !mends) LoseFinishHeld(monster, result);   // 1.3.3
+        }
     }
 
     /// <summary>
@@ -14767,6 +14826,12 @@ public partial class CombatEngine
                     action.Type = CombatActionType.UseItem;
                     return (action, false);
 
+                case "U":
+                    // 1.3.3 party survival: Rescue a Downed ally with one healing potion (the combat owner only)
+                    var rescue = await ChooseRescue(player);
+                    if (rescue != null) return (rescue, false);
+                    continue;
+
                 case "H":
                     // Heal ally - give potion or cast heal spell on teammate
                     var healAllyResult = await HandleHealAlly(player, monsters);
@@ -15063,6 +15128,10 @@ public partial class CombatEngine
                             TrainingSystem.GetProficiencyName(TrainingSystem.GetSkillProficiency(player, "basic_attack"))));
                     }
                 }
+                break;
+
+            case CombatActionType.Rescue:   // 1.3.3 party survival
+                await ExecuteRescue(player, action.RescueTarget, result);
                 break;
 
             case CombatActionType.Defend:
@@ -19950,7 +20019,8 @@ public partial class CombatEngine
         {
             // DoT killed the teammate: run the real death pipeline (permadeath,
             // equipment return, world-NPC sync), not a silent skip.
-            await HandleTeammateDeathDispatch(teammate, Loc.Get("combat.dot_killer"), result);
+            // 1.3.3 party survival: through the one step (an ally in scope is Downed).
+            await EnterDownedOrDie(teammate, Loc.Get("combat.dot_killer"), null, result);
             return;
         }
         if (!teammate.CanAct())
@@ -21275,7 +21345,9 @@ public partial class CombatEngine
             return (false, null);
 
         // Check if any companion will sacrifice
-        var sacrificingCompanion = companionSystem.CheckForSacrifice(player, incomingDamage);
+        // 1.3.3 party survival: only a companion standing in this fight; a Downed one never sacrifices
+        var standing = companionTeammates.Where(t => !t.IsDowned && t.IsAlive).Select(t => t.CompanionId!.Value).ToHashSet();
+        var sacrificingCompanion = companionSystem.CheckForSacrifice(player, incomingDamage, standing);
         if (sacrificingCompanion == null)
             return (false, null);
 
@@ -21326,6 +21398,7 @@ public partial class CombatEngine
         {
             companionChar.HP = 0;
             EvHurt(companionChar, incomingDamage, CombatEventKind.Basic);   // 1.2.6: took the player's blow and fell
+            EvFall(companionChar);   // 1.3.3: a sacrifice is a permanent loss (a direct death, never a down)
             result.Teammates?.Remove(companionChar);
         }
 
@@ -22019,6 +22092,12 @@ public partial class CombatEngine
         result.CombatLog.Add($"{monster.Name} attacks {companion.DisplayName} for {actualDamage} damage");
 
         CompanionDeathCheck:
+        // 1.3.3 party survival: the one step decides. An ally in scope is Downed; anyone else dies as before.
+        if (!companion.IsAlive)
+            await EnterDownedOrDie(companion, monster.Name, monster, result, DieAtHit);
+
+        async Task DieAtHit()
+        {
         // 1.2.0 Temple gods piece 5: a grouped follower of Mortis at Chosen cheats death once a day
         if (!companion.IsAlive) TryMortisMiracleForFollower(companion, result);
         // Check if teammate died
@@ -22089,6 +22168,7 @@ public partial class CombatEngine
                 // NPC teammate death (spouse, lover, team member)
                 await HandleNpcTeammateDeath(companion, monster.Name, result);
             }
+        }
         }
 
         // Sync companion HP back to CompanionSystem (only for story companions)
@@ -30789,13 +30869,15 @@ public partial class CombatEngine
         if (monster != null)
             targets.Add(new { index = 1, name = MonsterNames.Display(monster), hp = monster.HP, maxHp = monster.MaxHP, family = monster.FamilyName ?? "" });
 
-        var teammates = currentTeammates?.Where(t => t.IsAlive).Select(t => new
+        // 1.3.3 party survival: a Downed ally is listed with downed true
+        var teammates = currentTeammates?.Where(t => t.IsAlive || t.IsDowned).Select(t => new
         {
             name = t.DisplayName,
             hp = t.HP,
             maxHp = t.MaxHP,
             isCompanion = t.IsCompanion,
-            className = t.ClassName
+            className = t.ClassName,
+            downed = t.IsDowned
         }).ToList() ?? new();
 
         ElectronBridge.Emit("combat_menu", new
@@ -30837,13 +30919,15 @@ public partial class CombatEngine
             status = m.Poisoned ? "poisoned" : m.StunRounds > 0 ? "stunned" : ""
         }).ToList();
 
-        var teammates = currentTeammates?.Where(t => t.IsAlive).Select(t => new
+        // 1.3.3 party survival: a Downed ally is listed with downed true
+        var teammates = currentTeammates?.Where(t => t.IsAlive || t.IsDowned).Select(t => new
         {
             name = t.DisplayName,
             hp = t.HP,
             maxHp = t.MaxHP,
             isCompanion = t.IsCompanion,
-            className = t.ClassName
+            className = t.ClassName,
+            downed = t.IsDowned
         }).ToList() ?? new();
 
         ElectronBridge.Emit("combat_menu", new
@@ -30855,7 +30939,8 @@ public partial class CombatEngine
                 new { key = "P", label = Loc.Get("combat.power_attack"), available = true, style = "danger" },
                 new { key = "E", label = Loc.Get("combat.precise_strike"), available = true, style = "danger" },
                 new { key = "I", label = Loc.Get("combat.electron_potions", player.Healing, player.MaxPotions), available = player.Healing > 0, style = "feature" },
-                new { key = "H", label = Loc.Get("combat.aid_ally"), available = teammates.Count > 0, style = "feature" },
+                new { key = "H", label = Loc.Get("combat.aid_ally"), available = teammates.Any(t => !t.downed), style = "feature" },
+                new { key = "U", label = Loc.Get("combat.rescue_menu"), available = RescueOffered(player), style = "feature" },   // 1.3.3
                 new { key = "R", label = Loc.Get("combat.bbs_retreat"), available = true, style = "info" },
                 new { key = "T", label = Loc.Get("combat.taunt"), available = true, style = "info" },
                 new { key = "L", label = Loc.Get("combat.hide"), available = true, style = "info" },
@@ -31927,7 +32012,16 @@ public partial class CombatEngine
         {
             foreach (var tm in result.Teammates.Where(t => !t.IsAlive).ToList())
             {
-                if (TryMortisMiracleForFollower(tm, result)) continue;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
+                // 1.3.3 party survival: the one step decides; it skips an ally already Downed, so a Downed
+                // ally is never killed by this loop on a later boss round. Anyone out of scope dies as before.
+                await EnterDownedOrDie(tm, bossMonster.Name, bossMonster, result, () => DieToCorruption(tm));
+            }
+        }
+
+        async Task DieToCorruption(Character tm)
+        {
+            {
+                if (TryMortisMiracleForFollower(tm, result)) return;   // 1.2.0 Temple gods piece 5: Mortis's Miracle
                 string killerName = bossMonster.Name;
                 var killer = bossMonster;
                 BroadcastGroupLocalized(result, lang => UIHelper.AnsiRows("\u001b[1;31m", $"  ═══ {Loc.GetIn(lang, "combat.group_fallen_dark_powers", tm.DisplayName, MonsterNames.DisplayIn(lang, killer))} ═══"));   // v1.2.5: wrapped at 79
@@ -32194,7 +32288,8 @@ public partial class CombatEngine
         TickPvPControl(teammate); // v1.1.14: a hold that ended starts the grouped player's immunity, as for the leader
         if (!teammate.IsAlive)
         {
-            await HandleTeammateDeathDispatch(teammate, Loc.Get("combat.dot_killer"), result);
+            // 1.3.3: through the one step; a grouped player is out of scope and dies as before
+            await EnterDownedOrDie(teammate, Loc.Get("combat.dot_killer"), null, result);
             return;
         }
         if (!teammate.CanAct())
@@ -33614,7 +33709,8 @@ public enum CombatActionType
     BossSave,       // Attempt to save an Old God boss mid-combat
     CoatBlade,      // Coat weapon with poison from vial inventory
     UseHerb,        // Use an herb from herb pouch
-    Miracle         // 1.2.0 Temple gods: call on the day's Miracle (MiracleSystem)
+    Miracle,        // 1.2.0 Temple gods: call on the day's Miracle (MiracleSystem)
+    Rescue          // 1.3.3 party survival: lift a Downed ally with one healing potion
 }
 
 /// <summary>
@@ -33644,6 +33740,8 @@ public class CombatAction
     // v1.1.15: a party heal chosen from the Heal Ally menu, cast as a CastSpell. It still counts
     // as aid to an ally (NoteOwnerTurn), as every Heal Ally choice does.
     public bool FromAidMenu { get; set; }
+    /// <summary>1.3.3: the Downed ally a Rescue lifts.</summary>
+    public Character? RescueTarget { get; set; }
 }
 
 /// <summary>

@@ -278,7 +278,9 @@ public class PurifyParty132Tests : IDisposable
     {
         var owner = Follower(Purify);
         owner.Healing = 0;
-        var ally = new Character { Name2 = "Ally", Class = CharacterClass.Warrior, Race = CharacterRace.Human, HP = 40, MaxHP = 100 };
+        // 1.3.3 party survival: an ally in scope is judged on "Downed, a potion, no Rescue"; the heal-spell
+        // reading stays for the allies outside it, such as the Miracle beast, which this test now uses
+        var ally = new Character { Name2 = "Ally", Class = CharacterClass.Warrior, Race = CharacterRace.Human, HP = 40, MaxHP = 100, IsMiracleAlly = true };
         var engine = new CombatEngine();
         typeof(CombatEngine).GetField("_combatOwner", F)!.SetValue(engine, owner);
         engine.NoteOwnerTurn(owner, new List<Character> { ally }, new CombatAction { Type = CombatActionType.Attack });

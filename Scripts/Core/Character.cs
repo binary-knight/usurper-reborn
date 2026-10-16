@@ -2960,6 +2960,13 @@ public class Character
     
     // Helper properties for commonly used calculations
     public bool IsAlive => HP > 0;
+    /// <summary>1.3.3 party survival: a story companion or NPC ally at 0 HP inside a fight is Downed, not
+    /// dead. It stays in the party until a Rescue lifts it, a finisher ends it, or the fight's end brings
+    /// it back up at half HP. Combat only; no save carries it.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public AllyLifecycle Lifecycle { get; set; } = AllyLifecycle.Active;
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsDowned => Lifecycle == AllyLifecycle.Downed;
     public bool IsPlayer => AI == CharacterAI.Human;
     public bool IsNPC => AI == CharacterAI.Computer;
     // v0.65.1: append the optional family surname (set only on the player, via the
@@ -3134,6 +3141,14 @@ public enum CharacterAI
     Computer = 'C',
     Human = 'H',
     Civilian = 'N'
+}
+
+/// <summary>1.3.3 party survival: an ally's state inside a fight. Dead stays what it was
+/// (Companion.IsDead, NPC.IsDead).</summary>
+public enum AllyLifecycle
+{
+    Active,
+    Downed
 }
 
 /// <summary>
