@@ -65,6 +65,8 @@ public class Finish_PartySurvival133Tests
         (await Act(r, wolf, 1)).Should().BeTrue("the announce spends the action");
         r.Text.Should().Contain(Loc.Get("combat.finish_announce", MonsterNames.Display(wolf), ally.DisplayName));
         ally.IsDowned.Should().BeTrue("no finish in the announce round");
+        (await Act(r, wolf, 1)).Should().BeFalse("5: asked again in the announce round, it does not finish");
+        ally.IsDowned.Should().BeTrue("5: the finish never lands in the announce round");
         (await Act(r, wolf, 2)).Should().BeTrue();
         r.Text.Should().Contain(Loc.Get("combat.finish_lands", MonsterNames.Display(wolf), ally.DisplayName));
         ally.IsDowned.Should().BeFalse();

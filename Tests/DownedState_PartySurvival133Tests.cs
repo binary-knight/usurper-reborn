@@ -485,6 +485,7 @@ public class DownedState_PartySurvival133Tests
         r.Text.Should().Contain(Loc.Get("combat.party_summary_downs", 1, 0));
         System.Text.RegularExpressions.Regex.Matches(r.Text, System.Text.RegularExpressions.Regex.Escape(Loc.Get("combat.party_summary_downs", 1, 0)))
             .Count.Should().Be(1, "Kade never went down");
+        r.Text.Should().NotContain(Loc.Get("combat.party_summary_downs", 0, 0), "no downs line for an ally with no downs");
     }
 
     [Theory]
