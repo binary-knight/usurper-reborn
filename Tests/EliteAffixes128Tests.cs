@@ -864,18 +864,18 @@ public class EliteAffixes128Tests
         ["floor 7 pair, solo, ambush"] = "192:190A3A98554F5796:Victory in 14",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
-        ["floor 35 trio, level 35 hero, two teammates"] = "408:4ADF1FF79FED3AF2:Victory in 16",
+        ["floor 35 trio, level 35 hero, two teammates"] = "376:6607E7DDF32B96B2:Victory in 16",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: the group size grows each floor from 25, which changes these draws
         // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
-        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "343:0DA6079253B0AC74:Victory in 16",
+        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "271:0191476086994D39:Victory in 11",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
-        ["floor 50 four, level 50 hero, two teammates"] = "580:A97BECA568D361D7:Victory in 26",
+        ["floor 50 four, level 50 hero, two teammates"] = "460:33F1F0AAC209BF17:Victory in 20",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: monsters past floor 50 grow a full level a floor (the hero has more HP), which changes this fight's draws
         // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
-        ["floor 80 five, level 80 cleric, ambush"] = "856:9B6C9E9065A5E227:Victory in 39",
+        ["floor 80 five, level 80 cleric, ambush"] = "751:53EAFC4300DD0AA1:Victory in 37",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["floor 3 single"] = "51:25D2351E15E63BF7:Victory in 6",
     };

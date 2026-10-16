@@ -90,11 +90,11 @@ public class DeepCurve133Tests
     // 1.3.3: these also carry the deep ramp from floor 26 (DeepRamp133Tests); without it they were 9315 at 50, 9515 at
     // 51, 11342 at 60, 15484 at 80 and 19725 at 100
     [Theory]
-    [InlineData(50, 19561, 902, 173, 362, 636, 63)]
-    [InlineData(51, 20000, 924, 175, 369, 652, 65)]
-    [InlineData(60, 24043, 1127, 207, 450, 798, 76)]
-    [InlineData(80, 33446, 1694, 276, 675, 1201, 103)]
-    [InlineData(100, 43395, 2619, 346, 1039, 1856, 128)]
+    [InlineData(50, 14949, 688, 173, 276, 486, 63)]
+    [InlineData(51, 15282, 704, 175, 281, 499, 65)]
+    [InlineData(60, 18328, 852, 207, 339, 603, 76)]
+    [InlineData(80, 25362, 1244, 276, 495, 882, 103)]
+    [InlineData(100, 32744, 1831, 346, 726, 1298, 128)]
     public void MonsterStats_PastFloor50_GrowAtAFullFloorAFloor(int level, long hp, long str, long def, long punch, long wp, long ap)
     {
         MonsterGenerator.MonsterLevelSlopePast50.Should().Be(1.0);
