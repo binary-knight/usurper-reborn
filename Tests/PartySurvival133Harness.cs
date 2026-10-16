@@ -147,6 +147,16 @@ internal static class PartySurvival133Harness
 
     /// <summary>Puts back the pause and fresh companion and grief singletons, so no companion death or grief
     /// leaks into another class of the shared collection.</summary>
+    /// <summary>Every grief begun, live or not (IsGrieving leaves out a grief for a companion still alive).</summary>
+    internal static int GriefsBegun()
+    {
+        var g = GriefSystem.Instance;
+        int n = 0;
+        foreach (var name in new[] { "activeGrief", "activeNpcGrief" })
+            n += ((System.Collections.IDictionary)typeof(GriefSystem).GetField(name, NPI)!.GetValue(g)!).Count;
+        return n;
+    }
+
     internal static void RestoreSilence()
     {
         GameConfig.MomentOfSilenceEnabled = true;

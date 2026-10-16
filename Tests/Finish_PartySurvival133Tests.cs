@@ -177,11 +177,13 @@ public class Finish_PartySurvival133Tests
             var r = NewRig(team: new[] { w }, monsters: new[] { wolf }, script: Enters);
             await Down(r, w);
             GriefSystem.Instance.IsGrieving.Should().BeFalse("13: no grief at the down");
+            GriefsBegun().Should().Be(0, "13: no grief state at the down");
             await Act(r, wolf, 1);
             await Act(r, wolf, 2);
             CompanionSystem.Instance.GetCompanion(CompanionId.Aldric)!.IsDead.Should().BeTrue();
             CompanionSystem.Instance.GetFallenCompanions().Count(f => f.Companion.Id == CompanionId.Aldric).Should().Be(1, "killed once");
             GriefSystem.Instance.IsGrieving.Should().BeTrue("13: grief begins at the finish");
+            GriefsBegun().Should().Be(1);
         }
         finally { RestoreSilence(); }
     }
@@ -198,6 +200,7 @@ public class Finish_PartySurvival133Tests
             CompanionSystem.Instance.GetCompanion(CompanionId.Aldric)!.IsDead.Should().BeFalse();
             CompanionSystem.Instance.GetFallenCompanions().Should().BeEmpty();
             GriefSystem.Instance.IsGrieving.Should().BeFalse();
+            GriefsBegun().Should().Be(0, "a fight end begins no grief");
         }
         finally { RestoreSilence(); }
     }

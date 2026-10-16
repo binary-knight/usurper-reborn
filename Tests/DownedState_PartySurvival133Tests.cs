@@ -332,6 +332,7 @@ public class DownedState_PartySurvival133Tests
             var r = NewRig(team: new[] { w });
             await Down(r, w);
             GriefSystem.Instance.IsGrieving.Should().BeFalse("a down begins no grief");
+            GriefsBegun().Should().Be(0, "no grief state at all, live or not");
             GriefSystem.Instance.GetActiveGriefDetails().Should().BeEmpty();
         }
         finally { RestoreSilence(); }
