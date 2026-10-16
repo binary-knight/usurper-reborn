@@ -94,6 +94,11 @@ namespace UsurperRemake.Systems
         };
 
         private static readonly HashSet<string> PredatorFamilies = new(StringComparer.OrdinalIgnoreCase) { "Beast", "Insectoid", "Shadow", "Undead" };
+        /// <summary>1.3.3 party survival: a predator family (Beast, Insectoid, Shadow, Undead) closes on a
+        /// Downed ally. Read from the family alone, not through the tactics switch.</summary>
+        internal static bool IsPredatorFamily(string? family) =>
+            !string.IsNullOrEmpty(family) && PredatorFamilies.Contains(family);
+
         private static readonly HashSet<string> SkirmisherFamilies = new(StringComparer.OrdinalIgnoreCase) { "Goblinoid", "Fey", "Demonic" };
 
         /// <summary>True when the monster has anything Choose could pick from, at any level.</summary>

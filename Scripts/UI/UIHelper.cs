@@ -539,7 +539,8 @@ namespace UsurperRemake.UI
 
         /// <summary>
         /// A moment of silence — clears the screen and holds for a dramatic pause.
-        /// Skipped in screen reader mode (silence is meaningless without visuals).
+        /// Skipped in screen reader mode (silence is meaningless without visuals). The pause is held only while
+        /// GameConfig.MomentOfSilenceEnabled is on (the default).
         /// </summary>
         public static async Task MomentOfSilence(TerminalEmulator terminal, int durationMs)
         {
@@ -548,7 +549,8 @@ namespace UsurperRemake.UI
                 terminal.WriteRawAnsi("\x1b[2J\x1b[H");
             else
                 terminal.ClearScreen();
-            await Task.Delay(durationMs);
+            if (GameConfig.MomentOfSilenceEnabled)
+                await Task.Delay(durationMs);
         }
     }
 

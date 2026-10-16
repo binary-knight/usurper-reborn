@@ -655,7 +655,7 @@ public class WorldSimulator
         if (!IsCatchUpMode)
         {
             var aliveCount = npcs.Count(n => n.IsAlive && !n.IsDead);
-            var deadCount = npcs.Count(n => !n.IsAlive || n.IsDead);
+            var deadCount = npcs.Count(n => (!n.IsAlive || n.IsDead) && !n.IsDowned);   // 1.3.3: a Downed ally is not dead
             UsurperRemake.Systems.DebugLogger.Instance.LogDebug("WORLD", $"SimulateStep: {aliveCount} alive, {deadCount} dead, {deadNPCRespawnTimers.Count} in respawn queue");
         }
 
@@ -765,7 +765,8 @@ public class WorldSimulator
 
         // Track dead NPCs for respawn (check both HP <= 0 and IsDead flag)
         // Skip age-dead and perma-dead NPCs - they don't come back
-        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
+        // 1.3.3 party survival: an NPC ally Downed in a player's fight is at 0 HP but not dead; the sim leaves it alone
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsDowned && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
         {
             var respawnKey = npc.Id ?? npc.Name;
             if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
@@ -1273,12 +1274,12 @@ public class WorldSimulator
             return;
         }
 
-        var deadCount = npcs.Count(n => !n.IsAlive || n.IsDead);
+        var deadCount = npcs.Count(n => (!n.IsAlive || n.IsDead) && !n.IsDowned);   // 1.3.3
         UsurperRemake.Systems.DebugLogger.Instance.LogInfo("NPC", $"ProcessDeadNPCsOnLoad: Found {deadCount} dead NPCs out of {npcs.Count} total");
 
         // Find all dead NPCs and add them to the respawn queue
         // Skip permanently dead NPCs (aged death and permadeath)
-        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick
+        foreach (var npc in npcs.Where(n => (!n.IsAlive || n.IsDead) && !n.IsDowned && !n.IsAgedDeath && !n.IsPermaDead).ToList()) // v1.1.1: snapshot; sessions add NPCs mid-tick; 1.3.3: not a Downed ally
         {
             var respawnKey = npc.Id ?? npc.Name;
             if (!deadNPCRespawnTimers.ContainsKey(respawnKey))
@@ -1318,6 +1319,14 @@ public class WorldSimulator
             {
                 // Age death and permadeath are permanent - they don't come back
                 if (npc.IsAgedDeath || npc.IsPermaDead)
+                {
+                    deadNPCRespawnTimers.Remove(npcName);
+                    continue;
+                }
+
+                // 1.3.3 party survival: respawn only an NPC that is still dead. One that is alive again (raised,
+                // healed, or a Downed ally back up) drops its timer: no full heal, no gold loss, no news line.
+                if (!((!npc.IsAlive || npc.IsDead) && !npc.IsDowned))
                 {
                     deadNPCRespawnTimers.Remove(npcName);
                     continue;

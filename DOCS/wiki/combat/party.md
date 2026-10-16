@@ -96,13 +96,23 @@ Only the ruler can hire royal mercenaries, at the Castle with B (bodyguards). Yo
 
 ## When an ally falls
 
+### Downed allies
+
+A story companion, an NPC ally, your spouse or lover, or a fighting beast at 0 HP in a fight is Downed: it stays in the party at 0 HP, takes no turn, and no monster attack, heal or spell reaches it. The allies box of the combat screen shows a Downed ally as DOWN in place of its HP. A royal mercenary, a player echo and a grouped player are never Downed; they fall as below.
+
+- **Rescue (U):** on your turn, while an ally is Downed and you hold a healing potion, U spends your turn and one from your belt to lift it with the heal it gives an ally (at least 20 percent of its maximum HP). With two or more Downed you choose which. The Old God rule on drinks applies (see [consumables](/wiki/en/items/consumables/#potion-cooldown-in-old-god-fights)). Only the leader of the fight can rescue; a group follower cannot.
+- **The finish:** a Beast, Insectoid, Shadow or Undead monster, or any boss, spends its action to announce that it closes on the earliest Downed ally, and on its first action of a later round spends it again to finish that ally. Other monsters, champions and elites of other families never finish anyone. A taunt on the monster or a hold that costs it its turn loses the finish, and a rescue ends it; the monster may announce again later.
+- **The end of the fight:** every ally still Downed when the fight ends, won, fled or lost, stands up again with half its maximum HP. The end of a fight never finishes anyone.
+
+Grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you could have rescued it and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
+
 ### Story companion
 
-A companion who falls in a fight is dead for good: see [when a companion dies](/wiki/en/combat/companions/#when-a-companion-dies).
+A companion that a monster finishes is dead for good: see [when a companion dies](/wiki/en/combat/companions/#when-a-companion-dies).
 
 ### NPC ally
 
-An NPC ally, spouse or lover who falls in your fight dies for good with a chance of {{percent:PermadeathChanceDungeonTeam}} percent times 1 minus {{balance:PermadeathLevelReduction}} per level of the NPC, never under 1 percent: 1.4 percent at level 20. No NPC death is permanent while fewer than {{balance:PermadeathPopulationFloor}} NPCs are alive or {{balance:PermadeathRaceFloor}} or fewer of its race are alive, and story NPCs are exempt. An ally who does not die for good comes back to life after a short while; if a saved party member is dead when you enter the dungeon, a line tells you, and it rejoins on a later entry once it is alive again; Team Corner can raise a fallen member of your team for 1,000 gold per level. If you held a potion or a heal and did not aid it while it was below half HP, its opinion of you worsens. A permanent death of your spouse, a lover or a friend starts grief: see [Mental](/wiki/en/characters/mental/). The oath-mark is on [groups](/wiki/en/combat/groups/#the-oath-mark).
+An NPC ally, spouse or lover that a monster finishes in your fight dies for good with a chance of {{percent:PermadeathChanceDungeonTeam}} percent times 1 minus {{balance:PermadeathLevelReduction}} per level of the NPC, never under 1 percent: 1.4 percent at level 20. No NPC death is permanent while fewer than {{balance:PermadeathPopulationFloor}} NPCs are alive or {{balance:PermadeathRaceFloor}} or fewer of its race are alive, and story NPCs are exempt. An ally who does not die for good comes back to life after a short while; if a saved party member is dead when you enter the dungeon, a line tells you, and it rejoins on a later entry once it is alive again; Team Corner can raise a fallen member of your team for 1,000 gold per level. If it was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue, its opinion of you worsens when it is finished. A permanent death of your spouse, a lover or a friend starts grief: see [Mental](/wiki/en/characters/mental/). The oath-mark is on [groups](/wiki/en/combat/groups/#the-oath-mark).
 
 ### Royal mercenary
 
@@ -110,7 +120,7 @@ A mercenary who falls is gone for good; hire another at the Castle.
 
 ### Beast
 
-A fighting beast is never lost: see [fighting beasts](/wiki/en/combat/companions/#dire-wolf-and-storm-eagle-fighting-beasts).
+A fighting beast is Downed like any ally and is never lost: see [fighting beasts](/wiki/en/combat/companions/#dire-wolf-and-storm-eagle-fighting-beasts).
 
 ### Player echo
 

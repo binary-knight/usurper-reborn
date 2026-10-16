@@ -1022,7 +1022,7 @@ public partial class MainStreetLocation : BaseLocation
         }
 
         var aliveNPCs = npcs?.Where(n => n.IsAlive).OrderByDescending(n => n.Level).ThenBy(n => n.Name).ToList() ?? new List<NPC>();
-        var deadNPCs = npcs?.Where(n => !n.IsAlive).OrderByDescending(n => n.Level).ThenBy(n => n.Name).ToList() ?? new List<NPC>();
+        var deadNPCs = npcs?.Where(n => !n.IsAlive && !n.IsDowned).OrderByDescending(n => n.Level).ThenBy(n => n.Name).ToList() ?? new List<NPC>();
 
         int currentPage = 0;
         int itemsPerPage = 18;
