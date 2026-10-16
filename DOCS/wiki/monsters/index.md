@@ -88,7 +88,7 @@ The table shows what one use does for a level {{balance:AbilityProbeLevel}} mons
 
 ## How monsters fight
 
-A monster leaves out an ability that would be wasted: a heal on itself while it has 40 percent of its HP or more, a status its target already has, an evasion buff while one is active, and a one-time buff it has already used. When nothing is left it makes its normal attack. In a party, Beast, Insectoid, Shadow and Undead monsters prefer a target at 35 percent of its HP or less, and Goblinoid, Fey and Demonic monsters prefer a Magician, Sage, Cleric, Alchemist, Wavecaller or Abysswarden. A taunt still comes first. These rules are always on.
+A monster leaves out an ability that would be wasted: a heal on itself while it has 40 percent of its HP or more, a status its target already has, an evasion buff while one is active, and a one-time buff it has already used. When nothing is left it makes its normal attack. In a party, Beast, Insectoid, Shadow and Undead monsters prefer a target at 35 percent of its HP or less, and Goblinoid, Fey and Demonic monsters prefer a Magician, Sage, Cleric, Alchemist, Wavecaller or Abysswarden. A taunt still comes first. These rules are always on. Beast, Insectoid, Shadow and Undead monsters also finish a [Downed ally](/wiki/en/combat/party/#downed-allies) after announcing it, as every boss does.
 
 From monster level {{balance:SignatureMinLevel}}, five early monsters have a signature ability: Goblin (Rally), Zombie (Enfeeble), Kobold (Poison), Spark (Burn) and Animated Armor (Stoneskin). Old God fights keep their own rules.
 

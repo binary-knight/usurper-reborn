@@ -26,11 +26,11 @@ An Alchemist's healing potions heal {{percent:AlchemistPotionMasteryBonus}} perc
 
 ## Potions in a fight
 
-In a fight, I drinks healing potions: as many as it takes to fill your HP, all in one action, each healing the same rolled amount. With both kinds of potion and HP and mana both missing, I asks which kind. A mana potion restores 30 + 5 x your level mana, one per action. Drinking is your action for the round. H heals an ally with a potion or a spell.
+In a fight, I drinks healing potions: as many as it takes to fill your HP, all in one action, each healing the same rolled amount. With both kinds of potion and HP and mana both missing, I asks which kind. A mana potion restores 30 + 5 x your level mana, one per action. Drinking is your action for the round. H heals an ally with a potion or a spell, and U spends one potion to lift a [Downed ally](/wiki/en/combat/party/#downed-allies).
 
 ### Potion cooldown in Old God fights
 
-In an Old God fight, after you drink a healing or mana potion you cannot drink another for {{balance:bossPotionCooldownRounds}} round; trying spends your action. Ordinary fights and floor bosses have no potion cooldown, and herbs have none anywhere.
+In an Old God fight, after you drink a healing or mana potion, or use one to rescue a Downed ally, you cannot drink another for {{balance:bossPotionCooldownRounds}} round; trying spends your action, and Rescue is not offered until the cooldown ends. Ordinary fights and floor bosses have no potion cooldown, and herbs have none anywhere.
 
 ### Difficulty and potions
 
