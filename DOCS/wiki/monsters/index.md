@@ -24,6 +24,8 @@ A monster's stats follow its level L, at every level from 1 to 100:
 
 Each is multiplied by the tier's power and then by {{balance:BaseMonsterDifficultyScale}}. A level 20 monster of power 1.0 has 3,478 HP, 166 Strength and 67 Defence.
 
+The deep floors from 25 are built for a full team of five: a tank, a healer and damage dealers. From level 25 HP is also multiplied by a deep factor that rises in straight lines from 1.0 at level 25 to 1.8 at 35, 2.1 at 50 and 2.2 at 100, and Strength, punch and weapon power by one that rises from 1.0 at 25 to 1.8 at 35, 2.1 at 50, 2.3 at 75 and 3.0 at 100. Defence and armor are not. A level 60 monster of power 1.0 has 24,043 HP and 1,127 Strength.
+
 ### Monsters on the first floors
 
 Monsters of level 1 to 6 are softened: their HP, Strength, Defence, punch and weapon power are multiplied by {{balance:Floor1MonsterStatMultiplier}} at level 1, {{balance:Floor2MonsterStatMultiplier}} at level 2, {{balance:Floor3MonsterStatMultiplier}} at level 3, {{balance:Floor4MonsterStatMultiplier}} at level 4, {{balance:Floor5MonsterStatMultiplier}} at level 5 and {{balance:Floor6MonsterStatMultiplier}} at level 6. From level 7 they are at full strength.
