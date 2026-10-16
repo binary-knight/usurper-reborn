@@ -863,15 +863,20 @@ public class EliteAffixes128Tests
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["floor 7 pair, solo, ambush"] = "192:190A3A98554F5796:Victory in 14",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["floor 35 trio, level 35 hero, two teammates"] = "295:CDE6A01BDD9FE458:Victory in 12",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
+        ["floor 35 trio, level 35 hero, two teammates"] = "376:6607E7DDF32B96B2:Victory in 16",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: the group size grows each floor from 25, which changes these draws
-        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "218:3FB9BE9DED58B070:Victory in 9",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
+        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "271:0191476086994D39:Victory in 11",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["floor 50 four, level 50 hero, two teammates"] = "410:76583E31955CEF88:Victory in 15",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP);
+        // with party survival a teammate at 0 HP is Downed, not killed, and the finish path draws in its place
+        ["floor 50 four, level 50 hero, two teammates"] = "423:3997563F4B46C4AA:Victory in 18",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: monsters past floor 50 grow a full level a floor (the hero has more HP), which changes this fight's draws
-        ["floor 80 five, level 80 cleric, ambush"] = "409:21E50B66289122B0:Victory in 21",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
+        ["floor 80 five, level 80 cleric, ambush"] = "751:53EAFC4300DD0AA1:Victory in 37",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["floor 3 single"] = "51:25D2351E15E63BF7:Victory in 6",
     };

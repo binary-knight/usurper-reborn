@@ -775,7 +775,8 @@ public class HitRoll128Tests
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["one teammate, floor 7 pair"] = "160:1459B417B511A08C:Victory in 10",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["two teammates, floor 35 trio, level 35 hero"] = "201:C067CCE442CFA4F3:Victory in 9",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
+        ["two teammates, floor 35 trio, level 35 hero"] = "244:CDF404F6B0597013:Victory in 10",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["boss context, solo"] = "328:A34EFE8FBC897BB6:Victory in 41",
         // 1.3.2: party members regain stamina and mana at round end, which changes this long fight's draws

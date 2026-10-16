@@ -147,9 +147,11 @@ internal static class EliteAffixes128Golden
         ("floor 7 pair, solo, ambush", () => Fight(Hero(), Group(7, 2, 100), ambush: true)),
         ("floor 35 trio, level 35 hero, two teammates", () => Fight(Hero(40_000, 2500, 35), Group(35, 3, 200), new List<Character> { Mate("Ally One", 15_000), Mate("Ally Two", 15_000) })),
         ("floor 35 trio, level 35 hero, one teammate, ambush", () => Fight(Hero(40_000, 2500, 35), Group(35, 3, 300), new List<Character> { Mate("Ally One", 15_000) }, ambush: true)),
-        ("floor 50 four, level 50 hero, two teammates", () => Fight(Hero(70_000, 5000, 50), Group(50, 4, 400), new List<Character> { Mate("Ally One", 25_000), Mate("Ally Two", 25_000) }, seed: 5050)),
-        // 1.3.3: monsters past floor 50 grow a full level a floor, so this hero (no armour) needs more HP to win
-        ("floor 80 five, level 80 cleric, ambush", () => Fight(Hero(300_000, 12_000, 80, CharacterClass.Cleric), Group(80, 5, 500), ambush: true, seed: 8080)),
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, so this hero (no armour) needs more HP to win
+        ("floor 50 four, level 50 hero, two teammates", () => Fight(Hero(250_000, 5000, 50), Group(50, 4, 400), new List<Character> { Mate("Ally One", 25_000), Mate("Ally Two", 25_000) }, seed: 5050)),
+        // 1.3.3: monsters past floor 50 grow a full level a floor and from floor 25 with the deep ramp, so this hero
+        // (no armour) needs more HP to win
+        ("floor 80 five, level 80 cleric, ambush", () => Fight(Hero(1_200_000, 12_000, 80, CharacterClass.Cleric), Group(80, 5, 500), ambush: true, seed: 8080)),
         ("floor 3 single", () => Fight(Hero(600, 30, 3), Group(3, 1, 600), seed: 3)),
     };
 }
