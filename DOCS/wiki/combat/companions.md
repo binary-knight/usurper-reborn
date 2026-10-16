@@ -79,13 +79,13 @@ Before the quest, each companion has two story scenes, in order, on any floor at
 
 ## When a companion dies
 
-A companion at 0 HP in a fight is Downed, not dead: it stays in the party until you rescue it, a monster finishes it, or the fight ends and it gets back up with half its maximum HP (see [Downed allies](/wiki/en/combat/party/#downed-allies)). A companion that a monster finishes is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
+A companion at 0 HP in a fight is Downed, not dead: it stays in the party until you rescue it, a monster finishes it, or the fight ends and it stands up again with half its maximum HP (see [Downed allies](/wiki/en/combat/party/#downed-allies)). A companion that a monster finishes is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
 
 If a companion was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
 
 ### A companion who dies for you
 
-When a monster's blow would kill you and a companion is in the fight, an active companion standing in the fight (not Downed) may take the blow and die in your place; you live with 1 HP. The companion dies at once: a sacrifice is never a down. Aldric can always do it: his chance is his loyalty, and above loyalty 50 it is certain. Any other companion needs loyalty 90 or more, with a chance equal to its loyalty. A romance above 5 adds 30 to the chance.
+When a monster's blow would kill you and a companion is in the fight, an active companion may take the blow and die in your place; you live with 1 HP. Only a companion standing in the fight can, never a Downed one, and it dies at once: a sacrifice is never a down. Aldric can always do it: his chance is his loyalty, and above loyalty 50 it is certain. Any other companion needs loyalty 90 or more, with a chance equal to its loyalty. A romance above 5 adds 30 to the chance.
 
 ### Aldric and your Darkness
 

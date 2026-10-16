@@ -100,11 +100,11 @@ Only the ruler can hire royal mercenaries, at the Castle with B (bodyguards). Yo
 
 A story companion, an NPC ally, your spouse or lover, or a fighting beast at 0 HP in a fight is Downed: it stays in the party at 0 HP, takes no turn, and no monster attack, heal or spell reaches it. A royal mercenary, a player echo and a grouped player are never Downed; they fall as below.
 
-- **Rescue (U):** on your turn, while an ally is Downed and you hold a healing potion, U spends your turn and one potion from your belt to lift it with the heal a potion gives an ally (at least 20 percent of its maximum HP). With two or more Downed you choose which. In an Old God fight the potion cooldown applies to it as to a drink. Only the leader of the fight can rescue; a group follower cannot.
+- **Rescue (U):** on your turn, while an ally is Downed and you hold a healing potion, U spends your turn and one from your belt to lift it with the heal it gives an ally (at least 20 percent of its maximum HP). With two or more Downed you choose which. The Old God rule on drinks applies (see [consumables](/wiki/en/items/consumables/#potion-cooldown-in-old-god-fights)). Only the leader of the fight can rescue; a group follower cannot.
 - **The finish:** a Beast, Insectoid, Shadow or Undead monster, or any boss, spends its action to announce that it closes on the earliest Downed ally, and on its first action of a later round spends it again to finish that ally. Other monsters, champions and elites of other families never finish anyone. A taunt on the monster or a hold that costs it its turn loses the finish, and a rescue ends it; the monster may announce again later.
-- **The end of the fight:** every ally still Downed when the fight ends, won, fled or lost, gets back up with half its maximum HP. The end of a fight never finishes anyone.
+- **The end of the fight:** every ally still Downed when the fight ends, won, fled or lost, stands up again with half its maximum HP. The end of a fight never finishes anyone.
 
-A finished ally is lost as a death was before: grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
+Grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you could have rescued it and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
 
 ### Story companion
 
