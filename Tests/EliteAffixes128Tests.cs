@@ -870,8 +870,9 @@ public class EliteAffixes128Tests
         // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
         ["floor 35 trio, level 35 hero, one teammate, ambush"] = "271:0191476086994D39:Victory in 11",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
-        ["floor 50 four, level 50 hero, two teammates"] = "460:33F1F0AAC209BF17:Victory in 20",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP);
+        // with party survival a teammate at 0 HP is Downed, not killed, and the finish path draws in its place
+        ["floor 50 four, level 50 hero, two teammates"] = "423:3997563F4B46C4AA:Victory in 18",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: monsters past floor 50 grow a full level a floor (the hero has more HP), which changes this fight's draws
         // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
