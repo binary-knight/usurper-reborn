@@ -6691,6 +6691,7 @@
   "combat.party_label": "Groupe :",
   "combat.party_you": "Vous",
   "combat.party_down": "{0} À TERRE",
+  "combat.box_down": "À TERRE",
   "combat.follower_spell_cost": "{0}({1}pm)",
   "combat.actor_you": "Vous",
   "combat.disease_plague": "La peste ravage votre corps! (-{0} PV)",

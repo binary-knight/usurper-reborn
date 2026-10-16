@@ -19,7 +19,8 @@ namespace UsurperReborn.Tests;
 /// its class. A: a sweep that turns HP 0 into a death, removal or world action; it treats Downed as nothing
 /// to do (CombatEngine through EnterDownedOrDie; the world sim, resurrection lists and counts skip IsDowned).
 /// B: HP 0 already reads as nothing to do (no change). C: grouped players only (out of scope, unchanged).
-/// D: display that shows Downed once recovery runs. E: not party related (player, monsters, PvP, world NPC
+/// D: display that shows Downed (the two allies boxes, 13100 and 13436, draw a Downed ally as DOWN; the others
+/// once recovery runs). E: not party related (player, monsters, PvP, world NPC
 /// fights). Line numbers are at 490e679d.
 /// [E] EnhancedNPCBehaviorSystem.cs:418
 /// [E] EnhancedNPCBehaviorSystem.cs:422
@@ -97,9 +98,9 @@ namespace UsurperReborn.Tests;
 /// [B] CombatEngine.cs:11611
 /// [C] CombatEngine.cs:11969
 /// [E] CombatEngine.cs:12918
-/// [B] CombatEngine.cs:13100
+/// [D] CombatEngine.cs:13100
 /// [E] CombatEngine.cs:13347
-/// [B] CombatEngine.cs:13436
+/// [D] CombatEngine.cs:13436
 /// [E] CombatEngine.cs:13867
 /// [E] CombatEngine.cs:15239
 /// [E] CombatEngine.cs:15270
@@ -471,6 +472,42 @@ public class DownedState_PartySurvival133Tests
         follower.HP = 0;
         Call(r.Engine, "EvHurt", follower, 120L, CombatEventKind.Basic);
         r.Result.Tally.TeammatesLost.Should().Be(1);
+    }
+
+    // ---------- the allies box draws a Downed ally as DOWN (the played pilot reads it) ----------
+
+    private static string Plain(string s) => System.Text.RegularExpressions.Regex.Replace(s, "\u001b\\[[0-9;?]*[A-Za-z]", "");
+
+    [Theory]
+    [InlineData("DisplayCombatStatus", "en")]
+    [InlineData("DisplayCombatStatus", "hu")]
+    [InlineData("DisplayCombatStatusScreenReader", "en")]
+    [InlineData("DisplayCombatStatusScreenReader", "hu")]
+    public async Task TheAlliesBox_ShowsADownedAllyAsDown_AndAStandingRowAsBefore(string box, string lang)
+    {
+        var before = GameConfig.Language;
+        GameConfig.Language = lang;
+        try
+        {
+            var downed = Ally("Mira"); var standing = Ally("Kade", 80, 100);
+            var wolf = Mob();
+            var r = NewRig(team: new[] { downed, standing }, monsters: new[] { wolf });
+            Call(r.Engine, box, r.Result.Monsters, r.Owner, 1);
+            string standingBefore = Plain(r.Text).Split('\n').Single(l => l.Contains("Kade"));
+            await Down(r, downed);
+            int at = r.Output.ToArray().Length;
+            Call(r.Engine, box, r.Result.Monsters, r.Owner, 1);
+            var rows = Plain(System.Text.Encoding.UTF8.GetString(r.Output.ToArray()[at..])).Split('\n');
+            string marker = Loc.Get("combat.box_down");
+            var downRow = rows.Single(l => l.Contains("Mira"));
+            downRow.TrimEnd().Should().EndWith(marker, "the marker stands in place of the HP");
+            downRow.Should().NotContain(Loc.Get("combat.bar_hp") + ":");
+            downRow.TrimEnd('\r').Length.Should().BeLessThanOrEqualTo(79);
+            ("║ " + new string('W', 20) + " " + marker).Length.Should().BeLessThanOrEqualTo(79, "a long name still fits");
+            rows.Single(l => l.Contains("Kade")).Should().Be(standingBefore, "a standing ally's row is unchanged");
+            rows.Single(l => l.Contains("Kade")).Should().NotContain(marker);
+        }
+        finally { GameConfig.Language = before; }
     }
 
     // ---------- 21. the summary prints the downs line only when Downs > 0 ----------

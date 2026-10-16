@@ -13158,6 +13158,17 @@ public partial class CombatEngine
 
             foreach (var teammate in currentTeammates)
             {
+                // 1.3.3 party survival: a Downed ally keeps its row, marked DOWN in place of the HP bar
+                if (teammate.IsDowned)
+                {
+                    terminal.SetColor("bright_cyan");
+                    terminal.Write($"║ ");
+                    terminal.SetColor("white");
+                    terminal.Write($"{teammate.DisplayName,-16} ");
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine(Loc.Get("combat.box_down"));
+                    continue;
+                }
                 if (!teammate.IsAlive) continue;
 
                 // Calculate HP bar for teammate
@@ -13494,6 +13505,15 @@ public partial class CombatEngine
 
             foreach (var teammate in currentTeammates)
             {
+                // 1.3.3 party survival: a Downed ally keeps its row, marked DOWN in place of the HP
+                if (teammate.IsDowned)
+                {
+                    terminal.SetColor("white");
+                    terminal.Write($"  {teammate.DisplayName} ");
+                    terminal.SetColor("bright_red");
+                    terminal.WriteLine(Loc.Get("combat.box_down"));
+                    continue;
+                }
                 if (!teammate.IsAlive) continue;
 
                 double tmHpPercent = Math.Max(0, Math.Min(100, (double)teammate.HP / teammate.MaxHP * 100));

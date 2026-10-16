@@ -6699,6 +6699,7 @@
   "combat.party_label": "Csapat:",
   "combat.party_you": "Te",
   "combat.party_down": "{0} ELESETT",
+  "combat.box_down": "ELESETT",
   "combat.follower_spell_cost": "{0}({1}mp)",
   "combat.actor_you": "Te",
   "combat.disease_plague": "A pestis pusztítja a testedet! (-{0} ÉP)",

@@ -6691,6 +6691,7 @@
   "combat.party_label": "Gruppo:",
   "combat.party_you": "Tu",
   "combat.party_down": "{0} A TERRA",
+  "combat.box_down": "A TERRA",
   "combat.follower_spell_cost": "{0}({1}pm)",
   "combat.actor_you": "Tu",
   "combat.disease_plague": "La peste devasta il tuo corpo! (-{0} PV)",

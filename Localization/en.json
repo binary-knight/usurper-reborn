@@ -6911,6 +6911,7 @@
   "combat.party_label": "Party:",
   "combat.party_you": "You",
   "combat.party_down": "{0} DOWN",
+  "combat.box_down": "DOWN",
   "combat.follower_spell_cost": "{0}({1}mp)",
   "combat.actor_you": "You",
   "combat.disease_plague": "The plague ravages your body! (-{0} HP)",
