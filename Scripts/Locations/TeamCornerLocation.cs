@@ -2798,14 +2798,14 @@ public class TeamCornerLocation : BaseLocation
         // Find dead team members
         var allNPCs = NPCSpawnSystem.Instance.ActiveNPCs;
         var deadMembers = allNPCs
-            .Where(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsAgedDeath && !n.IsPermaDead)
+            .Where(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsDowned && !n.IsAgedDeath && !n.IsPermaDead)   // 1.3.3: not Downed in a fight
             .ToList();
 
         if (deadMembers.Count == 0)
         {
             // Check if there are permanently dead members that can't be resurrected
             var permadeadMembers = allNPCs
-                .Where(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && (n.IsPermaDead || n.IsAgedDeath))
+                .Where(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsDowned && (n.IsPermaDead || n.IsAgedDeath))
                 .ToList();
 
             terminal.WriteLine("");
@@ -2853,7 +2853,7 @@ public class TeamCornerLocation : BaseLocation
         // v1.1.12: a dead member holds a slot, so a revival adds no slot; it may bring the living up to
         // MaxTeamSize and no further (a team from before the cap, with more, keeps its members). Checked before the
         // live lookup below, since the query yields
-        int deadHere = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsPermaDead && !n.IsAgedDeath);
+        int deadHere = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.Team == currentPlayer.Team && (n.IsDead || !n.IsAlive) && !n.IsDowned && !n.IsPermaDead && !n.IsAgedDeath);
         if (await TeamSlotsUsed(currentPlayer.Team) - deadHere >= MaxTeamSize)
         {
             terminal.SetColor("red");

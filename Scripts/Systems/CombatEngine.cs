@@ -12918,13 +12918,15 @@ public partial class CombatEngine
                 family = m.FamilyName ?? ""
             }).ToList();
 
-            var teammateData = currentTeammates?.Where(t => t.IsAlive).Select(t => new
+            // 1.3.3 party survival: a Downed ally is listed with downed true
+            var teammateData = currentTeammates?.Where(t => t.IsAlive || t.IsDowned).Select(t => new
             {
                 name = t.DisplayName,
                 hp = t.HP,
                 maxHp = t.MaxHP,
                 isCompanion = t.IsCompanion,
-                className = t.ClassName
+                className = t.ClassName,
+                downed = t.IsDowned
             }).ToList() ?? new();
 
             ElectronBridge.Emit("combat_status", new
