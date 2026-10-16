@@ -211,6 +211,14 @@ public static partial class GameConfig
     public static bool ScaledPotionsEnabled { get; internal set; } = true;
 
     /// <summary>
+    /// 1.3.3: the held pause of UIHelper.MomentOfSilence (a companion's death scene and the other story beats
+    /// that call it). Default on. The setter is internal: it is not a sysop setting; tests and the balance
+    /// simulator turn it off so a fight does not wait on the clock. Off, the screen still clears and nothing
+    /// else changes; no random number is drawn either way.
+    /// </summary>
+    public static bool MomentOfSilenceEnabled { get; internal set; } = true;
+
+    /// <summary>
     /// 1.2.8 difficulty pass: monsters choose their special ability with MonsterTactics (no wasted pick,
     /// tier-1 signature abilities from monster level 3) and Predator and Skirmisher families weigh their
     /// targets by trait. Default on. The setter is internal: it is not a sysop setting; tests and the
