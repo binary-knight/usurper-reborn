@@ -84,15 +84,20 @@ public class DeepCurve133Tests
     // GetWikiStats (power 1.0, Normal, no sysop multiplier): HP, Strength, Defence, Punch, WeaponPower, ArmorPower
     [Theory]
     [InlineData(25, 4416, 211, 85, 85, 148, 31)]
-    [InlineData(50, 9315, 429, 173, 173, 303, 63)]
-    public void MonsterStats_UpToFloor50_AreUnchanged(int level, long hp, long str, long def, long punch, long wp, long ap)
+    public void MonsterStats_AtFloor25_AreUnchanged(int level, long hp, long str, long def, long punch, long wp, long ap)
         => MonsterGenerator.GetWikiStats(level, 1.0f).Should().Be((hp, str, def, punch, wp, ap));
 
+    // 1.3.3: these also carry the deep ramp from floor 26 (DeepRamp133Tests); without it they were 9315 at 50, 9515 at
+    // 51, 11342 at 60, 15484 at 80 and 19725 at 100
     [Theory]
-    [InlineData(51, 9515, 438, 175, 175, 310, 65)]
-    [InlineData(60, 11342, 517, 207, 207, 366, 76)]
-    [InlineData(80, 15484, 695, 276, 276, 492, 103)]
-    [InlineData(100, 19725, 873, 346, 346, 618, 128)]
+    [InlineData(50, 19561, 902, 173, 362, 636, 63)]
+    [InlineData(51, 20000, 924, 175, 369, 652, 65)]
+    [InlineData(60, 24043, 1127, 207, 450, 798, 76)]
+    [InlineData(80, 33446, 1694, 276, 675, 1201, 103)]
+    [InlineData(100, 43395, 2619, 346, 1039, 1856, 128)]
     public void MonsterStats_PastFloor50_GrowAtAFullFloorAFloor(int level, long hp, long str, long def, long punch, long wp, long ap)
-        => MonsterGenerator.GetWikiStats(level, 1.0f).Should().Be((hp, str, def, punch, wp, ap));
+    {
+        MonsterGenerator.MonsterLevelSlopePast50.Should().Be(1.0);
+        MonsterGenerator.GetWikiStats(level, 1.0f).Should().Be((hp, str, def, punch, wp, ap));
+    }
 }

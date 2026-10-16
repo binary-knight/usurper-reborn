@@ -273,6 +273,13 @@ public static class MonsterGenerator
 
         // Monster armor power (v0.41.4: raised from 0.4f to 0.7f so monsters have real armor)
         // Formula: level * 0.5 + level^1.02 * 0.3
+        // 1.3.3: the deep ramp, after the tier, boss and champion factors (they stack under it)
+        double deepHp = DeepMonsterHpFactor(level), deepDamage = DeepMonsterDamageFactor(level);
+        hp = (long)(hp * deepHp);
+        strength = (long)(strength * deepDamage);
+        punch = (long)(punch * deepDamage);
+        weaponPower = (long)(weaponPower * deepDamage);
+
         long baseArmorPower = (long)((0.5 * level) + Math.Pow(level, 1.02) * 0.3);
         long armorPower = (long)(baseArmorPower * defenseTotal * 0.7f);
 
@@ -514,6 +521,23 @@ public static class MonsterGenerator
     /// <summary>1.3.3: how fast monster HP, Strength, punch and weapon power grow per floor past floor 50, as a
     /// share of a floor (was 0.6 from v0.54.0). Defence and armour always use the floor itself.</summary>
     public const double MonsterLevelSlopePast50 = 1.0;
+
+    /// <summary>1.3.3: a ramp's factor at a level: its first factor up to the first waypoint, straight lines between
+    /// waypoints, its last factor past the last one.</summary>
+    public static double RampFactor((int Level, double Factor)[] ramp, int level)
+    {
+        if (level <= ramp[0].Level) return ramp[0].Factor;
+        for (int i = 1; i < ramp.Length; i++)
+            if (level <= ramp[i].Level)
+                return ramp[i - 1].Factor + (ramp[i].Factor - ramp[i - 1].Factor) * (level - ramp[i - 1].Level) / (ramp[i].Level - ramp[i - 1].Level);
+        return ramp[^1].Factor;
+    }
+
+    /// <summary>1.3.3: the deep HP factor at a level (GameConfig.DeepMonsterHpRamp).</summary>
+    public static double DeepMonsterHpFactor(int level) => RampFactor(GameConfig.DeepMonsterHpRamp, level);
+
+    /// <summary>1.3.3: the deep damage factor at a level (GameConfig.DeepMonsterDamageRamp).</summary>
+    public static double DeepMonsterDamageFactor(int level) => RampFactor(GameConfig.DeepMonsterDamageRamp, level);
 
     /// <summary>1.3.3: the first floor whose regular group size follows DeepGroupMean.</summary>
     public const int DeepGroupMinFloor = 25;

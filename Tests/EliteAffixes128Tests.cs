@@ -863,15 +863,19 @@ public class EliteAffixes128Tests
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["floor 7 pair, solo, ambush"] = "192:190A3A98554F5796:Victory in 14",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["floor 35 trio, level 35 hero, two teammates"] = "295:CDE6A01BDD9FE458:Victory in 12",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
+        ["floor 35 trio, level 35 hero, two teammates"] = "408:4ADF1FF79FED3AF2:Victory in 16",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: the group size grows each floor from 25, which changes these draws
-        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "218:3FB9BE9DED58B070:Victory in 9",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws
+        ["floor 35 trio, level 35 hero, one teammate, ambush"] = "343:0DA6079253B0AC74:Victory in 16",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
-        ["floor 50 four, level 50 hero, two teammates"] = "410:76583E31955CEF88:Victory in 15",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
+        ["floor 50 four, level 50 hero, two teammates"] = "580:A97BECA568D361D7:Victory in 26",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.3: monsters past floor 50 grow a full level a floor (the hero has more HP), which changes this fight's draws
-        ["floor 80 five, level 80 cleric, ambush"] = "409:21E50B66289122B0:Victory in 21",
+        // 1.3.3: monsters from floor 25 grow with the deep ramp, which changes this fight's draws (the hero has more HP)
+        ["floor 80 five, level 80 cleric, ambush"] = "856:9B6C9E9065A5E227:Victory in 39",
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         ["floor 3 single"] = "51:25D2351E15E63BF7:Victory in 6",
     };
