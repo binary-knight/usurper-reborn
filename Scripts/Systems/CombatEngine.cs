@@ -5155,6 +5155,14 @@ public partial class CombatEngine
                 monster.ThornsPercent = 0;
         }
 
+        // 1.3.4: Probability Shift counts down here too, once a round and before a hold can skip the turn.
+        // A round that starts with rounds left is a shifted round for every attack the monster makes in it.
+        if (firstActionThisRound)
+        {
+            monster.ProbabilityShiftActive = monster.ProbabilityShiftRounds > 0;
+            if (monster.ProbabilityShiftRounds > 0) monster.ProbabilityShiftRounds--;
+        }
+
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
         // based on the IsBurning flag -- so casting Roast (fire) on a poisoned
@@ -5608,6 +5616,11 @@ public partial class CombatEngine
             terminal.SetColor(ColorRole.Derived);
             UIHelper.WriteRow(terminal, Loc.Get("combat.monster_roll", MonsterNames.Display(monster), monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC));
         }
+
+        // 1.3.4: Probability Shift. A natural 20 is a plain hit, not a critical, and a roll that hit
+        // misses ProbabilityShiftMissPercent of the time.
+        if (monster.ProbabilityShiftActive && await ProbabilityShiftMisses(monster, player, monsterRoll, result))
+            return;
 
         // Blur / duplicate miss chance (20%) - additional miss chance on top of D20
         if (player.HasStatus(StatusEffect.Blur) && monsterRoll.Success)
@@ -6283,6 +6296,34 @@ public partial class CombatEngine
                 lang => GroupLine(lang, "\u001b[33m", "combat.companion_afflicted", name, Loc.GetIn(lang, "status.poisoned")),
                 inDungeonOnly: true);
         }
+    }
+
+    /// <summary>1.3.4: the points of miss chance Probability Shift adds to each attack of the monster it is on.</summary>
+    internal const int ProbabilityShiftMissPercent = 30;
+
+    /// <summary>
+    /// 1.3.4: Probability Shift on a monster's attack roll against the player, after the roll. A natural 20 is
+    /// a plain hit (it still hits, without the critical); then a roll that hit misses ProbabilityShiftMissPercent
+    /// of the time. True when the attack missed through it; the miss line is written.
+    /// </summary>
+    private async Task<bool> ProbabilityShiftMisses(Monster monster, Character player, RollResult roll, CombatResult result)
+    {
+        if (roll.IsCriticalSuccess)
+        {
+            roll.Success = true;
+            roll.IsCriticalSuccess = false;
+        }
+        if (!roll.Success || random.Next(100) >= ProbabilityShiftMissPercent) return false;
+        WriteProbabilityShiftMiss(monster, player, result);
+        await Pacing.Wait(GetCombatDelay(800));
+        return true;
+    }
+
+    /// <summary>1.3.4: the one line of an attack that missed through Probability Shift.</summary>
+    private void WriteProbabilityShiftMiss(Monster monster, Character target, CombatResult result)
+    {
+        UIHelper.WriteRow(terminal, Loc.Get("combat.probability_shift_miss", MonsterNames.Display(monster)), "cyan");
+        result.CombatLog.Add($"{monster.Name} misses {target.DisplayName} (Probability Shift)");
     }
 
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
@@ -13574,6 +13615,7 @@ public partial class CombatEngine
         if (monster.IsSlowed || monster.SlowDuration > 0) statuses.Add($"SLOW({Math.Max(1, monster.SlowDuration)})");
         if (monster.IsMarked || monster.MarkedDuration > 0) statuses.Add($"MARK({Math.Max(1, monster.MarkedDuration)})");
         if (monster.IsCorroded || monster.CorrodedDuration > 0) statuses.Add($"COR({Math.Max(1, monster.CorrodedDuration)})");
+        if (monster.ProbabilityShiftRounds > 0) statuses.Add($"PSH({monster.ProbabilityShiftRounds})");   // 1.3.4
         if (!string.IsNullOrEmpty(monster.TauntedBy) && monster.TauntRoundsLeft > 0) statuses.Add($"TNT({monster.TauntRoundsLeft})");
 
         if (monster.IsBoss) statuses.Add("[BOSS]");
@@ -13945,6 +13987,9 @@ public partial class CombatEngine
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
         bool evasionChecked = _evasionCheckedByHitRoll;
         _evasionCheckedByHitRoll = false;
+        // 1.3.4: set only by ApplySpellDamageIgnoringArmor, for this one call
+        int armorIgnoredPercent = _armorIgnoredPercent;
+        _armorIgnoredPercent = 0;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -13993,6 +14038,9 @@ public partial class CombatEngine
                 effectiveArmor = Math.Max(0, effectiveArmor - effectiveArmor * armorPiercePct / 100);
             }
         }
+        // 1.3.4: a spell that ignores part of the defence (Echo of Tomorrow, 50) takes that share off what is left
+        if (armorIgnoredPercent > 0)
+            effectiveArmor -= effectiveArmor * armorIgnoredPercent / 100;
         long actualDamage = Math.Max(1, damage - effectiveArmor);
 
         // Show defense calculation when armor reduces damage
@@ -14165,6 +14213,20 @@ public partial class CombatEngine
         _evasionCheckedByHitRoll = evasionChecked;
         try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage); }
         finally { _evasionCheckedByHitRoll = false; }
+    }
+
+    // 1.3.4: the share of the target's armor that the one ApplySingleMonsterDamage call made by
+    // ApplySpellDamageIgnoringArmor leaves out, in percent; 0 for every other call.
+    private int _armorIgnoredPercent;
+
+    /// <summary>1.3.4: ApplySingleMonsterDamage for a spell that ignores a share of the target's armor. Echo of
+    /// Tomorrow ignores 50 percent: the hit is damage - (armor - armor / 2), at least 1, with every other step of
+    /// the hit as before.</summary>
+    private async Task<bool> ApplySpellDamageIgnoringArmor(Monster target, long damage, CombatResult result, string damageSource, Character? attacker, int armorIgnoredPercent)
+    {
+        _armorIgnoredPercent = armorIgnoredPercent;
+        try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage: true); }
+        finally { _armorIgnoredPercent = 0; }
     }
 
     /// <summary>The monster's evasion buff (Incorporeal, Phase and the like): one draw while the buff is up,
@@ -16023,7 +16085,8 @@ public partial class CombatEngine
                 // flavor message are applied to the same damage event the standard combat line reports.
                 bool waveEchoDebuffed = target.Poisoned || target.Stunned || target.Charmed || target.Distracted
                     || target.WeakenRounds > 0 || target.IsSlowed || target.IsMarked
-                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen;
+                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen
+                    || target.ProbabilityShiftRounds > 0;   // 1.3.4: still a debuffed target
                 if (waveEchoDebuffed)
                 {
                     actualDamage *= 2;
@@ -18937,7 +19000,10 @@ public partial class CombatEngine
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
                     damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
-                    await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
+                    if (spellResult.SpecialEffect == "ignore_half_defense")
+                        await ApplySpellDamageIgnoringArmor(target, damage, result, spellInfo.Name, player, 50);   // 1.3.4: Echo of Tomorrow
+                    else
+                        await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
                 }
 
                 // Apply self-healing from attack spells (e.g. Prison Siphon, Devour Essence)
@@ -19165,31 +19231,18 @@ public partial class CombatEngine
                 break;
 
             case "probability_shift":
-                // Cyclebreaker: confuse (may skip/hit self) + slow (reduced power) for 3 rounds
-                target.IsConfused = true;
-                target.ConfusedDuration = Math.Max(target.ConfusedDuration, 3);
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, 3);
+                // 1.3.4 Cyclebreaker: as the spell's text says, for 3 rounds the target's attacks never crit and
+                // miss 30 points more often (ProbabilityShiftMisses). It used to confuse and slow the target,
+                // which cost it about four in five of its actions. Bosses and Old Gods take it the same way.
+                target.ProbabilityShiftRounds = Math.Max(target.ProbabilityShiftRounds, duration > 0 ? duration : 3);
+                target.ProbabilityShiftActive = true;
                 UIHelper.WriteRow(terminal, Loc.Get("combat.probability_shift", MonsterNames.Display(target)), "cyan");
                 break;
 
             case "ignore_half_defense":
-                // Cyclebreaker Echo of Tomorrow: deal bonus damage equal to 50% of target's armor
-                if (target.IsAlive && target.ArmPow > 0)
-                {
-                    long halfDefBonus = Math.Max(1, target.ArmPow / 2);
-                    halfDefBonus = TeamHQBonus.ApplyAttack(player, halfDefBonus); // v1.1.11: Team HQ Armory, last.
-                    target.HP -= halfDefBonus;
-                    EvHit(player, halfDefBonus, CombatEventKind.Spell);   // 1.2.6
-                    terminal.SetColor("cyan");
-                    UIHelper.WriteRow(terminal, Loc.Get("combat.future_echo", MonsterNames.Display(target), halfDefBonus));
-                    if (target.HP <= 0)
-                    {
-                        target.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(target))
-                            result.DefeatedMonsters.Add(target);
-                    }
-                }
+                // 1.3.4 Cyclebreaker Echo of Tomorrow: the half of the armor it ignores is taken off in the hit itself
+                // (ApplySpellDamageIgnoringArmor), so nothing is added here. It used to add half the target's armor as
+                // flat damage after the full armor came off, which dealt about half the armor whatever the roll.
                 break;
 
             case "angel":
@@ -21958,6 +22011,15 @@ public partial class CombatEngine
         {
             terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
             result.CombatLog.Add($"{monster.Name} misses {companion.DisplayName} due to blur");
+            await Pacing.Wait(GetCombatDelay(500));
+            return;
+        }
+
+        // 1.3.4: Probability Shift makes the monster miss a teammate as often as it adds misses against the
+        // player. This attack has no hit roll and no critical, so the miss is its whole effect here.
+        if (monster.ProbabilityShiftActive && random.Next(100) < ProbabilityShiftMissPercent)
+        {
+            WriteProbabilityShiftMiss(monster, companion, result);
             await Pacing.Wait(GetCombatDelay(500));
             return;
         }

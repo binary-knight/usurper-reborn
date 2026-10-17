@@ -265,7 +265,7 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Probability Shift", "Twist fate against your enemy. Target: crit chance = 0%, miss chance +30%. Duration: 3 rounds.", 40, 7, "Probashiftarie", false, "Debuff"),
             [3] = new SpellInfo(3, "Echo of Tomorrow", "Strike with damage from a future timeline. Damage: 80-110. Ignores 50% of defense. Duration: 1 turn.", 65, 12, "Echomorrarie", false, "Attack"),
             [4] = new SpellInfo(4, "Cycle Rewind", "Revert your body to an earlier state. Restores 30% max HP and cures disease. Duration: 1 turn.", 100, 18, "Cyclewindarie", false, "Heal"),
-            [5] = new SpellInfo(5, "Paradox Collapse", "Collapse multiple timelines onto the target. Damage: 250-350. Duration: 1 turn.", 200, 24, "Paradoxcollarie", false, "Attack")
+            [5] = new SpellInfo(5, "Paradox Collapse", "Collapse multiple timelines onto the target. Damage: 250-350, plus 10% of all damage you have dealt this fight. Duration: 1 turn.", 200, 24, "Paradoxcollarie", false, "Attack")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
