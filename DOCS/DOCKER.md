@@ -128,7 +128,7 @@ To turn it on, add these to the `usurper-web` `environment:` block in docker-com
 
 With mail on, an address stays optional for players; a player who gives none is told that only the server's operator can reset a forgotten password. The operator can reset any password from the `/admin` page (Reset Password on the player's row), with mail on or off.
 
-In this compose stack nginx passes every page to the web service, which looks up `/account/forgot` as `account/forgot.html`; the pages are `account/forgot/index.html` (and the same for reset and verify), so the addresses the game and the mail links name answer 404 here. The server setup in `DOCS/SERVER_DEPLOYMENT.md` serves them through nginx `try_files`.
+In this compose stack nginx passes every page to the web service, which serves `/account/forgot`, `/account/reset` and `/account/verify` from their folders' `index.html`.
 
 ---
 
