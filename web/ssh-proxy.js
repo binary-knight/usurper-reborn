@@ -4782,10 +4782,13 @@ function createAccountMail(options) {
   async function processReset(row, t) {
     const name = row.username || '';
     if (!name) return 'dropped';
-    let acct = findAccount(name);
-    if (!acct && name.includes('@')) {
+    let acct = null;
+    if (name.includes('@')) {
+      // text with '@' is an address (account names cannot hold '@'): only a confirmed address matches
       const a = accountNormalizeAddress(name);
       if (a) acct = db.prepare('SELECT username, password_hash, email, email_verified_at FROM players WHERE email = ? AND email_verified_at IS NOT NULL').get(a);
+    } else {
+      acct = findAccount(name);
     }
     if (!acct || !acct.email || !acct.email_verified_at) return 'dropped';
     const account = acct.username.toLowerCase();
@@ -4899,7 +4902,9 @@ function createAccountMail(options) {
 
   // 2.5: one reply for every input; a reset row like the game's, the same IP limit, no lookup.
   function forgot(req, body, t) {
-    const name = accountResetName(body.name);
+    // text with '@' is an address: the S1 rule, up to 254 characters; other text is a name cut at 64
+    const typed = typeof body.name === 'string' ? body.name : '';
+    const name = typed.includes('@') ? (accountNormalizeAddress(typed) || '') : accountResetName(typed);
     if (name.length > 0 && gameTablesReady()) {
       const ip = accountClientIp(req, options.isIP);
       const n = db.prepare('SELECT COUNT(*) AS n FROM mail_requests WHERE ip = ? AND created_at > ?').get(ip, accountSqlTime(t - ACCOUNT_HOUR_MS)).n;

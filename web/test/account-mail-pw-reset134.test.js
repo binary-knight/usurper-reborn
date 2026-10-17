@@ -300,6 +300,24 @@ test('form: the same reply for a known and an unknown name and address, and the 
   });
 });
 
+test('form: an address is kept whole (S1 rule, up to 254), so a 70 character confirmed address gets the mail', async () => {
+  await withServer({}, async (s) => {
+    const address = 'a'.repeat(58) + '@example.com';
+    assert.strictEqual(address.length, 70);
+    s.account('Longmail', address);
+    const r = await s.api('/api/account/forgot', { name: '  ' + address.toUpperCase() + ' ' });
+    assert.deepStrictEqual([r.status, r.data], [200, { ok: true }]);
+    assert.strictEqual(s.rows()[0].username, address, 'kept whole and normalized');
+    await s.tick();
+    assert.strictEqual(s.sent.length, 1);
+    assert.strictEqual(s.sent[0].to, address);
+    assert.ok(tokenIn(s.sent[0]));
+    // a name without '@' is still cut at 64
+    await s.api('/api/account/forgot', { name: 'n'.repeat(80) });
+    assert.strictEqual(s.rows()[1].username, 'n'.repeat(64));
+  });
+});
+
 test('form: per IP 5 an hour, counted with the game rows, the same reply past it', async () => {
   await withServer({}, async (s) => {
     s.gameRow('verify', 'someone', 'someone@example.com', '203.0.113.20');
