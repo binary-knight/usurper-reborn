@@ -67,7 +67,7 @@ Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 
 
 **Most damage from one hit.** An Old God's area attack and channel have no cap on the damage to you; a teammate takes at most {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP from one hit. Manwe's own abilities take at most 85 percent of your maximum HP from the first round, without the lower cap of the first rounds.
 
-**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you below a fifth of your HP unless you hold the Worldstone.
+**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Shadow Incarnate heals him 30 percent of the damage it deals, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you below a fifth of your HP unless you hold the Worldstone.
 :::
 
 {{table:old-god-mechanics}}

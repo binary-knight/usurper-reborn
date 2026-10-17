@@ -22840,7 +22840,7 @@
   "combat.manwe_cursed": "Une sombre malédiction s'abat sur vous...",
   "combat.manwe_darkness1": "Les ténèbres engloutissent tout...",
   "combat.manwe_darkness_block": "Votre foi vous protège des ténèbres !",
-  "combat.manwe_darkness_damage": "Les ténèbres brûlent pour {0} dégâts ! Vous récupérez {1} PV.",
+  "combat.manwe_darkness_damage": "Les ténèbres brûlent pour {0} dégâts ! Manwe se soigne de {1} PV !",
   "combat.manwe_dual_strike": "Manwe frappe avec lumière et ombre à la fois !",
   "combat.manwe_eyes_harden": "Les yeux de Manwe se durcissent.",
   "combat.manwe_final_word1": "\"Que ce soit donc le mot final.\"",

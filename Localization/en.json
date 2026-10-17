@@ -23385,7 +23385,7 @@
   "combat.manwe_cursed": "A dark curse settles over you...",
   "combat.manwe_darkness1": "Darkness engulfs everything...",
   "combat.manwe_darkness_block": "Your faith shields you from the darkness!",
-  "combat.manwe_darkness_damage": "The darkness burns for {0} damage! You recover {1} HP.",
+  "combat.manwe_darkness_damage": "The darkness burns for {0} damage! Manwe heals for {1} HP!",
   "combat.manwe_dual_strike": "Manwe strikes with both light and shadow!",
   "combat.manwe_eyes_harden": "Manwe's eyes harden.",
   "combat.manwe_final_word1": "\"Then let this be the final word.\"",

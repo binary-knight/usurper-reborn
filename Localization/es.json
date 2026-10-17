@@ -22851,7 +22851,7 @@
   "combat.manwe_cursed": "Una maldición oscura se asienta sobre ti...",
   "combat.manwe_darkness1": "La oscuridad lo envuelve todo...",
   "combat.manwe_darkness_block": "¡Tu fe te protege de la oscuridad!",
-  "combat.manwe_darkness_damage": "¡La oscuridad arde por {0} de daño! Recuperas {1} PV.",
+  "combat.manwe_darkness_damage": "¡La oscuridad arde por {0} de daño! ¡Manwe se cura {1} PV!",
   "combat.manwe_dual_strike": "¡Manwe golpea con luz y sombra a la vez!",
   "combat.manwe_eyes_harden": "Los ojos de Manwe se endurecen.",
   "combat.manwe_final_word1": "\"Que esta sea entonces la última palabra.\"",
