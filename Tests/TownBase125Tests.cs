@@ -497,13 +497,22 @@ public class TownBase125Tests : IDisposable
     public void AuctionDurations_ShowHoursInThePlayersLanguage_AndTheFeeSplit(string lang)
     {
         Player("seller_key", LongName, lang);
-        string shown = InLanguage(lang, () =>
+        // 1.3.4 (F10): the fee adds the king's tax (CastleLocation.GetCurrentKing), shared by every test of the collection,
+        // so this test sets the no-king state it expects and puts back what it found
+        var kingBefore = CastleLocation.GetCurrentKing();
+        CastleLocation.SetKing(null!);
+        string shown;
+        try
         {
-            var (term, output) = Term("1\n1000000\n\n");
-            var hero = Hero(); hero.Inventory.Add(new Item { Name = "Blade", Type = ObjType.Weapon, Value = 10 });
-            Call(At(new Plain(), term, hero), "SellOnAuction", Db);
-            return Shown(term, output);
-        });
+            shown = InLanguage(lang, () =>
+            {
+                var (term, output) = Term("1\n1000000\n\n");
+                var hero = Hero(); hero.Inventory.Add(new Item { Name = "Blade", Type = ObjType.Weapon, Value = 10 });
+                Call(At(new Plain(), term, hero), "SellOnAuction", Db);
+                return Shown(term, output);
+            });
+        }
+        finally { CastleLocation.SetKing(kingBefore!); }
         Capture($"town-base-auction-durations-{lang}.txt", shown);
         EveryRowFits(shown, $"{lang} auction durations");
         foreach (int h in new[] { 12, 24, 48, 72 })
