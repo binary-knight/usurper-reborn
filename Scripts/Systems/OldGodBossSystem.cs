@@ -32,6 +32,12 @@ namespace UsurperRemake.Systems
         // Prevents concurrent boss encounters from corrupting shared state in MUD mode
         private readonly SemaphoreSlim _bossEncounterLock = new(1, 1);
 
+        // 1.3.4: test seams on RunBossCombat, inert in a normal run (both stay null outside the tests).
+        // The first runs after the dialogue has set the modifiers; the second sees the god and its
+        // context as the fight is about to receive them. The build tests record and check through them.
+        internal static Action<OldGodBossSystem>? DialogueSeamForTests { get; set; }
+        internal static Action<Monster, BossCombatContext>? FightSeamForTests { get; set; }
+
         /// <summary>
         /// Combat modifiers applied based on dialogue choices before boss fight
         /// </summary>
@@ -808,6 +814,7 @@ namespace UsurperRemake.Systems
         {
             // Apply combat modifiers based on dialogue choices
             ApplyDialogueModifiers(boss.Type, terminal);
+            DialogueSeamForTests?.Invoke(this);
             terminal.WriteLine("");
             await Pacing.Wait(1500);
 
@@ -861,6 +868,8 @@ namespace UsurperRemake.Systems
             bool wasSaved;
             try
             {
+                FightSeamForTests?.Invoke(bossMonster, combatEngine.BossContext);
+
                 // Run combat through the standard engine
                 combatResult = await combatEngine.PlayerVsMonsters(
                     player, new List<Monster> { bossMonster }, dungeonTeammates);
