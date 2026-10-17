@@ -1,5 +1,5 @@
 # Usurper Reborn - MUD Game Server Systemd Service
-# Single-process TCP game server on port 4000. All players connect directly
+# Single-process TCP game server on port 4001. All players connect directly
 # via TCP (from Windows/Steam client, web proxy, or relay).
 # World simulator runs in-process as a background task.
 #
@@ -25,7 +25,8 @@ Type=simple
 User=usurper
 Group=usurper
 WorkingDirectory=/opt/usurper
-ExecStart=/opt/usurper/UsurperReborn --mud-server --mud-port 4001 --db /var/usurper/usurper_online.db --sim-interval 30 --npc-xp 3.0 --save-interval 5 --admin Rage --admin fastfinge
+# Put your own account name after --admin (repeat --admin for more than one admin); an admin has the in-game admin commands.
+ExecStart=/opt/usurper/UsurperReborn --mud-server --mud-port 4001 --db /var/usurper/usurper_online.db --sim-interval 30 --npc-xp 3.0 --save-interval 5 --admin YourName
 Restart=on-failure
 RestartSec=10
 StandardOutput=append:/var/usurper/logs/mud-server.log

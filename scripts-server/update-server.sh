@@ -45,6 +45,8 @@ cp "$NEW_FILES/UsurperReborn" /opt/usurper/
 cp "$NEW_FILES"/*.dll /opt/usurper/ 2>/dev/null || true
 cp "$NEW_FILES"/*.so /opt/usurper/ 2>/dev/null || true
 cp "$NEW_FILES"/*.json /opt/usurper/ 2>/dev/null || true
+# 1.3.4: the game text in every language (Localization/); without it a new release shows untranslated keys
+if [ -d "$NEW_FILES/Localization" ]; then cp -r "$NEW_FILES/Localization" /opt/usurper/; fi
 chmod +x /opt/usurper/UsurperReborn
 chown -R usurper:usurper /opt/usurper
 echo "  New binary deployed."

@@ -513,7 +513,7 @@ All multiplayer features activate automatically:
 
 | Feature | Description |
 |---------|-------------|
-| **Shared NPCs** | All NPCs are shared — relationships, marriages, deaths persist across all players |
+| **Shared NPCs** | All NPCs are shared: relationships, marriages and deaths persist across all players |
 | **Shared Economy** | King, treasury, taxes, shops affect everyone |
 | **Chat** | `/say` (broadcast), `/tell <name>` (private), `/who` (online players), `/news` (world events) |
 | **PvP Arena** | Challenge other players to combat (level 5+, max 5 fights/day) |
