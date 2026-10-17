@@ -11,7 +11,7 @@ namespace UsurperReborn.Tests;
 
 /// <summary>
 /// 1.3.4: the version, its release notes in the Changelist form (one line per change, Fixed, Adjusted or Improved,
-/// under three group headings, no Known issues section), the Steam text, the README lines and bullet, and the website roadmap in five
+/// under five group headings, no Known issues section), the Steam text, the README lines and bullet, and the website roadmap in five
 /// languages, with NOW for 1.3.4 first, then Next and Recently shipped. Nothing here touches the network.
 /// </summary>
 public class Bump134Tests
@@ -22,7 +22,7 @@ public class Bump134Tests
     private static readonly Regex DashOrEmoji = new(@"[\u2013\u2014]|[\u2600-\u27BF]|\uFE0F|[\uD83C-\uD83E][\uDC00-\uDFFF]");
     private static readonly Regex ChangeLine = new(@"^\u2022 (Fixed|Adjusted|Improved) [^:\n]+[^.\n]$");
 
-    private static readonly string[] Groups = { "Accounts", "Classes and Old Gods", "Website" };
+    private static readonly string[] Groups = { "Accounts", "Classes and Old Gods", "Website", "Running your own server", "Documentation" };
 
     private static string Repo(string relative) => Bump130Tests.Repo(relative);
 
@@ -51,7 +51,7 @@ public class Bump134Tests
         Regex.Matches(notes, "(?m)^### (.+)$").Select(m => m.Groups[1].Value).Should().Equal(Groups);
         notes.Should().NotContain("Known issues").And.NotContain("Known Issues");
         string[] bullets = Bullets(notes);
-        bullets.Length.Should().Be(16);
+        bullets.Length.Should().Be(26);
         foreach (string b in bullets) ChangeLine.IsMatch(b).Should().BeTrue(b);
         bullets.Distinct().Count().Should().Be(bullets.Length);
         notes.Split('\n').Where(l => l.Length > 0).Skip(2).Should().OnlyContain(l =>
@@ -87,7 +87,7 @@ public class Bump134Tests
         string[] lines = readme.Split('\n');
         int bullet = Array.FindIndex(lines, l => l.StartsWith("- **v1.3.4:**", StringComparison.Ordinal));
         bullet.Should().BeGreaterThan(0);
-        lines[bullet].Should().Be("- **v1.3.4:** 16 changes; the Changelist is in " + NotesPath);
+        lines[bullet].Should().Be("- **v1.3.4:** 26 changes; the Changelist is in " + NotesPath);
         lines[bullet + 1].Should().StartWith("- **v1.3.3:** 15 changes;", "the newest bullet comes first");
     }
 
