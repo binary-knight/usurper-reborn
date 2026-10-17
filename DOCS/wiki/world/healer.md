@@ -1,8 +1,9 @@
 ---
 title: The Healer
 path: /wiki/en/world/healer/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CityControlSystem.cs
+history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.2.5 | The Healer's Electron menu labels and the names of cursed items shown for curse removal are in the player's language.
 ---

@@ -1,8 +1,9 @@
 ---
 title: Potions, herbs and supplies
 path: /wiki/en/items/consumables/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/PotionBonus.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs
+history: 1.3.3 | U spends one healing potion to rescue a Downed ally, and in an Old God fight a rescue starts the potion cooldown.
 history: 1.3.2 | The difficulty's healing multiplier applies to every healing potion you or your party drink, and a Mystic Shaman drinks a mana potion automatically like the other mana classes.
 history: 1.3.0 | A healing potion heals at least 20 percent of the drinker's maximum HP, and a potion given to an ally at least 20 percent of the ally's maximum HP.
 history: 1.2.7 | none

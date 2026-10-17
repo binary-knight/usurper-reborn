@@ -1,8 +1,9 @@
 ---
 title: Mental health
 path: /wiki/en/characters/mental/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Systems/GriefSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs
+history: 1.3.3 | Grief and its Mental loss for a Downed companion or NPC ally come only when a monster finishes it, never when it goes down.
 history: 1.3.2 | Each story companion whose grief reached Acceptance gives you 5 Wisdom, at most 25, and Main Street shows that Wisdom whenever it applies.
 history: 1.3.1 | none
 history: 1.3.0 | none

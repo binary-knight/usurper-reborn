@@ -1,8 +1,9 @@
 ---
 title: Rare dungeon encounters
 path: /wiki/en/world/rare-encounters/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/RareEncounters.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs
+history: 1.3.3 | The Arena Portal champion on floor 25 or deeper has more HP and hits harder, as the floor's other monsters do.
 history: 1.3.2 | none
 history: 1.3.0 | none
 history: 1.2.5 | The Arena Portal champion's name is stored in English and shown in each player's language.
