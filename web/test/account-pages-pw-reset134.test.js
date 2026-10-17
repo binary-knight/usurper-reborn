@@ -272,7 +272,7 @@ test('the server API is under /api/account/ and the pages are the paths the game
   for (const r of ['/api/account/forgot', '/api/account/reset', '/api/account/verify']) assert.ok(src.includes(`'${r}'`), r);
   assert.ok(src.includes("'/account/reset#'") && src.includes("'/account/verify#'"));
   const en = JSON.parse(fs.readFileSync(path.join(ROOT, 'Localization', 'en.json'), 'utf8'));
-  assert.ok(en['auth.forgot_pointer'].includes('https://usurper-reborn.net/account/forgot'));
+  assert.match(en['auth.forgot_pointer'], /\shttps:\/\/usurper-reborn\.net\/account\/forgot$/);
   assert.ok(fs.existsSync(path.join(WEB, 'account', 'forgot', 'index.html')));
 });
 
