@@ -1,8 +1,9 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/ArenaLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DormitoryLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.0 | Fights between players make no hit roll, a dual-wielder's swings each use the weapon in their own hand, S in a duel shows your status without spending the turn, and duels with townspeople share one daily cap of 3 wins and spare the beaten NPC in an honor duel.

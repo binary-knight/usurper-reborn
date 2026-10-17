@@ -1,8 +1,9 @@
 ---
 title: Crafting materials
 path: /wiki/en/items/materials/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/MetaProgressionSystem.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | An alliance with Noctura hands over the Shadow Crown.
 ---

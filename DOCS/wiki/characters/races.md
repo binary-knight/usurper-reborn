@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | A Troll pays 10 percent less for a weapon at the Weapon Shop.
 history: 1.3.1 | none

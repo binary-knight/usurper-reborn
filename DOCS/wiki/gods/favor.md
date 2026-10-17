@@ -1,8 +1,9 @@
 ---
 title: Favor, prayer and sacrifice
 path: /wiki/en/gods/favor/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/FaithSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.4 | none
 history: 1.3.3 | Rescuing a Downed ally counts as healing an ally, a deed Amara likes.
 history: 1.3.2 | A Temple blessing's damage bonus, from daily prayer or a gold sacrifice, applies on your basic swings, and divine wrath cuts your damage and defence by the percent the screen states for the whole fight.
 ---

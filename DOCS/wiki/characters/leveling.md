@@ -1,8 +1,9 @@
 ---
 title: Leveling and training
 path: /wiki/en/characters/leveling/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/LevelMasterLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Core/GameConfig.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Each Attack action against monsters can raise your basic attack proficiency up to Good, and prestige class spells start at Average.
 history: 1.3.1 | none
