@@ -1,8 +1,9 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Systems/TeamHQBonus.cs, Scripts/Server/GroupSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.0 | Hiring an NPC costs less below level 25 and its daily wage follows the same curve, an NPC above your level costs 5 percent more per level up to 50 percent, the town keeps a pool of up to 18 low-level NPCs to hire, the hire list shows the NPCs nearest your level first, and hired NPCs carry the oath-mark.

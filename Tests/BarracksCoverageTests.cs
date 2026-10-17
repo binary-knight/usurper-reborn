@@ -98,7 +98,8 @@ public class BarracksCoverageTests
     {
         var lines = CombatEngineLines();
         var hits = PlayerHpWrites(lines);
-        hits.Count.Should().BeGreaterThan(30, "the scan must find the player-side HP writes, or it proves nothing");
+        // 1.3.4: 25 writes once the twelve named Manwe hits share ApplyManweAbilityDamageToPlayer (36 before)
+        hits.Count.Should().BeGreaterThan(20, "the scan must find the player-side HP writes, or it proves nothing");
 
         var problems = new List<string>();
         foreach (var (line, method, text) in hits)
@@ -120,7 +121,7 @@ public class BarracksCoverageTests
     {
         // A guard on the variable rules: these are the writes most easily lost by a narrower filter.
         var methods = PlayerHpWrites(CombatEngineLines()).Select(h => h.method).ToHashSet();
-        methods.Should().Contain(new[] { "ExecutePvPSingleHit", "ProcessComputerPlayerAction", "MonsterAttacksCompanion", "ProcessBossChannel", "ProcessBossAoE", "ProcessCorruptionTick", "TryManweBossAbility" });
+        methods.Should().Contain(new[] { "ExecutePvPSingleHit", "ProcessComputerPlayerAction", "MonsterAttacksCompanion", "ProcessBossChannel", "ProcessBossAoE", "ProcessCorruptionTick", "ApplyManweAbilityDamageToPlayer" });
     }
 
     [Fact]
@@ -174,13 +175,16 @@ public class BarracksCoverageTests
     [Fact]
     public void ShadowIncarnate_ReducesTheHitBeforeTheHealReadsIt()
     {
+        // 1.3.4: every named Manwe hit goes through ApplyManweAbilityDamageToPlayer, which applies the Barracks last
         string body = MethodBody("Scripts/Systems/CombatEngine.cs", "TryManweBossAbility");
-        Count(body, "TeamHQBonus.ApplyDefense(player,").Should().Be(12, "every named Manwe hit");
+        Count(body, "ApplyManweAbilityDamageToPlayer(monster, player,").Should().Be(12, "every named Manwe hit");
+        Count(body, "TeamHQBonus.ApplyDefense(").Should().Be(0, "the wrapper applies it");
+        Count(MethodBody("Scripts/Systems/CombatEngine.cs", "ApplyManweAbilityDamageToPlayer"), "TeamHQBonus.ApplyDefense(player, actualDamage)").Should().Be(1);
         int shadow = body.IndexOf("\"Shadow Incarnate\"", StringComparison.Ordinal);
-        int barracks = body.IndexOf("TeamHQBonus.ApplyDefense", shadow, StringComparison.Ordinal);
-        int heal = body.IndexOf("long healAmt = damage", shadow, StringComparison.Ordinal);
-        barracks.Should().BeGreaterThan(shadow);
-        heal.Should().BeGreaterThan(barracks);
+        int hit = body.IndexOf("damage = ApplyManweAbilityDamageToPlayer", shadow, StringComparison.Ordinal);
+        int heal = body.IndexOf("healAmt = damage * 30 / 100", shadow, StringComparison.Ordinal);
+        hit.Should().BeGreaterThan(shadow);
+        heal.Should().BeGreaterThan(hit, "the heal reads the damage the wrapper dealt");
     }
 
     [Theory]

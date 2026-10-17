@@ -1,8 +1,9 @@
+<!-- doc: checked 1.3.4; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.3.3 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.3.4 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
 130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
@@ -74,7 +75,7 @@ You wake with no memory. A letter in your own handwriting warns you: *"The gods 
 - Challenge the throne, recruit guards, manage treasury, navigate court factions, set tax rates and city-control turf.
 - 3 joinable factions: The Crown, The Shadows, The Faith.
 - PvP arena with daily limits, gold theft, and leaderboards.
-- Guild system with 8 chat commands, guild bank, member XP bonus, invite flow.
+- Guild system with 13 chat commands, guild bank, member XP bonus, invite flow.
 - Knighthood with combat buffs and Sir/Dame title prefix.
 
 ### Locations
@@ -85,7 +86,7 @@ Opt-in JSON mods drop into a `GameData/` folder next to the executable: NPCs, mo
 
 ### Accessibility
 - **Screen reader mode:** auto-detected on Windows for the standard console launch (NVDA / JAWS / Narrator), or pass `--screen-reader` explicitly. Strips box-drawing, decorative Unicode, color-bracketed menus; all locations have plain-text paths.
-- **Compact mode:** smaller terminals (mobile SSH, narrow windows). Toggle with `[Z]` from any menu or `/compact`.
+- **Compact mode:** smaller terminals (mobile SSH, narrow windows). Toggle with `[Z]` on the main menu or `/compact` anywhere.
 - **Steam launcher:** `Play.bat` is the default; `Play-Accessible.bat` opts into screen-reader mode at launch.
 - **5 languages:** English, Spanish, French, Hungarian, Italian. Swap via in-game preferences. Per-character language preference saved.
 
@@ -195,12 +196,12 @@ usurper-reborn/
 │   ├── AI/             # NPC AI (Brain, Memory, Goals, Emotions, Personality)
 │   ├── Data/           # NPCs, Equipment, Monsters, Old Gods, FounderStatueData
 │   └── UI/             # Terminal emulator, ANSI art, accessibility detection
-├── Console/            # Bootstrap (Program.cs)
+├── Console/            # Bootstrap (Bootstrap/Program.cs), console engine and terminal
 ├── Localization/       # en.json, es.json, fr.json, hu.json, it.json
 ├── electron-client/    # Optional Electron graphical client (beta)
 ├── web/                # Website (index.html, ssh-proxy.js, admin.html, language packs)
 ├── DOCS/               # Documentation, release notes, BBS setup, server deployment, modding
-├── docker/             # Docker compose stack
+├── docker/             # Docker images for the web proxy and nginx (docker-compose.yml is at the root)
 └── .github/            # CI/CD workflows
 ```
 
@@ -219,14 +220,14 @@ usurper-reborn/
 Total monsters killed, gold earned, time played, peak gold, deepest dungeon floor, quests completed, world boss kills, MVP count, achievements unlocked, and dozens of combat / economy / social counters.
 
 ### Difficulty Modes
-- **Easy:** 150% XP, 50% monster damage, 150% gold
+- **Easy:** 150% XP, 75% monster damage, 150% gold
 - **Normal:** Standard balanced experience
-- **Hard:** 75% XP, 150% monster damage, 75% gold
-- **Nightmare:** 50% XP, 200% monster damage, 50% gold
+- **Hard:** 75% XP, 125% monster damage, 75% gold
+- **Nightmare:** 50% XP, 150% monster damage, 50% gold, permadeath
 
 ### Family System
 - Marriage via the Church, multi-spouse polyamory supported.
-- Children inherit traits from both parents, age over real time (1 week real = 1 year in-game).
+- Children inherit traits from both parents, age over real time (about 9.6 real hours per year, so about 7 real days to come of age).
 - Per-child stat bonuses (HP, Strength, Charisma, daily gold).
 - Coming-of-age at 18 turns children into adult NPCs that join the world.
 - Custody, divorce, infidelity, and child rearing all carry mechanical weight.
@@ -327,6 +328,7 @@ The game ships small patches frequently. Each version has a dedicated release no
 - **v1.1.1:** a bug pass. Five review agents each took a domain of the codebase and about seventy findings were verified and fixed: NPCs losing their innate power on load, the world simulator editing the wrong player's relationships, a restored character unable to save, one player's autosave starving everyone else's, the Black Market re-rolling on relog, a closed connection spinning the server, bank and gambling exploits, buffs consumed a fight early, and raw placeholders in the text. See `DOCS/release-notes/RELEASE_NOTES_1.1.1.md`.
 - **v1.1.2:** seven of the eight open design items, each designed twice (Codex and Claude), reconciled against the code, and reviewed before implementation: grouped followers get their own cooldowns and a real death; haggling finally has a way in and its attempts persist; the bank vault is one persisted reserve per world, atomic online; relationships cool with neglect measured in days you were present; NPCs left to die while you held a heal remember it; ability and spell numbers are moddable from `GameData/`; the two intimacy lines that really dropped a name are fixed. Docker stack refreshed and verified. See `DOCS/release-notes/RELEASE_NOTES_1.1.2.md`.
 - **v1.1.3:** party survivability. Wounded allies shield up, brace (half damage on ordinary hits, specials, and life drain), and drink their own potion first; NPC allies who die in your party roll the 2 percent team permadeath rate they were always meant to; three stances per ally (Aggressive, Balanced, Cautious) set from the dungeon party menu or the Inn and saved with the character; monsters no longer prefer a wounded target and an ally's brace no longer pulls hits unless it is Aggressive; a shared potion belt (off by default, two loans per fight, never the player's last three), give-a-number, and the one-personal-potion rule; a fight summary per ally, a warning before a voluntary fight with an ally below 30 percent, and a floor guard that offers Cautious to an ally eleven levels behind. Planned by a council of Codex, a Claude design agent, and the supervisor session in `DOCS/PARTY_SURVIVABILITY_PLAN.md`; the downed state is the next release.
+- **v1.3.4:** 27 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.4.md
 - **v1.3.3:** 15 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.3.md
 - **v1.3.2:** 72 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.2.md
 - **v1.3.1:** Loading: a current character could be handled as a save from before base stats existed, which replaced the character's base stats with its saved totals and equipped an item. A save that carries base stats is now always loaded as it was saved. No existing character is changed. See `DOCS/release-notes/RELEASE_NOTES_1.3.1.md`.
@@ -394,7 +396,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 - **Daniel Zingaro:** Tremendous help with the Pascal source.
 - **Coosh:** Community code contributor. Diagnosed an XP-formula desync from his own soft-locked Lv.73 character, traced it to 12 duplicated copies of the same function across the codebase, and submitted PR #98 centralizing them into one canonical implementation.
 - **Xykier, DJLunacy, evanofficial, maxsond, LowLevelJavaCoder:** Community PRs covering combat loot party switching, smart sell filters, companion auto-equip, screen-reader preference persistence, shield loot generation, and the murder-mechanics rework.
-- **The 11 alpha-era founders** commemorated in the Hall of the Ascended (in-game, `/founders`).
+- **The 12 alpha-era founders** commemorated in the Hall of the Ascended (in-game, `/founders`).
 - **The BBS Community:** For keeping the spirit alive.
 - **All players, testers, and bug reporters** who made beta possible.
 
@@ -402,7 +404,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.3.3)
+## Known Issues (v1.3.4)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -416,4 +418,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** v1.3.3 "Reckoning". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.3.4 "Reckoning". The world is running. [Watch it live.](https://usurper-reborn.net)

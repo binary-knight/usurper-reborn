@@ -1,8 +1,9 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.0 | While a betrayal can be settled the Faith room lists B: forgive a betrayer, take revenge on the Stranger once if she escaped her fight, or make one act of atonement a day for a companion who left you, at 100 gold per level and at least 100.

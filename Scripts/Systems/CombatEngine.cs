@@ -5155,6 +5155,14 @@ public partial class CombatEngine
                 monster.ThornsPercent = 0;
         }
 
+        // 1.3.4: Probability Shift counts down here too, once a round and before a hold can skip the turn.
+        // A round that starts with rounds left is a shifted round for every attack the monster makes in it.
+        if (firstActionThisRound)
+        {
+            monster.ProbabilityShiftActive = monster.ProbabilityShiftRounds > 0;
+            if (monster.ProbabilityShiftRounds > 0) monster.ProbabilityShiftRounds--;
+        }
+
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
         // based on the IsBurning flag -- so casting Roast (fire) on a poisoned
@@ -5608,6 +5616,11 @@ public partial class CombatEngine
             terminal.SetColor(ColorRole.Derived);
             UIHelper.WriteRow(terminal, Loc.Get("combat.monster_roll", MonsterNames.Display(monster), monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC));
         }
+
+        // 1.3.4: Probability Shift. A natural 20 is a plain hit, not a critical, and a roll that hit
+        // misses ProbabilityShiftMissPercent of the time.
+        if (monster.ProbabilityShiftActive && await ProbabilityShiftMisses(monster, player, monsterRoll, result))
+            return;
 
         // Blur / duplicate miss chance (20%) - additional miss chance on top of D20
         if (player.HasStatus(StatusEffect.Blur) && monsterRoll.Success)
@@ -6283,6 +6296,34 @@ public partial class CombatEngine
                 lang => GroupLine(lang, "\u001b[33m", "combat.companion_afflicted", name, Loc.GetIn(lang, "status.poisoned")),
                 inDungeonOnly: true);
         }
+    }
+
+    /// <summary>1.3.4: the points of miss chance Probability Shift adds to each attack of the monster it is on.</summary>
+    internal const int ProbabilityShiftMissPercent = 30;
+
+    /// <summary>
+    /// 1.3.4: Probability Shift on a monster's attack roll against the player, after the roll. A natural 20 is
+    /// a plain hit (it still hits, without the critical); then a roll that hit misses ProbabilityShiftMissPercent
+    /// of the time. True when the attack missed through it; the miss line is written.
+    /// </summary>
+    private async Task<bool> ProbabilityShiftMisses(Monster monster, Character player, RollResult roll, CombatResult result)
+    {
+        if (roll.IsCriticalSuccess)
+        {
+            roll.Success = true;
+            roll.IsCriticalSuccess = false;
+        }
+        if (!roll.Success || random.Next(100) >= ProbabilityShiftMissPercent) return false;
+        WriteProbabilityShiftMiss(monster, player, result);
+        await Pacing.Wait(GetCombatDelay(800));
+        return true;
+    }
+
+    /// <summary>1.3.4: the one line of an attack that missed through Probability Shift.</summary>
+    private void WriteProbabilityShiftMiss(Monster monster, Character target, CombatResult result)
+    {
+        UIHelper.WriteRow(terminal, Loc.Get("combat.probability_shift_miss", MonsterNames.Display(monster)), "cyan");
+        result.CombatLog.Add($"{monster.Name} misses {target.DisplayName} (Probability Shift)");
     }
 
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
@@ -7084,12 +7125,77 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// 1.3.4: the damage of Manwe's named abilities, through the protections every other damage source honours, in
+    /// the order ApplyBossAbilityDamageToPlayer uses: difficulty, Shield Wall Formation, the cap, flee grace, the
+    /// Team HQ defence last, then Divine Mandate's reflect and Death's Embrace. Two written exceptions: no Old God
+    /// solo adjustment (Manwe's own abilities skip it), and the cap is always 85% of max HP, never the first rounds
+    /// cap. The caller checks Invulnerable and prints the ability's own lines and its damage line with the returned
+    /// amount; this prints only the protections' own lines. Returns the damage dealt.
+    /// </summary>
+    private long ApplyManweAbilityDamageToPlayer(Monster monster, Character player, long rawDamage, string abilityName, CombatResult result)
+    {
+        long actualDamage = Math.Max(1, rawDamage);
+
+        actualDamage = DifficultySystem.ApplyMonsterDamageMultiplier(actualDamage);
+
+        // Shield Wall Formation: % incoming damage reduction
+        if (player.TempDamageReductionPercent > 0 && player.TempDamageReductionDuration > 0 && actualDamage > 1)
+        {
+            long reduced = (long)(actualDamage * (player.TempDamageReductionPercent / 100.0));
+            if (reduced > 0)
+            {
+                actualDamage = Math.Max(1, actualDamage - reduced);
+                terminal.WriteLine(Loc.Get("combat.shield_wall_formation_absorbs", reduced), "bright_cyan");
+            }
+        }
+
+        long maxDmg = Math.Max(1, (long)(player.MaxHP * 0.85));
+        if (actualDamage > maxDmg) actualDamage = maxDmg;
+
+        actualDamage = ApplyFleeGrace(player, actualDamage);
+        actualDamage = TeamHQBonus.ApplyDefense(player, actualDamage); // v1.1.11: Team HQ Barracks, last
+
+        player.HP = Math.Max(0, player.HP - actualDamage);
+        EvHurt(player, actualDamage, CombatEventKind.Ability);   // 1.2.6
+
+        // Divine Mandate thorn reflect
+        if (player.TempThornReflectPercent > 0 && player.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
+        {
+            long reflect = (long)(actualDamage * (player.TempThornReflectPercent / 100.0));
+            if (reflect > 0)
+            {
+                monster.HP = Math.Max(0, monster.HP - reflect); // hq-armory: out (thorn reflect)
+                EvHit(player, reflect, CombatEventKind.Basic);   // 1.2.6
+                UIHelper.WriteRow(terminal, Loc.Get("combat.divine_mandate_reflect", MonsterNames.Display(monster), reflect), "bright_magenta");
+                if (monster.HP <= 0 && !result.DefeatedMonsters.Contains(monster))
+                    result.DefeatedMonsters.Add(monster);
+            }
+        }
+
+        ApplyManweDeathsEmbrace(player);
+        return actualDamage;
+    }
+
+    /// <summary>1.3.4: Voidreaver Death's Embrace in Manwe's fight: revive at 15% of max HP when HP reaches 0.</summary>
+    private void ApplyManweDeathsEmbrace(Character player)
+    {
+        if (player.HP <= 0 && player.DeathsEmbraceActive)
+        {
+            player.HP = Math.Max(1, (long)(player.MaxHP * 0.15));
+            player.DeathsEmbraceActive = false;
+            player.DodgeNextAttack = true;
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("combat.deaths_embrace_trigger"));
+            terminal.WriteLine(Loc.Get("combat.deaths_embrace_revived", player.HP), "dark_red");
+        }
+    }
+
+    /// <summary>
     /// Manwe-specific boss ability handler with fully custom mechanics.
     /// </summary>
     private async Task<bool> TryManweBossAbility(Monster monster, Character player, string abilityName, CombatResult result, List<Monster>? monsterList)
     {
         long baseDamage = monster.GetAttackPower();
-        long maxDmg = Math.Max(1, (long)(player.MaxHP * 0.85));
 
         switch (abilityName)
         {
@@ -7107,16 +7213,15 @@ public partial class CombatEngine
 
             case "Unmake":
             {
-                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                long damage = 0;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_unmake_shield")}", "bright_white");
                 }
                 else
                 {
-                    player.HP -= damage;
-                    EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_unmake_hit")}", "bright_red");
+                    damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 2.5) - player.Defence), "Unmake", result);
                     terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                 }
                 result.CombatLog.Add($"Manwe uses Unmake for {damage} damage");
@@ -7138,17 +7243,16 @@ public partial class CombatEngine
                 {
                     flavor = $"  {Loc.Get("combat.manwe_judgment_normal")}";
                 }
-                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * mult) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                long damage = 0;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_judgment_block")}", "bright_white");
                 }
                 else
                 {
-                    player.HP -= damage;
-                    EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_judgment_cast")}", "bright_yellow");
                     terminal.WriteLine(flavor, "red");
+                    damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * mult) - player.Defence), "Divine Judgment", result);
                     terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                 }
                 result.CombatLog.Add($"Manwe uses Divine Judgment for {damage} damage");
@@ -7195,12 +7299,11 @@ public partial class CombatEngine
                 else if (effect == 1)
                 {
                     // 1.5x damage
-                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                    long damage = 0;
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
-                        player.HP -= damage;
-                        EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_pain_inverts")}", "bright_magenta");
+                        damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence), "Reality Warp", result);
                         terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                     }
                     result.CombatLog.Add($"Reality Warp deals {damage} damage");
@@ -7224,12 +7327,11 @@ public partial class CombatEngine
                     }
                     else
                     {
-                        long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                        long damage = 0;
                         if (!player.HasStatus(StatusEffect.Invulnerable))
                         {
-                            player.HP -= damage;
-                            EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                             terminal.WriteLine($"  {Loc.Get("combat.manwe_convulse")}", "bright_magenta");
+                            damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 1.5) - player.Defence), "Reality Warp", result);
                             terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                         }
                     }
@@ -7272,12 +7374,11 @@ public partial class CombatEngine
                 else
                 {
                     // Already split — do a heavy damage attack instead
-                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                    long damage = 0;
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
-                        player.HP -= damage;
-                        EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_dual_strike")}", "bright_magenta");
+                        damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence), "Split Form", result);
                         terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                     }
                     result.CombatLog.Add($"Manwe dual-strikes for {damage} damage");
@@ -7287,17 +7388,16 @@ public partial class CombatEngine
 
             case "Light Incarnate":
             {
-                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                long damage = 0;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_light_block")}", "bright_white");
                 }
                 else
                 {
-                    player.HP -= damage;
-                    EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_light1")}", "bright_white");
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_light2")}", "bright_yellow");
+                    damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence), "Light Incarnate", result);
                     terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                 }
                 result.CombatLog.Add($"Manwe uses Light Incarnate for {damage} damage");
@@ -7306,18 +7406,22 @@ public partial class CombatEngine
 
             case "Shadow Incarnate":
             {
-                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
-                long healAmt = damage * 30 / 100;
+                long damage = 0;
+                long healAmt = 0;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_darkness_block")}", "bright_white");
                 }
                 else
                 {
-                    player.HP -= damage;
-                    EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
-                    monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_darkness1")}", "dark_magenta");
+                    damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 2.0) - player.Defence), "Shadow Incarnate", result);
+                    // 1.3.4: the heal is 30% of the damage actually dealt; a Manwe killed by Divine Mandate's reflect stays dead
+                    if (monster.HP > 0)
+                    {
+                        healAmt = damage * 30 / 100;
+                        monster.HP = Math.Min(monster.MaxHP, monster.HP + healAmt);
+                    }
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_darkness_damage", damage, healAmt)}", "red");
                 }
                 result.CombatLog.Add($"Manwe uses Shadow Incarnate: {damage} damage, heals {healAmt}");
@@ -7343,13 +7447,12 @@ public partial class CombatEngine
                 else
                 {
                     // The question IS the attack
-                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                    long damage = 0;
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
-                        player.HP -= damage;
-                        EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_creation_question")}", "bright_yellow");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_tears_soul")}", "bright_red");
+                        damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence), "The Question", result);
                         terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                     }
                     result.CombatLog.Add($"Manwe uses The Question as attack for {damage} damage");
@@ -7361,17 +7464,16 @@ public partial class CombatEngine
 
             case "Final Word":
             {
-                long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                long damage = 0;
                 if (player.HasStatus(StatusEffect.Invulnerable))
                 {
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_final_word_block")}", "bright_white");
                 }
                 else
                 {
-                    player.HP -= damage;
-                    EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_final_word1")}", "bright_white");
                     terminal.WriteLine($"  {Loc.Get("combat.manwe_final_word2")}", "bright_yellow");
+                    damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence), "Final Word", result);
                     terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "bright_red");
                 }
                 result.CombatLog.Add($"Manwe uses Final Word for {damage} damage");
@@ -7386,13 +7488,12 @@ public partial class CombatEngine
                     // Check for Worldstone protection
                     if (ArtifactSystem.Instance.HasArtifact(ArtifactType.Worldstone))
                     {
-                        long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                        long damage = 0;
                         if (!player.HasStatus(StatusEffect.Invulnerable))
                         {
-                            player.HP -= damage;
-                            EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                             terminal.WriteLine($"  {Loc.Get("combat.manwe_unmake_entirely")}", "bright_red");
                             terminal.WriteLine($"  {Loc.Get("combat.manwe_worldstone_holds")}", "bright_cyan");
+                            damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 3.0) - player.Defence), "Creation's End", result);
                             terminal.WriteLine($"  {Loc.Get("combat.manwe_worldstone_damage", damage)}", "yellow");
                         }
                         result.CombatLog.Add($"Creation's End blocked by Worldstone ({damage} damage)");
@@ -7406,19 +7507,20 @@ public partial class CombatEngine
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_touch_forehead")}", "bright_white");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_take_back")}", "bright_yellow");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_cease_exist")}", "dark_red");
+                        // 1.3.4: Death's Embrace revives "if HP reaches 0", so the kill goes through its check (not damage: no difficulty or cap)
+                        ApplyManweDeathsEmbrace(player);
                         result.CombatLog.Add("Creation's End -- instant kill (no Worldstone)");
                     }
                 }
                 else
                 {
                     // Player HP too high for instant kill — heavy damage instead
-                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                    long damage = 0;
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
-                        player.HP -= damage;
-                        EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_word_ending")}", "bright_red");
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_resist_annihilation")}", "yellow");
+                        damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 3.5) - player.Defence), "Creation's End", result);
                         terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "red");
                     }
                     result.CombatLog.Add($"Creation's End deals {damage} damage (HP too high for instant kill)");
@@ -7467,12 +7569,11 @@ public partial class CombatEngine
                 else
                 {
                     // Already offered — use Final Word instead
-                    long damage = TeamHQBonus.ApplyDefense(player, Math.Min(maxDmg, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence))); // v1.1.11: Team HQ Barracks, last
+                    long damage = 0;
                     if (!player.HasStatus(StatusEffect.Invulnerable))
                     {
-                        player.HP -= damage;
-                        EvHurt(player, damage, CombatEventKind.Ability);   // 1.2.6
                         terminal.WriteLine($"  {Loc.Get("combat.manwe_no_second")}", "bright_yellow");
+                        damage = ApplyManweAbilityDamageToPlayer(monster, player, Math.Max(1, (long)(baseDamage * 4.0) - player.Defence), "The Offer", result);
                         terminal.WriteLine($"  {Loc.Get("combat.you_take_damage", damage)}", "bright_red");
                     }
                     result.CombatLog.Add($"Manwe attacks (Offer already made) for {damage} damage");
@@ -13574,6 +13675,7 @@ public partial class CombatEngine
         if (monster.IsSlowed || monster.SlowDuration > 0) statuses.Add($"SLOW({Math.Max(1, monster.SlowDuration)})");
         if (monster.IsMarked || monster.MarkedDuration > 0) statuses.Add($"MARK({Math.Max(1, monster.MarkedDuration)})");
         if (monster.IsCorroded || monster.CorrodedDuration > 0) statuses.Add($"COR({Math.Max(1, monster.CorrodedDuration)})");
+        if (monster.ProbabilityShiftRounds > 0) statuses.Add($"PSH({monster.ProbabilityShiftRounds})");   // 1.3.4
         if (!string.IsNullOrEmpty(monster.TauntedBy) && monster.TauntRoundsLeft > 0) statuses.Add($"TNT({monster.TauntRoundsLeft})");
 
         if (monster.IsBoss) statuses.Add("[BOSS]");
@@ -13945,6 +14047,9 @@ public partial class CombatEngine
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
         bool evasionChecked = _evasionCheckedByHitRoll;
         _evasionCheckedByHitRoll = false;
+        // 1.3.4: set only by ApplySpellDamageIgnoringArmor, for this one call
+        int armorIgnoredPercent = _armorIgnoredPercent;
+        _armorIgnoredPercent = 0;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -13993,6 +14098,9 @@ public partial class CombatEngine
                 effectiveArmor = Math.Max(0, effectiveArmor - effectiveArmor * armorPiercePct / 100);
             }
         }
+        // 1.3.4: a spell that ignores part of the defence (Echo of Tomorrow, 50) takes that share off what is left
+        if (armorIgnoredPercent > 0)
+            effectiveArmor -= effectiveArmor * armorIgnoredPercent / 100;
         long actualDamage = Math.Max(1, damage - effectiveArmor);
 
         // Show defense calculation when armor reduces damage
@@ -14165,6 +14273,20 @@ public partial class CombatEngine
         _evasionCheckedByHitRoll = evasionChecked;
         try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage); }
         finally { _evasionCheckedByHitRoll = false; }
+    }
+
+    // 1.3.4: the share of the target's armor that the one ApplySingleMonsterDamage call made by
+    // ApplySpellDamageIgnoringArmor leaves out, in percent; 0 for every other call.
+    private int _armorIgnoredPercent;
+
+    /// <summary>1.3.4: ApplySingleMonsterDamage for a spell that ignores a share of the target's armor. Echo of
+    /// Tomorrow ignores 50 percent: the hit is damage - (armor - armor / 2), at least 1, with every other step of
+    /// the hit as before.</summary>
+    private async Task<bool> ApplySpellDamageIgnoringArmor(Monster target, long damage, CombatResult result, string damageSource, Character? attacker, int armorIgnoredPercent)
+    {
+        _armorIgnoredPercent = armorIgnoredPercent;
+        try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage: true); }
+        finally { _armorIgnoredPercent = 0; }
     }
 
     /// <summary>The monster's evasion buff (Incorporeal, Phase and the like): one draw while the buff is up,
@@ -16023,7 +16145,8 @@ public partial class CombatEngine
                 // flavor message are applied to the same damage event the standard combat line reports.
                 bool waveEchoDebuffed = target.Poisoned || target.Stunned || target.Charmed || target.Distracted
                     || target.WeakenRounds > 0 || target.IsSlowed || target.IsMarked
-                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen;
+                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen
+                    || target.ProbabilityShiftRounds > 0;   // 1.3.4: still a debuffed target
                 if (waveEchoDebuffed)
                 {
                     actualDamage *= 2;
@@ -18937,7 +19060,10 @@ public partial class CombatEngine
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
                     damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
-                    await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
+                    if (spellResult.SpecialEffect == "ignore_half_defense")
+                        await ApplySpellDamageIgnoringArmor(target, damage, result, spellInfo.Name, player, 50);   // 1.3.4: Echo of Tomorrow
+                    else
+                        await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
                 }
 
                 // Apply self-healing from attack spells (e.g. Prison Siphon, Devour Essence)
@@ -19165,31 +19291,18 @@ public partial class CombatEngine
                 break;
 
             case "probability_shift":
-                // Cyclebreaker: confuse (may skip/hit self) + slow (reduced power) for 3 rounds
-                target.IsConfused = true;
-                target.ConfusedDuration = Math.Max(target.ConfusedDuration, 3);
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, 3);
+                // 1.3.4 Cyclebreaker: as the spell's text says, for 3 rounds the target's attacks never crit and
+                // miss 30 points more often (ProbabilityShiftMisses). It used to confuse and slow the target,
+                // which cost it about four in five of its actions. Bosses and Old Gods take it the same way.
+                target.ProbabilityShiftRounds = Math.Max(target.ProbabilityShiftRounds, duration > 0 ? duration : 3);
+                target.ProbabilityShiftActive = true;
                 UIHelper.WriteRow(terminal, Loc.Get("combat.probability_shift", MonsterNames.Display(target)), "cyan");
                 break;
 
             case "ignore_half_defense":
-                // Cyclebreaker Echo of Tomorrow: deal bonus damage equal to 50% of target's armor
-                if (target.IsAlive && target.ArmPow > 0)
-                {
-                    long halfDefBonus = Math.Max(1, target.ArmPow / 2);
-                    halfDefBonus = TeamHQBonus.ApplyAttack(player, halfDefBonus); // v1.1.11: Team HQ Armory, last.
-                    target.HP -= halfDefBonus;
-                    EvHit(player, halfDefBonus, CombatEventKind.Spell);   // 1.2.6
-                    terminal.SetColor("cyan");
-                    UIHelper.WriteRow(terminal, Loc.Get("combat.future_echo", MonsterNames.Display(target), halfDefBonus));
-                    if (target.HP <= 0)
-                    {
-                        target.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(target))
-                            result.DefeatedMonsters.Add(target);
-                    }
-                }
+                // 1.3.4 Cyclebreaker Echo of Tomorrow: the half of the armor it ignores is taken off in the hit itself
+                // (ApplySpellDamageIgnoringArmor), so nothing is added here. It used to add half the target's armor as
+                // flat damage after the full armor came off, which dealt about half the armor whatever the roll.
                 break;
 
             case "angel":
@@ -21958,6 +22071,15 @@ public partial class CombatEngine
         {
             terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
             result.CombatLog.Add($"{monster.Name} misses {companion.DisplayName} due to blur");
+            await Pacing.Wait(GetCombatDelay(500));
+            return;
+        }
+
+        // 1.3.4: Probability Shift makes the monster miss a teammate as often as it adds misses against the
+        // player. This attack has no hit roll and no critical, so the miss is its whole effect here.
+        if (monster.ProbabilityShiftActive && random.Next(100) < ProbabilityShiftMissPercent)
+        {
+            WriteProbabilityShiftMiss(monster, companion, result);
             await Pacing.Wait(GetCombatDelay(500));
             return;
         }

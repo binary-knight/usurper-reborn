@@ -241,7 +241,7 @@ namespace UsurperRemake.Systems
                     password = (await terminal.GetMaskedInput()).Trim();
                     if (string.IsNullOrEmpty(password)) continue;
 
-                    if (password.Length < 4)
+                    if (password.Length < GameConfig.MinPasswordLength)
                     {
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("online.password_length"));

@@ -1,8 +1,9 @@
 ---
 title: Ways to play
 path: /wiki/en/getting-started/connections/
-checked: 1.3.3
+checked: 1.3.4
 sources: README.md, DOCS/BBS_DOOR_SETUP.md, DOCS/SERVER_DEPLOYMENT.md
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.1 | none

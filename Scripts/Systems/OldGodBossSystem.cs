@@ -32,6 +32,12 @@ namespace UsurperRemake.Systems
         // Prevents concurrent boss encounters from corrupting shared state in MUD mode
         private readonly SemaphoreSlim _bossEncounterLock = new(1, 1);
 
+        // 1.3.4: test seams on RunBossCombat, inert in a normal run (both stay null outside the tests).
+        // The first runs after the dialogue has set the modifiers; the second sees the god and its
+        // context as the fight is about to receive them. The build tests record and check through them.
+        internal static Action<OldGodBossSystem>? DialogueSeamForTests { get; set; }
+        internal static Action<Monster, BossCombatContext>? FightSeamForTests { get; set; }
+
         /// <summary>
         /// Combat modifiers applied based on dialogue choices before boss fight
         /// </summary>
@@ -74,6 +80,25 @@ namespace UsurperRemake.Systems
                 ApproachType = "neutral";
                 SpecialEffect = null;
             }
+
+            /// <summary>1.3.4: these modifiers as a value, for BuildBossFight.</summary>
+            public BossDialogue ToDialogue() => new BossDialogue
+            {
+                DamageMultiplier = DamageMultiplier,
+                DefenseMultiplier = DefenseMultiplier,
+                BonusDamage = BonusDamage,
+                BonusDefense = BonusDefense,
+                CriticalChance = CriticalChance,
+                CriticalMultiplier = CriticalMultiplier,
+                HasRageBoost = HasRageBoost,
+                HasInsight = HasInsight,
+                BossDamageMultiplier = BossDamageMultiplier,
+                BossDefenseMultiplier = BossDefenseMultiplier,
+                BossConfused = BossConfused,
+                BossWeakened = BossWeakened,
+                ApproachType = ApproachType,
+                SpecialEffect = SpecialEffect,
+            };
         }
 
         /// <summary>
@@ -155,7 +180,7 @@ namespace UsurperRemake.Systems
         /// Get the artifact required to save a specific god via the save quest chain.
         /// Returns null for gods that don't have a save-quest artifact.
         /// </summary>
-        private ArtifactType? GetArtifactForSave(OldGodType type)
+        private static ArtifactType? GetArtifactForSave(OldGodType type)
         {
             return type switch
             {
@@ -808,50 +833,25 @@ namespace UsurperRemake.Systems
         {
             // Apply combat modifiers based on dialogue choices
             ApplyDialogueModifiers(boss.Type, terminal);
+            DialogueSeamForTests?.Invoke(this);
             terminal.WriteLine("");
             await Pacing.Wait(1500);
 
-            // Create a Monster from boss data
-            var bossMonster = CreateBossMonster(boss);
+            // the fight recalculates the player's stats as it starts (dropping, say, a shrine's blessing);
+            // the build converts the flat answers against those stats, so recalculate first
+            player.RecalculateStats();
 
-            // Apply dialogue-based stat adjustments to the monster
-            ApplyModifiersToMonster(bossMonster, player);
+            // 1.3.4: the god and its context come from BuildBossFight, the one build the balance
+            // simulator calls too; the artifact count and the dialogue's modifiers are passed in
+            var fight = BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player);
+            var bossMonster = fight.Monster;
             if (AnnounceFightHP(bossMonster, boss, terminal))
                 await Pacing.Wait(1500);   // the fight clears the screen as it starts
 
-            // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
-            // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied here, before the
-            // fight, the reset wiped every one of them, so no answer ever changed the player's side.
-
-            // Set up boss context on combat engine
             var combatEngine = new CombatEngine(terminal);
-            combatEngine.BossContext = new BossCombatContext
-            {
-                BossData = boss,
-                GodType = boss.Type,
-                AttacksPerRound = boss.AttacksPerRound,
-                CanSave = boss.CanBeSaved && (GetArtifactForSave(boss.Type) == null || ArtifactSystem.Instance.HasArtifact(GetArtifactForSave(boss.Type)!.Value)),
-                DamageMultiplier = activeCombatModifiers.DamageMultiplier,
-                DefenseMultiplier = activeCombatModifiers.DefenseMultiplier,
-                BonusDamage = activeCombatModifiers.BonusDamage,
-                BonusDefense = activeCombatModifiers.BonusDefense,
-                CriticalChance = activeCombatModifiers.CriticalChance,
-                HasRageBoost = activeCombatModifiers.HasRageBoost,
-                HasInsight = activeCombatModifiers.HasInsight,
-                BossDamageMultiplier = activeCombatModifiers.BossDamageMultiplier,
-                BossDefenseMultiplier = activeCombatModifiers.BossDefenseMultiplier,
-                BossConfused = activeCombatModifiers.BossConfused,
-                BossWeakened = activeCombatModifiers.BossWeakened,
-                ApplyPlayerModifiers = ApplyModifiersToPlayer,
-            };
-
-            // Configure boss-specific party balance mechanics (v0.52.1)
-            ConfigureBossPartyMechanics(combatEngine.BossContext, boss.Type);
-
-            ApplyDialogueToFixedBossDamage(combatEngine.BossContext, player);
-
-            // Set divine armor reduction on the combat context so CombatEngine applies it
-            combatEngine.BossContext.DivineArmorReduction = GetDivineArmorReduction(boss.Type, player);
+            combatEngine.BossContext = fight.Context;
+            // the one input the build leaves to the caller: whether the god's save artifact is held
+            combatEngine.BossContext.CanSave = boss.CanBeSaved && (GetArtifactForSave(boss.Type) == null || ArtifactSystem.Instance.HasArtifact(GetArtifactForSave(boss.Type)!.Value));
 
             // Set session-scoped flag for Manwe battle
             CombatEngine.IsManweBattle = boss.Type == OldGodType.Manwe;
@@ -861,6 +861,8 @@ namespace UsurperRemake.Systems
             bool wasSaved;
             try
             {
+                FightSeamForTests?.Invoke(bossMonster, combatEngine.BossContext);
+
                 // Run combat through the standard engine
                 combatResult = await combatEngine.PlayerVsMonsters(
                     player, new List<Monster> { bossMonster }, dungeonTeammates);
@@ -890,26 +892,29 @@ namespace UsurperRemake.Systems
         /// base difficulty scale. The intro screen showed the data HP alone, 55,000 for Maelketh
         /// against the 123,750 of the fight (player report of a god far harder than expected).
         /// </summary>
-        internal static long FightHP(OldGodBossData boss)
+        internal static long FightHP(OldGodBossData boss) => FightHP(boss, ArtifactSystem.Instance.GetCollectedCount());
+
+        /// <summary>1.3.4: FightHP at a given artifact count (BuildBossFight passes its own).</summary>
+        internal static long FightHP(OldGodBossData boss, int artifactCount)
         {
-            int artifactCount = ArtifactSystem.Instance.GetCollectedCount();
             float hpScale = 1.0f + Math.Min(0.40f, artifactCount * GameConfig.OldGodDivineScalingHPPerArtifact);
             return (long)(boss.HP * hpScale * GameConfig.BaseMonsterDifficultyScale);
         }
 
-        private Monster CreateBossMonster(OldGodBossData boss)
+        private Monster CreateBossMonster(OldGodBossData boss) => BuildBossMonster(boss, ArtifactSystem.Instance.GetCollectedCount());
+
+        private static Monster BuildBossMonster(OldGodBossData boss, int artifactCount)
         {
             // v0.56.1 Divine Scaling: remaining Old Gods scale up with every artifact the
             // player has collected. Prevents trivialization once geared — feedback explicitly
             // said Veloura onward became easy with a tank+healer plus artifacts.
-            int artifactCount = ArtifactSystem.Instance.GetCollectedCount();
             float dmgScale = 1.0f + Math.Min(0.20f, artifactCount * GameConfig.OldGodDivineScalingDamagePerArtifact);
 
             // Post-beta-launch baseline difficulty correction (15%): applied here as
             // well so Old Gods scale alongside regular monsters. Stacks multiplicatively
             // with the artifact-based Divine Scaling above.
             float baseScale = GameConfig.BaseMonsterDifficultyScale;
-            long scaledHP = FightHP(boss);
+            long scaledHP = FightHP(boss, artifactCount);
             long scaledStrength = (long)(boss.Strength * dmgScale * baseScale);
             long scaledDefence = (long)(boss.Defence * baseScale);
 
@@ -959,11 +964,11 @@ namespace UsurperRemake.Systems
         /// player's defence answer, the harsh side capped at GameConfig.OldGodDialogueBossDamageCap.
         /// Applied to its stats and to the fixed damage of its scheduled AoE and channelled attacks.
         /// </summary>
-        private double DialogueBossDamageFactor(Character player)
+        private static double DialogueBossDamageFactor(Character player, BossDialogue dialogue)
         {
             long defenceBase = Math.Max(1, player.Defence + player.ArmPow);
-            double playerDefence = Math.Max(0.1, activeCombatModifiers.DefenseMultiplier + (double)activeCombatModifiers.BonusDefense / defenceBase);
-            return Math.Min(activeCombatModifiers.BossDamageMultiplier / playerDefence, GameConfig.OldGodDialogueBossDamageCap);
+            double playerDefence = Math.Max(0.1, dialogue.DefenseMultiplier + (double)dialogue.BonusDefense / defenceBase);
+            return Math.Min(dialogue.BossDamageMultiplier / playerDefence, GameConfig.OldGodDialogueBossDamageCap);
         }
 
         /// <summary>
@@ -971,9 +976,12 @@ namespace UsurperRemake.Systems
         /// ConfigureBossPartyMechanics, not damage from the god's stats, so the dialogue's god-damage
         /// factor is applied to them as well (Codex review).
         /// </summary>
-        private void ApplyDialogueToFixedBossDamage(BossCombatContext ctx, Character player)
+        private void ApplyDialogueToFixedBossDamage(BossCombatContext ctx, Character player) =>
+            ApplyDialogueToFixedDamage(ctx, player, activeCombatModifiers.ToDialogue());
+
+        private static void ApplyDialogueToFixedDamage(BossCombatContext ctx, Character player, BossDialogue dialogue)
         {
-            double factor = DialogueBossDamageFactor(player);
+            double factor = DialogueBossDamageFactor(player, dialogue);
             if (factor == 1.0) return;
             ctx.DialogueDamageFactor = factor;   // what the god summons hits the same way (Codex round 6)
             // every fixed damage figure the context carries (Doom is a countdown to a kill, not damage)
@@ -995,7 +1003,16 @@ namespace UsurperRemake.Systems
 
         private void ApplyModifiersToMonster(Monster monster, Character player)
         {
-            if (activeCombatModifiers.BossWeakened)
+            // the fight recalculates the player's stats as it starts (dropping, say, a shrine's blessing);
+            // the flat answers are converted against those stats, so recalculate first
+            player.RecalculateStats();
+            ApplyDialogueToMonster(monster, player, activeCombatModifiers.ToDialogue());
+        }
+
+        /// <summary>1.3.4: the dialogue's effect on the god; reads the player, writes only the monster.</summary>
+        private static void ApplyDialogueToMonster(Monster monster, Character player, BossDialogue dialogue)
+        {
+            if (dialogue.BossWeakened)
             {
                 monster.Strength = (long)(monster.Strength * 0.85);
                 monster.WeapPow = (long)(monster.WeapPow * 0.85);
@@ -1008,11 +1025,9 @@ namespace UsurperRemake.Systems
             // +20% defence is the god hitting 1/1.2 as hard. The harsh side of that product is capped at
             // GameConfig.OldGodDialogueBossDamageCap until the gods are retuned. The player's damage
             // answer shortens the god's HP: +25% damage is the god having 1/1.25 of it. Both reach the
-            // whole party, not only the player.
-            // the fight recalculates the player's stats as it starts (dropping, say, a shrine's blessing);
-            // the flat answers below are converted against those stats, so recalculate first
-            player.RecalculateStats();
-            double bossDamage = DialogueBossDamageFactor(player);
+            // whole party, not only the player. The flat answers below are converted against the
+            // player's recalculated stats (the caller recalculates before the build).
+            double bossDamage = DialogueBossDamageFactor(player, dialogue);
             if (bossDamage != 1.0)
             {
                 monster.Strength = (long)(monster.Strength * bossDamage);
@@ -1020,20 +1035,20 @@ namespace UsurperRemake.Systems
             }
 
             long attackBase = Math.Max(1, player.Strength + player.WeapPow);
-            double playerDamage = Math.Max(0.1, activeCombatModifiers.DamageMultiplier + (double)activeCombatModifiers.BonusDamage / attackBase);
+            double playerDamage = Math.Max(0.1, dialogue.DamageMultiplier + (double)dialogue.BonusDamage / attackBase);
             if (playerDamage != 1.0)
             {
                 monster.MaxHP = Math.Max(1, (long)Math.Round(monster.MaxHP / playerDamage));
                 monster.HP = monster.MaxHP;
             }
 
-            if (activeCombatModifiers.BossDefenseMultiplier != 1.0)
+            if (dialogue.BossDefenseMultiplier != 1.0)
             {
-                monster.Defence = (int)(monster.Defence * activeCombatModifiers.BossDefenseMultiplier);
-                monster.ArmPow = (long)(monster.ArmPow * activeCombatModifiers.BossDefenseMultiplier);
+                monster.Defence = (int)(monster.Defence * dialogue.BossDefenseMultiplier);
+                monster.ArmPow = (long)(monster.ArmPow * dialogue.BossDefenseMultiplier);
             }
 
-            if (activeCombatModifiers.BossConfused)
+            if (dialogue.BossConfused)
             {
                 monster.IsConfused = true;
                 monster.ConfusedDuration = 999;
@@ -1043,23 +1058,80 @@ namespace UsurperRemake.Systems
         /// <summary>
         /// Apply dialogue-based bonuses to the player before boss combat
         /// </summary>
-        private void ApplyModifiersToPlayer(Character player)
+        private void ApplyModifiersToPlayer(Character player) => ApplyDialogueToPlayer(player, activeCombatModifiers.ToDialogue());
+
+        private static void ApplyDialogueToPlayer(Character player, BossDialogue dialogue)
         {
             // v1.1.10: called by the combat engine after its fight-start reset. The answer's damage and
             // defence are carried on the god (ApplyModifiersToMonster), which every attack reaches;
             // crit chance, bloodlust and insight belong to the player.
             // CriticalChance is written as a total with 5% as the neutral base; the difference is the bonus
-            player.TempCritChanceBonus = (int)Math.Round((activeCombatModifiers.CriticalChance - 0.05) * 100);
+            player.TempCritChanceBonus = (int)Math.Round((dialogue.CriticalChance - 0.05) * 100);
 
-            if (activeCombatModifiers.HasRageBoost)
+            if (dialogue.HasRageBoost)
             {
                 player.HasBloodlust = true;
             }
 
-            if (activeCombatModifiers.HasInsight)
+            if (dialogue.HasInsight)
             {
                 player.DodgeNextAttack = true;
             }
+        }
+
+        /// <summary>
+        /// 1.3.4: the build of an Old God fight, shared by RunBossCombat and the balance simulator: the god as
+        /// a Monster and the context the combat engine reads. Pure: it reads no singleton (the artifact count
+        /// and the dialogue are arguments) and reads the player without writing it. The caller recalculates
+        /// the player's stats first, as the fight does. CanSave is set from the data alone (a god whose save
+        /// needs an artifact counts it as not held); RunBossCombat sets it from the artifacts held.
+        /// </summary>
+        internal static BossFight BuildBossFight(OldGodType type, int artifactCount, BossDialogue dialogue, Character player) =>
+            BuildBossFight(OldGodsData.GetGodBossData(type), artifactCount, dialogue, player);
+
+        /// <summary>1.3.4: BuildBossFight for a boss row (Noctura has two: her own and the betrayal's).</summary>
+        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player)
+        {
+            dialogue ??= BossDialogue.None;
+
+            // Create a Monster from boss data
+            var monster = BuildBossMonster(boss, artifactCount);
+
+            // Apply dialogue-based stat adjustments to the monster
+            ApplyDialogueToMonster(monster, player, dialogue);
+
+            // v1.1.10: the player's dialogue bonuses are applied by the combat engine after its
+            // fight-start reset (BossCombatContext.ApplyPlayerModifiers). Applied before the
+            // fight, the reset wiped every one of them, so no answer ever changed the player's side.
+            var ctx = new BossCombatContext
+            {
+                BossData = boss,
+                GodType = boss.Type,
+                AttacksPerRound = boss.AttacksPerRound,
+                CanSave = boss.CanBeSaved && GetArtifactForSave(boss.Type) == null,
+                DamageMultiplier = dialogue.DamageMultiplier,
+                DefenseMultiplier = dialogue.DefenseMultiplier,
+                BonusDamage = dialogue.BonusDamage,
+                BonusDefense = dialogue.BonusDefense,
+                CriticalChance = dialogue.CriticalChance,
+                HasRageBoost = dialogue.HasRageBoost,
+                HasInsight = dialogue.HasInsight,
+                BossDamageMultiplier = dialogue.BossDamageMultiplier,
+                BossDefenseMultiplier = dialogue.BossDefenseMultiplier,
+                BossConfused = dialogue.BossConfused,
+                BossWeakened = dialogue.BossWeakened,
+                ApplyPlayerModifiers = p => ApplyDialogueToPlayer(p, dialogue),
+            };
+
+            // Configure boss-specific party balance mechanics (v0.52.1)
+            ConfigurePartyMechanics(ctx, boss.Type);
+
+            ApplyDialogueToFixedDamage(ctx, player, dialogue);
+
+            // Set divine armor reduction on the combat context so CombatEngine applies it
+            ctx.DivineArmorReduction = DivineArmorReduction(boss.Type, player);
+
+            return new BossFight(monster, ctx);
         }
 
         /// <summary>
@@ -1454,13 +1526,7 @@ namespace UsurperRemake.Systems
             // loading save: Object reference not set...". The regular boss path at
             // ~line 825 sets BossData; the betrayal path was missing it. Same data
             // reused, same scaling/dialogue/phase logic now applies.
-            combatEngine.BossContext = new BossCombatContext
-            {
-                BossData = betrayalData,
-                GodType = OldGodType.Noctura,
-                AttacksPerRound = 1,
-                CanSave = false,
-            };
+            combatEngine.BossContext = BetrayalContext(betrayalData);
             // v1.1.15: a story fight, fought even at Mental 0 (Manwe's fight can end there): a refusal
             // would be recorded for good as Noctura escaping. The collapse follows it, from the location loop.
             var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates, storyFight: true);
@@ -1518,6 +1584,19 @@ namespace UsurperRemake.Systems
                 return false;
             }
         }
+
+        /// <summary>
+        /// 1.3.4: the context of Noctura's betrayal fight. It does not go through ConfigurePartyMechanics,
+        /// so it sets its own DoomRounds: 0, as Noctura's own fight (the context's default is 3).
+        /// </summary>
+        internal static BossCombatContext BetrayalContext(OldGodBossData betrayalData) => new BossCombatContext
+        {
+            BossData = betrayalData,
+            GodType = OldGodType.Noctura,
+            AttacksPerRound = 1,
+            CanSave = false,
+            DoomRounds = 0,
+        };
 
         /// <summary>
         /// Handle player being defeated
@@ -1584,7 +1663,9 @@ namespace UsurperRemake.Systems
         /// Earlier bosses (Maelketh, Veloura) have lighter mechanics to teach the player.
         /// Later bosses (Noctura+) have full mechanics requiring balanced parties.
         /// </summary>
-        private void ConfigureBossPartyMechanics(BossCombatContext ctx, OldGodType godType)
+        private void ConfigureBossPartyMechanics(BossCombatContext ctx, OldGodType godType) => ConfigurePartyMechanics(ctx, godType);
+
+        private static void ConfigurePartyMechanics(BossCombatContext ctx, OldGodType godType)
         {
             // All bosses get potion cooldown (teaches reliance on healers)
             ctx.PotionCooldownRounds = GameConfig.ModBossPotionCooldownRounds;
@@ -1593,6 +1674,7 @@ namespace UsurperRemake.Systems
             {
                 case OldGodType.Maelketh: // Floor 25 — Tutorial boss: enrage only
                     ctx.EnrageRound = 40;
+                    ctx.DoomRounds = 0; // 1.3.4: Doom starts at Aurelion (the context's default is 3)
                     break;
 
                 case OldGodType.Veloura: // Floor 40 — Introduces AoE (party damage spread)
@@ -1600,6 +1682,7 @@ namespace UsurperRemake.Systems
                     ctx.AoEFrequency = 4;
                     ctx.AoEDamage = 300;
                     ctx.AoEAbilityName = "old_god.ability.heartbreak_shatter";
+                    ctx.DoomRounds = 0; // 1.3.4: no Doom before Aurelion
                     break;
 
                 case OldGodType.Thorgrim: // Floor 55 — Introduces channeling (needs interrupter)
@@ -1610,6 +1693,7 @@ namespace UsurperRemake.Systems
                     ctx.ChannelFrequency = 5;
                     ctx.ChannelAbilityName = "old_god.ability.final_verdict";
                     ctx.ChannelDamage = 1200;
+                    ctx.DoomRounds = 0; // 1.3.4: no Doom before Aurelion
                     break;
 
                 case OldGodType.Noctura: // Floor 70 — Introduces corruption (needs healer cleanse)
@@ -1622,6 +1706,7 @@ namespace UsurperRemake.Systems
                     ctx.ChannelDamage = 1800;
                     ctx.CorruptionDamagePerStack = 35;
                     ctx.HasPhysicalImmunityPhase = true; // Phase 2: physical immunity
+                    ctx.DoomRounds = 0; // 1.3.4: no Doom before Aurelion (her betrayal row too)
                     break;
 
                 case OldGodType.Aurelion: // Floor 85 — Introduces doom (needs healer dispel)
@@ -1671,7 +1756,10 @@ namespace UsurperRemake.Systems
         /// Gods with divine armor resist unenchanted weapons.
         /// Artifact weapons fully bypass; enchanted weapons partially bypass.
         /// </summary>
-        private double GetDivineArmorReduction(OldGodType godType, Character player)
+        private double GetDivineArmorReduction(OldGodType godType, Character player) => DivineArmorReduction(godType, player);
+
+        /// <summary>1.3.4: the divine armor for BuildBossFight; the instance method above stays for the wiki export, which reaches it by name.</summary>
+        private static double DivineArmorReduction(OldGodType godType, Character player)
         {
             double baseReduction = godType switch
             {
@@ -1775,6 +1863,38 @@ namespace UsurperRemake.Systems
     }
 
     #region Boss System Data Classes
+
+    /// <summary>
+    /// 1.3.4: the dialogue's combat modifiers as a value (the fields of OldGodBossSystem's CombatModifiers).
+    /// None is every field at its default: no modifier.
+    /// </summary>
+    internal sealed record BossDialogue
+    {
+        public static readonly BossDialogue None = new();
+
+        public double DamageMultiplier { get; init; } = 1.0;
+        public double DefenseMultiplier { get; init; } = 1.0;
+        public int BonusDamage { get; init; } = 0;
+        public int BonusDefense { get; init; } = 0;
+        public double CriticalChance { get; init; } = 0.05;
+        public double CriticalMultiplier { get; init; } = 1.5;
+        public bool HasRageBoost { get; init; } = false;
+        public bool HasInsight { get; init; } = false;
+        public double BossDamageMultiplier { get; init; } = 1.0;
+        public double BossDefenseMultiplier { get; init; } = 1.0;
+        public bool BossConfused { get; init; } = false;
+        public bool BossWeakened { get; init; } = false;
+        public string ApproachType { get; init; } = "neutral";
+        public string? SpecialEffect { get; init; } = null;
+    }
+
+    /// <summary>1.3.4: a built Old God fight (OldGodBossSystem.BuildBossFight): the god and the context the engine reads.</summary>
+    internal sealed class BossFight
+    {
+        public BossFight(Monster monster, BossCombatContext context) { Monster = monster; Context = context; }
+        public Monster Monster { get; }
+        public BossCombatContext Context { get; }
+    }
 
     public enum BossOutcome
     {

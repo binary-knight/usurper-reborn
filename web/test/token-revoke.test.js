@@ -50,6 +50,8 @@ function load(withTable) {
   const ctx = {
     db: dbWrite, dbWrite,
     hashGamePassword: (p) => 'hashed:' + p,
+    // 1.3.4: the reset route's minimum, the server's own constant
+    ACCOUNT_MIN_PASSWORD_LENGTH: Number(src.match(/\nconst ACCOUNT_MIN_PASSWORD_LENGTH = (\d+);/)[1]),
     process: { env: {} }, Buffer, JSON, String, Object, Date, setTimeout,
     console: { log, warn: log, error: log, info: log },
     readBody: async () => body,

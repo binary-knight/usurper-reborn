@@ -76,3 +76,67 @@ for (const pageName of PAGES) {
     assertSafe(assert, h, b, pageName + ' stats');
   });
 }
+
+// 1.3.4: the live counters never show a 0 nobody measured. Before data, on an error answer and on a failed
+// request the hero line stays hidden; a missing count shows "--"; a real 0 still shows as 0.
+async function heroState(answer) {
+  const p = await loadPage('index.html', {
+    fetch: (url) => (url === '/api/stats' ? answer() : url === '/api/sponsors' ? { sponsors: [] } : {}),
+  });
+  await p.settle();
+  return {
+    p,
+    online: p.el('hl-online').hidden,
+    world: p.el('hl-world').hidden,
+    marr: p.el('hl-marr').textContent,
+    kids: p.el('hl-kids').textContent,
+    kills: p.el('hl-kills').textContent,
+  };
+}
+
+test('index.html hero line: hidden before data and with "--" in place of 0', async () => {
+  const p = await loadPage('index.html', { fetch: () => new Promise(() => {}) });
+  await p.settle();
+  assert.strictEqual(p.el('hl-online').hidden, true);
+  assert.strictEqual(p.el('hl-world').hidden, true);
+  for (const id of ['hl-online-n', 'hl-marr', 'hl-kids', 'hl-kills']) assert.strictEqual(p.el(id).textContent, '--', id);
+});
+
+test('index.html hero line: the server error answer (empty stats) shows no counts', async () => {
+  const s = await heroState(() => ({ error: 'Stats query failed', online: [], stats: {}, highlights: {}, news: [], npcActivities: [] }));
+  assert.strictEqual(s.world, true, 'world line hidden');
+  assert.strictEqual(s.online, true, 'online line hidden');
+});
+
+test('index.html hero line: a failed request shows no counts', async () => {
+  const s = await heroState(() => { throw new Error('network'); });
+  assert.strictEqual(s.world, true);
+  assert.strictEqual(s.online, true);
+  assert.ok(!/>0</.test(s.p.el('stats-content').innerHTML), 'board shows no zero');
+});
+
+test('index.html hero line: an HTTP error status shows no counts', async () => {
+  const s = await heroState(() => ({ status: 502, body: { stats: { marriages: 0, children: 0, totalKills: 0 } } }));
+  assert.strictEqual(s.world, true);
+});
+
+test('index.html hero line: a real 0 still shows as 0, a missing count as "--"', async () => {
+  const s = await heroState(() => ({ online: [], onlineCount: 0, stats: { marriages: 0, children: 12, totalPlayers: 3 }, highlights: {}, news: [] }));
+  assert.strictEqual(s.world, false, 'world line shown');
+  assert.strictEqual(s.marr, '0');
+  assert.strictEqual(s.kids, '12');
+  assert.strictEqual(s.kills, '--');
+});
+
+for (const pageName of PAGES) {
+  test(`${pageName} stats board: a missing count shows "--", a real 0 shows 0`, async () => {
+    const p = await loadPage(pageName, {
+      fetch: (url) => (url === '/api/stats' ? { online: [], onlineCount: 0, stats: { totalPlayers: 0, marriages: 2 }, highlights: {}, news: [], npcActivities: [] } : url === '/api/sponsors' ? { sponsors: [] } : {}),
+    });
+    await p.settle();
+    const cards = p.el('stats-content').querySelector('#stats-upper').innerHTML;
+    assert.ok(/stat-value">0</.test(cards), 'real 0 for total players');
+    assert.ok(/stat-value">--</.test(cards), '"--" for a missing count');
+    assert.ok(/stat-value">2 \/ --</.test(cards), 'marriages real, children missing');
+  });
+}

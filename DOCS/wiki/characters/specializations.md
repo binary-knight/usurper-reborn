@@ -1,8 +1,9 @@
 ---
 title: Specializations
 path: /wiki/en/characters/specializations/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/LevelMasterLocation.cs, Scripts/Data/SpecializationData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.4 | Shield Wall Formation and Divine Mandate, with their Protection and Guardian bonuses, now also work against Manwe's named abilities.
 history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.1 | none

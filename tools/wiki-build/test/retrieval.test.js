@@ -395,7 +395,7 @@ test("acceptance set: each answered question ranks its page first and its excerp
     if (at !== page || !text.includes(fact)) failed.push(`${id} ${question}: ${at}`);
   }
   assert.deepEqual(failed, []);
-  assert.ok(first.length >= 374, `${first.length} rows first`);
+  assert.ok(first.length >= 375, `${first.length} rows first`);
   const by = (re) => table.filter((r) => re.test(r[4])).length;
   console.log(`acceptance: ${first.length} first, ${foldRows.length} fold, ${by(/ranks first$/)} ranked lower, ${by(/outside the excerpt/)} excerpt misses, ${by(/fold page/)} fold misses, ${by(/^gap/)} gaps`);
 });

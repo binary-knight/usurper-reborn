@@ -162,6 +162,14 @@ public class Monster
     public int ThornsRounds { get; set; } = 0;
     public int ThornsPercent { get; set; } = 0;  // 0-100 percent
 
+    // 1.3.4: the Cyclebreaker's Probability Shift. While ProbabilityShiftActive is set the monster's
+    // attacks never crit, and an attack that hit misses 30 percent of the time. ProbabilityShiftRounds
+    // counts down once a round at the monster's first action, which sets ProbabilityShiftActive for
+    // that round's attacks. In memory only, not saved. Internal: engine state, not part of the
+    // monster's public shape.
+    internal int ProbabilityShiftRounds { get; set; } = 0;
+    internal bool ProbabilityShiftActive { get; set; } = false;
+
     // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
     // application increments RecentStunCount and resets RoundsSinceLastStun. The
     // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to
