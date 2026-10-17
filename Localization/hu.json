@@ -23155,7 +23155,7 @@
   "combat.manwe_cursed": "Sötét átok telepszik rád...",
   "combat.manwe_darkness1": "Sötétség nyeli el mindent...",
   "combat.manwe_darkness_block": "A hited véd a sötétségtől!",
-  "combat.manwe_darkness_damage": "A sötétség {0} sebzéssel éget! {1} ÉP-t visszanyersz.",
+  "combat.manwe_darkness_damage": "A sötétség {0} sebzéssel éget! Manwe {1} ÉP-t gyógyít!",
   "combat.manwe_dual_strike": "Manwe fénnyel és árnyékkal is sújt!",
   "combat.manwe_eyes_harden": "Manwe tekintete megkeményedik.",
   "combat.manwe_final_word1": "\"Akkor legyen ez az utolsó szó.\"",

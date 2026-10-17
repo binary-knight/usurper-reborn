@@ -22839,7 +22839,7 @@
   "combat.manwe_cursed": "Una maledizione oscura si posa su di te...",
   "combat.manwe_darkness1": "L'oscurità inghiotte tutto...",
   "combat.manwe_darkness_block": "La tua fede ti protegge dall'oscurità!",
-  "combat.manwe_darkness_damage": "L'oscurità brucia per {0} danni! Recuperi {1} PV.",
+  "combat.manwe_darkness_damage": "L'oscurità brucia per {0} danni! Manwe si cura per {1} PV!",
   "combat.manwe_dual_strike": "Manwe colpisce con luce e ombra insieme!",
   "combat.manwe_eyes_harden": "Gli occhi di Manwe si induriscono.",
   "combat.manwe_final_word1": "\"Allora che questa sia la parola finale.\"",
