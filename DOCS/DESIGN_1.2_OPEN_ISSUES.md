@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Design: the eight open issues (1.2 candidates)
 
 Reconciled from two independent designs produced on 2026-09-07: one by Codex

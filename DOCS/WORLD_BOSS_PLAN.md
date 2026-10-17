@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Plan: the world boss, redone (1.1.4)
 
 Written 2026-09-08 from four council seats answering one brief: the
