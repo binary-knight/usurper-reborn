@@ -30,6 +30,10 @@
 • Fixed the live counters showing 0 when the stats did not load
 • Adjusted the reset pages on a server that does not send mail to say so and keep no request
 
+### Online server
+
+• Adjusted the online server to turn off permanent death for a few weeks while the new difficulty curves are measured
+
 ### Running your own server
 
 • Improved servers that run their own website with a site address setting for the reset links and the game's reset pointer
