@@ -17,14 +17,15 @@ How you sign in, how many characters you can keep, and what you can set before y
 
 An online account is a username and a password kept by the game server. The browser, MUD client and SSH paths end at the same login screen, with four choices: L to log in, R to register, G to change the language of the login screen, and Q to quit.
 
-- **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen.
+- **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen. On a server that sends mail, this screen adds F (Forgot password) after a failed login; see [forgotten passwords](#forgotten-passwords).
 - **SSH.** The SSH gateway uses one shared gateway login, published with the connection instructions. It is not your account. After it, a login screen with the same L, R, G and Q choices asks for your own username and password. Its G changes the language of these login screens only; it is not saved to an account registered there.
 - **The standalone game.** O (Online Multiplayer) on the main menu offers the official server or a server address and port you type in. Its own login menu has L, R and Q, and uses the language the game is already set to. When the server can keep you logged in, the game asks "Stay logged in on this computer?" after you type your username and password and before the login is sent: Y, N, or D to stop asking. See [staying logged in](#staying-logged-in).
 
 Registration rules:
 
 - The username is 2 to 20 characters: letters, numbers, spaces, hyphens and underscores. It must not already exist, in any capitalization.
-- The password is at least 4 characters and cannot contain a colon. You type it twice.
+- The password is at least 8 characters and cannot contain a colon. You type it twice. A password set before 1.3.4 that is shorter still logs in; the 8 character rule applies to every new password.
+- On a server that sends mail, registering on the browser and MUD client screen then asks for an email address. It is optional: Enter skips it.
 - The server limits how many accounts one network address can create and slows repeated failed logins. A refused registration (a taken name or a rejected password) counts as a failed login, and an address that is being slowed cannot register until the wait is over.
 
 A login with an unknown username and a login with a wrong password get the same message: "Player doesn't exist or wrong password." Some login screens add a row saying that R registers a new account. A banned account sees its ban notice only after the right password.
@@ -32,6 +33,15 @@ A login with an unknown username and a login with a wrong password get the same 
 The language you chose on the login screen is saved to a new account. Online, your screen reader setting and language belong to the account and come back at your next login. Only one connection per account plays at a time: logging in again replaces the older session.
 
 P on the character screen changes your password. It asks for the current one first. A new password ends every saved login of the account.
+
+## Forgotten passwords
+
+An account can keep an email address, used only to reset a forgotten password. All of this needs a server that sends mail; on a server without mail set up there is no F choice, no email question and no E key.
+
+- **F on the login screen.** After a failed login, the browser and MUD client login screen offers F (Forgot password). It asks for the account name and always gives the same answer, whether or not the account exists: if the account has a confirmed email address, a reset link is on its way, and the link works for 30 minutes. Nothing changes until the link is used. One network address can ask at most five times an hour; past that the answer is the same and nothing is sent. The SSH login screen and the standalone game's login menu have no F.
+- **The address.** A new address is used only after you open the confirmation link sent to it. It is kept with your account, never in your character's save.
+- **The one-time question.** An account with no address that was never asked (one made before 1.3.4, or registered over SSH or in the standalone game) is asked once after login, after the combat data question and before the character screen. Enter skips it. Once skipped or answered, it is not asked again.
+- **E on the character screen.** E (Email address) shows the address masked, such as `a***@d***.net`, never in full. It adds or changes the address, or removes it, and each asks for your current password first. A new address takes over when its link is opened; until then the old one stays. Removing an address sends a notice to it.
 
 ## Staying logged in
 
@@ -78,9 +88,10 @@ After you log in, the character screen lists your characters with level, class a
 - **S**: Spectate a player
 - **G**: Language
 - **P**: Change password
+- **E**: Email address
 - **Q**: Quit
 
-Keys appear only when they apply: 2 and D need an alt, M needs an open slot, S and P need a connection to a game server. Pressing Enter alone plays your main character, or your alt if you only have an alt, or starts creation if you have neither.
+Keys appear only when they apply: 2 and D need an alt, M needs an open slot, S and P need a connection to a game server, and E needs a game server that sends mail. Pressing Enter alone plays your main character, or your alt if you only have an alt, or starts creation if you have neither.
 
 N on an account that has a main character warns you, then asks you to type DELETE in capitals. Anything else cancels. The old main character is removed along with its world ties (claimed quests, the King's bounty on it, guild membership, children and queued deliveries), and creation starts at once. An alt is not affected. D asks for DELETE the same way and removes only the alt.
 
