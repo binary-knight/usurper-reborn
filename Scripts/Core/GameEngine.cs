@@ -45,6 +45,7 @@ public partial class GameEngine
     private static readonly Queue<string> _staticPendingNotifications = new();
     private bool _splashScreenShown = false;
     private bool _telemetryAskedThisSession = false;   // 1.2.7: the telemetry question at most once a session
+    private bool _emailAskedThisSession = false;       // 1.3.4: the one-time email question at most once a session
     private string? _sleepLocationOnLogin;
 
     /// <summary>
@@ -430,6 +431,13 @@ public partial class GameEngine
         {
             _telemetryAskedThisSession = true;
             await TelemetryPrompt.AskPlayerIfNeededAsync(terminal, playerName);
+        }
+
+        // 1.3.4: the one-time email question on a game server (not a BBS door), only while it sends mail
+        if (!_emailAskedThisSession && UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
+        {
+            _emailAskedThisSession = true;
+            await EmailPrompt.AskIfDueAsync(terminal, SaveSystem.Instance.Backend as SqlSaveBackend, playerName, ctx0?.RemoteIP);
         }
 
         ShowLaunchBanner();
