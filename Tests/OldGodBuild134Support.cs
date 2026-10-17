@@ -145,6 +145,7 @@ internal static class OldGodBuild134Support
         foreach (var (name, fields) in Dialogues)
             sb.Append("# dialogue=" + name + ": " + (fields.Length == 0 ? "every CombatModifiers field at its default"
                 : string.Join(",", fields.Select(f => f.Field + "=" + Format(f.Value)))) + "\n");
+        sb.Append("# 1.3.4 doom fix: context.DoomRounds is 0 for Maelketh, Veloura, Thorgrim and Noctura (and her betrayal row); the 7ef83c36 record held the context default 3, a defect (Doom starts at Aurelion)\n");
         foreach (var (key, lines) in cases)
         {
             sb.Append('[').Append(key).Append("]\n");

@@ -104,7 +104,7 @@ test("Old God mechanics fold themselves and show the fight setup", () => {
   ]);
   const maelketh = row(html, "Maelketh, The Broken Blade");
   assert.deepEqual(maelketh.slice(2, 5), ["40", "None", "None"]);
-  assert.equal(maelketh[6], "3");
+  assert.equal(maelketh[6], "None");
 });
 
 test("monster guards: price, stats and feeding by King.cs", () => {

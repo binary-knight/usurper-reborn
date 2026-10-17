@@ -1526,13 +1526,7 @@ namespace UsurperRemake.Systems
             // loading save: Object reference not set...". The regular boss path at
             // ~line 825 sets BossData; the betrayal path was missing it. Same data
             // reused, same scaling/dialogue/phase logic now applies.
-            combatEngine.BossContext = new BossCombatContext
-            {
-                BossData = betrayalData,
-                GodType = OldGodType.Noctura,
-                AttacksPerRound = 1,
-                CanSave = false,
-            };
+            combatEngine.BossContext = BetrayalContext(betrayalData);
             // v1.1.15: a story fight, fought even at Mental 0 (Manwe's fight can end there): a refusal
             // would be recorded for good as Noctura escaping. The collapse follows it, from the location loop.
             var result = await combatEngine.PlayerVsMonsters(player, new List<Monster> { noctura }, teammates, storyFight: true);
@@ -1590,6 +1584,19 @@ namespace UsurperRemake.Systems
                 return false;
             }
         }
+
+        /// <summary>
+        /// 1.3.4: the context of Noctura's betrayal fight. It does not go through ConfigurePartyMechanics,
+        /// so it sets its own DoomRounds: 0, as Noctura's own fight (the context's default is 3).
+        /// </summary>
+        internal static BossCombatContext BetrayalContext(OldGodBossData betrayalData) => new BossCombatContext
+        {
+            BossData = betrayalData,
+            GodType = OldGodType.Noctura,
+            AttacksPerRound = 1,
+            CanSave = false,
+            DoomRounds = 0,
+        };
 
         /// <summary>
         /// Handle player being defeated
@@ -1667,6 +1674,7 @@ namespace UsurperRemake.Systems
             {
                 case OldGodType.Maelketh: // Floor 25 — Tutorial boss: enrage only
                     ctx.EnrageRound = 40;
+                    ctx.DoomRounds = 0; // 1.3.4: Doom starts at Aurelion (the context's default is 3)
                     break;
 
                 case OldGodType.Veloura: // Floor 40 — Introduces AoE (party damage spread)
@@ -1674,6 +1682,7 @@ namespace UsurperRemake.Systems
                     ctx.AoEFrequency = 4;
                     ctx.AoEDamage = 300;
                     ctx.AoEAbilityName = "old_god.ability.heartbreak_shatter";
+                    ctx.DoomRounds = 0; // 1.3.4: no Doom before Aurelion
                     break;
 
                 case OldGodType.Thorgrim: // Floor 55 — Introduces channeling (needs interrupter)
@@ -1684,6 +1693,7 @@ namespace UsurperRemake.Systems
                     ctx.ChannelFrequency = 5;
                     ctx.ChannelAbilityName = "old_god.ability.final_verdict";
                     ctx.ChannelDamage = 1200;
+                    ctx.DoomRounds = 0; // 1.3.4: no Doom before Aurelion
                     break;
 
                 case OldGodType.Noctura: // Floor 70 — Introduces corruption (needs healer cleanse)
@@ -1696,6 +1706,7 @@ namespace UsurperRemake.Systems
                     ctx.ChannelDamage = 1800;
                     ctx.CorruptionDamagePerStack = 35;
                     ctx.HasPhysicalImmunityPhase = true; // Phase 2: physical immunity
+                    ctx.DoomRounds = 0; // 1.3.4: no Doom before Aurelion (her betrayal row too)
                     break;
 
                 case OldGodType.Aurelion: // Floor 85 — Introduces doom (needs healer dispel)
