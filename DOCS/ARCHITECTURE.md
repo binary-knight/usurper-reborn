@@ -1,12 +1,13 @@
+<!-- doc: checked 1.3.4; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase as of v0.65.5 (Beta). Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.4. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
 **Runtime**: .NET 8.0 LTS | **Language**: C# 12 | **License**: GPL v2
 
-**Repository scale**: ~228 C# source files (~106 in `Scripts/Systems`, 33 in `Scripts/Locations`), plus the Node web proxy, Electron client, and 5-language localization payloads.
+**Repository scale**: 305 C# source files under `Scripts/` (164 in `Scripts/Systems`, 36 in `Scripts/Locations`), 4 more in `Console/` and the repository root, and 430 test files under `Tests/` (not part of the game build), plus the Node web proxy, the wiki build tools, the Electron client and 5-language localization payloads.
 
 This doc is updated per major release. If a section disagrees with the code, the code is the truth and this doc has rotted. Open an issue or PR.
 
@@ -91,7 +92,6 @@ Headless 24/7 NPC simulation (deprecated since v0.60.0; the MUD server has integ
 --node <dir>               Search directory for drop files
 --local                    Local testing (no BBS), routes through RunDoorModeAsync
 --stdio                    stdio mode (Synchronet / SSH-piped BBS)
---fossil <port>            Legacy FOSSIL serial mode
 --online                   --online single-instance multiplayer
 --mud-server               Run as multiplayer game server
 --mud-relay                Run as relay client (used by sshd-usurper)
@@ -104,9 +104,8 @@ Headless 24/7 NPC simulation (deprecated since v0.60.0; the MUD server has integ
 --editor                   Standalone game / save editor (single-player only)
 --screen-reader            Force accessible mode (NVDA / JAWS / Narrator)
 --electron                 Emit OSC events for the Electron graphical client
---public                   Self-listing on a future server registry (placeholder; deferred)
---private                  Opt out of public listing (placeholder)
---verbose / -v             Verbose debug output
+--export-wiki <dir>        Write the wiki data export and exit
+--verbose                  Verbose debug output (-v as the first argument prints the version)
 ```
 
 The `--screen-reader` flag has automatic siblings: on Windows, `Console/Bootstrap/Program.cs` calls `AccessibilityDetection.IsScreenReaderActive()` (via `SystemParametersInfo(SPI_GETSCREENREADER, ...)`) and enables the mode if a screen reader is running. Auto-detect is skipped in any door mode and inside WezTerm to avoid host-flag false positives (v0.60.7).
@@ -123,10 +122,10 @@ The `--screen-reader` flag has automatic siblings: on Windows, `Console/Bootstra
 public static GameEngine Instance { get; }
 public Character? CurrentPlayer { get; set; }
 public TerminalEmulator Terminal { get; }
-public LocationManager locationManager;
-public DailySystemManager dailyManager;
-public CombatEngine combatEngine;
-public WorldSimulator worldSimulator;
+private LocationManager locationManager;
+private DailySystemManager dailyManager;
+private CombatEngine combatEngine;
+private WorldSimulator worldSimulator;
 public List<string> DungeonPartyNPCIds { get; }
 ```
 
@@ -143,7 +142,7 @@ public List<string> DungeonPartyNPCIds { get; }
 ### Save File Repair (v0.57.19+)
 **File**: `Scripts/Systems/SaveFileRepair.cs`
 
-In-place repair for bloated saves (e.g. 71 MB). Reads via `JsonDocument.Parse(byte[])` (~2-3x file size in RAM, vs `JsonSerializer.Deserialize<T>` which materializes 10x+). Walks the tree via `Utf8JsonWriter`, applies hard-coded path-to-cap map for 17 known-bloated arrays (NPC memories, recent dialogue, relationships, enemies, market inventory, royal court collections, romance encounter history, etc.). Atomic `<file>.repair.tmp` -> `File.Move(overwrite: true)`.
+In-place repair for bloated saves (e.g. 71 MB). Reads via `JsonDocument.Parse(byte[])` (~2-3x file size in RAM, vs `JsonSerializer.Deserialize<T>` which materializes 10x+). Walks the tree via `Utf8JsonWriter`, applies hard-coded path-to-cap map for 19 known-bloated arrays and 1 dictionary (NPC memories, recent dialogue, relationships, enemies, market inventory, royal court collections, romance encounter history, etc.). Atomic `<file>.repair.tmp` -> `File.Move(overwrite: true)`.
 
 ### Periodic Updates
 `PeriodicUpdate()` runs every 30 seconds during gameplay: daily reset check, world sim tick, NPC maintenance.
@@ -160,7 +159,7 @@ Character (base)
 ```
 
 ### Character (base)
-**File**: `Scripts/Core/Character.cs` (~2000 lines)
+**File**: `Scripts/Core/Character.cs` (~3800 lines)
 
 Stats follow Pascal `UserRec` layout for source-game compatibility. Modern fields layered on top:
 
@@ -170,7 +169,7 @@ Stats follow Pascal `UserRec` layout for source-game compatibility. Modern field
 - **Combat**: `WeapPow`, `ArmPow`, `Punch`, `Absorb`
 - **Equipment**: dual system (legacy slot fields + modern `Dictionary<EquipmentSlot, int> EquippedItems`)
 - **Spells & Abilities**: `List<List<bool>> Spell` (2D: index x known/mastered), `HashSet<string> LearnedAbilities`, `List<int> Skill`
-- **Status Effects**: 17+ flags (`Blind`, `Poisoned`, `Stunned`, `Frozen`, `Sleep`, `Feared`, `Confused`, `Slowed`, `Cursed`, `Diseased`, `Burning`, `Marked`, `Corroded`, `IsArrestCombat`, `HasStatusImmunity`, `Hidden`, `IsBerserk`, ...)
+- **Status Effects**: most live in the `ActiveStatuses` dictionary keyed by the `StatusEffect` enum (41 values), plus flags such as `IsArrestCombat`, `HasStatusImmunity` and `IsBerserk`
 - **Online Death**: `Resurrections`, `MaxResurrections`, `ResurrectionsUsed`, `TempleResurrectionsUsed`, `IsArrestCombat`, `PlaythroughDeaths`
 - **Alignment**: `Chivalry`, `Darkness` (clamped to `[0, 1000]` via setter, paired-movement helper in `AlignmentSystem.ChangeAlignment`)
 - **Daily counters**: `MurdersToday`, `TeamWarsToday`, `DrinkingGamesToday`, `WildernessRevisitsToday`, `DesecrationsToday`, ...
@@ -186,24 +185,24 @@ Stats follow Pascal `UserRec` layout for source-game compatibility. Modern field
 ### Player
 **File**: `Scripts/Core/Player.cs`
 
-Adds player-specific fields: `RealName`, `LastLogin`, `TotalLogins`, `TotalPlayTime`, `PvPWins`, `PvPLosses`, `DungeonLevel`, `IsOnline`, `UnlockedAbilities`, `PlayerStatistics`, `PlayerAchievements`.
+Adds player-specific fields: `RealName`, `TotalLogins`, `TotalPlayTime`, `PvPWins`, `PvPLosses`, `DungeonLevel`, `IsOnline`, `UnlockedAbilities`. `Statistics`, `Achievements` and `LastLogin` are on `Character`.
 
 ### NPC
 **File**: `Scripts/Core/NPC.cs`
 
 Adds AI / social state:
 - **AI**: `NPCBrain Brain`, `PersonalityProfile Personality`, `MemorySystem Memory`, `EmotionalState EmotionalState`, `GoalSystem Goals`
-- **Social**: `Archetype`, `StoryRole`, `Faction`, `GangId`, `KnownCharacters`, `Enemies`, `GangMembers`
+- **Social**: `Archetype`, `StoryRole`, `NPCFaction`, `GangId`, `KnownCharacters`, `Enemies`, `GangMembers`
 - **Death**: `IsDead` (permanent flag, distinct from `IsAlive` which is `HP > 0`)
 - **Lifecycle**: `BirthDate`, `IsAgedDeath`, `PregnancyDueDate`, `PregnancyFatherName` (for affair attribution)
-- **Marriage**: `IsMarried`, `Married`, `SpouseName`, `MarriedTimes`, `BannedMarry`
+- **Marriage**: `IsMarried`, `Married`, `SpouseName`, `MarriedTimes`
 - **Commerce**: `MarketInventory` (auction listings)
 - **Specialization**: `Specialization` (enum), drives AI ability priorities and per-spec stat bonuses
 
 ### Monster
 **File**: `Scripts/Core/Monster.cs`
 
-Standalone class (not extending Character). Combat-relevant fields only: `Level`, `HP`, `Strength`, `Defence`, `Punch`, `WeapPow`, status flags (`PoisonRounds`, `IsBurning`, `StunRounds`, `Frozen`, `Sleep`, `Feared`, `Confused`, `Slowed`, `Marked`, `Corroded`, `WeakenRounds`, `IsChanneling`, `IsPhysicalImmune`, `IsMagicalImmune`, `PhaseImmunityRounds`, `IsEnraged`), boss-specific (`TauntedBy`, `TauntRoundsLeft`, `TauntStickChance`).
+Standalone class (not extending Character). Combat-relevant fields only: `Level`, `HP`, `Strength`, `Defence`, `Punch`, `WeapPow`, status flags (`PoisonRounds`, `IsBurning`, `StunRounds`, `IsFrozen`, `IsSleeping`, `IsFeared`, `IsConfused`, `IsSlowed`, `IsMarked`, `IsCorroded`, `WeakenRounds`, `IsChanneling`, `IsPhysicalImmune`, `IsMagicalImmune`, `PhaseImmunityRounds`, `IsEnraged`), boss-specific (`TauntedBy`, `TauntRoundsLeft`, `TauntStickChance`).
 
 ---
 
@@ -215,7 +214,7 @@ Defined in `CharacterClass` enum. Per-class starting stats and per-level growth 
 
 **Base classes (12)**: Alchemist, Assassin, Barbarian, Bard, Cleric, Jester, Magician, Paladin, Ranger, Sage, Warrior, Mystic Shaman.
 
-**Prestige classes (5; unlocked by completing different endings):**
+**Prestige classes (5; unlocked by endings: Savior opens Tidesworn and Wavecaller, Defiant opens Cyclebreaker, Usurper opens Abysswarden and Voidreaver, True or Secret opens all five; every unlock also needs NG+ cycle 2 or a recorded account ending, `CharacterCreationSystem.cs`). The table's ending column is older:**
 | Class | Ending Required | Theme |
 |---|---|---|
 | Tidesworn | (any) | Defensive warrior-cleric hybrid |
@@ -229,7 +228,7 @@ Mystic Shaman is race-locked (Troll / Orc / Gnoll only) and is a melee-caster hy
 ### Specialization System
 **File**: `Scripts/Data/SpecializationData.cs`, `Scripts/Systems/CompanionSystem.cs`
 
-24 specializations (2 per base class). Selectable at the Level Master, free swap. Each specialization carries:
+25 specializations (2 per base class, 3 for Paladin). Chosen at the Level Master from level 25, free swap. Each specialization carries:
 - `SpecRole` enum (Tank / DPS / Healer / Utility / Debuff)
 - Stat bonus deltas applied additively in `RecalculateStats()`
 - AI ability priorities (75% weight to preferred-type abilities for NPC teammates)
@@ -251,11 +250,11 @@ ANSI portrait + stats card on selection screens (10 races, 10+ classes have port
 `ObjType` enum: Head=1, Body=2, ... Potion=17. Properties: `Name`, `Value`, stat bonuses, `Cursed`, `OnlyOne`, `Cure`, `Shop`, `Dungeon`, `MinLevel`, `MaxLevel`, `ClassRestrictions`, plus `LootEffects` for procedural drops (LifeSteal, ManaSteal, 6 elemental enchants, ArmorPiercing, Thorns, HPRegen, ManaRegen, MagicResist, PoisonDamage, BossSlayer, TitanResolve, etc.).
 
 ### Modern Equipment System
-**File**: `Scripts/Core/Equipment.cs`, `Scripts/Data/EquipmentData.cs`
+**File**: `Scripts/Core/Items.cs` (the `Equipment` class), `Scripts/Core/EquipmentEnums.cs`, `Scripts/Data/EquipmentData.cs`
 
 - **15 slots**: Head, Body, Arms, Hands, Legs, Feet, Waist, Neck, Neck2, Face, Cloak, LFinger, RFinger, MainHand, OffHand
 - **Rarity**: Common, Uncommon, Rare, Epic, Legendary, Artifact
-- **Weapon types**: Sword, Axe, Mace, Dagger, Rapier, Staff, Bow, Crossbow, Spear, Greatsword, Greataxe, Hammer, Maul, Flail, Buckler, Shield, TowerShield, Instrument
+- **Weapon types**: Sword, Axe, Mace, Dagger, Rapier, Hammer, Flail, Scimitar, Greatsword, Greataxe, Polearm, Staff, Maul, Bow, Instrument, Shield, Buckler, TowerShield
 - **Armor weight class**: Light / Medium / Heavy (gates classes; affects dodge / stamina / fatigue)
 - **Handedness**: OneHanded / TwoHanded / OffHandOnly
 
@@ -278,7 +277,7 @@ Per-slot equip with slot validation (the `Chain Shirt in MainHand` exploit was f
 
 ## 6. Location System
 
-**File**: `Scripts/Locations/BaseLocation.cs` (~3000 lines), `Scripts/Systems/LocationManager.cs` (singleton router)
+**File**: `Scripts/Locations/BaseLocation.cs` (~11900 lines), `Scripts/Systems/LocationManager.cs` (singleton router)
 
 ### BaseLocation Lifecycle
 Every location:
@@ -299,14 +298,14 @@ Every location:
 | `/gear` | `/eq` | Detailed equipment + per-team-member breakdown |
 | `/time` | `/t` | Game-time and turn count |
 | `/gold` | `/g` | Gold + bank |
-| `/map` | `/m` | Town location overview |
+| `/materials` | `/m`, `/mat` | Crafting materials |
 | `/herb` | (n/a) | Use herb from quick-buf |
 | `/prefs` | `/p`, `~` | Preferences (the SAFE per-player menu) |
-| `/help` | `/?`, `H` | Help |
+| `/help` | `/?`, `/commands`, `/` | Help |
 | `/founders`/`/statues`/`/hall` | | Founder hall hub |
 | `/town`/`/townhall` | | Team Town Hall (turf controllers) |
 | `/restore` | | (admin-only) Restore deleted character |
-| `/look` / `look` / `l` | | Reprint location banner (MUD mode) |
+| `look` | | Reprint location banner (MUD mode; `l` is not an alias) |
 
 Global slash channels (MUD): `/say`, `/tell`, `/gossip`, `/shout`, `/gc` (guild), `/who`, `/news`, `/group`, `/leave`, `/disband`, `/accept`, `/deny`, `/spectate`, `/spectators`, `/nospec`, `/settings`, `/compact`, `/bug`. Channels auto-mute by typing the slash command with no message body.
 
@@ -314,15 +313,14 @@ Global slash channels (MUD): `/say`, `/tell`, `/gossip`, `/shout`, `/gc` (guild)
 **Hub**: MainStreet
 **Commerce**: WeaponShop, ArmorShop, MagicShop, MusicShop (v0.49.0), Bank, Marketplace
 **Social**: Inn, DarkAlley, LoveStreet, LoveCorner, TeamCorner
-**Religious**: Church, Temple, Pantheon (immortals only), GodWorld
+**Religious**: Church, Temple, Pantheon (immortals only), Sanctum
 **Services**: Healer, LevelMaster
 **Combat**: Dungeon, Arena (PvP), Wilderness (v0.49.4)
 **Housing**: Home (with 5-tier upgrade system), Dormitory
 **Governance**: Castle, Prison, PrisonWalk, AnchorRoad
-**Quests**: QuestHall, News
+**Quests**: QuestHall
 **Settlement** (v0.49.5): Settlement / Outskirts (NPC-built shops, votes, services)
-**Admin**: SysOpConsole, CharacterCreation
-**Legacy**: GodWorld
+**Admin**: SysOpConsole
 
 ### Travel
 `LocationManager` maintains a navigation graph (per-location exit list). Transitions go through `GameEngine.NavigateToLocation(GameLocation)` which validates the edge in `navigationTable`. `LocationExitException` is the bypass for special teleports (royal-guard defense alert, immortal-locked-to-Pantheon, prison sentencing). Caught at the top of `LocationManager.EnterLocation`.
@@ -331,19 +329,21 @@ Global slash channels (MUD): `/say`, `/tell`, `/gossip`, `/shout`, `/gc` (guild)
 
 ## 7. Dungeon System
 
-**File**: `Scripts/Locations/DungeonLocation.cs` (~13,000 lines, the largest single file)
+**File**: `Scripts/Locations/DungeonLocation.cs` (~19,600 lines, the second largest file after CombatEngine.cs)
 
 ### Structure
 - 100 procedurally generated floors with **deterministic seeding**: `new Random(level * 31337 + 42)` ensures reproducible layouts across visits
-- Floor themes (8): Underground, Cavern, Temple, Ancient, Corrupted, Crystalline, Magma, Frozen
-- Room types: MonsterRoom, TreasureChest, Shrine, LoreLibrary, Trap, SecretVault, MeditationChamber, Settlement, PuzzleRoom, Riddle, LeverPuzzle, MemoryFragment, Boss, Stair
+- Floor themes (8): Catacombs, Sewers, Caverns, AncientRuins, DemonLair, FrozenDepths, VolcanicPit, AbyssalVoid
+- Room types: Corridor, Chamber, Hall, Alcove, Shrine, Crypt, PuzzleRoom, RiddleGate, SecretVault, LoreLibrary, BossAntechamber, MeditationChamber, TrapGauntlet, ArenaRoom, MerchantDen, MemoryFragment, Settlement
 - Floor state persisted in `player.DungeonFloorStates` dictionary (per-floor: monsters, cleared, last visited / cleared, boss defeated)
 
 ### Access & Progression
 ```csharp
-int minAccessible = Math.Max(1, playerLevel - 10);
-int maxAccessible = Math.Min(GameConfig.MaxDungeonLevel, playerLevel + 10);
+int reachAllowance = GetFloorReachAllowance(playerLevel); // +3 at Lv.1-5, +5 at Lv.6-15, +8 at Lv.16-30, +10 at Lv.31+
+int maxAccessible = Math.Min(maxDungeonLevel, playerLevel + reachAllowance);
 ```
+
+Any floor from 1 up to that limit can be chosen.
 
 `maxDungeonLevel` is a property reading `GameConfig.MaxDungeonLevel` live so admin / SysOp changes take effect on next floor change (v0.60.7).
 
@@ -369,7 +369,7 @@ Floors with `LastVisitedAt > 1 hour ago` repopulate non-boss monster rooms on ne
 ### Old God Boss Mechanics
 **File**: `Scripts/Systems/OldGodBossSystem.cs`, `Scripts/Data/OldGodsData.cs`
 
-Per-boss `BossContext` carries: 3 phase HP thresholds, per-phase ability lists, AoE % MaxHP cap (with first-3-rounds 15% per-hit damage cap), channel/interrupt mechanics, status immunities (physical / magical), corruption stacks, doom countdown, divine armor (boss self-protection scaled by player's equipped artifact count), enrage timer with extra-attack count, potion cooldown, phase-transition dialogue. Companion damage per round capped at `OldGodTeammateDamageCapPercent` (75%) of MaxHP. Solo Old God fights apply +15% boss damage AND -20% player damage (preserves the 1v1 tension while staying winnable). NG+ "Divine Scaling" buffs remaining gods +10% HP / +5% damage per artifact already collected (cap +40% / +20%).
+Per-boss `BossContext` carries: 3 phase HP thresholds, per-phase ability lists, AoE % MaxHP cap (with first-3-rounds 15% per-hit damage cap), channel/interrupt mechanics, status immunities (physical / magical), corruption stacks, doom countdown, divine armor (boss self-protection scaled by player's equipped artifact count), enrage timer with extra-attack count, potion cooldown, phase-transition dialogue. Any single hit on a companion or NPC teammate is capped at `OldGodTeammateDamageCapPercent` (75%) of MaxHP. Solo Old God fights apply +15% boss damage AND -20% player damage (preserves the 1v1 tension while staying winnable). NG+ "Divine Scaling" buffs remaining gods +10% HP / +5% damage per artifact already collected (cap +40% / +20%).
 
 ### Floor Locking
 Special floors lock the player until cleared:
@@ -383,13 +383,13 @@ Companions, spouses, lovers, and team NPCs join the dungeon party; live grouped 
 Mini-boss encounter on first floor-5 entry. Tied to the v0.52.0 onboarding hook arc.
 
 ### Settlements
-NPC-built community at floor 1. 7 building types (Palisade, Tavern, Market Stall, Shrine, Workshop, Watchtower, Council Hall) x 3 tiers each. NPCs propose builds, vote, contribute gold; players can endorse / oppose. Buffs: Tavern XP, Workshop +20% ATK / 5 combats, Watchtower full floor reveal, Council Hall daily gold for the controlling team, etc.
+NPC-built community in the Outskirts, a town location beyond the city gates. 7 building types (Palisade, Tavern, Market Stall, Shrine, Workshop, Watchtower, Council Hall) x 3 tiers each. NPCs propose builds, vote, contribute gold; players can endorse / oppose. Buffs: Tavern XP, Workshop +20% ATK / 5 combats, Watchtower full floor reveal, Council Hall daily gold for the controlling team, etc.
 
 ---
 
 ## 8. Combat Engine
 
-**File**: `Scripts/Systems/CombatEngine.cs` (~28,000 lines, the largest single system)
+**File**: `Scripts/Systems/CombatEngine.cs` (~34,000 lines, the largest single system)
 
 ### Combat Modes
 - `PlayerVsMonsters()` -- single & multi-monster
@@ -416,7 +416,8 @@ Attack, Defend (+50% defense), Heal (potion), CastSpell, UseAbility, Backstab, R
 
 ### Damage Formula (basic attack)
 ```
-attackPower = Strength + StrengthBonus + Level*2 + WeapPow + Random(WeapPow) + Random(1, Level/2)
+attackPower = Strength + StrengthBonus + Level + WeapPow + Random(WeapPow/2 + 1) + Random(1, max(21, Level/2))
+            (Bard, Jester and Wavecaller use Charisma in place of Strength)
 modifiers   x Raging 1.5, x TwoHanded 1.45 (post-v0.48), x DualWield off-hand 0.5
             +Knight 5%, +Shaman elemental rider, +Bard performance, +Specialization, +Settlement
 defense     = monster.Defence + Random(Defence/8) + ArmPow + Random(ArmPow) -- 75-100% variance
@@ -425,17 +426,17 @@ MinIncomingDamage = max(1, rawAttack/20, MaxHP * 0.25%)  // tank-floor scaling
 ```
 
 ### Hit Determination (D20)
-`monsterAC = 10 + Level/5 + Defence/20 + situational`. Attack roll via `TrainingSystem.RollAttack()`. Natural 20 = crit, Natural 1 = miss. Crit chance cap is DEX-scaled (`50 + min(25, DEX/30)`, max 75% at 750 DEX) plus +10 from Creator's Eye (was a 1.5x multiplier; flat now to avoid pinning everyone at the cap).
+`monsterAC = 10 + Level/2 + Defence/10 + situational`. Attack roll via `TrainingSystem.RollAttack()`. Natural 20 = crit, Natural 1 = miss. Crit chance cap is DEX-scaled (`50 + min(25, DEX/30)`, max 75% at 750 DEX) plus +10 from Creator's Eye (was a 1.5x multiplier; flat now to avoid pinning everyone at the cap).
 
 ### Anti-Exploit Caps
 | Mechanic | Cap | Reason |
 |---|---|---|
-| Backstab success | 75% | Prevent guaranteed exploit |
-| Backstab multiplier | 1.75x | Was 2.0x, double-crit fix |
+| Backstab success | 75% (multi-monster path min(95, 50 + DEX/2)) | Prevent guaranteed exploit |
+| Backstab multiplier | 3x (`BackstabMultiplier`) | From MURDER.PAS |
 | Mercy escape | 75% | Prevent guaranteed escape |
 | Crit chance | DEX-scaled 50-75% | Diminishing returns |
 | Flee chance | 75% | Risk/reward |
-| Boss HP multiplier | 2.8x (regular boss), 1.5x champion solo, 2.2x champion solo (post-v0.56) | Scaling |
+| Boss HP multiplier | 2.8x (regular boss), 2.2x champion (post-v0.56) | Scaling |
 | Bank robbery | Real combat, scaled guard difficulty, full party | Anti-grind |
 | Daily murder cap | 3/day | Keeps the town from being wiped in a session |
 | Daily team wars | 3/day, 6h cooldown per opponent, 1.5x reward | Anti-grind |
@@ -451,7 +452,7 @@ Base XP / Gold from monster -> world event modifiers (Blood Moon 2x XP / 3x gold
 Attacker vs AI-controlled defender (loaded from save at full HP). Same engine. Death handled in-arena: 10% gold stolen, 10% XP loss, 25% gold penalty, resurrect at Inn. Gold theft is bidirectional and atomic via `json_set()` SQL with `MAX(0, ...)`.
 
 ### Boss Rewards
-+50 Fame for Old God defeat, +25 Fame for World Boss kill credit. Floor boss XP/gold +40% in v0.56.1.
++50 Fame for Old God defeat, +15 Fame for a qualifying World Boss share, +10 more for the MVP. Floor boss XP/gold +40% in v0.56.1.
 
 ### Monster Targeting Intelligence
 Per-class threat weight (Paladin=180, Barbarian=170, Warrior=160 ... Magician=60, Sage=65) plus modifiers for armor, HP %, defending stance, and taunt state. Taunt force-targets at `TauntStickChance` (75% by default for AoE class taunts, 100% for hard `[T]` and Eternal Vigil).
@@ -461,22 +462,22 @@ Per-class threat weight (Paladin=180, Barbarian=170, Warrior=160 ... Magician=60
 ## 9. Spell & Ability Systems
 
 ### Spells
-**Files**: `Scripts/Data/SpellDatabase.cs`, `Scripts/Systems/SpellSystem.cs`
+**File**: `Scripts/Systems/SpellSystem.cs`
 
 3 base caster classes with **25 spells each** (75 total) plus **5 prestige classes with 5 spells each** (25 total) = **100 spells**:
 
 - **Cleric (Divine)**: Cure Light -> Cure Wounds -> Holy Smite -> Restoration -> Aurelion's Radiance -> God's Finger
 - **Magician (Arcane)**: Magic Missile -> Fireball -> Lightning Bolt -> Disintegrate -> Meteor Swarm -> Wish
 - **Sage (Mind/Shadow)**: Mind Spike -> Steal Life -> Energy Drain -> Shadow Step -> Temporal Paradox -> Death Kiss
-- **Tidesworn**: Alethia's Ward, Ocean's Resilience, Calm Waters (party debuff shield), Deluge, Sanctified Torrent
-- **Wavecaller**: CHA-scaling spells -- Tidal Strike, Siren's Lament, Wave Echo (double dmg vs debuffed), Symphony of the Depths, Harmonic Crescendo
+- **Tidesworn**: Alethia's Ward, Purifying Surge, Ocean's Rebuke, Covenant of the Deep, Deluge of Sanctity
+- **Wavecaller**: CHA-scaling spells: Harmonic Resonance, Tidecall Barrier, Siren's Lament, Alethia's Grace, Symphony of the Depths
 - **Cyclebreaker**: Time-bending utility
 - **Abysswarden**: Lifesteal / DoT
 - **Voidreaver**: Glass-cannon nukes (Unmaking, Void Bolt)
 
 **Mana cost**: `baseCost = 10 + (spellLevel * 5)`, reduced by Wisdom (max 50%). Healing spells never fizzle; offensive spells preserve the original fizzle gradient. Prestige spell scaling soft-capped at 4.0x INT (was hard 4.0x cap; v0.50.5 reworked to soft 8.0x ceiling).
 
-### Class Abilities (44+ across 17 classes)
+### Class Abilities (179 across 17 classes)
 **File**: `Scripts/Systems/ClassAbilitySystem.cs`
 
 ~10 abilities per class spread levels 1-100, costing Combat Stamina. Each carries `RequiredWeaponTypes`, `RequiresShield`, cooldown, mana / stamina cost, target type, and tier-scaled stamina cost (L50+ +25%, L75+ +40%).
@@ -485,18 +486,17 @@ Per-class threat weight (Paladin=180, Barbarian=170, Warrior=160 ... Magician=60
 - **Warrior**: Power Strike -> Shield Wall -> Battle Cry -> Shield Wall Formation (level 40 AoE taunt) -> Shield Bash (L16) -> Iron Fortress -> Champion's Strike
 - **Paladin**: Lay on Hands -> Divine Smite -> Aura of Protection -> Holy Shield Slam (L28) -> Divine Mandate (L40 AoE thorn taunt) -> Avatar of Light
 - **Barbarian**: Berserker Rage -> Reckless Attack -> Intimidating Roar -> Rage Challenge (L40 AoE taunt + regen) -> Bloodlust -> Avatar of Destruction
-- **Assassin**: Backstab -> Evasion -> Poison Strike -> Biaxin (L35 poison + corrosion) -> Shadow Clone -> Assassinate -> Nightblade Dance (passive: Lethal Precision)
+- **Assassin**: Backstab -> Poison Blade -> Biaxin (L35 poison + corrosion) -> Assassinate -> Blade Dance -> Death Blossom (passive: Lethal Precision)
 - **Tidesworn**: Undertow Stance -> Breakwater -> Abyssal Anchor (AoE taunt) -> Eternal Vigil (invuln-with-forced-aggro)
 - **Mystic Shaman**: 4 enchantments (fire/frost/earth/storm) + 5 totems (healing/earthbind/searing/windfury/spirit link) + Lightning Bolt + Chain Lightning + Ancestral Guidance
 
-Universal abilities (available to most classes): Second Wind, Battle Focus, etc. Spellcasters can equip these too (v0.50.5).
+Universal abilities (available to most classes): Second Wind, Focus, Rally. Spellcasters can equip these too (v0.50.5).
 
 ### Class Passives (selection)
-- Warrior Iron Fortress: shield-equipped damage reduction
 - Bard Bardic Inspiration: 15% proc +20 ATK to teammate
 - Mystic Shaman Elemental Mastery: INT-scaling enchant rider (capped at `ShamanEnchantPowerCap = 250`)
 - Paladin Divine Resolve: +10% vs undead/demons, 15% status resist
-- Tidesworn Ocean's Voice: sequential +20% backup crit roll
+- Wavecaller Ocean's Voice: sequential +20% backup crit roll
 
 ---
 
@@ -504,32 +504,32 @@ Universal abilities (available to most classes): Second Wind, Battle Focus, etc.
 
 **Files**: `Scripts/Core/Monster.cs`, `Scripts/Data/MonsterFamilies.cs`, `Scripts/Systems/MonsterGenerator.cs`
 
-### Monster Families (10 x 5 tiers = 50 unique types)
+### Monster Families (15 x 5 tiers = 75 unique types)
 Goblinoid, Undead, Orcish, Draconic, Demonic, Giant, Beast, Elemental, Aberration, Insectoid. Tiers low-to-high per family.
 
 ### Stat Generation
 ```
-HP        = (25*level + level^1.1 * 8) x bossMultiplier x GameConfig.MonsterHPMultiplier
+HP        = (50*eff + eff^1.2 * 15) x bossMultiplier x GameConfig.MonsterHPMultiplier   (eff = level, slope MonsterLevelSlopePast50 past 50)
 Strength  = (2*level + level^1.05 * 1.5) x multiplier
-Defence   = (level + level^1.02 * 0.5) x multiplier x 0.5
+Defence   = (level + level^1.02 * 0.5) x multiplier
 ```
 
 `GameConfig.MonsterHPMultiplier` is admin-tunable via the web Server Settings panel; effective at next monster spawn.
 
 ### Group Encounters
-10% chance single mini-boss, 70% same-family thematic encounter, 30% mixed families (mixed-floor restricted to floor 30+ to keep early floors thematic). Group size scales: 1-2 / 1-3 / 2-4 / 3-5.
+10% chance single mini-boss, 70% same-family thematic encounter, 30% mixed families (on any floor). Group size: 1-2 up to floor 10, 1-3 below floor 25, then a mean rising to 4.
 
 ### Champion / Mini-Boss / Boss Tiers
 | Tier | HP mult | Damage | Defense | Loot guarantee |
 |---|---|---|---|---|
 | Solo Champion | 2.2x | +30% | +20% | 2 items (was 1) |
 | Group Champion | 1.5x | -- | -- | 1 item |
-| Mini-Boss | 1.5x | +15% | +10% | Boosted |
+| Mini-Boss | 2.2x | +30% | +20% | Boosted (same multipliers as a champion) |
 | Floor Boss | 2.8x | x1.25 | x1.2 | 4.2x XP/gold; first-3-rounds 15% MaxHP per-hit damage cap |
 | Old God | per-boss in `OldGodsData.cs` | per-boss | per-boss | 1-of-7 artifact + boss-themed loot |
 
 ### Boss Damage Multiplier
-`DifficultySystem.ApplyMonsterDamageMultiplier(baseDmg)` is applied to monster basic-attack damage. Monster special abilities (DirectDamage, life drain, AoE) currently bypass it (existing pre-v0.60 gap, called out in the registry's descriptor description for honesty).
+`DifficultySystem.ApplyMonsterDamageMultiplier(baseDmg)` is applied to monster basic-attack damage. Old God named abilities apply it too; generic DirectDamage abilities still bypass it.
 
 ---
 
@@ -545,6 +545,8 @@ Goal-based AI with 15-min decision cooldown:
 4. Re-evaluate goals
 5. Get priority goal -> generate actions -> score -> select best
 
+NPCs flagged `IsAIDriven` skip this path in the world sim and use the Brain v2 utility scorer (`BrainV2ProcessActivities`, `Scripts/AI/BrainV2Scorer.cs`).
+
 ### Memory System
 **File**: `Scripts/AI/MemorySystem.cs`
 
@@ -557,11 +559,11 @@ Goal-based AI with 15-min decision cooldown:
 ### Personality System
 **File**: `Scripts/AI/PersonalityProfile.cs`
 
-13 core personality traits (0.0-1.0): Aggression, Loyalty, Intelligence, Greed, Compassion, Courage, Honesty, Ambition, Vengefulness, Impulsiveness, Caution, Mysticism, Patience.
+13 core personality traits (0.0-1.0): Aggression, Greed, Courage, Loyalty, Vengefulness, Impulsiveness, Sociability, Ambition, Trustworthiness, Caution, Intelligence, Mysticism, Patience.
 
-10 romance traits: Romanticism, Flirtatiousness, Commitment, attraction preferences, gender preferences, relationship style.
+10 romance traits: Romanticism, Sensuality, Jealousy, Commitment, Adventurousness, Exhibitionism, Voyeurism, Flirtatiousness, Passion, Tenderness; plus gender, orientation and relationship preference fields.
 
-NPC orientation rates: 85% straight, 8% gay, 5% lesbian, 2% bi, with minimum-diversity guarantee (>=2 of each non-straight). Orientation persists per-NPC in saves.
+NPC orientation rates: 85% straight, 8% gay or lesbian (by gender), 6% bisexual, 1% pansexual, with a floor of 2 gay males, 2 lesbians and 2 bisexuals. Orientation persists per-NPC in saves.
 
 ### Enhanced Behaviors
 **File**: `Scripts/AI/EnhancedNPCBehaviors.cs`
@@ -570,22 +572,25 @@ Per simulation tick:
 1. Inventory swap if 20% better
 2. Class-based shopping AI
 3. Gang management (recruit, dissolve small)
-4. Relationship dynamics (2% marriage chance/tick at L5+)
+4. Relationship dynamics (0.2% marriage attempt per tick at level 5 and up)
 5. Gang warfare automation
-6. Conway-style neighbor pressure (isolation / overcrowding modulates location selection)
+
+Conway-style neighbor pressure (isolation and overcrowding change location selection) is in `WorldSimulator` activity selection, not in this file.
 
 ### Emotional State
 **File**: `Scripts/AI/EmotionalState.cs`
 
-12 emotion types (Happiness, Anger, Fear, Confidence, Sadness, Greed, Hope, Peace, Trust, Loneliness, Envy, Pride). Personality-derived baselines + transient world-event modulation (+/-15%) + antagonistic suppression (high anger dampens happiness/peace, etc.). Serialized for the web admin / dashboard.
+12 emotion types (Anger, Fear, Joy, Sadness, Confidence, Greed, Gratitude, Loneliness, Envy, Pride, Hope, Peace). Personality-derived baselines + transient world-event modulation (+/-15%) + antagonistic suppression (high anger dampens happiness and peace, applied in `OnlineStateManager`). Serialized for the web admin / dashboard.
 
 ---
 
 ## 12. World Simulator
 
-**Files**: `Scripts/Systems/WorldSimulator.cs` (in-game, single-player + MUD), `Scripts/Systems/WorldSimService.cs` (legacy headless deployment)
+**Files**: `Scripts/Systems/WorldSimulator.cs` (in-game, single-player + MUD), `Scripts/Systems/WorldSimService.cs` (the host the MUD server and `--worldsim` run it in)
 
 ### Tick (every 30 seconds)
+
+The order below is the older one. In 1.3.4 immigration and the recruit pool top-up run right after aging, before pregnancies; the tick ends with the settlement tick; catch-up mode runs the volatile systems every 60th tick (`WorldSimulator.cs`).
 ```
 1. ProcessNPCRespawns
 2. FamilySystem.ProcessDailyAging          -- age children, convert to NPCs at 18
@@ -605,7 +610,7 @@ Per simulation tick:
 ```
 
 ### Race Extinction Floor
-NPCs of any race below `PermadeathRaceFloor = 3` trigger immigration; new NPCs of that race spawn from a name pool to keep the population diverse. `IsAgedDeath` is a hard NO-respawn flag.
+Any race with fewer than 5 living NPCs gets immigrants from a name pool to keep the population diverse; `PermadeathRaceFloor = 3` instead blocks permadeath for a race that small. `IsAgedDeath` is a hard NO-respawn flag.
 
 ### World State Authority
 The world sim is the authoritative source for shared state (NPCs, royal court, economy, settlement, marriages, children, world events) in MUD mode. Player saves write player-specific data only; world state is loaded from `world_state` SQLite rows on every login and pushed back on mutating actions. Concurrent online edits are protected by row-level versioning and `OnlineStateManager.SaveAllSharedState()`.
@@ -620,23 +625,23 @@ The world sim is the authoritative source for shared state (NPCs, royal court, e
 - Race lifespans: Human 75 (~30 d), Elf 200 (~80 d), Orc 55 (~22 d), Gnoll 50 (~20 d), etc.
 
 ### Pregnancies
-- 1% per tick for eligible married females (age 18-45). Dynamic 3% if underpopulated, 0.5% if overpopulated
+- Chance per tick scales with population, from about 0.67% under 40 NPCs down to 0.025% above 160, for females aged 18 to 45, married or not
 - Gestation ~7 real hours
 - Max 4 children per couple
 - Same-sex couples: no natural pregnancy
 - Affair pregnancy father is `NPC.PregnancyFatherName` (serialized; replaced an unserialized `_pregnancyFathers` dict that lost data on reloads, v0.52.11)
 
 ### Children
-Born via `FamilySystem.CreateNPCChild()`. Auto-convert to full NPCs at age 18 via `ConvertChildToNPC()`. 80 fantasy names (40 male, 40 female) with Roman numeral suffixes for duplicates. Per-player children get full save plumbing; renaming or birthing immediately persists `world_state.children` to avoid race-condition wipes from concurrent logins.
+Born via `FamilySystem.CreateNPCChild()`. Auto-convert to full NPCs at age 18 via `ConvertChildToNPC()`. Names come from the shared immigrant pools (80 male, 80 female) with Roman numeral suffixes for duplicates. Per-player children get full save plumbing; renaming or birthing immediately persists `world_state.children` to avoid race-condition wipes from concurrent logins.
 
 ### Natural Death, Divorce, Polyamory
 - Natural death: `IsAgedDeath = true` -> permanent, never respawned; widowed spouse gets bereavement memory
-- Divorce: 0.3% base/tick, modulated by personality and alignment compatibility
+- Divorce: 0.3% base per tick in single player, 0.02% online, modulated by personality and alignment compatibility
 - Affairs: flirtatious married NPCs (>0.6) have 15% chance of conceiving with non-spouse
 - Polyamory: NPCs with `RelationshipPreference.Polyamorous` / `OpenRelationship` can seek partners while married
 
 ### Permadeath Cleanup (v0.60.5+)
-On NPC permadeath: marriage cleared, faction membership purged, gang affiliation dropped, pregnancy cleared, relationship cache pruned. The same purge runs for player permadeath via `SqlSaveBackend.PurgePlayerWorldState(username)` -- 9 tables in one transaction (guild_members, online_players, sleeping_players, wizard_flags, messages, trade_offers, bounties, auction_listings, world_boss_damage) plus in-memory hooks for `GodSystem.SetPlayerGod` and `RelationshipSystem.ResetPlayerRelationships`.
+On NPC permadeath: marriage cleared, faction membership purged, gang affiliation dropped, pregnancy cleared, relationship cache pruned. The same purge runs for player permadeath via `SqlSaveBackend.PurgePlayerWorldState(username)` -- 13 tables in one transaction (guild_members, online_players, sleeping_players, creation_rolls, messages, trade_offers, bounties, auction_listings, world_boss_damage, pvp_log, pending_inheritance, pending_gold_transfers, world_boss_rewards; wizard_flags is kept) plus in-memory hooks for `GodSystem.SetPlayerGod` and `RelationshipSystem.ResetPlayerRelationships`.
 
 ---
 
@@ -645,18 +650,19 @@ On NPC permadeath: marriage cleared, faction membership purged, gang affiliation
 **Files**: `Scripts/Systems/SaveSystem.cs`, `Scripts/Systems/SaveDataStructures.cs`, `Scripts/Systems/SaveFileRepair.cs`
 
 ### Architecture
-Pluggable: `IOnlineSaveBackend` interface with two implementations:
-- `FileSaveBackend` -- per-player JSON files in `saves/` (single-player and BBS sysop deployments)
-- `SqlSaveBackend` -- SQLite (online / MUD multiplayer)
+Pluggable: the `ISaveBackend` interface, with two implementations:
+- `FileSaveBackend` implements `ISaveBackend`: per-player JSON files in `saves/` (single-player and BBS sysop deployments)
+- `SqlSaveBackend` implements `IOnlineSaveBackend`, which extends `ISaveBackend`: SQLite (online / MUD multiplayer)
 
 Selected at startup via `SaveSystem.InitializeWithBackend()`.
 
 ### Save Data
 ```csharp
 SaveGameData {
-  int Version, MinSaveVersion;
+  int Version;
   DateTime SaveTime, LastDailyReset;
-  int CurrentDay, GameTimeMinutes;
+  int CurrentDay;
+  DailyCycleMode DailyCycleMode;
   PlayerData Player;            // 200+ fields
   List<NPCData> NPCs;            // Full state including AI brain
   WorldStateData WorldState;     // Economy, ruler, events, shops
@@ -673,7 +679,7 @@ Identity, stats, class/race, lifecycle (Age, BirthDate, IsAgedDeath, PregnancyDu
 
 ### Bloat Caps (v0.57.16+, v0.57.18+)
 Serialization-time caps prevent save inflation on long sessions:
-- `MaxSerializedMemoriesPerNpc = 30` (top by Importance desc)
+- Memories: 30 per NPC (`MaxMemoriesToSerialize` in `SaveSystem`, top by Importance desc)
 - `MaxSerializedDialogueIdsPerNpc = 50`
 - `MaxSerializedRelationshipsPerNpc = 100` (by `|strength|` desc)
 - `MaxSerializedKnownCharactersPerNpc = 80`
@@ -692,12 +698,12 @@ Serialization-time caps prevent save inflation on long sessions:
 Ctrl+C / disconnect path writes `emergency_<charname>_<timestamp>.json` (3 most recent retained per character). Restored by the recovery menu when the primary save fails to load.
 
 ### Format
-JSON via `System.Text.Json` with `JsonNamingPolicy.CamelCase`, `IncludeFields = true`, `MaxDepth = 256`. `TolerantEnumConverter` accepts case-insensitive enum strings (forward-compat for moddable JSON).
+JSON via `System.Text.Json` with `JsonNamingPolicy.CamelCase`, `IncludeFields = true`, `MaxDepth = 256`. `TolerantEnumConverterFactory` accepts case-insensitive enum strings in moddable game data (`GameDataLoader`); the SQL backend adds `TolerantDictionaryConverter` and writes compact JSON.
 
 ### 7-Day Deleted Characters Archive
 **Table**: `deleted_characters` (SQLite)
 
-On any `DeleteGameData()`, the player_data JSON is archived for 7 days before the row is purged from `players`. `/restore` command (admin-only since v0.60.6) can reverse a deletion within the window. Permadeath uses `bypassArchive: false` so archived rows go through the same flow.
+On any `DeleteGameData()`, the player_data JSON is archived for 7 days; the `players` row is kept (password and ban intact) with `player_data` cleared to `{}`. `/restore` command (admin-only since v0.60.6) can reverse a deletion within the window. Permadeath uses `bypassArchive: false` so archived rows go through the same flow.
 
 ---
 
@@ -718,18 +724,18 @@ Single-process multi-user game server. Listens on a configurable TCP port. Each 
 - `DiscordBridgePollerAsync` -- 250ms, drains inbound Discord -> in-game
 - `ServerSettingsApplyLoopAsync` -- 1s, drains `server_config_apply_queue` (v0.60.7)
 - `ActiveBroadcast` -- volatile string for sysop's persistent banner
-- `BroadcastToAll(msg, excludeUsername, channelKey)` -- per-channel mute respected
+- `BroadcastToAll(message, excludeUsername, channelKey, historyChannel)`: per-channel mute respected
 - Static delegate hooks: `KickActiveSessionHook` (called by `BanPlayer`), `PermadeathPurgeHook` (called by `PurgePlayerWorldState` for in-memory cleanup)
 
 ### PlayerSession
 **File**: `Scripts/Server/PlayerSession.cs`
 
-Per-connection state: `Username`, `ConnectionType` (Web / SSH / BBS / Steam / MUD / Local), `RemoteIP`, `IsPlainText`, `GmcpEnabled`, `IsCp437`, `IsGroupFollower`, `GroupLeaderSession`, `Spectators`, `SpectatingSession`, `MutedChannels`, `SuppressDisconnectSave`, `IdleWarningShown`. Wraps the `TerminalEmulator` and tracks idle time. On disconnect: emergency save (unless suppressed by permadeath), presence cleanup, group cleanup, spectator cleanup, GMCP shutdown.
+Per-connection state: `Username`, `ConnectionType` (Web / SSH / BBS / Steam / MUD / Local), `WizardLevel`, `ScreenReaderMode`, `IsMuted`, `IsGroupFollower`, `GroupLeaderSession`, `Spectators`, `SpectatingSession`, `SuppressDisconnectSave`, `IdleWarningShown`, `ClientVersion` (muted channels live in the player's save). Wraps the `TerminalEmulator` and tracks idle time. On disconnect: emergency save (unless suppressed by permadeath), presence cleanup, group cleanup, spectator cleanup, GMCP shutdown.
 
 ### SessionContext
 **File**: `Scripts/Server/SessionContext.cs`
 
-Per-session AsyncLocal context: `Username`, `CharacterKey`, `RemoteIP`, `IsAdmin`, `IsIntentionalExit`, `Language`, `CompactMode`, `DisableCharacterMonsterArt`, `ScreenReaderMode`, `GmcpEnabled`. AsyncLocal lets session-scoped state propagate through async calls without explicit threading.
+Per-session AsyncLocal context: `Username`, `CharacterKey`, `ConnectionType`, `ClientVersion`, `RemoteIP`, `WizardLevel`, `IsIntentionalExit`, `Language`, `CompactMode`, `AutoLook`, `DisableCharacterMonsterArt`, `GmcpEnabled`, plus the per-session system instances. AsyncLocal lets session-scoped state propagate through async calls without explicit threading.
 
 ### Authentication Protocol
 
@@ -739,7 +745,9 @@ Two paths:
 
 2. **Password AUTH (4-part)**: `AUTH:user:password:type` or `AUTH:user:password:REGISTER:type`. Routed through `SqlSaveBackend.AuthenticatePlayer` / `RegisterPlayer` with PBKDF2-SHA256 (100k iterations, 16-byte salt, constant-time comparison).
 
-3. **Interactive auth**: raw telnet without an AUTH header times out the 500ms probe and falls into a register / login menu over TCP. Used by direct-MUD-client connections (Mudlet, MUSHclient, TinTin++).
+3. **Remember-me token (1.2.8)**: `AUTH:TOKEN1` logs in with a login token the client saved (`LoginTokenProtocol`, `login_tokens` table). Failed logins are throttled per IP, and an `X-IP` header is honoured only from loopback.
+
+4. **Interactive auth**: raw telnet without an AUTH header times out the 500ms probe and falls into a register / login menu over TCP. Used by direct-MUD-client connections (Mudlet, MUSHclient, TinTin++).
 
 The accept-time IP-ban check runs before any auth path; banned single IPs and CIDR rows immediately get a polite `Connection refused` and a closed socket.
 
@@ -749,7 +757,7 @@ On interactive connect, server sends `IAC WILL ECHO` + `IAC WILL SGA` + `IAC WIL
 ### MudChatSystem
 **File**: `Scripts/Server/MudChatSystem.cs`
 
-Per-channel slash commands with rate limits, mute support, name resolution (greedy longest-prefix matching for multi-word display names like "Lumina Starbloom"), and broadcast routing. Channels: `say`, `tell`, `gossip`, `shout`, `gc` (guild), `who`, `news`, `group`, plus admin channels `accept`, `deny`, `spectators`, `nospec`, `pardon`, `restore`.
+Per-channel slash commands with rate limits, mute support, name resolution (greedy longest-prefix matching for multi-word display names like "Lumina Starbloom"), and broadcast routing. Commands: `say`, `tell`, `shout`, `emote`, `gossip`, `who`, `history`, `title`, `group`, the guild commands (`guild`, `gc` and the `g*` set), and the spectate commands `accept`, `deny`, `spectators`, `nospec`.
 
 ### Group System
 **File**: `Scripts/Server/GroupSystem.cs`
@@ -759,7 +767,7 @@ Cooperative dungeon parties. Detailed in [Section 21](#21-group--spectator).
 ### Wizard Commands
 **File**: `Scripts/Server/WizardCommandSystem.cs`
 
-Tiered admin commands: `/restore`, `/freeze`, `/mute`, `/broadcast`, `/rage` (memorial event toggle), `/sysop`, etc. Audit-logged to `wizard_log`.
+Tiered admin commands: `/restore`, `/freeze`, `/mute`, `/ban`, `/pardon`, `/broadcast`, `/rage` (memorial event toggle), etc. Audit-logged to `wizard_log`.
 
 ---
 
@@ -781,9 +789,11 @@ CREATE TABLE players (
   created_at TEXT, last_login TEXT, last_logout TEXT,
   total_playtime_minutes INTEGER,
   is_banned INTEGER, ban_reason TEXT,
-  noble_title TEXT,                      -- Sir / Dame / etc.
   last_login_ip TEXT,                    -- v0.60.5
-  created_ip TEXT                        -- v0.60.5 (for reg rate-limit)
+  created_ip TEXT,                       -- v0.60.5 (for reg rate-limit)
+  wizard_level, screen_reader, language, -- later migrations
+  email TEXT, email_verified_at TEXT,    -- 1.3.4 account mail (unique index on a set email)
+  email_prompted_at TEXT                 -- 1.3.4
 );
 
 -- Shared world state (NPCs, royal court, economy, settlement, etc.)
@@ -815,23 +825,26 @@ CREATE TABLE sleeping_players (
 ```sql
 CREATE TABLE messages (id, from_player, to_player, message_type, message, is_read, created_at);
 CREATE TABLE news (id, message, category, player_name, created_at);
-CREATE TABLE pvp_log (id, attacker, defender, levels, winner, gold_stolen, xp_gained, hp_remaining, rounds, created_at);
+CREATE TABLE pvp_log (id, attacker, defender, attacker_level, defender_level, winner, gold_stolen, xp_gained, attacker_hp_remaining, rounds, created_at);
 CREATE TABLE discord_gossip (id, direction, author, message, created_at, processed);
 ```
 
 ### Trading & Economy
 
 ```sql
-CREATE TABLE trade_offers (id, from_player, to_player, items, gold, status, created_at);
-CREATE TABLE auction_listings (id, seller, buyer, item_data, starting_bid, current_bid, expires_at, status);
-CREATE TABLE bounties (id, target_player, placed_by, claimed_by, reward, ...);
+CREATE TABLE trade_offers (id, from_player, to_player, items_json, gold, status, message, created_at, resolved_at);
+CREATE TABLE auction_listings (id, seller, item_name, item_json, price, listed_at, expires_at, buyer, status, gold_collected);  -- fixed price, no bidding
+CREATE TABLE bounties (id, target_player, placed_by, amount, placed_at, claimed_by, claimed_at, status);
 ```
 
 ### World Bosses & Permadeath Memorial
 
 ```sql
-CREATE TABLE world_bosses (id, boss_data_json, current_hp, status, spawned_at);
+CREATE TABLE world_bosses (id, boss_name, boss_level, max_hp, current_hp, boss_data_json, started_at, expires_at, status);
 CREATE TABLE world_boss_damage (id, boss_id, player_name, damage_dealt, ...);
+CREATE TABLE world_boss_rewards (...); CREATE TABLE world_boss_events (...);
+CREATE TABLE fallen_legacy (...);      -- permadeath memorial and heirloom
+CREATE TABLE rage_victims (...);
 ```
 
 ### Wizard Tools
@@ -904,9 +917,17 @@ Single-row, UPSERTed every 30s.
 ### Guilds (v0.52.0)
 
 ```sql
-CREATE TABLE guilds (id, name, leader_username, bank_gold, motd, created_at);
-CREATE TABLE guild_members (guild_id, username, role, joined_at);
+CREATE TABLE guilds (name PRIMARY KEY, display_name, motto, leader_username, bank_gold, created_at);
+CREATE TABLE guild_members (username PRIMARY KEY, guild_name, rank, joined_at);
+CREATE TABLE guild_bank_items (id, guild_name, item_name, ...);
 ```
+
+### Accounts and Telemetry
+- `login_tokens` (1.2.8): remember-me login tokens.
+- `mail_requests`, `account_tokens`, `account_security_log` (1.3.4): password self-reset by email (`SqlSaveBackend.AccountMail.cs`); see `DOCS/MULTIPLAYER_ARCHITECTURE.md`, Account Mail.
+- `telemetry_consent` (1.2.7, `SqlSaveBackend.Telemetry.cs`): opt-in telemetry.
+
+The backend creates many more tables than this section lists (teams, sieges, combat events, admin commands, pending purges, inheritance and others); `SqlSaveBackend.cs` is the full list. The web proxy creates its own tables too (`balance_config`, `admin_config`, `remote_combat_events`, `mail_limits`, `account_token_stamps`).
 
 ### Atomic Operations
 - Gold theft via `json_set()` + `MAX(0, ...)` (no full save load required)
@@ -941,7 +962,7 @@ The registry's `All` list is the single source of truth. The same descriptor dri
 - Server-side validation in `ServerSettingsRegistry.Validate(key, value)`
 - Live apply via `ApplyConfigValue(key, value)` (drained from `server_config_apply_queue` every 1s by `MudServer.ServerSettingsApplyLoopAsync`)
 
-### Phase 1 Settings (9 tunables)
+### Settings (10 tunables)
 
 **Death**:
 - `default_starting_resurrections` (int 0-99, default 3)
@@ -959,6 +980,9 @@ The registry's `All` list is the single source of truth. The same descriptor dri
 
 **Communication**:
 - `motd` (string max 500)
+
+**Privacy** (1.2.7):
+- `telemetry_prompt` (bool, default false): ask players once whether to share combat data
 
 `max_dungeon_level` was deliberately excluded from the registry (capping below 100 breaks the Old God boss floors and ending sequence). It remains tunable via SysOpConfig file for BBS sysops.
 
@@ -1005,7 +1029,7 @@ All three short-circuit on `SessionContext.IsIntentionalExit == true` (set by th
 Royal Guards "subdue" murderers non-lethally. `Character.IsArrestCombat = true` flags the fight; `HandlePlayerDeath` short-circuits at HP=1 with `Outcome = PlayerEscaped`, no resurrection consumed, no permadeath check, no broadcast. Player is hauled to prison via `LocationExitException(GameLocation.Prison)`.
 
 ### World-State Purge on Permadeath
-`SqlSaveBackend.PurgePlayerWorldState(username)` runs BEFORE `DeleteGameData` so joined queries still resolve the username. Single-transaction purge of 9 tables (guild_members, online_players, sleeping_players, wizard_flags, messages, trade_offers, bounties, auction_listings, world_boss_damage). In-memory hooks (via `PermadeathPurgeHook`) clear `GodSystem.playerGods[username]` (decrementing the god's believer count) and `RelationshipSystem` per-player NPC opinion cache. `pvp_log`, `wizard_log`, `news` deliberately preserved as historical record.
+`SqlSaveBackend.PurgePlayerWorldState(username)` runs inside `PermadeathHelper.PurgeDeletedCharacterAsync`, which every online delete path calls BEFORE `DeleteGameData` so joined queries still resolve the username. Single-transaction purge of 13 tables (guild_members, online_players, sleeping_players, creation_rolls, messages, trade_offers, bounties, auction_listings, world_boss_damage, the pvp_log rows the character won, pending_inheritance, pending_gold_transfers, undelivered world_boss_rewards); wizard_flags stay with the account. In-memory hooks (via `PermadeathPurgeHook`) clear `GodSystem.playerGods[username]` (decrementing the god's believer count) and `RelationshipSystem` per-player NPC opinion cache. `wizard_log`, `news` and the other `pvp_log` rows are preserved as historical record.
 
 ### Suppress-Disconnect-Save
 Permadeath sets `SessionContext.IsIntentionalExit = true` and `PlayerSession.SuppressDisconnectSave = true` before deleting the row. Prevents the emergency-save-on-disconnect path from re-INSERTing the freshly-deleted character. Plus an in-memory blacklist (`SqlSaveBackend.MarkUsernameErased`) checked at the top of every `WriteGameData` call as belt-and-suspenders.
@@ -1018,12 +1042,12 @@ Permadeath sets `SessionContext.IsIntentionalExit = true` and `PlayerSession.Sup
 
 Per-player combat-input cadence tracking. Rolling 30-sample window of inter-input intervals; tracks mean, stddev, consecutive-fast streaks, total flag count.
 
-### Flag Thresholds (tunable in `GameConfig`)
-- Mean interval below `BotMeanThresholdMs` (200ms) -> 1 flag
-- Stddev below `BotStdDevThresholdMs` (50ms) -> 1 flag (low variance = bot)
-- Consecutive-fast streak above `BotConsecutiveFastThreshold` (10) -> 1 flag
+### Flag Thresholds (constants in `BotDetectionSystem`)
+- Mean interval below `SuspectMeanMs` (60ms)
+- Stddev below `SuspectStdDevMs` (20ms) (low variance = bot)
+- `SuspectConsecutiveCount` (20) or more consecutive inputs faster than `FastThresholdMs` (40ms)
 
-A session crossing all three thresholds simultaneously is "BOT_SUSPECT" (logged). Single-flag sessions show as "flagged" on the dashboard but no automated action is taken.
+A session is flagged "BOT_SUSPECT" (logged) only when all three conditions hold at once, at most once per 60 seconds (`FlagCooldownSeconds`). No automated action is taken.
 
 ### Snapshot to DB (v0.60.4)
 `BotDetectionSnapshotLoopAsync` in `MudServer` runs every 30s, writes the full `Snapshot()` (thresholds + per-session metrics) as JSON to a single `bot_detection_snapshot` row. The web admin polls `GET /api/admin/bot-stats` and renders a sortable table with per-cell flag-state highlighting.
@@ -1050,14 +1074,14 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 |---|---|---|
 | `Char.Vitals` | Top of `BaseLocation.LocationLoop` (delta-tracked, only when changed) | `{ hp, maxHp, mp, maxMp, sp, mental, maxMental }` (v1.1.15: mental and maxMental added, both modes) |
 | `Char.Status` | Every location change | `{ name, class, level, race, gold, bank, xp, location }` |
-| `Room.Info` | Every location change | `{ num, name, area, exits }` (exits placeholder) |
+| `Room.Info` | Every location change | `{ num, name, area, exits }` (exits filled for town locations and dungeon rooms) |
 | `Comm.Channel.Text` | All chat broadcasts | `{ channel, talker, text }` |
 | `Char.Death` | At top of `HandlePlayerDeath` | `{ killer, resurrectionsLeft }` |
 
 Strict opt-in: SSH-relayed, web terminal, BBS, and Electron sessions skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. Synchronous per-stream lock prevents interleaved frames.
 
-### Not Shipped (Deferred)
-`Char.Items` (inventory deltas), `Char.Skills`, full combat events, `Room.Exits` enumeration, `Core.Supports.Set` client-side package negotiation.
+### Shipped Since
+The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). `Core.Supports.Set` is recorded per session but changes nothing yet.
 
 ---
 
@@ -1066,16 +1090,16 @@ Strict opt-in: SSH-relayed, web terminal, BBS, and Electron sessions skip GMCP e
 ### Group System
 **File**: `Scripts/Server/GroupSystem.cs`
 
-Cooperative dungeon parties for MUD mode. Form via `/group <player>`. Player accepts via `/accept`; declines via `/deny`. Group max size `GroupMaxSize = 4`, min level `GroupMinLevel = 5`, invite timeout `GroupInviteTimeoutSeconds = 60`, combat input timeout `GroupCombatInputTimeoutSeconds = 90`.
+Cooperative dungeon parties for MUD mode. Form via `/group <player>`. Player accepts via `/accept`; declines via `/deny`. Group max size `GroupMaxSize = 5` (leader + 4), min level `GroupMinLevel = 5`, invite timeout `GroupInviteTimeoutSeconds = 60`, combat input timeout `GroupCombatInputTimeoutSeconds = 30`.
 
 ### Combat Architecture
-Each player runs their own action loop with the full action set (spells with target selection, tactical actions, individual retreat, quickbar abilities). Round-by-round status broadcast to all members. Leader death doesn't end combat -- surviving players fight on. Monster special abilities target every party member. `BroadcastGroupCombatEvent`, `BroadcastGroupedPlayerAction`, `MonsterAttacksCompanion` all carry the dungeon-only filter so followers in town don't get spammed with combat lines.
+Each player runs their own action loop with the full action set (spells with target selection, tactical actions, individual retreat, quickbar abilities). Round-by-round status broadcast to all members. Leader death doesn't end combat -- surviving players fight on. Monster special abilities target every party member. `BroadcastGroupCombatEvent`, `BroadcastGroupedPlayerLocalized`, `MonsterAttacksCompanion` all carry the dungeon-only filter so followers in town don't get spammed with combat lines.
 
 ### Loot
 Dice-roll system. Each item rolls each player; higher roll wins. Per-item Pass / Equip / Take prompts to followers. Cascade through party if leader passes. Equipment comparison overlay on each prompt.
 
 ### XP / Gold Distribution
-`DistributeGroupRewards` -- equal split across alive party members. Followers get same multipliers as leader (Blood Moon, NG+ cycle, settlement buffs, knight bonus, etc.). Catch-up XP for underleveled teammates (+10% per level gap, 4x cap). Per-slot percentage (auto-redistributed on teammate death).
+`DistributeGroupRewards`: gold is split evenly across alive party members; each grouped player's XP is worked out from their own level against the monster's. Followers get same multipliers as leader (Blood Moon, NG+ cycle, settlement buffs, knight bonus, etc.). NPC teammates get catch-up XP (+10% per level behind, no cap). Per-slot percentage (auto-redistributed on teammate death).
 
 ### Spectator Mode
 **Files**: `Scripts/Core/GameEngine.cs` (RunSpectatorModeUI, RunSpectatorLoop), `Scripts/UI/TerminalEmulator.cs` (`AddSpectatorStream`, `RemoveSpectatorStream`, `ForwardToSpectators`)
@@ -1093,14 +1117,14 @@ Player-formed guilds with persistent membership and shared bank.
 ### Schema
 ```sql
 guilds (id, name, leader_username, bank_gold, motd, created_at)
-guild_members (guild_id, username, role, joined_at)
+guild_members (username, guild_name, rank, joined_at)
 ```
 
-### Slash Commands (8)
-`/guild`, `/gcreate`, `/ginvite`, `/gleave`, `/gkick`, `/ginfo`, `/gc` (guild chat), `/gbank`, `/gtransfer`. Invite flow uses `PendingGroupInvite` on `PlayerSession`; expires on timeout. Membership cache (`guildDisplayNameCache`) for `/who` rendering.
+### Slash Commands (12)
+`/guild`, `/gcreate`, `/ginvite`, `/gleave`, `/gkick`, `/ginfo`, `/gc` (guild chat), `/gbank`, `/gwithdraw`, `/gdeposit`, `/grank`, `/gtransfer`. Invites are held in `GuildSystem`'s `pendingInvites` map; they expire on timeout. Membership cache (`guildDisplayNameCache`) for `/who` rendering.
 
 ### Mechanics
-- Guild XP bonus: +2% per member (cap +10%), applied in 3 XP paths in `CombatEngine`
+- Guild XP bonus: +2% per member (cap +10%), applied in 4 XP paths in `CombatEngine`, the group path included
 - Item bank deposit / withdrawal with SQLite transaction (single-writer race fix v0.52.10)
 - Guild leader transfer with broadcast (`gtransfer`)
 - Public guild board on Main Street showing ranked guilds by member count, bank, online status
@@ -1111,7 +1135,7 @@ guild_members (guild_id, username, role, joined_at)
 
 **File**: `Scripts/Systems/WorldBossSystem.cs`, `Scripts/Data/WorldBossData.cs` (v0.48.2)
 
-Server-wide raid bosses spawning automatically when 2+ players are online (1 boss per day, 1-hour fight window, 4-hour cooldown after defeat / expiry).
+Server-wide raid bosses. Since v1.1.4 a boss spawns daily at 8 PM Eastern (`WorldBossSpawnHourEastern`) whether or not anyone is online, for a 3-hour nightly window over up to 3 nights, with 120s and 300s re-entry cooldowns after a retreat or a fall (`GameConfig.cs`, the WorldBoss constants). The reward tiers and anti-solo notes below predate that rework.
 
 ### 8 Bosses
 Each with 3 phases, escalating abilities, themed loot. Spawned with `boss_data_json` snapshot for full data preservation across restarts.
@@ -1132,7 +1156,7 @@ Presence aura (5-8% MaxHP/round) plus boss attacks make solo attempts lethal in 
 **Files**: `Scripts/Systems/DiscordBridge.cs`, `web/ssh-proxy.js` (Discord bot side), shared SQLite `discord_gossip` table.
 
 ### Bidirectional Mirror
-`/gossip` channel mirrors to a designated Discord channel (`#in-game-gossip`) and back. The C# game writes outbound rows to `discord_gossip` on `/gos`. The Node bot (running inside `usurper-web`) polls inbound from Discord, claims rows in a single transaction, and posts to in-game via `MudServer.BroadcastToAll`. Polling interval 250ms. Re-entrant `_discordPollInFlight` guard prevents overlap (the v0.57.13 hotfix that stopped duplicate posts).
+`/gossip` channel mirrors to a designated Discord channel (`#in-game-gossip`) and back. The C# game writes outbound rows to `discord_gossip` on `/gos`. The Node bot (running inside `usurper-web`) polls the outbound rows every 250ms, claims them in a single transaction and posts them to Discord; the game drains the inbound rows every 250ms and broadcasts them in-game. Re-entrant `_discordPollInFlight` guard prevents overlap (the v0.57.13 hotfix that stopped duplicate posts).
 
 ### Configuration
 `DISCORD_BOT_TOKEN` + `DISCORD_GOSSIP_CHANNEL_ID` env vars on `usurper-web` systemd service. Optional `DISCORD_STATS_CHANNEL_ID` for the auto-updating live `#server-status` embed (60s timer, edits in place, posts on bot ready, self-heals on missing message).
@@ -1154,9 +1178,9 @@ Inbound rate limit 1 msg / 3s per Discord user, 200-char truncate, `@everyone` /
 ### Story Progression
 **File**: `Scripts/Systems/StoryProgressionSystem.cs`
 
-11 chapters: Awakening -> FirstBlood -> TheStranger -> TheFirstSeal -> FactionChoice -> RisingPower -> TheWhispers -> FirstGod -> GodWar -> TheChoice -> Ascension -> FinalConfrontation -> Epilogue.
+13 chapters (`FinalConfrontation` is kept as an alias of `TheFinalConfrontation`): Awakening -> FirstBlood -> TheStranger -> TheFirstSeal -> FactionChoice -> RisingPower -> TheWhispers -> FirstGod -> GodWar -> TheChoice -> Ascension -> FinalConfrontation -> Epilogue.
 
-22+ story flags (bitmask) plus arbitrary string flags via `StoryProgressionSystem.SetStringFlag(key, value)`. Per-Old-God states: Unknown -> Imprisoned/Dormant/Dying/Corrupted/Neutral -> Awakened/Hostile/Allied -> Saved/Defeated/Consumed.
+22+ story flags (bitmask) plus named flags via `StoryProgressionSystem.SetStoryFlag(flag, bool)`. Per-Old-God states: Unknown -> Imprisoned/Dormant/Dying/Corrupted/Neutral -> Awakened/Hostile/Allied -> Saved/Defeated/Consumed.
 
 ### Endings
 **File**: `Scripts/Systems/EndingsSystem.cs`
@@ -1182,11 +1206,11 @@ Floors 0 (town), 15, 30, 45, 60, 80, 99. Each reveals a fragment of the truth ab
 
 ### Other Narrative Systems
 - **DreamSystem** (~30+ dreams) -- triggered at Inn rest, scale with awakening level, narrative arcs (Amnesia, Companion Grief, Old God prophecy, etc.)
-- **StrangerEncounterSystem** -- 10 Noctura disguises, escalating encounters
-- **TownNPCStorySystem** -- 6 NPCs with 4-5 story stages each (Marcus, Elena, Aldric, Merchant's Daughter, Old Adventurer, Pip)
+- **StrangerEncounterSystem** -- 9 Noctura disguises, escalating encounters
+- **TownNPCStorySystem** -- 6 NPCs with 4-5 story stages each (Marcus, Elena, Bartholomew, Greta, Pip, Ezra)
 - **CycleDialogueSystem** -- NG+ aware (Cycle 1: normal, Cycle 2: deja vu, Cycle 5+: full acknowledgment)
 - **CulturalMemeSystem** -- world-meme propagation across NPC populations
-- **AmnesiaSystem** -- Vex-storyline disease that surfaces missing memories
+- **AmnesiaSystem** -- reveals the player's forgotten past as a fragment of Manwe
 - **GriefSystem** -- companion / NPC death consequences (combat penalties, dream triggers, awakening)
 - **BetrayalSystem** -- NPC betrayal mechanics (loyalty, revenge, faction)
 - **MoralParadoxSystem** -- complex moral choices with alignment implications
@@ -1213,8 +1237,8 @@ Adjusts target monster level: `playerLevel + (difficulty - 2) * 3`, capped to `p
 - **Royal Audience** -- per-king custom quests at Castle
 - **Open Contract Bounties** -- kill any NPC with a bounty for instant payout (no claiming required)
 
-### Daily Quest Limit (`MaxDailyQuests = 3`)
-Tracked at claim time via `Character.QuestsToday`. Reset at daily reset.
+### Daily Quest Limit (`MaxQuestsPerDay = 3`)
+Tracked at claim time via `RoyQuestsToday`. Reset at daily reset.
 
 ### Quest Completion
 Gold rewards reduced 7-10x in v0.52.5 (was overtuned). Failure penalties enabled. Abandoned quests serialize with `QuestStatus.Abandoned`.
@@ -1230,9 +1254,9 @@ Gold rewards reduced 7-10x in v0.52.5 (was overtuned). Failure penalties enabled
 | Companion | Recruit Lvl | Role / Class | Can Die | Personal Quest |
 |---|---|---|---|---|
 | **Aldric** | 10 (Inn) | Tank / Warrior | Yes (moral trigger) | Confront demon from past (floors 55-65) |
-| **Mira** | 20 (Healer) | Healer / Cleric | Yes (inevitable narrative) | Accept meaning of mercy (floors 40-50) |
-| **Lyris** | 15 (Inn) | Hybrid / Ranger | Yes | Recover artifact for Aurelion (floors 80-90) |
-| **Vex** | 25 (Inn) | DPS / Assassin | Yes (disease, ~30 days) | Complete before-I-die list (floor 70+ OR daysWithVex >= 10) |
+| **Mira** | 20 (Temple Ruins) | Healer / Cleric | Yes (inevitable narrative) | Accept meaning of mercy (floors 40-50) |
+| **Lyris** | 15 (floor 15 Forgotten Shrine) | Damage / Ranger | Yes | Recover the Deepwood mother-tree seed (floors 80-90) |
+| **Vex** | 25 (Prison) | DPS / Assassin | Yes (disease, ~30 days) | Complete before-I-die list (floor 70+ OR daysWithVex >= 10) |
 | **Melodia** | 20 (Music Shop, v0.49.0) | Support / Hybrid Bard | Yes | The Lost Opus (floors 50-60) |
 
 ### Death Consequences
@@ -1259,7 +1283,7 @@ Companions can be assigned a specialization at Team Corner. Drives ability prior
 ### Relationships
 **File**: `Scripts/Systems/RelationshipSystem.cs`
 
-Bidirectional tracking. Levels: Hated -> Normal -> Friendship (~40) -> Married (~200). Daily cap: 2 steps per NPC per day (bypassed for milestone events: confession, marriage). Minimum 7 days acquaintance before NPC accepts marriage proposal. NPC proposal acceptance based on personality (20-95%).
+Bidirectional tracking. Levels (lower is closer): Hate (110) -> Normal (70) -> Friendship (40) -> Married (10). Daily cap: 2 steps per NPC per day (bypassed for milestone events: confession, marriage). Minimum 7 days acquaintance before NPC accepts marriage proposal. NPC proposal acceptance based on personality (20-95%).
 
 ### Romance Tracker
 **File**: `Scripts/Systems/RomanceTracker.cs`
@@ -1273,12 +1297,12 @@ On marriage / divorce / death, four data stores must agree:
 3. `NPCMarriageRegistry` (NPC-NPC marriages)
 4. `Character.IsMarried` / `SpouseName` flags
 
-The v0.53.7 / v0.53.10 audit found 17 sync bugs across 5 passes. All four stores are now updated atomically through `RelationshipSystem.ProcessDivorce()`, `ChurchLocation.PerformMarriage()`, etc.
+The v0.53.7 / v0.53.10 audit found 17 sync bugs across 5 passes. All four stores are now updated atomically through `RelationshipSystem.ProcessDivorce()`, `RelationshipSystem.PerformMarriage()`, etc.
 
 ### Family
 **File**: `Scripts/Systems/FamilySystem.cs`
 
-Children provide stat bonuses: +50 HP, +5 STR, +3 CHA, +100 daily gold per child, +2% XP per child (cap +10%). Royal children +5 CHA and +500 gold. Children inherit traits from both parents. Aging via `NpcLifecycleHoursPerYear`. At 18, children become adult NPCs (`ConvertChildToNPC()`). Custody handled at divorce.
+Children provide stat bonuses: +50 HP, +5 STR, +3 CHA, +100 daily gold per child, +2% XP per child (each child past five counts half). Royal children +5 CHA and +500 gold. Children inherit traits from both parents. Aging via `NpcLifecycleHoursPerYear`. At 18, children become adult NPCs (`ConvertChildToNPC()`). Custody handled at divorce.
 
 ### CK-Style Parenting
 24 age-appropriate moral dilemma scenarios at Home with Soul alignment effects. Each child has `LastParentingDay` (deprecated) / `LastParentingTime` (current, wall-clock since v0.57.6) cooldown. Birth alignment inheritance from parents.
@@ -1304,7 +1328,7 @@ Full political system: guard loyalty, treasury management, court factions (Loyal
 
 5 tiers: Bronze, Silver, Gold, Platinum, Diamond. Tier-scaled Fame rewards.
 
-Notable: `first_steps`, `monster_slayer_1000`, `boss_killer`, `level_100`, `married`, `ruler`, `pvp_veteran`, `nightmare_master`, `completionist`, `first_blood`, `guardian_slayer`, `dedicated_adventurer`, `devoted_champion`, `legendary_devotion`, `world_slayer`, `world_boss_first`, `world_boss_5_unique`, `world_boss_25_total`, `world_boss_mvp`. Steam achievements wired through `OSC` markers in online mode.
+Notable: `first_steps`, `monster_slayer_1000`, `boss_killer`, `level_100`, `married`, `ruler`, `pvp_veteran`, `nightmare_master`, `completionist`, `first_blood`, `guardian_slayer`, `dedicated_adventurer`, `devoted_champion`, `legendary_devotion`, `world_boss_first`, `world_boss_5_unique`, `world_boss_25_total`, `world_boss_mvp`. Steam achievements wired through `OSC` markers in online mode.
 
 ### Statistics
 **File**: `Scripts/Systems/StatisticsSystem.cs`
@@ -1315,7 +1339,7 @@ RecordMonsterKill, RecordDamageDealt, RecordDamageTaken,
 RecordPurchase, RecordGoldSpent, RecordSale, RecordGoldChange,
 RecordLevelUp, RecordDungeonLevel,
 RecordPotionUsed, RecordHealthRestored, RecordResurrection, RecordDiseaseCured,
-RecordWorldBossKill, RecordWorldBossDamage, RecordWorldBossMVP
+RecordWorldBossKill(bossType, damageDealt, isMVP)
 ```
 
 Session summary on logout shows duration, combat stats, progress, economy, exploration. Incremental playtime accumulation (no inflation on save).
@@ -1327,7 +1351,7 @@ Session summary on logout shows duration, combat stats, progress, economy, explo
 **Files**: `Scripts/Systems/LocalizationSystem.cs` (`Loc.Get` API), `Localization/{en,es,fr,hu,it}.json`
 
 ### 5 Languages
-English (~16,500 keys, source of truth), Spanish, French, Hungarian, Italian. Each language file loaded lazily on first `Loc.Get` call (auto-detected from `Localization/` directory).
+English (~31,000 keys, source of truth), Spanish, French, Hungarian, Italian. Each language file loaded lazily on first `Loc.Get` call (auto-detected from `Localization/` directory).
 
 ### API
 ```csharp
@@ -1338,13 +1362,13 @@ Loc.Initialize()                         // Eager-load all languages at startup
 Fallback chain: current language -> English -> raw key. Format args must match between languages. New en.json keys must get matching keys in all 5 files. Translation batch limit ~700 keys per agent (32K output token limit on Claude).
 
 ### Per-Session Language
-`GameConfig.Language` is `AsyncLocal<string?>` so concurrent MUD players each see their own language. Language preference persists per-character in `PlayerData.Language`, restored on login.
+`GameConfig.Language` reads the current `SessionContext.Language` (a static field offline) so concurrent MUD players each see their own language. Language preference persists per-character in `PlayerData.Language`, restored on login.
 
 ### Compact Mode
 Per-session via `SessionContext.CompactMode`. Toggled by `[Z]` key, `/compact` slash command, or in preferences. Uses tighter BBS-style menus. Independent of language and screen-reader mode.
 
 ### Screen Reader Mode
-Strips box-drawing, decorative Unicode, color-bracketed menus. All locations have plain-text paths. Auto-detected on Windows console launches (skipped in WezTerm or door modes due to false-positive risk -- v0.60.7).
+Strips box-drawing, decorative Unicode, color-bracketed menus. All locations have plain-text paths. Auto-detected on Windows console launches (skipped in WezTerm or door modes due to false-positive risk, v0.60.5).
 
 ### Translation Quality
 Hungarian (v0.52.13), Italian (v0.52.13), French (v0.52.13) fully translated from English placeholders with multiple audit passes. v0.60.0 French audit found ~10 genuine gaps (most "untranslated" keys turned out to be intentional cognates like "Combat", "Faction", "Confession"). UTF-8 defense in depth: `Console.OutputEncoding = UTF8` set explicitly at startup since v0.60.0 (protects against systemd-on-Linux services running without UTF-8 locale where `Console.Out` defaults to ASCII).
@@ -1354,7 +1378,7 @@ Hungarian (v0.52.13), Italian (v0.52.13), French (v0.52.13) fully translated fro
 ## 31. Terminal & UI Layer
 
 ### TerminalEmulator
-**File**: `Scripts/UI/TerminalEmulator.cs` (~2500 lines)
+**File**: `Scripts/UI/TerminalEmulator.cs` (~3000 lines)
 
 Output modes (auto-detected):
 1. **MUD Mode** -- ANSI to network stream; supports per-spectator forwarding; `_prevInputWasCR` flag fixes Mudlet's `\r\n` double-Enter
@@ -1389,7 +1413,7 @@ Methods: `DrawBoxTop/Bottom/Line/Separator`, `DrawMenuOption`, `DrawStatBar`, `D
 ### ANSI Art
 **File**: `Scripts/UI/ANSIArt.cs`, `Scripts/UI/RacePortraits.cs`
 
-Race / class portraits at character creation (5 races: Orc, Dwarf, Elf, Half-Elf, Troll, Gnoll, Gnome, Human, Hobbit, Mutant; 5 classes: Magician, Assassin, Warrior, Cleric, Paladin). Plus monster silhouettes, Old God boss reveal art, splash screen, Death art, Treasure / Boss Victory / Level Up event art. SR mode short-circuits at `DisplayArt` / `DisplayArtAnimated` to plain text.
+Race / class portraits at character creation (10 races: Orc, Dwarf, Elf, Half-Elf, Troll, Gnoll, Gnome, Human, Hobbit, Mutant; 4 classes: Magician, Assassin, Warrior, Paladin). Plus monster silhouettes, Old God boss reveal art, splash screen, Death art, Treasure / Boss Victory / Level Up event art. SR mode short-circuits at `DisplayArt` / `DisplayArtAnimated` to plain text.
 
 ### AccessibilityDetection
 **File**: `Scripts/UI/AccessibilityDetection.cs`
@@ -1406,13 +1430,13 @@ Win32 wrapper for `SystemParametersInfo(SPI_GETSCREENREADER, ...)`. Returns true
 1. **Native Winsock** (v0.54.7) -- raw `send`/`recv` P/Invoke on inherited socket handle. Bypasses .NET Socket / NetworkStream wrappers. Fixed long-standing relaunch bugs on EleBBS / Mystic. `WSAStartup(2.2)` + `WSAEWOULDBLOCK` retry pattern. `DrainNativeInputBuffer` with `MSG_PEEK` flushes telnet line-mode `\r\n`. `NativeExitProcess` skipped for stdio-mode (NFU, Synchronet) since the child owns no socket.
 2. **Socket I/O (legacy)** -- direct TCP socket from DOOR32.SYS handle. For unencrypted telnet (EleBBS, Mystic telnet).
 3. **stdio Mode** (`--stdio`) -- stdin/stdout with ANSI. Required for SSH, Synchronet stdio, GameSrv, ENiGMA, WWIV.
-4. **FOSSIL/Serial** (`--fossil`) -- COM port for legacy BBS software.
+4. **Serial**: a COM port in DOOR.SYS is recorded as `ConnectionType.Serial`, but no FOSSIL or serial I/O mode is implemented.
 
 ### Auto-Detection
 DOOR32.SYS BBS-name auto-detection: Synchronet, GameSrv, ENiGMA, WWIV -> auto-enable stdio mode. `Console.IsInputRedirected` / `IsOutputRedirected` catches SSH / pipe-based transports. CP437 encoding auto-set for Synchronet stdio (`Console.OutputEncoding = CodePagesEncodingProvider.Instance.GetEncoding(437)`) to avoid garbled box-drawing.
 
 ### Drop File Parsing
-`BBSSessionInfo`: `CommType`, `SocketHandle`, `UserName`, `SecurityLevel`, `TimeLeft`, `BBSName`, `Emulation`, `ScreenWidth`, `ScreenHeight`.
+`BBSSessionInfo`: `CommType`, `SocketHandle`, `UserName`, `SecurityLevel`, `TimeLeftMinutes`, `BBSName`, `Emulation`, `ScreenWidth`, `ScreenHeight`.
 
 ### Save Isolation
 BBS saves stored in `saves/{BBSName}/` to prevent cross-BBS conflicts. Single-player saves in `saves/` (no namespace).
@@ -1444,7 +1468,7 @@ Stray `steam_appid.txt` in BBS game directories used to trigger the "Steam handl
 **Files**: `wezterm.lua`, `launchers/Play.bat`, `launchers/play.sh`, `launchers/Play-Accessible.bat`, `launchers/play-accessible.sh`
 
 ### Bundled Terminal
-Standalone and Steam builds ship with WezTerm AppImage / .exe + 7 monospace fonts (JetBrains Mono, Cascadia Code, Fira Code, Iosevka, Hack). Double-click `Play.bat` / `play.sh` launches the game in a branded terminal window with custom title bar, dark navy / gold theme, integrated buttons, no tab bar.
+Standalone and Steam builds ship with WezTerm AppImage / .exe + 8 font files in 5 families (Cascadia Code, Fira Code, Hack, Iosevka, Kelmscott Mono), with JetBrains Mono as the configured default name. Double-click `Play.bat` / `play.sh` launches the game in a branded terminal window with custom title bar, dark navy / gold theme, integrated buttons and a tab bar shown even with one tab.
 
 ### Font Selection
 In-game `[7] Terminal Font` preference writes `font-choice.txt`; WezTerm reads and auto-reloads. Font scaling 0.85x-1.4x persists in localStorage (Electron client) or via the same prefs file.
@@ -1494,8 +1518,8 @@ Beta. Text mode is the supported way to play; Electron is optional. Phase 9.5 po
 **File**: `web/index.html`
 
 Dark-themed responsive page with:
-- Embedded xterm.js 5.5.0 web terminal (WebSocket -> SSH bridge)
-- Live stats dashboard (`/api/stats`, 30s cache)
+- Embedded xterm.js 5.5.0 web terminal (WebSocket bridge to the game)
+- Live stats dashboard (`/api/stats`, 2 minute server cache)
 - SSE live feed (`/api/feed`) for NPC activity and player news
 - PvP leaderboard, Hall of Fame, event color coding
 - Game lore: story, Old Gods, classes, races, companions, endings, BBS history, Founder Hall
@@ -1504,17 +1528,17 @@ Dark-themed responsive page with:
 **File**: `web/ssh-proxy.js` (Node.js, port 3000)
 
 - **HTTP**: serves `/api/stats`, `/api/feed` (SSE), and `/api/admin/*` family
-- **WebSocket bridge**: browser -> SSH to localhost:4000 (game)
-- **Stats API**: 30s server-side cache + 15s browser cache
+- **WebSocket bridge**: browser -> TCP to the MUD server on 127.0.0.1:4001 (`MUD_MODE` on by default); `MUD_MODE=0` falls back to SSH on 127.0.0.1:4000
+- **Stats API**: 2 minute server-side cache (`CACHE_TTL`) + 15s browser cache
 - **SSE feed**: 5s poll of `news` table with high-water marks; auto-reconnect after 5s
 - **Discord bot**: discord.js v14 bidirectional gossip relay (Section 24)
 - **Live `#server-status` embed**: 60s timer, edits in place
-- **Dependencies**: ws, ssh2, better-sqlite3, discord.js
+- **Dependencies**: ws, ssh2, better-sqlite3, discord.js, bcryptjs, @anthropic-ai/sdk
 
 ### Stats API Response
 ```json
 {
-  "online": [...],            // Current players with connectionType, level, class, location, IP
+  "online": [...],            // Current players: name, level, className, location, connectedAt, connectionType (no IP)
   "onlineCount": N,
   "stats": { totalPlayers, totalKills, avgLevel, ... },
   "highlights": { topPlayer, king, popularClass },
@@ -1533,7 +1557,7 @@ Public dashboard at `/dashboard`. Real-time observation of the NPC simulation:
 - Relationship Network: D3.js force-directed graph
 - Live Event Timeline: SSE feed via `/api/dash/feed`
 - Trend Charts: events/hour, alive/dead breakdown
-- 8 endpoints under `/api/dash/`
+- 5 endpoints under `/api/dash/` (feed, npcs, summary, events, events/hourly)
 
 ---
 
@@ -1570,7 +1594,7 @@ Database (table sizes, integrity), SSL cert info, recent logins, game news, serv
 
 ### Architecture
 ```
-Browser -> https://usurper-reborn.net (nginx, SSL via Let's Encrypt)
+Browser -> https://game.example.com (nginx, SSL via Let's Encrypt)
   ├── Static (web/index.html, dashboard.html, admin.html)
   ├── /api/* -> Node (port 3000) -> SQLite
   └── /ws  -> Node MUD proxy (port 3000, MUD_MODE=1)
@@ -1578,7 +1602,7 @@ Browser -> https://usurper-reborn.net (nginx, SSL via Let's Encrypt)
                 X-IP forwarded header is honored end-to-end for real-IP visibility)
 
 Direct SSH / Raw TCP / Telnet / BBS Online Play
-  -> play.usurper-reborn.net:4000 (haproxy multiplexer; replaced sslh in v0.64.0
+  -> play.example.com:4000 (haproxy multiplexer; replaced sslh in v0.64.0
      because the packaged sslh lacked PROXY-protocol support)
      ├── "SSH-..." version-line sniff -> 127.0.0.1:4022 (sshd-usurper)
      │      -> ForceCommand --mud-relay --mud-port 4001 -> 127.0.0.1:4001 (MudServer)
@@ -1592,20 +1616,19 @@ usurper-mud (port 4001) -> game server (multi-user, SQLite-backed, integrated wo
 ### Nginx
 **File**: `scripts-server/nginx-usurper.conf`
 
-Static files from `/opt/usurper/web/`. `/api/*` -> `127.0.0.1:3000`. `/ws` -> WebSocket with 24-hour timeout. SSL via Let's Encrypt certbot (auto-renewing). `/api/` block tightened in v0.60.5 for SSE: `proxy_buffering off`, `proxy_cache off`, `proxy_http_version 1.1`, `proxy_read_timeout 600s`, `proxy_send_timeout 600s`. `/api/releases/latest` exempted from HTTPS redirect (Win7 TLS fallback path; v0.49.7).
+Static files from `/opt/usurper/web/`. `/api/*` -> `127.0.0.1:3000`. `/ws` -> WebSocket with 24-hour timeout. SSL via Let's Encrypt certbot (auto-renewing). The SSE feeds (`/api/feed`, `/api/dash/feed`) have their own location with buffering off and a 24-hour read timeout; the `/api/` block rate-limits and proxies. The HTTPS redirect exemption for `/api/releases/latest` (Win7 TLS fallback path; v0.49.7) is added by `scripts-server/fix-nginx-http-releases.py`, not by the conf in the repo.
 
 ### Systemd Services
 - **haproxy** -- port-4000 multiplexer; SSH-version-line sniff routes "SSH-..." to sshd-usurper:4022, everything else to MudServer:4001 with a PROXY v2 header prepended (replaced sslh in v0.64.0)
 - **usurper-web.service** -- Node web proxy (port 3000)
-- **usurper-mud.service** -- game server (port 4001) with integrated world sim, `HeapHardLimit=512MB` in `runtimeconfig.template.json`
+- **usurper-mud.service** -- game server (port 4001) with integrated world sim, GC heap hard limit 768 MB in `runtimeconfig.template.json` and `MemoryMax=512M` in the unit
 - **sshd-usurper.service** -- SSH daemon on port 4022, ForceCommand to `--mud-relay`
-- (`usurper-world.service` was removed; the world sim folded into usurper-mud in v0.60.0)
+- (`usurper-world.service` is kept in `scripts-server/` marked deprecated; the world sim folded into usurper-mud in v0.60.0)
 
-Discord bot env vars: `DISCORD_BOT_TOKEN`, `DISCORD_GOSSIP_CHANNEL_ID`, optional `DISCORD_STATS_CHANNEL_ID`. Stored in `/etc/systemd/system/usurper-web.service.d/discord.conf` (600 perms).
+Discord bot env vars: `DISCORD_BOT_TOKEN`, `DISCORD_GOSSIP_CHANNEL_ID`, optional `DISCORD_STATS_CHANNEL_ID`. They come from the web unit's optional environment file or a root-owned drop-in, never committed.
 
 ### Deployment
-- **Standard recipe**: publish linux-x64 self-contained -> tar -> scp -> stop usurper-mud + sshd-usurper -> extract -> chmod / chown -> start usurper-mud (after 2s) -> start sshd-usurper
-- **Web changes**: scp web files -> systemctl restart usurper-web (no game restart needed)
+- **Standard recipe**: the `deploy-server` CI job, after a 130 second shutdown countdown: stop sshd-usurper and usurper-mud, extract, start usurper-mud and sshd-usurper, and redeploy the web files in the same window
 - **`/opt/usurper/version.txt`**: written on every deploy, surfaced by admin dashboard
 
 ### Server Paths
@@ -1616,12 +1639,12 @@ Discord bot env vars: `DISCORD_BOT_TOKEN`, `DISCORD_GOSSIP_CHANNEL_ID`, optional
 | `/opt/usurper/web/` | Website (index.html, admin.html, ssh-proxy.js, dashboard.html, language packs) |
 | `/var/usurper/usurper_online.db` | SQLite database |
 | `/var/usurper/sysop_config.json` | BBS-mode SysOpConfig (bypassed in MUD mode since v0.60.7) |
-| `/var/usurper/logs/debug.log` | Debug log (auto-rotates at 5MB; 4 archives kept) |
+| `logs/debug.log` beside the binary | Debug log (auto-rotates at 5MB; 3 archives kept) |
 | `/var/usurper/backups/` | Daily SQLite backups (14-day retention, 4 AM cron) |
 | `/etc/nginx/sites-available/usurper` | Nginx site config |
 
 ### Deployment Scripts
-- `setup-server.sh` -- full server bootstrap (users, dirs, services, firewall, fail2ban)
+- `setup-server.sh`: bootstrap for the older single-sshd layout (port 4000, ForceCommand `--online --stdio`); it does not install the mud or web units
 - `update-server.sh` -- deploy new binary with backup + restart
 - `backup.sh` -- daily SQLite backup
 - `healthcheck.sh` -- system health (DB, players, disk)
@@ -1633,6 +1656,8 @@ Discord bot env vars: `DISCORD_BOT_TOKEN`, `DISCORD_GOSSIP_CHANNEL_ID`, optional
 **File**: `.github/workflows/ci-cd.yml`
 
 ### Jobs
+The workflow's jobs are now `wiki`, `web-test`, `test`, `build`, `smoke-test`, `build-steam`, `bundle-desktop`, `steam-package`, `attach-to-release`, `steam-upload` and `deploy-server`; the list below is the older outline.
+
 1. **Test** -- build + unit tests (`Tests/Tests.csproj`)
 2. **Build** -- publish 6 platforms (Windows x64/x86, Linux x64/ARM64, macOS Intel/Apple Silicon)
 3. **Build-desktop** (v0.48.0+) -- bundle WezTerm + fonts + Play.bat / play.sh -> 3 desktop artifacts
@@ -1642,10 +1667,10 @@ Discord bot env vars: `DISCORD_BOT_TOKEN`, `DISCORD_GOSSIP_CHANNEL_ID`, optional
 
 ### Build Command
 ```bash
-dotnet publish usurper-reloaded.csproj -c Release -r <rid> --self-contained -o publish/<rid>
+dotnet publish usurper-reloaded.csproj -c Release -r <rid> -o build/ -p:PublishSingleFile=true -p:SelfContained=true -p:InvariantGlobalization=true
 ```
 
-`--self-contained` is mandatory; without it the binary won't run on machines without .NET 8 runtime installed.
+Self-contained is mandatory; without it the binary won't run on machines without .NET 8 runtime installed.
 
 ### IL Trimming (Disabled)
 `PublishTrimmed` is intentionally false. Trimming removes runtime-reflected methods (`Path.GetExtension`, `DbConnection.OpenAsync`) that the BBS deploy path relies on. v0.51.0 disabled it permanently.
@@ -1654,7 +1679,7 @@ dotnet publish usurper-reloaded.csproj -c Release -r <rid> --self-contained -o p
 **File**: `usurper-reloaded.csproj`
 
 - Target: .NET 8.0
-- NuGet: Newtonsoft.Json, Microsoft.Data.Sqlite, SSH.NET, System.IO.Ports, System.Text.Encoding.CodePages
+- NuGet: SSH.NET, System.IO.Ports, Microsoft.Data.Sqlite, System.Text.Encoding.CodePages, Spectre.Console
 - Steam: Steamworks.NET + native libraries (steam_api64.dll, libsteam_api.so)
 - Configurations: Debug, Release, Steam, SteamRelease
 
@@ -1662,12 +1687,12 @@ dotnet publish usurper-reloaded.csproj -c Release -r <rid> --self-contained -o p
 
 ## 40. Configuration & Constants
 
-**File**: `Scripts/Core/GameConfig.cs` (~2500 lines)
+**File**: `Scripts/Core/GameConfig.cs` (~3900 lines)
 
 ### Version
 ```csharp
-Version = "0.60.7"
-VersionName = "Beta"
+Version = "1.3.4"
+VersionName = "Reckoning"
 ```
 
 ### Core Constants
@@ -1687,13 +1712,13 @@ AlignmentCap = 1000          (v0.57.12)
 MaxRegistrationsPerIpPer24h = 3   (v0.60.5)
 SoftTauntStickChance = 75    (v0.60.3)
 PermadeathRaceFloor = 3
-WorldBossSpawnCooldownHours = 4.0
+WorldBossSpawnHourEastern = 20, WorldBossRetreatCooldownSeconds = 120, WorldBossFallCooldownSeconds = 300
 DefaultStartingResurrections = 3   (admin-tunable, v0.60.7)
 OnlinePermadeathEnabled = true     (admin-tunable, v0.60.7)
 ```
 
 ### Admin-Tunable (via Server Settings Registry, v0.60.7)
-`DefaultStartingResurrections`, `OnlinePermadeathEnabled`, `XPMultiplier`, `GoldMultiplier`, `MonsterHPMultiplier`, `MonsterDamageMultiplier`, `DisableOnlinePlay`, `IdleTimeoutMinutes`, `MessageOfTheDay`. (`MaxDungeonLevel` deliberately NOT exposed -- breaks story.)
+`DefaultStartingResurrections`, `OnlinePermadeathEnabled`, `XPMultiplier`, `GoldMultiplier`, `MonsterHPMultiplier`, `MonsterDamageMultiplier`, `DisableOnlinePlay`, `IdleTimeoutMinutes`, `MessageOfTheDay`, and the telemetry prompt switch (`telemetry_prompt`). (`MaxDungeonLevel` deliberately NOT exposed -- breaks story.)
 
 ### Class Starting Attributes
 12 base classes + 5 prestige with HP, STR, DEF, STA, AGI, CHA, DEX, WIS, INT, CON, Mana base values and per-level growth.
@@ -1719,8 +1744,8 @@ CharacterClass {
 CharacterRace { Human, Hobbit, Elf, HalfElf, Dwarf, Troll, Orc, Gnome, Gnoll, Mutant }
 CharacterAI { Computer='C', Human='H', Civilian='N' }
 CharacterSex { Male=1, Female=2 }
-RomanticOrientation { Straight, Gay, Bisexual, Asexual }
-ClassSpecialization { ... 24 specs ... }
+SexualOrientation { Straight, Gay, Lesbian, Bisexual, Pansexual, Asexual, Demisexual }
+ClassSpecialization { None, ... 25 specs ... }
 SpecRole { Tank, DPS, Healer, Utility, Debuff }
 ```
 
@@ -1732,8 +1757,9 @@ EquipmentSlot { Head=1, Body, Arms, Hands, Legs, Feet, Waist, Neck, Neck2, Face,
                 Cloak, LFinger, RFinger, MainHand=14, OffHand=15 }
 EquipmentRarity { Common, Uncommon, Rare, Epic, Legendary, Artifact }
 WeaponHandedness { OneHanded=1, TwoHanded=2, OffHandOnly=3 }
-WeaponType { Sword=1, Axe, Mace, Dagger, Rapier, Staff, Bow, Crossbow, Spear,
-             Greatsword, Greataxe, Hammer, Maul, Flail, Buckler, Shield, TowerShield, Instrument }
+WeaponType { None=0, Sword=1, Axe, Mace, Dagger, Rapier, Hammer, Flail, Scimitar=8,
+             Greatsword=10, Greataxe, Polearm, Staff, Maul=14, Bow=15, Instrument=17,
+             Shield=20, Buckler, TowerShield=22 }
 ArmorWeightClass { Light, Medium, Heavy }
 ```
 
@@ -1741,11 +1767,11 @@ ArmorWeightClass { Light, Medium, Heavy }
 ```csharp
 GameLocation {
   MainStreet=1, TheInn=2, DarkAlley=3, Church=4, WeaponShop=5, Master=6, MagicShop=7,
-  Dungeons=8, ArmorShop=18, Bank=19, News=20, Healer=21, Marketplace=22,
+  Dungeons=8, ArmorShop=18, Bank=19, ReportRoom=20, Healer=21, AuctionHouse=22,
   AnchorRoad=27, Dormitory=26, TeamCorner=41, Temple=47, Castle=70, QuestHall=75,
-  LoveCorner=77, Prison=90, PrisonWalk=94, LoveStreet=200, Home=201,
-  Pantheon, Settlement, Wilderness, MusicShop=503, GodWorld=400,
-  SysOpConsole=500, Arena=501, CharacterCreation
+  LoveCorner=77, Prison=90, PrisonWalk=94, LoveStreet=200, Home=201, Heaven=400,
+  SysOpConsole=500, Arena=501, Pantheon=502, MusicShop=503, Wilderness=504,
+  Settlement=505, Sanctum=506, ...
 }
 ```
 
@@ -1753,11 +1779,11 @@ GameLocation {
 ```csharp
 CombatActionType { Attack, Defend, Heal, CastSpell, UseAbility, Backstab, Retreat,
                    PowerAttack, Rage, Smite, Disarm, Taunt, Hide, RangedAttack,
-                   AidAlly, BegForMercy, UseHerb, Status, ... }
-CombatOutcome { Victory, Loss, Fled, PlayerEscaped }
+                   HealAlly, BegForMercy, UseHerb, Status, Miracle, Rescue, ... }
+CombatOutcome { Victory, PlayerDied, PlayerEscaped, Stalemate, Interrupted, OpponentSpared }
 CombatSpeed { Normal=0, Fast=1, Instant=2 }
 DifficultyMode { Easy, Normal, Hard, Nightmare }
-StatusEffect { Stunned, Frozen, Confused, Sleep, Feared, Slowed, Marked, Cursed,
+StatusEffect { Stunned, Frozen, Confused, Sleeping, Feared, Slow, Cursed,
                Diseased, Burning, Bleeding, Poisoned, Paralyzed, Lifesteal, ... }
 ```
 
@@ -1765,8 +1791,8 @@ StatusEffect { Stunned, Frozen, Confused, Sleep, Feared, Slowed, Marked, Cursed,
 ```csharp
 StoryChapter { Awakening, FirstBlood, TheStranger, TheFirstSeal, FactionChoice,
                RisingPower, TheWhispers, FirstGod, GodWar, TheChoice, Ascension,
-               FinalConfrontation, Epilogue }
-EndingType { Usurper, Savior, Defiant, TrueEnding, Dissolution }
+               TheFinalConfrontation, FinalConfrontation, Epilogue }
+EndingType { Usurper, Savior, Defiant, TrueEnding, Secret }
 OldGodType { Maelketh, Veloura, Thorgrim, Noctura, Aurelion, Terravok, Manwe }
 GodStatus { Unknown, Imprisoned, Dormant, Dying, Corrupted, Neutral, Awakened,
             Hostile, Allied, Saved, Defeated, Consumed }
@@ -1779,9 +1805,9 @@ SealType { Creation, FirstWar, Corruption, Imprisonment, Prophecy, Regret, Truth
 ```csharp
 DailyCycleMode { SessionBased, RealTime24Hour, Accelerated4Hour,
                  Accelerated8Hour, Accelerated12Hour, Endless }
-ConnectionType { Local, Telnet, SSH, BBS, Web, Steam, MUD }
+ConnectionType { Local, Serial, Telnet }   // drop file; session connection types are strings
 SettingType { Bool, Int, Float, String }    // ServerSettingsRegistry
-RecruitmentBand { Hidden, Friend, Neutral, Rival, Refused }   // Team recruitment
+RecruitmentBand { Hidden, Family, Friend, Neutral, Rival, Refused }   // Team recruitment
 ```
 
 ---
@@ -1796,13 +1822,11 @@ Scripts/
 ├── Core/
 │   ├── GameEngine.cs               Singleton, main game loop, init, save load
 │   ├── GameConfig.cs               Constants, class/race attrs, version, admin tunables
-│   ├── Character.cs                Base class (~2000 lines) + all enums
+│   ├── Character.cs                Base class (~3800 lines) + all enums
 │   ├── Player.cs                   Player-specific state
 │   ├── NPC.cs                      NPC with AI brain, lifecycle
 │   ├── Monster.cs                  Combat entity (standalone)
-│   ├── Items.cs                    Legacy Pascal item system
-│   ├── Equipment.cs                Modern RPG equipment
-│   ├── Item.cs                     (deprecated, dual-class merged)
+│   ├── Items.cs                    Legacy Pascal Item class + modern Equipment class
 │   ├── King.cs                     Monarch / treasury / guards
 │   └── Quest.cs                    Quest data model
 │
@@ -1820,20 +1844,24 @@ Scripts/
 │   ├── WizardCommandSystem.cs      Wizard commands (/restore, /freeze, /broadcast)
 │   └── WizardLevel.cs              Tier definitions
 │
-├── Systems/                        ~106 game systems
+├── Systems/                        164 files (a selection below)
 │   ├── LocationManager.cs          Location routing & navigation graph
 │   ├── SaveSystem.cs               Pluggable backend dispatcher
 │   ├── SaveDataStructures.cs       All serialization data classes
 │   ├── SaveFileRepair.cs           Bloated-save in-place repair
 │   ├── FileSaveBackend.cs          Local JSON saves
-│   ├── SqlSaveBackend.cs           SQLite for online / MUD (~6000 lines)
-│   ├── IOnlineSaveBackend.cs       Backend interface
+│   ├── SqlSaveBackend.cs           SQLite for online / MUD (~10000 lines, plus partial files such as SqlSaveBackend.AccountMail.cs)
+│   ├── ISaveBackend.cs             Base save backend interface
+│   ├── IOnlineSaveBackend.cs       Online extension of ISaveBackend
+│   ├── AccountMail.cs              1.3.4 mail switch, site and address rules (password self-reset)
+│   ├── TelemetryStore.cs           1.2.7 opt-in telemetry (with TelemetryUploader.cs)
+│   ├── WikiDataExporter.cs         --export-wiki data for the player wiki
 │   ├── ServerSettingsRegistry.cs   v0.60.7 admin-tunable framework
 │   ├── PermadeathHelper.cs         Online death + permadeath
-│   ├── CombatEngine.cs             Turn-based combat (~28000 lines)
+│   ├── CombatEngine.cs             Turn-based combat (~34000 lines, plus CombatEngine.PartySurvival.cs)
 │   ├── DailySystemManager.cs       Daily resets, time-of-day, maintenance
 │   ├── WorldSimulator.cs           Background NPC simulation
-│   ├── WorldSimService.cs          (deprecated headless service)
+│   ├── WorldSimService.cs          World sim host (MUD server and --worldsim)
 │   ├── SpellSystem.cs              Spell casting mechanics
 │   ├── SpellLearningSystem.cs      Spell learning / training
 │   ├── ClassAbilitySystem.cs       Class abilities (stamina-based)
@@ -1843,7 +1871,6 @@ Scripts/
 │   ├── StatisticsSystem.cs         Player stats tracking
 │   ├── RelationshipSystem.cs       NPC relationships, daily caps
 │   ├── RomanceTracker.cs           Per-player romance registry
-│   ├── NPCMarriageRegistry.cs      NPC-NPC marriages
 │   ├── FamilySystem.cs             Children, aging, parenting
 │   ├── IntimacySystem.cs           Romance encounter system
 │   ├── CompanionSystem.cs          5 recruitable companions
@@ -1860,7 +1887,6 @@ Scripts/
 │   ├── TownNPCStorySystem.cs       6 NPCs with story arcs
 │   ├── CycleDialogueSystem.cs      NG+ aware dialogue
 │   ├── CityControlSystem.cs        Economic / tax control
-│   ├── TournamentSystem.cs         Combat tournaments
 │   ├── NewsSystem.cs               Event feed (file + SQLite)
 │   ├── DebugLogger.cs              File-based debug logging
 │   ├── OnlineStateManager.cs       Player presence tracking
@@ -1881,7 +1907,6 @@ Scripts/
 │   ├── VisualNovelDialogueSystem.cs  Visual-novel style romance
 │   ├── OpeningStorySystem.cs       Pre-game intro
 │   ├── OpeningSequence.cs          Title sequence
-│   ├── DailyLoginRewardSystem.cs   Streak bonuses (in DailySystemManager)
 │   ├── HintSystem.cs               Onboarding hints
 │   ├── DifficultySystem.cs         Difficulty multipliers
 │   ├── TrainingSystem.cs           Skill / proficiency training
@@ -1893,7 +1918,6 @@ Scripts/
 │   ├── ArtifactSystem.cs           7 artifacts + divine armor
 │   ├── AmnesiaSystem.cs            Memory recovery story
 │   ├── MetaProgressionSystem.cs    Account-scope progression
-│   ├── BotDetectionSystem.cs       (in Scripts/Server/)
 │   ├── BugReportSystem.cs          ! key reports to Discord
 │   ├── StreetEncounterSystem.cs    Random Main Street encounters
 │   ├── NPCPetitionSystem.cs        Royal audience flows
@@ -1907,15 +1931,14 @@ Scripts/
 │   ├── MaintenanceSystem.cs        Daily admin maintenance tasks
 │   ├── UsurperHistorySystem.cs     In-game history reader
 │   ├── RageEventSystem.cs          Alpha-era memorial event (dormant)
-│   ├── MetaProgressionSystem.cs    Cross-character account progression
 │   └── LocalizationSystem.cs       Loc.Get + JSON loaders
 │
-├── Locations/                      33 location files
-│   ├── BaseLocation.cs             Abstract base (~3000 lines)
-│   ├── MainStreetLocation.cs       Central hub (post-v0.60.7: trimmed to ~3000 lines)
-│   ├── DungeonLocation.cs          100-floor dungeon (~13000 lines)
+├── Locations/                      36 location files
+│   ├── BaseLocation.cs             Abstract base (~11900 lines)
+│   ├── MainStreetLocation.cs       Central hub (~2500 lines, plus MainStreetClassic.cs and MainStreetDistricts.cs)
+│   ├── DungeonLocation.cs          100-floor dungeon (~19600 lines)
 │   ├── CastleLocation.cs           Politics, throne, court
-│   ├── InnLocation.cs              Rest, companions, tournaments
+│   ├── InnLocation.cs              Rest, companions
 │   ├── HomeLocation.cs             5-tier home upgrades, family
 │   ├── ArenaLocation.cs            PvP combat
 │   ├── TempleLocation.cs           Gods, worship, Confession
@@ -1942,12 +1965,12 @@ Scripts/
 │   ├── GodWorldLocation.cs         God realm
 │   ├── WildernessLocation.cs       4-region wilderness exploration
 │   ├── SettlementLocation.cs       Outskirts NPC settlement
+│   ├── SanctumLocation.cs          Sanctum, Tournament of Honor
 │   ├── SysOpLocation.cs            BBS-mode sysop console
 │   └── CharacterCreationLocation.cs
 │
 ├── Data/
 │   ├── MonsterFamilies.cs          10 families x 5 tiers
-│   ├── SpellDatabase.cs            100 spells
 │   ├── EquipmentData.cs            Equipment definitions + shop queries
 │   ├── OldGodsData.cs              7 Old God boss data
 │   ├── WorldBossData.cs            8 world boss definitions
@@ -1957,7 +1980,7 @@ Scripts/
 ├── AI/
 │   ├── NPCBrain.cs                 Goal-based NPC AI
 │   ├── MemorySystem.cs             Memory (30 max, 7-day decay)
-│   ├── EmotionalState.cs           12-emotion model with antagonistic suppression
+│   ├── EmotionalState.cs           12-emotion model (antagonistic suppression is in OnlineStateManager)
 │   ├── PersonalityProfile.cs       13 core + 10 romance traits
 │   ├── GoalSystem.cs               Goal generation / scoring
 │   ├── EnhancedNPCBehaviors.cs     Shopping, gangs, relationships
@@ -1970,11 +1993,11 @@ Scripts/
 │   ├── SocketTerminal.cs           TCP socket I/O
 │   └── BBSTerminalAdapter.cs       Terminal adapter (ANSI / WWIV / Console)
 │
-├── Editor/
+├── Editor/                         12 files
 │   └── PlayerSaveEditor.cs         Standalone game / save editor (--editor)
 │
 ├── UI/
-│   ├── TerminalEmulator.cs         Console / BBS / Electron abstraction (~2500 lines)
+│   ├── TerminalEmulator.cs         Console / BBS / Electron abstraction (~3000 lines)
 │   ├── UIHelper.cs                 80-char box drawing
 │   ├── ANSIArt.cs                  Race / class portraits, monster art
 │   ├── RacePortraits.cs            ANSI portrait registry
@@ -1989,7 +2012,9 @@ web/
 ├── dashboard.html                  NPC Analytics Dashboard
 ├── admin.html                      Admin console (bots, bans, settings, players)
 ├── steam.html                      Steam landing page
-├── ssh-proxy.js                    HTTP + WS + SSE + Discord + admin API
+├── ssh-proxy.js                    HTTP + WS + SSE + Discord + admin API + account mail + telemetry
+├── wiki-bot.js                     Discord wiki Ask and Suggest
+├── account/                        Forgotten password, reset and address pages (1.3.4)
 ├── package.json                    ws, ssh2, better-sqlite3, discord.js
 └── lang/{en,es,fr,hu,it}.json     Website localization
 
@@ -2006,7 +2031,7 @@ electron-client/                    Optional graphical client (beta)
 └── assets/monsters-hd/             15 HD monster sprites
 
 Localization/
-├── en.json                         English (~16500 keys, source of truth)
+├── en.json                         English (~31000 keys, source of truth)
 ├── es.json                         Spanish
 ├── fr.json                         French
 ├── hu.json                         Hungarian
@@ -2016,6 +2041,7 @@ scripts-server/
 ├── nginx-usurper.conf              Nginx site config
 ├── usurper-web.service             Web proxy systemd
 ├── usurper-mud.service             MUD server systemd
+├── usurper-world.service           Separate world simulator systemd
 ├── setup-server.sh                 Server bootstrap
 ├── update-server.sh                Binary deployment
 ├── backup.sh                       Daily DB backup
@@ -2032,11 +2058,15 @@ DOCS/
 ├── SERVER_DEPLOYMENT.md            Server ops
 └── release-notes/                  Per-version changelogs (RELEASE_NOTES_*.md) and steam/ (BBCode copies)
 
+tools/
+├── wiki-build/                     Wiki build, drift check, documentation check
+└── promptfoo/                      Council brief evals (not in the gate)
+
 launchers/
 ├── Play.bat / play.sh              WezTerm launcher
 └── Play-Accessible.bat / play-accessible.sh   Screen-reader launcher
 
-GameData/
+GameData/                           (optional, beside the executable; not in the repository)
 └── (optional JSON mod overrides per DOCS/MODDING.md)
 ```
 
@@ -2044,9 +2074,9 @@ GameData/
 
 ## 43. Key Design Patterns
 
-1. **Singleton via `Lazy<T>`** -- thread-safe lazy init for GameEngine, SaveSystem, LocationManager, NPCSpawnSystem, NewsSystem, DiscordBridge, GodSystem, FamilySystem, RomanceTracker, etc.
+1. **Lazy singletons**: GameEngine uses `Lazy<T>`. SaveSystem, NPCSpawnSystem, FamilySystem, NewsSystem and GodSystem use a lazy static `Instance`. LocationManager and RomanceTracker resolve per session through `SessionContext` with a process-wide fallback. DiscordBridge is a static class.
 
-2. **Pluggable Backend** -- `IOnlineSaveBackend` with `FileSaveBackend` (local) and `SqlSaveBackend` (online) implementations. Selected at startup; same API.
+2. **Pluggable Backend**: `ISaveBackend` is implemented by `FileSaveBackend` (local); `IOnlineSaveBackend` extends it and is implemented by `SqlSaveBackend` (online). Selected at startup; same base API.
 
 3. **Location Loop** -- `BaseLocation` provides display/input/dispatch loop; subclasses implement `DisplayLocation` and `ProcessChoice`; global commands run before per-location dispatch.
 
