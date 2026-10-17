@@ -1,8 +1,9 @@
 ---
 title: The Dark Alley
 path: /wiki/en/world/dark-alley/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MonsterGenerator.cs
+history: 1.3.4 | none
 history: 1.3.3 | The Pit monster, the street mugger and the Loan Shark enforcer of level 25 or more have more HP and hit harder, as a dungeon monster of that level does.
 history: 1.3.2 | Loan Shark interest is added once a day on the loan plus the interest owed.
 history: 1.3.0 | The Pit's reckless side bet is labelled 2.5x, the amount it pays.

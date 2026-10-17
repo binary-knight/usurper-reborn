@@ -425,7 +425,7 @@
   "r1.road_title": "// FEUILLE DE ROUTE",
   "r1.road_sub": "Développé au grand jour depuis 2024. Le code source, le suivi des problèmes et cette liste sont publics, et la moitié de ce qui est livré commence par un rapport de joueur. Un plan ne vaut que par son exécution ; juge par toi-même :",
   "r1.road_now_t": "MAINTENANT -- La 1.3.4 est en ligne",
-  "r1.road_now_d": "TODO(1.3.4 banner): describe only what 1.3.4 shipped; write it at the release bump from the merged work.",
+  "r1.road_now_d": "La 1.3.4 est sortie : tu peux réinitialiser par e-mail un mot de passe oublié, et les combats contre les Old Gods et les classes de prestige ont été mesurés, avec des corrections là où un sort ou un dieu ne faisait pas ce que disait son texte. La feuille de route ci-dessous dit ce qui vient ensuite.",
   "r1.road_next_h": "À venir",
   "r1.road_135_t": "1.3.5 -- Étages 11 à 24 du donjon",
   "r1.road_135_d": "Les étages 11 à 24 du donjon, mesurés dans la 1.3.4, sont réglés comme les étages 1 à 10 et 25 à 100 : d'abord la composition des rencontres, l'usage des capacités des monstres et les traits d'élite, les chiffres en dernier.",

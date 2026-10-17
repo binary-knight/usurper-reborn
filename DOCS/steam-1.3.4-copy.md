@@ -1,7 +1,7 @@
 # Steam copy for 1.3.4 (edited into the Steam page by hand)
 
-Steam formats with BBCode, so (a) is written in it. Every line about 1.3.0 to 1.3.3 comes from the shipped release notes in
-DOCS/release-notes. The 1.3.4 lines are a TODO: 1.3.4 is not finished, and only what is merged at the release goes in.
+Steam formats with BBCode, so (a) is written in it. Every line about 1.3.0 to 1.3.4 comes from the shipped release notes in
+DOCS/release-notes.
 
 ## a) Announcement for 1.3.4 (to pin)
 
@@ -33,9 +33,13 @@ DOCS/release-notes. The 1.3.4 lines are a TODO: 1.3.4 is not finished, and only 
 [*]An ally is lost only when a monster finishes them. Predators and bosses announce a finish first.
 [/list]
 
-[h2]1.3.4[/h2]
+[h2]1.3.4: accounts and the Old Gods[/h2]
 [list]
-[*]TODO at the release: one short line per player-facing change that merged in 1.3.4.
+[*]You can reset a forgotten password by email. The address is optional, asked when you register or once at your next login, and confirmed by a link.
+[*]New passwords need at least 8 characters. Existing shorter passwords still log in.
+[*]Probability Shift, Echo of Tomorrow and Paradox Collapse now do what their text says.
+[*]Doom starts at Aurelion. The four earlier Old Gods and the betrayal fight no longer apply it.
+[*]Manwe's named abilities now respect your difficulty setting, Shield Wall Formation, flee guarding, Divine Mandate and Death's Embrace.
 [/list]
 
 [h2]Next[/h2]
@@ -44,8 +48,8 @@ DOCS/release-notes. The 1.3.4 lines are a TODO: 1.3.4 is not finished, and only 
 The roadmap: https://usurper-reborn.net/#roadmap
 ```
 
-Not yet true, so not in the text above: the Old God fights and the prestige classes have not been retuned. Their measurement
-runs in the 1.3.4 work, and whether they change is still open. Add a line for them only if a change merges.
+Not in the text above: the Old God fights and the prestige classes were measured in 1.3.4 and not retuned; only the fixes
+listed changed. Their tuning is open for a later release.
 
 ## b) Store page "About" paragraph
 

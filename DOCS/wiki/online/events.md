@@ -1,8 +1,9 @@
 ---
 title: Rankings, news and world events
 path: /wiki/en/online/events/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/NewsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimService.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Systems/WeeklyGodSystem.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | World events start, count down and end online, and at most one Realm Celebrates runs at a time.
 history: 1.2.5 | World event titles, descriptions and royal decrees are shown in each player's language, and team news now shows the headline and the event.

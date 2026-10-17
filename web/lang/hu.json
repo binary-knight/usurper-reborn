@@ -425,7 +425,7 @@
   "r1.road_title": "// ÜTEMTERV",
   "r1.road_sub": "2024 óta nyíltan épül. A forráskód, a hibakövető és ez a lista nyilvános, és ami megjelenik, annak fele játékosi jelentésként indul. A terv csak annyit ér, amennyit a végrehajtása; ítéld meg magad:",
   "r1.road_now_t": "MOST -- Megjelent az 1.3.4",
-  "r1.road_now_d": "TODO(1.3.4 banner): describe only what 1.3.4 shipped; write it at the release bump from the merged work.",
+  "r1.road_now_d": "Megjelent az 1.3.4: egy elfelejtett jelszót e-mailben visszaállíthatsz, az Istenek elleni harcokat és a presztízs kasztokat pedig felmértük, és javítottuk, ahol egy varázslat vagy egy isten nem azt tette, amit a szövege mond. Az alábbi ütemterv megmondja, mi jön ezután.",
   "r1.road_next_h": "Következik",
   "r1.road_135_t": "1.3.5 -- A kazamaták 11. és 24. közötti szintjei",
   "r1.road_135_d": "A kazamaták 11. és 24. közötti szintjei, amelyeket az 1.3.4 mér fel, úgy kapják meg a hangolást, mint az 1. és 10., illetve a 25. és 100. közötti szintek: először a találkozások összetétele, a szörnyek képességhasználata és az elit tulajdonságok, a számok a végén.",
