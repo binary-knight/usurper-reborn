@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/NPCSpawnSystem.cs, Scripts/AI/EnhancedNPCBehaviors.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/WorldSimService.cs, Scripts/BBS/DoorMode.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.3 | An NPC ally at 0 HP in your fight is Downed and dies only if a monster finishes it, and an NPC raised before its return time is no longer sent to Main Street with half its gold.
 history: 1.3.2 | NPCs on your team or in your party and your spouse or lover keep their gear, and NPC shopping buys only gear the NPC's class can use.
 history: 1.3.0 | A companion can leave over resentment, taking a new lover without telling a spouse or an exclusive lover brings a heartbreak scene in town, and a spouse or lover who falls at your side and will recover is no longer lost to you.
 history: 1.2.5 | Companion screens, romance milestones and companion quest notices are shown in all five languages.
@@ -64,7 +65,7 @@ Chosen characters can receive remarks about their god's mark. NPC faith also con
 
 The death of a companion, teammate, spouse or lover can cause Mental loss and grief. Grief stages have their own consequences, listed in the [Mental guide](/wiki/en/characters/mental/#grief); a replacement party member is not an immediate cure for the relationship's loss.
 
-A hired NPC or an NPC friend in your dungeon party who falls in your fight and will recover is carried out to mend. If that NPC is your spouse, lover or affair partner, the marriage or romance is not ended; it ends only when the NPC is lost for good.
+A hired NPC or an NPC friend in your dungeon party who is finished in your fight and will recover is carried out to mend. If that NPC is your spouse, lover or affair partner, the marriage or romance is not ended; it ends only when the NPC is lost for good.
 
 ## Betrayal
 
