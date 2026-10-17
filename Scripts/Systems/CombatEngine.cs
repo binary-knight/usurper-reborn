@@ -13987,6 +13987,9 @@ public partial class CombatEngine
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
         bool evasionChecked = _evasionCheckedByHitRoll;
         _evasionCheckedByHitRoll = false;
+        // 1.3.4: set only by ApplySpellDamageIgnoringArmor, for this one call
+        int armorIgnoredPercent = _armorIgnoredPercent;
+        _armorIgnoredPercent = 0;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -14035,6 +14038,9 @@ public partial class CombatEngine
                 effectiveArmor = Math.Max(0, effectiveArmor - effectiveArmor * armorPiercePct / 100);
             }
         }
+        // 1.3.4: a spell that ignores part of the defence (Echo of Tomorrow, 50) takes that share off what is left
+        if (armorIgnoredPercent > 0)
+            effectiveArmor -= effectiveArmor * armorIgnoredPercent / 100;
         long actualDamage = Math.Max(1, damage - effectiveArmor);
 
         // Show defense calculation when armor reduces damage
@@ -14207,6 +14213,20 @@ public partial class CombatEngine
         _evasionCheckedByHitRoll = evasionChecked;
         try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage); }
         finally { _evasionCheckedByHitRoll = false; }
+    }
+
+    // 1.3.4: the share of the target's armor that the one ApplySingleMonsterDamage call made by
+    // ApplySpellDamageIgnoringArmor leaves out, in percent; 0 for every other call.
+    private int _armorIgnoredPercent;
+
+    /// <summary>1.3.4: ApplySingleMonsterDamage for a spell that ignores a share of the target's armor. Echo of
+    /// Tomorrow ignores 50 percent: the hit is damage - (armor - armor / 2), at least 1, with every other step of
+    /// the hit as before.</summary>
+    private async Task<bool> ApplySpellDamageIgnoringArmor(Monster target, long damage, CombatResult result, string damageSource, Character? attacker, int armorIgnoredPercent)
+    {
+        _armorIgnoredPercent = armorIgnoredPercent;
+        try { return await ApplySingleMonsterDamage(target, damage, result, damageSource, attacker, isSpellDamage: true); }
+        finally { _armorIgnoredPercent = 0; }
     }
 
     /// <summary>The monster's evasion buff (Incorporeal, Phase and the like): one draw while the buff is up,
@@ -18980,7 +19000,10 @@ public partial class CombatEngine
                 {
                     damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
                     damage += OldGodEchoSystem.BonusDamage(player, target, damage);   // 1.2.0 Temple gods: the Old God echo, once per spell
-                    await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
+                    if (spellResult.SpecialEffect == "ignore_half_defense")
+                        await ApplySpellDamageIgnoringArmor(target, damage, result, spellInfo.Name, player, 50);   // 1.3.4: Echo of Tomorrow
+                    else
+                        await ApplySingleMonsterDamage(target, damage, result, spellInfo.Name, player, isSpellDamage: true);
                 }
 
                 // Apply self-healing from attack spells (e.g. Prison Siphon, Devour Essence)
@@ -19217,22 +19240,9 @@ public partial class CombatEngine
                 break;
 
             case "ignore_half_defense":
-                // Cyclebreaker Echo of Tomorrow: deal bonus damage equal to 50% of target's armor
-                if (target.IsAlive && target.ArmPow > 0)
-                {
-                    long halfDefBonus = Math.Max(1, target.ArmPow / 2);
-                    halfDefBonus = TeamHQBonus.ApplyAttack(player, halfDefBonus); // v1.1.11: Team HQ Armory, last.
-                    target.HP -= halfDefBonus;
-                    EvHit(player, halfDefBonus, CombatEventKind.Spell);   // 1.2.6
-                    terminal.SetColor("cyan");
-                    UIHelper.WriteRow(terminal, Loc.Get("combat.future_echo", MonsterNames.Display(target), halfDefBonus));
-                    if (target.HP <= 0)
-                    {
-                        target.HP = 0;
-                        if (!result.DefeatedMonsters.Contains(target))
-                            result.DefeatedMonsters.Add(target);
-                    }
-                }
+                // 1.3.4 Cyclebreaker Echo of Tomorrow: the half of the armor it ignores is taken off in the hit itself
+                // (ApplySpellDamageIgnoringArmor), so nothing is added here. It used to add half the target's armor as
+                // flat damage after the full armor came off, which dealt about half the armor whatever the roll.
                 break;
 
             case "angel":

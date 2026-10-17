@@ -339,6 +339,99 @@ public class CyclebreakerFix134Tests
         Value(path).Should().Contain("{0}").And.NotBe(Value(en));
     }
 
+    // ---------- Echo of Tomorrow ----------
+
+    /// <summary>The HP the target loses from Echo of Tomorrow's damage step for a spell damage d against armor a.</summary>
+    private static async Task<long> EchoStep(long d, long a)
+    {
+        var caster = Caster(CharacterClass.Cyclebreaker);
+        var (engine, _) = Engine(caster, new Random(3));
+        var m = new Monster { Name = "Golem", Level = 50, HP = 10_000_000, MaxHP = 10_000_000, ArmPow = a };
+        var result = new CombatResult { Player = caster };
+        await (Task<bool>)Call(engine, "ApplySpellDamageIgnoringArmor", m, d, result, "Echo of Tomorrow", caster, 50)!;
+        Call(engine, "HandleSpecialSpellEffectOnMonster", m, "ignore_half_defense", 1, caster, d, result);
+        return m.MaxHP - m.HP;
+    }
+
+    [Theory]
+    [InlineData(100, 1000)]
+    [InlineData(100, 5000)]
+    [InlineData(300, 401)]
+    [InlineData(100, 150)]
+    [InlineData(200, 401)]
+    public async Task EchoOfTomorrow_AgainstArmorAboveItsDamage_DealsDamageLessHalfTheArmor(long d, long a)
+    {
+        long lost = await EchoStep(d, a);
+        lost.Should().Be(Math.Max(1, d - (a - a / 2)), "half the armor is ignored and the other half still counts");
+        long before = Math.Max(1, d - a) + Math.Max(1, a / 2);   // 04720f16: full armor off, then half the armor added
+        lost.Should().BeLessThan(before, "the flat bonus of half the armor is gone");
+    }
+
+    [Theory]
+    [InlineData(500, 2)]
+    [InlineData(500, 3)]
+    [InlineData(500, 60)]
+    [InlineData(500, 61)]
+    [InlineData(1000, 999)]
+    [InlineData(5000, 4000)]
+    public async Task EchoOfTomorrow_AgainstArmorBelowItsDamage_IsUnchangedFrom04720f16(long d, long a)
+    {
+        long lost = await EchoStep(d, a);
+        long before = Math.Max(1, d - a) + Math.Max(1, a / 2);   // 04720f16
+        lost.Should().Be(before);
+    }
+
+    private static void ArmSpellWeapon(Character c)
+    {
+        if (SpellSystem.HasRequiredSpellWeapon(c)) return;
+        foreach (var w in EquipmentDatabase.GetAll().Where(e => e.Slot == EquipmentSlot.MainHand))
+        {
+            c.EquippedItems[EquipmentSlot.MainHand] = w.Id;
+            if (SpellSystem.HasRequiredSpellWeapon(c)) return;
+        }
+    }
+
+    /// <summary>Casts Echo of Tomorrow through the combat engine until the cast lands; returns the HP lost and the screen.</summary>
+    private static async Task<(long lost, string text)> CastEcho(long armor)
+    {
+        for (int attempt = 0; attempt < 60; attempt++)
+        {
+            var caster = Caster(CharacterClass.Cyclebreaker);
+            ArmSpellWeapon(caster);
+            var (engine, output) = Engine(caster, new Random(11));
+            var m = new Monster { Name = "Golem", Level = 50, HP = 100_000_000, MaxHP = 100_000_000, ArmPow = armor };
+            var monsters = new List<Monster> { m };
+            var result = new CombatResult { Player = caster };
+            result.Monsters.Add(m);
+            var action = new CombatAction { Type = CombatActionType.CastSpell, SpellIndex = 3, TargetIndex = 0 };
+            await (Task)Call(engine, "ExecuteSpellMultiMonster", caster, monsters, action, result)!;
+            if (m.HP < m.MaxHP) return (m.MaxHP - m.HP, Text(engine, output));
+        }
+        throw new InvalidOperationException("Echo of Tomorrow never landed in 60 casts");
+    }
+
+    [Fact]
+    public async Task EchoOfTomorrow_Cast_AgainstHugeArmor_DealsOne()
+    {
+        var (lost, text) = await CastEcho(10_000_000);
+        lost.Should().Be(1, "80-110 scaled damage less half of ten million armor is the floor of 1; it was 1 + 5,000,000");
+        var golem = new Monster { Name = "Golem", Level = 50 };
+        text.Should().NotContain(Loc.Get("combat.future_echo", MonsterNames.Display(golem), 5_000_000), "no flat bonus line");
+    }
+
+    [Fact]
+    public async Task EchoOfTomorrow_Cast_ShowsHalfTheArmorAsTheDefence()
+    {
+        var (lost, text) = await CastEcho(40);
+        var match = Regex.Match(text, @"\[(\d+) damage vs (\d+) defense\]");
+        match.Success.Should().BeTrue("the hit shows its damage against the defence that counts; screen:\n" + text);
+        long d = long.Parse(match.Groups[1].Value);
+        long shown = long.Parse(match.Groups[2].Value);
+        shown.Should().Be(20, "half of 40 armor is ignored");
+        lost.Should().Be(d - 20);
+        lost.Should().Be(Math.Max(1, d - 40) + 20, "the same as 04720f16 while the armor is below the damage");
+    }
+
     // ---------- other spells untouched ----------
 
     [Fact]
