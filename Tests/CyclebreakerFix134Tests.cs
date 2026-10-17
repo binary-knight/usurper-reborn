@@ -432,6 +432,49 @@ public class CyclebreakerFix134Tests
         lost.Should().Be(Math.Max(1, d - 40) + 20, "the same as 04720f16 while the armor is below the damage");
     }
 
+    // ---------- Paradox Collapse ----------
+
+    [Theory]
+    [InlineData("en", "plus 10% of all damage you have dealt this fight")]
+    [InlineData("es", "más el 10% de todo el daño que has infligido en este combate")]
+    [InlineData("fr", "plus 10 % de tous les dégâts que vous avez infligés pendant ce combat")]
+    [InlineData("hu", "az ebben a harcban általad okozott összes sebzés 10%-a")]
+    [InlineData("it", "più il 10% di tutti i danni che hai inflitto in questo combattimento")]
+    public void ParadoxCollapse_TextNamesItsBonus(string lang, string bonus)
+    {
+        var path = Path.Combine(Leftovers1114BTests.RepoRoot(), "Localization", lang + ".json");
+        var text = System.Text.Json.JsonDocument.Parse(File.ReadAllText(path))
+            .RootElement.GetProperty("spell.cyclebreaker.5.desc").GetString()!;
+        text.Should().Contain(bonus);
+        text.Should().Contain("250-350");
+        var prev = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = lang;
+            SpellSystem.GetSpellInfo(CharacterClass.Cyclebreaker, 5)!.DisplayDescription.Should().Contain(bonus, "the player sees it");
+        }
+        finally { GameConfig.Language = prev; }
+        if (lang == "en")
+            SpellSystem.GetSpellInfo(CharacterClass.Cyclebreaker, 5)!.Description.Should().Be(text, "the built-in text matches the English key");
+    }
+
+    [Theory]
+    [InlineData(0, 0)]
+    [InlineData(5000, 500)]
+    [InlineData(12345, 1234)]
+    public void ParadoxCollapse_Bonus_IsTenPercentOfTheFightsDamage_AsBefore(long dealt, long bonus)
+    {
+        var caster = Caster(CharacterClass.Cyclebreaker);
+        var (engine, _) = Engine(caster, new Random(9));
+        var m = new Monster { Name = "Golem", Level = 50, HP = 1_000_000, MaxHP = 1_000_000 };
+        var result = new CombatResult { Player = caster, TotalDamageDealt = dealt };
+        Call(engine, "HandleSpecialSpellEffectOnMonster", m, "paradox_collapse", 0, caster, 300L, result);
+        (m.MaxHP - m.HP).Should().Be(bonus);
+    }
+
+    // The spell's own damage (250-350 scaled) and its bonus on a fixed seed are in the other-spells fixture
+    // (Cyclebreaker:5), which equals 04720f16.
+
     // ---------- other spells untouched ----------
 
     [Fact]

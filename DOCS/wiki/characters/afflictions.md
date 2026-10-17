@@ -75,6 +75,7 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 - **Confused:** the monster loses its action 50 percent of the time; otherwise it hits itself for a third of its Strength 25 percent of the time.
 - **Slowed:** the monster loses its action 50 percent of the time.
 - **Weakened:** the monster's attack is 0.70 times.
+- **Probability Shift:** a Cyclebreaker spell. For 3 rounds the monster never scores a critical hit, and 30 percent of its normal attacks that would hit you or an ally miss. Its special abilities are not affected.
 
 ### Stuns and holds on monsters
 

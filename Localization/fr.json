@@ -10929,7 +10929,7 @@
   "spell.cyclebreaker.4.name": "Rembobinage du Cycle",
   "spell.cyclebreaker.4.desc": "Ramène votre corps à un état antérieur. Restaure 30 % des PV max et guérit les maladies. Durée : 1 tour.",
   "spell.cyclebreaker.5.name": "Effondrement du Paradoxe",
-  "spell.cyclebreaker.5.desc": "Effondre plusieurs chronologies sur la cible. Dégâts : 250-350. Durée : 1 tour.",
+  "spell.cyclebreaker.5.desc": "Effondre plusieurs chronologies sur la cible. Dégâts : 250-350, plus 10 % de tous les dégâts que vous avez infligés pendant ce combat. Durée : 1 tour.",
   "spell.abysswarden.1.name": "Siphon de Prison",
   "spell.abysswarden.1.desc": "Puise la puissance de la prison divine scellée la plus proche. Dégâts : 12-18. Vous soigne de 50 % des dégâts. Durée : 1 tour.",
   "spell.abysswarden.2.name": "Murmure de Noctura",

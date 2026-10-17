@@ -11167,7 +11167,7 @@
   "spell.cyclebreaker.4.name": "Cycle Rewind",
   "spell.cyclebreaker.4.desc": "Revert your body to an earlier state. Restores 30% max HP and cures disease. Duration: 1 turn.",
   "spell.cyclebreaker.5.name": "Paradox Collapse",
-  "spell.cyclebreaker.5.desc": "Collapse multiple timelines onto the target. Damage: 250-350. Duration: 1 turn.",
+  "spell.cyclebreaker.5.desc": "Collapse multiple timelines onto the target. Damage: 250-350, plus 10% of all damage you have dealt this fight. Duration: 1 turn.",
   "spell.abysswarden.1.name": "Prison Siphon",
   "spell.abysswarden.1.desc": "Draw power from the nearest sealed God-prison. Damage: 12-18. Heals self 50% of damage. Duration: 1 turn.",
   "spell.abysswarden.2.name": "Noctura's Whisper",

@@ -10937,7 +10937,7 @@
   "spell.cyclebreaker.4.name": "Ciklus-visszatekerés",
   "spell.cyclebreaker.4.desc": "Egy korábbi állapotba állítja vissza a tested. Helyreállítja a maximum ÉP 30%-át, és meggyógyítja a betegséget. Időtartam: 1 kör.",
   "spell.cyclebreaker.5.name": "Paradoxonösszeomlás",
-  "spell.cyclebreaker.5.desc": "Több idővonalat omlaszt össze a célponton. Sebzés: 250-350. Időtartam: 1 kör.",
+  "spell.cyclebreaker.5.desc": "Több idővonalat omlaszt össze a célponton. Sebzés: 250-350, plusz az ebben a harcban általad okozott összes sebzés 10%-a. Időtartam: 1 kör.",
   "spell.abysswarden.1.name": "Börtön-szipoly",
   "spell.abysswarden.1.desc": "Erőt szív ki a legközelebbi lepecsételt istenbörtönből. Sebzés: 12-18. A sebzés 50%-át gyógyítja rajtad. Időtartam: 1 kör.",
   "spell.abysswarden.2.name": "Noctura Suttogása",
