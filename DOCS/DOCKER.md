@@ -1,10 +1,11 @@
-# Usurper Reborn — Docker Deployment Guide
+<!-- doc: checked 1.3.4; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
+# Usurper Reborn: Docker Deployment Guide
 
 Host your own Usurper Reborn MUD server using Docker.
 
-Verified against v1.1.1 (2026-09-07): `docker compose up -d` builds all three
-images, serves the login menu on port 4000, and browser play, the dashboards,
-the stats API, and the language files all answer through nginx on port 80.
+`docker compose up -d` builds all three images, serves the login menu on port
+4000, and browser play, the dashboards, the stats API and the language files
+answer through nginx on port 80.
 
 ---
 
@@ -19,7 +20,7 @@ cd usurper-reborn
 docker compose up -d
 ```
 
-**Game server**: port 4000 (raw TCP — BBS clients, MUD clients, SSH relay)
+**Game server**: port 4000 (raw TCP: BBS clients, MUD clients, SSH relay)
 **Web interface**: port 80 (browser play, live stats, admin dashboards)
 
 ---
@@ -34,7 +35,7 @@ docker-compose.yml
 └── volume: usurper-data  Shared SQLite database (/var/usurper/)
 ```
 
-All three containers share the `/var/usurper/` volume where the SQLite database lives. The game server writes game state; the web proxy reads it for stats and dashboards and opens a second, writable handle for the admin panel (bans, player edits, config changes).
+The game and web containers share the `/var/usurper/` volume where the SQLite database lives; nginx has no volume. The game server writes game state; the web proxy reads it for stats and dashboards and opens a second, writable handle for the admin panel (bans, player edits, config changes) and the account mail.
 
 The web proxy opens the database once at startup and never reconnects, so it must not start before the game server has created the file. The compose file handles this: the game service has a healthcheck that passes once `usurper_online.db` exists, and the web service waits for it. On a brand new deploy the first `docker compose up` therefore takes a few seconds longer before the web container starts.
 
@@ -51,12 +52,12 @@ services:
   usurper-game:
     command:
       - "--admin"
-      - "YourAdminName"    # Replace with your username — grants God-level admin access
+      - "YourAdminName"    # Replace with your username: grants God-level admin access
       - "--sim-interval"
-      - "30"               # World sim tick rate in seconds (default: 30)
+      - "30"               # World sim tick rate in seconds (compose sets 30; the default is 60)
       # Optional additional flags:
       # - "--npc-xp"
-      # - "0.25"           # NPC XP gain multiplier (default: 0.25)
+      # - "5.0"            # NPC XP gain multiplier (default: 5.0)
       # - "--save-interval"
       # - "5"              # NPC state persistence interval in minutes (default: 5)
 
@@ -71,20 +72,20 @@ services:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--mud-server` | — | Start as MUD server (required) |
+| `--mud-server` | (none) | Start as MUD server (required) |
 | `--mud-port <port>` | 4000 | TCP listen port |
 | `--db <path>` | (next to exe) | SQLite database path |
 | `--auto-provision` | off | Auto-create accounts for trusted auth connections |
 | `--log-stdout` | off | Route logs to stdout instead of files |
-| `--sim-interval <sec>` | 60 | World simulation tick interval (compose sets 30) |
-| `--npc-xp <mult>` | 0.25 | NPC XP gain multiplier (0.01–10.0) |
-| `--save-interval <min>` | 5 | How often NPC state is saved to database |
-| `--admin <user>` | — | Bootstrap admin user (repeatable) |
+| `--sim-interval <sec>` | 60 | World simulation tick interval, at least 10 (compose sets 30) |
+| `--npc-xp <mult>` | 5.0 | NPC XP gain multiplier (0.01 to 10.0) |
+| `--save-interval <min>` | 5 | How often NPC state is saved to database, at least 1 |
+| `--admin <user>` | (none) | Bootstrap admin user (repeatable) |
 | `--no-worldsim` | off | Disable the embedded world simulator (run `--worldsim` as a separate process instead) |
-| `--worldsim` | — | Headless 24/7 world simulator with no players (only with `--no-worldsim` on the server) |
-| `--idle-timeout <min>` | 15 | Idle disconnect for BBS door sessions (1–60) |
+| `--worldsim` | (none) | Headless 24/7 world simulator with no players (only with `--no-worldsim` on the server) |
+| `--idle-timeout <min>` | 15 | Idle disconnect for BBS door and MUD sessions (1 to 60) |
 
-Run `UsurperReborn --help` for the full list, including the single-player and BBS door flags.
+Run `UsurperReborn --help` for the single-player, BBS door and online flags; it does not list `--mud-server`, `--mud-port`, `--auto-provision`, `--log-stdout`, `--admin` or `--idle-timeout`.
 
 ### Web Proxy Environment Variables
 
@@ -104,8 +105,30 @@ Run `UsurperReborn --help` for the full list, including the single-player and BB
 | `DISCORD_STATS_CHANNEL_ID` | (unset) | Optional channel for a live stats embed |
 | `GITHUB_PAT` | (unset) | Read-only token for the sponsors list on the landing page |
 | `USURPER_NUKE_SCRIPT` | (unset) | Script the admin panel's world-wipe runs; leave unset unless you have written one |
+| `SSH_USER`, `SSH_PASS` | `usurper`, `play` | SSH gateway account, used only when `MUD_MODE=0` |
+| `RESEND_API_KEY` | (unset) | Resend API key for password reset mail; see below |
+| `MAIL_FROM` | (unset) | Sender address for that mail; see below |
+| `SITE_URL` | `https://usurper-reborn.net` | Public address of your website, named in the mail links; see below |
 
 The admin panel shows the game version from `/opt/usurper/version.txt`, which the web image writes from `GameConfig.Version` at build time. Rebuild the web image when you update.
+
+### Password reset by email (optional)
+
+Players with an online account can reset a forgotten password by email, sent through the Resend mail service. It is off by default. With mail off, players see no forgot password choice, no email question and no Email menu, and the website reset pages (`/account/forgot`, `/account/reset`, `/account/verify`) say that the server does not send mail.
+
+To turn it on, add these to the `usurper-web` `environment:` block in docker-compose.yml (both of the first two must be set):
+
+```yaml
+      - RESEND_API_KEY=re_example          # a Resend API key
+      - MAIL_FROM=noreply@example.com      # an address on a domain verified with Resend
+      - SITE_URL=https://example.com       # the public address of your website, http(s)://host[:port]
+```
+
+`SITE_URL` defaults to `https://usurper-reborn.net`. A value that is not http or https with a host and an optional port (no path, not even a trailing `/`) is refused with a warning in the web log, and the default is used. Then run `docker compose up -d usurper-web` to recreate the web container with the new environment. The web service writes the mail switch into the database when it starts and every 15 seconds, and the game reads it at each prompt, so the game follows within 15 seconds; if the web service stops, the game counts mail as off once the last beat is 10 minutes old.
+
+With mail on, an address stays optional for players; a player who gives none is told that only the server's operator can reset a forgotten password. The operator can reset any password from the `/admin` page (Reset Password on the player's row), with mail on or off.
+
+In this compose stack nginx passes every page to the web service, which looks up `/account/forgot` as `account/forgot.html`; the pages are `account/forgot/index.html` (and the same for reset and verify), so the addresses the game and the mail links name answer 404 here. The server setup in `DOCS/SERVER_DEPLOYMENT.md` serves them through nginx `try_files`.
 
 ---
 
@@ -124,19 +147,20 @@ BBS software connects via raw TCP to port 4000 and sends an AUTH header:
 AUTH:username:connectionType\n
 ```
 
-With `--auto-provision` enabled (default in Docker), the game server automatically creates an account if the username doesn't exist. No separate registration needed.
+The game server accepts this trusted form (no password) only from a loopback peer, a process on the same host or in the same container; from any other address it answers `ERR:Authentication required. Trusted auth is only available from local relays.` A BBS on another machine sends one of the password forms below. With `--auto-provision` enabled (set in the Docker command; off by default), a trusted login creates the account if the username doesn't exist.
 
 **Example BBS integration** (Synchronet JavaScript):
 ```javascript
 var sock = new Socket();
 sock.connect("your-server", 4000);
+// Trusted form: only when the BBS runs on the same host as the game server
 sock.send("AUTH:" + user.alias + ":BBS\n");
 // Relay I/O between BBS user and game socket
 ```
 
 **AUTH header formats**:
 ```
-AUTH:username:connectionType              Trusted auth (auto-provision if enabled)
+AUTH:username:connectionType              Trusted auth, loopback only (auto-provision if enabled)
 AUTH:username:password:connectionType     Password auth
 AUTH:username:password:REGISTER:type      Register new account with password
 ```
@@ -240,8 +264,9 @@ docker compose up -d
 ```
 
 ### View Online Players
+The game image has no `sqlite3`; copy the database out (see Database Backup) and query the copy:
 ```bash
-docker compose exec usurper-game sqlite3 /var/usurper/usurper_online.db \
+sqlite3 ./usurper-backup.db \
   "SELECT username, display_name FROM players ORDER BY last_login DESC LIMIT 20;"
 ```
 
@@ -259,8 +284,8 @@ docker compose down -v        # Stop containers AND delete database volume
 Check logs: `docker compose logs usurper-game`
 
 Common issues:
-- Database volume permissions — ensure the container can write to `/var/usurper/`
-- Port 4000 already in use — change the host port mapping in docker-compose.yml
+- Database volume permissions: ensure the container can write to `/var/usurper/`
+- Port 4000 already in use: change the host port mapping in docker-compose.yml
 
 ### Web proxy can't connect to game server
 The web proxy connects to `usurper-game:4000` (Docker internal networking). If you changed the game server port, update `MUD_PORT` in the web service environment.
@@ -272,11 +297,11 @@ The web proxy connects to `usurper-game:4000` (Docker internal networking). If y
 
 ### Players can't connect via BBS
 - Ensure port 4000 is exposed and reachable from the BBS server
-- BBS must send `AUTH:username:BBS\n` as the first line within 500ms of connecting
+- BBS must send an AUTH line as the first line within 500ms of connecting; from another machine it must be a password form
 - Check game server logs for auth failures: `docker compose logs usurper-game | grep AUTH`
 
 ### Database is locked
-SQLite doesn't handle high concurrency well. If you see "database is locked" errors, the game server and web proxy may be contending. The proxy's reads use a read-only handle and its writes are limited to admin actions, so this should be rare. Restart the web proxy if it persists.
+SQLite doesn't handle high concurrency well. If you see "database is locked" errors, the game server and web proxy may be contending. The proxy's reads use a read-only handle and its writes are limited to admin actions and the account mail, so this should be rare. Restart the web proxy if it persists.
 
 ### Stats and dashboards are empty but the game works
 The proxy logs `Database not available` when it started before the database existed and it does not retry. `docker compose restart usurper-web` fixes it. This happens only if the game service's healthcheck was removed or the proxy was started on its own.
