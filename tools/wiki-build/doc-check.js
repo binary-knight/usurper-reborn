@@ -1,5 +1,5 @@
 "use strict";
-// Documentation gate (1.3.4): every README.md and DOCS/*.md file opens with one marker comment, either
+// Documentation gate (1.3.4): every Markdown file at the repository root and in DOCS/ opens with one marker comment, either
 //   <!-- doc: checked 1.3.4; sources: Scripts/Server/MudServer.cs, web/ssh-proxy.js -->   (a current doc)
 //   <!-- doc: historical -->                                                              (a plan or record kept as it was)
 // It fails on a file with no marker or a bad one, a listed source that does not exist, and, while a release
@@ -42,10 +42,12 @@ function previousTag(root, version) {
   return lower.length ? lower[lower.length - 1] : null;
 }
 
-// The files the gate covers: README.md and the top level of DOCS.
+// The files the gate covers: the Markdown files at the repository root (README, PRIVACY, CONTRIBUTING) and the top
+// level of DOCS.
 function docFiles(root) {
   const out = [];
-  if (fs.existsSync(path.join(root, "README.md"))) out.push("README.md");
+  for (const name of fs.readdirSync(root).sort())
+    if (name.endsWith(".md") && fs.statSync(path.join(root, name)).isFile()) out.push(name);
   const docs = path.join(root, "DOCS");
   if (fs.existsSync(docs))
     for (const name of fs.readdirSync(docs).sort())

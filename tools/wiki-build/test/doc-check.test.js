@@ -81,6 +81,14 @@ test("a file with no marker fails, and DOCS/wiki and DOCS/release-notes are outs
   assert.match(r.problems[0], /^DOCS\/NEW\.md: no doc marker/);
 });
 
+test("every Markdown file at the root is in the gate, not only README.md", () => {
+  const r = withDoc("PRIVACY.md", "# Privacy\n", () => check({ root: repo, version: "1.0.0" }));
+  assert.deepEqual(r.problems.map((p) => p.split(":")[0]), ["PRIVACY.md"]);
+  const ok = withDoc("CONTRIBUTING.md", current("1.0.0", ["Scripts/Same.cs"]), () => check({ root: repo, version: "1.0.0" }));
+  assert.deepEqual(ok.problems, []);
+  assert.equal(ok.current, 2);
+});
+
 test("a listed source that does not exist fails", () => {
   const r = withDoc("DOCS/D.md", current("1.0.0", ["Scripts/Same.cs", "Scripts/Missing.cs"]), () => check({ root: repo, version: "1.0.0" }));
   assert.deepEqual(r.problems, ["DOCS/D.md: source Scripts/Missing.cs does not exist"]);
