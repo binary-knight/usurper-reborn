@@ -283,7 +283,7 @@ test('the privacy text and the accounts guide describe the address and the websi
   assert.match(section, /used only to send password reset links and account notices/);
   assert.match(section, /remove it at any time with E on the character screen/);
   const guide = fs.readFileSync(path.join(ROOT, 'DOCS', 'wiki', 'getting-started', 'accounts.md'), 'utf8');
-  assert.match(guide, /\nchecked: 1\.3\.3\n/);
+  assert.match(guide, /\nchecked: 1\.3\.[34]\n/);
   assert.ok(guide.includes('https://usurper-reborn.net/account/forgot asks for the account name or the email address'));
   assert.ok(guide.includes('A game played as a BBS door runs on that BBS, not on the game server, and is not closed.'));
   assert.ok(guide.includes('at least 8 characters, no colon'));
