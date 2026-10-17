@@ -66,6 +66,8 @@ function loadAuth(options = {}) {
     dbWrite,
     process: { env: options.env || {} },
     SHIPPED_DEFAULT_PASS: DEFAULT,
+    // 1.3.4: the reset route's minimum, the server's own constant
+    ACCOUNT_MIN_PASSWORD_LENGTH: Number(src.match(/\nconst ACCOUNT_MIN_PASSWORD_LENGTH = (\d+);/)[1]),
     BALANCE_DEFAULT_PASS: options.env && options.env.BALANCE_PASS ? options.env.BALANCE_PASS : DEFAULT,
     Buffer, JSON, String, Object,
     console: { log, warn: log, error: log, info: log },
