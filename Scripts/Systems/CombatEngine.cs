@@ -25235,8 +25235,7 @@ public partial class CombatEngine
                 // Wavecaller Wave Echo: doubling moved inline (see multi-monster comment for details).
                 bool waveEchoDebuffed = monster.Poisoned || monster.Stunned || monster.Charmed || monster.Distracted
                     || monster.WeakenRounds > 0 || monster.IsSlowed || monster.IsMarked
-                    || monster.IsCorroded || monster.IsFeared || monster.IsConfused || monster.IsSleeping || monster.IsFrozen
-                    || monster.ProbabilityShiftRounds > 0;   // 1.3.4: still a debuffed target
+                    || monster.IsCorroded || monster.IsFeared || monster.IsConfused || monster.IsSleeping || monster.IsFrozen;
                 if (waveEchoDebuffed)
                 {
                     actualDamage *= 2;

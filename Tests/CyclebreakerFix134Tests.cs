@@ -304,6 +304,27 @@ public class CyclebreakerFix134Tests
         active.Should().Equal(true, true, true, false, false);
     }
 
+    /// <summary>Wave Echo doubles against a debuffed target; a target under Probability Shift counted as one before
+    /// (through the confusion and slow) and still does.</summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProbabilityShift_StillCountsAsADebuff_ForWaveEcho(bool shifted)
+    {
+        var caster = Caster(CharacterClass.Wavecaller);
+        var (engine, output) = Engine(caster, new Random(13));
+        var m = new Monster { Name = "Golem", Level = 50, HP = 10_000_000, MaxHP = 10_000_000 };
+        if (shifted) Shift(engine, m, Caster(CharacterClass.Cyclebreaker));
+        var ability = ClassAbilitySystem.GetAbility("wave_echo")!;
+        var r = new ClassAbilityResult { Success = true, AbilityUsed = ability, Damage = 1000, SpecialEffect = "double_vs_debuffed" };
+        var result = new CombatResult { Player = caster };
+        result.Monsters.Add(m);
+        await (Task)Call(engine, "ApplyAbilityEffectsMultiMonster", caster, m, new List<Monster> { m }, r, result)!;
+        string resonates = Loc.Get("combat.wave_echo_resonates", MonsterNames.Display(m));
+        if (shifted) Text(engine, output).Should().Contain(resonates);
+        else Text(engine, output).Should().NotContain(resonates);
+    }
+
     [Theory]
     [InlineData("en")]
     [InlineData("hu")]
