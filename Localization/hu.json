@@ -23131,6 +23131,7 @@
   "combat.miss": "A {0} téveszt!",
   "combat.probability_negates": "A valószínűség-eltolódás semmissé teszi: {0}!",
   "combat.probability_shift": "A valószínűség eltolódik {0} körül -- a támadások tévesztenek!",
+  "combat.probability_shift_miss": "A valószínűség eltolódik: {0} támadása célt téveszt!",
   "combat.reflection_destroy": "Visszatükröződésed összetöri {0}-t!",
   "combat.sacrifice_blow_strikes": "{0} feláldozza magát egy pusztító csapás erejéért!",
   "combat.sacrifice_generic": "{0} meghozza a végső áldozatot!",

@@ -22815,6 +22815,7 @@
   "combat.miss": "{0} manca il bersaglio!",
   "combat.probability_negates": "Lo spostamento di probabilità annulla {0}!",
   "combat.probability_shift": "La probabilità si sposta attorno a {0} -- gli attacchi mancheranno!",
+  "combat.probability_shift_miss": "La probabilità cambia: l'attacco di {0} va a vuoto!",
   "combat.reflection_destroy": "Il tuo riflesso frantuma {0}!",
   "combat.sacrifice_blow_strikes": "{0} si sacrifica per sferrare un colpo devastante!",
   "combat.sacrifice_generic": "{0} compie il sacrificio supremo!",

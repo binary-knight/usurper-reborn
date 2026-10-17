@@ -5155,6 +5155,14 @@ public partial class CombatEngine
                 monster.ThornsPercent = 0;
         }
 
+        // 1.3.4: Probability Shift counts down here too, once a round and before a hold can skip the turn.
+        // A round that starts with rounds left is a shifted round for every attack the monster makes in it.
+        if (firstActionThisRound)
+        {
+            monster.ProbabilityShiftActive = monster.ProbabilityShiftRounds > 0;
+            if (monster.ProbabilityShiftRounds > 0) monster.ProbabilityShiftRounds--;
+        }
+
         // v0.60.8: burn and poison tick INDEPENDENTLY. Pre-fix, both effects
         // shared the PoisonRounds counter and only one tick fired per round
         // based on the IsBurning flag -- so casting Roast (fire) on a poisoned
@@ -5608,6 +5616,11 @@ public partial class CombatEngine
             terminal.SetColor(ColorRole.Derived);
             UIHelper.WriteRow(terminal, Loc.Get("combat.monster_roll", MonsterNames.Display(monster), monsterRoll.NaturalRoll, monsterRoll.Modifier, monsterRoll.Total, monsterRoll.TargetDC));
         }
+
+        // 1.3.4: Probability Shift. A natural 20 is a plain hit, not a critical, and a roll that hit
+        // misses ProbabilityShiftMissPercent of the time.
+        if (monster.ProbabilityShiftActive && await ProbabilityShiftMisses(monster, player, monsterRoll, result))
+            return;
 
         // Blur / duplicate miss chance (20%) - additional miss chance on top of D20
         if (player.HasStatus(StatusEffect.Blur) && monsterRoll.Success)
@@ -6283,6 +6296,34 @@ public partial class CombatEngine
                 lang => GroupLine(lang, "\u001b[33m", "combat.companion_afflicted", name, Loc.GetIn(lang, "status.poisoned")),
                 inDungeonOnly: true);
         }
+    }
+
+    /// <summary>1.3.4: the points of miss chance Probability Shift adds to each attack of the monster it is on.</summary>
+    internal const int ProbabilityShiftMissPercent = 30;
+
+    /// <summary>
+    /// 1.3.4: Probability Shift on a monster's attack roll against the player, after the roll. A natural 20 is
+    /// a plain hit (it still hits, without the critical); then a roll that hit misses ProbabilityShiftMissPercent
+    /// of the time. True when the attack missed through it; the miss line is written.
+    /// </summary>
+    private async Task<bool> ProbabilityShiftMisses(Monster monster, Character player, RollResult roll, CombatResult result)
+    {
+        if (roll.IsCriticalSuccess)
+        {
+            roll.Success = true;
+            roll.IsCriticalSuccess = false;
+        }
+        if (!roll.Success || random.Next(100) >= ProbabilityShiftMissPercent) return false;
+        WriteProbabilityShiftMiss(monster, player, result);
+        await Pacing.Wait(GetCombatDelay(800));
+        return true;
+    }
+
+    /// <summary>1.3.4: the one line of an attack that missed through Probability Shift.</summary>
+    private void WriteProbabilityShiftMiss(Monster monster, Character target, CombatResult result)
+    {
+        UIHelper.WriteRow(terminal, Loc.Get("combat.probability_shift_miss", MonsterNames.Display(monster)), "cyan");
+        result.CombatLog.Add($"{monster.Name} misses {target.DisplayName} (Probability Shift)");
     }
 
     private async Task<bool> TryMonsterSpecialAbility(Monster monster, Character player, CombatResult result, List<Monster>? monsterList = null)
@@ -13574,6 +13615,7 @@ public partial class CombatEngine
         if (monster.IsSlowed || monster.SlowDuration > 0) statuses.Add($"SLOW({Math.Max(1, monster.SlowDuration)})");
         if (monster.IsMarked || monster.MarkedDuration > 0) statuses.Add($"MARK({Math.Max(1, monster.MarkedDuration)})");
         if (monster.IsCorroded || monster.CorrodedDuration > 0) statuses.Add($"COR({Math.Max(1, monster.CorrodedDuration)})");
+        if (monster.ProbabilityShiftRounds > 0) statuses.Add($"PSH({monster.ProbabilityShiftRounds})");   // 1.3.4
         if (!string.IsNullOrEmpty(monster.TauntedBy) && monster.TauntRoundsLeft > 0) statuses.Add($"TNT({monster.TauntRoundsLeft})");
 
         if (monster.IsBoss) statuses.Add("[BOSS]");
@@ -16023,7 +16065,8 @@ public partial class CombatEngine
                 // flavor message are applied to the same damage event the standard combat line reports.
                 bool waveEchoDebuffed = target.Poisoned || target.Stunned || target.Charmed || target.Distracted
                     || target.WeakenRounds > 0 || target.IsSlowed || target.IsMarked
-                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen;
+                    || target.IsCorroded || target.IsFeared || target.IsConfused || target.IsSleeping || target.IsFrozen
+                    || target.ProbabilityShiftRounds > 0;   // 1.3.4: still a debuffed target
                 if (waveEchoDebuffed)
                 {
                     actualDamage *= 2;
@@ -19165,11 +19208,11 @@ public partial class CombatEngine
                 break;
 
             case "probability_shift":
-                // Cyclebreaker: confuse (may skip/hit self) + slow (reduced power) for 3 rounds
-                target.IsConfused = true;
-                target.ConfusedDuration = Math.Max(target.ConfusedDuration, 3);
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, 3);
+                // 1.3.4 Cyclebreaker: as the spell's text says, for 3 rounds the target's attacks never crit and
+                // miss 30 points more often (ProbabilityShiftMisses). It used to confuse and slow the target,
+                // which cost it about four in five of its actions. Bosses and Old Gods take it the same way.
+                target.ProbabilityShiftRounds = Math.Max(target.ProbabilityShiftRounds, duration > 0 ? duration : 3);
+                target.ProbabilityShiftActive = true;
                 UIHelper.WriteRow(terminal, Loc.Get("combat.probability_shift", MonsterNames.Display(target)), "cyan");
                 break;
 
@@ -21958,6 +22001,15 @@ public partial class CombatEngine
         {
             terminal.WriteLine(Loc.Get("combat.blur_miss"), "gray");
             result.CombatLog.Add($"{monster.Name} misses {companion.DisplayName} due to blur");
+            await Pacing.Wait(GetCombatDelay(500));
+            return;
+        }
+
+        // 1.3.4: Probability Shift makes the monster miss a teammate as often as it adds misses against the
+        // player. This attack has no hit roll and no critical, so the miss is its whole effect here.
+        if (monster.ProbabilityShiftActive && random.Next(100) < ProbabilityShiftMissPercent)
+        {
+            WriteProbabilityShiftMiss(monster, companion, result);
             await Pacing.Wait(GetCombatDelay(500));
             return;
         }
@@ -25173,7 +25225,8 @@ public partial class CombatEngine
                 // Wavecaller Wave Echo: doubling moved inline (see multi-monster comment for details).
                 bool waveEchoDebuffed = monster.Poisoned || monster.Stunned || monster.Charmed || monster.Distracted
                     || monster.WeakenRounds > 0 || monster.IsSlowed || monster.IsMarked
-                    || monster.IsCorroded || monster.IsFeared || monster.IsConfused || monster.IsSleeping || monster.IsFrozen;
+                    || monster.IsCorroded || monster.IsFeared || monster.IsConfused || monster.IsSleeping || monster.IsFrozen
+                    || monster.ProbabilityShiftRounds > 0;   // 1.3.4: still a debuffed target
                 if (waveEchoDebuffed)
                 {
                     actualDamage *= 2;
