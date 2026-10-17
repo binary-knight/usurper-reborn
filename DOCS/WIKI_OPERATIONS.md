@@ -1,3 +1,4 @@
+<!-- doc: checked 1.3.4; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
 # Wiki build and review
 
 The launch wiki has English prose in `DOCS/wiki/`, generated references and a
@@ -264,7 +265,11 @@ and each error.
 ```sh
 node tools/wiki-build/drift.js --warn
 node tools/wiki-build/drift.js --fail --version 1.2.1
+node tools/wiki-build/drift.js --mode fail
 ```
+
+`--mode warn` and `--mode fail` are the same as `--warn` and `--fail`; CI
+passes `--mode`.
 
 Run it from a clone with full history and tags (`git fetch --tags origin`).
 Warn mode always exits 0. Fail mode exits 1 when anything is listed. In CI the
@@ -285,7 +290,27 @@ Release prep, before opening the release pull request: set
 `GameConfig.Version` to the new version (or pass `--version` with it until the
 bump lands), run `node tools/wiki-build/drift.js --fail`, re-check every stale
 guide, add a history line to every guide listed as missing one, resolve every
-uncovered location, and repeat until the check passes.
+uncovered location, and repeat until the check passes. Then run the
+documentation check, `node tools/wiki-build/doc-check.js`, and repeat until it
+passes too.
+
+### Documentation check
+
+`tools/wiki-build/doc-check.js` covers the Markdown files outside the wiki:
+every `.md` file at the repository root and at the top level of `DOCS/`
+(`DOCS/wiki` and `DOCS/release-notes` are outside it). Line 1 of each file is
+one marker, either `<!-- doc: checked 1.3.4; sources: Scripts/Server/MudServer.cs, web/ssh-proxy.js -->`
+for a current doc or `<!-- doc: historical -->` for a plan or record kept as
+it was. A current doc's sources are repository paths, files or folders. The
+check fails on a file with no marker or a bad one, a current doc with no
+sources, a listed source that does not exist, and a checked version newer than
+the game version. While a release is being prepared (the same rule as the
+drift check's history rule: no tag `v<version>` yet, previous release the
+highest lower tag), it also fails on a current doc whose checked version is
+older than the game version and one of whose sources changed since the
+previous release. To clear that, read the doc against the changed code,
+correct it, and set its checked version to the game version. The CI `wiki`
+job runs it after the drift check, in every mode.
 
 Shared website labels live in `web/lang/`. Launch guides are English only.
 Generated translated names are included only where the exporter found a real
@@ -423,7 +448,7 @@ Owner steps before the first enable:
    ```
 
    The startup log should read `[Wiki] Ask LLM path on: ...`. The service has
-   `MemoryMax=128M`; watch its memory for the first days. To switch the path
+   `MemoryMax=384M`; watch its memory for the first days. To switch the path
    off, set `DISCORD_WIKI_LLM=off` in the drop-in, reload and restart.
 
 Review usage with a read-only query on an authorized copy, for example

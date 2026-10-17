@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Player Experience Analysis: The Level-40 Cliff (2026-07-12)
 
 An end-to-end analysis of why players stop progressing around level 30-40, built from live telemetry

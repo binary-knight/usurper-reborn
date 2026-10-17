@@ -2016,10 +2016,11 @@ function showMessageModal(username) {
 
 function showResetPwModal(username) {
   showActionModal('Reset Password: ' + username,
-    '<input type="text" id="new-pw" placeholder="New password (min 4 chars)">',
+    '<input type="text" id="new-pw" placeholder="New password (min 8 chars, no colon)">',
     async () => {
       const pw = document.getElementById('new-pw').value;
-      if (!pw || pw.length < 4) throw new Error('Password must be at least 4 characters');
+      if (!pw || pw.length < 8) throw new Error('Password must be at least 8 characters');
+      if (pw.includes(':')) throw new Error('Password cannot contain a colon');
       const r = await fetch(`${API}/players/${encodeURIComponent(username)}/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },

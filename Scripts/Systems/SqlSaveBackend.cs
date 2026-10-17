@@ -1085,6 +1085,8 @@ namespace UsurperRemake.Systems
             }
             catch (Exception ex) { DebugLogger.Instance.LogWarning("SQL", $"login_tokens not ensured: {ex.Message}"); }
 
+            MigrateAccountMail(connection); // 1.3.4: the address columns and the account mail tables (password self-reset)
+
             MigrateCombatEventColumns(connection); // 1.2.6: accumulator columns and indexes, after the table exists
 
             MigrateWorldBossTables(connection); // v1.1.4
@@ -5081,7 +5083,7 @@ namespace UsurperRemake.Systems
                 if (string.IsNullOrWhiteSpace(username) || username.Length < 2 || username.Length > 20)
                     return (false, T("auth.err_username_len"));
 
-                if (password.Length < 4)
+                if (password.Length < GameConfig.MinPasswordLength)
                     return (false, T("auth.err_password_len"));
 
                 // (reserved-name gate is applied with the other name rules below)
@@ -5417,7 +5419,7 @@ namespace UsurperRemake.Systems
                 if (!authenticated)
                     return (false, T("auth.err_current_password"));
 
-                if (newPassword.Length < 4)
+                if (newPassword.Length < GameConfig.MinPasswordLength)
                     return (false, T("auth.err_new_password_len"));
 
                 string newHash = HashPassword(newPassword);
@@ -5448,8 +5450,8 @@ namespace UsurperRemake.Systems
             {
                 if (newPassword.Contains(':'))
                     return (false, "Password cannot contain ':'."); // v1.1.1: the relay/desktop AUTH line splits on ':'
-                if (newPassword.Length < 4)
-                    return (false, "New password must be at least 4 characters.");
+                if (newPassword.Length < GameConfig.MinPasswordLength)
+                    return (false, $"New password must be at least {GameConfig.MinPasswordLength} characters.");
 
                 // Verify user exists
                 using var connection = OpenConnection();

@@ -907,8 +907,8 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         var maelketh = One(gods, "Maelketh");
         Assert.Equal(40, maelketh.GetProperty("enrageRound").GetInt32());
         Assert.Equal(0, maelketh.GetProperty("areaEveryRounds").GetInt32());
-        // every Old God marks Doom in phase 3: the context's own default when the god sets none
-        Assert.Equal(new BossCombatContext().DoomRounds, maelketh.GetProperty("doomRounds").GetInt32());
+        // 1.3.4: Doom starts at Aurelion; the gods before it set 0 over the context's default
+        Assert.Equal(0, maelketh.GetProperty("doomRounds").GetInt32());
         var manwe = One(gods, "Manwe");
         Assert.Equal(2, manwe.GetProperty("areaEveryRounds").GetInt32());
         Assert.Equal(1500, manwe.GetProperty("areaDamage").GetInt32());

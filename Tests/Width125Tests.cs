@@ -62,7 +62,7 @@ public class Width125Tests
         "combat.enchant_lightning_resist_tm", "combat.enchant_lightning_stun", "combat.enchant_lightning_stun_multi",
         "combat.enchant_lightning_stun_tm", "combat.enchant_shadow_immune_demon", "combat.enchant_shadow_multi",
         "combat.enchant_venom_multi", "combat.enemy_hp", "combat.evasion_miss", "combat.fire_burn",
-        "combat.frost_bites_no_freeze", "combat.future_echo", "combat.group_fallen_dark_powers",
+        "combat.frost_bites_no_freeze", "combat.group_fallen_dark_powers",
         "combat.harmonic_reflect", "combat.hemlock_weakened", "combat.holy_smite_passive",
         "combat.legendary_shot_staggers", "combat.legendary_shot_withstands", "combat.lethal_precision_poison",
         "combat.loot_ally_picks_up", "combat.loot_ally_upgrade_prompt", "combat.loses_defense",

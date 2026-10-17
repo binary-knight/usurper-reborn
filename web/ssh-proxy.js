@@ -3862,7 +3862,15 @@ async function handleAdminRequest(req, res) {
   // GET /api/admin/players/:username — full player detail
   if (method === 'GET' && playerUsername && playerAction === '') {
     try {
-      const row = db.prepare("SELECT * FROM players WHERE LOWER(username) = LOWER(?)").get(playerUsername);
+      // 1.3.4: named columns, so the account's address never reaches the response; it is shown masked.
+      // A database from before 1.3.4 has no address columns.
+      const DETAIL_COLUMNS = 'username, display_name, is_banned, ban_reason, last_login, last_login_ip, last_logout, created_at, total_playtime_minutes, player_data';
+      let row;
+      try {
+        row = db.prepare(`SELECT ${DETAIL_COLUMNS}, email, email_verified_at FROM players WHERE LOWER(username) = LOWER(?)`).get(playerUsername);
+      } catch (e) {
+        row = db.prepare(`SELECT ${DETAIL_COLUMNS} FROM players WHERE LOWER(username) = LOWER(?)`).get(playerUsername);
+      }
       if (!row) { sendJson(res, 404, { error: 'Player not found' }); return true; }
 
       const online = db.prepare("SELECT * FROM online_players WHERE LOWER(username) = LOWER(?)").get(playerUsername);
@@ -3884,6 +3892,8 @@ async function handleAdminRequest(req, res) {
         lastLogout: row.last_logout,
         createdAt: row.created_at,
         playtimeMinutes: row.total_playtime_minutes || 0,
+        email: row.email ? accountMask(row.email) : null,
+        emailVerified: !!row.email_verified_at,
         stats: {
           level: p.level || 1,
           experience: p.experience || 0,
@@ -4232,8 +4242,12 @@ async function handleAdminRequest(req, res) {
   if (method === 'POST' && playerUsername && playerAction === '/reset-password') {
     try {
       const body = await readBody(req);
-      if (!body.newPassword || body.newPassword.length < 4) {
-        sendJson(res, 400, { error: 'Password must be at least 4 characters' }); return true;
+      // 1.3.4: the game's rule for a new password (GameConfig.MinPasswordLength) and no ':' (D5)
+      if (typeof body.newPassword !== 'string' || body.newPassword.length < ACCOUNT_MIN_PASSWORD_LENGTH) {
+        sendJson(res, 400, { error: `Password must be at least ${ACCOUNT_MIN_PASSWORD_LENGTH} characters` }); return true;
+      }
+      if (body.newPassword.includes(':')) {
+        sendJson(res, 400, { error: 'Password cannot contain a colon' }); return true;
       }
       // 1.2.8: the game's own PBKDF2 form; the bcrypt or SHA256 written before could never log in.
       const hashed = hashGamePassword(body.newPassword);
@@ -4461,12 +4475,625 @@ async function handleAdminRequest(req, res) {
   return true;
 }
 
+// --- Account Mail (1.3.4) ---
+// Password self-reset by email, the web side. The game writes mail_requests rows (reset, verify,
+// remove_notice); this section claims them, applies the limits, makes the tokens and sends the mail
+// through the Resend API with a raw HTTPS POST. The key and the sender address come from the process
+// environment only (RESEND_API_KEY, MAIL_FROM) and are never logged, and neither is a token or an
+// address. It also serves POST /api/account/forgot, /api/account/reset and /api/account/verify for
+// the pages under web/account/. Everything it touches is passed in, so the tests run it with a fake
+// sender, a fake clock and no network. SITE_URL (optional) is the site the links and the footer name.
+const ACCOUNT_MIN_PASSWORD_LENGTH = 8;            // GameConfig.MinPasswordLength (a test reads the C# value)
+const ACCOUNT_MAX_PASSWORD_LENGTH = 128;          // bounds the PBKDF2 work one request can ask for
+const ACCOUNT_RESET_TTL_MS = 30 * 60 * 1000;      // his choice PW-C
+const ACCOUNT_VERIFY_TTL_MS = 24 * 60 * 60 * 1000; // O2
+const ACCOUNT_HOUR_MS = 60 * 60 * 1000;
+const ACCOUNT_PER_IP_PER_HOUR = 5;                // GameConfig.MailRequestsPerIpPerHour, the same count as the game
+const ACCOUNT_PER_ACCOUNT_PER_HOUR = 3;
+const ACCOUNT_PER_ADDRESS_PER_HOUR = 3;
+const ACCOUNT_KEEP_MS = 7 * 24 * 60 * 60 * 1000;  // S3: processed rows and spent tokens
+const ACCOUNT_STUCK_MS = 10 * 60 * 1000;          // a row left 'sending' this long is dropped, never sent twice
+const ACCOUNT_TICK_MS = 15000;
+const ACCOUNT_BATCH = 20;
+const ACCOUNT_BODY_MAX = 4096;
+const ACCOUNT_SEND_TIMEOUT_MS = 15000;
+const ACCOUNT_NAME_MAX = 64;                      // SqlSaveBackend.ResetNameMaxLength
+const ACCOUNT_ADDRESS_MAX = 254;                  // AccountEmail.MaxLength
+const ACCOUNT_SITE = 'https://usurper-reborn.net';  // the default site, when SITE_URL is unset or not accepted
+// The site rule, the same as MailSite.IsValid in the game: http or https, a host, an optional port, and
+// nothing else (no path, not even '/', no query, fragment or user part).
+const ACCOUNT_SITE_RE = /^https?:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::[0-9]{1,5})?$/;
+const ACCOUNT_SITE_MAX = 300;
+const ACCOUNT_LANGS = ['en', 'es', 'fr', 'hu', 'it'];
+const ACCOUNT_RESEND_HOST = 'api.resend.com';
+const ACCOUNT_RESEND_PATH = '/emails';
+const ACCOUNT_TOKEN_RE = /^[A-Za-z0-9_-]{43}$/;   // 32 bytes, base64url
+// The security notices go only to an address that is or was on the account, so the limits count
+// them but never hold one back (a hijacker could otherwise use up the limit to hide a change).
+const ACCOUNT_NOTICE_KINDS = ['remove_notice', 'change_notice', 'password_changed'];
+const ACCOUNT_API_HEADERS = {
+  'Content-Type': 'application/json',
+  'Cache-Control': 'no-store',
+  'Referrer-Policy': 'no-referrer',
+  'X-Content-Type-Options': 'nosniff',
+};
+const ACCOUNT_MAIL_TEMPLATES = {
+  reset_request: 'reset', verify: 'verify', already_linked: 'linked',
+  change_notice: 'change', remove_notice: 'remove', password_changed: 'changed',
+};
+
+// S1: AccountEmail.Normalize. Trimmed, lower case, at most 254, exactly one '@' with text on both
+// sides, no control character and no white space. Null when the text is not an address.
+function accountNormalizeAddress(input) {
+  if (typeof input !== 'string') return null;
+  const s = input.trim().toLowerCase();
+  if (s.length === 0 || s.length > ACCOUNT_ADDRESS_MAX) return null;
+  if (/[\s\u0000-\u001f\u007f-\u009f]/.test(s)) return null;
+  const at = s.indexOf('@');
+  if (at <= 0 || at !== s.lastIndexOf('@') || at === s.length - 1) return null;
+  return s;
+}
+
+// AccountEmail.Mask: a***@d***.net (the first letter of each part and the last domain label).
+function accountMask(address) {
+  if (typeof address !== 'string' || address.length === 0) return '';
+  const at = address.indexOf('@');
+  if (at <= 0 || at === address.length - 1) return '***';
+  const domain = address.slice(at + 1);
+  const dot = domain.lastIndexOf('.');
+  let tld = dot > 0 ? domain.slice(dot) : '';
+  if (tld.length > 10) tld = tld.slice(0, 10);
+  return address[0] + '***@' + domain[0] + '***' + tld;
+}
+
+// SITE_URL: trimmed and lower case; the accepted form, or null when the rule refuses it.
+function accountSiteUrl(raw) {
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (t.length === 0 || t.length > ACCOUNT_SITE_MAX || /[^\x20-\x7e]/.test(t)) return null;
+  const s = t.toLowerCase();
+  if (!ACCOUNT_SITE_RE.test(s)) return null;
+  const port = s.match(/:([0-9]+)$/);
+  if (port && !(Number(port[1]) >= 1 && Number(port[1]) <= 65535)) return null;
+  return s;
+}
+
+// SqlSaveBackend.ResetRequestName: trimmed, lower case, no control characters, at most 64.
+function accountResetName(typed) {
+  const s = (typeof typed === 'string' ? typed : '').trim().toLowerCase().replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+  return s.length > ACCOUNT_NAME_MAX ? s.slice(0, ACCOUNT_NAME_MAX) : s;
+}
+
+// SQLite's datetime('now') form, UTC, so a value compares as text with the game's own.
+function accountSqlTime(ms) {
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+}
+
+function accountEscapeHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// {name} style placeholders. In html mode the template text and every value are escaped (S2) and
+// {link} becomes a plain anchor; in text mode control characters are removed from the values.
+function accountFill(template, values, html) {
+  const src = html ? accountEscapeHtml(template) : template;
+  return src.replace(/\{(\w+)\}/g, (m, k) => {
+    if (!Object.prototype.hasOwnProperty.call(values, k)) return m;
+    const v = String(values[k]);
+    if (!html) return v.replace(/[\u0000-\u001f\u007f-\u009f]/g, '');
+    const e = accountEscapeHtml(v);
+    return k === 'link' ? '<a href="' + e + '">' + e + '</a>' : e;
+  });
+}
+
+// One mail from the web/lang strings: plain text and simple HTML, no image, no tracking, nothing
+// loaded from anywhere. strings is the language's file, fallback the English one.
+function accountMailMessage(strings, fallback, kind, values) {
+  const get = (k) => (strings && typeof strings[k] === 'string' ? strings[k]
+    : (fallback && typeof fallback[k] === 'string' ? fallback[k] : ''));
+  const base = 'mail.' + ACCOUNT_MAIL_TEMPLATES[kind];
+  const paras = get(base + '.body').split('\n\n').concat([get('mail.footer')]).filter((p) => p.length > 0);
+  const subject = accountFill(get(base + '.subject'), values, false).replace(/[\r\n]+/g, ' ');
+  const text = paras.map((p) => accountFill(p, values, false)).join('\n\n') + '\n';
+  const html = '<!DOCTYPE html><html><body style="font-family:sans-serif;line-height:1.5">' +
+    paras.map((p) => '<p>' + accountFill(p, values, true).replace(/\n/g, '<br>') + '</p>').join('') +
+    '</body></html>';
+  return { subject, text, html };
+}
+
+// The Resend API call: one HTTPS POST. Resolves { ok, status }; never logs the key or the body.
+function accountResendSend(httpsModule, key, msg, timeoutMs) {
+  return new Promise((resolve) => {
+    const body = JSON.stringify({ from: msg.from, to: [msg.to], subject: msg.subject, text: msg.text, html: msg.html });
+    let settled = false;
+    const done = (r) => { if (!settled) { settled = true; resolve(r); } };
+    try {
+      const req = httpsModule.request({
+        hostname: ACCOUNT_RESEND_HOST, port: 443, path: ACCOUNT_RESEND_PATH, method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + key, 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) },
+        timeout: timeoutMs,
+      }, (res) => {
+        res.on('data', () => {});
+        res.on('end', () => done({ ok: res.statusCode >= 200 && res.statusCode < 300, status: res.statusCode }));
+        res.on('error', () => done({ ok: false, status: 0 }));
+      });
+      req.on('timeout', () => { req.destroy(); done({ ok: false, status: 0 }); });
+      req.on('error', () => done({ ok: false, status: 0 }));
+      req.end(body);
+    } catch (e) {
+      done({ ok: false, status: 0 });
+    }
+  });
+}
+
+// The client address: the socket peer, or X-Real-IP when the peer is the local reverse proxy (the
+// telemetry rule), so a request straight to the node port cannot pick its own limit bucket.
+function accountClientIp(req, isIP) {
+  const peer = (req.socket && req.socket.remoteAddress) || '';
+  if (peer === '127.0.0.1' || peer === '::1' || peer === '::ffff:127.0.0.1') {
+    const h = req.headers && req.headers['x-real-ip'];
+    if (typeof h === 'string' && isIP(h.trim())) return h.trim();
+  }
+  return peer;
+}
+
+function accountReadBody(req, max) {
+  return new Promise((resolve) => {
+    const chunks = [];
+    let size = 0;
+    let over = false;
+    req.on('data', (c) => {
+      if (over) return;
+      size += c.length;
+      if (size > max) { over = true; resolve(null); if (req.destroy) req.destroy(); return; }
+      chunks.push(Buffer.isBuffer(c) ? c : Buffer.from(String(c)));
+    });
+    req.on('end', () => {
+      if (over) return;
+      try {
+        const v = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        resolve(v && typeof v === 'object' && !Array.isArray(v) ? v : null);
+      } catch (e) { resolve(null); }
+    });
+    req.on('error', () => { if (!over) resolve(null); });
+  });
+}
+
+// options: db (the writable game database or null), env (RESEND_API_KEY, MAIL_FROM, SITE_URL), https, crypto,
+// isIP, hashGamePassword, loadStrings(lang) (a web/lang file as an object), now() in ms, log
+// (console-like), send(msg) to replace the Resend call (tests), tickMs.
+function createAccountMail(options) {
+  const db = options.db || null;
+  const env = options.env || {};
+  const now = options.now || (() => Date.now());
+  const log = options.log || { info() {}, warn() {}, error() {} };
+  const cryptoMod = options.crypto;
+  const loadStrings = options.loadStrings || (() => ({}));
+  const mailKey = () => (typeof env.RESEND_API_KEY === 'string' ? env.RESEND_API_KEY.trim() : '');
+  const mailFrom = () => (typeof env.MAIL_FROM === 'string' ? env.MAIL_FROM.trim() : '');
+  const configured = () => mailKey().length > 0 && mailFrom().length > 0;
+  const send = options.send || ((msg) => accountResendSend(options.https, mailKey(), msg, ACCOUNT_SEND_TIMEOUT_MS));
+  // the site the links, the footer and the game's reset pointer name; read once, at start
+  const siteSet = typeof env.SITE_URL === 'string' && env.SITE_URL.trim().length > 0;
+  const site = (siteSet && accountSiteUrl(env.SITE_URL)) || ACCOUNT_SITE;
+  if (siteSet && !accountSiteUrl(env.SITE_URL)) {
+    log.warn('[account-mail] SITE_URL not accepted (http or https, a host and an optional port only); using ' + ACCOUNT_SITE);
+  }
+  let timer = null;
+  let busy = false;
+  let webTablesReady = false;
+
+  const sha256Hex = (s) => cryptoMod.createHash('sha256').update(String(s), 'utf8').digest('hex');
+  // LoginTokenProtocol.PasswordStamp: base64 SHA-256 of the stored hash. A reset token is good only
+  // while the account's password is the one it was made for, so any password change voids it.
+  const pwStamp = (hash) => cryptoMod.createHash('sha256').update(String(hash || ''), 'utf8').digest('base64');
+
+  function gameTablesReady() {
+    try {
+      const r = db.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('players', 'mail_requests', 'account_tokens', 'account_security_log')").get();
+      return r.n === 4;
+    } catch (e) { return false; }
+  }
+
+  // The web side's own tables: the sender limits (an address only as its SHA-256, kept one hour)
+  // and the password stamp of each reset token.
+  function ensureWebTables() {
+    if (webTablesReady) return;
+    db.exec(`CREATE TABLE IF NOT EXISTS mail_limits (
+        id      INTEGER PRIMARY KEY AUTOINCREMENT,
+        scope   TEXT NOT NULL,
+        subject TEXT NOT NULL,
+        at      TEXT NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_mail_limits ON mail_limits(scope, subject, at);
+      CREATE TABLE IF NOT EXISTS account_token_stamps (
+        token_id INTEGER PRIMARY KEY,
+        pw_stamp TEXT NOT NULL
+      );`);
+    webTablesReady = true;
+  }
+
+  // O3: '1' while the key and the sender address are set, '0' when not; the game treats a '1'
+  // under ten minutes old as on. 'mail_site' is the accepted site, for the game's reset pointer.
+  function heartbeat() {
+    const up = db.prepare(`INSERT INTO world_state (key, value, updated_at, updated_by) VALUES (?, ?, datetime('now'), 'usurper-web')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`);
+    up.run('mail_enabled', configured() ? '1' : '0');
+    up.run('mail_site', site);
+  }
+
+  // S3 retention, and the bounds on rows that wait.
+  function prune(t) {
+    const ts = accountSqlTime(t);
+    const hourAgo = accountSqlTime(t - ACCOUNT_HOUR_MS);
+    const keep = accountSqlTime(t - ACCOUNT_KEEP_MS);
+    // a processed row loses its address at once, and its IP once it is past the hour the IP limit counts
+    db.prepare("UPDATE mail_requests SET address = NULL WHERE status IN ('done', 'dropped') AND address IS NOT NULL").run();
+    db.prepare("UPDATE mail_requests SET ip = '' WHERE status IN ('done', 'dropped') AND ip <> '' AND created_at <= ?").run(hourAgo);
+    // a request not sent within the hour (mail was off, or the sender was down) is dropped, not sent late
+    const stale = db.prepare("UPDATE mail_requests SET status = 'dropped', address = NULL, processed_at = ? WHERE status = 'pending' AND created_at <= ?").run(ts, hourAgo).changes;
+    if (stale > 0) log.info(`[account-mail] ${stale} row(s) dropped stale`);
+    // a row claimed by a sender that stopped mid-send is dropped: it may have gone out already
+    db.prepare("UPDATE mail_requests SET status = 'dropped', address = NULL, processed_at = ? WHERE status = 'sending' AND (processed_at IS NULL OR processed_at <= ?)")
+      .run(ts, accountSqlTime(t - ACCOUNT_STUCK_MS));
+    db.prepare("DELETE FROM mail_requests WHERE status IN ('done', 'dropped') AND processed_at <= ?").run(keep);
+    db.prepare('DELETE FROM account_tokens WHERE (used_at IS NOT NULL AND used_at <= ?) OR expires_at <= ?').run(keep, keep);
+    db.prepare('DELETE FROM account_token_stamps WHERE token_id NOT IN (SELECT id FROM account_tokens)').run();
+    db.prepare('DELETE FROM mail_limits WHERE at <= ?').run(hourAgo);
+  }
+
+  // S7: one atomic UPDATE claims a row; a second sender (or a second loop) gets no change.
+  function claim(id) {
+    return db.prepare("UPDATE mail_requests SET status = 'sending', processed_at = ? WHERE id = ? AND status = 'pending'")
+      .run(accountSqlTime(now()), id).changes === 1;
+  }
+
+  function finish(id, status) {
+    db.prepare("UPDATE mail_requests SET status = ?, address = NULL, processed_at = ? WHERE id = ? AND status = 'sending'")
+      .run(status, accountSqlTime(now()), id);
+  }
+
+  function limitCount(scope, subject, t) {
+    return db.prepare('SELECT COUNT(*) AS n FROM mail_limits WHERE scope = ? AND subject = ? AND at > ?')
+      .get(scope, subject, accountSqlTime(t - ACCOUNT_HOUR_MS)).n;
+  }
+
+  // S4 at the sender: 3 an hour per account and per address, held in the database.
+  function overLimit(account, address, t) {
+    if (account && limitCount('account', account, t) >= ACCOUNT_PER_ACCOUNT_PER_HOUR) return true;
+    if (address && limitCount('address', sha256Hex(address), t) >= ACCOUNT_PER_ADDRESS_PER_HOUR) return true;
+    return false;
+  }
+
+  function recordLimit(account, address, t) {
+    const ins = db.prepare('INSERT INTO mail_limits (scope, subject, at) VALUES (?, ?, ?)');
+    if (account) ins.run('account', account, accountSqlTime(t));
+    if (address) ins.run('address', sha256Hex(address), accountSqlTime(t));
+  }
+
+  function strings(lang) {
+    const code = ACCOUNT_LANGS.includes(lang) ? lang : 'en';
+    let s = null;
+    let en = null;
+    try { s = loadStrings(code); } catch (e) { s = null; }
+    try { en = code === 'en' ? s : loadStrings('en'); } catch (e) { en = null; }
+    return { s, en };
+  }
+
+  async function deliver(kind, lang, address, values) {
+    const { s, en } = strings(lang);
+    const m = accountMailMessage(s, en, kind, Object.assign({ site }, values));
+    try {
+      const r = await send({ from: mailFrom(), to: address, subject: m.subject, text: m.text, html: m.html });
+      return !!(r && r.ok);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function newToken() {
+    const token = cryptoMod.randomBytes(32).toString('base64url');
+    return { token, hash: sha256Hex(token) };
+  }
+
+  function findAccount(name) {
+    return db.prepare('SELECT username, password_hash, email, email_verified_at FROM players WHERE LOWER(username) = LOWER(?)').get(name);
+  }
+
+  // A reset row's name is what was typed: an account name first, then a confirmed address. Only an
+  // account with a confirmed address gets mail; otherwise nothing is sent.
+  async function processReset(row, t) {
+    const name = row.username || '';
+    if (!name) return 'dropped';
+    let acct = null;
+    if (name.includes('@')) {
+      // text with '@' is an address (account names cannot hold '@'): only a confirmed address matches
+      const a = accountNormalizeAddress(name);
+      if (a) acct = db.prepare('SELECT username, password_hash, email, email_verified_at FROM players WHERE email = ? AND email_verified_at IS NOT NULL').get(a);
+    } else {
+      acct = findAccount(name);
+    }
+    if (!acct || !acct.email || !acct.email_verified_at) return 'dropped';
+    const account = acct.username.toLowerCase();
+    if (overLimit(account, acct.email, t)) return 'dropped';
+    recordLimit(account, acct.email, t);
+    const tok = newToken();
+    db.transaction(() => {
+      // a newer token of the same kind voids the older ones
+      db.prepare("UPDATE account_tokens SET used_at = ? WHERE LOWER(username) = ? AND kind = 'reset' AND used_at IS NULL").run(accountSqlTime(t), account);
+      const id = db.prepare("INSERT INTO account_tokens (username, kind, token_hash, created_at, expires_at, ip) VALUES (?, 'reset', ?, ?, ?, ?)")
+        .run(account, tok.hash, accountSqlTime(t), accountSqlTime(t + ACCOUNT_RESET_TTL_MS), row.ip || '').lastInsertRowid;
+      db.prepare('INSERT INTO account_token_stamps (token_id, pw_stamp) VALUES (?, ?)').run(id, pwStamp(acct.password_hash));
+    })();
+    const ok = await deliver('reset_request', row.lang, acct.email,
+      { name: acct.username, link: site + '/account/reset#' + tok.token, minutes: ACCOUNT_RESET_TTL_MS / 60000 });
+    return ok ? 'done' : 'dropped';
+  }
+
+  // A new address to confirm. G1: an address already on another account gets a notice instead,
+  // and the account is not changed.
+  async function processVerify(row, t) {
+    const acct = row.username ? findAccount(row.username) : null;
+    const address = accountNormalizeAddress(row.address);
+    if (!acct || !address) return 'dropped';
+    const account = acct.username.toLowerCase();
+    if (overLimit(account, address, t)) return 'dropped';
+    recordLimit(account, address, t);
+    const other = db.prepare('SELECT 1 AS x FROM players WHERE email = ? AND LOWER(username) <> LOWER(?)').get(address, account);
+    if (other) {
+      return (await deliver('already_linked', row.lang, address, {})) ? 'done' : 'dropped';
+    }
+    const tok = newToken();
+    db.transaction(() => {
+      db.prepare("UPDATE account_tokens SET used_at = ? WHERE LOWER(username) = ? AND kind = 'verify' AND used_at IS NULL").run(accountSqlTime(t), account);
+      // created_at is the time of the request, so a later change or removal of the address voids it (D-e)
+      db.prepare("INSERT INTO account_tokens (username, kind, token_hash, new_address, created_at, expires_at, ip) VALUES (?, 'verify', ?, ?, ?, ?, ?)")
+        .run(account, tok.hash, address, row.created_at || accountSqlTime(t), accountSqlTime(t + ACCOUNT_VERIFY_TTL_MS), row.ip || '');
+    })();
+    const ok = await deliver('verify', row.lang, address,
+      { name: acct.username, link: site + '/account/verify#' + tok.token, hours: ACCOUNT_VERIFY_TTL_MS / ACCOUNT_HOUR_MS });
+    return ok ? 'done' : 'dropped';
+  }
+
+  async function processNotice(row, t) {
+    const address = accountNormalizeAddress(row.address);
+    if (!address) return 'dropped';
+    const account = row.username ? String(row.username).toLowerCase() : '';
+    const notice = ACCOUNT_NOTICE_KINDS.includes(row.kind);
+    if (!notice && overLimit(account, address, t)) return 'dropped';
+    recordLimit(account, address, t);
+    const values = { name: row.username || '' };
+    return (await deliver(row.kind, row.lang, address, values)) ? 'done' : 'dropped';
+  }
+
+  async function processRow(row, t) {
+    if (row.kind === 'reset') return processReset(row, t);
+    if (row.kind === 'verify') return processVerify(row, t);
+    if (row.kind === 'already_linked' || ACCOUNT_NOTICE_KINDS.includes(row.kind)) return processNotice(row, t);
+    return 'dropped';
+  }
+
+  // One loop: the heartbeat, the retention, then the pending rows. With mail off nothing is sent
+  // and the rows wait (the prune drops them after an hour).
+  async function tick() {
+    if (!db || busy) return;
+    busy = true;
+    try {
+      heartbeat();
+      if (!gameTablesReady()) return;
+      ensureWebTables();
+      prune(now());
+      if (!configured()) return;
+      const ids = db.prepare("SELECT id FROM mail_requests WHERE status = 'pending' ORDER BY id LIMIT ?").all(ACCOUNT_BATCH);
+      for (const { id } of ids) {
+        if (!claim(id)) continue;
+        const row = db.prepare('SELECT id, kind, username, address, ip, lang, created_at FROM mail_requests WHERE id = ?').get(id);
+        let status = 'dropped';
+        try { status = await processRow(row, now()); } catch (e) { status = 'dropped'; log.warn(`[account-mail] row ${id} failed: ${e && e.code ? e.code : 'error'}`); }
+        finish(id, status);
+        log.info(`[account-mail] row ${id} ${row.kind} ${status}`);
+      }
+    } catch (e) {
+      log.error(`[account-mail] loop failed: ${e && e.code ? e.code : 'error'}`);
+    } finally {
+      busy = false;
+    }
+  }
+
+  function reply(res, status, data) {
+    for (const [k, v] of Object.entries(ACCOUNT_API_HEADERS)) res.setHeader(k, v);
+    res.writeHead(status);
+    res.end(JSON.stringify(data));
+  }
+
+  // A token of this kind that is unused and unexpired, or null. Every bad token gets the same null.
+  function findToken(token, kind, t) {
+    if (typeof token !== 'string' || !ACCOUNT_TOKEN_RE.test(token)) return null;
+    const row = db.prepare('SELECT id, username, kind, new_address, created_at, expires_at, used_at FROM account_tokens WHERE token_hash = ?').get(sha256Hex(token));
+    if (!row || row.kind !== kind || row.used_at) return null;
+    if (!(row.expires_at > accountSqlTime(t))) return null;
+    return row;
+  }
+
+  function enqueue(kind, username, address, ip, lang, t) {
+    db.prepare('INSERT INTO mail_requests (kind, username, address, ip, lang, created_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(kind, username, address, ip || '', lang, accountSqlTime(t));
+  }
+
+  const langOf = (body) => (ACCOUNT_LANGS.includes(body.lang) ? body.lang : 'en');
+  const INVALID = { error: 'invalid_link' };
+  // With mail off the three routes give this one answer, a state of the server and the same for
+  // every name and token: no row is written and no token is looked at or used.
+  const MAIL_OFF = [503, { error: 'mail_off' }];
+
+  // 2.5: one reply for every input; a reset row like the game's, the same IP limit, no lookup.
+  function forgot(req, body, t) {
+    if (!configured()) return MAIL_OFF;
+    // text with '@' is an address: the S1 rule, up to 254 characters; other text is a name cut at 64
+    const typed = typeof body.name === 'string' ? body.name : '';
+    const name = typed.includes('@') ? (accountNormalizeAddress(typed) || '') : accountResetName(typed);
+    if (name.length > 0 && gameTablesReady()) {
+      const ip = accountClientIp(req, options.isIP);
+      const n = db.prepare('SELECT COUNT(*) AS n FROM mail_requests WHERE ip = ? AND created_at > ?').get(ip, accountSqlTime(t - ACCOUNT_HOUR_MS)).n;
+      if (n < ACCOUNT_PER_IP_PER_HOUR) enqueue('reset', name, null, ip, langOf(body), t);
+    }
+    return [200, { ok: true }];
+  }
+
+  function passwordError(pw) {
+    if (typeof pw !== 'string' || pw.length < ACCOUNT_MIN_PASSWORD_LENGTH) return 'password_short';
+    if (pw.length > ACCOUNT_MAX_PASSWORD_LENGTH) return 'password_long';
+    if (pw.includes(':')) return 'password_colon';
+    return null;
+  }
+
+  // 2.7: the token is the only credential (no cookie is read). The password is set, every saved
+  // login ends, the MUD is asked to end the live sessions, the other reset tokens are void, and the
+  // account's address is told.
+  function reset(req, body, t) {
+    if (!configured()) return MAIL_OFF;
+    const bad = passwordError(body.password);
+    if (bad) return [400, { error: bad }];
+    if (!gameTablesReady()) return [400, INVALID];
+    ensureWebTables();
+    const tok = findToken(body.token, 'reset', t);
+    if (!tok) return [400, INVALID];
+    const acct = findAccount(tok.username);
+    const stamp = db.prepare('SELECT pw_stamp FROM account_token_stamps WHERE token_id = ?').get(tok.id);
+    if (!acct || !stamp || stamp.pw_stamp !== pwStamp(acct.password_hash)) return [400, INVALID];
+    const hashed = options.hashGamePassword(body.password);
+    const ip = accountClientIp(req, options.isIP);
+    const ts = accountSqlTime(t);
+    const account = acct.username.toLowerCase();
+    const ok = db.transaction(() => {
+      if (db.prepare('UPDATE account_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL').run(ts, tok.id).changes !== 1) return false;
+      db.prepare('UPDATE players SET password_hash = ? WHERE LOWER(username) = LOWER(?)').run(hashed, account);
+      try {
+        db.prepare('DELETE FROM login_tokens WHERE LOWER(username) = LOWER(?)').run(account);
+      } catch (e) { /* no login_tokens table yet */ }
+      db.prepare("UPDATE account_tokens SET used_at = ? WHERE LOWER(username) = ? AND kind = 'reset' AND used_at IS NULL").run(ts, account);
+      // G4: the MUD runs this through KickPlayerLocalized for the sessions it holds
+      db.prepare("INSERT INTO admin_commands (command, target_username, args, created_by) VALUES ('kick', ?, NULL, 'account-reset')").run(account);
+      db.prepare("INSERT INTO account_security_log (username, event, ip, created_at) VALUES (?, 'password_reset', ?, ?)").run(account, ip, ts);
+      if (acct.email && acct.email_verified_at) enqueue('password_changed', account, acct.email, ip, langOf(body), t);
+      return true;
+    })();
+    if (!ok) return [400, INVALID];
+    log.info('[account] password reset by link completed');
+    return [200, { ok: true }];
+  }
+
+  // 2.4: the address is set when its link is used. Void when the account's address was changed or
+  // removed after the request (D-e). G1: on another account, no change, a notice, the same reply.
+  function verify(req, body, t) {
+    if (!configured()) return MAIL_OFF;
+    if (!gameTablesReady()) return [400, INVALID];
+    const tok = findToken(body.token, 'verify', t);
+    if (!tok) return [400, INVALID];
+    const acct = findAccount(tok.username);
+    const address = accountNormalizeAddress(tok.new_address);
+    if (!acct || !address) return [400, INVALID];
+    if (acct.email_verified_at && acct.email_verified_at >= tok.created_at) return [400, INVALID];
+    const removed = db.prepare("SELECT 1 AS x FROM account_security_log WHERE LOWER(username) = LOWER(?) AND event = 'email_removed' AND created_at >= ?")
+      .get(acct.username, tok.created_at);
+    if (removed) return [400, INVALID];
+    const ip = accountClientIp(req, options.isIP);
+    const ts = accountSqlTime(t);
+    const account = acct.username.toLowerCase();
+    const lang = langOf(body);
+    const linkedElsewhere = () => db.prepare('SELECT 1 AS x FROM players WHERE email = ? AND LOWER(username) <> LOWER(?)').get(address, account);
+    const consume = () => db.prepare('UPDATE account_tokens SET used_at = ? WHERE id = ? AND used_at IS NULL').run(ts, tok.id).changes === 1;
+    const notLinked = db.transaction(() => {
+      if (!consume()) return false;
+      enqueue('already_linked', account, address, ip, lang, t);
+      return true;
+    });
+    let ok;
+    if (linkedElsewhere()) {
+      ok = notLinked();
+    } else {
+      try {
+        ok = db.transaction(() => {
+          if (!consume()) return false;
+          db.prepare('UPDATE players SET email = ?, email_verified_at = ? WHERE LOWER(username) = LOWER(?)').run(address, ts, account);
+          db.prepare("UPDATE account_tokens SET used_at = ? WHERE LOWER(username) = ? AND kind = 'verify' AND used_at IS NULL").run(ts, account);
+          db.prepare("INSERT INTO account_security_log (username, event, ip, created_at) VALUES (?, 'email_verified', ?, ?)").run(account, ip, ts);
+          if (acct.email && acct.email !== address) enqueue('change_notice', account, acct.email, ip, lang, t);
+          return true;
+        })();
+      } catch (e) {
+        // the unique address index: another account took it in between
+        if (!(e && String(e.code || '').startsWith('SQLITE_CONSTRAINT'))) throw e;
+        ok = notLinked();
+      }
+    }
+    if (!ok) return [400, INVALID];
+    return [200, { ok: true }];
+  }
+
+  const ROUTES = { '/api/account/forgot': forgot, '/api/account/reset': reset, '/api/account/verify': verify };
+
+  async function handle(req, res) {
+    const url = (req.url || '').split('?')[0];
+    const route = ROUTES[url];
+    if (!route) { reply(res, 404, { error: 'not_found' }); return; }
+    if (req.method !== 'POST') { res.setHeader('Allow', 'POST'); reply(res, 405, { error: 'method' }); return; }
+    const type = String((req.headers && req.headers['content-type']) || '').split(';')[0].trim().toLowerCase();
+    if (type !== 'application/json') { reply(res, 415, { error: 'media_type' }); return; }
+    if (!db) { reply(res, 503, { error: 'unavailable' }); return; }
+    const body = await accountReadBody(req, ACCOUNT_BODY_MAX);
+    if (!body) { reply(res, 400, { error: 'bad_request' }); return; }
+    let out;
+    try {
+      out = route(req, body, now());
+    } catch (e) {
+      log.error(`[account] request failed: ${e && e.code ? e.code : 'error'}`);
+      out = [500, { error: 'internal' }];
+    }
+    reply(res, out[0], out[1]);
+  }
+
+  function start() {
+    if (timer || !db) return;
+    tick();
+    timer = setInterval(tick, options.tickMs || ACCOUNT_TICK_MS);
+    if (timer && timer.unref) timer.unref();
+  }
+
+  function stop() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
+  return { tick, handle, start, stop, claim, configured, site };
+}
+// --- End Account Mail ---
+
+// 1.3.4: the account mail sender and the account pages' API, on the writable game database.
+function accountLangStrings(lang) {
+  return JSON.parse(fs.readFileSync(path.join(__dirname, 'lang', lang + '.json'), 'utf8'));
+}
+const accountMail = createAccountMail({
+  db: dbWrite, env: process.env, https, crypto, isIP: net.isIP, hashGamePassword,
+  loadStrings: accountLangStrings, log: console,
+});
+accountMail.start();
+
 // --- HTTP Handler ---
 function handleHttpRequest(req, res) {
   // 1.2.7: opt-in telemetry from copies of the game. First, so no header of another route
   // (CORS above all) can reach its replies; handle() never rejects.
   if (req.url && isTelemetryUrl(req.url)) {
     telemetryEndpoint.handle(req, res);
+    return;
+  }
+
+  // 1.3.4: the account pages (forgotten password, reset, address confirmation)
+  if (req.url && req.url.startsWith('/api/account/')) {
+    accountMail.handle(req, res).catch(() => {
+      if (!res.headersSent) sendJson(res, 500, { error: 'Internal error' });
+    });
     return;
   }
 
@@ -4610,12 +5237,9 @@ function handleHttpRequest(req, res) {
   } else if (req.method === 'GET') {
     // Static file serving for HTML pages and assets (index, dashboard, balance, admin, lang/*.json)
     const MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
-    let filePath = req.url.split('?')[0];
-    if (filePath === '/') filePath = '/index.html';
-    if (!path.extname(filePath)) filePath += '.html';
-    // Resolve path safely — allow lang/ subdirectory but prevent directory traversal
-    const resolved = path.resolve(__dirname, '.' + filePath);
-    if (!resolved.startsWith(path.resolve(__dirname))) {
+    // 1.3.4: staticFilePath (a folder's index.html for the account pages; nothing outside the web folder)
+    const resolved = staticFilePath(__dirname, req.url, fs);
+    if (!resolved) {
       res.writeHead(403);
       res.end('{"error":"forbidden"}');
     } else if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
@@ -5138,6 +5762,28 @@ function startDiscordBridge() {
 }
 
 // --- HTTP + WebSocket Server ---
+// --- Static path (1.3.4) ---
+// The file a GET path names under the web folder: "/" is index.html; a path with no extension is that
+// folder's index.html when it exists (the /account/forgot, /account/reset and /account/verify pages), else
+// the path plus .html. The path is percent-decoded once; a bad encoding, a NUL, a backslash or a result
+// outside the web folder gives null (the caller answers 403).
+function staticFilePath(root, url, fsx) {
+  let p;
+  try { p = decodeURIComponent(String(url).split('?')[0]); } catch { return null; }
+  if (p.includes('\0') || p.includes('\\')) return null;
+  if (p === '/') p = '/index.html';
+  const base = path.resolve(root);
+  const inside = (f) => f.startsWith(base + path.sep);
+  if (!path.extname(p)) {
+    const folderIndex = path.resolve(base, '.' + p, 'index.html');
+    if (inside(folderIndex) && fsx.existsSync(folderIndex) && fsx.statSync(folderIndex).isFile()) return folderIndex;
+    p += '.html';
+  }
+  const f = path.resolve(base, '.' + p);
+  return inside(f) ? f : null;
+}
+// --- End static path ---
+
 const httpServer = http.createServer(handleHttpRequest);
 // v0.65.8 (audit T2 ops): cap WS frames at 64 KB -- terminal keystrokes are
 // tiny; an unbounded maxPayload lets one client buffer-bomb the proxy.
@@ -5351,6 +5997,7 @@ function gracefulShutdown() {
   if (db) db.close();
   if (dbWrite) dbWrite.close();
   telemetryEndpoint.close();
+  accountMail.stop();
   wss.close(() => httpServer.close(() => process.exit(0)));
 }
 process.on('SIGTERM', gracefulShutdown);

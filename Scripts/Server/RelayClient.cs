@@ -146,7 +146,7 @@ public static class RelayClient
                 authPassword = (await ReadPasswordLine(stdout, ct))?.Trim();
                 if (string.IsNullOrEmpty(authPassword)) continue;
 
-                if (authPassword.Length < 4)
+                if (authPassword.Length < GameConfig.MinPasswordLength)
                 {
                     await WriteAnsi(stdout, $"\r\n\u001b[1;31m  {L("auth.err_password_len")}\u001b[0m\r\n\r\n");
                     await stdout.FlushAsync(ct);

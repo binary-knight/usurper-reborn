@@ -1,8 +1,9 @@
 ---
 title: Accounts and character slots
 path: /wiki/en/getting-started/accounts/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Server/MudServer.cs, Scripts/Server/RelayClient.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/PantheonLocation.cs, Scripts/Locations/ArenaLocation.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/ServerSettingsRegistry.cs, Scripts/Systems/TelemetryPrompt.cs, Scripts/Systems/SysOpConsoleManager.cs, README.md
+history: 1.3.4 | New passwords need at least 8 characters, and on a server that sends mail an account can keep a confirmed email address and reset a forgotten password with a link sent to it.
 history: 1.3.3 | none
 history: 1.3.2 | A save that carries its base stats keeps them when it loads, and a save with nothing equipped loads with nothing equipped.
 history: 1.3.1 | none
@@ -17,14 +18,15 @@ How you sign in, how many characters you can keep, and what you can set before y
 
 An online account is a username and a password kept by the game server. The browser, MUD client and SSH paths end at the same login screen, with four choices: L to log in, R to register, G to change the language of the login screen, and Q to quit.
 
-- **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen.
+- **Browser and MUD clients.** The [website's Play section](/#connect) opens a browser terminal. A MUD client such as Mudlet, MUSHclient or TinTin++ connects to the game port directly and gets the same login screen, with GMCP data when the client asks for it. A client that reports a screen reader terminal type gets the plain text version of the screen. On a server that sends mail, this screen adds F (Forgot password) after a failed login; see [forgotten passwords](#forgotten-passwords).
 - **SSH.** The SSH gateway uses one shared gateway login, published with the connection instructions. It is not your account. After it, a login screen with the same L, R, G and Q choices asks for your own username and password. Its G changes the language of these login screens only; it is not saved to an account registered there.
 - **The standalone game.** O (Online Multiplayer) on the main menu offers the official server or a server address and port you type in. Its own login menu has L, R and Q, and uses the language the game is already set to. When the server can keep you logged in, the game asks "Stay logged in on this computer?" after you type your username and password and before the login is sent: Y, N, or D to stop asking. See [staying logged in](#staying-logged-in).
 
 Registration rules:
 
 - The username is 2 to 20 characters: letters, numbers, spaces, hyphens and underscores. It must not already exist, in any capitalization.
-- The password is at least 4 characters and cannot contain a colon. You type it twice.
+- The password is at least 8 characters and cannot contain a colon. You type it twice. A password set before 1.3.4 that is shorter still logs in; the 8 character rule applies to every new password.
+- On a server that sends mail, registering on the browser and MUD client screen then asks for an email address. It is optional: Enter skips it, and without an address a forgotten password can only be reset by the server's operator.
 - The server limits how many accounts one network address can create and slows repeated failed logins. A refused registration (a taken name or a rejected password) counts as a failed login, and an address that is being slowed cannot register until the wait is over.
 
 A login with an unknown username and a login with a wrong password get the same message: "Player doesn't exist or wrong password." Some login screens add a row saying that R registers a new account. A banned account sees its ban notice only after the right password.
@@ -32,6 +34,17 @@ A login with an unknown username and a login with a wrong password get the same 
 The language you chose on the login screen is saved to a new account. Online, your screen reader setting and language belong to the account and come back at your next login. Only one connection per account plays at a time: logging in again replaces the older session.
 
 P on the character screen changes your password. It asks for the current one first. A new password ends every saved login of the account.
+
+## Forgotten passwords
+
+An account can keep an email address. The game tells you that the server uses it only for password resets and notices about the account, and that it is never sold or shared, except with the mail service that delivers these messages. All of this needs a server that sends mail; on a server without mail set up there is no F choice, no reset address after a failed login, no email question and no E key.
+
+- **F on the login screen.** After a failed login, the browser and MUD client login screen offers F (Forgot password). It asks for the account name and always gives the same answer, whether or not the account exists: if the account has a confirmed email address, a reset link is on its way, and the link works for 30 minutes. Nothing changes until the link is used. One network address can ask at most five times an hour, and one account or address gets at most three mails an hour; past that the answer is the same and nothing is sent. The SSH login screen and the standalone game's login menu have no F; instead, after a failed login there, the message ends with the website's reset address: https://usurper-reborn.net/account/forgot on the official server, or the forgot page at the site address another server's operator has set.
+- **The website.** The page https://usurper-reborn.net/account/forgot asks for the account name or the email address on the account, and gives the same answer as F for every name or address. It works for every account, whichever way you play online. On a server that does not send mail, the website's reset pages say so and send nothing.
+- **The reset link.** The link opens a page that asks for the new password twice: at least 8 characters, no colon. Saving it ends every saved login of the account and closes the account's open sessions on the game server (browser, MUD client, SSH and the standalone game's Online Play), and a notice that the password changed goes to the address. A game played as a BBS door runs on that BBS, not on the game server, and is not closed. A link works once; a newer request ends the older link, and so does any password change.
+- **The address.** A new address is used only after you open the confirmation link sent to it within 24 hours and press Confirm address. The link stops working if the address on the account is changed or removed after you asked. An address already on another account is not moved: the answer is the same, and a notice goes to that address instead. The address is kept with your account, never in your character's save.
+- **The one-time question.** An account with no address that was never asked (one made before 1.3.4, or registered over SSH or in the standalone game) is asked once after login, after the combat data question and before the character screen. Enter skips it. Once skipped or answered, it is not asked again.
+- **E on the character screen.** E (Email address) shows the address masked, such as `a***@d***.net`, never in full. It adds or changes the address, or removes it, and each asks for your current password first. A new address takes over when its link is opened; until then the old one stays, and then the old one gets a notice of the change. Removing an address sends a notice to it.
 
 ## Staying logged in
 
@@ -78,9 +91,10 @@ After you log in, the character screen lists your characters with level, class a
 - **S**: Spectate a player
 - **G**: Language
 - **P**: Change password
+- **E**: Email address
 - **Q**: Quit
 
-Keys appear only when they apply: 2 and D need an alt, M needs an open slot, S and P need a connection to a game server. Pressing Enter alone plays your main character, or your alt if you only have an alt, or starts creation if you have neither.
+Keys appear only when they apply: 2 and D need an alt, M needs an open slot, S and P need a connection to a game server, and E needs a game server that sends mail. Pressing Enter alone plays your main character, or your alt if you only have an alt, or starts creation if you have neither.
 
 N on an account that has a main character warns you, then asks you to type DELETE in capitals. Anything else cancels. The old main character is removed along with its world ties (claimed quests, the King's bounty on it, guild membership, children and queued deliveries), and creation starts at once. An alt is not affected. D asks for DELETE the same way and removes only the alt.
 

@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.4 | A Cyclebreaker's Probability Shift makes 30 percent of a monster's hits on you miss and turns its natural 20 into an ordinary hit, and the difficulty's monster damage now applies to Manwe's named abilities.
 history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
 history: 1.3.2 | Class combat bonuses, divine damage bonuses, the Blood Price cut and the world boss Boss Slayer bonus apply on your swings, a monster's Thorns costs a melee attacker a quarter of the damage dealt, and every party member regains stamina and mana at round end.
 history: 1.3.0 | Your physical attacks on monsters roll a twenty-sided die to hit and show the roll and the number needed, and a dual-wielder's swings each use the weapon in their own hand.
@@ -179,15 +180,16 @@ The number it needs is your armor class minus its modifier. Your armor class is 
 
 A hit that landed can still be avoided, checked in this order:
 
-1. **Blur:** 20 percent of hits miss.
-2. **Dodge:** 5 percent plus 1 percent per 2 Agility above 10, at most 35 percent; light armor adds {{percent:LightArmorDodgeBonus}} and medium armor {{percent:MediumArmorDodgeBonus}}, for at most 45 percent. Agility 40 in light armor gives 30 percent.
-3. **Shield block:** 20 percent, halves the damage.
+1. **Probability Shift:** while a Cyclebreaker's Probability Shift is on the monster (3 rounds), 30 percent of its hits miss, and its natural 20 is an ordinary hit, not a critical.
+2. **Blur:** 20 percent of hits miss.
+3. **Dodge:** 5 percent plus 1 percent per 2 Agility above 10, at most 35 percent; light armor adds {{percent:LightArmorDodgeBonus}} and medium armor {{percent:MediumArmorDodgeBonus}}, for at most 45 percent. Agility 40 in light armor gives 30 percent.
+4. **Shield block:** 20 percent, halves the damage.
 
-Dodge, Blur and block work only against a monster's normal attack, not its special abilities.
+Probability Shift, dodge, Blur and block work only against a monster's normal attack, not its special abilities.
 
 ### Monster damage
 
-A monster's hit is its Strength + weapon power + punch, plus a random 0 to 9 (0 to 5 for a monster of level 3 or less). A boss hits 1.3 times as hard. The hit does 1.25 times when its roll beat the number needed by 5, 1.5 times when by 10, and double on a natural 20. A weakened monster hits for 0.70 times.
+A monster's hit is its Strength + weapon power + punch, plus a random 0 to 9 (0 to 5 for a monster of level 3 or less). A boss hits 1.3 times as hard. The hit does 1.25 times when its roll beat the number needed by 5, 1.5 times when by 10, and double on a natural 20 (not under Probability Shift). A weakened monster hits for 0.70 times.
 
 ### Your defence
 

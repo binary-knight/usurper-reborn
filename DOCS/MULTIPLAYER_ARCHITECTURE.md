@@ -1,3 +1,4 @@
+<!-- doc: checked 1.3.4; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
 # Usurper Reborn - Online Multiplayer Architecture
 
 > HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,
@@ -6,7 +7,7 @@
 > multiplexer on port 4000 (SSH-version-line sniff to sshd-usurper:4022, everything else to
 > MudServer:4001 with a PROXY v2 header), with the world sim folded in. For the current architecture
 > (MudServer / PlayerSession / SessionContext, GMCP, group play, world-state row-versioning CAS), see
-> `DOCS/ARCHITECTURE.md` and the top of `CLAUDE.md`. Treat the diagrams and the "SSH.NET client"
+> `DOCS/ARCHITECTURE.md`. Treat the diagrams and the "SSH.NET client"
 > details below as history, not current deployment guidance.
 
 ## Overview
@@ -218,7 +219,7 @@ Players can connect directly from a web browser at `https://usurper-reborn.net`.
 ### Web Architecture
 - **nginx** serves the static landing page and reverse-proxies WebSocket/API traffic
 - **ssh-proxy.js** (Node.js) runs on port 3000, providing:
-  - WebSocket-to-SSH bridge: browser connects via WebSocket, proxy SSH's to game on localhost:4000
+  - WebSocket-to-game bridge: browser connects via WebSocket; by default the proxy opens a TCP connection to the MUD server on 127.0.0.1:4001 (`MUD_HOST`, `MUD_PORT`), and with `MUD_MODE=0` it uses the older SSH hop to 127.0.0.1:4000
   - Stats REST API: `GET /api/stats` returns live game data from the SQLite database
 - **xterm.js** in the browser provides the terminal emulator UI
 - **Live Stats Dashboard** on the landing page shows who's online, aggregate stats, highlights, and news
@@ -228,12 +229,13 @@ Players can connect directly from a web browser at `https://usurper-reborn.net`.
 {
   "online": [{"name": "...", "level": 15, "className": "Warrior", "location": "Dungeon F12", "connectionType": "SSH", "connectedAt": "..."}],
   "onlineCount": 1,
-  "stats": {"totalPlayers": 42, "totalKills": 1337, "avgLevel": 8.5, "deepestFloor": 45, "totalGold": 500000, "marriages": 3, "children": 7},
-  "highlights": {"topPlayer": {...}, "king": "Rage", "popularClass": "Warrior"},
-  "leaderboard": [{"rank": 1, "name": "Rage", "level": 15, "className": "Warrior", "experience": 12500, "isOnline": true}],
-  "news": [{"message": "...", "playerName": "Rage", "time": "..."}]
+  "stats": {"totalPlayers": 42, "totalKills": 1337, "avgLevel": 8.5, "maxLevel": 40, "deepestFloor": 45, "totalGold": 500000, "marriages": 3, "children": 7, "permadeadNpcs": 2, "agedDeathNpcs": 5},
+  "highlights": {"topPlayer": {...}, "king": "...", "popularClass": "Warrior", "mostWanted": ...},
+  "leaderboard": [{"rank": 1, "name": "...", "level": 15, "className": "Warrior", "experience": 12500, "isOnline": true}],
+  "news": [{"message": "...", "playerName": "...", "time": "..."}]
 }
 ```
+The response also carries `immortals`, `pvpLeaderboard`, `economy`, `npcActivities` and `cachedAt`.
 
 ### Key Files
 - `web/index.html` - Landing page with embedded xterm.js terminal + live stats dashboard
@@ -241,6 +243,15 @@ Players can connect directly from a web browser at `https://usurper-reborn.net`.
 - `web/package.json` - Node.js dependencies
 - `scripts-server/nginx-usurper.conf` - nginx reverse proxy config
 - `scripts-server/usurper-web.service` - systemd service for web proxy
+
+## Account Mail (1.3.4)
+
+Password self-reset by email is split between the game and the web service, so the game never holds a mail key.
+
+- **The game writes request rows.** `SqlSaveBackend.AccountMail.cs` adds `email`, `email_verified_at` and `email_prompted_at` to `players` (a unique index on a set `email`) and creates `mail_requests`, `account_tokens` and `account_security_log`. A forgotten password writes a `reset` row with the name as typed and no address, the same way for a known and an unknown name; a new address writes a `verify` row; a removed address writes a `remove_notice` row. Past `GameConfig.MailRequestsPerIpPerHour` (5) rows from one IP in an hour, no row is written and the player sees the same reply.
+- **The web service sends and holds the tokens.** `createAccountMail` in `web/ssh-proxy.js` runs every 15 seconds: it claims pending rows (20 at a time), makes the tokens (stored only as a SHA-256 hash in `account_tokens`), sends through the Resend API and keeps its own `mail_limits` and `account_token_stamps` tables. A reset link lasts 30 minutes and an address link 24 hours. It serves `POST /api/account/forgot`, `/api/account/reset` and `/api/account/verify` for the pages under `web/account/`. Processed rows and spent tokens are kept 7 days.
+- **The heartbeat.** On each loop the web service writes two `world_state` rows: `mail_enabled` (`1` while `RESEND_API_KEY` and `MAIL_FROM` are both set, `0` otherwise) and `mail_site` (its `SITE_URL` when accepted: http or https, a host and an optional port, nothing else; otherwise the built in default site). The game (`MailSwitch` in `Scripts/Systems/AccountMail.cs`) treats mail as on only when `mail_enabled` is `1` and under ten minutes old, read at each prompt. The reset pointer the game shows after a failed login names `mail_site` plus `/account/forgot`, checked again by the same rule.
+- **Off by default.** With no mail key or sender address set, or with the web service stopped, mail is off: the login menu has no reset choice, registration has no email step and there is no email menu.
 
 ## Client-Side Changes
 
@@ -268,14 +279,14 @@ library available as a NuGet package. This means:
 
 ```xml
 <!-- NuGet package reference -->
-<PackageReference Include="SSH.NET" Version="2024.1.0" />
+<PackageReference Include="SSH.NET" Version="2026.0.0" />
 ```
 
 ```csharp
 // Simplified connection flow
 using Renci.SshNet;
 
-var client = new SshClient("play.usurper-reborn.net", 22, "usurper", password);
+var client = new SshClient("play.example.com", 4000, "usurper", password);
 client.Connect();
 var stream = client.CreateShellStream("usurper", 80, 24, 800, 600, 1024);
 
@@ -286,8 +297,8 @@ var output = stream.Read();
 
 ### Online Play Flow (Client)
 1. Player selects [O]nline Play
-2. Game prompts for username/password (or loads saved credentials)
-3. Game connects to `play.usurper-reborn.net` via SSH.NET (native C# SSH)
+2. Game offers the official server (`GameConfig.OnlineServerAddress`, port 4000) or a custom host and port, then asks for the username and password unless a remembered login token is used
+3. Game connects through the SSH gateway via SSH.NET (native C# SSH); the BBS door connects by plain TCP instead
 4. SSH stream established - server launches game in online mode
 5. Player creates character or loads existing server-side character
 6. All I/O piped through SSH stream (encrypted, no external SSH client needed)
@@ -296,8 +307,8 @@ var output = stream.Read();
 ### Alternative: Direct Connection via External SSH Client
 For BBS users or those who prefer their own SSH client:
 ```
-Server: play.usurper-reborn.net
-Port: 22 (or custom port like 2222)
+Server: play.example.com
+Port: 4000
 Username: usurper
 Password: (set during first connection, or use SSH keys)
 ```
@@ -454,12 +465,12 @@ Option B: Single shared account with in-game auth (simpler)
 - DNS setup and hosting provider comparison (Lightsail, DigitalOcean, Hetzner, Vultr, Oracle)
 
 ### Phase 8: Client Integration ✅ COMPLETE
-- Added `SSH.NET` v2024.1.0 NuGet package for native C# SSH
+- Added `SSH.NET` NuGet package for native C# SSH (now v2026.0.0)
 - Created `OnlinePlaySystem` (`Scripts/Systems/OnlinePlaySystem.cs`) - full client connection system:
   - `[O]nline Play` menu option added to main menu (hidden in BBS door mode)
   - Server/port/username/password prompt with defaults
-  - Credential storage with base64 password obfuscation (`online_credentials.json`)
-  - SSH connection via `Renci.SshNet.SshClient` with 15s timeout and retry
+  - Remembered logins (1.2.8) in `online_login.json` in the per-user data directory: the username and a remember-me token per server and port, never a password; an older `online_credentials.json` is converted once and its password erased
+  - SSH connection via `Renci.SshNet.SshClient` with a 10s timeout
   - Shell stream (80x24 terminal) for remote game I/O
   - Console-level I/O piping: reads ANSI output from server, sends keystrokes back
   - Windows VT100 processing enabled via `SetConsoleMode` for ANSI color support
@@ -538,4 +549,4 @@ no AWS complexity. Upgrade to EC2 t3.small if you outgrow it.
 - No shell access - ForceCommand only runs the game
 - Input validation on all player commands (already exists)
 - SSH.NET handles host key verification to prevent MITM attacks
-- Credentials can be stored locally (encrypted) for convenience
+- The client can remember a login token for one server and port; it never stores a password

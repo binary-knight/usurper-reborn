@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.4 | none
 history: 1.3.3 | A companion, NPC ally, spouse, lover or fighting beast at 0 HP is Downed: U rescues it with a healing potion, a Beast, Insectoid, Shadow or Undead monster or a boss can finish it, and it stands up with half its maximum HP when the fight ends.
 history: 1.3.2 | An NPC at Friendship or closer charges 15 percent less to enter the dungeon and one at Anger or worse 25 percent more, a short purse leaves behind only the NPCs you cannot pay for, and NPC party members keep their gear.
 ---

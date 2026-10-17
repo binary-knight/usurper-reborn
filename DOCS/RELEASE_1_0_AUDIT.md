@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Usurper Reborn: Beta to 1.0 Readiness Audit (v0.65.4, 2026-07-08)
 
 Full-system audit ahead of leaving Beta. Eight parallel domain reviews (save-state, combat,

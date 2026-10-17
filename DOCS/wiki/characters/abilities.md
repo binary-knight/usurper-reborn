@@ -1,8 +1,9 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.4 | Shield Wall Formation, Divine Mandate and Death's Embrace now also work against Manwe's named abilities.
 history: 1.3.3 | none
 history: 1.3.2 | Backstab and Smite are shown on the combat menus of the classes that can use them, Smite spends one of the day's charges, and a Ranger's bow abilities deal 4 more damage.
 history: 1.3.1 | none

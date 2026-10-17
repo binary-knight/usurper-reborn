@@ -1411,6 +1411,13 @@
             font-family: 'JetBrains Mono', monospace; font-size: 13px;
         }
         .roadmap-now h3 { color: var(--green); }
+        .roadmap-group {
+            font-family: 'JetBrains Mono', monospace; font-size: 13px; letter-spacing: 2px;
+            text-transform: uppercase; color: var(--cyan); margin: 8px 0 20px;
+        }
+        .roadmap-group-shipped { color: var(--text-dim); margin-top: 16px; }
+        .history-entry p.roadmap-when { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+        .free-steam-note { font-size: 13px; color: var(--text-dim); max-width: 720px; margin: 12px auto 0; }
         .finale-section {
             text-align: center; padding: 100px 0;
             background: radial-gradient(ellipse at center, rgba(139,92,246,0.08), transparent 70%);
@@ -1462,8 +1469,8 @@
             and where your name -- for glory or for infamy -- is carved in stone.
         </p>
         <div class="hero-live" id="hero-live">
-            <span id="hl-online" hidden><span class="live-dot-inline"></span><b id="hl-online-n">0</b>&nbsp;<span data-i18n="r1.live_online">adventurers in the world right now</span></span>
-            <span id="hl-world" hidden><span class="live-dot-inline"></span><span data-i18n="r1.live_world">The world is alive:</span> <b id="hl-marr">0</b> <span data-i18n="r1.live_marr">marriages</span>, <b id="hl-kids">0</b> <span data-i18n="r1.live_kids">children born</span>, <b id="hl-kills">0</b> <span data-i18n="r1.live_kills">monsters slain</span></span>
+            <span id="hl-online" hidden><span class="live-dot-inline"></span><b id="hl-online-n">--</b>&nbsp;<span data-i18n="r1.live_online">adventurers in the world right now</span></span>
+            <span id="hl-world" hidden><span class="live-dot-inline"></span><span data-i18n="r1.live_world">The world is alive:</span> <b id="hl-marr">--</b> <span data-i18n="r1.live_marr">marriages</span>, <b id="hl-kids">--</b> <span data-i18n="r1.live_kids">children born</span>, <b id="hl-kills">--</b> <span data-i18n="r1.live_kills">monsters slain</span></span>
             <span id="hl-news" hidden class="hl-news-line"><span data-i18n="r1.live_latest">Just now:</span> <span id="hl-news-text"></span></span>
         </div>
         <div class="hero-buttons">
@@ -1546,6 +1553,7 @@
             <p data-i18n-html="philosophy.closing">Free. No ads, no microtransactions, no loot boxes.<br>
             GPL v2 licensed. Source code is on GitHub if you want to look at it or fork it.</p>
             <p class="manifesto-play" data-i18n="philosophy.closing_play">Server's up 24/7. Drop in whenever.</p>
+            <p class="free-steam-note" data-i18n="r1.free_steam">The game is free and open source: play it in the browser, over SSH or telnet, or from the GitHub release builds. The Steam version is the same game with a terminal and fonts bundled, and buying it is an optional way to support development.</p>
         </div>
     </div>
 </section>
@@ -1860,6 +1868,7 @@
             <div class="connect-card">
                 <h3 data-i18n-html="connect.steam_title">&#9658; Steam</h3>
                 <p data-i18n="connect.steam_desc">Usurper Reborn is available on Steam. Includes bundled terminal and fonts.</p>
+                <p class="free-steam-note" data-i18n="r1.free_steam">The game is free and open source: play it in the browser, over SSH or telnet, or from the GitHub release builds. The Steam version is the same game with a terminal and fonts bundled, and buying it is an optional way to support development.</p>
                 <a class="btn btn-steam" href="https://store.steampowered.com/app/4336570/" target="_blank" style="width:100%;justify-content:center;" data-i18n="connect.steam_btn">Get on Steam</a>
             </div>
             <div class="connect-card">
@@ -1941,52 +1950,59 @@
 
         <div class="history-timeline">
             <div class="history-entry roadmap-now">
-                <h3 data-i18n="r1.road_now_t">NOW -- 1.3 "Reckoning" is live</h3>
-                <p data-i18n="r1.road_now_d">1.3.3 is out: the rework of dungeon difficulty and betrayal from 1.3.0, now carried down to dungeon floor 100, with allies who are Downed instead of killed and can be rescued. The 1.3.0, 1.3.2 and 1.3.3 entries below say what they hold. The world is open, and it is running right now.</p>
+                <h3 data-i18n="r1.road_now_t">NOW -- 1.3.4 is live</h3>
+                <p data-i18n="r1.road_now_d">1.3.4 is out: you can reset a forgotten password by email, and the Old God fights and prestige classes were measured, with fixes where a spell or a god did not do what its text said. The roadmap below says what comes next.</p>
+            </div>
+            <h3 class="roadmap-group" data-i18n="r1.road_next_h">Next</h3>
+            <div class="history-entry">
+                <h3 data-i18n="r1.road_135_t">1.3.5 -- Dungeon floors 11 to 24</h3>
+                <p data-i18n="r1.road_135_d">Dungeon floors 11 to 24, measured in 1.3.4, are tuned the way floors 1 to 10 and 25 to 100 were: encounter make-up, monster ability use and elite traits first, numbers last.</p>
+                <p class="roadmap-when" data-i18n="r1.road_135_when">After 1.3.4</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_12x_t">1.2.x -- Polish and translation</h3>
-                <p data-i18n="r1.road_12x_d">Steady patches: fixes and loose ends closed. As of 1.2.5 the whole game is translated into all five languages.</p>
+                <h3 data-i18n="r1.road_15_t">1.5 -- Party survival (partly shipped)</h3>
+                <p data-i18n="r1.road_15_d">Downed allies and Rescue shipped in 1.3.3. Still to come: withdrawing from a fight the party is losing, and telling an ally to wait in a cleared room. 1.5 comes before 1.4 because party survival was pulled forward into 1.3.3.</p>
+                <p class="roadmap-when" data-i18n="r1.road_15_when">After 1.3.5</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_126_t">1.2.6 -- Combat logging and web security</h3>
-                <p data-i18n="r1.road_126_d">Shipped: every online fight records detailed combat data for the coming difficulty pass, logins no longer reveal whether an account exists, new names refuse markup characters, and the website shows all player text safely.</p>
+                <h3 data-i18n="r1.road_14_t">1.4 -- The Player District</h3>
+                <p data-i18n="r1.road_14_d">A district of player-owned shops and stalls. Alongside it: faction vendors with exclusive stock, allies who rally to your banner when your renown warrants it, and darker games in the Dark Alley for those who walk the other path.</p>
+                <p class="roadmap-when" data-i18n="r1.road_14_when">After 1.5</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_127_t">1.2.7 -- Opt-in telemetry</h3>
-                <p data-i18n="r1.road_127_d">Shipped: the game asks once whether to share combat data to help balance it, and the answer can be changed in Preferences at any time. On a BBS or a self-hosted server the operator decides whether the question is asked at all.</p>
+                <h3 data-i18n="r1.road_20_t">2.0 -- The graphical client</h3>
+                <p data-i18n="r1.road_20_d">A graphical client for the same living world, grown from the one that already runs in the repository.</p>
+                <p class="roadmap-when" data-i18n="r1.road_20_when">After 1.4</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_130_t">1.3.0 -- Difficulty and betrayal</h3>
-                <p data-i18n="r1.road_130_d">Shipped: the first step of a longer rework of dungeon difficulty. Monsters use their abilities with more sense, encounters mix monster types and sizes, elite monsters carry traits, your attacks roll to hit and healing potions scale with you. The targets of this step were set for dungeon floors 1 to 10; the deeper floors follow in the entries below. And betrayal: those you trust can turn on you.</p>
+                <h3 data-i18n="r1.road_beyond_t">Beyond</h3>
+                <p data-i18n="r1.road_beyond_d">More languages. And more of the world growing on its own: settlements, wilderness, families, and whatever the simulation surprises us with next. Bring ideas to Discord; they have a habit of shipping with your name in the release notes.</p>
+                <p class="roadmap-when" data-i18n="r1.road_beyond_when">After 2.0</p>
+            </div>
+            <h3 class="roadmap-group roadmap-group-shipped" data-i18n="r1.road_shipped_h">Recently shipped</h3>
+            <div class="history-entry">
+                <h3 data-i18n="r1.road_133_t">1.3.3 -- Dungeon floors 25 to 100</h3>
+                <p data-i18n="r1.road_133_d">Shipped: dungeon floors 25 to 100 grow harder with depth and are built for a full team of five, and allies at 0 HP are Downed, can be rescued with a potion and are lost only when a monster finishes them.</p>
             </div>
             <div class="history-entry">
                 <h3 data-i18n="r1.road_132_t">1.3.2 -- Tuning and fixes</h3>
                 <p data-i18n="r1.road_132_d">Shipped: class combat bonuses that apply in fights, god, Blood Price and divine wrath effects on basic attacks, monster ability fixes, online world events, NPC party gear that stays put, and a wiki rewritten with exact numbers and generated tables.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_133_t">1.3.3 -- Dungeon floors 25 to 100</h3>
-                <p data-i18n="r1.road_133_d">Shipped: dungeon floors 25 to 100 grow harder with depth and are built for a full team of five, and allies at 0 HP are Downed, can be rescued with a potion and are lost only when a monster finishes them.</p>
+                <h3 data-i18n="r1.road_130_t">1.3.0 -- Difficulty and betrayal</h3>
+                <p data-i18n="r1.road_130_d">Shipped: the first step of a longer rework of dungeon difficulty. Monsters use their abilities with more sense, encounters mix monster types and sizes, elite monsters carry traits, your attacks roll to hit and healing potions scale with you. The targets of this step were set for dungeon floors 1 to 10; the deeper floors follow in the entries below. And betrayal: those you trust can turn on you.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_134_t">1.3.4 -- The Old Gods and prestige classes</h3>
-                <p data-i18n="r1.road_134_d">The Old God fights and the New Game+ prestige classes get the same measured tuning as the dungeon floors.</p>
+                <h3 data-i18n="r1.road_127_t">1.2.7 -- Opt-in telemetry</h3>
+                <p data-i18n="r1.road_127_d">Shipped: the game asks once whether to share combat data to help balance it, and the answer can be changed in Preferences at any time. On a BBS or a self-hosted server the operator decides whether the question is asked at all.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_15_t">1.5 -- Party survival</h3>
-                <p data-i18n="r1.road_15_d">Shipped in part in 1.3.3 (Downed allies and Rescue). Still to come: a party can withdraw from a fight it is losing, and an ally can be told to wait in a cleared room.</p>
+                <h3 data-i18n="r1.road_126_t">1.2.6 -- Combat logging and web security</h3>
+                <p data-i18n="r1.road_126_d">Shipped: every online fight records detailed combat data for the coming difficulty pass, logins no longer reveal whether an account exists, new names refuse markup characters, and the website shows all player text safely.</p>
             </div>
             <div class="history-entry">
-                <h3 data-i18n="r1.road_14_t">1.4 -- The Player District</h3>
-                <p data-i18n="r1.road_14_d">A district of player-owned shops and stalls. Alongside it: faction vendors with exclusive stock, allies who rally to your banner when your renown warrants it, and darker games in the Dark Alley for those who walk the other path.</p>
-            </div>
-            <div class="history-entry">
-                <h3 data-i18n="r1.road_20_t">2.0 -- The graphical client</h3>
-                <p data-i18n="r1.road_20_d">A graphical client for the same living world, grown from the one that already runs in the repository.</p>
-            </div>
-            <div class="history-entry">
-                <h3 data-i18n="r1.road_beyond_t">Beyond</h3>
-                <p data-i18n="r1.road_beyond_d">More languages. And more of the world growing on its own: settlements, wilderness, families, and whatever the simulation surprises us with next. Bring ideas to Discord; they have a habit of shipping with your name in the release notes.</p>
+                <h3 data-i18n="r1.road_12x_t">1.2.x -- Polish and translation</h3>
+                <p data-i18n="r1.road_12x_d">Steady patches: fixes and loose ends closed. As of 1.2.5 the whole game is translated into all five languages.</p>
             </div>
         </div>
     </div>
@@ -2473,12 +2489,14 @@
         // Stats grid
         const s = data.stats || {};
         html += '<div class="stats-grid">';
-        html += renderStatCard(formatNumber(s.totalPlayers || 0), t('stats.total_players'));
-        html += renderStatCard(formatNumber(s.totalKills || 0), t('stats.monsters_slain'));
-        html += renderStatCard(s.avgLevel || 0, t('stats.avg_level'));
-        html += renderStatCard(s.deepestFloor || 0, t('stats.deepest_floor'));
-        html += renderStatCard(formatGold(s.totalGold || 0), t('stats.total_gold'));
-        html += renderStatCard((s.marriages || 0) + ' / ' + (s.children || 0), t('stats.marriages_kids'));
+        // a count the answer does not carry shows as "--", never as a 0 nobody measured; a real 0 shows as 0
+        const stat = (v, f) => (typeof v === 'number' ? (f ? f(v) : v) : '--');
+        html += renderStatCard(stat(s.totalPlayers, formatNumber), t('stats.total_players'));
+        html += renderStatCard(stat(s.totalKills, formatNumber), t('stats.monsters_slain'));
+        html += renderStatCard(stat(s.avgLevel), t('stats.avg_level'));
+        html += renderStatCard(stat(s.deepestFloor), t('stats.deepest_floor'));
+        html += renderStatCard(stat(s.totalGold, formatGold), t('stats.total_gold'));
+        html += renderStatCard(stat(s.marriages) + ' / ' + stat(s.children), t('stats.marriages_kids'));
         const permaTotal = (s.permadeadNpcs || 0) + (s.agedDeathNpcs || 0);
         if (permaTotal > 0) {
             html += renderStatCard((s.permadeadNpcs || 0) + ' / ' + (s.agedDeathNpcs || 0), t('stats.permadead_old_age'));
@@ -2732,12 +2750,18 @@
             var worldEl = document.getElementById('hl-world');
             var newsEl = document.getElementById('hl-news');
             if (!onlineEl || !worldEl) return;
+            // no answer, or the server's error answer (its stats are empty): show nothing, never counts of 0
+            if (!data || data.error || !data.stats) {
+                onlineEl.hidden = true; worldEl.hidden = true;
+                if (newsEl) newsEl.hidden = true;
+                return;
+            }
             var n = (data.online && data.online.length) || 0;
             if (n > 0) {
                 document.getElementById('hl-online-n').textContent = n;
                 onlineEl.hidden = false; worldEl.hidden = true;
-            } else if (data.stats) {
-                var fmt = function(x) { return (x || 0).toLocaleString(); };
+            } else {
+                var fmt = function(x) { return typeof x === 'number' ? x.toLocaleString() : '--'; };
                 document.getElementById('hl-marr').textContent = fmt(data.stats.marriages);
                 document.getElementById('hl-kids').textContent = fmt(data.stats.children);
                 document.getElementById('hl-kills').textContent = fmt(data.stats.totalKills);
@@ -2750,11 +2774,21 @@
         } catch (e) { /* hero strip is decoration */ }
     }
 
+    // the stats request gives up after this long, so the board never waits forever on a hung server
+    const STATS_TIMEOUT_MS = 10000;
+    function statsRequest() {
+        const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), STATS_TIMEOUT_MS) : null;
+        return fetch('/api/stats', ctrl ? { signal: ctrl.signal } : undefined)
+            .then(res => { if (timer) clearTimeout(timer); if (!res.ok) throw new Error('stats ' + res.status); return res.json(); },
+                  err => { if (timer) clearTimeout(timer); throw err; });
+    }
+
     function fetchStats() {
-        fetch('/api/stats')
-            .then(res => res.json())
+        statsRequest()
             .then(data => { _lastStatsData = data; renderStats(data); updateHeroLive(data); })
             .catch(() => {
+                updateHeroLive(null);
                 document.getElementById('stats-content').innerHTML =
                     '<div class="stats-error">' + t('stats.server_error') + '</div>';
             });

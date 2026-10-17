@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.4 | Doom starts at Aurelion, Shadow Incarnate's message says Manwe heals, and Manwe's named abilities follow the difficulty, Shield Wall Formation, a failed flee, Divine Mandate and Death's Embrace.
 history: 1.3.3 | From floor 25 floor bosses have more HP and hit harder and bring more escorts as the floor's groups grow, and every boss can finish a Downed ally.
 history: 1.3.2 | Dispel Evil on an enraged boss takes back its enrage, floors keep their secret boss rooms, and Boss Slayer gear adds its damage against bosses and mini bosses.
 history: 1.2.5 | Boss names, titles, world boss elements and Old God ability names are shown in the player's language, and Old God names on the wiki come in all five languages.
@@ -59,7 +60,7 @@ Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 
 
 **Area attacks and channels.** From round 2, on every round that is a multiple of its number, the god strikes everyone in the party for its area damage less 3 x the square root of each target's Defence. A taunting teammate, or a Warrior, Paladin, Barbarian or Tidesworn you play, takes the hit for the others: the others take 40 percent and the tank 130 percent. A channel starts the same way and lands two rounds later on everyone, for its damage less 3 x the square root of Defence. A teammate with Agility plus half Dexterity of 80 or more may interrupt it; a Dispel Evil ends it too, and also ends a phase immunity and cuts the god's Defence by 20 percent.
 
-**Corruption and Doom.** From phase 2 a god with corruption has a 30 percent chance each round to put a stack on a random party member, 2 stacks in phase 3, up to {{balance:BossCorruptionMaxStacks}}; each stack deals its damage every round. In phase 3 every Old God has a 15 percent chance each round to mark a member without Doom, who dies outright when the count reaches 0. Only a healer teammate (Cleric, Paladin, Bard, Wavecaller, Abysswarden or a healer specialization) clears them: first the Doom closest to landing, otherwise 3 + its level / 20 stacks from a member holding 3 or more. You cannot clear them yourself.
+**Corruption and Doom.** From phase 2 a god with corruption has a 30 percent chance each round to put a stack on a random party member, 2 stacks in phase 3, up to {{balance:BossCorruptionMaxStacks}}; each stack deals its damage every round. Doom starts at Aurelion: in phase 3 Aurelion, Terravok and Manwe have a 15 percent chance each round to mark a member without Doom, who dies outright when the count reaches 0 (3 rounds for Aurelion and Terravok, 2 for Manwe). Maelketh, Veloura, Thorgrim and Noctura, her betrayal fight included, do not use Doom. Only a healer teammate (Cleric, Paladin, Bard, Wavecaller, Abysswarden or a healer specialization) clears them: first the Doom closest to landing, otherwise 3 + its level / 20 stacks from a member holding 3 or more. You cannot clear them yourself.
 
 **Immunity.** At phase 2 Noctura, Terravok and Manwe become immune to physical damage for 4 rounds and Aurelion to magical damage; Manwe adds magical immunity for 4 rounds at phase 3. Damage of the blocked kind is cut to {{percent:BossPhaseImmunityResidual}} percent.
 
@@ -67,7 +68,7 @@ Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 
 
 **Most damage from one hit.** An Old God's area attack and channel have no cap on the damage to you; a teammate takes at most {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP from one hit. Manwe's own abilities take at most 85 percent of your maximum HP from the first round, without the lower cap of the first rounds.
 
-**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you below a fifth of your HP unless you hold the Worldstone.
+**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Shadow Incarnate heals him 30 percent of the damage it deals, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you below a fifth of your HP unless you hold the Worldstone.
 :::
 
 {{table:old-god-mechanics}}

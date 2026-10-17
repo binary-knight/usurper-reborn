@@ -698,11 +698,11 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             terminal.SetColor("white");
-            var newPassword = await ReadInput("Enter new password (min 4 chars): ");
-            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
+            var newPassword = await ReadInput($"Enter new password (min {GameConfig.MinPasswordLength} chars): ");
+            if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < GameConfig.MinPasswordLength)
             {
                 terminal.SetColor("red");
-                terminal.WriteLine("Password must be at least 4 characters. Cancelled.");
+                terminal.WriteLine($"Password must be at least {GameConfig.MinPasswordLength} characters. Cancelled.");
                 await ReadInput(Loc.Get("ui.press_enter"));
                 return;
             }

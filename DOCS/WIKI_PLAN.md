@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Usurper Reborn player wiki plan
 
 Status: design choices approved by the owner, 2026-09-29. Baseline: the released

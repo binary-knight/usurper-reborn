@@ -76,6 +76,10 @@ jobs:
               || (github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-')))
               && 'fail' || 'warn' }}
         run: node tools/wiki-build/drift.js --mode "$DRIFT_MODE"
+      # Every README.md and DOCS/*.md file carries a doc marker; while a release is prepared, a current doc
+      # whose sources changed since the previous release must be checked at the new version.
+      - name: Documentation check
+        run: node tools/wiki-build/doc-check.js
       - name: Install browser for accessibility checks
         working-directory: tools/wiki-build
         run: npx playwright install --with-deps chromium

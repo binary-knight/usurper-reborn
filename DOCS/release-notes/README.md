@@ -3,6 +3,7 @@
 One file per version, newest first. Steam-formatted copies (BBCode) are in
 `steam/`. The GitHub release for each tag carries the same text.
 
+- [v1.3.4](RELEASE_NOTES_1.3.4.md)
 - [v1.3.3](RELEASE_NOTES_1.3.3.md)
 - [v1.3.2](RELEASE_NOTES_1.3.2.md)
 - [v1.3.1](RELEASE_NOTES_1.3.1.md)

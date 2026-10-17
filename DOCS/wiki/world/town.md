@@ -1,8 +1,9 @@
 ---
 title: Main Street directory
 path: /wiki/en/world/town/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Locations/MainStreetClassic.cs, Scripts/Locations/DormitoryLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/MarketplaceLocation.cs, Scripts/Locations/NewsLocation.cs, Scripts/Systems/LocationManager.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MarketplaceSystem.cs, Scripts/Locations/BaseLocation.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Main Street shows the Wisdom a finished story companion grief gives whenever it applies.
 history: 1.3.0 | Team Corner's hire list shows the NPCs nearest your level first, hiring costs less below level 25, and the town keeps a pool of low-level NPCs to hire.

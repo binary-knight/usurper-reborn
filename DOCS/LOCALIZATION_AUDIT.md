@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Localization Deep Audit (v0.65.11, 2026-07-28)
 
 Comprehensive audit of every localization aspect: scripted integrity checks over all five

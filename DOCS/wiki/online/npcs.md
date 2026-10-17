@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/NPCSpawnSystem.cs, Scripts/AI/EnhancedNPCBehaviors.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/WorldSimService.cs, Scripts/BBS/DoorMode.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.4 | none
 history: 1.3.3 | An NPC ally at 0 HP in your fight is Downed and dies only if a monster finishes it, and an NPC raised before its return time is no longer sent to Main Street with half its gold.
 history: 1.3.2 | NPCs on your team or in your party and your spouse or lover keep their gear, and NPC shopping buys only gear the NPC's class can use.
 history: 1.3.0 | A companion can leave over resentment, taking a new lover without telling a spouse or an exclusive lover brings a heartbreak scene in town, and a spouse or lover who falls at your side and will recover is no longer lost to you.

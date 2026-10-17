@@ -20,6 +20,7 @@
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="Tests" />
+        <InternalsVisibleTo Include="BalanceSim" />
     </ItemGroup>
 
     <!-- Trimming disabled — was stripping DbConnection.OpenAsync() and Path.GetExtension()
