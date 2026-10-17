@@ -323,7 +323,8 @@ public class LoginScreen_PwReset134Tests : IDisposable
     // ================= 1.3.4 self-host: the operator warning and the privacy line =================
 
     internal const string OperatorSentence = "If you forget your password, the server's operator will have to reset it.";
-    internal const string PrivacyLine = "Your address is used only for password resets and notices about your account. It is never sold or shared, except with the mail service that delivers these messages.";
+    // 1.3.4: "This server uses..." (his choice, 2026-10-17): the line is each server's own promise, the official one or another
+    internal const string PrivacyLine = "This server uses your address only for password resets and notices about your account. It is never sold or shared, except with the mail service that delivers these messages.";
     internal static string Flat(string s) => s.Replace("\n", " ");
     private static readonly string[] Langs = { "en", "es", "fr", "hu", "it" };
 

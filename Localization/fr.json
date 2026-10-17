@@ -31103,7 +31103,7 @@
   "email.title_visual": "═══ ADRESSE E-MAIL ═══",
   "email.current": "Adresse de ce compte : {0}",
   "email.none": "Ce compte n'a pas d'adresse.\nSi vous oubliez votre mot de passe, l'opérateur du serveur devra le\nréinitialiser.",
-  "email.about": "Votre adresse sert uniquement aux réinitialisations de mot de passe et\naux avis concernant votre compte. Elle n'est jamais vendue ni partagée,\nsauf avec le service de courrier qui achemine ces messages.",
+  "email.about": "Ce serveur utilise votre adresse uniquement pour les réinitialisations de\nmot de passe et les avis concernant votre compte. Elle n'est jamais vendue\nni partagée, sauf avec le service de courrier qui achemine ces messages.",
   "email.opt_change": "Ajouter ou changer l'adresse",
   "email.opt_remove": "Retirer l'adresse",
   "email.new_prompt": "Nouvelle adresse e-mail : ",

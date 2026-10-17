@@ -4157,7 +4157,7 @@
   "email.title_visual": "═══ EMAIL ADDRESS ═══",
   "email.current": "Address on this account: {0}",
   "email.none": "No address on this account.\nIf you forget your password, the server's operator will have to reset it.",
-  "email.about": "Your address is used only for password resets and notices about your\naccount. It is never sold or shared, except with the mail service that\ndelivers these messages.",
+  "email.about": "This server uses your address only for password resets and notices about\nyour account. It is never sold or shared, except with the mail service that\ndelivers these messages.",
   "email.opt_change": "Add or change the address",
   "email.opt_remove": "Remove the address",
   "email.new_prompt": "New email address: ",

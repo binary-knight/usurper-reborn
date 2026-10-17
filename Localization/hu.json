@@ -31105,7 +31105,7 @@
   "email.title_visual": "═══ E-MAIL-CÍM ═══",
   "email.current": "A fiók e-mail-címe: {0}",
   "email.none": "A fiókhoz nem tartozik cím.\nHa elfelejted a jelszavad, a szerver üzemeltetőjének kell visszaállítania.",
-  "email.about": "A címedet csak jelszó-visszaállításra és a fiókodat érintő\nértesítésekre használjuk. Soha nem adjuk el és nem adjuk ki senkinek,\nkivéve a levelezőszolgáltatást, amely ezeket az üzeneteket kézbesíti.",
+  "email.about": "Ez a szerver a címedet csak jelszó-visszaállításra és a fiókodat érintő\nértesítésekre használja. Soha nem adja el és nem adja ki senkinek, kivéve a\nlevelezőszolgáltatást, amely ezeket az üzeneteket kézbesíti.",
   "email.opt_change": "Cím megadása vagy módosítása",
   "email.opt_remove": "Cím törlése",
   "email.new_prompt": "Új e-mail-cím: ",
