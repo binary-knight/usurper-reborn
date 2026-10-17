@@ -1,8 +1,9 @@
 ---
 title: Fear, retreat and fleeing
 path: /wiki/en/combat/fleeing/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | Allies still Downed when you flee stand up with half their maximum HP.
 history: 1.3.2 | none
 history: 1.3.0 | none
 history: 1.2.7 | none

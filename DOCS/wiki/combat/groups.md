@@ -1,8 +1,9 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.3 | An NPC of your team at 0 HP in your fight is Downed, and the oath-mark speaks only when a monster finishes it.
 history: 1.3.2 | Every party member regains stamina and mana at round end, a Cleric teammate cures poison and disease with Purify, and a living Paladin on your side makes monsters roll against 2 more armor class.
 history: 1.3.0 | Teammates and companions roll to hit as you do, a healing potion given to an ally heals at least 20 percent of the ally's maximum HP, and a hired NPC or a friend in your party carries the oath-mark of your banner.
 history: 1.2.7 | none
@@ -56,7 +57,7 @@ A Cleric in your party who knows Purify casts it on a living party member who is
 
 ## The oath-mark
 
-An NPC hired for your team, and an NPC friend who joins your dungeon party, carries the oath-mark of your banner; story companions do not. The game says so when you hire, in your team view and when someone joins the party. The oath-mark does not change the chance that a fall at your side is permanent: see [when an ally falls](/wiki/en/combat/party/#when-an-ally-falls). When one of them falls in your fight and will recover, the game says the oath-mark held. When one is lost for good, a short scene plays. If the one who fell and will recover is your spouse, lover or affair partner, the marriage or romance is not ended.
+An NPC hired for your team, and an NPC friend who joins your dungeon party, carries the oath-mark of your banner; story companions do not. The game says so when you hire, in your team view and when someone joins the party. The oath-mark does not change the chance that a fall at your side is permanent: see [when an ally falls](/wiki/en/combat/party/#when-an-ally-falls). When one of them is finished in your fight and will recover, the game says the oath-mark held. When one is lost for good, a short scene plays. If the one who fell and will recover is your spouse, lover or affair partner, the marriage or romance is not ended.
 
 ## Mental in a group
 

@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.1 | none
 history: 1.3.0 | In an Arena fight a dual-wielder's swing uses the weapon in its own hand; before, every swing used both weapons' power added together.

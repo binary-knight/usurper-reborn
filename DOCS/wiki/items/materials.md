@@ -1,8 +1,9 @@
 ---
 title: Crafting materials
 path: /wiki/en/items/materials/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/MetaProgressionSystem.cs
+history: 1.3.3 | none
 history: 1.3.2 | An alliance with Noctura hands over the Shadow Crown.
 ---
 There are 8 crafting materials. They drop only in the dungeon, each on its own band of floors, and nothing drops on floors 1 to 19. The Magic Shop spends them on its highest [enchants](/wiki/en/items/enchanting/), and the Master Trainer at the Inn spends them on the last stat trainings. Materials do not take a backpack slot.

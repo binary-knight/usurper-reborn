@@ -1,8 +1,9 @@
 ---
 title: What each god's boon does
 path: /wiki/en/gods/boons/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/SettlementLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | The Solarius and Valorian damage boons, Umbrath's critical hit chance and the Old God echo apply on your basic swings, and boon critical chance counts against a world boss.
 ---
 A boon is your god's domain effect. The numbers below are the full boon, which you have at Zealot and Chosen; a Follower gets {{balance:GodBoonFollowerStrengthPct}} percent of each and a Devout {{balance:GodBoonDevoutStrengthPct}} percent (the [Favor table](/wiki/en/gods/favor/)). A boon only helps in the place that uses it.

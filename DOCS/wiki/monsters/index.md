@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.3 | From level 25 monsters have more HP and hit harder and groups grow a little each level with no jump at level 31 or 61, monsters keep growing past level 50, and Beast, Insectoid, Shadow and Undead monsters can finish a Downed ally.
 history: 1.3.2 | Thorns costs a melee attacker a quarter of the damage dealt for 3 rounds, summon, flee and drain abilities no longer land a hit, and difficulty multiplies kill experience and gold once.
 history: 1.3.0 | Monsters choose their abilities with more sense and five early monsters gain a signature ability, dungeon floors 4 to 10 mix families in groups of up to three with a possible Shaman, elite monsters with named traits appear from floor 3, and the Orc is weaker except as a floor boss.
 ---
@@ -23,6 +24,8 @@ A monster's stats follow its level L, at every level from 1 to 100:
 - Defence = L + 0.5 x L^1.02
 
 Each is multiplied by the tier's power and then by {{balance:BaseMonsterDifficultyScale}}. A level 20 monster of power 1.0 has 3,478 HP, 166 Strength and 67 Defence.
+
+A floor boss is built from its tier's boss power where the tier has one (the Orc's is 1.0 against its 0.9), then has 2.8 times the HP, 1.25 times the Strength, punch and weapon power and 1.2 times the Defence and armor of a monster of its level and tier; the deep factors below multiply on top.
 
 The deep floors from 25 are built for a full team of five: a tank, a healer and damage dealers. From level 25 HP is also multiplied by a deep factor that rises in straight lines from 1.0 at level 25 to 1.44 at 35, 1.605 at 50 and 1.66 at 100, and Strength, punch and weapon power by one that rises from 1.0 at 25 to 1.44 at 35, 1.605 at 50, 1.715 at 75 and 2.1 at 100. Defence and armor are not. A level 60 monster of power 1.0 has 18,328 HP and 852 Strength.
 

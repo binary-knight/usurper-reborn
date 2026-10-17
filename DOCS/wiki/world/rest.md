@@ -1,8 +1,9 @@
 ---
 title: Home, the Inn and rest
 path: /wiki/en/world/rest/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.0 | At the Inn, Seth Able fights at the level his challenge screen shows and a win pays the Inn's flat reward only, Inn duels and town honor duels share one daily cap of 3 wins, and a forgiven companion waits there.
 history: 1.2.6 | none

@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Locations/PrisonLocation.cs, Scripts/Locations/MusicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Core/Character.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | A companion at 0 HP in a fight is Downed and dies only when a monster finishes it or when, still standing, it takes a killing blow in your place; leaving it to die now means holding a healing potion and not rescuing it while it is Downed.
 history: 1.3.2 | Companions regain stamina and mana at the end of each round, and when your gold does not cover every entry fee only the NPCs you cannot pay for stay at the dungeon entrance.
 history: 1.3.0 | Companions remember a murder they witness and a companion left to die: after a warning the least loyal one leaves, handing back its gear, and forgiveness in the Temple's Faith room brings it back.
 history: 1.2.5 | Companion descriptions, romance milestones, quest history and last words are shown in all five languages.
