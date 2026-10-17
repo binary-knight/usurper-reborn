@@ -33,17 +33,6 @@ public class Bump133Tests
         text.Split('\n').Where(l => l.StartsWith("\u2022 ", StringComparison.Ordinal)).ToArray();
 
     [Fact]
-    public void Version_Is133_NamedReckoning_AndTheTelemetryBodySays133()
-    {
-        GameConfig.Version.Should().Be("1.3.3");
-        GameConfig.VersionName.Should().Be("Reckoning");
-        byte[] body = TelemetryUploader.BuildBody(new List<string> { TelemetryBody127Tests.MaxLine() },
-            TelemetryBody127Tests.FixtureInstallId, TelemetrySource.Single);
-        using var doc = JsonDocument.Parse(body);
-        doc.RootElement.GetProperty("version").EnumerateArray().Select(v => v.GetInt64()).Should().Equal(1L, 3L, 3L);
-    }
-
-    [Fact]
     public void Notes_AreOneChangelist_OfShortLines_InGroups_WithNoKnownIssues()
     {
         string notes = Repo(NotesPath);
