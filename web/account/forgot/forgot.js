@@ -14,6 +14,8 @@
     A.show('msg-busy');
     A.post('/api/account/forgot', { name: name, lang: A.lang }).then(function (r) {
       button.disabled = false;
+      // a server that does not send mail says so, the same answer for every name
+      if (r.data.error === 'mail_off') { A.show('msg-mail-off'); return; }
       if (r.status === 200) { input.value = ''; A.show('msg-sent'); } else { A.show('msg-error'); }
     }, function () {
       button.disabled = false;

@@ -288,3 +288,46 @@ test('the privacy text and the accounts guide describe the address and the websi
   assert.ok(guide.includes('A game played as a BBS door runs on that BBS, not on the game server, and is not closed.'));
   assert.ok(guide.includes('at least 8 characters, no colon'));
 });
+
+// ---------------------------------------------------------------- 1.3.4 self-host: a server that does not send mail
+
+const MAIL_OFF = () => ({ status: 503, body: { error: 'mail_off' } });
+
+test('mail off: the three pages carry the one line in five languages', () => {
+  assert.strictEqual(LANG.en['account.mail_off'], "This server does not send mail. Ask the server's operator to reset your password.");
+  for (const l of LANGS.slice(1)) assert.notStrictEqual(LANG[l]['account.mail_off'], LANG.en['account.mail_off'], l);
+  for (const rel of PAGES) {
+    const p = elements(fs.readFileSync(path.join(WEB, rel), 'utf8')).filter((e) => e.attrs.id === 'msg-mail-off');
+    assert.strictEqual(p.length, 1, rel);
+    assert.strictEqual(p[0].attrs['data-i18n'], 'account.mail_off', rel);
+  }
+});
+
+test('mail off: the forgot page shows the line from the API answer, not the sent line', async () => {
+  const p = await loadAccountPage('account/forgot/index.html', { reply: MAIL_OFF });
+  p.el('name').value = 'Keeper';
+  await p.submit('forgot-form');
+  assert.strictEqual(p.calls.fetch.filter((f) => f.url === '/api/account/forgot').length, 1, 'decided from the one API answer');
+  assert.deepStrictEqual(p.shown(), ['msg-mail-off']);
+  const on = await loadAccountPage('account/forgot/index.html');
+  on.el('name').value = 'Keeper';
+  await on.submit('forgot-form');
+  assert.deepStrictEqual(on.shown(), ['msg-sent'], 'with mail on the line is not shown');
+});
+
+test('mail off: the reset page shows the line and hides the form', async () => {
+  const p = await loadAccountPage('account/reset/index.html', { hash: '#' + TOKEN, reply: MAIL_OFF });
+  p.el('password').value = '12345678'; p.el('password2').value = '12345678';
+  await p.submit('reset-form');
+  assert.deepStrictEqual(p.shown(), ['msg-mail-off']);
+  assert.strictEqual(p.el('reset-form').hidden, true);
+  assert.strictEqual(p.el('msg-again').hidden, true, 'no new link to ask for');
+});
+
+test('mail off: the verify page shows the line and hides the button', async () => {
+  const p = await loadAccountPage('account/verify/index.html', { hash: '#' + TOKEN, reply: MAIL_OFF });
+  await p.click('confirm');
+  assert.deepStrictEqual(p.shown(), ['msg-mail-off']);
+  assert.strictEqual(p.el('confirm').hidden, true);
+  assert.strictEqual(p.el('intro').hidden, true);
+});

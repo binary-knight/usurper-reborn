@@ -62,7 +62,8 @@ function loadSection() {
   return vm.runInContext(slice(proxySource(), START, END) + `
 ;({ createAccountMail, accountNormalizeAddress, accountMask, accountResetName, accountMailMessage, accountResendSend,
    accountClientIp, accountSqlTime, accountEscapeHtml, ACCOUNT_MIN_PASSWORD_LENGTH, ACCOUNT_MAX_PASSWORD_LENGTH,
-   ACCOUNT_PER_IP_PER_HOUR, ACCOUNT_NAME_MAX, ACCOUNT_ADDRESS_MAX, ACCOUNT_MAIL_TEMPLATES, ACCOUNT_LANGS });`,
+   ACCOUNT_PER_IP_PER_HOUR, ACCOUNT_NAME_MAX, ACCOUNT_ADDRESS_MAX, ACCOUNT_MAIL_TEMPLATES, ACCOUNT_LANGS,
+   accountSiteUrl, ACCOUNT_SITE });`,
   ctx, { filename: 'ssh-proxy.js (account mail section)' });
 }
 const S = loadSection();
@@ -798,9 +799,11 @@ test('templates: six mails in five languages, the same placeholders as English, 
         assert.doesNotMatch(v, /<|https?:\/\/(?!usurper-reborn\.net\/)/, `${l} ${key}`);
       }
     }
-    assert.match(LANG[l]['mail.footer'], /^Usurper Reborn, https:\/\/usurper-reborn\.net\. /);
+    // 1.3.4 self-host: the footer names the operator's site ({site}), not a fixed one
+    assert.match(LANG[l]['mail.footer'], /^Usurper Reborn, \{site\}\. /);
+    assert.doesNotMatch(LANG[l]['mail.footer'], /https?:\/\//);
   }
-  const m = S.accountMailMessage(LANG.fr, LANG.en, 'reset_request', { name: 'Keeper', link: 'https://usurper-reborn.net/account/reset#abc', minutes: 30 });
+  const m = S.accountMailMessage(LANG.fr, LANG.en, 'reset_request', { site: 'https://usurper-reborn.net', name: 'Keeper', link: 'https://usurper-reborn.net/account/reset#abc', minutes: 30 });
   assert.match(m.html, /^<!DOCTYPE html><html><body[^>]*>/);
   assert.doesNotMatch(m.html, /<img|<script|<link|src=|https?:\/\/(?!usurper-reborn\.net)/);
   assert.ok(m.html.includes('<a href="https://usurper-reborn.net/account/reset#abc">'));
@@ -821,4 +824,138 @@ test('G3: the addresses in these tests and in the account mail section use reser
     }
   }
   assert.deepStrictEqual(found, []);
+});
+
+// ---------------------------------------------------------------- 1.3.4 self-host: SITE_URL, mail off, stale rows
+
+const SITE_CASES = JSON.parse(read('web', 'test', 'site-url-cases.json'));
+
+test('SITE_URL: each accepted form is kept (trimmed, lower case) and each refused form is refused (the C# cases)', () => {
+  assert.ok(SITE_CASES.accepted.length >= 8 && SITE_CASES.refused.length >= 20);
+  for (const [raw, want] of SITE_CASES.accepted) assert.strictEqual(S.accountSiteUrl(raw), want, JSON.stringify(raw));
+  for (const raw of SITE_CASES.refused) assert.strictEqual(S.accountSiteUrl(raw), null, JSON.stringify(raw));
+  assert.strictEqual(S.accountSiteUrl(undefined), null);
+  assert.strictEqual(S.accountSiteUrl('https://' + 'a'.repeat(63) + '.example.com'), 'https://' + 'a'.repeat(63) + '.example.com');
+  assert.strictEqual(S.accountSiteUrl('https://' + 'a'.repeat(64) + '.example.com'), null, 'a label over 63');
+  assert.strictEqual(S.ACCOUNT_SITE, 'https://usurper-reborn.net');
+});
+
+test('SITE_URL: the links, the footer and the password notice use it; world_state mail_site holds it', async () => {
+  const env = Object.assign({ SITE_URL: 'https://Game.Example.com:8443' }, KEY_ENV);
+  await withServer({ env }, async (s) => {
+    assert.strictEqual(s.mail.site, 'https://game.example.com:8443');
+    const token = await resetToken(s, 'Keeper', 'keeper@example.com');
+    const m = s.sent[0];
+    assert.ok(m.text.includes('https://game.example.com:8443/account/reset#' + token));
+    assert.ok(m.html.includes('<a href="https://game.example.com:8443/account/reset#' + token + '">'));
+    assert.ok(m.text.includes('Usurper Reborn, https://game.example.com:8443. '), 'the footer');
+    assert.ok(!m.text.includes('usurper-reborn.net') && !m.html.includes('usurper-reborn.net'));
+    s.account('Changer', 'old@example.com');
+    s.gameRow('verify', 'changer', 'new@example.com');
+    await s.tick();
+    assert.ok(s.sent[s.sent.length - 1].text.includes('https://game.example.com:8443/account/verify#'));
+    assert.strictEqual((await s.api('/api/account/reset', { token, password: GOOD_PW })).status, 200);
+    await s.tick();
+    const notice = s.sent[s.sent.length - 1];
+    assert.strictEqual(notice.subject, LANG.en['mail.changed.subject']);
+    assert.ok(notice.text.includes('https://game.example.com:8443/account/forgot'));
+    assert.ok(!notice.text.includes('usurper-reborn.net') && !notice.text.includes('{site}'));
+    const row = s.db.prepare("SELECT value FROM world_state WHERE key = 'mail_site'").get();
+    assert.strictEqual(row.value, 'https://game.example.com:8443');
+    assert.deepStrictEqual(s.logs.filter((l) => l.includes('SITE_URL')), [], 'no warning for an accepted site');
+  });
+});
+
+test('SITE_URL: unset is the default with no warning; a refused form is the default and one warning line', async () => {
+  await withServer({ env: {} }, async (s) => {
+    assert.strictEqual(s.mail.site, 'https://usurper-reborn.net');
+    await s.tick();
+    assert.strictEqual(s.db.prepare("SELECT value FROM world_state WHERE key = 'mail_site'").get().value, 'https://usurper-reborn.net', 'written with mail off too');
+    assert.deepStrictEqual(s.logs.filter((l) => l.includes('SITE_URL')), []);
+  });
+  for (const bad of ['https://evil.example.com/account', 'https://user@example.com', 'ftp://example.com']) {
+    await withServer({ env: Object.assign({ SITE_URL: bad }, KEY_ENV) }, async (s) => {
+      assert.strictEqual(s.mail.site, 'https://usurper-reborn.net', bad);
+      const warns = s.logs.filter((l) => l.includes('SITE_URL'));
+      assert.strictEqual(warns.length, 1, bad);
+      assert.match(warns[0], /^warn /);
+      assert.ok(!warns[0].includes(bad), 'the refused value is not echoed');
+      const token = await resetToken(s, 'Keeper', 'keeper@example.com');
+      assert.ok(s.sent[0].text.includes('https://usurper-reborn.net/account/reset#' + token), bad);
+      assert.ok(!s.sent[0].text.includes('evil'), bad);
+      await s.tick();
+      assert.strictEqual(s.db.prepare("SELECT value FROM world_state WHERE key = 'mail_site'").get().value, 'https://usurper-reborn.net');
+      assert.strictEqual(s.logs.filter((l) => l.includes('SITE_URL')).length, 1, 'once, at start');
+    });
+  }
+});
+
+test('mail off: forgot answers mail_off for every name and writes no row', async () => {
+  await withServer({ env: {} }, async (s) => {
+    s.account('Keeper', 'keeper@example.com');
+    const answers = [];
+    for (const name of ['keeper', 'ghost', 'keeper@example.com', 'nobody@example.net', '']) {
+      answers.push(await s.api('/api/account/forgot', { name }));
+    }
+    for (const r of answers) {
+      assert.strictEqual(r.status, 503);
+      assert.deepStrictEqual(r.data, { error: 'mail_off' });
+      assert.strictEqual(r.raw, answers[0].raw, 'the same answer for every name');
+      assert.strictEqual(r.headers['cache-control'], 'no-store');
+    }
+    assert.strictEqual(s.rows().length, 0, 'no row');
+  });
+});
+
+test('mail off: reset and verify answer mail_off; an unexpired token is not used and works once mail is back', async () => {
+  const first = server();
+  let s = first;
+  try {
+    const token = await resetToken(s, 'Keeper', 'keeper@example.com');
+    s.account('Changer', 'old@example.com');
+    s.gameRow('verify', 'changer', 'new@example.com');
+    await s.tick();
+    const vt = tokenIn(s.sent[s.sent.length - 1]);
+    const before = s.db.prepare('SELECT id, used_at FROM account_tokens ORDER BY id').all();
+    s = s.reopen({ env: {} });
+    const r = await s.api('/api/account/reset', { token, password: GOOD_PW });
+    assert.strictEqual(r.status, 503);
+    assert.deepStrictEqual(r.data, { error: 'mail_off' });
+    const short = await s.api('/api/account/reset', { token, password: 'x' });
+    assert.deepStrictEqual(short.data, { error: 'mail_off' }, 'before the password rule');
+    const bad = await s.api('/api/account/reset', { token: 'garbage', password: GOOD_PW });
+    assert.strictEqual(bad.raw, r.raw, 'the same answer for a bad token');
+    const v = await s.api('/api/account/verify', { token: vt });
+    assert.strictEqual(v.status, 503);
+    assert.deepStrictEqual(v.data, { error: 'mail_off' });
+    assert.deepStrictEqual(s.db.prepare('SELECT id, used_at FROM account_tokens ORDER BY id').all(), before, 'no token used');
+    assert.strictEqual(s.player('keeper').password_hash, 'old-hash-Keeper');
+    assert.strictEqual(s.player('changer').email, 'old@example.com');
+    s = s.reopen({ env: KEY_ENV });
+    assert.strictEqual((await s.api('/api/account/reset', { token, password: GOOD_PW })).status, 200);
+    assert.strictEqual((await s.api('/api/account/verify', { token: vt })).status, 200);
+    assert.strictEqual(s.player('changer').email, 'new@example.com');
+  } finally {
+    s.cleanup();
+  }
+});
+
+test('stale: a row older than an hour is dropped unsent (logged dropped stale); a fresh row is sent', async () => {
+  const first = server({ env: {} });
+  let s = first;
+  try {
+    s.account('Old', 'old@example.com');
+    s.account('Fresh', 'fresh@example.com');
+    const oldId = s.gameRow('reset', 'old', null, '198.51.100.7', 'en', T0 - HOUR - MIN);
+    const freshId = s.gameRow('reset', 'fresh', null, '198.51.100.8', 'en', T0 - 59 * MIN);
+    // the key is added later: a fresh instance with mail on
+    s = s.reopen({ env: KEY_ENV });
+    await s.tick();
+    assert.strictEqual(s.row(oldId).status, 'dropped');
+    assert.strictEqual(s.row(freshId).status, 'done');
+    assert.deepStrictEqual(s.sent.map((m) => m.to), ['fresh@example.com'], 'only the fresh row is mailed');
+    assert.ok(s.logs.some((l) => /^info \[account-mail\] 1 row\(s\) dropped stale$/.test(l)), s.logs.join('\n'));
+  } finally {
+    s.cleanup();
+  }
 });
