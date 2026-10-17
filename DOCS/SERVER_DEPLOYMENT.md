@@ -1,14 +1,14 @@
+<!-- doc: checked 1.3.4; sources: scripts-server, web/ssh-proxy.js, web/index.html, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/VersionChecker.cs -->
 # Usurper Reborn - Online Server Deployment Guide
 
 ## Overview
 
 Host your own Usurper Reborn online multiplayer server. Players connect via SSH to a shared game world with persistent characters, NPCs, economy, and inter-player chat.
 
-> DEPLOYMENT NOTE: the canonical production server (usurper-reborn.net) runs the **MUD Server** model
+> DEPLOYMENT NOTE: the project's own server runs the **MUD Server** model
 > behind an haproxy multiplexer on port 4000 (SSH-version-line sniff routes "SSH-..." to sshd-usurper
 > on 4022, everything else to the MudServer on 4001 with a PROXY v2 header for real-IP visibility).
-> That live setup, including exact service names, ports, and deploy commands, is documented at the top
-> of `CLAUDE.md` and in `DOCS/ARCHITECTURE.md`; treat those as the source of truth for the recommended
+> That setup is described in `DOCS/ARCHITECTURE.md`; treat it as the source of truth for the recommended
 > topology. The **Simple (Per-Process)** model below is still fully supported for small self-hosted
 > communities (it runs one game process per SSH connection with `--online --stdio` and needs no
 > haproxy), but the MUD Server model is what the production server uses and what scales.
@@ -38,8 +38,11 @@ The simple model spawns a new game process per SSH connection. It's the easiest 
 # 1. Build the Linux binary on your dev machine
 dotnet publish usurper-reloaded.csproj -c Release -r linux-x64 --self-contained -o publish/linux-x64
 
-# 2. Upload to your server
+# 2. Upload to your server, with the server scripts from the repository
 scp -r publish/linux-x64/* root@your-server:/opt/usurper/
+scp scripts-server/setup-server.sh scripts-server/update-server.sh scripts-server/usurper-mud.service \
+    scripts-server/usurper-web.service scripts-server/usurper-logrotate.conf scripts-server/usurper-shell.sh \
+    root@your-server:/opt/usurper/
 
 # 3. Run the setup script (default port 4000)
 ssh root@your-server
@@ -92,6 +95,11 @@ dotnet publish usurper-reloaded.csproj -c Release -r linux-x64 --self-contained 
 # Upload to server (direct copy)
 scp -r publish/linux-x64/* root@your-server:/opt/usurper/
 
+# The publish output has no server scripts; copy them from scripts-server/ in the repository
+scp scripts-server/setup-server.sh scripts-server/update-server.sh scripts-server/usurper-mud.service \
+    scripts-server/usurper-web.service scripts-server/usurper-logrotate.conf scripts-server/usurper-shell.sh \
+    root@your-server:/opt/usurper/
+
 # Or create a tarball first
 cd publish/linux-x64
 tar czf /tmp/usurper-reborn-server.tar.gz .
@@ -122,8 +130,8 @@ The setup script automatically:
 - Sets shared password to "play"
 - Configures UFW firewall (ports 22 + game port)
 - Configures fail2ban for brute-force protection
-- Sets up daily database backups at 4 AM
-- Installs health check script
+- Writes `/opt/usurper/backup.sh` and sets up daily database backups at 4 AM (14 days kept)
+- Writes the health check script `/opt/usurper/healthcheck.sh`
 
 ### 3. Cloud Firewall (AWS/Lightsail/etc.)
 
@@ -151,24 +159,28 @@ ssh -p 4000 usurper@your-server-ip
 /opt/usurper/              # Game binary and scripts
   UsurperReborn            # Main executable
   *.dll, *.so              # .NET runtime libraries
-  setup-server.sh          # Initial setup (run once)
-  update-server.sh         # Update script
-  backup.sh                # Database backup
-  healthcheck.sh           # Health check
-  usurper-mud.service      # MUD server service file (advanced)
-  usurper-web.service      # Web terminal service file
-  usurper-logrotate.conf   # Log rotation config
-  web/                     # Website files (optional)
+  Localization/            # Language files
+  logs/debug.log           # Game debug log (next to the executable)
+  setup-server.sh          # Initial setup (run once), copied from scripts-server/
+  update-server.sh         # Update script, copied from scripts-server/
+  backup.sh                # Database backup (written by setup-server.sh)
+  healthcheck.sh           # Health check (written by setup-server.sh)
+  usurper-mud.service      # MUD server service file (advanced), copied from scripts-server/
+  usurper-web.service      # Web terminal service file, copied from scripts-server/
+  usurper-logrotate.conf   # Log rotation config, copied from scripts-server/
+  web/                     # Website files (optional), the repository's web/ folder
     index.html             # Landing page + live stats dashboard
-    ssh-proxy.js           # WebSocket-to-SSH bridge + Stats API
+    ssh-proxy.js           # WebSocket bridge to the game + Stats API + account mail
+    account/               # Password reset and address confirmation pages
     package.json           # Node.js dependencies
     node_modules/          # Installed dependencies
+    .env                   # Environment for the web service (optional, see below)
 
 /var/usurper/              # Game data (persists across updates)
   usurper_online.db        # SQLite database (all player data)
-  logs/                    # Game logs
-    debug.log
-    mud-server.log         # MUD server logs (if using MUD model)
+  logs/                    # Server logs
+    mud-server.log         # MUD server output (if using MUD model)
+    backup.log             # Backup cron output
   backups/                 # Daily database backups
     usurper_online_YYYYMMDD_HHMMSS.db
 
@@ -192,14 +204,14 @@ sudo /opt/usurper/update-server.sh /tmp/usurper-update/
 ```
 
 The update script:
-1. Backs up the current binary to `/opt/usurper.bak.TIMESTAMP/`
+1. Backs up all of `/opt/usurper` to `/opt/usurper.bak.TIMESTAMP/`
 2. Backs up the database
-3. Copies new binary and libraries
-4. Restarts services (MUD server and/or sshd-usurper)
+3. Copies `UsurperReborn`, `*.dll`, `*.so` and `*.json` from the top of the update folder (not the `Localization/` folder and not the web files)
+4. Restarts usurper-mud and sshd-usurper, each only if it is running
 5. New player connections use the updated binary immediately
 6. For the simple model, existing connections continue with the old binary until disconnect
 
-**Version checking is disabled in online mode** - the game won't prompt players to update. You handle updates manually via the update script.
+**Version checking is disabled in online mode** - the game won't prompt players to update. You handle updates manually via the update script, or check from the SysOp console.
 
 ## Website & Browser Play (Optional)
 
@@ -213,11 +225,12 @@ Browser -> https://your-domain.com (nginx)
   +-- Static landing page (index.html)
   +-- /api/stats -> Node.js (port 3000) -> SQLite game database
   +-- /ws -> Node.js WebSocket (port 3000)
-              -> SSH to localhost:4000 (game)
+              -> TCP to the MUD server at MUD_HOST:MUD_PORT (default 127.0.0.1:4001)
+                 (or SSH to localhost:4000 when MUD_MODE=0)
 ```
 
 **Components**:
-- `ssh-proxy.js` - Node.js server providing WebSocket-to-SSH bridge + Stats REST API
+- `ssh-proxy.js` - Node.js server providing the WebSocket bridge to the game + Stats REST API
 - `index.html` - Landing page with xterm.js terminal emulator + live stats dashboard
 - nginx proxies `/ws` (WebSocket) and `/api/` (HTTP) to Node.js on port 3000
 
@@ -229,7 +242,7 @@ sudo apt install -y nodejs
 
 # Install web files
 sudo mkdir -p /opt/usurper/web
-sudo cp web/index.html web/ssh-proxy.js web/package.json /opt/usurper/web/
+sudo cp -r web/. /opt/usurper/web/
 sudo chown -R usurper:usurper /opt/usurper/web
 
 # Install dependencies (needs build tools for better-sqlite3)
@@ -266,7 +279,7 @@ The web proxy serves a `GET /api/stats` endpoint with live game statistics:
 
 ```json
 {
-  "online": [{"name": "Rage", "level": 15, "className": "Warrior", "location": "Dungeon F12"}],
+  "online": [{"name": "ExamplePlayer", "level": 15, "className": "Warrior", "location": "Dungeon F12"}],
   "onlineCount": 1,
   "stats": {
     "totalPlayers": 42,
@@ -278,17 +291,18 @@ The web proxy serves a `GET /api/stats` endpoint with live game statistics:
     "children": 7
   },
   "highlights": {
-    "topPlayer": {"name": "Rage", "level": 15, "className": "Warrior"},
-    "king": "Rage",
+    "topPlayer": {"name": "ExamplePlayer", "level": 15, "className": "Warrior"},
+    "king": "ExamplePlayer",
     "popularClass": "Warrior"
   },
-  "news": [{"message": "defeated a Dragon", "playerName": "Rage", "time": "2026-02-10T06:00:00"}]
+  "news": [{"message": "defeated a Dragon", "playerName": "ExamplePlayer", "time": "2026-02-10T06:00:00"}]
 }
 ```
 
-- Queries the game's SQLite database (read-only)
-- 30-second server-side cache
-- Used by the landing page's live stats dashboard (auto-refreshes every 30s)
+- A shortened example: the response also carries `immortals`, `leaderboard`, `pvpLeaderboard`, `economy`, `npcActivities` and `cachedAt`, and more fields under `stats` and `highlights`
+- Queries the game's SQLite database through the read-only handle
+- 2-minute server-side cache
+- Used by the landing page's live stats dashboard (auto-refreshes every 2 minutes)
 
 ### Web Service Management
 
@@ -306,6 +320,22 @@ sudo cp /tmp/ssh-proxy.js /opt/usurper/web/ssh-proxy.js
 sudo chown usurper:usurper /opt/usurper/web/*
 sudo systemctl restart usurper-web
 ```
+
+### Password reset by email (optional)
+
+Players with an online account can reset a forgotten password by email, sent through the Resend mail service by the web service. It is off by default. With mail off, players see no forgot password choice, no email question and no Email menu, and the website reset pages (`/account/forgot`, `/account/reset`, `/account/verify`) say that the server does not send mail.
+
+To turn it on, set these in the web service environment. `usurper-web.service` reads `/opt/usurper/web/.env` as its `EnvironmentFile`:
+
+```bash
+RESEND_API_KEY=re_example          # a Resend API key
+MAIL_FROM=noreply@example.com      # an address on a domain verified with Resend
+SITE_URL=https://example.com       # the public address of your website, http(s)://host[:port]
+```
+
+Both `RESEND_API_KEY` and `MAIL_FROM` must be set. `SITE_URL` defaults to `https://usurper-reborn.net`; a value that is not http or https with a host and an optional port (no path, not even a trailing `/`) is refused with a warning in the web log, and the default is used. Then restart the web service with `sudo systemctl restart usurper-web`. The web service writes the mail switch into the database when it starts and every 15 seconds, and the game reads it at each prompt, so the game follows within 15 seconds; if the web service stops, the game counts mail as off once the last beat is 10 minutes old.
+
+With mail on, an address stays optional for players; a player who gives none is told that only the server's operator can reset a forgotten password. The operator can reset any password from the `/admin` page (Reset Password on the player's row), with mail on or off.
 
 ## Advanced: MUD Server (High-Capacity)
 
@@ -358,13 +388,14 @@ sudo systemctl enable usurper-mud
 
 # 3. Edit the service file to customize admin names and settings
 sudo systemctl edit usurper-mud --full
-# Key flags:
-#   --mud-port 4001        TCP port for player relay connections
-#   --db <path>            SQLite database path
-#   --sim-interval 30      World simulation tick interval (seconds)
-#   --npc-xp 3.0           NPC XP gain multiplier
-#   --save-interval 5      State persistence interval (minutes)
-#   --admin <name>         Grant admin privileges to a player (repeatable)
+# Key flags (values as in the shipped service file; code defaults in brackets):
+#   --mud-server           Run as the MUD server
+#   --mud-port 4001        TCP port for player relay connections [4000]
+#   --db <path>            SQLite database path [/var/usurper/usurper_online.db]
+#   --sim-interval 30      World simulation tick interval, at least 10 (seconds) [60]
+#   --npc-xp 3.0           NPC XP gain multiplier, 0.01 to 10.0 [5.0]
+#   --save-interval 5      State persistence interval, at least 1 (minutes) [5]
+#   --admin <name>         Grant admin privileges to a player (repeatable); replace the names in the shipped file
 
 # 4. Start the MUD server, then restart sshd to pick up the new ForceCommand
 sudo systemctl start usurper-mud
@@ -482,7 +513,7 @@ journalctl -u sshd-usurper -f
 journalctl -u usurper-mud -f
 journalctl -u usurper-web -f
 tail -f /var/usurper/logs/mud-server.log
-tail -f /var/usurper/logs/debug.log
+tail -f /opt/usurper/logs/debug.log
 ```
 
 ## Troubleshooting
@@ -517,7 +548,7 @@ tail -f /var/usurper/logs/debug.log
 - Consider switching to MUD model if running out of memory with many players
 
 ### Game crashes on connect
-- Check logs: `tail -f /var/usurper/logs/debug.log`
+- Check logs: `tail -f /opt/usurper/logs/debug.log`
 - Check binary permissions: `ls -la /opt/usurper/UsurperReborn`
 - Ensure self-contained publish was used (includes .NET runtime)
 
