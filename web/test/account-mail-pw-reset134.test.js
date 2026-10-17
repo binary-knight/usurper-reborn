@@ -798,7 +798,7 @@ test('templates: six mails in five languages, the same placeholders as English, 
         assert.doesNotMatch(v, /<|https?:\/\/(?!usurper-reborn\.net\/)/, `${l} ${key}`);
       }
     }
-    assert.match(LANG[l]['mail.footer'], /(^|\s)https:\/\/usurper-reborn\.net([.,;\s]|$)/);
+    assert.match(LANG[l]['mail.footer'], /^Usurper Reborn, https:\/\/usurper-reborn\.net\. /);
   }
   const m = S.accountMailMessage(LANG.fr, LANG.en, 'reset_request', { name: 'Keeper', link: 'https://usurper-reborn.net/account/reset#abc', minutes: 30 });
   assert.match(m.html, /^<!DOCTYPE html><html><body[^>]*>/);
