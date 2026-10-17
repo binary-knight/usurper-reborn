@@ -290,7 +290,8 @@ public class LoginScreen_PwReset134Tests : IDisposable
         var (t1, o1) = Term("");
         await EmailPrompt.AskIfDueAsync(t1, Db, "Skipper", "198.51.100.70");
         EmailPrompt.Drawn.Should().Be(before + 1);
-        Plain(t1, o1).Should().Contain(L("en", "email.prompt_title")).And.Contain(L("en", "email.skipped"));
+        Plain(t1, o1).Should().Contain(L("en", "email.prompt_title"));
+        foreach (var row in L("en", "email.skipped").Split('\n')) Plain(t1, o1).Should().Contain(" " + row + "\n", "1.3.4 self-host: the skip text has more than one row");
         Db.GetAccountEmail("Skipper").Prompted.Should().BeTrue();
         await EmailPrompt.AskIfDueAsync(Term("").Term, Db, "Skipper", "198.51.100.70");
         EmailPrompt.Drawn.Should().Be(before + 1, "never again after a skip");
@@ -319,6 +320,102 @@ public class LoginScreen_PwReset134Tests : IDisposable
             .Should().BeGreaterThan(src.IndexOf("TelemetryPrompt.AskPlayerIfNeededAsync(terminal, playerName)", StringComparison.Ordinal));
     }
 
+    // ================= 1.3.4 self-host: the operator warning and the privacy line =================
+
+    internal const string OperatorSentence = "If you forget your password, the server's operator will have to reset it.";
+    internal const string PrivacyLine = "Your address is used only for password resets and notices about your account. It is never sold or shared, except with the mail service that delivers these messages.";
+    internal static string Flat(string s) => s.Replace("\n", " ");
+    private static readonly string[] Langs = { "en", "es", "fr", "hu", "it" };
+
+    [Fact]
+    public void TheWarningAndPrivacyTexts_AreTheRulingsWords_AndTranslated()
+    {
+        Flat(L("en", "auth.reg_email_note")).Should().Be("Optional. Without an address, a forgotten password can only be reset by the server's operator.");
+        Flat(L("en", "auth.reg_email_skipped")).Should().Be("No address added. " + OperatorSentence);
+        Flat(L("en", "email.about")).Should().Be(PrivacyLine);
+        Flat(L("en", "email.prompt_body")).Should().Contain(OperatorSentence).And.NotContain("nothing else");
+        Flat(L("en", "email.skipped")).Should().Be("No address added. " + OperatorSentence + " E on the character screen adds one later.");
+        Flat(L("en", "email.none")).Should().Be("No address on this account. " + OperatorSentence);
+        Flat(L("en", "email.removed")).Should().Be("The address was removed. A notice is being sent to it. " + OperatorSentence);
+        foreach (var lang in Langs.Skip(1))
+            foreach (var key in new[] { "auth.reg_email_note", "auth.reg_email_skipped", "email.about", "email.prompt_body", "email.skipped", "email.none", "email.removed" })
+                L(lang, key).Should().NotBe(L("en", key), $"{lang} {key} is translated");
+    }
+
+    [Fact]
+    public async Task Registration_ShowsTheOperatorNote_AndThePrivacyLine_BeforeTheEmailStep()
+    {
+        MailOn();
+        var output = await RegisterFlow(Ip(140), "Note Player", "note-pass-1", "Note.Player@Example.com");
+        int ask = output.IndexOf(L("en", "auth.reg_email"), StringComparison.Ordinal);
+        ask.Should().BeGreaterThan(0);
+        foreach (var key in new[] { "auth.reg_email_note", "email.about" })
+            foreach (var row in L("en", key).Split('\n'))
+            {
+                int at = output.IndexOf("  " + row + "\r\n", StringComparison.Ordinal);
+                at.Should().BeGreaterThan(0, $"{key}: {row}");
+                at.Should().BeLessThan(ask, "before the question");
+            }
+        output.Should().NotContain(L("en", "auth.reg_email_skipped").Split('\n')[0], "an address was added");
+        output.Should().Contain(L("en", "auth.reg_email_sent"));
+    }
+
+    [Fact]
+    public async Task Registration_Enter_SaysTheOperatorResets_LeavesNoAddress_NoRow()
+    {
+        MailOn();
+        var output = await RegisterFlow(Ip(141), "Skip Two", "skip-pass-2", "");
+        int ask = output.IndexOf(L("en", "auth.reg_email"), StringComparison.Ordinal);
+        foreach (var row in L("en", "auth.reg_email_skipped").Split('\n'))
+            output.IndexOf("  " + row + "\r\n", StringComparison.Ordinal).Should().BeGreaterThan(ask, row);
+        Db.GetAccountEmail("Skip Two").Should().Be((true, (string?)null, true), "no address, and asked");
+        Count("SELECT COUNT(*) FROM mail_requests;").Should().Be(0, "no row");
+    }
+
+    [Fact]
+    public async Task Registration_MailOff_ShowsNoneOfTheLines()
+    {
+        MailOff();
+        var output = await RegisterFlow(Ip(142), "Off Player", "off-pass-12");
+        output.Should().Contain(L("en", "auth.welcome"));
+        foreach (var key in new[] { "auth.reg_email_note", "email.about", "auth.reg_email_skipped" })
+            foreach (var row in L("en", key).Split('\n'))
+                output.Should().NotContain(row, key);
+    }
+
+    [Fact]
+    public async Task FirstLoginQuestion_SaysTheOperatorResets_AndShowsThePrivacyLine()
+    {
+        await Register("Asked One");
+        await Register("Off One");
+        MailOff();
+        var (t0, o0) = Term("");
+        await EmailPrompt.AskIfDueAsync(t0, Db, "Off One", "198.51.100.143");
+        var off = Plain(t0, o0);
+        foreach (var key in new[] { "email.prompt_body", "email.about", "email.skipped" })
+            foreach (var row in L("en", key).Split('\n'))
+                off.Should().NotContain(row, "mail off: " + key);
+
+        MailOn();
+        var (t1, o1) = Term("");
+        await EmailPrompt.AskIfDueAsync(t1, Db, "Asked One", "198.51.100.143");
+        var screen = Plain(t1, o1);
+        int ask = screen.IndexOf(L("en", "email.prompt_ask").Trim(), StringComparison.Ordinal);
+        ask.Should().BeGreaterThan(0);
+        foreach (var key in new[] { "email.prompt_body", "email.about" })
+            foreach (var row in L("en", key).Split('\n'))
+            {
+                int at = screen.IndexOf(" " + row + "\n", StringComparison.Ordinal);
+                at.Should().BeGreaterThan(0, $"{key}: {row}");
+                at.Should().BeLessThan(ask, "before the question");
+            }
+        screen.Should().Contain(" " + OperatorSentence + "\n");
+        foreach (var row in L("en", "email.skipped").Split('\n'))
+            screen.IndexOf(" " + row + "\n", StringComparison.Ordinal).Should().BeGreaterThan(ask, row);
+        Db.GetAccountEmail("Asked One").Email.Should().BeNull();
+        Count("SELECT COUNT(*) FROM mail_requests;").Should().Be(0, "a skip writes no row");
+    }
+
     // ================= 79 columns =================
 
     [Fact]
@@ -337,7 +434,11 @@ public class LoginScreen_PwReset134Tests : IDisposable
             rows.Add(" " + L(lang, "email.prompt_title"));
             rows.AddRange(L(lang, "email.prompt_body").Split('\n').Select(l => " " + l));
             rows.Add(" " + L(lang, "email.prompt_ask") + new string('x', 20));
-            rows.Add(" " + L(lang, "email.skipped"));
+            rows.AddRange(L(lang, "email.skipped").Split('\n').Select(l => " " + l));
+            // 1.3.4 self-host: the operator warnings and the privacy line, at the registration step and the question
+            foreach (var key in new[] { "auth.reg_email_note", "auth.reg_email_skipped", "email.about" })
+                rows.AddRange(L(lang, key).Split('\n').Select(l => "  " + l));
+            rows.AddRange(L(lang, "email.about").Split('\n').Select(l => " " + l));
             rows.Add(" " + L(lang, "auth.err_email_invalid"));
             rows.Add(" " + L(lang, "auth.reg_email_sent"));
             foreach (var row in rows)

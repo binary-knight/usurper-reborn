@@ -27,6 +27,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine(" " + Loc.Get("email.prompt_title"), "bright_yellow");
             foreach (var line in Loc.Get("email.prompt_body").Split('\n'))
                 terminal.WriteLine(" " + line, "white");
+            // what the address is used for, and that it is never sold or shared
+            foreach (var line in Loc.Get("email.about").Split('\n'))
+                terminal.WriteLine(" " + line, "gray");
             terminal.WriteLine("");
             for (int i = 0; i < MaxTries; i++)
             {
@@ -45,7 +48,8 @@ namespace UsurperRemake.Systems
                 return;
             }
             db.MarkEmailPrompted(username);
-            terminal.WriteLine(" " + Loc.Get("email.skipped"), "gray");
+            foreach (var line in Loc.Get("email.skipped").Split('\n'))
+                terminal.WriteLine(" " + line, "gray");
             await Pacing.Wait(1500);
         }
     }
