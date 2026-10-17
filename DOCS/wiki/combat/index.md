@@ -163,6 +163,10 @@ Rage lasts 5 rounds: the Strength and level part of your basic swing and Power A
 
 Defend halves every monster basic attack on you for the rest of the round, rounded up. It does not halve a monster's special ability. While you defend, monsters are more likely to pick you over your allies (see [who monsters attack](/wiki/en/combat/groups/#who-monsters-attack)).
 
+### Rescue (U)
+
+An ally at 0 HP in a fight (a companion, NPC ally, spouse, lover or fighting beast) is Downed, not dead. U spends one healing potion from your belt to lift a Downed ally: it stands again with the HP your healing potion would give it, and a finish a monster announced on it is called off. With two or more allies Downed you pick which one. U is in the menu only while an ally is Downed and you hold a healing potion, and only for the player leading the fight. In an Old God fight a rescue waits for the potion cooldown and starts it, as a potion does. A rescue counts as healing an ally for a god's deeds.
+
 ## When a monster attacks you
 
 ### How often monsters hit you
