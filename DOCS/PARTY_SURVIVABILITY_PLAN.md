@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Plan: NPC and companion survivability in a player's dungeon party
 
 Written 2026-09-07 from three inputs: a twelve-idea brief by the implementing

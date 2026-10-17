@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Steam copy for 1.3.4 (edited into the Steam page by hand)
 
 Steam formats with BBCode, so (a) is written in it. Every line about 1.3.0 to 1.3.4 comes from the shipped release notes in

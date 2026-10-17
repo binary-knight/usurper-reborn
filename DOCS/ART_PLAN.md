@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Plan: replacing the ANSI art (terminal game)
 
 Written 2026-09-07 from three inputs: a draft by the implementing agent, a

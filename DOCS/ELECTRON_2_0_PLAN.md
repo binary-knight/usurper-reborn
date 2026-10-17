@@ -1,3 +1,4 @@
+<!-- doc: historical -->
 # Electron client plan for 2.0
 
 This is a design for the user's approval. No code starts before it is approved. It covers what the Electron client is today, what it lacks against the current game, three ways to build it for 2.0, a recommended one, an ordered list of slices, and the decisions only the user can make.
