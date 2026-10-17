@@ -731,13 +731,13 @@ public class OnlineSystems125Tests : IDisposable
         (await Db.RegisterPlayer("a", "pass", null, "hu")).message.Should().Be(L("hu", "auth.err_username_len"));
         (await Db.RegisterPlayer("Valid Name", "pw", null, "hu")).message.Should().Be(L("hu", "auth.err_password_len"));
         (await Db.RegisterPlayer("Valid Name", "pa:ss", null, "hu")).message.Should().Be(L("hu", "auth.err_password_colon"));
-        (await Db.RegisterPlayer("Known", "secret", null, "hu")).message.Should().Be(L("hu", "auth.err_username_taken"));
-        var created = await Db.RegisterPlayer("Fresh Name", "secret", null, "hu");
+        (await Db.RegisterPlayer("Known", "secret-long", null, "hu")).message.Should().Be(L("hu", "auth.err_username_taken"));
+        var created = await Db.RegisterPlayer("Fresh Name", "secret-long", null, "hu");
         created.success.Should().BeTrue();
         created.message.Should().Be(L("hu", "auth.account_created"));
         (await Db.AuthenticatePlayer("nobody", "x", null, "hu")).message.Should().Be(L("hu", "auth.err_bad_login"));
         (await Db.AuthenticatePlayer("Fresh Name", "wrong", null, "hu")).message.Should().Be(L("hu", "auth.err_bad_login"));
-        (await Db.AuthenticatePlayer("Fresh Name", "secret", null, "hu")).message.Should().Be(L("hu", "auth.login_ok"));
+        (await Db.AuthenticatePlayer("Fresh Name", "secret-long", null, "hu")).message.Should().Be(L("hu", "auth.login_ok"));
         // v1.2.6: the ban shows only after the right password (LoginGeneric126Tests); this hash is unusable
         (await Db.AuthenticatePlayer("banned", "x", null, "hu")).message.Should().Be(L("hu", "auth.err_bad_login"));
 
@@ -745,7 +745,7 @@ public class OnlineSystems125Tests : IDisposable
         await InLanguage("hu", async () =>
         {
             (await Db.ChangePassword("Fresh Name", "wrong", "newer")).message.Should().Be(L("hu", "auth.err_current_password"));
-            (await Db.ChangePassword("Fresh Name", "secret", "abc")).message.Should().Be(L("hu", "auth.err_new_password_len"));
+            (await Db.ChangePassword("Fresh Name", "secret-long", "abc")).message.Should().Be(L("hu", "auth.err_new_password_len"));
             (await Db.AuthenticatePlayer("nobody", "x")).message.Should().Be(L("hu", "auth.err_bad_login"));
             return 0;
         });

@@ -305,20 +305,20 @@ public class LoginToken128Tests : IDisposable
     // ================= row 1, 2: old client shapes unchanged, no TOKEN line without the request =================
 
     [Theory]
-    [InlineData("AUTH:Old Timer:oldpass:Steam\n")]                                  // 4 parts
-    [InlineData("AUTH:Old Timer:oldpass:Steam:1.2.7\n")]                            // 5 parts with version
-    [InlineData("X-IP:198.51.100.71\nAUTH:Old Timer:oldpass:Local:1.0.0\n")]        // relay X-IP
-    [InlineData("X-IP:198.51.100.72\nX-Client:Web\nAUTH:Old Timer:oldpass:Web\n")]  // X-IP and X-Client
-    [InlineData("AUTH:Old Timer:oldpass:SSH;echo=1\n")]                             // 1.0.6 echo parameter
+    [InlineData("AUTH:Old Timer:oldpass-long:Steam\n")]                                  // 4 parts
+    [InlineData("AUTH:Old Timer:oldpass-long:Steam:1.2.7\n")]                            // 5 parts with version
+    [InlineData("X-IP:198.51.100.71\nAUTH:Old Timer:oldpass-long:Local:1.0.0\n")]        // relay X-IP
+    [InlineData("X-IP:198.51.100.72\nX-Client:Web\nAUTH:Old Timer:oldpass-long:Web\n")]  // X-IP and X-Client
+    [InlineData("AUTH:Old Timer:oldpass-long:SSH;echo=1\n")]                             // 1.0.6 echo parameter
     [InlineData("AUTH:Old Timer:Steam\n")]                                          // 3 parts, trusted from loopback
     [InlineData("AUTH:CAPS:capspass:Steam\n")]                                      // an account named CAPS
-    [InlineData("AUTH:TOKEN1 x:tokpass:Steam:1.2.8\n")]                             // an account named "TOKEN1 x"
-    [InlineData("AUTH:Fresh One:freshpw:REGISTER:Steam\n")]                         // registration
+    [InlineData("AUTH:TOKEN1 x:tokpass-long:Steam:1.2.8\n")]                             // an account named "TOKEN1 x"
+    [InlineData("AUTH:Fresh One:freshpw-long:REGISTER:Steam\n")]                         // registration
     public async Task Row01_OldClientShapes_GetOkAsBefore_AndNoTokenLine(string request)
     {
-        await Register("Old Timer", "oldpass");
+        await Register("Old Timer", "oldpass-long");
         await Register("CAPS", "capspass");
-        await Register("TOKEN1 x", "tokpass");
+        await Register("TOKEN1 x", "tokpass-long");
         foreach (var ip in new[] { "198.51.100.71", "198.51.100.72" }) { FailedLogins().TryRemove(ip, out _); _throttleIps.Add(ip); }
 
         var (lines, raw, stderr, _) = await Exchange(request);
@@ -369,7 +369,7 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row07_RegistrationWithTokenRequest_SendsOk_ThenOneTokenLine()
     {
-        var (lines, raw, _, _) = await Exchange("AUTH:New Comer:newpw1:REGISTER:Steam;token=1\n");
+        var (lines, raw, _, _) = await Exchange("AUTH:New Comer:newpw1-long:REGISTER:Steam;token=1\n");
         lines[0].Should().Be("OK", raw);
         lines[1].Should().StartWith("TOKEN:");
         var (selector, _) = Split(lines[1].Split(':')[1]);
@@ -390,7 +390,7 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row07_WrongPasswordWithTokenRequest_IssuesNothing()
     {
-        await Register("Careful", "rightpw");
+        await Register("Careful", "rightpw-long");
         var ip = ThrottleIp(77);
         var (lines, raw, _, _) = await Exchange($"X-IP:{ip}\nAUTH:Careful:wrongpw:Steam;token=1:1.2.8\n");
         lines[0].Should().Be("ERR:" + L("auth.err_bad_login"));
@@ -435,7 +435,7 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row10_TokenLogin_LogsInAsTheRowsAccount_AndSetsLastUsed()
     {
-        await Register("Token User", "tokenpw");
+        await Register("Token User", "tokenpw-long");
         var token = Issue("Token User");
         var (selector, _) = Split(token);
         Row(selector)["last_used_at"].Should().BeNull();
@@ -505,7 +505,7 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row12_UnknownSelector_StillRunsOneCompare_AgainstTheDummy()
     {
-        await Register("Known", "knownpw");
+        await Register("Known", "knownpw-long");
         var (selector, verifier) = Split(Issue("Known"));
         var fresh = LoginTokenProtocol.NewToken();
 
@@ -562,11 +562,11 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row14_ChangePassword_RevokesEveryToken()
     {
-        await Register("Changer", "oldpw1");
+        await Register("Changer", "oldpw1-long");
         var (s1, v1) = Split(Issue("Changer"));
         Issue("Changer");
         TokenRows("Changer").Should().Be(2);
-        (await Db.ChangePassword("Changer", "oldpw1", "newpw2")).success.Should().BeTrue();
+        (await Db.ChangePassword("Changer", "oldpw1-long", "newpw2-long")).success.Should().BeTrue();
         TokenRows("Changer").Should().Be(0, "a password change deletes the rows");
         Db.AuthenticateByToken(s1, v1).success.Should().BeFalse();
     }
@@ -574,9 +574,9 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row15_AdminResetPassword_RevokesEveryToken()
     {
-        await Register("Resetee", "oldpw1");
+        await Register("Resetee", "oldpw1-long");
         var (s1, v1) = Split(Issue("Resetee"));
-        Db.AdminResetPassword("Resetee", "newpw2").success.Should().BeTrue();
+        Db.AdminResetPassword("Resetee", "newpw2-long").success.Should().BeTrue();
         TokenRows("Resetee").Should().Be(0, "an admin reset deletes the rows");
         Db.AuthenticateByToken(s1, v1).success.Should().BeFalse();
     }
@@ -643,7 +643,7 @@ public class LoginToken128Tests : IDisposable
     [Fact]
     public async Task Row19_AtMostFiveRowsPerAccount_TheLeastRecentlyUsedGoes()
     {
-        await Register("Many Devices", "manypw");
+        await Register("Many Devices", "manypw-long");
         var start = new DateTime(2026, 10, 7, 12, 0, 0, DateTimeKind.Utc);
         var tokens = new List<string>();
         for (int i = 0; i < 5; i++)
@@ -673,7 +673,7 @@ public class LoginToken128Tests : IDisposable
     public async Task Row20_ExpiredRows_ArePruned_ByThePrune_AtStart_AndByThePoller()
     {
         await Register("Pruned", "prunedpw");
-        await Register("Still Here", "stillpw");
+        await Register("Still Here", "stillpw-long");
         var now = DateTime.UtcNow;
         Db.UtcNow = () => now.AddDays(-100);
         var (old1, _) = Split(Issue("Pruned"));
@@ -716,10 +716,10 @@ public class LoginToken128Tests : IDisposable
             replies.Append(raw);
         }
 
-        await Register("Quiet One", "quietpw");
+        await Register("Quiet One", "quietpw-long");
         var ip = ThrottleIp(21);
         // issue over the wire
-        var (lines, raw0, err0, _) = await Exchange($"X-IP:{ip}\nAUTH:Quiet One:quietpw:Steam;token=1:1.2.8\n");
+        var (lines, raw0, err0, _) = await Exchange($"X-IP:{ip}\nAUTH:Quiet One:quietpw-long:Steam;token=1:1.2.8\n");
         stderr.Append(err0);
         var issued = lines[1].Split(':')[1];
         secrets.Add(issued);

@@ -252,7 +252,7 @@ public class NameChars126Tests : IDisposable
     [Fact]
     public async Task AdminImmortalize_RefusedDivineName_IsAskedAgain()
     {
-        (await _db.RegisterPlayer("adm126", "secret1")).success.Should().BeTrue();
+        (await _db.RegisterPlayer("adm126", "secret1-long")).success.Should().BeTrue();
         var pd = new PlayerData { Name1 = "adm126", Name2 = "Adm126", Level = 30, HP = 100, MaxHP = 100 };
         (await _db.WriteGameData("adm126", new SaveGameData { Version = GameConfig.SaveVersion, Player = pd })).Should().BeTrue();
 

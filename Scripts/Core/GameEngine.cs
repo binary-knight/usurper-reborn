@@ -1974,7 +1974,7 @@ public partial class GameEngine
         }
 
         var newPassword = await terminal.GetMaskedInput(Loc.Get("engine.new_password_prompt"));
-        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < 4)
+        if (string.IsNullOrWhiteSpace(newPassword) || newPassword.Length < GameConfig.MinPasswordLength)
         {
             terminal.SetColor("red");
             terminal.WriteLine(Loc.Get("engine.password_min_length"));

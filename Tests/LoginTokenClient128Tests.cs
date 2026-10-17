@@ -378,8 +378,8 @@ public class LoginTokenClient128Tests : IDisposable
         var no = await Play(NewRelay("pw"), new[] { "L", "Other", "pw", "N" }, HostB);
         no.Sent.Last().Should().Be($"AUTH:Other:pw:Local:{Version}");
 
-        var reg = await Play(NewRelay("newpw"), new[] { "R", "Newcomer", "newpw", "newpw", "Y" }, HostA, 4002);
-        reg.Sent.Last().Should().Be("AUTH:Newcomer:newpw:REGISTER:Local;token=1");
+        var reg = await Play(NewRelay("newpw-long"), new[] { "R", "Newcomer", "newpw-long", "newpw-long", "Y" }, HostA, 4002);
+        reg.Sent.Last().Should().Be("AUTH:Newcomer:newpw-long:REGISTER:Local;token=1");
 
         var never = await Play(NewRelay("pw"), new[] { "L", "Other", "pw", "D" }, HostB, 4003);
         never.Sent.Last().Should().Be($"AUTH:Other:pw:Local:{Version}");
@@ -883,11 +883,11 @@ public class LoginTokenClient128Tests : IDisposable
     {
         await WithEndToEnd(async mud =>
         {
-            (await mud.Db.RegisterPlayer("Far Traveler", "firstpw")).success.Should().BeTrue();
+            (await mud.Db.RegisterPlayer("Far Traveler", "firstpw-long")).success.Should().BeTrue();
 
-            var (first, _) = await PlayEndToEnd(mud, new[] { "L", "Far Traveler", "firstpw", "Y" });
+            var (first, _) = await PlayEndToEnd(mud, new[] { "L", "Far Traveler", "firstpw-long", "Y" });
             first.Outcome.Should().Be(OnlineAuthOutcome.Authenticated, first.Screen);
-            first.Sent.Should().Equal(LoginTokenProtocol.CapsLine, $"AUTH:Far Traveler:firstpw:Local;token=1:{Version}");
+            first.Sent.Should().Equal(LoginTokenProtocol.CapsLine, $"AUTH:Far Traveler:firstpw-long:Local;token=1:{Version}");
             var issued = OnlineLoginStore.Find(HostA, 4000)!.Token;
             issued.Should().NotBeNull(first.Screen);
             TokenRows("Far Traveler").Should().Be(1);
@@ -897,7 +897,7 @@ public class LoginTokenClient128Tests : IDisposable
             again.Outcome.Should().Be(OnlineAuthOutcome.Authenticated, again.Screen);
             again.Sent.Should().Equal(LoginTokenProtocol.CapsLine, LoginTokenProtocol.FormatTokenLogin(issued!, "Local", Version));
 
-            (await mud.Db.ChangePassword("Far Traveler", "firstpw", "secondpw")).success.Should().BeTrue();
+            (await mud.Db.ChangePassword("Far Traveler", "firstpw-long", "secondpw")).success.Should().BeTrue();
 
             var (third, reconnects) = await PlayEndToEnd(mud, new[] { "L", "", "secondpw", "Y" });
             third.Outcome.Should().Be(OnlineAuthOutcome.Authenticated, third.Screen);
@@ -907,7 +907,7 @@ public class LoginTokenClient128Tests : IDisposable
             var renewed = OnlineLoginStore.Find(HostA, 4000)!.Token;
             renewed.Should().NotBeNull().And.NotBe(issued);
             TokenRows("Far Traveler").Should().Be(1);
-            AllFiles().Should().NotContain("firstpw").And.NotContain("secondpw");
+            AllFiles().Should().NotContain("firstpw-long").And.NotContain("secondpw");
         });
     }
 

@@ -1034,7 +1034,7 @@ public class MudServer
                     await WriteAnsiAsync(stream, $"{L("auth.reg_password")} ", isCp437);
                     password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
-                    if (password.Length < 4)
+                    if (password.Length < GameConfig.MinPasswordLength)
                     {
                         await WriteAnsiAsync(stream, $"{L("auth.err_password_len")}\r\n\r\n", isCp437);
                         continue;
@@ -1060,7 +1060,7 @@ public class MudServer
                     await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_password")} \u001b[0m", isCp437);
                     password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
-                    if (password.Length < 4)
+                    if (password.Length < GameConfig.MinPasswordLength)
                     {
                         await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.err_password_len")}\u001b[0m\r\n\r\n", isCp437);
                         continue;
