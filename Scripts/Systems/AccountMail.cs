@@ -61,6 +61,47 @@ namespace UsurperRemake.Systems
     }
 
     /// <summary>
+    /// 1.3.4: the website address the game's reset pointer names. The web sender writes world_state key 'mail_site'
+    /// (its SITE_URL, already checked) on each loop; the game checks it again by the same rule as the web side
+    /// (accountSiteUrl in web/ssh-proxy.js): http or https, a host and an optional port, nothing else (no path, not
+    /// even '/', no query, fragment or user part). A missing row or a value the rule refuses is the default site.
+    /// </summary>
+    public static class MailSite
+    {
+        public const string Key = "mail_site";
+        public const string Default = "https://usurper-reborn.net";
+        internal const int MaxLength = 300;
+        private static readonly System.Text.RegularExpressions.Regex Rule = new(
+            @"^https?://[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::[0-9]{1,5})?\z",
+            System.Text.RegularExpressions.RegexOptions.CultureInvariant);
+
+        /// <summary>The site as kept (trimmed, lower case), or null when the rule refuses the text.</summary>
+        public static string? Accept(string? raw)
+        {
+            if (raw == null) return null;
+            string s = raw.Trim();
+            if (s.Length == 0 || s.Length > MaxLength) return null;
+            foreach (char c in s)
+                if (c < 0x20 || c > 0x7e) return null;
+            s = s.ToLowerInvariant();
+            if (!Rule.IsMatch(s)) return null;
+            int colon = s.LastIndexOf(':');
+            if (colon > "https:".Length && (!int.TryParse(s.Substring(colon + 1), NumberStyles.None, CultureInfo.InvariantCulture, out int port) || port < 1 || port > 65535))
+                return null;
+            return s;
+        }
+
+        /// <summary>The accepted site, or the default.</summary>
+        public static string Resolve(string? raw) => Accept(raw) ?? Default;
+
+        /// <summary>The site from the server's database; any read failure is the default.</summary>
+        public static string Read(SqlSaveBackend? db) => Resolve(db?.ReadWorldStateText(Key));
+
+        /// <summary>The forgotten password page on a site.</summary>
+        public static string ForgotUrl(string site) => site + "/account/forgot";
+    }
+
+    /// <summary>
     /// 1.3.4 (S1): the one address rule, for every place an address is typed. Trimmed and lower case, at most 254
     /// characters, exactly one '@' with text on both sides, and no control character (CR and LF included) or other
     /// white space. The address is kept only in the players row (once confirmed) and in request rows.

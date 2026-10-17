@@ -4482,7 +4482,7 @@ async function handleAdminRequest(req, res) {
 // environment only (RESEND_API_KEY, MAIL_FROM) and are never logged, and neither is a token or an
 // address. It also serves POST /api/account/forgot, /api/account/reset and /api/account/verify for
 // the pages under web/account/. Everything it touches is passed in, so the tests run it with a fake
-// sender, a fake clock and no network.
+// sender, a fake clock and no network. SITE_URL (optional) is the site the links and the footer name.
 const ACCOUNT_MIN_PASSWORD_LENGTH = 8;            // GameConfig.MinPasswordLength (a test reads the C# value)
 const ACCOUNT_MAX_PASSWORD_LENGTH = 128;          // bounds the PBKDF2 work one request can ask for
 const ACCOUNT_RESET_TTL_MS = 30 * 60 * 1000;      // his choice PW-C
@@ -4499,7 +4499,11 @@ const ACCOUNT_BODY_MAX = 4096;
 const ACCOUNT_SEND_TIMEOUT_MS = 15000;
 const ACCOUNT_NAME_MAX = 64;                      // SqlSaveBackend.ResetNameMaxLength
 const ACCOUNT_ADDRESS_MAX = 254;                  // AccountEmail.MaxLength
-const ACCOUNT_SITE = 'https://usurper-reborn.net';
+const ACCOUNT_SITE = 'https://usurper-reborn.net';  // the default site, when SITE_URL is unset or not accepted
+// The site rule, the same as MailSite.IsValid in the game: http or https, a host, an optional port, and
+// nothing else (no path, not even '/', no query, fragment or user part).
+const ACCOUNT_SITE_RE = /^https?:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*(?::[0-9]{1,5})?$/;
+const ACCOUNT_SITE_MAX = 300;
 const ACCOUNT_LANGS = ['en', 'es', 'fr', 'hu', 'it'];
 const ACCOUNT_RESEND_HOST = 'api.resend.com';
 const ACCOUNT_RESEND_PATH = '/emails';
@@ -4540,6 +4544,18 @@ function accountMask(address) {
   let tld = dot > 0 ? domain.slice(dot) : '';
   if (tld.length > 10) tld = tld.slice(0, 10);
   return address[0] + '***@' + domain[0] + '***' + tld;
+}
+
+// SITE_URL: trimmed and lower case; the accepted form, or null when the rule refuses it.
+function accountSiteUrl(raw) {
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (t.length === 0 || t.length > ACCOUNT_SITE_MAX || /[^\x20-\x7e]/.test(t)) return null;
+  const s = t.toLowerCase();
+  if (!ACCOUNT_SITE_RE.test(s)) return null;
+  const port = s.match(/:([0-9]+)$/);
+  if (port && !(Number(port[1]) >= 1 && Number(port[1]) <= 65535)) return null;
+  return s;
 }
 
 // SqlSaveBackend.ResetRequestName: trimmed, lower case, no control characters, at most 64.
@@ -4644,7 +4660,7 @@ function accountReadBody(req, max) {
   });
 }
 
-// options: db (the writable game database or null), env (RESEND_API_KEY, MAIL_FROM), https, crypto,
+// options: db (the writable game database or null), env (RESEND_API_KEY, MAIL_FROM, SITE_URL), https, crypto,
 // isIP, hashGamePassword, loadStrings(lang) (a web/lang file as an object), now() in ms, log
 // (console-like), send(msg) to replace the Resend call (tests), tickMs.
 function createAccountMail(options) {
@@ -4658,6 +4674,12 @@ function createAccountMail(options) {
   const mailFrom = () => (typeof env.MAIL_FROM === 'string' ? env.MAIL_FROM.trim() : '');
   const configured = () => mailKey().length > 0 && mailFrom().length > 0;
   const send = options.send || ((msg) => accountResendSend(options.https, mailKey(), msg, ACCOUNT_SEND_TIMEOUT_MS));
+  // the site the links, the footer and the game's reset pointer name; read once, at start
+  const siteSet = typeof env.SITE_URL === 'string' && env.SITE_URL.trim().length > 0;
+  const site = (siteSet && accountSiteUrl(env.SITE_URL)) || ACCOUNT_SITE;
+  if (siteSet && !accountSiteUrl(env.SITE_URL)) {
+    log.warn('[account-mail] SITE_URL not accepted (http or https, a host and an optional port only); using ' + ACCOUNT_SITE);
+  }
   let timer = null;
   let busy = false;
   let webTablesReady = false;
@@ -4693,11 +4715,12 @@ function createAccountMail(options) {
   }
 
   // O3: '1' while the key and the sender address are set, '0' when not; the game treats a '1'
-  // under ten minutes old as on.
+  // under ten minutes old as on. 'mail_site' is the accepted site, for the game's reset pointer.
   function heartbeat() {
-    db.prepare(`INSERT INTO world_state (key, value, updated_at, updated_by) VALUES ('mail_enabled', ?, datetime('now'), 'usurper-web')
-      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`)
-      .run(configured() ? '1' : '0');
+    const up = db.prepare(`INSERT INTO world_state (key, value, updated_at, updated_by) VALUES (?, ?, datetime('now'), 'usurper-web')
+      ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at, updated_by = excluded.updated_by`);
+    up.run('mail_enabled', configured() ? '1' : '0');
+    up.run('mail_site', site);
   }
 
   // S3 retention, and the bounds on rows that wait.
@@ -4708,8 +4731,9 @@ function createAccountMail(options) {
     // a processed row loses its address at once, and its IP once it is past the hour the IP limit counts
     db.prepare("UPDATE mail_requests SET address = NULL WHERE status IN ('done', 'dropped') AND address IS NOT NULL").run();
     db.prepare("UPDATE mail_requests SET ip = '' WHERE status IN ('done', 'dropped') AND ip <> '' AND created_at <= ?").run(hourAgo);
-    // a request not sent within the hour (mail was off) is dropped, not sent late
-    db.prepare("UPDATE mail_requests SET status = 'dropped', address = NULL, processed_at = ? WHERE status = 'pending' AND created_at <= ?").run(ts, hourAgo);
+    // a request not sent within the hour (mail was off, or the sender was down) is dropped, not sent late
+    const stale = db.prepare("UPDATE mail_requests SET status = 'dropped', address = NULL, processed_at = ? WHERE status = 'pending' AND created_at <= ?").run(ts, hourAgo).changes;
+    if (stale > 0) log.info(`[account-mail] ${stale} row(s) dropped stale`);
     // a row claimed by a sender that stopped mid-send is dropped: it may have gone out already
     db.prepare("UPDATE mail_requests SET status = 'dropped', address = NULL, processed_at = ? WHERE status = 'sending' AND (processed_at IS NULL OR processed_at <= ?)")
       .run(ts, accountSqlTime(t - ACCOUNT_STUCK_MS));
@@ -4759,7 +4783,7 @@ function createAccountMail(options) {
 
   async function deliver(kind, lang, address, values) {
     const { s, en } = strings(lang);
-    const m = accountMailMessage(s, en, kind, values);
+    const m = accountMailMessage(s, en, kind, Object.assign({ site }, values));
     try {
       const r = await send({ from: mailFrom(), to: address, subject: m.subject, text: m.text, html: m.html });
       return !!(r && r.ok);
@@ -4803,7 +4827,7 @@ function createAccountMail(options) {
       db.prepare('INSERT INTO account_token_stamps (token_id, pw_stamp) VALUES (?, ?)').run(id, pwStamp(acct.password_hash));
     })();
     const ok = await deliver('reset_request', row.lang, acct.email,
-      { name: acct.username, link: ACCOUNT_SITE + '/account/reset#' + tok.token, minutes: ACCOUNT_RESET_TTL_MS / 60000 });
+      { name: acct.username, link: site + '/account/reset#' + tok.token, minutes: ACCOUNT_RESET_TTL_MS / 60000 });
     return ok ? 'done' : 'dropped';
   }
 
@@ -4828,7 +4852,7 @@ function createAccountMail(options) {
         .run(account, tok.hash, address, row.created_at || accountSqlTime(t), accountSqlTime(t + ACCOUNT_VERIFY_TTL_MS), row.ip || '');
     })();
     const ok = await deliver('verify', row.lang, address,
-      { name: acct.username, link: ACCOUNT_SITE + '/account/verify#' + tok.token, hours: ACCOUNT_VERIFY_TTL_MS / ACCOUNT_HOUR_MS });
+      { name: acct.username, link: site + '/account/verify#' + tok.token, hours: ACCOUNT_VERIFY_TTL_MS / ACCOUNT_HOUR_MS });
     return ok ? 'done' : 'dropped';
   }
 
@@ -4899,9 +4923,13 @@ function createAccountMail(options) {
 
   const langOf = (body) => (ACCOUNT_LANGS.includes(body.lang) ? body.lang : 'en');
   const INVALID = { error: 'invalid_link' };
+  // With mail off the three routes give this one answer, a state of the server and the same for
+  // every name and token: no row is written and no token is looked at or used.
+  const MAIL_OFF = [503, { error: 'mail_off' }];
 
   // 2.5: one reply for every input; a reset row like the game's, the same IP limit, no lookup.
   function forgot(req, body, t) {
+    if (!configured()) return MAIL_OFF;
     // text with '@' is an address: the S1 rule, up to 254 characters; other text is a name cut at 64
     const typed = typeof body.name === 'string' ? body.name : '';
     const name = typed.includes('@') ? (accountNormalizeAddress(typed) || '') : accountResetName(typed);
@@ -4924,6 +4952,7 @@ function createAccountMail(options) {
   // login ends, the MUD is asked to end the live sessions, the other reset tokens are void, and the
   // account's address is told.
   function reset(req, body, t) {
+    if (!configured()) return MAIL_OFF;
     const bad = passwordError(body.password);
     if (bad) return [400, { error: bad }];
     if (!gameTablesReady()) return [400, INVALID];
@@ -4958,6 +4987,7 @@ function createAccountMail(options) {
   // 2.4: the address is set when its link is used. Void when the account's address was changed or
   // removed after the request (D-e). G1: on another account, no change, a notice, the same reply.
   function verify(req, body, t) {
+    if (!configured()) return MAIL_OFF;
     if (!gameTablesReady()) return [400, INVALID];
     const tok = findToken(body.token, 'verify', t);
     if (!tok) return [400, INVALID];
@@ -5036,7 +5066,7 @@ function createAccountMail(options) {
     timer = null;
   }
 
-  return { tick, handle, start, stop, claim, configured };
+  return { tick, handle, start, stop, claim, configured, site };
 }
 // --- End Account Mail ---
 

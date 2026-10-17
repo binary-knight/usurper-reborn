@@ -101,13 +101,65 @@ public class AuthLinePointer_PwReset134Tests : IDisposable
     {
         await Setup("1");
         var raw = await AuthReply(Ip(90), "Real Name:wrong-pass-1:Steam:1.3.4");
-        string expected = $"{OldLine} {L("en", "auth.forgot_pointer")}";
+        string expected = $"{OldLine} {Loc.GetIn("en", "auth.forgot_pointer", Url)}";
         raw.Should().Be(expected + "\r\n", "the ERR line with the pointer, one line, and nothing else");
         expected.Should().EndWith(Url);
         expected.IndexOfAny(new[] { '\r', '\n' }).Should().Be(-1);
-        MudServer.WithForgotPointer("m", "hu").Should().Be("m " + L("hu", "auth.forgot_pointer"));
+        // 1.3.4 self-host: the key ends with the site's page as {0}; with no mail_site row it is the default site
+        MudServer.WithForgotPointer("m", "hu").Should().Be("m " + Loc.GetIn("hu", "auth.forgot_pointer", Url));
         foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
-            L(lang, "auth.forgot_pointer").Should().EndWith(" " + Url, lang);
+        {
+            L(lang, "auth.forgot_pointer").Should().EndWith(" {0}", lang);
+            Loc.GetIn(lang, "auth.forgot_pointer", Url).Should().EndWith(" " + Url, lang);
+        }
+    }
+
+    // ================= 1.3.4 self-host: the pointer names world_state mail_site =================
+
+    private void SetSite(string? value)
+    {
+        if (value == null)
+            AccountMailData_PwReset134Tests.Exec(_path, "DELETE FROM world_state WHERE key = 'mail_site';");
+        else
+            AccountMailData_PwReset134Tests.Exec(_path, "INSERT OR REPLACE INTO world_state (key, value, version, updated_at) VALUES ('mail_site', @v, 1, datetime('now'));", ("@v", value));
+    }
+
+    private static string PointerOn(string page) => $"{OldLine} {Loc.GetIn("en", "auth.forgot_pointer", page)}\r\n";
+
+    [Fact]
+    public async Task MailOn_ThePointer_NamesTheOperatorsSite()
+    {
+        await Setup("1");
+        SetSite("https://game.example.com:8443");
+        var raw = await AuthReply(Ip(110), "Real Name:wrong-pass-1:Steam:1.3.4");
+        raw.Should().Be(PointerOn("https://game.example.com:8443/account/forgot"));
+        raw.Should().NotContain("usurper-reborn.net");
+        SetSite("http://localhost:3000");
+        (await AuthReply(Ip(111), "Ghost Name:wrong-pass-1:Steam")).Should().Be(PointerOn("http://localhost:3000/account/forgot"));
+    }
+
+    [Fact]
+    public async Task MailOn_ABadOrMissingSiteRow_IsTheDefaultSite()
+    {
+        await Setup("1");
+        int n = 112;
+        foreach (var bad in new[] { "https://evil.example.com/account", "https://user@evil.example.com", "ftp://evil.example.com", "evil.example.com", "" })
+        {
+            SetSite(bad);
+            var raw = await AuthReply(Ip(n++), "Real Name:wrong-pass-1:Steam");
+            raw.Should().Be(PointerOn(Url), bad);
+            raw.Should().NotContain("evil", bad);
+        }
+        SetSite(null);
+        (await AuthReply(Ip(n++), "Real Name:wrong-pass-1:Steam")).Should().Be(PointerOn(Url), "no row");
+    }
+
+    [Fact]
+    public async Task MailOff_WithASiteRow_IsStillTheOldLine()
+    {
+        await Setup("0");
+        SetSite("https://game.example.com");
+        (await AuthReply(Ip(120), "Real Name:wrong-pass-1:Steam")).Should().Be(OldLine + "\r\n");
     }
 
     // ================= (b) mail off: the 1.3.3 line =================

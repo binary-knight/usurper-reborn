@@ -137,6 +137,35 @@ public class EmailMenu_PwReset134Tests : IDisposable
         src.Should().Contain("goto default; // mail off: E is any other key, as before 1.3.4");
     }
 
+    // ================= 1.3.4 self-host: the operator warning and the privacy line =================
+
+    [Fact]
+    public async Task Menu_WithNoAddress_SaysTheOperatorResets_AndShowsThePrivacyLine()
+    {
+        (await Db.RegisterPlayer("Bare", "bare-pass-12")).success.Should().BeTrue();
+        var bare = await Menu("Bare", "0");
+        foreach (var key in new[] { "email.none", "email.about" })
+            foreach (var row in L("en", key).Split('\n'))
+                bare.Should().Contain(row + "\n", key);
+        bare.Should().Contain(LoginScreen_PwReset134Tests.OperatorSentence + "\n");
+        bare.Should().NotContain("used only to reset a forgotten password", "the old line is replaced");
+
+        await Owner();
+        var owner = await Menu("Owner", "0");
+        foreach (var row in L("en", "email.about").Split('\n')) owner.Should().Contain(row + "\n", "the privacy line with an address too");
+        owner.Should().NotContain(LoginScreen_PwReset134Tests.OperatorSentence, "an account with an address");
+    }
+
+    [Fact]
+    public async Task Removal_SaysTheOperatorResets()
+    {
+        await Owner();
+        var removed = await Menu("Owner", "2", "owner-pass-1", "");
+        foreach (var row in L("en", "email.removed").Split('\n')) removed.Should().Contain(row + "\n");
+        removed.Should().Contain(LoginScreen_PwReset134Tests.OperatorSentence + "\n");
+        Db.GetAccountEmail("Owner").Email.Should().BeNull();
+    }
+
     [Fact]
     public void MenuRows_Fit79Columns_InEnglishAndHungarian()
     {
@@ -145,11 +174,14 @@ public class EmailMenu_PwReset134Tests : IDisposable
         {
             var rows = new List<string>
             {
-                L(lang, "email.title_visual"), L(lang, "email.current", longest), L(lang, "email.none"), L(lang, "email.about"),
+                L(lang, "email.title_visual"), L(lang, "email.current", longest),
                 "  [1] " + L(lang, "email.opt_change"), "  [2] " + L(lang, "email.opt_remove"),
                 L(lang, "email.new_prompt") + new string('x', 30), L(lang, "email.err_invalid"), L(lang, "email.change_note"),
-                L(lang, "email.removed"), L(lang, "email.failed"), "  [E] " + L(lang, "engine.menu_email"),
+                L(lang, "email.failed"), "  [E] " + L(lang, "engine.menu_email"),
             };
+            // 1.3.4 self-host: these texts have more than one row now (the operator warning, the privacy line)
+            foreach (var key in new[] { "email.none", "email.about", "email.removed" })
+                rows.AddRange(L(lang, key).Split('\n'));
             foreach (var row in rows)
                 row.Length.Should().BeLessOrEqualTo(79, $"[{lang}] {row}");
         }

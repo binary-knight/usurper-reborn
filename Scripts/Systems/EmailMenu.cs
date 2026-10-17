@@ -19,10 +19,9 @@ namespace UsurperRemake.Systems
             terminal.WriteLine("");
 
             var (_, email, _) = db.GetAccountEmail(username);
-            terminal.SetColor("white");
-            terminal.WriteLine(email != null ? Loc.Get("email.current", AccountEmail.Mask(email)) : Loc.Get("email.none"));
-            terminal.SetColor("gray");
-            terminal.WriteLine(Loc.Get("email.about"));
+            if (email != null) terminal.WriteLine(Loc.Get("email.current", AccountEmail.Mask(email)), "white");
+            else Rows(terminal, "email.none", "white");
+            Rows(terminal, "email.about", "gray");
             terminal.WriteLine("");
             WriteChoice(terminal, "1", Loc.Get("email.opt_change"));
             if (email != null) WriteChoice(terminal, "2", Loc.Get("email.opt_remove"));
@@ -72,10 +71,10 @@ namespace UsurperRemake.Systems
             switch (result)
             {
                 case SqlSaveBackend.EmailChangeResult.Removed:
-                    terminal.WriteLine(Loc.Get("email.removed"), "bright_green");
+                    Rows(terminal, "email.removed", "bright_green");
                     break;
                 case SqlSaveBackend.EmailChangeResult.NoAddress:
-                    terminal.WriteLine(Loc.Get("email.none"), "white");
+                    Rows(terminal, "email.none", "white");
                     break;
                 case SqlSaveBackend.EmailChangeResult.BadPassword:
                     terminal.WriteLine(Loc.Get("auth.err_current_password"), "red");
@@ -85,6 +84,12 @@ namespace UsurperRemake.Systems
                     break;
             }
             await terminal.PressAnyKey();
+        }
+
+        /// <summary>A text of one or more rows (split at '\n').</summary>
+        private static void Rows(TerminalEmulator terminal, string key, string color)
+        {
+            foreach (var row in Loc.Get(key).Split('\n')) terminal.WriteLine(row, color);
         }
 
         private static async Task Cancelled(TerminalEmulator terminal)

@@ -27,6 +27,7 @@
         return;
       }
       button.disabled = false;
+      if (r.data.error === 'mail_off') { button.hidden = true; intro.hidden = true; A.show('msg-mail-off'); return; }
       if (r.data.error === 'invalid_link') { invalid(); return; }
       A.show('msg-error');
     }, function () {

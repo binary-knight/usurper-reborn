@@ -808,7 +808,7 @@ public class MudServer
                         // 1.3.4: while this server sends mail, a wrong password or unknown name also gets the
                         // website reset address, on the same line (relay and desktop clients show the text after ERR:)
                         if (SqlSaveBackend.IsGenericLoginFailure(reason) && UsurperRemake.Systems.MailSwitch.IsOn(sqlBackend))
-                            message = WithForgotPointer(message);
+                            message = WithForgotPointer(message, null, UsurperRemake.Systems.MailSite.Read(sqlBackend));
                         await WriteLineAsync(stream, $"ERR:{message}");
                         client.Close();
                         return;
@@ -1209,9 +1209,10 @@ public class MudServer
     }
 
     /// <summary>1.3.4: a failed AUTH line login's message with the website reset address after it, in the language
-    /// the message itself uses (the AUTH line gives no language: the server's, as AuthenticatePlayer's text).</summary>
-    internal static string WithForgotPointer(string message, string? lang = null) =>
-        $"{message} {UsurperRemake.Systems.Loc.GetIn(string.IsNullOrEmpty(lang) ? GameConfig.Language : lang, "auth.forgot_pointer")}";
+    /// the message itself uses (the AUTH line gives no language: the server's, as AuthenticatePlayer's text). The
+    /// address is on <paramref name="site"/> (world_state mail_site, checked again here), or the default site.</summary>
+    internal static string WithForgotPointer(string message, string? lang = null, string? site = null) =>
+        $"{message} {UsurperRemake.Systems.Loc.GetIn(string.IsNullOrEmpty(lang) ? GameConfig.Language : lang, "auth.forgot_pointer", UsurperRemake.Systems.MailSite.ForgotUrl(UsurperRemake.Systems.MailSite.Resolve(site)))}";
 
     /// <summary>1.3.4: the one reply to a forgot password request, the same for every name.</summary>
     internal static List<string> ForgotReplyRows(string lang) => new()
@@ -1223,12 +1224,22 @@ public class MudServer
     /// <summary>
     /// 1.3.4 (1.4): after a registration at this menu, one optional address. Blank skips; a typo asks again (three
     /// tries); an address goes into a verify request, never into the players row. Either way the account is not
-    /// asked again at its first login. A dropped connection marks nothing, so the first login asks.
+    /// asked again at its first login. A dropped connection marks nothing, so the first login asks. Before the
+    /// question: that a forgotten password without an address needs the operator, and what the address is used for;
+    /// with no address added, that the operator will have to reset a forgotten password.
     /// </summary>
     private static async Task RegistrationEmailStepAsync(Stream stream, SqlSaveBackend sqlBackend, CancellationToken ct, string username,
         string? effectiveIp, string authLang, bool isPlainText, bool isCp437, bool echoInput)
     {
         string L(string key) => UsurperRemake.Systems.Loc.GetIn(authLang, key);
+        async Task Rows(string key, string ansi)
+        {
+            foreach (var row in L(key).Split('\n'))
+                await WriteAnsiAsync(stream, isPlainText ? $"{row}\r\n" : $"\u001b[{ansi}m  {row}\u001b[0m\r\n", isCp437);
+        }
+        await Rows("auth.reg_email_note", "0;37");
+        await Rows("email.about", "0;37");
+        bool added = false;
         for (int i = 0; i < 3; i++)
         {
             if (isPlainText)
@@ -1246,8 +1257,10 @@ public class MudServer
             }
             sqlBackend.RequestEmailVerify(username, typed, effectiveIp, authLang);
             await WriteAnsiAsync(stream, isPlainText ? $"{L("auth.reg_email_sent")}\r\n" : $"\u001b[1;32m  {L("auth.reg_email_sent")}\u001b[0m\r\n", isCp437);
+            added = true;
             break;
         }
+        if (!added) await Rows("auth.reg_email_skipped", "1;33");
         sqlBackend.MarkEmailPrompted(username);
     }
 

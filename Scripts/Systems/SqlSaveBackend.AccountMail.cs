@@ -104,6 +104,25 @@ namespace UsurperRemake.Systems
             }
         }
 
+        /// <summary>1.3.4: one world_state value as text (<see cref="MailSite"/>), or null when it is missing or cannot be read.</summary>
+        internal string? ReadWorldStateText(string key)
+        {
+            try
+            {
+                using var connection = OpenConnection();
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "SELECT value FROM world_state WHERE key = @key;";
+                cmd.Parameters.AddWithValue("@key", key);
+                var v = cmd.ExecuteScalar();
+                return v is string s ? s : null;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.Instance.LogWarning("SQL", $"world_state {key} not read: {ex.Message}");
+                return null;
+            }
+        }
+
         /// <summary>The name a reset request keeps: trimmed, lower case, no control characters, at most 64 characters.</summary>
         internal static string ResetRequestName(string? typed)
         {
