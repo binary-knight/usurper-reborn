@@ -36,6 +36,8 @@ public partial class TerminalEmulator
     private StringBuilder? _captureBuffer;
     public void StartCapture() => _captureBuffer = new StringBuilder();
     public string? StopCapture() { var result = _captureBuffer?.ToString(); _captureBuffer = null; return result; }
+    /// <summary>1.3.3: true while a capture runs (its text reaches group followers from the capture).</summary>
+    public bool IsCapturing => _captureBuffer != null;
 
     /// <summary>
     /// Show "-- More --" prompt and wait for keypress in BBS door mode.

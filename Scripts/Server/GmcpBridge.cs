@@ -266,6 +266,7 @@ public static class GmcpBridge
             mp       = m.Mana,
             maxMp    = m.MaxMana,
             isAlive  = m.IsAlive,
+            downed   = m.IsDowned,   // 1.3.3 party survival: at 0 HP but not dead (isAlive stays false)
             isPlayer = m.IsGroupedPlayer,
             isCompanion = m.IsCompanion,
             statuses = m.ActiveStatuses.Keys
@@ -311,7 +312,7 @@ public static class GmcpBridge
         var sb = new System.Text.StringBuilder();
         foreach (var m in safeParty)
         {
-            sb.Append($"{m.DisplayName}|{m.HP}|{m.MaxHP}|{m.Mana}|{m.MaxMana}|{m.IsAlive}|");
+            sb.Append($"{m.DisplayName}|{m.HP}|{m.MaxHP}|{m.Mana}|{m.MaxMana}|{m.IsAlive}|{m.IsDowned}|");
             foreach (var s in m.ActiveStatuses.Keys.Select(k => k.ToString()).OrderBy(k => k, System.StringComparer.Ordinal))
                 sb.Append(s).Append(',');
             sb.Append(';');

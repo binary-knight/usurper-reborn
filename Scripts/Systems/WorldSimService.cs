@@ -161,7 +161,7 @@ namespace UsurperRemake.Systems
             if (_tickCount % 10 == 0)
             {
                 var alive = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => n.IsAlive && !n.IsDead);
-                var dead = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => !n.IsAlive || n.IsDead);
+                var dead = NPCSpawnSystem.Instance.ActiveNPCs.Count(n => (!n.IsAlive || n.IsDead) && !n.IsDowned);   // 1.3.3
                 DebugLogger.Instance.LogDebug("WORLDSIM", $"Tick {_tickCount}: {alive} alive, {dead} dead NPCs");
             }
 

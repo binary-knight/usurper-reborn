@@ -1,8 +1,9 @@
 ---
 title: The Old Church
 path: /wiki/en/world/church/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/ChurchLocation.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/RelationshipSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | Church blessing lines no longer promise a number of days.
 history: 1.2.5 | Church screens and the Electron Church menu are shown in all five languages, and a long refused marriage message wraps at 79 columns.
 ---

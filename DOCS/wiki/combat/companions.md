@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Locations/PrisonLocation.cs, Scripts/Locations/MusicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Core/Character.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | A companion at 0 HP in a fight is Downed and dies only when a monster finishes it or when, still standing, it takes a killing blow in your place; leaving it to die now means holding a healing potion and not rescuing it while it is Downed.
 history: 1.3.2 | Companions regain stamina and mana at the end of each round, and when your gold does not cover every entry fee only the NPCs you cannot pay for stay at the dungeon entrance.
 history: 1.3.0 | Companions remember a murder they witness and a companion left to die: after a warning the least loyal one leaves, handing back its gear, and forgiveness in the Temple's Faith room brings it back.
 history: 1.2.5 | Companion descriptions, romance milestones, quest history and last words are shown in all five languages.
@@ -79,13 +80,13 @@ Before the quest, each companion has two story scenes, in order, on any floor at
 
 ## When a companion dies
 
-A companion who falls in a fight is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
+A companion at 0 HP in a fight is Downed, not dead: it stays in the party until you rescue it, a monster finishes it, or the fight ends and it stands up again with half its maximum HP (see [Downed allies](/wiki/en/combat/party/#downed-allies)). A companion that a monster finishes is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
 
-If a companion was below half HP at the start of your turn, you did not use your turn to aid an ally, and you held a usable healing potion or a heal you could cast, its death also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
+If a companion was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
 
 ### A companion who dies for you
 
-When a monster's blow would kill you and a companion is in the fight, an active companion may take the blow and die in your place; you live with 1 HP. Aldric can always do it: his chance is his loyalty, and above loyalty 50 it is certain. Any other companion needs loyalty 90 or more, with a chance equal to its loyalty. A romance above 5 adds 30 to the chance.
+When a monster's blow would kill you and a companion is in the fight, an active companion may take the blow and die in your place; you live with 1 HP. Only a companion standing in the fight can, never a Downed one, and it dies at once: a sacrifice is never a down. Aldric can always do it: his chance is his loyalty, and above loyalty 50 it is certain. Any other companion needs loyalty 90 or more, with a chance equal to its loyalty. A romance above 5 adds 30 to the chance.
 
 ### Aldric and your Darkness
 
@@ -161,7 +162,7 @@ An active Dire Wolf or Storm Eagle joins your party each time you enter the dung
 
 Each Storm Eagle hit adds lightning damage of a tenth of the hit and has a 15 percent chance to stun the target for 1 round.
 
-A fighting beast is never lost. After each fight it is back at full HP, and if it falls in a fight it is back at full HP the next time you enter the dungeon. Each won fight gives it a twentieth of your share of the fight's experience, at least 5, and it needs 50 times its level to gain a level. Passive beasts never gain levels.
+A fighting beast is never lost. At 0 HP it is Downed like any ally. After each fight it is back at full HP, and if a monster finishes it in a fight it is back at full HP the next time you enter the dungeon. Each won fight gives it a twentieth of your share of the fight's experience, at least 5, and it needs 50 times its level to gain a level. Passive beasts never gain levels.
 
 Sylvana's Miracle calls a Dire Wolf at your own level for one fight, with the same scaling: see [Miracles](/wiki/en/gods/miracles/).
 

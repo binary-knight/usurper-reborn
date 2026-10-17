@@ -1316,7 +1316,7 @@ namespace UsurperRemake.Systems
                     Name = npc.Name2 ?? npc.Name1,
                     Archetype = npc.Archetype ?? "citizen",
                     Level = npc.Level,
-                    HP = npc.HP,
+                    HP = npc.IsDowned ? Math.Max(1, npc.HP) : npc.HP,   // 1.3.3: a Downed ally is saved alive, never as a death
                     MaxHP = npc.MaxHP,
                     BaseMaxHP = npc.BaseMaxHP > 0 ? npc.BaseMaxHP : npc.MaxHP,  // Fallback to MaxHP if BaseMaxHP not set
                     BaseMaxMana = npc.BaseMaxMana > 0 ? npc.BaseMaxMana : npc.MaxMana,  // Fallback to MaxMana if BaseMaxMana not set

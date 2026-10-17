@@ -480,9 +480,12 @@ public class CombatEvents126Tests
     [Fact]
     public async Task ATeammateWhoFalls_IsCountedOnce()
     {
+        // 1.3.3 party survival: a fall is a finish. Predator brutes down the ally, announce and finish it.
         var frail = Mate("Frail Ally", 3);
+        var a = Brute("Brute A", 1500); a.FamilyName = "Beast";
+        var b = Brute("Brute B", 1500); b.FamilyName = "Beast";
         var f = await Run(NewFight(Attacks(60)), e => e.PlayerVsMonsters(Hero(hp: 5000),
-            new List<Monster> { Brute("Brute A", 1500), Brute("Brute B", 1500) },
+            new List<Monster> { a, b },
             new List<Character> { frail }, offerMonkEncounter: false));
         f.Error.Should().BeNull("{0}", f.Transcript);
         frail.IsAlive.Should().BeFalse(f.Transcript);

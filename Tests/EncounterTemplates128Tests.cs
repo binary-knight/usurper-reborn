@@ -40,9 +40,12 @@ public class EncounterTemplates128Tests
         ["30,30,1"] = "Sprite/Fey/30/War Hammer/Splint Mail",
         ["30,30,2"] = "Shadow/Shadow/30/War Hammer/Full Plate|Shadow/Shadow/30/Steel Longsword/Plate Armor",
         ["30,30,3"] = "Orc Warrior/Orcish/30/Steel Longsword/Splint Mail|Shadow/Shadow/30/War Hammer/Banded Mail|Sea Troll/Aquatic/30/Steel Longsword/Plate Armor",
-        ["30,30,4"] = "Dire Wolf/Beast/30/Steel Longsword/Banded Mail|Dire Wolf/Beast/30/War Hammer/Banded Mail|Dire Wolf/Beast/30/Halberd/Splint Mail",
-        ["30,30,5"] = "Phase Spider/Insectoid/30/Greatsword/Plate Armor",
-        ["30,30,6"] = "Sea Troll/Aquatic/30/Greatsword/Banded Mail|Dire Wolf/Beast/30/War Hammer/Banded Mail",
+        // 1.3.3: the group size grows each floor from 25, which changes these draws
+        ["30,30,4"] = "Dire Wolf/Beast/30/Steel Longsword/Banded Mail|Dire Wolf/Beast/30/War Hammer/Banded Mail|Dire Wolf/Beast/30/Halberd/Splint Mail|Dire Wolf/Beast/30/Greatsword/Banded Mail",
+        // 1.3.3: the group size grows each floor from 25, which changes these draws
+        ["30,30,5"] = "Phase Spider/Insectoid/30/Greatsword/Plate Armor|Phase Spider/Insectoid/30/Halberd/Plate Armor",
+        // 1.3.3: the group size grows each floor from 25, which changes these draws
+        ["30,30,6"] = "Sea Troll/Aquatic/30/Greatsword/Banded Mail|Dire Wolf/Beast/30/War Hammer/Banded Mail|Orc Warrior/Orcish/30/Halberd/Plate Armor",
         ["30,30,7"] = "Goblin Champion/Goblinoid/30/Halberd/Plate Armor|Goblin Champion/Goblinoid/30/Greatsword/Full Plate|Goblin Champion/Goblinoid/30/Greatsword/Splint Mail",
         ["30,30,8"] = "Drake/Draconic/30/Halberd/Splint Mail",
         ["61,61,1"] = "Treant/Fey/61/Mythril Axe/Mythril Armor|Treant/Fey/61/Enchanted Blade/Dragonscale Mail|Treant/Fey/61/Enchanted Blade/Mythril Armor",

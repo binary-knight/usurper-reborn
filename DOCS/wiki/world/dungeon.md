@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | From monster level 25 monster groups grow a little with each level and monsters have more HP and hit harder, so the deep floors are built for a full team of five.
 history: 1.3.2 | Floors keep their outposts and special rooms, and dungeon entry names a saved party member who is dead.
 history: 1.3.0 | Rooms you cleared stay cleared after a disconnect, a reconnect or a save taken on the floor, floors 4 to 10 mix monster families in groups of up to three, and elite monsters appear from floor 3.
 history: 1.2.5 | Monster names in rooms and group summaries and the dungeon merchant's wares are shown in each player's language, and long dungeon rows wrap at 79 columns.

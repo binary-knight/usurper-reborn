@@ -86,6 +86,20 @@ internal static partial class RecruitPoolRuns
         if (!rig.Result.Teammates.Contains(ally)) rig.Result.Teammates.Add(ally);
     }
 
+    /// <summary>1.3.3 party survival: the killing blow downs the ally (it stays in the party at 0 HP); the death,
+    /// and with it H3, comes at a predator's finish one round after its announce.</summary>
+    private static void FinishTheDowned(WardFightRig rig, NPC ally)
+    {
+        ally.IsDowned.Should().BeTrue("a blow at 0 HP downs an ally in scope");
+        ally.IsDead.Should().BeFalse("a down is not a death");
+        rig.Result.Teammates.Should().Contain(ally);
+        var wolf = new Monster { Name = "Wolf", Level = 8, HP = 500, MaxHP = 500, FamilyName = "Beast", IsActive = true };
+        rig.Result.CurrentRound = 1;
+        rig.Engine.TryFinishOrAnnounce(wolf, rig.Result).GetAwaiter().GetResult().Should().BeTrue("the announce");
+        rig.Result.CurrentRound = 2;
+        rig.Engine.TryFinishOrAnnounce(wolf, rig.Result).GetAwaiter().GetResult().Should().BeTrue("the finish");
+    }
+
     /// <summary>What H3 shows for the fall: caught (banner, caught row, no scene, no row of loss) or
     /// permanent (banner, the scene in order, no caught row).</summary>
     private static void TheFallIsAsTheOathMarkSays(string outcome, string shown, NPC ally, FixedRandom roll, WardFightRig rig)
@@ -170,6 +184,8 @@ internal static partial class RecruitPoolRuns
             // with it the same blow is the killing one
             Blow(true, plain + 1, out var rig, out var roll);
             ally.HP.Should().Be(0, "the commanded blow deals {0}, the plain one {1}", commanded, plain);
+            roll.Doubles.Should().Be(0, "1.3.3: a down rolls no permadeath");
+            FinishTheDowned(rig, ally);
             TheFallIsAsTheOathMarkSays(outcome, rig.Shown(), ally, roll, rig);
             return "ok";
         }
@@ -221,6 +237,8 @@ internal static partial class RecruitPoolRuns
 
             // with it: the line of the poison, then its tick fells the NPC
             var rig = Turn(true, out var roll);
+            roll.Doubles.Should().Be(0, "1.3.3: a down rolls no permadeath");
+            FinishTheDowned(rig, ally);
             string shown = rig.Shown();
             Times(shown, Loc.Get("combat.companion_afflicted", ally.DisplayName, "Poisoned").Trim()).Should().Be(1, shown);
             ally.HP.Should().Be(0);

@@ -298,7 +298,9 @@ public partial class CombatEngine
     private void EvHurt(Character target, long amount, CombatEventKind kind)
     {
         if (_eventTally == null || target == null) return;
-        bool fell = Fell(target);
+        // 1.3.3 party survival: a down is not a loss. An ally in scope falls (teammates_lost) only at a
+        // finish or a sacrifice (EvFall); the player and out of scope teammates fall here as before.
+        bool fell = !(SideOf(target) == CombatSide.Team && IsDownable(target)) && Fell(target);
         if (amount <= 0 && !fell) return;
         RaiseCombatEvent(new CombatEvent(CombatSide.Monster, SideOf(target), Math.Max(0, amount), kind, TargetFell: fell));
     }

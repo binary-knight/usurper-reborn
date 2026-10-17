@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
 history: 1.3.2 | Class combat bonuses, divine damage bonuses, the Blood Price cut and the world boss Boss Slayer bonus apply on your swings, a monster's Thorns costs a melee attacker a quarter of the damage dealt, and every party member regains stamina and mana at round end.
 history: 1.3.0 | Your physical attacks on monsters roll a twenty-sided die to hit and show the roll and the number needed, and a dual-wielder's swings each use the weapon in their own hand.
 history: 1.2.7 | A monster's critical hit line no longer leaves an empty gap where a damage number used to be.
@@ -161,6 +162,10 @@ Rage lasts 5 rounds: the Strength and level part of your basic swing and Power A
 ### Defend (D)
 
 Defend halves every monster basic attack on you for the rest of the round, rounded up. It does not halve a monster's special ability. While you defend, monsters are more likely to pick you over your allies (see [who monsters attack](/wiki/en/combat/groups/#who-monsters-attack)).
+
+### Rescue (U)
+
+An ally at 0 HP in a fight (a companion, NPC ally, spouse, lover or fighting beast) is Downed, not dead. U spends one healing potion from your belt to lift a Downed ally: it stands again with the HP your healing potion would give it, and a finish a monster announced on it is called off. With two or more allies Downed you pick which one. U is in the menu only while an ally is Downed and you hold a healing potion, and only for the player leading the fight. In an Old God fight a rescue waits for the potion cooldown and starts it, as a potion does. A rescue counts as healing an ally for a god's deeds.
 
 ## When a monster attacks you
 

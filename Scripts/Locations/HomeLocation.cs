@@ -4463,7 +4463,7 @@ public class HomeLocation : BaseLocation
                 var npc = NPCSpawnSystem.ResolvePartnerNpc(allWorldNPCs, spouse.NPCId, spouse.NPCName);
 
                 // Check IsDead (permanent death) OR !IsAlive (currently at 0 HP)
-                if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsAgedDeath && !npc.IsPermaDead)
+                if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsDowned && !npc.IsAgedDeath && !npc.IsPermaDead)   // 1.3.3: not Downed in a fight
                 {
                     deadMembers.Add(npc);
                 }
@@ -4475,7 +4475,7 @@ public class HomeLocation : BaseLocation
 
                 // Check IsDead (permanent death) OR !IsAlive (currently at 0 HP)
                 // Skip aged death and permadead NPCs (matching spouse path guards)
-                if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsAgedDeath && !npc.IsPermaDead && !deadMembers.Contains(npc))
+                if (npc != null && (npc.IsDead || !npc.IsAlive) && !npc.IsDowned && !npc.IsAgedDeath && !npc.IsPermaDead && !deadMembers.Contains(npc))
                 {
                     deadMembers.Add(npc);
                 }

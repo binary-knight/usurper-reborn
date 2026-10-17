@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.3.2";
+    public const string Version = "1.3.3";
     public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -209,6 +209,14 @@ public static partial class GameConfig
     /// reproduce the flat heal. Off or on, a potion draws the same random number.
     /// </summary>
     public static bool ScaledPotionsEnabled { get; internal set; } = true;
+
+    /// <summary>
+    /// 1.3.3: the held pause of UIHelper.MomentOfSilence (a companion's death scene and the other story beats
+    /// that call it). Default on. The setter is internal: it is not a sysop setting; tests and the balance
+    /// simulator turn it off so a fight does not wait on the clock. Off, the screen still clears and nothing
+    /// else changes; no random number is drawn either way.
+    /// </summary>
+    public static bool MomentOfSilenceEnabled { get; internal set; } = true;
 
     /// <summary>
     /// 1.2.8 difficulty pass: monsters choose their special ability with MonsterTactics (no wasted pick,
@@ -2269,6 +2277,14 @@ public static partial class GameConfig
     // (maintainer decision: a modest ramp, a warning rather than a wall; defence is not scaled).
     public const int OldGodApproachFloors = 5;
     public const double OldGodApproachStepPerFloor = 0.05;
+
+    /// <summary>1.3.3: deep monster HP by level, as (level, factor) waypoints joined by straight lines; 1.0 up to
+    /// level 25 and never lower deeper, so from floor 25 the dungeon is built for a full team of five.</summary>
+    public static readonly (int Level, double Factor)[] DeepMonsterHpRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (100, 1.66) };
+
+    /// <summary>1.3.3: deep monster Strength, punch and weapon power by level, waypoints as DeepMonsterHpRamp;
+    /// it climbs further than HP so the risk of dying grows with depth.</summary>
+    public static readonly (int Level, double Factor)[] DeepMonsterDamageRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (75, 1.715), (100, 2.1) };
     public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses
