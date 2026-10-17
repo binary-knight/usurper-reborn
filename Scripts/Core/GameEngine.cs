@@ -619,6 +619,8 @@ public partial class GameEngine
 
             if (UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode)
                 WriteMenuKey("P", Loc.Get("engine.menu_change_password"));
+            if (EmailMenuShown())
+                WriteMenuKey("E", Loc.Get("engine.menu_email"));
             if (isSysOp || isOnlineAdmin)
                 WriteMenuKey("%", isSysOp ? Loc.Get("engine.menu_sysop_console") : Loc.Get("engine.menu_admin_console"));
             terminal.SetColor("darkgray");
@@ -765,6 +767,16 @@ public partial class GameEngine
                     return;
                 }
                 break;
+
+            case "E":
+                // 1.3.4: the account's email address, on a game server while it sends mail
+                if (EmailMenuShown() && SaveSystem.Instance.Backend is SqlSaveBackend emailDb)
+                {
+                    await EmailMenu.RunAsync(terminal, emailDb, accountName, ctx0?.RemoteIP);
+                    await RunBBSDoorMode();
+                    return;
+                }
+                goto default; // mail off: E is any other key, as before 1.3.4
 
             case "%":
                 if (isSysOp || (isOnlineAdmin && UsurperRemake.BBS.DoorMode.IsInDoorMode))
@@ -1938,6 +1950,11 @@ public partial class GameEngine
         var adminConsole = new OnlineAdminConsole(terminal, sqlBackend);
         await adminConsole.Run();
     }
+
+    /// <summary>1.3.4: E (email address) is on the character screen of a game server (not a BBS door) while it sends mail.</summary>
+    private static bool EmailMenuShown() =>
+        UsurperRemake.BBS.DoorMode.IsOnlineMode && !UsurperRemake.BBS.DoorMode.IsInDoorMode
+        && MailSwitch.IsOn(SaveSystem.Instance.Backend as SqlSaveBackend);
 
     /// <summary>
     /// Change password screen - accessible from character selection in online mode.
