@@ -1,8 +1,9 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/DungeonLocation.cs
+history: 1.3.4 | Probability Shift now keeps the monster from scoring critical hits and makes 30 percent of its normal attacks that would hit you or an ally miss, in place of confusing and slowing it.
 history: 1.3.3 | Poison, bleeding or another status that takes a companion or NPC ally to 0 HP leaves it Downed, not dead.
 history: 1.3.2 | A Cleric's Purify cures a poisoned or diseased party member, and an Assassin's landed melee hit has a 5 percent chance to poison a monster for 3 rounds.
 history: 1.3.0 | An elite monster with the Venomous trait can poison with its blows, and the lines that say you cannot act name the status in your language.

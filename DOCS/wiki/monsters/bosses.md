@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.4 | Doom starts at Aurelion, Shadow Incarnate's message says Manwe heals, and Manwe's named abilities follow the difficulty, Shield Wall Formation, a failed flee, Divine Mandate and Death's Embrace.
 history: 1.3.3 | From floor 25 floor bosses have more HP and hit harder and bring more escorts as the floor's groups grow, and every boss can finish a Downed ally.
 history: 1.3.2 | Dispel Evil on an enraged boss takes back its enrage, floors keep their secret boss rooms, and Boss Slayer gear adds its damage against bosses and mini bosses.
 history: 1.2.5 | Boss names, titles, world boss elements and Old God ability names are shown in the player's language, and Old God names on the wiki come in all five languages.
