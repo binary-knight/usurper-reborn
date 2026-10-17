@@ -22,6 +22,7 @@ public partial class OwnerProcessConflictTests : IDisposable
     private readonly string _path = Path.Combine(Path.GetTempPath(), $"usurper-owner3-{Guid.NewGuid():N}.db");
     private readonly SqlSaveBackend _db;
     private readonly List<NPC> _rosterBefore;
+    private readonly King? _kingBefore;   // 1.3.4 (F10): the court tests load a stored king through OnlineStateManager
     private readonly List<NPCMarriageData> _registryBefore;
     private readonly object? _instanceBefore;
 
@@ -38,6 +39,7 @@ public partial class OwnerProcessConflictTests : IDisposable
     {
         _db = new SqlSaveBackend(_path);
         _rosterBefore = NPCSpawnSystem.Instance.ActiveNPCs.ToList();
+        _kingBefore = CastleLocation.GetCurrentKing();
         NPCSpawnSystem.Instance.ActiveNPCs.Clear();
         _registryBefore = NPCMarriageRegistry.Instance.GetAllMarriages();
         NPCMarriageRegistry.Instance.RestoreMarriages(null);
@@ -56,6 +58,7 @@ public partial class OwnerProcessConflictTests : IDisposable
         FallbackInstance.SetValue(null, _instanceBefore);
         WorldEditLog.OwnerOverride = null;
         OnlineStateManager.NoteRosterRestored(null);
+        CastleLocation.SetKing(_kingBefore!);
         SqliteConnection.ClearAllPools();
         try { File.Delete(_path); } catch { }
     }
