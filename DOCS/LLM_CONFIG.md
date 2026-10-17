@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: Scripts/Server/MudServer.cs, DOCS/release-notes/RELEASE_NOTES_1.0.3.md -->
+<!-- doc: historical -->
 # LLM Moments: Sysop Configuration
 
 LLM moments were removed in 1.0.3. The game no longer contacts any language model service in any
