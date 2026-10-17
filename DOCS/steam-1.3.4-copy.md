@@ -42,6 +42,7 @@ DOCS/release-notes.
 [*]Probability Shift, Echo of Tomorrow and Paradox Collapse now do what their text says.
 [*]Doom starts at Aurelion. The four earlier Old Gods and the betrayal fight no longer apply it.
 [*]Manwe's named abilities now respect your difficulty setting, Shield Wall Formation, flee guarding, Divine Mandate and Death's Embrace.
+[*]On the online server, permanent death is off for a few weeks while the new difficulty curves are measured.
 [/list]
 
 [h2]Next[/h2]
