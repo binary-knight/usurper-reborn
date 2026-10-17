@@ -145,4 +145,136 @@ public class ManwePipeline134Tests
         }
         compared.Should().BeGreaterThan(3, "enough swings must land for the pin to mean anything");
     }
+
+    // ---------- Manwe's named abilities through the wrapper ----------
+
+    private const long Raw = 30_000;   // Light Incarnate: 3 x an attack of 10,000, less Defence 0
+
+    private static async Task<(Character hero, Monster god, CombatResult result)> Manwe(string ability = "Light Incarnate",
+        DifficultyMode mode = DifficultyMode.Normal, long attack = 10_000, long hp = 100_000, int round = 5, bool solo = true,
+        Action<Character>? setup = null, long godHp = 10_000_000)
+    {
+        var before = DifficultySystem.CurrentDifficulty;
+        var held = OldGodBuild134Support.SetArtifacts(0);   // no Worldstone
+        DifficultySystem.CurrentDifficulty = mode;
+        try
+        {
+            var hero = Hero(hp);
+            setup?.Invoke(hero);
+            var engine = Engine(hero);
+            Party(engine, solo);
+            var god = God("Manwe", attack);
+            god.HP = godHp;
+            var result = new CombatResult { CurrentRound = round };
+            bool handled = await (Task<bool>)typeof(CombatEngine).GetMethod("TryManweBossAbility", F)!
+                .Invoke(engine, new object?[] { god, hero, ability, result, new List<Monster> { god } })!;
+            handled.Should().BeTrue();
+            return (hero, god, result);
+        }
+        finally
+        {
+            DifficultySystem.CurrentDifficulty = before;
+            OldGodBuild134Support.RestoreArtifacts(held);
+        }
+    }
+
+    private static long Taken(Character hero) => hero.MaxHP - hero.HP;
+
+    [Fact]
+    public async Task OnNormal_LightIncarnate_DealsItsRawDamage()
+    {
+        var (hero, _, result) = await Manwe();
+        Taken(hero).Should().Be(Raw);
+        result.CombatLog.Should().Contain($"Manwe uses Light Incarnate for {Raw} damage", "the log reports the damage dealt");
+    }
+
+    [Theory]
+    [InlineData(DifficultyMode.Easy, 22_500)]
+    [InlineData(DifficultyMode.Hard, 37_500)]
+    [InlineData(DifficultyMode.Nightmare, 45_000)]
+    public async Task TheDifficulty_ScalesManwesAbilities(DifficultyMode mode, long expected)
+    {
+        var (hero, _, _) = await Manwe(mode: mode);
+        Taken(hero).Should().Be(expected, $"{mode} multiplies monster damage");
+    }
+
+    private static void Wall(Character c) { c.TempDamageReductionPercent = 30; c.TempDamageReductionDuration = 3; }
+
+    [Fact]
+    public async Task ShieldWallFormation_LowersManwesAbilities_ByItsPercent()
+    {
+        var (hero, _, result) = await Manwe(setup: Wall);
+        Taken(hero).Should().Be(Raw - Raw * 30 / 100);
+        result.CombatLog.Should().Contain($"Manwe uses Light Incarnate for {Raw - Raw * 30 / 100} damage", "the ability reports the damage dealt");
+    }
+
+    [Fact]
+    public async Task DivineMandate_ReflectsItsPercent_ToManwe()
+    {
+        var (hero, god, _) = await Manwe(setup: c => { c.TempThornReflectPercent = 15; c.TempThornReflectDuration = 3; });
+        Taken(hero).Should().Be(Raw);
+        god.HP.Should().Be(10_000_000 - Raw * 15 / 100);
+    }
+
+    [Fact]
+    public async Task AFailedFlee_HalvesManwesAbility()
+    {
+        var (hero, _, _) = await Manwe(setup: c => c.FleeGraceThisRound = true);
+        Taken(hero).Should().Be(Raw / 2);
+    }
+
+    [Fact]
+    public async Task DeathsEmbrace_Revives_OnLethalAbilityDamage()
+    {
+        var (hero, _, _) = await Manwe(hp: 1_000, setup: c => c.DeathsEmbraceActive = true);
+        hero.HP.Should().Be(15_000, "Death's Embrace revives at 15 percent of max HP");
+        hero.DeathsEmbraceActive.Should().BeFalse();
+        var (control, _, _) = await Manwe(hp: 1_000);
+        control.HP.Should().Be(0, "without Death's Embrace the blow is lethal");
+    }
+
+    [Fact]
+    public async Task DeathsEmbrace_Revives_FromCreationsEndsKill()
+    {
+        var (hero, _, _) = await Manwe("Creation's End", hp: 10_000, setup: c => c.DeathsEmbraceActive = true);
+        hero.HP.Should().Be(15_000, "the kill takes HP to 0, and Death's Embrace revives \"if HP reaches 0\"");
+        hero.DeathsEmbraceActive.Should().BeFalse();
+        var (control, _, _) = await Manwe("Creation's End", hp: 10_000);
+        control.HP.Should().Be(0, "without Death's Embrace or the Worldstone the kill stands");
+    }
+
+    [Fact]
+    public async Task TheSoloAdjustment_StaysSkipped_OnManwe()
+    {
+        var (solo, _, _) = await Manwe(solo: true);
+        var (party, _, _) = await Manwe(solo: false);
+        Taken(solo).Should().Be(Raw, "Manwe's own abilities skip the solo adjustment");
+        Taken(party).Should().Be(Taken(solo));
+    }
+
+    [Fact]
+    public async Task RoundOne_IsCappedAt85Percent_NotTheFirstRoundsCap()
+    {
+        var (hero, _, _) = await Manwe(attack: 40_000, round: 1);
+        Taken(hero).Should().Be(85_000, "the cap on Manwe's own abilities is 85 percent of max HP from the first round");
+        var (later, _, _) = await Manwe(attack: 40_000, round: 5);
+        Taken(later).Should().Be(85_000);
+    }
+
+    [Fact]
+    public async Task ShadowIncarnate_HealsManwe_30PercentOfTheDamageDealt()
+    {
+        var (hero, god, result) = await Manwe("Shadow Incarnate", setup: Wall, godHp: 5_000_000);
+        long dealt = 20_000 - 20_000 * 30 / 100;   // 2 x 10,000, then Shield Wall Formation
+        Taken(hero).Should().Be(dealt);
+        god.HP.Should().Be(5_000_000 + dealt * 30 / 100);
+        result.CombatLog.Should().Contain($"Manwe uses Shadow Incarnate: {dealt} damage, heals {dealt * 30 / 100}");
+    }
+
+    [Fact]
+    public async Task Invulnerable_StillBlocksManwesAbility()
+    {
+        var (hero, _, _) = await Manwe(setup: c => c.ApplyStatus(StatusEffect.Invulnerable, 2));
+        hero.HP.Should().Be(100_000);
+    }
 }
