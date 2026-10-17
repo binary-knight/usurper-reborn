@@ -5237,12 +5237,9 @@ function handleHttpRequest(req, res) {
   } else if (req.method === 'GET') {
     // Static file serving for HTML pages and assets (index, dashboard, balance, admin, lang/*.json)
     const MIME_TYPES = { '.html': 'text/html', '.css': 'text/css', '.js': 'application/javascript', '.json': 'application/json', '.png': 'image/png', '.ico': 'image/x-icon' };
-    let filePath = req.url.split('?')[0];
-    if (filePath === '/') filePath = '/index.html';
-    if (!path.extname(filePath)) filePath += '.html';
-    // Resolve path safely — allow lang/ subdirectory but prevent directory traversal
-    const resolved = path.resolve(__dirname, '.' + filePath);
-    if (!resolved.startsWith(path.resolve(__dirname))) {
+    // 1.3.4: staticFilePath (a folder's index.html for the account pages; nothing outside the web folder)
+    const resolved = staticFilePath(__dirname, req.url, fs);
+    if (!resolved) {
       res.writeHead(403);
       res.end('{"error":"forbidden"}');
     } else if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
@@ -5765,6 +5762,28 @@ function startDiscordBridge() {
 }
 
 // --- HTTP + WebSocket Server ---
+// --- Static path (1.3.4) ---
+// The file a GET path names under the web folder: "/" is index.html; a path with no extension is that
+// folder's index.html when it exists (the /account/forgot, /account/reset and /account/verify pages), else
+// the path plus .html. The path is percent-decoded once; a bad encoding, a NUL, a backslash or a result
+// outside the web folder gives null (the caller answers 403).
+function staticFilePath(root, url, fsx) {
+  let p;
+  try { p = decodeURIComponent(String(url).split('?')[0]); } catch { return null; }
+  if (p.includes('\0') || p.includes('\\')) return null;
+  if (p === '/') p = '/index.html';
+  const base = path.resolve(root);
+  const inside = (f) => f.startsWith(base + path.sep);
+  if (!path.extname(p)) {
+    const folderIndex = path.resolve(base, '.' + p, 'index.html');
+    if (inside(folderIndex) && fsx.existsSync(folderIndex) && fsx.statSync(folderIndex).isFile()) return folderIndex;
+    p += '.html';
+  }
+  const f = path.resolve(base, '.' + p);
+  return inside(f) ? f : null;
+}
+// --- End static path ---
+
 const httpServer = http.createServer(handleHttpRequest);
 // v0.65.8 (audit T2 ops): cap WS frames at 64 KB -- terminal keystrokes are
 // tiny; an unbounded maxPayload lets one client buffer-bomb the proxy.
