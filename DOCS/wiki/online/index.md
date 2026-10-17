@@ -1,8 +1,9 @@
 ---
 title: The online world
 path: /wiki/en/online/
-checked: 1.3.2
+checked: 1.3.4
 sources: DOCS/MULTIPLAYER_ARCHITECTURE.md, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/WorldBossSystem.cs
+history: 1.3.4 | none
 history: 1.3.2 | World events start, count down and end online.
 history: 1.2.5 | Daily messages and the blood moon broadcast reach each player in their own language, and grief stages are shown translated.
 history: 1.2.4 | New: /history shows your last 50 chat lines, kept in server memory only.
