@@ -1129,7 +1129,7 @@ namespace UsurperRemake.Systems
             ApplyDialogueToFixedDamage(ctx, player, dialogue);
 
             // Set divine armor reduction on the combat context so CombatEngine applies it
-            ctx.DivineArmorReduction = GetDivineArmorReduction(boss.Type, player);
+            ctx.DivineArmorReduction = DivineArmorReduction(boss.Type, player);
 
             return new BossFight(monster, ctx);
         }
@@ -1745,7 +1745,10 @@ namespace UsurperRemake.Systems
         /// Gods with divine armor resist unenchanted weapons.
         /// Artifact weapons fully bypass; enchanted weapons partially bypass.
         /// </summary>
-        private static double GetDivineArmorReduction(OldGodType godType, Character player)
+        private double GetDivineArmorReduction(OldGodType godType, Character player) => DivineArmorReduction(godType, player);
+
+        /// <summary>1.3.4: the divine armor for BuildBossFight; the instance method above stays for the wiki export, which reaches it by name.</summary>
+        private static double DivineArmorReduction(OldGodType godType, Character player)
         {
             double baseReduction = godType switch
             {
