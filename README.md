@@ -1,3 +1,4 @@
+<!-- doc: checked 1.3.4; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
@@ -74,7 +75,7 @@ You wake with no memory. A letter in your own handwriting warns you: *"The gods 
 - Challenge the throne, recruit guards, manage treasury, navigate court factions, set tax rates and city-control turf.
 - 3 joinable factions: The Crown, The Shadows, The Faith.
 - PvP arena with daily limits, gold theft, and leaderboards.
-- Guild system with 8 chat commands, guild bank, member XP bonus, invite flow.
+- Guild system with 13 chat commands, guild bank, member XP bonus, invite flow.
 - Knighthood with combat buffs and Sir/Dame title prefix.
 
 ### Locations
@@ -85,7 +86,7 @@ Opt-in JSON mods drop into a `GameData/` folder next to the executable: NPCs, mo
 
 ### Accessibility
 - **Screen reader mode:** auto-detected on Windows for the standard console launch (NVDA / JAWS / Narrator), or pass `--screen-reader` explicitly. Strips box-drawing, decorative Unicode, color-bracketed menus; all locations have plain-text paths.
-- **Compact mode:** smaller terminals (mobile SSH, narrow windows). Toggle with `[Z]` from any menu or `/compact`.
+- **Compact mode:** smaller terminals (mobile SSH, narrow windows). Toggle with `[Z]` on the main menu or `/compact` anywhere.
 - **Steam launcher:** `Play.bat` is the default; `Play-Accessible.bat` opts into screen-reader mode at launch.
 - **5 languages:** English, Spanish, French, Hungarian, Italian. Swap via in-game preferences. Per-character language preference saved.
 
@@ -195,12 +196,12 @@ usurper-reborn/
 │   ├── AI/             # NPC AI (Brain, Memory, Goals, Emotions, Personality)
 │   ├── Data/           # NPCs, Equipment, Monsters, Old Gods, FounderStatueData
 │   └── UI/             # Terminal emulator, ANSI art, accessibility detection
-├── Console/            # Bootstrap (Program.cs)
+├── Console/            # Bootstrap (Bootstrap/Program.cs), console engine and terminal
 ├── Localization/       # en.json, es.json, fr.json, hu.json, it.json
 ├── electron-client/    # Optional Electron graphical client (beta)
 ├── web/                # Website (index.html, ssh-proxy.js, admin.html, language packs)
 ├── DOCS/               # Documentation, release notes, BBS setup, server deployment, modding
-├── docker/             # Docker compose stack
+├── docker/             # Docker images for the web proxy and nginx (docker-compose.yml is at the root)
 └── .github/            # CI/CD workflows
 ```
 
@@ -219,14 +220,14 @@ usurper-reborn/
 Total monsters killed, gold earned, time played, peak gold, deepest dungeon floor, quests completed, world boss kills, MVP count, achievements unlocked, and dozens of combat / economy / social counters.
 
 ### Difficulty Modes
-- **Easy:** 150% XP, 50% monster damage, 150% gold
+- **Easy:** 150% XP, 75% monster damage, 150% gold
 - **Normal:** Standard balanced experience
-- **Hard:** 75% XP, 150% monster damage, 75% gold
-- **Nightmare:** 50% XP, 200% monster damage, 50% gold
+- **Hard:** 75% XP, 125% monster damage, 75% gold
+- **Nightmare:** 50% XP, 150% monster damage, 50% gold, permadeath
 
 ### Family System
 - Marriage via the Church, multi-spouse polyamory supported.
-- Children inherit traits from both parents, age over real time (1 week real = 1 year in-game).
+- Children inherit traits from both parents, age over real time (about 9.6 real hours per year, so about 7 real days to come of age).
 - Per-child stat bonuses (HP, Strength, Charisma, daily gold).
 - Coming-of-age at 18 turns children into adult NPCs that join the world.
 - Custody, divorce, infidelity, and child rearing all carry mechanical weight.
@@ -395,7 +396,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 - **Daniel Zingaro:** Tremendous help with the Pascal source.
 - **Coosh:** Community code contributor. Diagnosed an XP-formula desync from his own soft-locked Lv.73 character, traced it to 12 duplicated copies of the same function across the codebase, and submitted PR #98 centralizing them into one canonical implementation.
 - **Xykier, DJLunacy, evanofficial, maxsond, LowLevelJavaCoder:** Community PRs covering combat loot party switching, smart sell filters, companion auto-equip, screen-reader preference persistence, shield loot generation, and the murder-mechanics rework.
-- **The 11 alpha-era founders** commemorated in the Hall of the Ascended (in-game, `/founders`).
+- **The 12 alpha-era founders** commemorated in the Hall of the Ascended (in-game, `/founders`).
 - **The BBS Community:** For keeping the spirit alive.
 - **All players, testers, and bug reporters** who made beta possible.
 

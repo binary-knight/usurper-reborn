@@ -31103,7 +31103,7 @@
   "email.title_visual": "═══ CORREO ELECTRÓNICO ═══",
   "email.current": "Correo de esta cuenta: {0}",
   "email.none": "Esta cuenta no tiene correo.\nSi olvidas tu contraseña, el operador del servidor tendrá que restablecerla.",
-  "email.about": "Tu dirección solo se usa para restablecer la contraseña y para avisos\nsobre tu cuenta. Nunca se vende ni se comparte, salvo con el servicio de\ncorreo que entrega estos mensajes.",
+  "email.about": "Este servidor solo usa tu dirección para restablecer la contraseña y para\navisos sobre tu cuenta. Nunca se vende ni se comparte, salvo con el servicio\nde correo que entrega estos mensajes.",
   "email.opt_change": "Añadir o cambiar el correo",
   "email.opt_remove": "Quitar el correo",
   "email.new_prompt": "Nuevo correo electrónico: ",

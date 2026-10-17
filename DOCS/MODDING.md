@@ -1,3 +1,4 @@
+<!-- doc: checked 1.3.4; sources: Console/Bootstrap/Program.cs, Scripts/Systems/GameDataLoader.cs, Scripts/Data, Scripts/Editor -->
 # Modding Usurper Reborn
 
 Usurper Reborn ships with a modding system and a standalone editor tool, analogous to the old DOS-era `USEDIT.EXE` companion tool that shipped with the original game. There are two ways to modify game content:
@@ -13,12 +14,12 @@ Drop any of these files into `GameData/` next to the game executable. Missing fi
 
 | File                     | What it controls                                                         |
 |--------------------------|--------------------------------------------------------------------------|
-| `npcs.json`              | 60 built-in town NPCs (classes, stats, personality, story role)          |
+| `npcs.json`              | 59 built-in town NPCs (classes, stats, personality, story role)          |
 | `monster_families.json`  | 15 monster families × 5 tiers each (HP/STR curves, abilities, loot)      |
 | `dreams.json`            | narrative dreams and their trigger conditions                            |
 | `achievements.json`      | 79 achievements and their tier rewards                                   |
 | `dialogue.json`          | ~500 lines of NPC dialogue keyed by personality                          |
-| `balance.json`           | ~30 game-balance constants (crit rate, boss scaling, daily limits…)      |
+| `balance.json`           | 20 game-balance constants (crit rate, boss scaling, daily limits)        |
 | `equipment.json`         | custom weapons, armor, shields, accessories (additive, IDs 200000+)      |
 | `abilities.json`         | number tuning of existing class abilities, by ability id                 |
 | `spells.json`            | number and text tuning of existing spells, by class and spell level      |
@@ -27,9 +28,9 @@ The loader reads these nine files and no others.
 
 ## Starting a mod
 
-Run `UsurperReborn --export-data` once. This writes the current built-in content to `GameData/*.json` as a starting point. Edit what you like. The next time the game runs, your changes take effect.
+Run `UsurperReborn --export-data` once. This writes the current built-in content to `GameData/*.json` as a starting point (for `equipment.json`, two example items at IDs 200001 and 200002, since built-in items cannot be changed). Edit what you like. The next time the game runs, your changes take effect.
 
-(For localizers: `UsurperReborn --export-discoveries [path]` emits the dungeon Discovery localization source keys in English, using the engine's exact key scheme, as a starting point for translating the ~600 `discovery.*` keys.)
+(For localizers: `UsurperReborn --export-discoveries [path]` emits the dungeon Discovery localization source keys in English (to `discovery_en.json` next to the executable when no path is given), using the engine's exact key scheme, as a starting point for translating the ~600 `discovery.*` keys.)
 
 If you don't want to bother with every file, you can create just the ones you care about. The game loads each independently and falls back to built-ins for anything missing.
 
@@ -48,7 +49,7 @@ What tuning cannot do today: add a new spell or ability, remove one, change an a
 
 Custom equipment lives in `equipment.json`. Each entry is a full `Equipment` object — name, slot, stats, restrictions. Rules:
 
-- **IDs must be 200,000 or higher.** IDs below 200000 are reserved for built-in items (1000–14999), shop-generated items (50000–99999), and dungeon-generated loot (100000–199999). The game will refuse to load custom items with conflicting IDs.
+- **IDs must be 200,000 or higher.** IDs below 200000 are reserved for built-in items (1000–14999), shop-generated items (50000–99999), and dungeon-generated loot (100000–199999). The game skips a custom item below 200000 with a warning in the log, and the editor refuses to save one.
 - **Built-in items stay read-only.** You can't edit or delete the starter equipment (Rusty Dagger, etc.). This preserves save compatibility across game versions — an existing save referencing item #1023 will always find the same item.
 - **You can add as many custom items as you want.** They'll appear in the world alongside built-ins once wired into loot tables, shops, or quest rewards.
 
@@ -81,17 +82,17 @@ UsurperReborn --editor
 
 Works on Windows, Linux, and macOS. Pure console-mode tool; no graphical terminal needed. The editor has five top-level menus. Equipment, NPCs, Monsters, Dreams, Dialogue and Balance sit under **Game Data / Modding**:
 
-1. **Player Saves** — pick a save, then dive into 11 nested categories covering almost every editable aspect of a character: Character Info (name/class/race/alignment/fame/knighthood), Stats & Progression (level/XP/core attributes/HP/Mana/resurrections/training), Gold & Economy, Inventory & Equipment (add items from the database, remove, equip/unequip any slot, uncurse), Spells & Abilities (learn individually or grant all), Companions (revive, set loyalty/trust/romance, recruit, dismiss), Quests (mark complete, cancel), Achievements (grant/revoke individually or all), Old Gods & Story (per-god status, seals, artifacts, NG+ cycle), Relationships & Family (per-NPC scores, divine wrath cleanup), and Status & Cleanup (cure diseases, clear poison, reset daily counters, release from prison, clear wanted level / murder weight). Every edit stays in memory until explicit Save; on save the file is backed up to `<name>.json.bak` before overwriting.
+1. **Player Saves** — pick a save, then dive into 16 nested categories covering almost every editable aspect of a character: Character Info (name/class/race/alignment/fame/knighthood), Stats & Progression (level/XP/core attributes/HP/Mana/resurrections/training), Gold & Economy, Inventory & Equipment (add items from the database, remove, equip/unequip any slot, uncurse), Spells & Abilities (learn individually or grant all), Companions (revive, set loyalty/trust/romance, recruit, dismiss), Quests (mark complete, cancel), Achievements (disabled, so Steam achievements cannot be granted), Old Gods & Story (per-god status, seals, artifacts, NG+ cycle), Relationships & Family (per-NPC scores, divine wrath cleanup), Status & Cleanup (cure diseases, clear poison, reset daily counters, release from prison, clear wanted level / murder weight), Appearance & Flavor, Skills & Training, Team / Guild / Factions, Settings & Preferences, and World State (current king, bank interest, town pot, economy). Every edit stays in memory until explicit Save; on save the file is backed up to `<name>.json.bak` before overwriting.
 2. **Game Data / Modding**, a nested menu with one editor per data file:
    - **Equipment**: CRUD on `equipment.json`. Add new items, edit existing custom items, browse built-ins for reference.
-   - **NPCs**: CRUD on `npcs.json`. The 60 built-in town NPCs are seeded if no mod file exists yet.
+   - **NPCs**: CRUD on `npcs.json`. The 59 built-in town NPCs are seeded if no mod file exists yet.
    - **Monsters**: monster families and tiers (`monster_families.json`).
    - **Dreams**: narrative dreams (`dreams.json`).
    - **Achievements**: disabled in the editor so Steam achievements cannot be cheated; `achievements.json` can still be edited by hand.
    - **Dialogue**: NPC dialogue lines (`dialogue.json`).
    - **Balance**: edit any property on `balance.json`. Uses reflection over the config class so newly-added balance properties are editable without editor changes.
 3. **Save File Management**: clone, delete, restore saves.
-4. **Export Defaults**: write built-in data to `GameData/` as a starting mod template, like the `--export-data` CLI flag. Its confirmation text still says 7 files; the export writes 9.
+4. **Export Defaults**: write built-in data to `GameData/` as a starting mod template, like the `--export-data` CLI flag.
 5. **File Locations**: prints paths for GameData, saves, localization.
 
 ## Save compatibility and mods

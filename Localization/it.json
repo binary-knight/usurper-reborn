@@ -31103,7 +31103,7 @@
   "email.title_visual": "═══ INDIRIZZO EMAIL ═══",
   "email.current": "Indirizzo di questo account: {0}",
   "email.none": "Nessun indirizzo su questo account.\nSe dimentichi la password, dovrà reimpostarla il gestore del server.",
-  "email.about": "Il tuo indirizzo serve solo per reimpostare la password e per gli avvisi\nsul tuo account. Non viene mai venduto né condiviso, tranne che con il\nservizio di posta che consegna questi messaggi.",
+  "email.about": "Questo server usa il tuo indirizzo solo per reimpostare la password e per\ngli avvisi sul tuo account. Non viene mai venduto né condiviso, tranne che\ncon il servizio di posta che consegna questi messaggi.",
   "email.opt_change": "Aggiungi o cambia l'indirizzo",
   "email.opt_remove": "Rimuovi l'indirizzo",
   "email.new_prompt": "Nuovo indirizzo email: ",

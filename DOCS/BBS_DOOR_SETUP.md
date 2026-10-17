@@ -1,3 +1,4 @@
+<!-- doc: checked 1.3.4; sources: Scripts/BBS, Console/Bootstrap/Program.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/SysOpConsoleManager.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudServer.cs, scripts-server/updatecheck.sh, scripts-server/updatecheck.ps1 -->
 # Usurper Reborn - BBS Door Setup Guide
 
 This guide explains how to configure Usurper Reborn to run as a door game on BBS software like Synchronet, Mystic, EleBBS, WWIV, GameSrv, ENiGMA, or other systems that support DOOR32.SYS drop files.
@@ -58,7 +59,9 @@ UsurperReborn --local            # Local testing mode (no BBS)
 UsurperReborn --stdio            # Force Standard I/O mode
 UsurperReborn --screen-reader    # Plain-text accessible mode (no box-drawing/color menus)
 UsurperReborn --verbose, -v      # Enable detailed debug output
-UsurperReborn --help             # Show help
+UsurperReborn --sysop-level <n>  # Minimum security level for the SysOp Console (default 100)
+UsurperReborn --idle-timeout <m> # Idle disconnect in minutes, 1 to 60 (default 15)
+UsurperReborn --help, -h         # Show help
 ```
 
 ### I/O Mode Flags
@@ -421,7 +424,7 @@ This shows:
 ### Linux
 - Use `./UsurperReborn`
 - Set executable permission: `chmod +x UsurperReborn`
-- Drop file names may be lowercase - game checks both cases
+- Drop file names may be lowercase: given a directory, the game tries `door32.sys`, `DOOR32.SYS`, `door.sys` and `DOOR.SYS`
 
 ### macOS
 - Use `./UsurperReborn`
@@ -435,32 +438,23 @@ SysOps with security level 100 or higher can access an in-game administration co
 
 ### Accessing the Console
 
-When you connect to the door as a SysOp (security level 100+), you'll see a prompt at the **BBS Door welcome screen** (before character selection):
+When you connect to the door as a SysOp (security level 100+), the character selection screen shows an extra choice, `[%] SysOp Console`, below your character slots.
 
-```
-╔═══════════════════════════════════════════════════════════════════╗
-║  SysOp detected! Press [%] for Administration Console            ║
-╚═══════════════════════════════════════════════════════════════════╝
-(Or press Enter to continue to the game)
-```
-
-Press `%` to open the SysOp Console, or press Enter to continue to the normal game.
+Press `%` to open the SysOp Console, or pick a character to continue to the normal game.
 
 > **Note:** The SysOp Console is accessible BEFORE any player saves are loaded. This allows SysOps to manage the game, reset data, delete players, and apply updates without any game state interference.
 
 ### Available Functions
 
-| Category | Function | Description |
-|----------|----------|-------------|
-| **Game Management** | View All Players | List all player saves with file info |
-| | Delete Player | Permanently remove a player's save file |
-| | Reset Game | Complete game wipe (deletes ALL data) |
-| **Game Settings** | Difficulty | Adjust XP, gold, monster HP/damage multipliers |
-| | Set MOTD | Set Message of the Day for players |
-| **Monitoring** | View Statistics | Player count, NPC status, story progress |
-| | View Debug Log | Paginated debug log viewer |
-| | View Active NPCs | Paginated list of all NPCs with status |
-| **System Maintenance** | Check for Updates | Download and install game updates |
+A door runs in online mode, so the console is the online one:
+
+| Category | Keys and functions |
+|----------|--------------------|
+| **Players** | `1` List/Edit, `2` Ban, `3` Unban, `4` Delete, `P` Pardon |
+| **Settings** | `5` Difficulty, `6` MOTD, `I` Idle timeout, `T` Theme, `E` Telemetry question on or off, `O` Online play on or off, `S` Online server address |
+| **Monitoring** | `7` Online players, `8` Stats, `K` Kick, `D` Debug log, `N` NPCs |
+| **World** | `V` News, `C` Clear news, `B` Broadcast, `R` Recovery |
+| **Updates** | `U` Install an update (shown when one is available) |
 
 ### Security Level Threshold
 
@@ -476,15 +470,11 @@ Different BBS software uses different security levels for SysOps. You can config
 UsurperReborn --door %f --sysop-level 90
 ```
 
-This setting is also saved in `sysop_config.json`, so you only need to specify it once. Future runs will use the saved value.
+A door runs in online mode, which does not read `sysop_config.json`, so put `--sysop-level` in the door command for every launch.
 
 ### Configuration Persistence
 
-All game configuration changes made through the SysOp Console are automatically saved to `sysop_config.json` in your BBS's save directory (e.g., `Saves/MyBBS/sysop_config.json`). Settings persist across door restarts and include:
-
-- Message of the Day (MOTD)
-- Difficulty multipliers (XP, Gold, Monster HP, Monster Damage)
-- SysOp security level threshold
+A door runs in online mode, where the settings the SysOp Console changes (MOTD, difficulty multipliers, idle timeout and the rest) are kept in the shared SQLite database and persist across door restarts. `sysop_config.json` is not read in this mode.
 
 ---
 
@@ -523,7 +513,7 @@ All multiplayer features activate automatically:
 
 | Feature | Description |
 |---------|-------------|
-| **Shared NPCs** | All 60 NPCs are shared — relationships, marriages, deaths persist across all players |
+| **Shared NPCs** | All NPCs are shared — relationships, marriages, deaths persist across all players |
 | **Shared Economy** | King, treasury, taxes, shops affect everyone |
 | **Chat** | `/say` (broadcast), `/tell <name>` (private), `/who` (online players), `/news` (world events) |
 | **PvP Arena** | Challenge other players to combat (level 5+, max 5 fights/day) |
@@ -534,7 +524,13 @@ All multiplayer features activate automatically:
 
 ### Authentication
 
-**No extra passwords needed.** BBS Online mode trusts your BBS's authentication. The player name from DOOR32.SYS/DOOR.SYS becomes their online identity automatically. Players do NOT see an in-game login screen — they go straight to their character.
+**No extra passwords needed.** BBS Online mode trusts your BBS's authentication. The player name from DOOR32.SYS/DOOR.SYS becomes their online identity automatically. Players do NOT see an in-game login screen; they go straight to their character.
+
+### Password reset by email (optional)
+
+This does not apply to a door. The BBS logs the player in, so the game asks for no password in a door, and it shows no forgot password choice, no email question, no Email menu and no change password choice there, whatever the mail setting.
+
+Password reset by email belongs to a self hosted game server (the MUD server with its web service). It is off by default; with mail off, players see no forgot choice, no email question and no Email menu, and the website reset pages say that the server does not send mail. To turn it on, set `RESEND_API_KEY` (a Resend API key), `MAIL_FROM` (an address on a domain verified with Resend) and `SITE_URL` (the public address of your website, `http(s)://host[:port]`, default `https://usurper-reborn.net`) in the web service environment and restart the web service; the game follows within 15 seconds. With mail on, the address stays optional for players, and one who gives none is told that only the operator can reset a forgotten password. An operator can always reset a password from the `/admin` page. See `DOCS/SERVER_DEPLOYMENT.md` and `DOCS/DOCKER.md`.
 
 ### How the Auto World Simulator Works
 
@@ -602,8 +598,8 @@ nssm start UsurperWorldSim
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--sim-interval <sec>` | 60 | How often the world ticks (seconds). Lower = more active world. |
-| `--npc-xp <mult>` | 0.25 | NPC XP gain rate. 1.0 = same as players, 0.25 = quarter speed. |
+| `--sim-interval <sec>` | 60 | How often the world ticks (seconds), at least 10. Lower = more active world. |
+| `--npc-xp <mult>` | 5.0 | NPC XP gain multiplier, 0.01 to 10.0. |
 | `--save-interval <min>` | 5 | How often world state is saved to database. |
 
 ### Database Location
@@ -624,8 +620,8 @@ Existing single-player BBS saves (JSON files in `Saves/`) are **not** automatica
 - Verify all nodes use the exact same `--db` path (or both use the default)
 - Check stderr/logs for `[WORLDSIM]` messages confirming the world sim is running
 
-#### "This character is already logged in"
-- The previous session didn't disconnect cleanly. Wait 2-3 minutes for the heartbeat to expire.
+#### "Previous session disconnected."
+- The previous session didn't disconnect cleanly. The new login clears it and continues; nothing to do.
 
 #### World seems dead (no NPC activity)
 - Check stderr for `[WORLDSIM]` messages — one session should show "Acquired worldsim lock"
@@ -641,15 +637,13 @@ Existing single-player BBS saves (JSON files in `Saves/`) are **not** automatica
 
 Each node automatically gets its own:
 - Drop file (handled by BBS)
-- Save isolation (by BBS name + username in single-player mode, or shared database in online mode)
+- A player record in the shared database, keyed by the username from the drop file
 
 ---
 
 ## Save File Location
 
-**Single-player BBS mode:** Saves are stored in `<game directory>/Saves/<BBS Name>/` and are keyed by the username from the drop file.
-
-**BBS Online mode:** All player data is stored in the shared SQLite database specified by `--db`.
+Every door launch (`--door`, `--door32`, `--doorsys`, `--node`) runs in online mode, so all player data is stored in the shared SQLite database: `usurper_online.db` next to the executable, or the path given with `--db`.
 
 ---
 
@@ -704,7 +698,7 @@ Environment variables for custom installations:
 The script automatically:
 - Detects the current version from `version.txt`
 - Downloads the Linux-x64 release asset from GitHub
-- Creates a timestamped backup in the `backups/` folder (keeps last 5)
+- Creates a timestamped `.tar.gz` backup of the install in the `backups/` folder, leaving out backups, logs, saves and database files (keeps last 5)
 - Stops `usurper-mud` and `sshd-usurper` services
 - Extracts the update and restarts services
 
@@ -755,7 +749,7 @@ Both scripts use the same exit codes:
 ### Important Notes
 
 - The scripts require internet access to reach GitHub (or the fallback proxy at `usurper-reborn.net`)
-- Backups only include the game binary and DLL, not save files or databases
+- Backups never include save files or databases (the Windows backup holds only the game binary and DLL)
 - On Linux, the script needs `sudo` access to restart systemd services
 - On Windows, the script kills any running `UsurperReborn.exe` process before updating
 - The `version.txt` file in the install directory is used to track the current version
