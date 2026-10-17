@@ -31092,7 +31092,7 @@
   "auth.reg_email": "Correo para restablecer la contraseña (opcional, Intro para omitir):",
   "auth.err_email_invalid": "Eso no es una dirección de correo. Inténtalo de nuevo o pulsa Intro para omitir.",
   "auth.reg_email_sent": "Revisa tu correo y abre el enlace para confirmar la dirección.",
-  "auth.forgot_pointer": "¿Olvidaste tu contraseña? https://usurper-reborn.net/account/forgot",
+  "auth.forgot_pointer": "¿Olvidaste tu contraseña? {0}",
   "email.prompt_title": "¿Añadir un correo electrónico?",
   "email.prompt_body": "Un correo te permite restablecer una contraseña olvidada. Es opcional\ny no se usa para nada más. Con E en la pantalla de personajes puedes\nañadirlo, cambiarlo o quitarlo más tarde.",
   "email.prompt_ask": "Correo electrónico (Intro para omitir): ",

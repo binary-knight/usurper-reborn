@@ -31092,7 +31092,7 @@
   "auth.reg_email": "E-mail pour réinitialiser le mot de passe (facultatif, Entrée pour passer) :",
   "auth.err_email_invalid": "Ce n'est pas une adresse e-mail. Réessaie, ou appuie sur Entrée pour passer.",
   "auth.reg_email_sent": "Consulte tes e-mails et ouvre le lien pour confirmer l'adresse.",
-  "auth.forgot_pointer": "Mot de passe oublié ? https://usurper-reborn.net/account/forgot",
+  "auth.forgot_pointer": "Mot de passe oublié ? {0}",
   "email.prompt_title": "Ajouter une adresse e-mail ?",
   "email.prompt_body": "Une adresse e-mail permet de réinitialiser un mot de passe oublié.\nElle est facultative et ne sert à rien d'autre. E sur l'écran des\npersonnages permet plus tard de l'ajouter, la changer ou la retirer.",
   "email.prompt_ask": "Adresse e-mail (Entrée pour passer) : ",

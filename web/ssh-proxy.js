@@ -4549,8 +4549,10 @@ function accountMask(address) {
 // SITE_URL: trimmed and lower case; the accepted form, or null when the rule refuses it.
 function accountSiteUrl(raw) {
   if (typeof raw !== 'string') return null;
-  const s = raw.trim().toLowerCase();
-  if (s.length === 0 || s.length > ACCOUNT_SITE_MAX || !ACCOUNT_SITE_RE.test(s)) return null;
+  const t = raw.trim();
+  if (t.length === 0 || t.length > ACCOUNT_SITE_MAX || /[^\x20-\x7e]/.test(t)) return null;
+  const s = t.toLowerCase();
+  if (!ACCOUNT_SITE_RE.test(s)) return null;
   const port = s.match(/:([0-9]+)$/);
   if (port && !(Number(port[1]) >= 1 && Number(port[1]) <= 65535)) return null;
   return s;

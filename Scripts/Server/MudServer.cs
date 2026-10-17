@@ -808,7 +808,7 @@ public class MudServer
                         // 1.3.4: while this server sends mail, a wrong password or unknown name also gets the
                         // website reset address, on the same line (relay and desktop clients show the text after ERR:)
                         if (SqlSaveBackend.IsGenericLoginFailure(reason) && UsurperRemake.Systems.MailSwitch.IsOn(sqlBackend))
-                            message = WithForgotPointer(message);
+                            message = WithForgotPointer(message, null, UsurperRemake.Systems.MailSite.Read(sqlBackend));
                         await WriteLineAsync(stream, $"ERR:{message}");
                         client.Close();
                         return;
@@ -1209,9 +1209,10 @@ public class MudServer
     }
 
     /// <summary>1.3.4: a failed AUTH line login's message with the website reset address after it, in the language
-    /// the message itself uses (the AUTH line gives no language: the server's, as AuthenticatePlayer's text).</summary>
-    internal static string WithForgotPointer(string message, string? lang = null) =>
-        $"{message} {UsurperRemake.Systems.Loc.GetIn(string.IsNullOrEmpty(lang) ? GameConfig.Language : lang, "auth.forgot_pointer")}";
+    /// the message itself uses (the AUTH line gives no language: the server's, as AuthenticatePlayer's text). The
+    /// address is on <paramref name="site"/> (world_state mail_site, checked again here), or the default site.</summary>
+    internal static string WithForgotPointer(string message, string? lang = null, string? site = null) =>
+        $"{message} {UsurperRemake.Systems.Loc.GetIn(string.IsNullOrEmpty(lang) ? GameConfig.Language : lang, "auth.forgot_pointer", UsurperRemake.Systems.MailSite.ForgotUrl(UsurperRemake.Systems.MailSite.Resolve(site)))}";
 
     /// <summary>1.3.4: the one reply to a forgot password request, the same for every name.</summary>
     internal static List<string> ForgotReplyRows(string lang) => new()

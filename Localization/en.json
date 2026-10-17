@@ -4146,7 +4146,7 @@
   "auth.reg_email": "Email for password resets (optional, Enter to skip):",
   "auth.err_email_invalid": "That is not an email address. Try again, or press Enter to skip.",
   "auth.reg_email_sent": "Check your mail and open the link to confirm the address.",
-  "auth.forgot_pointer": "Forgot your password? https://usurper-reborn.net/account/forgot",
+  "auth.forgot_pointer": "Forgot your password? {0}",
   "email.prompt_title": "Add an email address?",
   "email.prompt_body": "An email address lets you reset a forgotten password. It is optional\nand is used for nothing else. E on the character screen adds, changes\nor removes it later.",
   "email.prompt_ask": "Email address (Enter to skip): ",

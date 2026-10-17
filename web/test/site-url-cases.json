@@ -1,5 +1,5 @@
 {
-  "_note": "1.3.4: the site rule (SITE_URL on the web side, world_state mail_site in the game). Both test files read these cases: web/test/account-mail-pw-reset134.test.js and Tests/MailSite_SelfHost134Tests.cs.",
+  "_note": "1.3.4: the site rule (SITE_URL on the web side, world_state mail_site in the game). Both test files read these cases: web/test/account-mail-pw-reset134.test.js and Tests/AccountMailSite_SelfHost134Tests.cs.",
   "accepted": [
     ["https://usurper-reborn.net", "https://usurper-reborn.net"],
     ["https://play.example.com", "https://play.example.com"],
@@ -33,6 +33,9 @@
     "https://exa\nmple.com",
     "https://[::1]:3000",
     "https://example..com",
-    "https://example.com."
+    "https://example.com.",
+    "https://\u0130.example.com",
+    "https://ex\u212aample.com",
+    "https://ex\u00e1mple.com"
   ]
 }
