@@ -2002,12 +2002,14 @@
         // Stats grid
         const s = data.stats || {};
         html += '<div class="stats-grid">';
-        html += renderStatCard(formatNumber(s.totalPlayers || 0), 'Total Players');
-        html += renderStatCard(formatNumber(s.totalKills || 0), 'Monsters Slain');
-        html += renderStatCard(s.avgLevel || 0, 'Avg Level');
-        html += renderStatCard(s.deepestFloor || 0, 'Deepest Floor');
-        html += renderStatCard(formatGold(s.totalGold || 0), 'Total Gold');
-        html += renderStatCard((s.marriages || 0) + ' / ' + (s.children || 0), 'Marriages / Kids');
+        // a count the answer does not carry shows as "--", never as a 0 nobody measured; a real 0 shows as 0
+        const stat = (v, f) => (typeof v === 'number' ? (f ? f(v) : v) : '--');
+        html += renderStatCard(stat(s.totalPlayers, formatNumber), 'Total Players');
+        html += renderStatCard(stat(s.totalKills, formatNumber), 'Monsters Slain');
+        html += renderStatCard(stat(s.avgLevel), 'Avg Level');
+        html += renderStatCard(stat(s.deepestFloor), 'Deepest Floor');
+        html += renderStatCard(stat(s.totalGold, formatGold), 'Total Gold');
+        html += renderStatCard(stat(s.marriages) + ' / ' + stat(s.children), 'Marriages / Kids');
         const permaTotal = (s.permadeadNpcs || 0) + (s.agedDeathNpcs || 0);
         if (permaTotal > 0) {
             html += renderStatCard((s.permadeadNpcs || 0) + ' / ' + (s.agedDeathNpcs || 0), 'Permadead / Old Age');
@@ -2227,9 +2229,18 @@
         };
     }
 
+    // the stats request gives up after this long, so the board never waits forever on a hung server
+    const STATS_TIMEOUT_MS = 10000;
+    function statsRequest() {
+        const ctrl = typeof AbortController === 'function' ? new AbortController() : null;
+        const timer = ctrl ? setTimeout(() => ctrl.abort(), STATS_TIMEOUT_MS) : null;
+        return fetch('/api/stats', ctrl ? { signal: ctrl.signal } : undefined)
+            .then(res => { if (timer) clearTimeout(timer); if (!res.ok) throw new Error('stats ' + res.status); return res.json(); },
+                  err => { if (timer) clearTimeout(timer); throw err; });
+    }
+
     function fetchStats() {
-        fetch('/api/stats')
-            .then(res => res.json())
+        statsRequest()
             .then(data => renderStats(data))
             .catch(() => {
                 document.getElementById('stats-content').innerHTML =
