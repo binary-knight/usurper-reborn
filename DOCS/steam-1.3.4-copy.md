@@ -38,6 +38,7 @@ DOCS/release-notes.
 [list]
 [*]You can reset a forgotten password by email. The address is optional, asked when you register or once at your next login, and confirmed by a link.
 [*]New passwords need at least 8 characters. Existing shorter passwords still log in.
+[*]Your email address is optional. Without one, only the server's operator can reset a forgotten password. It is used only for password resets and account notices and is never sold or shared, except with the mail service that delivers them.
 [*]Probability Shift, Echo of Tomorrow and Paradox Collapse now do what their text says.
 [*]Doom starts at Aurelion. The four earlier Old Gods and the betrayal fight no longer apply it.
 [*]Manwe's named abilities now respect your difficulty setting, Shield Wall Formation, flee guarding, Divine Mandate and Death's Embrace.
