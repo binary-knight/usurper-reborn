@@ -3715,6 +3715,14 @@ public static partial class GameConfig
     // within 24h get refused. Generous default — most legit households / shared
     // dorms / coffee shops won't see 3+ new players in a day.
     public const int MaxRegistrationsPerIpPer24h = 3;
+
+    // 1.3.4: the shortest NEW password, one rule for registration (the MUD menu, the relay menu, Online Play and
+    // RegisterPlayer), the in-game password change and the admin console reset. A login never checks the length,
+    // so a shorter password set before 1.3.4 still works.
+    public const int MinPasswordLength = 8;
+
+    // 1.3.4: password reset and email requests the game writes for one address in one hour (mail_requests rows)
+    public const int MailRequestsPerIpPerHour = 5;
     public const string GoldColor = "`E";              // Bright yellow for gold
     public const string LocationColor = "`9";          // Bright blue for locations
     public const string EmptyColor = "`8";             // Gray for empty slots

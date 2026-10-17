@@ -805,6 +805,10 @@ public class MudServer
                     {
                         RecordFailedLogin(effectiveIp);
                         Console.Error.WriteLine(AuthFailedLogLine(username, reason));
+                        // 1.3.4: while this server sends mail, a wrong password or unknown name also gets the
+                        // website reset address, on the same line (relay and desktop clients show the text after ERR:)
+                        if (SqlSaveBackend.IsGenericLoginFailure(reason) && UsurperRemake.Systems.MailSwitch.IsOn(sqlBackend))
+                            message = WithForgotPointer(message);
                         await WriteLineAsync(stream, $"ERR:{message}");
                         client.Close();
                         return;
@@ -940,10 +944,14 @@ public class MudServer
             ?? new List<string> { "en" };
         if (langCodes.Count == 0) langCodes.Add("en");
         string L(string key, params object[] args) => UsurperRemake.Systems.Loc.GetIn(authLang, key, args);
+        bool loginFailed = false; // 1.3.4: the forgot password choice appears after a failed login
 
         for (int attempt = 0; attempt < MAX_ATTEMPTS; attempt++)
         {
             if (ct.IsCancellationRequested) return null;
+
+            // 1.3.4: read at each menu; with mail off there is no reset choice
+            bool offerForgot = loginFailed && UsurperRemake.Systems.MailSwitch.IsOn(sqlBackend);
 
             string langName = authLang;
             foreach (var ll in UsurperRemake.Systems.Loc.AvailableLanguages)
@@ -957,6 +965,8 @@ public class MudServer
                 await WriteAnsiAsync(stream, $"\r\n=== {L("auth.title")} ===\r\n", isCp437);
                 await WriteAnsiAsync(stream, $"[L] {L("auth.login")}\r\n", isCp437);
                 await WriteAnsiAsync(stream, $"[R] {L("auth.register")}\r\n", isCp437);
+                if (offerForgot)
+                    await WriteAnsiAsync(stream, $"[F] {L("auth.forgot")}\r\n", isCp437);
                 await WriteAnsiAsync(stream, $"[G] {L("auth.language")} ({langName})\r\n", isCp437);
                 await WriteAnsiAsync(stream, $"[Q] {L("auth.quit")}\r\n", isCp437);
                 await WriteAnsiAsync(stream, $"{L("auth.choice")} ", isCp437);
@@ -965,11 +975,11 @@ public class MudServer
             {
                 // v1.2.5: the box is 79 columns wide (it was 80); AuthBoxRows, shared with the SSH relay.
                 await WriteAnsiAsync(stream, "\u001b[2J\u001b[H", isCp437); // Clear screen
-                foreach (var row in AuthBoxRows(L("auth.title"), new[] {
-                    ("1;36", "L", L("auth.login")),
-                    ("1;32", "R", L("auth.register")),
-                    ("1;35", "G", $"{L("auth.language")} ({langName})"),
-                    ("1;31", "Q", L("auth.quit")) }))
+                var entries = new List<(string, string, string)> { ("1;36", "L", L("auth.login")), ("1;32", "R", L("auth.register")) };
+                if (offerForgot) entries.Add(("1;33", "F", L("auth.forgot")));
+                entries.Add(("1;35", "G", $"{L("auth.language")} ({langName})"));
+                entries.Add(("1;31", "Q", L("auth.quit")));
+                foreach (var row in AuthBoxRows(L("auth.title"), entries))
                     await WriteAnsiAsync(stream, row + "\r\n", isCp437);
                 await WriteAnsiAsync(stream, "\u001b[0m", isCp437);
                 await WriteAnsiAsync(stream, $"\r\n  {L("auth.choice")} ", isCp437);
@@ -991,6 +1001,24 @@ public class MudServer
                 int idx = langCodes.IndexOf(authLang);
                 authLang = langCodes[(idx + 1) % langCodes.Count];
                 attempt--;
+                continue;
+            }
+
+            if (choice == "F" && offerForgot)
+            {
+                // 1.3.4 (1.3): one reset request row whatever the name, then one fixed reply. The name is not
+                // logged (a player may type an address there).
+                if (isPlainText)
+                    await WriteAnsiAsync(stream, $"{L("auth.forgot_name")} ", isCp437);
+                else
+                    await WriteAnsiAsync(stream, $"\r\n\u001b[1;33m  {L("auth.forgot_name")} \u001b[0m", isCp437);
+                var forgotName = (await ReadLineAsync(stream, ct, echo: echoInput))?.Trim();
+                if (string.IsNullOrEmpty(forgotName)) continue;
+                bool written = sqlBackend.RequestPasswordReset(forgotName, effectiveIp, authLang);
+                Console.Error.WriteLine($"[MUD] Password reset request from {effectiveIp ?? "unknown"} ({(written ? "queued" : "not queued")})");
+                foreach (var row in ForgotReplyRows(authLang))
+                    await WriteAnsiAsync(stream, isPlainText ? $"{row}\r\n" : $"\r\n\u001b[1;32m  {row}\u001b[0m", isCp437);
+                await WriteAnsiAsync(stream, "\r\n\r\n", isCp437);
                 continue;
             }
 
@@ -1034,7 +1062,7 @@ public class MudServer
                     await WriteAnsiAsync(stream, $"{L("auth.reg_password")} ", isCp437);
                     password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
-                    if (password.Length < 4)
+                    if (password.Length < GameConfig.MinPasswordLength)
                     {
                         await WriteAnsiAsync(stream, $"{L("auth.err_password_len")}\r\n\r\n", isCp437);
                         continue;
@@ -1060,7 +1088,7 @@ public class MudServer
                     await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_password")} \u001b[0m", isCp437);
                     password = (await ReadLineAsync(stream, ct, echo: echoInput, maskChar: '*'))?.Trim();
                     if (string.IsNullOrEmpty(password)) continue;
-                    if (password.Length < 4)
+                    if (password.Length < GameConfig.MinPasswordLength)
                     {
                         await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.err_password_len")}\u001b[0m\r\n\r\n", isCp437);
                         continue;
@@ -1113,12 +1141,16 @@ public class MudServer
                 // first character) starts localized. English is the column
                 // default, so only non-en needs a write.
                 if (authLang != "en") sqlBackend.SetAccountLanguage(username!, authLang);
+                // 1.3.4 (1.4): the optional email step, only where this server sends mail
+                if (UsurperRemake.Systems.MailSwitch.IsOn(sqlBackend))
+                    await RegistrationEmailStepAsync(stream, sqlBackend, ct, username!, effectiveIp, authLang, isPlainText, isCp437, echoInput);
             }
 
             // Authenticate
             var (success, displayName, message, screenReader, language, reason) = await sqlBackend.AuthenticatePlayer(username!, password!, effectiveIp, authLang);
             if (!success)
             {
+                loginFailed = true;
                 RecordFailedLogin(effectiveIp);
                 Console.Error.WriteLine(AuthFailedLogLine(username!, reason));
                 // v1.2.6: the generic message, then the register hint on its own row ([R] is on this menu)
@@ -1174,6 +1206,49 @@ public class MudServer
         else
             await WriteAnsiAsync(stream, $"\r\n\u001b[1;31m  {L("auth.too_many")}\u001b[0m\r\n", isCp437);
         return null;
+    }
+
+    /// <summary>1.3.4: a failed AUTH line login's message with the website reset address after it, in the language
+    /// the message itself uses (the AUTH line gives no language: the server's, as AuthenticatePlayer's text).</summary>
+    internal static string WithForgotPointer(string message, string? lang = null) =>
+        $"{message} {UsurperRemake.Systems.Loc.GetIn(string.IsNullOrEmpty(lang) ? GameConfig.Language : lang, "auth.forgot_pointer")}";
+
+    /// <summary>1.3.4: the one reply to a forgot password request, the same for every name.</summary>
+    internal static List<string> ForgotReplyRows(string lang) => new()
+    {
+        UsurperRemake.Systems.Loc.GetIn(lang, "auth.forgot_sent"),
+        UsurperRemake.Systems.Loc.GetIn(lang, "auth.forgot_sent2"),
+    };
+
+    /// <summary>
+    /// 1.3.4 (1.4): after a registration at this menu, one optional address. Blank skips; a typo asks again (three
+    /// tries); an address goes into a verify request, never into the players row. Either way the account is not
+    /// asked again at its first login. A dropped connection marks nothing, so the first login asks.
+    /// </summary>
+    private static async Task RegistrationEmailStepAsync(Stream stream, SqlSaveBackend sqlBackend, CancellationToken ct, string username,
+        string? effectiveIp, string authLang, bool isPlainText, bool isCp437, bool echoInput)
+    {
+        string L(string key) => UsurperRemake.Systems.Loc.GetIn(authLang, key);
+        for (int i = 0; i < 3; i++)
+        {
+            if (isPlainText)
+                await WriteAnsiAsync(stream, $"{L("auth.reg_email")} ", isCp437);
+            else
+                await WriteAnsiAsync(stream, $"\u001b[1;32m  {L("auth.reg_email")} \u001b[0m", isCp437);
+            var typed = await ReadLineAsync(stream, ct, echo: echoInput);
+            if (typed == null) return;
+            typed = typed.Trim();
+            if (typed.Length == 0) break;
+            if (UsurperRemake.Systems.AccountEmail.Normalize(typed) == null)
+            {
+                await WriteAnsiAsync(stream, isPlainText ? $"{L("auth.err_email_invalid")}\r\n" : $"\u001b[1;31m  {L("auth.err_email_invalid")}\u001b[0m\r\n", isCp437);
+                continue;
+            }
+            sqlBackend.RequestEmailVerify(username, typed, effectiveIp, authLang);
+            await WriteAnsiAsync(stream, isPlainText ? $"{L("auth.reg_email_sent")}\r\n" : $"\u001b[1;32m  {L("auth.reg_email_sent")}\u001b[0m\r\n", isCp437);
+            break;
+        }
+        sqlBackend.MarkEmailPrompted(username);
     }
 
     /// <summary>Cached CP437 encoding instance (initialized once on first use).</summary>

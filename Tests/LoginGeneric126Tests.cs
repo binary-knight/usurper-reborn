@@ -218,10 +218,10 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task UnknownName_NoHash_AndWrongPassword_GiveOneMessage_InEveryLanguage()
     {
-        await Register("Real Name", "secret");
+        await Register("Real Name", "secret-long");
         NoHashAccount("nohash", "");
         NoHashAccount("badhash", "x");
-        await Register("Banned One", "rightpw");
+        await Register("Banned One", "rightpw-long");
         Ban("Banned One", "griefing");
 
         foreach (var lang in AllLanguages)
@@ -230,9 +230,9 @@ public class LoginGeneric126Tests : IDisposable
             expected.Should().NotBe("auth.err_bad_login", $"[{lang}] the key exists");
             var cases = new (string Name, string Password, SqlSaveBackend.LoginFailure Reason)[]
             {
-                ("nobody here", "secret", SqlSaveBackend.LoginFailure.UnknownName),
+                ("nobody here", "secret-long", SqlSaveBackend.LoginFailure.UnknownName),
                 ("Real Name", "wrong", SqlSaveBackend.LoginFailure.WrongPassword),
-                ("nohash", "secret", SqlSaveBackend.LoginFailure.NoUsableHash),
+                ("nohash", "secret-long", SqlSaveBackend.LoginFailure.NoUsableHash),
                 ("badhash", "x", SqlSaveBackend.LoginFailure.NoUsableHash),
                 ("Banned One", "wrong", SqlSaveBackend.LoginFailure.BannedWrongPassword),
             };
@@ -245,7 +245,7 @@ public class LoginGeneric126Tests : IDisposable
                 r.displayName.Should().BeEmpty();
             }
         }
-        (await Db.AuthenticatePlayer("Real Name", "secret", null, "en")).success.Should().BeTrue();
+        (await Db.AuthenticatePlayer("Real Name", "secret-long", null, "en")).success.Should().BeTrue();
     }
 
     // ================= the same PBKDF2 work on every path =================
@@ -255,14 +255,14 @@ public class LoginGeneric126Tests : IDisposable
     {
         SqlSaveBackend.Pbkdf2Iterations.Should().Be(100000, "the work factor stored hashes were made with");
         SqlSaveBackend.IsUsableHash(SqlSaveBackend.DummyPasswordHash).Should().BeTrue("so the dummy verify runs PBKDF2 instead of returning early");
-        await Register("Real Name", "secret");
+        await Register("Real Name", "secret-long");
         var real = StoredHash("Real Name").Split(':');
         var dummy = SqlSaveBackend.DummyPasswordHash.Split(':');
         Convert.FromBase64String(dummy[0]).Length.Should().Be(Convert.FromBase64String(real[0]).Length, "the same salt size as a stored hash");
         Convert.FromBase64String(dummy[1]).Length.Should().Be(Convert.FromBase64String(real[1]).Length, "the same hash size as a stored hash");
 
         NoHashAccount("nohash", "");
-        await Register("Banned One", "rightpw");
+        await Register("Banned One", "rightpw-long");
         Ban("Banned One", "griefing");
 
         async Task Expect(string name, string password, int verifies, int dummies)
@@ -272,8 +272,8 @@ public class LoginGeneric126Tests : IDisposable
             (Db.LoginVerifies - v0).Should().Be(verifies, $"{name}: one PBKDF2 verify");
             (Db.LoginDummyVerifies - d0).Should().Be(dummies, $"{name}: against the dummy hash when there is no usable one");
         }
-        await Expect("nobody here", "secret", 1, 1);
-        await Expect("nohash", "secret", 1, 1);
+        await Expect("nobody here", "secret-long", 1, 1);
+        await Expect("nohash", "secret-long", 1, 1);
         await Expect("Banned One", "wrong", 1, 0);
         await Expect("Real Name", "wrong", 1, 0);
 
@@ -303,7 +303,7 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task BannedAccount_ShowsTheBan_OnlyAfterTheRightPassword_AndStillCannotLogIn()
     {
-        await Register("Banned One", "rightpw");
+        await Register("Banned One", "rightpw-long");
         Ban("Banned One", "griefing the newbies");
 
         var wrong = await Db.AuthenticatePlayer("Banned One", "wrong", null, "hu");
@@ -313,7 +313,7 @@ public class LoginGeneric126Tests : IDisposable
 
         foreach (var lang in AllLanguages)
         {
-            var right = await Db.AuthenticatePlayer("Banned One", "rightpw", null, lang);
+            var right = await Db.AuthenticatePlayer("Banned One", "rightpw-long", null, lang);
             right.success.Should().BeFalse("a ban still refuses the login");
             right.displayName.Should().BeEmpty();
             right.reason.Should().Be(SqlSaveBackend.LoginFailure.Banned);
@@ -326,10 +326,10 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task IpBan_StillRefusesFirst_BeforeAnyAccountLookup()
     {
-        await Register("Real Name", "secret");
+        await Register("Real Name", "secret-long");
         Db.BanIp("203.0.113.9", "spam", "admin", null);
 
-        foreach (var (name, password) in new[] { ("Real Name", "secret"), ("Real Name", "wrong"), ("nobody here", "x") })
+        foreach (var (name, password) in new[] { ("Real Name", "secret-long"), ("Real Name", "wrong"), ("nobody here", "x") })
         {
             int v0 = Db.LoginVerifies;
             var r = await Db.AuthenticatePlayer(name, password, "203.0.113.9", "hu");
@@ -347,7 +347,7 @@ public class LoginGeneric126Tests : IDisposable
         refusal.Should().BeLessThan(mud.IndexOf("sqlBackend.AuthenticatePlayer(username, password, effectiveIp)", StringComparison.Ordinal));
 
         // over the wire too: the refusal text and a closed socket, no ERR line
-        var (output, _) = await AuthLine("203.0.113.9", "Real Name:secret:Web");
+        var (output, _) = await AuthLine("203.0.113.9", "Real Name:secret-long:Web");
         output.Should().Contain("Connection refused: this address is banned from the server.").And.Contain("Reason: spam");
         output.Should().NotContain("ERR:");
     }
@@ -383,7 +383,7 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task OperatorLog_KeepsTheNameAndTheRealReason_NeverThePassword()
     {
-        await Register("Real Name", "secret");
+        await Register("Real Name", "secret-long");
         const string typed = "Pw-Never-Logged-7731";
 
         var (outWrong, errWrong) = await AuthLine(ThrottleIp(31), $"Real Name:{typed}:Web");
@@ -430,7 +430,7 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task InteractiveGate_ShowsTheMessage_ThenTheHintOnItsOwnRow()
     {
-        await Register("Real Name", "secret");
+        await Register("Real Name", "secret-long");
         foreach (var (name, password) in new[] { ("Real Name", "wrong"), ("Ghost Name", "wrong") })
         {
             var (output, _) = await Interactive(ThrottleIp(name.Length + 40), "L", name, password);
@@ -478,21 +478,21 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task Logins_NeverChangeAStoredHash()
     {
-        await Register("Real Name", "secret");
-        await Register("Banned One", "rightpw");
+        await Register("Real Name", "secret-long");
+        await Register("Banned One", "rightpw-long");
         Ban("Banned One", "griefing");
         NoHashAccount("nohash", "");
         var before = new[] { "Real Name", "Banned One", "nohash" }.Select(StoredHash).ToList();
 
         await Db.AuthenticatePlayer("Real Name", "wrong");
-        (await Db.AuthenticatePlayer("Real Name", "secret")).success.Should().BeTrue();
+        (await Db.AuthenticatePlayer("Real Name", "secret-long")).success.Should().BeTrue();
         await Db.AuthenticatePlayer("Banned One", "wrong");
-        await Db.AuthenticatePlayer("Banned One", "rightpw");
+        await Db.AuthenticatePlayer("Banned One", "rightpw-long");
         await Db.AuthenticatePlayer("nohash", "anything");
         await Db.AuthenticatePlayer("nobody here", "anything");
 
         new[] { "Real Name", "Banned One", "nohash" }.Select(StoredHash).Should().Equal(before);
-        (await Db.AuthenticatePlayer("Real Name", "secret")).success.Should().BeTrue("an existing password still works");
+        (await Db.AuthenticatePlayer("Real Name", "secret-long")).success.Should().BeTrue("an existing password still works");
     }
 
     // ================= registration counts in the per-IP throttle =================
@@ -500,23 +500,23 @@ public class LoginGeneric126Tests : IDisposable
     [Fact]
     public async Task RegistrationAttempts_CountInThePerIpThrottle_KeyedByIp()
     {
-        await Register("Real Name", "secret");
+        await Register("Real Name", "secret-long");
 
         // AUTH protocol: a taken name is refused and counts as a failure for that IP
         string ipA = ThrottleIp(51);
-        var (outTaken, _) = await AuthLine(ipA, "Real Name:newpass:REGISTER:Web");
+        var (outTaken, _) = await AuthLine(ipA, "Real Name:newpass-long:REGISTER:Web");
         AllLanguages.Select(l => L(l, "auth.err_username_taken")).Should().Contain(ErrText(outTaken), "the name-taken message stays");
         FailedLogins()[ipA].Fails.Should().Be(1);
 
         // the interactive gate counts it too
         string ipB = ThrottleIp(52);
-        await Interactive(ipB, "R", "Real Name", "newpass", "newpass");
+        await Interactive(ipB, "R", "Real Name", "newpass-long", "newpass-long");
         FailedLogins()[ipB].Fails.Should().Be(1);
 
         // a throttled IP cannot register
         string ipC = ThrottleIp(53);
         FailedLogins()[ipC] = (10, DateTime.UtcNow, DateTime.UtcNow.AddSeconds(60));
-        var (outLocked, _) = await AuthLine(ipC, "Brand New:newpass:REGISTER:Web");
+        var (outLocked, _) = await AuthLine(ipC, "Brand New:newpass-long:REGISTER:Web");
         ErrText(outLocked).Should().StartWith("Too many failed logins.");
         Db.PlayerExists("Brand New").Should().BeFalse();
 
