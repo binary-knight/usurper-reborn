@@ -1,8 +1,9 @@
 ---
 title: The Sanctum
 path: /wiki/en/world/sanctum/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | The Sanctum turns an Evil character away at the door, as the Church does.
 history: 1.2.5 | Honor tournament champions and their drops are shown in each player's language, and the daily cost row is translated into all five languages.
 ---

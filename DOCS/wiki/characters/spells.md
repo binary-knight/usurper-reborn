@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.3 | none
 history: 1.3.2 | Prestige class spells start at Average, Purify cures a poisoned or diseased ally, and party healers no longer cast Purify as a heal.
 history: 1.3.1 | none
 history: 1.3.0 | The spell table shows the level at which each spell can be learned and cast and the mana a cast costs before Wisdom, and the Cure Critical and Judgment descriptions say that a cast removes Darkness first.

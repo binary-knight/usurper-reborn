@@ -1,8 +1,9 @@
 ---
 title: The world boss
 path: /wiki/en/online/world-boss/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/WorldBossMath.cs, Scripts/Data/WorldBossData.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/WorldEventSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | Your attacks on a world boss roll on your full critical hit chance, and a second world boss kill refreshes the running Realm Celebrates.
 ---
 A world boss is a shared online fight: every player who joins fights the same boss and its HP is shared. It exists only in online play. The bosses and their abilities are in the [boss reference](/wiki/en/monsters/bosses/#world-bosses).

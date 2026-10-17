@@ -1,8 +1,9 @@
 ---
 title: Daily Miracles
 path: /wiki/en/gods/miracles/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Systems/MiracleSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Data/BeastData.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | none
 ---
 A Miracle needs the Chosen tier, {{balance:GodFavorTierChosenMin}} Favor or more, and you have one use per daily reset. The combat menu shows the Miracle key only when it would help. Each grouped player has their own use. Saving and reloading does not restore a spent Miracle.

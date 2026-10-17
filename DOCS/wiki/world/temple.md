@@ -1,8 +1,9 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.3.2
+checked: 1.3.3
 sources: Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.3 | none
 history: 1.3.2 | none
 history: 1.3.0 | While a betrayal can be settled the Faith room lists B: forgive a betrayer, take revenge on the Stranger once if she escaped her fight, or make one act of atonement a day for a companion who left you, at 100 gold per level and at least 100.
 history: 1.2.5 | From level 10, while the Seal of Creation is unfound, a priest points you to the first Seal in the Temple; Temple screens and player god notices are in each player's language.
