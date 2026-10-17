@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex">
+<title>Forgotten password | Usurper Reborn</title>
+<link rel="stylesheet" href="/account/account.css">
+</head>
+<body>
+<main>
+<h1 data-i18n="account.forgot.title">Forgotten password</h1>
+<p data-i18n="account.forgot.intro">Type your account name or the email address on your account. If the account has a confirmed email address, a reset link is sent to it. The link works for 30 minutes.</p>
+<form id="forgot-form" method="post" action="/api/account/forgot" novalidate>
+<label for="name" data-i18n="account.forgot.label">Account name or email address</label>
+<input id="name" name="name" type="text" maxlength="254" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+<button type="submit" id="submit" data-i18n="account.forgot.submit">Send reset link</button>
+</form>
+<p id="msg-busy" class="msg" role="status" data-i18n="account.busy" hidden>Please wait...</p>
+<p id="msg-sent" class="msg good" role="status" data-i18n="account.forgot.sent" hidden>If that account has a confirmed email address, a reset link is on its way. Check your mail, including the spam folder.</p>
+<p id="msg-empty" class="msg bad" role="status" data-i18n="account.forgot.empty" hidden>Type an account name or an email address.</p>
+<p id="msg-error" class="msg bad" role="status" data-i18n="account.error" hidden>Something went wrong. Please try again in a few minutes.</p>
+<p class="note" data-i18n="account.forgot.bbs">Players who play through a BBS sign in with the BBS and have no game password here.</p>
+<p><a href="/" data-i18n="account.home">Back to Usurper Reborn</a></p>
+</main>
+<script src="/account/account.js"></script>
+<script src="/account/forgot/forgot.js"></script>
+</body>
+</html>
