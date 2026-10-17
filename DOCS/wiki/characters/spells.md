@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.4 | Probability Shift makes 30 percent of the target's hits miss and stops its critical hits in place of confusing and slowing it, Echo of Tomorrow ignores half the target's armor, and Paradox Collapse's text names its bonus damage.
 history: 1.3.3 | none
 history: 1.3.2 | Prestige class spells start at Average, Purify cures a poisoned or diseased ally, and party healers no longer cast Purify as a heal.
 history: 1.3.1 | none

@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Floors keep their special rooms, a failed riddle charges its damage once, and the Outskirts Prison buff halves room and chest trap damage.
 history: 1.3.0 | Rooms you cleared stay cleared after a disconnect, a reconnect or a save taken on the floor, a beaten boss included, and from floor 3 a room's monsters can include an elite, announced when the fight starts.
