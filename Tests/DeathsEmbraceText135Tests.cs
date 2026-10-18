@@ -33,7 +33,7 @@ public class DeathsEmbraceText135Tests
     private static string RepoRoot()
     {
         var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !File.Exists(Path.Combine(dir.FullName, "Localization", "en.json")))
+        while (dir != null && !(Directory.Exists(Path.Combine(dir.FullName, "Scripts")) && Directory.Exists(Path.Combine(dir.FullName, "Localization"))))
             dir = dir.Parent;
         dir.Should().NotBeNull("the test must run inside the repository");
         return dir!.FullName;
