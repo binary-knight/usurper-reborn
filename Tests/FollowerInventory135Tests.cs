@@ -48,15 +48,17 @@ public class FollowerInventory135Tests
 
     /// <summary>The follower inventory with `equipped` in every slot and `backpack` in the bag, through the game's
     /// own path (Character.BuildEquipmentFromItem, EquipmentDatabase.RegisterDynamic). The input unequips the weapon
-    /// and then tries backpack item 1, so both messages that carry a name are shown.</summary>
-    private static async Task<string> Render(string lang, Item equipped, Item backpack)
+    /// and then equips the last backpack item, a copy of `equipped`, which the registry finds by name whatever
+    /// other tests registered, so both messages that carry its name are shown.</summary>
+    private static async Task<string> Render(string lang, Item equipped, params Item[] backpack)
     {
         var eq = Character.BuildEquipmentFromItem(equipped, EquipmentSlot.MainHand, WeaponHandedness.OneHanded, WeaponType.Sword);
         int id = EquipmentDatabase.RegisterDynamic(eq);
         var player = new Character { Name1 = "Follower", Name2 = "Follower", Class = CharacterClass.Magician, Level = 100, HP = 10, MaxHP = 10,
             AI = CharacterAI.Human };
         foreach (var slot in AllSlots) player.EquippedItems[slot] = id;
-        player.Inventory.Add(backpack);
+        player.Inventory.AddRange(backpack);
+        player.Inventory.Add(Loot(equipped.Name, equipped.Family));
 
         var prev = GameConfig.Language;
         bool sr = GameConfig.ScreenReaderMode;
@@ -65,7 +67,7 @@ public class FollowerInventory135Tests
             GameConfig.Language = lang;
             GameConfig.ScreenReaderMode = false;
             var output = new MemoryStream();
-            var term = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes("U\n1\n1\n\n")), output);
+            var term = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes($"U\n1\n{backpack.Length + 1}\n\n")), output);
             await (Task)typeof(DungeonLocation).GetMethod("ShowFollowerInventory", FS)!.Invoke(null, new object[] { player, term })!;
             term.StreamWriterInternal?.Flush();
             // A player's Enter after a prompt ends that row on screen; the test input is not echoed, so the row
@@ -95,6 +97,8 @@ public class FollowerInventory135Tests
     /// show the name in full or cut.</summary>
     private static void NameRowsShow(string text, string lang, string shown)
     {
+        string prompt = "  " + Loc.GetIn(lang, "dungeon.follower_unequip_prompt");
+        text = text.Substring(0, text.IndexOf(prompt, StringComparison.Ordinal));
         int slotWidth = Math.Max(10, new[] { "inn.equip_slot_weapon", "inn.equip_slot_off_hand", "ui.head", "ui.body", "ui.arms", "ui.hands",
             "ui.legs", "ui.feet", "ui.cloak", "ui.waist", "ui.neck", "dungeon.slot_l_ring", "dungeon.slot_r_ring" }
             .Max(k => Loc.GetIn(lang, k).Length) + 1);
@@ -130,6 +134,8 @@ public class FollowerInventory135Tests
         if (lang == "es") shown.Length.Should().BeGreaterThan(MaxWidth - 20, "the Spanish name runs past the equipped row");
 
         string text = await Render(lang, rolled, dagger);
+        string unequippedEnd = Loc.GetIn(lang, "dungeon.follower_unequipped", "#").Split(' ').Last();
+        Rows(text).Should().Contain(r => r.EndsWith(unequippedEnd), "the unequip message is shown, wrapped at 79");
         text.Should().NotContain(RolledName).And.NotContain(dagger.Name);
         text.Should().Contain(Loc.GetIn(lang, "item.forest_guardian_armor"));
         NameRowsShow(text, lang, shown);
@@ -152,7 +158,7 @@ public class FollowerInventory135Tests
             .OrderByDescending(x => x.shown.Length).ThenBy(x => x.stored, StringComparer.Ordinal).First();
         if (lang != "en") shown.Should().NotBe(stored);
 
-        string text = await Render(lang, Loot(stored, family), Loot(stored, family));
+        string text = await Render(lang, Loot(stored, family));
         if (lang != "en") text.Should().NotContain(stored);
         NameRowsShow(text, lang, shown);
         EveryRowFits(text, "follower inventory");
