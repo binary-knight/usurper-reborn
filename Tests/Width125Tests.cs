@@ -93,7 +93,7 @@ public class Width125Tests
         "mability.sanctuary", "mability.self_repair", "mability.thorns", "mability.tree_meld_avoid",
         "magic_shop.curse_confirm", "magic_shop.curse_confirm_team", "magic_shop.cursed_team_entry",
         "magic_shop.cursed_worn_entry", "magic_shop.curse_scene_1", "magic_shop.curse_team_scene_1",
-        "magic_shop.curse_team_success", "magic_shop.enchant_anvil", "magic_shop.old_enchant_confirm",
+        "magic_shop.curse_team_success", "magic_shop.enchant_anvil",
         "magic_shop.remove_enchant_confirm", "marketplace.news_npc_bought", "marketplace.news_npc_listed",
         "marketplace.news_purchased", "miracle.banish", "miracle.banish_resist", "miracle.bind", "party_inv.taken",
         "secretboss.group_share", "settlement.scouts_floor", "shop.couldnt_equip", "shop.purchased_inventory",

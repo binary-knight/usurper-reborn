@@ -356,4 +356,34 @@ public class FailedEnchant135Tests : IDisposable
             Regex.Replace(string.Join(" ", rows), @"\s+", " ").Trim().Should().Be(Regex.Replace(row, @"\s+", " ").Trim());
         }
     }
+
+    [Fact]
+    public async Task Removal_NamesTheRestoredItem_AsItIsShown()
+    {
+        var hero = Hero();
+        Wear(hero, new Equipment { Name = "Leather Cap", Slot = EquipmentSlot.Head, ArmorClass = 3, MinLevel = 1, Value = 100 });
+        MagicShopLocation.EnchantRandom = Succeeds;
+        await Enchant(hero, 1, 1, 4);
+        GameConfig.Language = "hu";
+        string shown = ItemNames.DisplayIn("hu", "Leather Cap");
+        shown.Should().NotBe("Leather Cap", "the Hungarian name differs from the stored English one");
+        string text = await Run(hero, "RemoveEnchantment", "1", "Y");
+        text.Should().Contain(Loc.Get("magic_shop.remove_restored", shown), "the restored line names the item as it is shown");
+        hero.GetEquipment(EquipmentSlot.Head)!.Name.Should().Be("Leather Cap", "the stored name stays English");
+    }
+
+    // ---------- the legacy enchant menu ----------
+
+    [Fact]
+    public void LegacyEnchantMenu_AndItsOldKeys_AreGone()
+    {
+        typeof(MagicShopLocation).GetMethod("EnchantItem", F).Should().BeNull("the legacy enchant menu had no caller");
+        string root = UsurperReborn.Tests.Localization.HardcodedTextScannerTests.RepoRoot();
+        foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+        {
+            string json = File.ReadAllText(Path.Combine(root, "Localization", lang + ".json"));
+            Regex.Matches(json, "\"magic_shop\\.old_[a-z0-9_]*\"").Select(m => m.Value).Should()
+                .BeEmpty($"no magic_shop.old_ key is left in {lang}");
+        }
+    }
 }

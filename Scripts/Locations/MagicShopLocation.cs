@@ -1104,258 +1104,6 @@ public partial class MagicShopLocation : BaseLocation
     }
 
     /// <summary>
-    /// Enchant or bless items - add magical properties
-    /// </summary>
-    private async Task EnchantItem(Character player)
-    {
-        DisplayMessage("");
-        WriteSectionHeader(Loc.Get("magic_shop.enchant_bless"), "magenta");
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_waves", _ownerName), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_intro"), "cyan");
-        DisplayMessage("");
-
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_1"), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_2"), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_3"), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_4"), "blue");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_5"), "cyan");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_6"), "yellow");
-        DisplayMessage("");
-
-        var input = await terminal.GetInput(Loc.Get("magic_shop.old_enchant_prompt"));
-        if (!int.TryParse(input, out int enchantChoice) || enchantChoice <= 0 || enchantChoice > 6)
-            return;
-
-        long[] costs = { 0, 2000, 5000, 12000, 25000, 15000, 8000 };
-        long cost = costs[enchantChoice];
-        var (enchKingTax, enchCityTax, enchTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
-
-        if (player.Gold < enchTotalWithTax)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_enchant_no_gold"), "cyan");
-            DisplayMessage(Loc.Get("shop.insufficient_gold_enchant", $"{enchTotalWithTax:N0}"), "red");
-            await terminal.WaitForKey();
-            return;
-        }
-
-        // Show items that can be enchanted
-        var enchantableItems = player.Inventory.Where(i =>
-            i.Type == ObjType.Magic || i.MagicType != MagicItemType.None).ToList();
-
-        if (enchantableItems.Count == 0)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_no_enchantable"), "gray");
-            DisplayMessage(Loc.Get("magic_shop.old_bring_items"), "cyan");
-            await terminal.WaitForKey();
-            return;
-        }
-
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchantable_items"), "cyan");
-        for (int i = 0; i < enchantableItems.Count; i++)
-        {
-            var item = enchantableItems[i];
-            string status = item.IsCursed ? Loc.Get("shop.cursed_no_enchant") : "";
-            DisplayMessage($"{i + 1}. {ItemNames.Display(item)}{status}", item.IsCursed ? "red" : "white");
-        }
-
-        DisplayMessage("");
-        input = await terminal.GetInput(Loc.Get("magic_shop.old_choose_item"));
-
-        if (!int.TryParse(input, out int itemIndex) || itemIndex <= 0 || itemIndex > enchantableItems.Count)
-            return;
-
-        var targetItem = enchantableItems[itemIndex - 1];
-
-        if (targetItem.IsCursed)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_cursed_enchant"), "red");
-            DisplayMessage(Loc.Get("magic_shop.old_remove_first"), "cyan");
-            await terminal.WaitForKey();
-            return;
-        }
-
-        // For stat-boosting enchants, let player choose the stat.
-        // v0.57.9 (Lumina report: "there are only these stats available: WP, STR, DEX,
-        // DEF, WIS, AP. What about the rest?"): expanded from 5 options to 13 so casters
-        // can actually enhance INT/Mana, tanks can buff HP/CON, dex builds get Agility,
-        // etc. The first 5 cases are identical to the legacy behavior; cases 6-13 cover
-        // every remaining Item stat field (Armor, HP, Mana, Agility, Charisma, Stamina)
-        // plus the two fields that live in the LootEffects list (Constitution, Intelligence).
-        int statChoice = 0;
-        if (enchantChoice >= 1 && enchantChoice <= 3)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_choose_stat"), "cyan");
-            DisplayMessage(Loc.Get("magic_shop.old_stat_options"), "gray");
-            DisplayMessage(Loc.Get("magic_shop.old_stat_options_2"), "gray");
-            DisplayMessage(Loc.Get("magic_shop.old_stat_options_3"), "gray");
-            input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (!int.TryParse(input, out statChoice) || statChoice <= 0 || statChoice > 13)
-                return;
-        }
-
-        DisplayMessage("");
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
-        // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.old_enchant_confirm", ItemNames.Display(targetItem), $"{enchTotalWithTax:N0}"))))
-            return;
-
-        player.Gold -= enchTotalWithTax;
-        CityControlSystem.Instance.ProcessSaleTax(cost);
-
-        // Apply the enchantment
-        int bonus = enchantChoice switch
-        {
-            1 => 2,
-            2 => 4,
-            3 => 6,
-            _ => 0
-        };
-
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_ritual", _ownerName), "gray");
-        await Pacing.Wait(500);
-
-        switch (enchantChoice)
-        {
-            case 1:
-            case 2:
-            case 3:
-                ApplyStatEnchant(targetItem, statChoice, bonus);
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_flows", ItemNames.Display(targetItem)), "magenta");
-                break;
-
-            case 4: // Divine Blessing
-                targetItem.Strength += 3;
-                targetItem.Defence += 3;
-                targetItem.Dexterity += 3;
-                targetItem.Wisdom += 3;
-                targetItem.Attack += 3;
-                targetItem.MagicProperties.Wisdom += 3;
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_divine"), "bright_yellow");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_blessed", ItemNames.Display(targetItem)), "blue");
-                break;
-
-            case 5: // Ocean's Touch
-                targetItem.MagicProperties.Mana += 30;
-                targetItem.Wisdom += 2;
-                targetItem.MagicProperties.Wisdom += 2;
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_salt"), "cyan");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_ocean", ItemNames.Display(targetItem)), "blue");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_waves_remember"), "gray");
-                break;
-
-            case 6: // Ward Against Evil
-                targetItem.MagicProperties.MagicResistance += 20;
-                targetItem.Defence += 2;
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_runes"), "yellow");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_protect", ItemNames.Display(targetItem)), "green");
-                break;
-        }
-
-        // Update item name to show it's been enchanted (if not already)
-        if (!targetItem.Name.Contains("+") && !targetItem.Name.Contains("Blessed") &&
-            !targetItem.Name.Contains("Enchanted"))
-        {
-            string suffix = enchantChoice switch
-            {
-                4 or 5 or 6 => NamedEnchantTag(enchantChoice + 1),   // Blessed, Ocean-Touched, Warded
-                _ => $" +{bonus}"
-            };
-
-            // Only add suffix if name isn't too long
-            if (targetItem.Name.Length + suffix.Length < 35)
-                targetItem.Name += suffix;
-        }
-
-        // v1.1.7: an enchant adds what it cost, never a multiple of what the item was worth. The old
-        // x1.5 compounded without limit for a flat fee. (This legacy flow has no caller; kept honest.)
-        targetItem.Value = Math.Min(GameConfig.MaxItemValue, Math.Clamp(targetItem.Value, 0, GameConfig.MaxItemValue) + Math.Clamp(cost, 0, GameConfig.MaxItemValue));
-        targetItem.ClampStats();
-
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_complete"), "bright_green");
-
-        player.Statistics?.RecordGoldSpent(enchTotalWithTax);
-        player.Statistics?.RecordMagicShopPurchase(enchTotalWithTax);
-    }
-
-    private void ApplyStatEnchant(Item item, int statChoice, int bonus)
-    {
-        switch (statChoice)
-        {
-            case 1:
-                item.Strength += bonus;
-                break;
-            case 2:
-                item.Defence += bonus;
-                break;
-            case 3:
-                item.Dexterity += bonus;
-                item.MagicProperties.Dexterity += bonus;
-                break;
-            case 4:
-                item.Wisdom += bonus;
-                item.MagicProperties.Wisdom += bonus;
-                break;
-            case 5:
-                item.Attack += bonus;
-                break;
-            case 6:
-                item.Armor += bonus;
-                break;
-            case 7:
-                item.HP += bonus;
-                break;
-            case 8:
-                item.Mana += bonus;
-                break;
-            case 9:
-                item.Agility += bonus;
-                break;
-            case 10:
-                item.Charisma += bonus;
-                break;
-            case 11:
-                item.Stamina += bonus;
-                break;
-            case 12:
-                IncrementLootEffect(item, (int)LootGenerator.SpecialEffect.Constitution, bonus);
-                break;
-            case 13:
-                IncrementLootEffect(item, (int)LootGenerator.SpecialEffect.Intelligence, bonus);
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Increment (or add) a value on an Item.LootEffects entry. Used for Constitution /
-    /// Intelligence enchants, which live in the LootEffects list rather than as direct
-    /// Item fields. Tuple elements aren't mutable in place, so an existing entry is
-    /// replaced with a new tuple carrying the summed value.
-    /// </summary>
-    private static void IncrementLootEffect(Item item, int effectType, int bonus)
-    {
-        if (item.LootEffects == null) return;
-        int existing = item.LootEffects.FindIndex(e => e.EffectType == effectType);
-        if (existing >= 0)
-        {
-            var (type, value) = item.LootEffects[existing];
-            item.LootEffects[existing] = (type, value + bonus);
-        }
-        else
-        {
-            item.LootEffects.Add((effectType, bonus));
-        }
-    }
-
-
-    /// <summary>
     /// Buy a Dungeon Reset Scroll to reset a dungeon floor's monsters.
     /// Permanently cleared floors (seal / secret boss) and Old God boss floors
     /// are excluded — those cannot be rolled back by a scroll.
@@ -1686,12 +1434,12 @@ public partial class MagicShopLocation : BaseLocation
     internal static string StatSuffix(int bonus, int statChoice) => $" +{bonus} {StatNames[statChoice - 1]}";
 
     /// <summary>v1.2.5: the English tag a named enchant appends to the item's stored name, by enchant tier
-    /// (both enchant flows write it from here, the legacy one by its own choice + 1), "" for a stat tier.
+    /// (the enchant flow writes it from here), "" for a stat tier.
     /// RemoveEnchantment strips every tag this returns, so a new tag is stripped as soon as it is written.</summary>
     internal static string NamedEnchantTag(int tierChoice) =>
         NamedEnchantTags.FirstOrDefault(t => t.Tier == tierChoice).Tag ?? "";
 
-    // v1.2.5: the named enchant tags by tier, the one list both enchant flows write from and removal strips.
+    // v1.2.5: the named enchant tags by tier, the one list the enchant flow writes from and removal strips.
     private static readonly (int Tier, string Tag)[] NamedEnchantTags =
     {
         (5, " (Blessed)"),
@@ -1708,7 +1456,7 @@ public partial class MagicShopLocation : BaseLocation
         Enumerable.Range(1, EnchantTiers.Length).Select(NamedEnchantTag).Where(t => t.Length > 0);
 
     /// <summary>v1.2.5: the stored name with every enchant tag taken out: each named tag, each stat suffix
-    /// (" +6 Dex", StatSuffix) and the legacy flow's bare " +N". Used by RemoveEnchantment.</summary>
+    /// (" +6 Dex", StatSuffix) and the bare " +N" the old enchant menu (removed in 1.3.5) wrote. Used by RemoveEnchantment.</summary>
     internal static string StripEnchantTags(string name)
     {
         foreach (var tag in AllNamedEnchantTags())
@@ -2769,7 +2517,7 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.remove_dissolve"), "magenta");
-        DisplayMessage(Loc.Get("magic_shop.remove_restored", stripped.Name), "yellow");
+        DisplayMessage(Loc.Get("magic_shop.remove_restored", ItemNames.Display(stripped)), "yellow");
         player.Statistics?.RecordGoldSpent(removalCost);
 
         await terminal.WaitForKey();
