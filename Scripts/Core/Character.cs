@@ -1550,7 +1550,8 @@ public class Character
             Name = equipment.Name,
             Type = itemType,
             Attack = equipment.WeaponPower,
-            Armor = itemType == global::ObjType.Shield ? 0 : equipment.ArmorClass,
+            // 1.3.5: a shield's own armour class (an enchant's AC) rides in Armor beside its ShieldBonus.
+            Armor = equipment.ArmorClass,
             ShieldBonus = equipment.ShieldBonus,
             BlockChance = equipment.BlockChance,
             Value = equipment.Value,
@@ -1645,10 +1646,12 @@ public class Character
             WeaponType = weaponType,
             WeightClass = weightClass,
             WeaponPower = item.Attack,
-            // A shield's defensive value lives in ShieldBonus (Armor stays 0). Math.Max also recovers
-            // legacy saves that stored it in item.Armor. Non-shields keep ArmorClass = item.Armor.
-            ArmorClass = isShield ? 0 : item.Armor,
-            ShieldBonus = isShield ? Math.Max(item.ShieldBonus, item.Armor) : 0,
+            // A shield's defensive value lives in ShieldBonus. 1.3.5: with a ShieldBonus, item.Armor is the
+            // shield's own armour class (an enchant's AC) and is kept. A legacy shield (saved before 0.52.14)
+            // has ShieldBonus 0 and its block value in item.Armor, and still reads it as ShieldBonus.
+            // Non-shields keep ArmorClass = item.Armor.
+            ArmorClass = isShield ? (item.ShieldBonus > 0 ? item.Armor : 0) : item.Armor,
+            ShieldBonus = isShield ? (item.ShieldBonus > 0 ? item.ShieldBonus : item.Armor) : 0,
             BlockChance = item.BlockChance,
             DefenceBonus = item.Defence,
             StrengthBonus = item.Strength,
