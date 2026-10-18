@@ -4398,8 +4398,13 @@ public partial class CombatEngine
             // are now real Slow status applications.
             if (attacker.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+                // 1.3.5: through the boss soft-control resist, as the frost proc; a resisted slow does nothing
+                int frostbrandRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+                if (frostbrandRounds > 0)
+                {
+                    target.IsSlowed = true;
+                    target.SlowDuration = Math.Max(target.SlowDuration, frostbrandRounds);
+                }
             }
 
             // Ancestral Guidance: 25% of enchant damage dealt heals the party
@@ -5452,7 +5457,10 @@ public partial class CombatEngine
         // Check if monster is slowed (from Slow spell)
         if (monster.IsSlowed)
         {
-            monster.SlowDuration--;
+            // 1.3.5: every slow counts down once a round, as its rounds say, not on each action of a boss that
+            // acts more than once
+            if (firstActionThisRound)
+                monster.SlowDuration--;
             if (random.Next(100) < 50)
             {
                 terminal.WriteLine(Loc.Get("combat.monster_sluggish", MonsterNames.Display(monster)), "gray");
@@ -9010,7 +9018,9 @@ public partial class CombatEngine
         result.TotalDamageDealt += actualDamage;
         result.Player?.Statistics.RecordDamageDealt(actualDamage, crit || alreadyCrit);
 
+        // 1.3.5: a magical ability fires no weapon proc and no Lifedrinker, as on the generic ability path
         ApplyPostHitEnchantments(player, target, actualDamage, result,
+            isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect),
             notMelee: IsMagicalAbilityEffect(abilityResult.SpecialEffect) || IsRangedAbility(abilityResult.AbilityUsed));   // the Gnoll bite is melee only
 
         if (!IsMagicalAbilityEffect(abilityResult.SpecialEffect) && !IsRangedAbility(abilityResult.AbilityUsed))
@@ -9845,18 +9855,23 @@ public partial class CombatEngine
             // description "+20 power + chance to slow enemies". Now applies the real Slow
             // status (Monster.IsSlowed halves attack count via CombatEngine:4266), refreshing
             // duration on repeat procs to FrostEnchantDuration (2 rounds).
-            target.IsSlowed = true;
-            target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
-            terminal.SetColor("bright_cyan");
-            // v0.60.10 (druidah Lv.20 Cleric report): "Somehow Lyris can use the frost effect
-            // sometimes." The proc was correctly reading the source weapon's HasFrostEnchant,
-            // but the message had no attacker attribution -- so when a teammate's frost-enchanted
-            // weapon procced, the player saw "Frost spreads from the impact!" with no name and
-            // assumed her own staff's enchant had leaked across characters. Mirror the
-            // fire/lightning pattern that already differentiates player vs teammate.
-            UIHelper.WriteRow(terminal, isPlayer
-                ? Loc.Get("combat.enchant_frost", MonsterNames.Display(target))
-                : Loc.Get("combat.enchant_frost_tm", name, MonsterNames.Display(target)));
+            // 1.3.5: through the boss soft-control resist, as every other slow; a resisted proc does nothing.
+            int frostRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+            if (frostRounds > 0)
+            {
+                target.IsSlowed = true;
+                target.SlowDuration = Math.Max(target.SlowDuration, frostRounds);
+                terminal.SetColor("bright_cyan");
+                // v0.60.10 (druidah Lv.20 Cleric report): "Somehow Lyris can use the frost effect
+                // sometimes." The proc was correctly reading the source weapon's HasFrostEnchant,
+                // but the message had no attacker attribution -- so when a teammate's frost-enchanted
+                // weapon procced, the player saw "Frost spreads from the impact!" with no name and
+                // assumed her own staff's enchant had leaked across characters. Mirror the
+                // fire/lightning pattern that already differentiates player vs teammate.
+                UIHelper.WriteRow(terminal, isPlayer
+                    ? Loc.Get("combat.enchant_frost", MonsterNames.Display(target))
+                    : Loc.Get("combat.enchant_frost_tm", name, MonsterNames.Display(target)));
+            }
         }
 
         if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
@@ -14042,6 +14057,8 @@ public partial class CombatEngine
     // was invalid/dead. Callers MUST skip post-hit effects (lifesteal and other enchant procs,
     // weapon-enchant riders, on-hit heals) when this returns false -- an evaded swing passes
     // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
+    // 1.3.5: on-hit effects scale from the HP the hit removed, not from the damage passed in (a phase immunity
+    // residual included, never more than the HP the target had); a caller reads it through ApplySingleMonsterDamageDealt.
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
@@ -14050,6 +14067,7 @@ public partial class CombatEngine
         // 1.3.4: set only by ApplySpellDamageIgnoringArmor, for this one call
         int armorIgnoredPercent = _armorIgnoredPercent;
         _armorIgnoredPercent = 0;
+        _lastHitOnHitDamage = 0;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -14159,8 +14177,13 @@ public partial class CombatEngine
         if (attacker != null)
             actualDamage = TeamHQBonus.ApplyAttack(attacker, actualDamage);
 
+        long hpBeforeHit = target.HP;
         target.HP -= actualDamage;
         EvHit(attacker, actualDamage);   // 1.2.6
+        // 1.3.5: the figure on-hit effects scale from: the HP removed, after armour, divine armour and the Armory,
+        // never more than the HP the target had (no overkill)
+        long hpRemoved = Math.Min(actualDamage, hpBeforeHit);
+        long onHitDamage = hpRemoved;   // a phase immunity residual counts as any other hit, as on the area and older paths
 
         // Track damage dealt statistics (only for player attacks)
         if (attacker == currentPlayer || attacker == result.Player)
@@ -14259,7 +14282,21 @@ public partial class CombatEngine
             ReflectMonsterThorns(attacker, target, actualDamage);   // 1.3.2: a melee swing on Thorns
 
         result.CombatLog.Add($"{target.Name} took {actualDamage} damage from {damageSource}");
+        _lastHitOnHitDamage = onHitDamage;   // set last: a call made above (a kill, thorns) does not overwrite it
         return true; // attack landed -- caller may apply post-hit effects
+    }
+
+    // 1.3.5: the on-hit figure of the last ApplySingleMonsterDamage call; 0 when it landed nothing
+    private long _lastHitOnHitDamage;
+
+    /// <summary>1.3.5: ApplySingleMonsterDamageChecked for a caller that runs on-hit effects. Returns the HP the hit
+    /// removed, after armour, divine armour and the Armory and never more than the target had, which every on-hit
+    /// effect scales from; 0 when the hit was evaded or found no target, and then the caller runs no on-hit effect.</summary>
+    private async Task<long> ApplySingleMonsterDamageDealt(Monster target, long damage, CombatResult result, string damageSource, Character attacker, bool isSpellDamage, bool evasionChecked)
+    {
+        if (!await ApplySingleMonsterDamageChecked(target, damage, result, damageSource, attacker, isSpellDamage, evasionChecked))
+            return 0;
+        return _lastHitOnHitDamage;
     }
 
     // 1.2.8 (the player to-hit roll): true while the one ApplySingleMonsterDamage call made by
@@ -14444,8 +14481,13 @@ public partial class CombatEngine
             // now real Slow status.
             if (player.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+                // 1.3.5: through the boss soft-control resist, as the frost proc; a resisted slow does nothing
+                int frostbrandRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+                if (frostbrandRounds > 0)
+                {
+                    target.IsSlowed = true;
+                    target.SlowDuration = Math.Max(target.SlowDuration, frostbrandRounds);
+                }
             }
 
             // Ancestral Guidance: 25% of damage dealt heals the party
@@ -15246,7 +15288,7 @@ public partial class CombatEngine
 
                         long damage = ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, hitNatural);
 
-                        bool swingLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
+                        long swingDealt = await ApplySingleMonsterDamageDealt(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
 
                         // If the swing was evaded (Incorporeal / Phase / etc. -- the attack passes
                         // through for 0 damage), skip EVERY on-hit effect for this swing: lifesteal
@@ -15254,13 +15296,13 @@ public partial class CombatEngine
                         // damage/procs, and the Ancestral Guidance heal below. Player report: life
                         // steal still triggered when the attack passed through the enemy. The evasion
                         // flavor line was already printed inside ApplySingleMonsterDamage.
-                        if (!swingLanded)
+                        if (swingDealt <= 0)
                             continue;
 
                         // All landed-swing on-hit effects (post-hit enchants + Shaman weapon-enchant
                         // rider + Ancestral Guidance) run through the shared helper so the [P] Power
                         // Attack fires the identical pipeline.
-                        ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, damage), isOffHandAttack, result);   // v1.1.11: riders scale from the hit, Armory included
+                        ApplyPlayerSwingOnHitEffects(player, target, swingDealt, isOffHandAttack, result);   // 1.3.5: riders scale from the HP removed, Armory included (v1.1.11)
                     }
 
                     // 1.3.2: the attack action can improve basic attack proficiency, once an action, up to Good
@@ -15617,8 +15659,9 @@ public partial class CombatEngine
         // Power Attack runs the same on-hit enchant pipeline as a basic swing (lifesteal, elemental
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
         // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
-        if (await ApplySingleMonsterDamageChecked(target, powerDamage, result, "power attack", player, isSpellDamage: false, evasionChecked: hitRolled))
-            ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, powerDamage), isOffHandAttack: false, result);   // v1.1.11
+        long powerDealt = await ApplySingleMonsterDamageDealt(target, powerDamage, result, "power attack", player, isSpellDamage: false, evasionChecked: hitRolled);
+        if (powerDealt > 0)
+            ApplyPlayerSwingOnHitEffects(player, target, powerDealt, isOffHandAttack: false, result);   // 1.3.5: from the HP removed (v1.1.11 Armory inside)
 
         await PowerAttackOffHandFollowUp(player, target, monsters, result, hitRolled);
     }
@@ -15656,8 +15699,9 @@ public partial class CombatEngine
 
                 // Off-hand follow-up procs its enchants only if it actually connected (same evade
                 // gate + shared on-hit pipeline as the basic-attack off-hand swing).
-                if (await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
-                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), isOffHandAttack: true, result);   // v1.1.11
+                long ohDealt = await ApplySingleMonsterDamageDealt(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled);
+                if (ohDealt > 0)
+                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, ohDealt, isOffHandAttack: true, result);   // 1.3.5: from the HP removed (v1.1.11 Armory inside)
             }
         }
     }
@@ -16372,8 +16416,9 @@ public partial class CombatEngine
 
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
                 // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
-                if (ohLands && await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
-                    ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);   // v1.1.11: riders scale from the boosted hit, as at every other caller
+                long ohDealt = ohLands ? await ApplySingleMonsterDamageDealt(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled) : 0;
+                if (ohDealt > 0)
+                    ApplyPostHitEnchantments(player, offHandTarget, ohDealt, result, weaponSlot: EquipmentSlot.OffHand);   // 1.3.5: from the HP removed (v1.1.11 Armory inside), as at every other caller
             }
         }
 
@@ -20268,12 +20313,13 @@ public partial class CombatEngine
 
                 long damage = Math.Max(1, attackPower);
                 damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-                bool tmLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
+                long tmDealt = await ApplySingleMonsterDamageDealt(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
 
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
-                if (tmLanded)
-                    ApplyPostHitEnchantments(teammate, target, TeamHQBonus.ApplyAttack(teammate, damage), result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 (0 for NPCs)
+                // 1.3.5: the riders scale from the HP removed.
+                if (tmDealt > 0)
+                    ApplyPostHitEnchantments(teammate, target, tmDealt, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 Armory inside (0 for NPCs)
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
