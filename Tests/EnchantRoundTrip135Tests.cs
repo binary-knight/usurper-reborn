@@ -163,7 +163,7 @@ public class EnchantRoundTrip135Tests
     private static Equipment WearShield(Character hero, global::Item bag) =>
         Wear(hero, bag, EquipmentSlot.OffHand, WeaponHandedness.OffHandOnly, WeaponType.Shield);
 
-    private static void ShieldTrips(Character hero, global::Item bag, int armour, int bareArmPow)
+    private static void ShieldTrips(Character hero, global::Item bag, int armour, long bareArmPow)
     {
         for (int trip = 1; trip <= Trips; trip++)
         {
@@ -183,7 +183,7 @@ public class EnchantRoundTrip135Tests
     {
         var hero = Hero();
         hero.RecalculateStats();
-        int bare = hero.ArmPow;
+        long bare = hero.ArmPow;
         hero.Inventory.Add(hero.ConvertEquipmentToLegacyItem(TripShield()));
 
         await ShopEnchant(hero, "1", "5", "Y");   // Divine Blessing, made while the shield is in the bag
@@ -199,7 +199,7 @@ public class EnchantRoundTrip135Tests
     {
         var hero = Hero();
         hero.RecalculateStats();
-        int bare = hero.ArmPow;
+        long bare = hero.ArmPow;
         var bag = hero.ConvertEquipmentToLegacyItem(TripShield());
         hero.Inventory.Add(bag);
         WearShield(hero, bag);
