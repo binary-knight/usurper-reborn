@@ -12563,7 +12563,7 @@
   "ability.void_rupture.name": "Squarcio del Vuoto",
   "ability.void_rupture.desc": "Squarcia il vuoto. 160 danni ad area. I nemici uccisi esplodono infliggendo 60 danni bonus agli altri.",
   "ability.deaths_embrace.name": "Abbraccio della Morte",
-  "ability.deaths_embrace.desc": "Inganna la morte. Se i PV scendono a 0, resusciti con 1 PV e diventi invulnerabile per 1 turno. Dura 3 turni.",
+  "ability.deaths_embrace.desc": "Inganna la morte. Rigeneri PV per 3 turni e schivi il prossimo attacco. La prossima volta che i PV scendono a 0 in questo combattimento, resusciti con il 15% dei PV massimi e schivi il prossimo attacco.",
   "ability.annihilation.name": "Annientamento",
   "ability.annihilation.desc": "Cancella dall'esistenza. Costa il 50% dei PV attuali. 300 danni. Sotto il 50% di PV: uccisione istantanea (non boss).",
   "_comment_city": "=== Sistema Controllo Città ===",

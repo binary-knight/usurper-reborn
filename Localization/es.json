@@ -12563,7 +12563,7 @@
   "ability.void_rupture.name": "Ruptura del Vacío",
   "ability.void_rupture.desc": "Desgarra el vacío. 160 de daño en área. Los enemigos muertos explotan y causan 60 de daño extra a los demás.",
   "ability.deaths_embrace.name": "Abrazo de la Muerte",
-  "ability.deaths_embrace.desc": "Engaña a la muerte. Si tus PV llegan a 0, revives con 1 PV y eres invulnerable durante 1 ronda. Dura 3 rondas.",
+  "ability.deaths_embrace.desc": "Engaña a la muerte. Regeneras PV durante 3 rondas y esquivas el próximo ataque. La próxima vez que tus PV lleguen a 0 en este combate, revives con el 15% de tus PV máx. y esquivas el próximo ataque.",
   "ability.annihilation.name": "Aniquilación",
   "ability.annihilation.desc": "Borra de la existencia. Cuesta 50% de los PV actuales. 300 de daño. Con menos de 50% de PV: muerte instantánea (no jefes).",
   "_comment_city": "=== Control de Ciudad ===",

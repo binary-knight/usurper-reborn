@@ -12571,7 +12571,7 @@
   "ability.void_rupture.name": "Űrhasadás",
   "ability.void_rupture.desc": "Széttéped az ürt. 160 területi sebzés. A megölt ellenségek felrobbannak, 60 bónusz sebzést okozva a többieknek.",
   "ability.deaths_embrace.name": "Halál Ölelése",
-  "ability.deaths_embrace.desc": "Megcsalod a halált. Ha az ÉP eléri a 0-t, 1 ÉP-vel feltámadsz és 1 körre sebezhetetlen leszel. 3 körig tart.",
+  "ability.deaths_embrace.desc": "Megcsalod a halált. 3 körön át regenerálódsz, és kitérsz a következő támadás elől. Amikor ebben a harcban legközelebb az ÉP-d eléri a 0-t, a max ÉP 15%-ával feltámadsz, és kitérsz a következő támadás elől.",
   "ability.annihilation.name": "Megsemmisítés",
   "ability.annihilation.desc": "Kitörlöd a létezésből. Az aktuális ÉP 50%-ába kerül. 300 sebzés. 50% ÉP alatt: azonnali halál (boss nem).",
   "_comment_city": "=== Városirányítási Rendszer ===",
