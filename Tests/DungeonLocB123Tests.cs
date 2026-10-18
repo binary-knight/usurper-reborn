@@ -662,8 +662,9 @@ public class DungeonLocB123Tests
     [InlineData("es")]
     public async Task FollowerInventory_RendersInLanguage_AndFits(string lang)
     {
-        // Every slot holds the equipment with the longest name; the backpack holds it too.
-        var longest = EquipmentDatabase.GetAll().OrderByDescending(e => e.Name.Length).First();
+        // Every slot holds the built-in equipment with the longest name; the backpack holds it too. v1.3.5: built-in
+        // only, never a loot item another test registered (a composed loot name has no single key; FollowerInventory135Tests).
+        var longest = EquipmentDatabase.GetBuiltInTemplates().OrderByDescending(e => e.Name.Length).First();
         var player = Follower();
         foreach (var slot in new[] { EquipmentSlot.MainHand, EquipmentSlot.OffHand, EquipmentSlot.Head, EquipmentSlot.Body, EquipmentSlot.Arms,
                      EquipmentSlot.Hands, EquipmentSlot.Legs, EquipmentSlot.Feet, EquipmentSlot.Cloak, EquipmentSlot.Waist, EquipmentSlot.Neck,

@@ -19199,6 +19199,15 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private static async Task ShowFollowerInventory(Character player, TerminalEmulator term)
     {
+        // v1.3.5: an item name ends each list row; a name longer than the rest of the row in this language
+        // (a world boss drop in Spanish) is cut with a closing period, so the row fits 79 columns. No English
+        // name is that long.
+        static string FitRow(string shown, int used)
+        {
+            int room = UsurperRemake.UI.UIHelper.WrapWidth - used;
+            return shown.Length <= room ? shown : shown.Substring(0, room - 1).TrimEnd() + ".";
+        }
+
         while (true)
         {
             term.ClearScreen();
@@ -19253,7 +19262,7 @@ public class DungeonLocation : BaseLocation
                     term.SetColor("gray");
                     term.Write($"    {name.PadRight(slotWidth)}");
                     term.SetColor("yellow");
-                    term.WriteLine($"{ItemNames.Display(equip)}");
+                    term.WriteLine(FitRow(ItemNames.Display(equip), 4 + slotWidth));
                 }
             }
 
@@ -19271,9 +19280,10 @@ public class DungeonLocation : BaseLocation
                 for (int i = 0; i < player.Inventory.Count; i++)
                 {
                     term.SetColor("gray");
-                    term.Write($"    {i + 1}. ");
+                    string number = $"    {i + 1}. ";
+                    term.Write(number);
                     term.SetColor("cyan");
-                    term.WriteLine(ItemNames.Display(player.Inventory[i]));
+                    term.WriteLine(FitRow(ItemNames.Display(player.Inventory[i]), number.Length));
                 }
             }
 
@@ -19315,7 +19325,7 @@ public class DungeonLocation : BaseLocation
                 if (!item.CanUse(player))
                 {
                     term.SetColor("red");
-                    term.WriteLine(Loc.Get("dungeon.cannot_equip_item", ItemNames.Display(item)));
+                    UsurperRemake.UI.UIHelper.WriteRow(term, Loc.Get("dungeon.cannot_equip_item", ItemNames.Display(item)));
                     await Pacing.Wait(1500);
                     continue;
                 }
@@ -19329,7 +19339,7 @@ public class DungeonLocation : BaseLocation
                     {
                         player.Inventory.RemoveAt(itemNum - 1);
                         term.SetColor("bright_green");
-                        term.WriteLine(Loc.Get("dungeon.equipped_item_self", ItemNames.Display(knownEquip)));
+                        UsurperRemake.UI.UIHelper.WriteRow(term, Loc.Get("dungeon.equipped_item_self", ItemNames.Display(knownEquip)));
                         if (!string.IsNullOrEmpty(equipMsg))
                         {
                             term.SetColor("gray");
@@ -19345,7 +19355,7 @@ public class DungeonLocation : BaseLocation
                 else
                 {
                     term.SetColor("red");
-                    term.WriteLine($"  {Loc.Get("dungeon.follower_cannot_be_equipped", ItemNames.Display(item))}");
+                    UsurperRemake.UI.UIHelper.WriteRow(term, $"  {Loc.Get("dungeon.follower_cannot_be_equipped", ItemNames.Display(item))}");
                 }
                 await Pacing.Wait(1500);
                 continue;
@@ -19359,11 +19369,12 @@ public class DungeonLocation : BaseLocation
                 for (int i = 0; i < equippedList.Count; i++)
                 {
                     term.SetColor("gray");
-                    term.Write($"    {i + 1}. ");
+                    string number = $"    {i + 1}. ", slotLabel = $"{equippedList[i].name}: ";
+                    term.Write(number);
                     term.SetColor("yellow");
-                    term.Write($"{equippedList[i].name}: ");
+                    term.Write(slotLabel);
                     term.SetColor("cyan");
-                    term.WriteLine(ItemNames.Display(equippedList[i].equip));
+                    term.WriteLine(FitRow(ItemNames.Display(equippedList[i].equip), number.Length + slotLabel.Length));
                 }
                 term.SetColor("gray");
                 term.Write($"  {Loc.Get("dungeon.follower_unequip_prompt")}");
@@ -19380,7 +19391,7 @@ public class DungeonLocation : BaseLocation
                         player.RecalculateStats();
 
                         term.SetColor("bright_yellow");
-                        term.WriteLine($"  {Loc.Get("dungeon.follower_unequipped", ItemNames.Display(unequipped))}");
+                        UsurperRemake.UI.UIHelper.WriteRow(term, $"  {Loc.Get("dungeon.follower_unequipped", ItemNames.Display(unequipped))}");
                     }
                     else
                     {
