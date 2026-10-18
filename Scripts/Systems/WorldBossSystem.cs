@@ -620,7 +620,7 @@ namespace UsurperRemake.Systems
                         }
                         else
                         {
-                            var opts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, IncludeFields = true };
+                            var opts = ItemJson.Inheritance;   // v1.3.5: the one shared setting
                             if (QueueHook(backend, key, r.BossName, JsonSerializer.Serialize(item, opts)))
                             {
                                 terminal.SetColor("gray");

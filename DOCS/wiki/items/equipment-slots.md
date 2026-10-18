@@ -1,7 +1,7 @@
 ---
 title: Equipment slots
 path: /wiki/en/items/equipment-slots/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Core/EquipmentEnums.cs, Scripts/Core/Character.cs, Scripts/Systems/InventorySystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Core/Items.cs
 history: 1.3.3 | none
 history: 1.3.2 | A Mystic Shaman follows its own main hand and armor weight rules.
