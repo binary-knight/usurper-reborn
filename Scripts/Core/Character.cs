@@ -1715,9 +1715,10 @@ public class Character
                 case LootGenerator.SpecialEffect.MaxHP: equipment.MaxHPBonus += value; break;
                 case LootGenerator.SpecialEffect.MaxMana: equipment.MaxManaBonus += value; break;
                 case LootGenerator.SpecialEffect.AllStats:
+                    // 1.3.5: the loot generator puts Strength, Dexterity, Agility, Wisdom and Charisma on the
+                    // item itself; only Constitution and Intelligence come from the effect, so Charisma counts once.
                     equipment.ConstitutionBonus += value;
                     equipment.IntelligenceBonus += value;
-                    equipment.CharismaBonus += value;
                     break;
                 case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
                 case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;

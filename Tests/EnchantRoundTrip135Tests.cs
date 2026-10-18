@@ -264,4 +264,41 @@ public class EnchantRoundTrip135Tests
         (hero.MaxHP - bareHP).Should().Be(hp, "after the bag enchant the character's Max HP rises by the item's, once");
         (hero.MaxMana - bareMana).Should().Be(mana, "after the bag enchant the character's Max Mana rises by the item's, once");
     }
+
+    // ---------- X9: AllStats loot counts Charisma once ----------
+
+    [Fact]
+    public async Task X9_AllStatsLoot_CountsCharismaOnce_ThroughFiveTripsAndABagEnchant()
+    {
+        const int all = 6;
+        var hero = Hero();
+        hero.RecalculateStats();
+        long bareCha = hero.Charisma, bareCon = hero.Constitution, bareInt = hero.Intelligence;
+        var bag = Loot("Trip Mail of the Paragon", ObjType.Body, false, (LootGenerator.SpecialEffect.AllStats, all));
+        bag.Charisma.Should().Be(all, "the loot generator puts the Charisma on the item");
+        hero.Inventory.Add(bag);
+
+        for (int trip = 1; trip <= Trips; trip++)
+        {
+            var worn = WearMail(hero, bag);
+            worn.CharismaBonus.Should().Be(all, "trip {0}: the worn mail gives the Charisma it shows, once", trip);
+            worn.ConstitutionBonus.Should().Be(all, "trip {0}: Constitution from the effect", trip);
+            worn.IntelligenceBonus.Should().Be(all, "trip {0}: Intelligence from the effect", trip);
+            (hero.Charisma - bareCha).Should().Be(all, "trip {0}: the character's Charisma rises by the item's, once", trip);
+            (hero.Constitution - bareCon).Should().Be(all, "trip {0}: the character's Constitution rises once", trip);
+            (hero.Intelligence - bareInt).Should().Be(all, "trip {0}: the character's Intelligence rises once", trip);
+            bag = TakeOff(hero, EquipmentSlot.Body);
+            bag.Charisma.Should().Be(all, "trip {0}: the bag keeps the Charisma at its value", trip);
+            Effect(bag, LootGenerator.SpecialEffect.Constitution).Should().Be(all, "trip {0}: the bag keeps the Constitution", trip);
+            Effect(bag, LootGenerator.SpecialEffect.Intelligence).Should().Be(all, "trip {0}: the bag keeps the Intelligence", trip);
+            hero.Charisma.Should().Be(bareCha, "trip {0}: unequip takes the Charisma off", trip);
+        }
+
+        await BagEnchantMinorStrength(hero);
+        bag = hero.Inventory.Single();
+        bag.Strength.Should().Be(all + 2, "the bag enchant landed");
+        bag.Charisma.Should().Be(all, "an enchant made in the bag keeps the Charisma");
+        WearMail(hero, bag);
+        (hero.Charisma - bareCha).Should().Be(all, "after the bag enchant the character's Charisma rises by the item's, once");
+    }
 }
