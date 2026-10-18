@@ -160,7 +160,8 @@ public static class PlayerCharacterLoader
                     ClassRestrictions = equipData.ClassRestrictions?.Select(c => (CharacterClass)c).ToList() ?? new List<CharacterClass>(),
                     IsUnique = equipData.IsUnique,
                     HasBossSlayer = equipData.HasBossSlayer,
-                    HasTitanResolve = equipData.HasTitanResolve
+                    HasTitanResolve = equipData.HasTitanResolve,
+                    IsIdentified = equipData.IsIdentified   // 1.3.5: an unidentified item loads unidentified
                 };
 
                 // Migration: fix legacy items with WeaponType=None
