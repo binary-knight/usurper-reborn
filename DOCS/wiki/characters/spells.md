@@ -51,6 +51,8 @@ Spells do not use the ability scaling, and a spell does not make the [hit roll](
 - Healing: the base healing times 1 plus 2.5 percent per character level, times 1 plus 1.5 percent per point of Wisdom above 10, at most 3 times. Healing varies by up to 5 percent either way. Clerics heal 25 percent more with spells (Divine Grace).
 - Protection: the base protection times 1 plus 2 percent per character level, times 1 plus 1.5 percent per point of Intelligence above 10 up to 60, then 0.5 percent per point, at most 2.5 times. Wavecallers use Charisma here too.
 
+Frost Touch slows its target, and Ice Storm every monster still standing, for 2 rounds; the slow counts down once a round, and a slowed monster loses its action half the time.
+
 Drugs, herbs, food and god boons can add to these results. A healer [specialization](/wiki/en/characters/specializations/) adds 20 percent to spell healing.
 
 ## Spells that move alignment
