@@ -1,7 +1,7 @@
 ---
 title: Armor and accessories
 path: /wiki/en/items/armor/
-checked: 1.3.3
+checked: 1.3.4
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Systems/GearSetSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/InventorySystem.cs
 history: 1.3.3 | none
 history: 1.3.2 | A Mystic Shaman follows its own armor weight limit.
