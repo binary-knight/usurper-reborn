@@ -84,7 +84,7 @@ The table shows what one use does for a level {{balance:AbilityProbeLevel}} mons
 
 ### Monster abilities that depend on the situation
 
-- **Multiattack, Frenzy, Swarm and Time Stop** announce extra attacks, but only the one hit in the table lands.
+- **Multiattack, Frenzy, Swarm and Time Stop** strike once; the table shows that one hit.
 - **Thorns** covers the monster in thorns for 3 rounds, and the monster then makes its normal attack. While they last, each melee hit on it (a weapon swing or a melee ability, yours, a teammate's or a companion's) costs the attacker 25 percent of the damage it dealt, at least 1, but never below 1 HP. Spells, bow shots and the Ranged Attack are not reflected. Only the Gauntlet champion Korr Stonewarden has Thorns.
 - **Possess** deals direct damage equal to half your Strength.
 - **Devour** deals damage equal to your current HP when you are below a fifth of your maximum HP; **Devour Soul** does so 5 percent of the time. The most damage one hit can do still applies.
