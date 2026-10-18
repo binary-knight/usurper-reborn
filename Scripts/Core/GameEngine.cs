@@ -4310,11 +4310,7 @@ public partial class GameEngine
             int itemsOverflowed = 0;
             long goldDelivered = 0;
 
-            var jsonOpts = new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                IncludeFields = true
-            };
+            var jsonOpts = ItemJson.Inheritance;   // v1.3.5: the one shared setting (camelCase, IncludeFields)
 
             // v1.1.10: with a full pack and nothing that goes straight to gold, nothing can be handed
             // over. The bequest header used to print anyway, followed by a small "could not fit"

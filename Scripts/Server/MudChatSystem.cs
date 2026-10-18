@@ -1877,7 +1877,7 @@ public static class MudChatSystem
                 // Show item stats from stored JSON
                 try
                 {
-                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(items[i].ItemJson); ItemLimits.Heal(item, "guild bank");
+                    var item = ItemJson.ReadStore(items[i].ItemJson); ItemLimits.Heal(item, "guild bank");
                     if (item != null)
                     {
                         var stats = new System.Collections.Generic.List<string>();
@@ -1984,7 +1984,7 @@ public static class MudChatSystem
         }
 
         var item = inventory[choice - 1];
-        string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
+        string itemJson = ItemJson.WriteStore(item);
         var error = guild.DepositItem(username, item.Name, itemJson);
         if (error != null) { terminal.WriteLine($"  {error}", "red"); return true; }
 
@@ -2035,7 +2035,7 @@ public static class MudChatSystem
 
         try
         {
-            var item = System.Text.Json.JsonSerializer.Deserialize<global::Item>(itemJson); ItemLimits.Heal(item, "guild bank");
+            var item = global::ItemJson.ReadStore(itemJson); ItemLimits.Heal(item, "guild bank");
             if (item != null)
             {
                 player.Inventory.Add(item);

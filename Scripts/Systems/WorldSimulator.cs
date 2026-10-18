@@ -1794,11 +1794,7 @@ public class WorldSimulator
             // so an admin fixing the key meanwhile cannot strand part of the estate under the old one
 
             int queued = 0;
-            var jsonOpts = new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                IncludeFields = true
-            };
+            var jsonOpts = ItemJson.Inheritance;   // v1.3.5: the one shared setting (camelCase, IncludeFields)
 
             // Equipped items: walk EquippedItems dict, resolve each ID to an Item,
             // queue. EquipmentDatabase has the full item registry.
@@ -6143,7 +6139,7 @@ public class WorldSimulator
         {
             var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
             long price = MarketplaceSystem.Instance.CalculateNPCPrice(item, npc);
-            string itemJson = JsonSerializer.Serialize(item);
+            string itemJson = ItemJson.WriteStore(item);
             npc.MarketInventory.Remove(item);
 
             _ = Task.Run(async () =>
@@ -6183,7 +6179,7 @@ public class WorldSimulator
                     var chosen = affordable[random.Next(affordable.Count)];
 
                     // Deserialize the item to check if NPC wants it
-                    var item = JsonSerializer.Deserialize<Item>(chosen.ItemJson); ItemLimits.Heal(item, "auction");
+                    var item = ItemJson.ReadStore(chosen.ItemJson); ItemLimits.Heal(item, "auction");
                     if (item == null) return;
 
                     var tempListing = new MarketplaceSystem.MarketListing
