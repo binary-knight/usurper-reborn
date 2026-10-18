@@ -10,6 +10,7 @@ using FluentAssertions;
 using UsurperRemake;
 using UsurperRemake.Locations;
 using UsurperRemake.Systems;
+using UsurperRemake.UI;
 using Xunit;
 
 namespace UsurperReborn.Tests;
