@@ -956,15 +956,18 @@ public class WorldSimulator
 
             if (toRemove.Count == 0) return;
 
+            // Remove through the spawn system: in MUD mode ActiveNPCs is a snapshot copy,
+            // so a Remove on it would leave the corpse in the real roster.
+            int removed = 0;
             foreach (var corpse in toRemove)
             {
-                spawnSystem.ActiveNPCs.Remove(corpse);
+                if (spawnSystem.RemoveNPC(corpse)) removed++;
                 // Also clear the respawn timer just in case it lingered.
                 deadNPCRespawnTimers.Remove(corpse.Id ?? corpse.Name);
             }
 
             DebugLogger.Instance.LogInfo("LIFECYCLE",
-                $"PrunePermanentlyDeadNPCs: removed {toRemove.Count} aged/permadead corpse(s) " +
+                $"PrunePermanentlyDeadNPCs: removed {removed} aged/permadead corpse(s) " +
                 $"from active list. Remaining: {spawnSystem.ActiveNPCs.Count}.");
         }
         catch (Exception ex)

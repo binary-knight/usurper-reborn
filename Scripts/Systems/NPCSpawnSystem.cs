@@ -1166,6 +1166,46 @@ namespace UsurperRemake.Systems
         }
 
         /// <summary>
+        /// Remove one NPC from the real roster under the write lock. Callers must use this
+        /// rather than ActiveNPCs.Remove: in MUD mode ActiveNPCs is a snapshot copy, so a
+        /// Remove on it never reaches the roster. The NPC's name stays retired in
+        /// NPCNameRegistry. Returns true when the NPC was in the roster and is now gone.
+        /// </summary>
+        public bool RemoveNPC(NPC npc)
+        {
+            if (npc == null) return false;
+
+            _npcLock.EnterWriteLock();
+            try
+            {
+                bool removed = spawnedNPCs.Remove(npc);
+                if (removed) _listVersion++;
+                return removed;
+            }
+            finally
+            {
+                _npcLock.ExitWriteLock();
+            }
+        }
+
+        /// <summary>
+        /// Test support: marks the snapshot stale so the next MUD-mode ActiveNPCs read
+        /// rebuilds it from the real roster (after a test edits the real list directly).
+        /// </summary>
+        internal void InvalidateSnapshot()
+        {
+            _npcLock.EnterWriteLock();
+            try
+            {
+                _listVersion++;
+            }
+            finally
+            {
+                _npcLock.ExitWriteLock();
+            }
+        }
+
+        /// <summary>
         /// Add a restored NPC from save data
         /// </summary>
         public void AddRestoredNPC(NPC npc)

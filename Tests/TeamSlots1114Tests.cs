@@ -98,6 +98,7 @@ public class TeamSlots1114Tests
         {
             await WithNpcs(Crew("tsl_onl", "Alley Cats", 3), async () =>
             {
+                NPCSpawnSystem.Instance.InvalidateSnapshot();
                 await TeamCornerRig.Online(async (db, path) =>
                 {
                     TeamCornerRig.PlayerRow(path, "catone", "Alley Cats");
