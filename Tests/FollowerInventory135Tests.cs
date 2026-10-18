@@ -47,10 +47,8 @@ public class FollowerInventory135Tests
     private static Item Loot(string name, string family) => new Item { Name = name, Family = family, Type = ObjType.Weapon };
 
     /// <summary>The follower inventory with `equipped` in every slot and `backpack` in the bag, through the game's
-    /// own path (Character.BuildEquipmentFromItem, EquipmentDatabase.RegisterDynamic). The input unequips the weapon
-    /// and then equips the last backpack item, a copy of `equipped`, which the registry finds by name whatever
-    /// other tests registered, so both messages that carry its name are shown.</summary>
-    private static async Task<string> Render(string lang, Item equipped, params Item[] backpack)
+    /// own path (Character.BuildEquipmentFromItem, EquipmentDatabase.RegisterDynamic), answered with `input`.</summary>
+    private static async Task<string> Render(string lang, Item equipped, string input, params Item[] backpack)
     {
         var eq = Character.BuildEquipmentFromItem(equipped, EquipmentSlot.MainHand, WeaponHandedness.OneHanded, WeaponType.Sword);
         int id = EquipmentDatabase.RegisterDynamic(eq);
@@ -58,7 +56,6 @@ public class FollowerInventory135Tests
             AI = CharacterAI.Human };
         foreach (var slot in AllSlots) player.EquippedItems[slot] = id;
         player.Inventory.AddRange(backpack);
-        player.Inventory.Add(Loot(equipped.Name, equipped.Family));
 
         var prev = GameConfig.Language;
         bool sr = GameConfig.ScreenReaderMode;
@@ -67,7 +64,7 @@ public class FollowerInventory135Tests
             GameConfig.Language = lang;
             GameConfig.ScreenReaderMode = false;
             var output = new MemoryStream();
-            var term = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes($"U\n1\n{backpack.Length + 1}\n\n")), output);
+            var term = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes(input)), output);
             await (Task)typeof(DungeonLocation).GetMethod("ShowFollowerInventory", FS)!.Invoke(null, new object[] { player, term })!;
             term.StreamWriterInternal?.Flush();
             // A player's Enter after a prompt ends that row on screen; the test input is not echoed, so the row
@@ -77,6 +74,12 @@ public class FollowerInventory135Tests
         }
         finally { GameConfig.Language = prev; GameConfig.ScreenReaderMode = sr; }
     }
+
+    private static string Flat(string s) => Regex.Replace(s, @"\s+", " ").Trim();
+
+    /// <summary>The message is shown whole, on one row or wrapped over several.</summary>
+    private static void MessageShown(string text, string message) =>
+        Flat(text).Should().Contain(Flat(message), "the message is shown whole, wrapped at 79");
 
     /// <summary>Each list row that ends in the item's name (after `label`) shows that name in full, or cut with a
     /// closing period; the rows are found by their label.</summary>
@@ -133,9 +136,17 @@ public class FollowerInventory135Tests
         daggerShown.Should().NotBe(dagger.Name).And.Contain(Loc.GetIn(lang, "item.fine_dagger").Split(' ')[0]);
         if (lang == "es") shown.Length.Should().BeGreaterThan(MaxWidth - 20, "the Spanish name runs past the equipped row");
 
-        string text = await Render(lang, rolled, dagger);
-        string unequippedEnd = Loc.GetIn(lang, "dungeon.follower_unequipped", "#").Split(' ').Last();
-        Rows(text).Should().Contain(r => r.EndsWith(unequippedEnd), "the unequip message is shown, wrapped at 79");
+        // Another world boss drop nobody has registered (it cannot be equipped from the bag), and the rolled name on a
+        // drop too strong for the follower.
+        var unknown = Loot("Abyssal Forest Guardian Armor of the Salamander", RolledFamily);
+        EquipmentDatabase.GetByName(unknown.Name).Should().BeNull("the drop is not in the registry");
+        var strong = Loot(RolledName, RolledFamily);
+        strong.StrengthNeeded = 100_000;
+        // Unequip the weapon, then pick backpack items 2 and 3.
+        string text = await Render(lang, rolled, "U\n1\n2\n3\n\n", dagger, unknown, strong);
+        MessageShown(text, "  " + Loc.GetIn(lang, "dungeon.follower_unequipped", shown));
+        MessageShown(text, "  " + Loc.GetIn(lang, "dungeon.follower_cannot_be_equipped", ItemNames.DisplayIn(lang, unknown)));
+        MessageShown(text, Loc.GetIn(lang, "dungeon.cannot_equip_item", shown));
         text.Should().NotContain(RolledName).And.NotContain(dagger.Name);
         text.Should().Contain(Loc.GetIn(lang, "item.forest_guardian_armor"));
         NameRowsShow(text, lang, shown);
@@ -144,11 +155,13 @@ public class FollowerInventory135Tests
     }
 
     // Every form the generator can write on every loot template, with every world boss element word: the longest one
-    // in each language still fits the follower inventory.
+    // in each language still fits the follower inventory, in the tenth backpack row too, and when it is equipped.
     [Theory]
     [InlineData("en")]
     [InlineData("hu")]
     [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("it")]
     public async Task LongestLootForm_Fits(string lang)
     {
         var (stored, family, shown) = ItemNames.LootTemplates()
@@ -158,7 +171,11 @@ public class FollowerInventory135Tests
             .OrderByDescending(x => x.shown.Length).ThenBy(x => x.stored, StringComparer.Ordinal).First();
         if (lang != "en") shown.Should().NotBe(stored);
 
-        string text = await Render(lang, Loot(stored, family));
+        // Ten copies in the bag; unequip the weapon, then equip the tenth, which the registry finds by its name.
+        var bag = Enumerable.Range(0, 10).Select(_ => Loot(stored, family)).ToArray();
+        string text = await Render(lang, Loot(stored, family), "U\n1\n10\n\n", bag);
+        ListRowsShow(text.Substring(0, text.IndexOf("  > ", StringComparison.Ordinal)), "    10. ", shown);
+        Flat(text).Should().Contain(Flat(Loc.GetIn(lang, "dungeon.equipped_item_self", shown)), "the tenth copy is equipped and the message wraps");
         if (lang != "en") text.Should().NotContain(stored);
         NameRowsShow(text, lang, shown);
         EveryRowFits(text, "follower inventory");
