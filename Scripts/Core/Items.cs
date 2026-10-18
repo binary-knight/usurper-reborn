@@ -1351,6 +1351,24 @@ public class Equipment
         Description = System.Text.RegularExpressions.Regex.Replace(Description ?? "", @"\s*\[ES:[a-z,]+\]", marker.Length > 0 ? " " + marker : "").Trim();
     }
 
+    /// <summary>1.3.5: take one kind off the kind list (a failed enchant destroyed it), so that kind is free again.</summary>
+    public void RemoveEnchantedKind(string code)
+    {
+        var kinds = GetEnchantedKinds();
+        if (!kinds.Remove(code)) return;
+        string marker = kinds.Count > 0 ? $"[ES:{string.Join(",", kinds)}]" : "";
+        Description = System.Text.RegularExpressions.Regex.Replace(Description ?? "", @"\s*\[ES:[a-z,]+\]", marker.Length > 0 ? " " + marker : "").Trim();
+    }
+
+    /// <summary>1.3.5: lower the enchant count by one (a failed enchant destroyed one); at zero the marker goes.</summary>
+    public void DecrementEnchantmentCount()
+    {
+        int current = GetEnchantmentCount();
+        if (current <= 0) return;
+        string marker = current > 1 ? $"[E:{current - 1}]" : "";
+        Description = System.Text.RegularExpressions.Regex.Replace(Description ?? "", @"\s*\[E:\d+\]", marker.Length > 0 ? " " + marker : "").Trim();
+    }
+
     public int GetEnchantmentCount()
     {
         if (string.IsNullOrEmpty(Description)) return 0;

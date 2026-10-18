@@ -2279,7 +2279,7 @@ public partial class MagicShopLocation : BaseLocation
         if (currentEnchantCount >= 3)
         {
             float failChance = currentEnchantCount == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
-            var rng = Random.Shared;
+            var rng = EnchantRandom;
             if (rng.NextDouble() < failChance)
             {
                 // FAILURE — gold consumed, random existing enchant destroyed
@@ -2291,33 +2291,8 @@ public partial class MagicShopLocation : BaseLocation
                 DisplayMessage(Loc.Get("magic_shop.fail_crack"), "bright_red");
                 await Pacing.Wait(500);
 
-                // Destroy one random existing enchant by decrementing count
-                var damaged = selectedEquip.Clone();
-                int oldCount = damaged.GetEnchantmentCount();
-                if (oldCount > 0)
-                {
-                    // Replace the enchant marker with decremented count
-                    string newMarker = oldCount > 1 ? $"[E:{oldCount - 1}]" : "";
-                    damaged.Description = System.Text.RegularExpressions.Regex.Replace(
-                        damaged.Description ?? "", @"\[E:\d+\]", newMarker).Trim();
-                    // v1.1.7: the lost enchant frees its kind too. The markers persist now, so a kind
-                    // list left behind would bar the player from ever replacing what the failure took.
-                    damaged.TrimEnchantedKindsTo(oldCount - 1);
-
-                    // Reduce a random stat bonus as if one enchant was lost
-                    var rngStat = rng.Next(6);
-                    switch (rngStat)
-                    {
-                        case 0: damaged.WeaponPower = Math.Max(0, damaged.WeaponPower - 5); break;
-                        case 1: damaged.StrengthBonus = Math.Max(0, damaged.StrengthBonus - 5); break;
-                        case 2: damaged.DexterityBonus = Math.Max(0, damaged.DexterityBonus - 5); break;
-                        case 3: damaged.DefenceBonus = Math.Max(0, damaged.DefenceBonus - 5); break;
-                        case 4: damaged.WisdomBonus = Math.Max(0, damaged.WisdomBonus - 5); break;
-                        case 5: damaged.ArmorClass = Math.Max(0, damaged.ArmorClass - 5); break;
-                    }
-
-                    writeBack(damaged);
-                }
+                // 1.3.5: one existing enchant, picked at random, is destroyed whole (DestroyOneEnchant).
+                writeBack(DestroyOneEnchant(selectedEquip, rng).Item);
 
                 DisplayMessage("");
                 DisplayMessage(Loc.Get("magic_shop.fail_destroyed"), "bright_red");
@@ -2531,6 +2506,99 @@ public partial class MagicShopLocation : BaseLocation
         return true;
     }
 
+    /// <summary>1.3.5: the random source of the 4th and 5th enchant failure roll and of the enchant a failure
+    /// destroys. A test sets its own and puts this back.</summary>
+    internal static Random EnchantRandom = Random.Shared;
+
+    private static int NamedTierOf(string kind) =>
+        NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
+
+    private static int StatOf(string kind) =>
+        Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
+
+    private static int GetEquipmentStat(Equipment e, int statChoice) => statChoice switch
+    {
+        1 => e.WeaponPower, 2 => e.StrengthBonus, 3 => e.DexterityBonus, 4 => e.DefenceBonus, 5 => e.WisdomBonus,
+        6 => e.ArmorClass, 7 => e.ConstitutionBonus, 8 => e.IntelligenceBonus, 9 => e.CharismaBonus,
+        10 => e.AgilityBonus, 11 => e.StaminaBonus, _ => 0,
+    };
+
+    /// <summary>1.3.5: a failed 4th or 5th enchant destroys one existing enchant picked at random, as
+    /// enchant_failure_warning and enchant_risk_4 say. When the item's base form is known (EnchantBaseOf) and every
+    /// counted enchant is on its kind list, the item keeps its base form plus every other enchant: the destroyed
+    /// one's stats, fire or frost flag, name tag and kind go, and nothing else moves (the value keeps what was paid).
+    /// A stat enchant's amount is its stat above the base form less what the named enchants on the list add to it.
+    /// Otherwise (an item enchanted before 1.2.5 that matches no template, or a kind list shorter than the count) one
+    /// of the counted enchants is picked: a named kind loses its own fixed amounts and its flag, a stat kind the amount
+    /// in its name tag, or with no tag the largest stat tier bonus its stat still holds, never below zero; an enchant
+    /// the kind list never recorded lowers the count only. In every path the count drops by one.
+    /// Returns the changed copy and the destroyed kind ("" for one the list never recorded).</summary>
+    internal static (Equipment Item, string Kind) DestroyOneEnchant(Equipment item, Random rng)
+    {
+        var damaged = item.Clone();
+        var kinds = item.GetEnchantedKinds();
+        int count = item.GetEnchantmentCount();
+        if (count <= 0) return (damaged, "");
+        var baseForm = kinds.Count == count ? EnchantBaseOf(item) : null;
+        string kind;
+        if (baseForm != null)
+            kind = kinds[rng.Next(kinds.Count)];
+        else
+        {
+            int pick = rng.Next(count);
+            kind = pick < kinds.Count ? kinds[pick] : "";
+        }
+        damaged.DecrementEnchantmentCount();
+        if (kind.Length == 0) return (damaged, "");
+        damaged.RemoveEnchantedKind(kind);
+
+        int named = NamedTierOf(kind);
+        if (named > 0)
+        {
+            var delta = new Equipment();
+            ApplyNamedEnchant(delta, named);
+            var now = damaged.ToEnchantBaseRecord();
+            var off = delta.ToEnchantBaseRecord();
+            foreach (var prop in typeof(Equipment.EnchantBaseRecord).GetProperties().Where(p => p.PropertyType == typeof(int)))
+            {
+                int v = (int)prop.GetValue(now)!, d = (int)prop.GetValue(off)!;
+                prop.SetValue(now, baseForm != null ? v - d : Math.Max(Math.Min(v, 0), v - d));
+            }
+            damaged.ApplyEnchantBaseRecord(now);
+            if (delta.HasFireEnchant) damaged.HasFireEnchant = baseForm?.HasFireEnchant ?? false;
+            if (delta.HasFrostEnchant) damaged.HasFrostEnchant = baseForm?.HasFrostEnchant ?? false;
+            string namedTag = NamedEnchantTag(named);
+            int at = damaged.Name.IndexOf(namedTag, StringComparison.Ordinal);
+            if (at >= 0) damaged.Name = damaged.Name.Remove(at, namedTag.Length);
+            return (damaged, kind);
+        }
+
+        int stat = StatOf(kind);
+        if (stat == 0) return (damaged, kind);
+        var tag = System.Text.RegularExpressions.Regex.Match(damaged.Name, $@"\s\+(\d+) {StatNames[stat - 1]}(?!\w)");
+        int have = GetEquipmentStat(item, stat);
+        int amount;
+        if (baseForm != null)
+        {
+            var baseItem = new Equipment();
+            baseItem.ApplyEnchantBaseRecord(baseForm);
+            int namedOnStat = kinds.Select(NamedTierOf).Where(t => t > 0)
+                .Sum(t => { var d = new Equipment(); ApplyNamedEnchant(d, t); return GetEquipmentStat(d, stat); });
+            amount = Math.Max(0, have - GetEquipmentStat(baseItem, stat) - namedOnStat);
+        }
+        else
+        {
+            var statBonuses = Enumerable.Range(1, EnchantTiers.Length).Where(t => t <= 4 || (t >= 10 && t <= 12))
+                .Select(t => EnchantTiers[t - 1].bonus);
+            amount = tag.Success ? int.Parse(tag.Groups[1].Value)
+                : statBonuses.Where(b => b <= have).DefaultIfEmpty(0).Max();
+            amount = Math.Min(amount, Math.Max(0, have));
+        }
+        ApplyEquipmentStatBonus(damaged, stat, -amount);
+        if (tag.Success) damaged.Name = damaged.Name.Remove(tag.Index, tag.Length);
+        return (damaged, kind);
+    }
+
     private static void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
     {
         switch (statChoice)
@@ -2553,6 +2621,11 @@ public partial class MagicShopLocation : BaseLocation
     // ENCHANTMENT REMOVAL - Remove enchantments from dynamic equipment
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /// <summary>1.3.5: one row of the enchant removal list: number, slot label (EnchantSlotLabel, or the bag label),
+    /// the shown name with its enchant count, and the cursed tag.</summary>
+    internal static string RemovalRow(int number, string label, Equipment equip) =>
+        $"  ({number}) {label}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]{(equip.IsCursed ? Loc.Get("shop.cursed_tag") : "")}";
+
     private async Task RemoveEnchantment(Character player)
     {
         terminal.ClearScreen();
@@ -2569,19 +2642,42 @@ public partial class MagicShopLocation : BaseLocation
             EquipmentSlot.Neck, EquipmentSlot.LFinger, EquipmentSlot.RFinger
         };
 
-        var enchantedItems = new List<(EquipmentSlot slot, Equipment equip)>();
-        int idx = 1;
+        // 1.3.5: worn items first, then enchanted items in the backpack, each with a writeBack to where it came from
+        // (the enchant list's pattern), labelled as the enchant list labels them.
+        var enchantedItems = new List<(string label, Equipment equip, System.Action<Equipment> writeBack)>();
         foreach (var slot in enchantableSlots)
         {
             var equip = player.GetEquipment(slot);
-            if (equip != null && equip.GetEnchantmentCount() > 0)
+            if (equip == null || equip.GetEnchantmentCount() <= 0) continue;
+            var capturedSlot = slot;
+            enchantedItems.Add((EnchantSlotLabel(slot), equip, (newEq) =>
             {
-                enchantedItems.Add((slot, equip));
-                string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
-                DisplayMessage($"  ({idx}) {slot}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]{cursedTag}", equip.IsCursed ? "red" : equip.GetRarityColor());
-                idx++;
+                // 1.3.1: straight back into the slot it came from, as the enchant write does.
+                EquipmentDatabase.RegisterDynamic(newEq);
+                player.EquippedItems[capturedSlot] = newEq.Id;
+                player.RecalculateStats();
+            }));
+        }
+        if (player.Inventory != null)
+        {
+            for (int i = 0; i < player.Inventory.Count; i++)
+            {
+                var item = player.Inventory[i];
+                if (!IsEnchantableInventoryItem(item)) continue;
+                var equipFromBag = ConvertInventoryItemToEquipmentForEnchant(item);
+                if (equipFromBag.GetEnchantmentCount() <= 0) continue;
+                var capturedIdx = i;
+                enchantedItems.Add((Loc.Get("magic_shop.slot_bag"), equipFromBag, (newEq) =>
+                {
+                    EquipmentDatabase.RegisterDynamic(newEq);
+                    if (capturedIdx >= 0 && capturedIdx < player.Inventory.Count)
+                        player.Inventory[capturedIdx] = player.ConvertEquipmentToLegacyItem(newEq);
+                }));
             }
         }
+        for (int i = 0; i < enchantedItems.Count; i++)
+            DisplayMessage(RemovalRow(i + 1, enchantedItems[i].label, enchantedItems[i].equip),
+                enchantedItems[i].equip.IsCursed ? "red" : enchantedItems[i].equip.GetRarityColor());
 
         if (enchantedItems.Count == 0)
         {
@@ -2602,7 +2698,7 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        var (rmSlot, rmEquip) = enchantedItems[choice - 1];
+        var (_, rmEquip, rmWriteBack) = enchantedItems[choice - 1];
         // 1.3.2: a cursed item is refused here as it is for enchanting: nothing is charged or changed.
         if (rmEquip.IsCursed)
         {
@@ -2650,14 +2746,12 @@ public partial class MagicShopLocation : BaseLocation
         // Frostbite are stripped too, and so is a stale tag on the base name)
         stripped.Name = StripEnchantTags(stripped.Name);
 
-        // 1.3.1: straight back into the slot it came from, as the enchant write does.
-        EquipmentDatabase.RegisterDynamic(stripped);
-        player.EquippedItems[rmSlot] = stripped.Id;
-        player.RecalculateStats();
+        // 1.3.1: straight back to where it came from (1.3.5: a worn slot or its backpack place).
+        rmWriteBack(stripped);
 
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.remove_dissolve"), "magenta");
-        DisplayMessage(Loc.Get("magic_shop.remove_restored", stripped.Name), "yellow");
+        DisplayMessage(Loc.Get("magic_shop.remove_restored", ItemNames.Display(stripped)), "yellow");
         player.Statistics?.RecordGoldSpent(removalCost);
 
         await terminal.WaitForKey();
