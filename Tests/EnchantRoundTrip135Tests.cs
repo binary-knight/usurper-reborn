@@ -25,9 +25,9 @@ public class EnchantRoundTrip135Tests
 
     // ---------- helpers ----------
 
-    private static Character Hero() => new()
+    private static Character Hero(CharacterClass cls = CharacterClass.Warrior) => new()
     {
-        Name1 = "tripper", Name2 = "Tripper", Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 100,
+        Name1 = "tripper", Name2 = "Tripper", Class = cls, Race = CharacterRace.Human, Level = 100,
         HP = 5000, MaxHP = 5000, BaseMaxHP = 5000, Mana = 500, MaxMana = 500, BaseMaxMana = 500,
         BaseStrength = 60, BaseDexterity = 40, BaseConstitution = 40, BaseIntelligence = 30, BaseWisdom = 30,
         BaseCharisma = 30, BaseAgility = 30, BaseStamina = 30, BaseDefence = 10,
@@ -219,5 +219,49 @@ public class EnchantRoundTrip135Tests
         var worn = WearShield(hero, bag);
         worn.ArmorClass.Should().Be(2, "after the bag enchant the shield still has its armour class");
         (hero.ArmPow - bare).Should().Be(ShieldBlock + 2, "after the bag enchant the character gets block plus armour class, once");
+    }
+
+    // ---------- X8: loot Max HP and Max Mana ----------
+
+    private static int ShownHP(global::Item item) => item.HP + Effect(item, LootGenerator.SpecialEffect.MaxHP);
+    private static int ShownMana(global::Item item) => item.Mana + Effect(item, LootGenerator.SpecialEffect.MaxMana);
+
+    private static Equipment WearMail(Character hero, global::Item bag) =>
+        Wear(hero, bag, EquipmentSlot.Body, WeaponHandedness.None, WeaponType.None);
+
+    [Fact]
+    public async Task X8_LootMaxHPAndMana_AreGivenAsShown_AndTakenOff_ThroughFiveTripsAndABagEnchant()
+    {
+        const int hp = 40, mana = 25;
+        var hero = Hero(CharacterClass.Magician);   // a mana class, so Max Mana counts
+        hero.RecalculateStats();
+        long bareHP = hero.MaxHP, bareMana = hero.MaxMana;
+        var bag = Loot("Robust Trip Robe", ObjType.Body, false,
+            (LootGenerator.SpecialEffect.MaxHP, hp), (LootGenerator.SpecialEffect.MaxMana, mana));
+        bag.Description[0].Should().Be($"Max HP +{hp}, Max Mana +{mana}", "the drop shows its values");
+        hero.Inventory.Add(bag);
+
+        for (int trip = 1; trip <= Trips; trip++)
+        {
+            var worn = WearMail(hero, bag);
+            worn.MaxHPBonus.Should().Be(hp, "trip {0}: the worn robe gives the Max HP it shows", trip);
+            worn.MaxManaBonus.Should().Be(mana, "trip {0}: the worn robe gives the Max Mana it shows", trip);
+            (hero.MaxHP - bareHP).Should().Be(hp, "trip {0}: the character's Max HP rises by the item's, once", trip);
+            (hero.MaxMana - bareMana).Should().Be(mana, "trip {0}: the character's Max Mana rises by the item's, once", trip);
+            bag = TakeOff(hero, EquipmentSlot.Body);
+            ShownHP(bag).Should().Be(hp, "trip {0}: the bag keeps the Max HP", trip);
+            ShownMana(bag).Should().Be(mana, "trip {0}: the bag keeps the Max Mana", trip);
+            hero.MaxHP.Should().Be(bareHP, "trip {0}: unequip takes the Max HP off", trip);
+            hero.MaxMana.Should().Be(bareMana, "trip {0}: unequip takes the Max Mana off", trip);
+        }
+
+        await BagEnchantMinorStrength(hero);
+        bag = hero.Inventory.Single();
+        bag.Strength.Should().Be(2, "the bag enchant landed");
+        ShownHP(bag).Should().Be(hp, "an enchant made in the bag keeps the Max HP");
+        ShownMana(bag).Should().Be(mana, "an enchant made in the bag keeps the Max Mana");
+        WearMail(hero, bag);
+        (hero.MaxHP - bareHP).Should().Be(hp, "after the bag enchant the character's Max HP rises by the item's, once");
+        (hero.MaxMana - bareMana).Should().Be(mana, "after the bag enchant the character's Max Mana rises by the item's, once");
     }
 }

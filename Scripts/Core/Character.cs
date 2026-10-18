@@ -1710,6 +1710,10 @@ public class Character
                 case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
                 case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
                 case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
+                // 1.3.5: the loot generator leaves Max HP and Max Mana to this switch; the item shows "+X".
+                // ConvertEquipmentToItem then carries them in Item.HP and Item.Mana, not as an effect.
+                case LootGenerator.SpecialEffect.MaxHP: equipment.MaxHPBonus += value; break;
+                case LootGenerator.SpecialEffect.MaxMana: equipment.MaxManaBonus += value; break;
                 case LootGenerator.SpecialEffect.AllStats:
                     equipment.ConstitutionBonus += value;
                     equipment.IntelligenceBonus += value;
