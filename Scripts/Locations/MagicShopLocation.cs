@@ -2523,6 +2523,23 @@ public partial class MagicShopLocation : BaseLocation
         10 => e.AgilityBonus, 11 => e.StaminaBonus, _ => 0,
     };
 
+    // 1.3.5: the [E:N] count one lower (the marker goes at zero), and one code off the [ES:...] kind list.
+    private static void DropOneFromCount(Equipment e)
+    {
+        int current = e.GetEnchantmentCount();
+        if (current <= 0) return;
+        string marker = current > 1 ? $" [E:{current - 1}]" : "";
+        e.Description = System.Text.RegularExpressions.Regex.Replace(e.Description ?? "", @"\s*\[E:\d+\]", marker).Trim();
+    }
+
+    private static void RemoveKind(Equipment e, string code)
+    {
+        var kinds = e.GetEnchantedKinds();
+        if (!kinds.Remove(code)) return;
+        string marker = kinds.Count > 0 ? $" [ES:{string.Join(",", kinds)}]" : "";
+        e.Description = System.Text.RegularExpressions.Regex.Replace(e.Description ?? "", @"\s*\[ES:[a-z,]+\]", marker).Trim();
+    }
+
     /// <summary>1.3.5: a failed 4th or 5th enchant destroys one existing enchant picked at random, as
     /// enchant_failure_warning and enchant_risk_4 say. When the item's base form is known (EnchantBaseOf) and every
     /// counted enchant is on its kind list, the item keeps its base form plus every other enchant: the destroyed
@@ -2549,9 +2566,9 @@ public partial class MagicShopLocation : BaseLocation
             int pick = rng.Next(count);
             kind = pick < kinds.Count ? kinds[pick] : "";
         }
-        damaged.DecrementEnchantmentCount();
+        DropOneFromCount(damaged);
         if (kind.Length == 0) return (damaged, "");
-        damaged.RemoveEnchantedKind(kind);
+        RemoveKind(damaged, kind);
 
         int named = NamedTierOf(kind);
         if (named > 0)
