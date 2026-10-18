@@ -25,7 +25,7 @@ Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapo
 
 ### Phoenix Fire and Frostbite
 
-Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and crafting materials. With Phoenix Fire, each hit with that weapon has a {{percent:FireEnchantProcChance}} percent chance of extra fire damage equal to {{percent:FireEnchantDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostEnchantProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them.
+Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and crafting materials. With Phoenix Fire, each hit with that weapon has a {{percent:FireEnchantProcChance}} percent chance of extra fire damage equal to {{percent:FireEnchantDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostEnchantProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them.
 
 ## Enchant limit
 
