@@ -842,8 +842,9 @@ namespace UsurperRemake.Systems
             player.RecalculateStats();
 
             // 1.3.4: the god and its context come from BuildBossFight, the one build the balance
-            // simulator calls too; the artifact count and the dialogue's modifiers are passed in
-            var fight = BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player);
+            // simulator calls too; the artifact count and the dialogue's modifiers are passed in.
+            // 1.3.5 (B1): and the living fighters, counted once here (the god's HP is not recounted)
+            var fight = BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player, CountLivingFighters(player, dungeonTeammates));
             var bossMonster = fight.Monster;
             if (AnnounceFightHP(bossMonster, boss, terminal))
                 await Pacing.Wait(1500);   // the fight clears the screen as it starts

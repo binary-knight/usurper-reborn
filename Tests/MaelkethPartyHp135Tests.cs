@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using FluentAssertions;
 using UsurperRemake.Data;
 using UsurperRemake.Systems;
@@ -169,5 +171,60 @@ public class MaelkethPartyHp135Tests
         OldGodBossSystem.CountLivingFighters(hero, team).Should().Be(5);
         team[1].HP = 0;
         OldGodBossSystem.CountLivingFighters(hero, team).Should().Be(4, "a fallen teammate is not a fighter");
+    }
+
+    // ---------- RunBossCombat counts the fighters once and passes them to the build ----------
+
+    private const BindingFlags Inst = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    /// <summary>The real RunBossCombat against Maelketh with no artifact and the given teammates: the god's
+    /// MaxHP at the fight seam (just before the engine runs), the MaxHP after the fight and the outcome.
+    /// The hero is at Mental 0, so the fight returns before any round.</summary>
+    private static async Task<(long AtFight, long After, BossOutcome Outcome)> ThroughRunBossCombat(List<Character>? team, Action? atFight = null)
+    {
+        var before = OldGodBuild134Support.SetArtifacts(0);
+        Monster? god = null; long hpAtFight = -1;
+        try
+        {
+            var sys = new OldGodBossSystem();
+            typeof(OldGodBossSystem).GetField("dungeonTeammates", Inst)!.SetValue(sys, team);
+            OldGodBossSystem.FightSeamForTests = (m, _) => { god = m; hpAtFight = m.MaxHP; atFight?.Invoke(); };
+            var result = await (Task<BossEncounterResult>)typeof(OldGodBossSystem).GetMethod("RunBossCombat", Inst)!
+                .Invoke(sys, new object[] { OldGodBuild134Support.Hero(), Maelketh, new TerminalEmulator(new MemoryStream(), new MemoryStream()) })!;
+            god.Should().NotBeNull("RunBossCombat reaches the fight seam");
+            return (hpAtFight, god!.MaxHP, result.Outcome);
+        }
+        finally
+        {
+            OldGodBossSystem.FightSeamForTests = null;
+            OldGodBuild134Support.RestoreArtifacts(before);
+        }
+    }
+
+    private static List<Character> Team(int living, int fallen = 0)
+    {
+        var team = Enumerable.Range(0, living + fallen).Select(_ => OldGodBuild134Support.Hero()).ToList();
+        foreach (var t in team.Skip(living)) t.HP = 0;
+        return team;
+    }
+
+    [Fact]
+    public async Task RunBossCombat_PassesTheLivingFighters()
+    {
+        (await ThroughRunBossCombat(null)).AtFight.Should().Be(49500, "alone: as today");
+        (await ThroughRunBossCombat(Team(2, fallen: 1))).AtFight.Should().Be(24750, "three living fighters, a fallen teammate not counted");
+        (await ThroughRunBossCombat(Team(3))).AtFight.Should().Be(37125, "four fighters");
+        (await ThroughRunBossCombat(Team(1))).AtFight.Should().Be(12375, "two fighters");
+        (await ThroughRunBossCombat(Team(4))).AtFight.Should().Be(49500, "the full party: as today");
+    }
+
+    [Fact]
+    public async Task RunBossCombat_ATeammateFalling_AsTheFightStarts_IsNotRecounted()
+    {
+        var team = Team(2);
+        var (atFight, after, outcome) = await ThroughRunBossCombat(team, atFight: () => team[0].HP = 0);
+        outcome.Should().Be(BossOutcome.NotFought, "the hero at Mental 0 does not fight a round");
+        atFight.Should().Be(24750, "three fighters when the fight was built");
+        after.Should().Be(24750, "a teammate falling after the count does not change Maelketh's MaxHP");
     }
 }
