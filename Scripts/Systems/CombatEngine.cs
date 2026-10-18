@@ -4398,8 +4398,13 @@ public partial class CombatEngine
             // are now real Slow status applications.
             if (attacker.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+                // 1.3.5: through the boss soft-control resist, as the frost proc; a resisted slow does nothing
+                int frostbrandRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+                if (frostbrandRounds > 0)
+                {
+                    target.IsSlowed = true;
+                    target.SlowDuration = Math.Max(target.SlowDuration, frostbrandRounds);
+                }
             }
 
             // Ancestral Guidance: 25% of enchant damage dealt heals the party
@@ -5452,18 +5457,18 @@ public partial class CombatEngine
         // Check if monster is slowed (from Slow spell)
         if (monster.IsSlowed)
         {
-            // 1.3.5: a slow counts down once a round, as its rounds say, not on each action of a boss that acts
-            // more than once; a frost spell's slow (its text gives turns) still counts each action
-            if (firstActionThisRound || _slowCountsPerAction.TryGetValue(monster, out _))
+            // 1.3.5: every slow counts down once a round, as its rounds say, not on each action of a boss that
+            // acts more than once
+            if (firstActionThisRound)
                 monster.SlowDuration--;
             if (random.Next(100) < 50)
             {
                 terminal.WriteLine(Loc.Get("combat.monster_sluggish", MonsterNames.Display(monster)), "gray");
-                if (monster.SlowDuration <= 0) EndMonsterSlow(monster);
+                if (monster.SlowDuration <= 0) monster.IsSlowed = false;
                 await Pacing.Wait(GetCombatDelay(600));
                 return;
             }
-            if (monster.SlowDuration <= 0) EndMonsterSlow(monster);
+            if (monster.SlowDuration <= 0) monster.IsSlowed = false;
         }
 
         // Tick down marked duration
@@ -14052,8 +14057,8 @@ public partial class CombatEngine
     // was invalid/dead. Callers MUST skip post-hit effects (lifesteal and other enchant procs,
     // weapon-enchant riders, on-hit heals) when this returns false -- an evaded swing passes
     // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
-    // 1.3.5: on-hit effects scale from the HP the hit removed, not from the damage passed in; a caller
-    // reads that figure through ApplySingleMonsterDamageDealt (0 for a hit that phase immunity absorbed).
+    // 1.3.5: on-hit effects scale from the HP the hit removed, not from the damage passed in (a phase immunity
+    // residual included, never more than the HP the target had); a caller reads it through ApplySingleMonsterDamageDealt.
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
@@ -14081,17 +14086,14 @@ public partial class CombatEngine
         // isMagicalDamage:true and missed IsPhysicalImmune entirely, so physical abilities
         // routed through this function took magical-immunity reduction during Manwe phase 3
         // and ignored physical-immunity reduction during physical-immune phases.
-        bool phaseImmune = false;   // 1.3.5: an absorbed hit procs no on-hit effect
         if (isSpellDamage && target.IsMagicalImmune)
         {
-            phaseImmune = true;
             damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: true);
             terminal.SetColor("dark_magenta");
             UIHelper.WriteRow(terminal, Loc.Get("combat.magical_immunity_absorbs", MonsterNames.Display(target)));
         }
         else if (!isSpellDamage && target.IsPhysicalImmune)
         {
-            phaseImmune = true;
             damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: false);
             terminal.SetColor("dark_magenta");
             UIHelper.WriteRow(terminal, Loc.Get("combat.physical_immunity_absorbs", MonsterNames.Display(target)));
@@ -14175,10 +14177,13 @@ public partial class CombatEngine
         if (attacker != null)
             actualDamage = TeamHQBonus.ApplyAttack(attacker, actualDamage);
 
+        long hpBeforeHit = target.HP;
         target.HP -= actualDamage;
         EvHit(attacker, actualDamage);   // 1.2.6
-        // 1.3.5: the figure on-hit effects scale from: the HP removed, after armour, divine armour and the Armory
-        long onHitDamage = phaseImmune ? 0 : actualDamage;
+        // 1.3.5: the figure on-hit effects scale from: the HP removed, after armour, divine armour and the Armory,
+        // never more than the HP the target had (no overkill)
+        long hpRemoved = Math.Min(actualDamage, hpBeforeHit);
+        long onHitDamage = hpRemoved;   // a phase immunity residual counts as any other hit, as on the area and older paths
 
         // Track damage dealt statistics (only for player attacks)
         if (attacker == currentPlayer || attacker == result.Player)
@@ -14284,19 +14289,9 @@ public partial class CombatEngine
     // 1.3.5: the on-hit figure of the last ApplySingleMonsterDamage call; 0 when it landed nothing
     private long _lastHitOnHitDamage;
 
-    // 1.3.5: the monsters whose slow came from a frost spell (Frost Touch, Ice Storm: "Duration: 1 turn"). That slow
-    // still counts down on each of the monster's actions, as before 1.3.5; every other slow counts once a round.
-    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Monster, Monster> _slowCountsPerAction = new();
-
-    private void EndMonsterSlow(Monster monster)
-    {
-        monster.IsSlowed = false;
-        _slowCountsPerAction.Remove(monster);
-    }
-
     /// <summary>1.3.5: ApplySingleMonsterDamageChecked for a caller that runs on-hit effects. Returns the HP the hit
-    /// removed, after armour, divine armour and the Armory, which every on-hit effect scales from; 0 when the hit was
-    /// evaded, found no target, or went into a matching phase immunity, and then the caller runs no on-hit effect.</summary>
+    /// removed, after armour, divine armour and the Armory and never more than the target had, which every on-hit
+    /// effect scales from; 0 when the hit was evaded or found no target, and then the caller runs no on-hit effect.</summary>
     private async Task<long> ApplySingleMonsterDamageDealt(Monster target, long damage, CombatResult result, string damageSource, Character attacker, bool isSpellDamage, bool evasionChecked)
     {
         if (!await ApplySingleMonsterDamageChecked(target, damage, result, damageSource, attacker, isSpellDamage, evasionChecked))
@@ -14486,8 +14481,13 @@ public partial class CombatEngine
             // now real Slow status.
             if (player.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+                // 1.3.5: through the boss soft-control resist, as the frost proc; a resisted slow does nothing
+                int frostbrandRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+                if (frostbrandRounds > 0)
+                {
+                    target.IsSlowed = true;
+                    target.SlowDuration = Math.Max(target.SlowDuration, frostbrandRounds);
+                }
             }
 
             // Ancestral Guidance: 25% of damage dealt heals the party
@@ -15296,7 +15296,6 @@ public partial class CombatEngine
                         // damage/procs, and the Ancestral Guidance heal below. Player report: life
                         // steal still triggered when the attack passed through the enemy. The evasion
                         // flavor line was already printed inside ApplySingleMonsterDamage.
-                        // 1.3.5: a hit that phase immunity absorbed runs none of them either.
                         if (swingDealt <= 0)
                             continue;
 
@@ -19198,7 +19197,6 @@ public partial class CombatEngine
             case "frost":
                 target.IsSlowed = true;
                 target.SlowDuration = duration > 0 ? duration : 2;
-                _slowCountsPerAction.AddOrUpdate(target, target);   // 1.3.5: its text says turns: counts each action, as before
                 terminal.WriteLine(Loc.Get("combat.spell_chilled", MonsterNames.Display(target)), "cyan");
                 break;
 
@@ -20319,7 +20317,7 @@ public partial class CombatEngine
 
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
-                // 1.3.5: nor a hit that phase immunity absorbed; the riders scale from the HP removed.
+                // 1.3.5: the riders scale from the HP removed.
                 if (tmDealt > 0)
                     ApplyPostHitEnchantments(teammate, target, tmDealt, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 Armory inside (0 for NPCs)
 

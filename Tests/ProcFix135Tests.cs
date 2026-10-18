@@ -12,9 +12,9 @@ namespace UsurperReborn.Tests;
 
 /// <summary>
 /// 1.3.5 enchant audit rows R1 to R3 (EF-8F). R1: every on-hit effect scales from the HP the hit removed (after
-/// armour, divine armour and the Armory), and a hit that phase immunity absorbed procs nothing. R2: the frost proc
-/// goes through the boss soft-control resist, and a slow counts down once a round. R3: a magical handler ability
-/// fires no weapon proc and no lifesteal.
+/// armour, divine armour and the Armory, a phase immunity residual included, never more than the target had); an
+/// evaded hit procs nothing. R2: the frost proc and the Frostbrand slow go through the boss soft-control resist, and
+/// every slow counts down once a round. R3: a magical handler ability fires no weapon proc and no lifesteal.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class ProcFix135Tests
@@ -118,16 +118,17 @@ public class ProcFix135Tests
     }
 
     [Fact]
-    public void ProcFix135_R1b_AHitIntoAPhysicalImmunityPhase_ProcsNothingAndHealsNothing()
+    public void ProcFix135_R1b_AHitIntoAPhysicalImmunityPhase_ProcsFromTheResidual_AnEvadedHitProcsNothing()
     {
         var hero = Hero(fire: true, lifeSteal: LifeStealPct);
         var engine = Engine(hero, 135);
         engine.BossContext = new BossCombatContext { DivineArmorReduction = TerravokDivineArmor(hero), HasPhysicalImmunityPhase = true };
 
-        // the hit still takes its residual, and reports 0 to the on-hit effects
+        // the residual lands, and the on-hit figure is that residual (supervisor, ledger 2026-10-18T21:17:17Z)
         var probe = God(physicalImmune: true);
-        Dealt(engine, probe, D, hero, new CombatResult { Player = hero }).Should().Be(0, "an absorbed hit runs no on-hit effect");
-        (probe.MaxHP - probe.HP).Should().BeGreaterThan(0, "the immunity residual still lands");
+        long dealt = Dealt(engine, probe, D, hero, new CombatResult { Player = hero });
+        dealt.Should().BeGreaterThan(0, "the on-hit effects scale from the immunity residual the hit removed");
+        dealt.Should().Be(probe.MaxHP - probe.HP);
 
         int landed = 0;
         for (int i = 0; i < 200; i++)
@@ -135,12 +136,47 @@ public class ProcFix135Tests
             var god = God(physicalImmune: true);
             hero.HP = 1_000;
             PowerAttack(engine, hero, god, new CombatResult { Player = hero });
-            if (god.HP == god.MaxHP) continue;
+            long lost = god.MaxHP - god.HP;
+            if (lost == 0) continue;
             landed++;
-            hero.HP.Should().Be(1_000, "Lifedrinker heals nothing from a hit that physical immunity absorbed");
+            long healed = hero.HP - 1_000;
+            healed.Should().BeGreaterThan(0, "Lifedrinker heals from the residual of an immune hit");
+            (healed * 100 / LifeStealPct).Should().BeLessThanOrEqualTo(lost, "the heal scales from the HP removed, not the swing");
         }
         engine.BossContext = null;
         landed.Should().BeGreaterThan(50);
+
+        // an evaded hit (Incorporeal and the like) still procs nothing
+        var ghost = Plain();
+        ghost.EvasionRounds = 3; ghost.EvasionMissChance = 100;
+        Dealt(engine, ghost, D, hero, new CombatResult { Player = hero }).Should().Be(0, "an evaded hit runs no on-hit effect");
+        ghost.HP.Should().Be(ghost.MaxHP);
+    }
+
+    [Fact]
+    public void ProcFix135_R1e_AKillingBlow_ScalesFromTheHpTheTargetHad_NotTheOverkill()
+    {
+        var hero = Hero(lifeSteal: LifeStealPct);
+        var engine = Engine(hero, 135);
+        var result = new CombatResult { Player = hero };
+
+        var weak = Plain();
+        weak.HP = 100;
+        Dealt(engine, weak, D, hero, result).Should().Be(100, "the on-hit base is capped at the HP before the hit");
+
+        // the live Power Attack on a target with little HP left heals from that HP only
+        int kills = 0;
+        for (int i = 0; i < 100; i++)
+        {
+            var m = Plain();
+            m.HP = 100;
+            hero.HP = 1_000;
+            PowerAttack(engine, hero, m, new CombatResult { Player = hero });
+            if (m.HP == 100) continue;
+            kills++;
+            (hero.HP - 1_000).Should().Be(100 * LifeStealPct / 100, "Lifedrinker heals from the 100 HP removed, not the overkill");
+        }
+        kills.Should().BeGreaterThan(20);
     }
 
     [Fact]
@@ -273,7 +309,7 @@ public class ProcFix135Tests
     }
 
     [Fact]
-    public void ProcFix135_R2c_AFrostSpellSlow_WhoseTextSaysTurns_StillCountsEachAction()
+    public void ProcFix135_R2c_AFrostSpellSlow_CountsOnceARound()
     {
         var hero = Hero();
         hero.HP = 1_000_000;
@@ -281,16 +317,44 @@ public class ProcFix135Tests
         var spellEffect = typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!;
         var boss = God();
         spellEffect.Invoke(engine, new object?[] { boss, "frost", 0, hero, 0L, new CombatResult { Player = hero } });
-        boss.SlowDuration.Should().Be(2);
+        boss.SlowDuration.Should().Be(2, "Frost Touch and Ice Storm slow for 2 rounds");
         Round(engine, boss, hero, 2);
-        boss.SlowDuration.Should().Be(0, "Frost Touch and Ice Storm keep the count of each action, as before 1.3.5");
+        boss.SlowDuration.Should().Be(1, "a frost spell's slow joins the once-a-round countdown");
+        boss.IsSlowed.Should().BeTrue();
+        Round(engine, boss, hero, 2);
         boss.IsSlowed.Should().BeFalse();
+    }
 
-        // a later slow from another source on the same monster counts once a round again
-        boss.IsSlowed = true;
-        boss.SlowDuration = 2;
-        Round(engine, boss, hero, 2);
-        boss.SlowDuration.Should().Be(1);
+    [Fact]
+    public void ProcFix135_R2d_FrostbrandSlowOnABoss_GoesThroughTheSoftControlResist_ARegularMonsterIsUnchanged()
+    {
+        var hero = Hero();
+        hero.Class = CharacterClass.MysticShaman;
+        int bossRounds = Math.Max(1, GameConfig.FrostEnchantDuration / 2);
+        int bossSlowed = 0, resisted = 0;
+        for (int seed = 0; seed < 200; seed++)
+        {
+            hero.ShamanEnchantType = 2; hero.ShamanEnchantRounds = 5; hero.ShamanEnchantPower = 50;
+            var regular = Plain();
+            OnHit(Engine(hero, seed), regular, D, hero, new CombatResult { Player = hero });
+            regular.IsSlowed.Should().BeTrue("Frostbrand slows a regular monster on every hit");
+            regular.SlowDuration.Should().Be(GameConfig.FrostEnchantDuration);
+
+            var boss = God();
+            OnHit(Engine(hero, seed), boss, D, hero, new CombatResult { Player = hero });
+            if (boss.IsSlowed)
+            {
+                bossSlowed++;
+                boss.SlowDuration.Should().Be(bossRounds, "a boss takes SoftControlRounds' rounds of the Frostbrand slow");
+            }
+            else
+            {
+                resisted++;
+                boss.SlowDuration.Should().Be(0, "a resisted slow applies nothing");
+            }
+        }
+        bossSlowed.Should().BeGreaterThan(0);
+        resisted.Should().BeGreaterThan(0, "a boss resists the Frostbrand slow a share of the time");
     }
 
     // ---- R3 ----
