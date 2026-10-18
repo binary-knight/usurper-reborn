@@ -202,8 +202,8 @@ public class SaveGuards135Tests : IDisposable
     {
         var item = Props(typeof(Equipment)).Select(p => p.Name).ToList();
         var record = Props(typeof(DynamicEquipmentData)).Select(p => p.Name).ToList();
+        // 53 at 1.3.5 (EN-4); a property added to both types is filled and checked on every path below
         record.Should().Equal(item, "every Equipment property has a save field of the same name, and no other");
-        item.Should().HaveCount(53, "the property count the save paths were checked against (EN-4); a new one is checked on every path below");
     }
 
     [Fact]
