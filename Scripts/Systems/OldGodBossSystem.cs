@@ -1089,13 +1089,54 @@ namespace UsurperRemake.Systems
         internal static BossFight BuildBossFight(OldGodType type, int artifactCount, BossDialogue dialogue, Character player) =>
             BuildBossFight(OldGodsData.GetGodBossData(type), artifactCount, dialogue, player);
 
-        /// <summary>1.3.4: BuildBossFight for a boss row (Noctura has two: her own and the betrayal's).</summary>
-        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player)
+        /// <summary>1.3.5 (B1): BuildBossFight with the living fighters n, counted once by the caller.</summary>
+        internal static BossFight BuildBossFight(OldGodType type, int artifactCount, BossDialogue dialogue, Character player, int fighters) =>
+            BuildBossFight(OldGodsData.GetGodBossData(type), artifactCount, dialogue, player, fighters);
+
+        /// <summary>1.3.4: BuildBossFight for a boss row (Noctura has two: her own and the betrayal's). One fighter.</summary>
+        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player) =>
+            BuildBossFight(boss, artifactCount, dialogue, player, 1);
+
+        /// <summary>
+        /// 1.3.5 (B1): the party HP factor s(n) of a god's fight, n the living fighters (the player and every
+        /// teammate, companion or NPC ally) counted once when the fight is built: 1.0 for n of 1 (solo, its own
+        /// rule unchanged) and for 5 or more, 1 - 3k for 2, 1 - 2k for 3, 1 - k for 4, k being
+        /// GameConfig.MaelkethPartyHpScaleK. 1.0 for every god but GameConfig.MaelkethPartyHpScaleGod.
+        /// </summary>
+        internal static double PartyHpScale(OldGodType god, int fighters)
+        {
+            if (god != GameConfig.MaelkethPartyHpScaleGod) return 1.0;
+            const double k = GameConfig.MaelkethPartyHpScaleK;
+            return fighters switch
+            {
+                2 => 1.0 - 3 * k,
+                3 => 1.0 - 2 * k,
+                4 => 1.0 - k,
+                _ => 1.0,
+            };
+        }
+
+        /// <summary>1.3.5 (B1): the living fighters at a fight's start: the player and every living teammate
+        /// (companions and NPC allies alike). Read once, when the fight is built.</summary>
+        internal static int CountLivingFighters(Character player, IEnumerable<Character>? teammates) =>
+            (player.IsAlive ? 1 : 0) + (teammates?.Count(t => t != null && t.IsAlive) ?? 0);
+
+        /// <summary>1.3.5 (B1): BuildBossFight with the living fighters n; the god's fight HP is scaled by
+        /// PartyHpScale(n) before the dialogue's adjustments. n is not read again during the fight.</summary>
+        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player, int fighters)
         {
             dialogue ??= BossDialogue.None;
 
             // Create a Monster from boss data
             var monster = BuildBossMonster(boss, artifactCount);
+
+            // 1.3.5 (B1): the party HP scale, once, from the fighters counted at the build
+            double partyScale = PartyHpScale(boss.Type, fighters);
+            if (partyScale != 1.0)
+            {
+                monster.MaxHP = Math.Max(1, (long)(monster.MaxHP * partyScale));
+                monster.HP = monster.MaxHP;
+            }
 
             // Apply dialogue-based stat adjustments to the monster
             ApplyDialogueToMonster(monster, player, dialogue);

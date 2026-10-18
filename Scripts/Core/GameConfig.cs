@@ -1693,6 +1693,16 @@ public static partial class GameConfig
     public const float OldGodDivineScalingDamagePerArtifact = 0.05f;   // +5% damage per collected artifact (cap +20% after 4 artifacts)
     public const float OldGodSoloDamageBonus = 0.15f;                  // Solo Old God fight: god does +15% damage
     public const float OldGodSoloPlayerDamageReduction = 0.20f;         // Solo Old God fight: player takes -20% damage
+
+    /// <summary>
+    /// 1.3.5 (B1): the step k of the party HP scale of an Old God fight (OldGodBossSystem.PartyHpScale). The
+    /// god's fight HP is times 1.0 alone, 1 - 3k with 2 fighters, 1 - 2k with 3, 1 - k with 4 and 1.0 with 5
+    /// or more, the living fighters counted once when the fight is built. Measured pick 0.25 (B1-REPORT).
+    /// </summary>
+    public const double MaelkethPartyHpScaleK = 0.25;
+
+    /// <summary>1.3.5 (B1): the one god the party HP scale applies to; every other god is unchanged.</summary>
+    public const OldGodType MaelkethPartyHpScaleGod = OldGodType.Maelketh;
     public const float BossFirstRoundsDamageCapPercent = 0.15f;        // First 3 rounds of boss fight: cap hit at 15% MaxHP
     public const int BossFirstRoundsDamageCapRounds = 3;
 
