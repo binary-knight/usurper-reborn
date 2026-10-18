@@ -72,7 +72,13 @@ public class FollowerInventory135Tests
             string unequipPrompt = "  " + Loc.GetIn(lang, "dungeon.follower_unequip_prompt");
             return Strip(Encoding.UTF8.GetString(output.ToArray())).Replace("  > ", "  > \n").Replace(unequipPrompt, unequipPrompt + "\n");
         }
-        finally { GameConfig.Language = prev; GameConfig.ScreenReaderMode = sr; }
+        finally
+        {
+            GameConfig.Language = prev; GameConfig.ScreenReaderMode = sr;
+            // The registry is shared by every test in the process and other tests measure its longest name (a curse
+            // removal row, the Magic Shop rows): the registered copy leaves under its template's name (at most 25).
+            eq.Name = equipped.Family;
+        }
     }
 
     private static string Flat(string s) => Regex.Replace(s, @"\s+", " ").Trim();
