@@ -358,7 +358,7 @@ public class TownMagic125Tests
             return s.Text;
         });
         hero.GetEquipment(EquipmentSlot.Head)!.Name.Should().Be("Leather Cap", "RemoveEnchantment strips the English code by pattern");
-        shown.Should().Contain(L("hu", "magic_shop.remove_restored", "Leather Cap"));
+        shown.Should().Contain(L("hu", "magic_shop.remove_restored", ItemNames.DisplayIn("hu", "Leather Cap")));
         EveryRowFits(shown, "hu enchant removal");
     }
 

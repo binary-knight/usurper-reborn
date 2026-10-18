@@ -33,7 +33,7 @@ An item holds at most {{balance:MaxEnchantments}} enchants, and never the same k
 
 ## Can enchanting fail
 
-The 4th enchant on an item fails {{percent:FourthEnchantFailChance}} percent of the time and the 5th fails {{percent:FifthEnchantFailChance}} percent of the time; the first three never fail. The shop warns you before you confirm. On a failure the shop keeps the gold and the materials and adds no enchant. Instead the item loses one enchant from its count and 5 from one of weapon power, Strength, Dexterity, Defence, Wisdom or armor class, picked at random and never below 0.
+The 4th enchant on an item fails {{percent:FourthEnchantFailChance}} percent of the time and the 5th fails {{percent:FifthEnchantFailChance}} percent of the time; the first three never fail. The shop warns you before you confirm. On a failure the shop keeps the gold and the materials and adds no enchant. Instead one of the item's existing enchants, picked at random, is destroyed: its stats, its fire or frost effect and its name tag are taken off, its kind can be enchanted again, and the item's other enchants and stats stay as they were.
 
 ## Crafting materials for enchants
 
@@ -41,7 +41,7 @@ Mythic takes 1 Fading Starlight Dust. Legendary takes 1 Heart of the Ocean and 1
 
 ## Enchant removal cost
 
-Enchant removal (W) costs 5,000 + level x 200 gold before the price modifiers: 9,000 at level 20. It works on equipment you are wearing and returns the item to its base form; see [shops](/wiki/en/items/shops/).
+Enchant removal (W) costs 5,000 + level x 200 gold before the price modifiers: 9,000 at level 20. It works on equipment you are wearing and on enchanted items in your backpack, and returns the item to its base form; see [shops](/wiki/en/items/shops/).
 
 ## Magic Shop prices and the loyalty discount
 
