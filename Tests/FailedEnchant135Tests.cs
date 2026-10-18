@@ -163,8 +163,8 @@ public class FailedEnchant135Tests : IDisposable
         foreach (var k in kept) k.Adds(expected);
         Fields(after).Should().Be(Fields(expected), "no stat outside the destroyed enchant moved and each kept one keeps its full effect");
         after.Value.Should().Be(before.Value, "the value keeps what was paid");
-        after.Name.Should().NotContain(gone.Tag, "the destroyed enchant's tag is gone");
-        foreach (var k in kept) after.Name.Should().Contain(k.Tag);
+        // a tag that would pass 40 characters is never written (the 4th here), so the name is compared to its own before
+        after.Name.Should().Be(before.Name.Replace(gone.Tag, ""), "the destroyed enchant's tag is gone and the others stay");
         after.EnchantBase.Should().Be(before.EnchantBase, "removal still returns the item to the same base form");
     }
 

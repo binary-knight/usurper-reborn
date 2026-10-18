@@ -2530,7 +2530,8 @@ public partial class MagicShopLocation : BaseLocation
     /// A stat enchant's amount is its stat above the base form less what the named enchants on the list add to it.
     /// Otherwise (an item enchanted before 1.2.5 that matches no template, or a kind list shorter than the count) one
     /// of the counted enchants is picked: a named kind loses its own fixed amounts and its flag, a stat kind the amount
-    /// in its name tag, or with no tag the largest stat tier bonus its stat still holds, never below zero; an enchant
+    /// in its name tag, or with no tag the largest stat tier bonus its stat still holds (all of it when
+    /// that is less than the smallest), never below zero; an enchant
     /// the kind list never recorded lowers the count only. In every path the count drops by one.
     /// Returns the changed copy and the destroyed kind ("" for one the list never recorded).</summary>
     internal static (Equipment Item, string Kind) DestroyOneEnchant(Equipment item, Random rng)
@@ -2591,7 +2592,7 @@ public partial class MagicShopLocation : BaseLocation
             var statBonuses = Enumerable.Range(1, EnchantTiers.Length).Where(t => t <= 4 || (t >= 10 && t <= 12))
                 .Select(t => EnchantTiers[t - 1].bonus);
             amount = tag.Success ? int.Parse(tag.Groups[1].Value)
-                : statBonuses.Where(b => b <= have).DefaultIfEmpty(0).Max();
+                : statBonuses.Where(b => b <= have).DefaultIfEmpty(Math.Max(0, have)).Max();
             amount = Math.Min(amount, Math.Max(0, have));
         }
         ApplyEquipmentStatBonus(damaged, stat, -amount);
@@ -2751,7 +2752,7 @@ public partial class MagicShopLocation : BaseLocation
 
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.remove_dissolve"), "magenta");
-        DisplayMessage(Loc.Get("magic_shop.remove_restored", ItemNames.Display(stripped)), "yellow");
+        DisplayMessage(Loc.Get("magic_shop.remove_restored", stripped.Name), "yellow");
         player.Statistics?.RecordGoldSpent(removalCost);
 
         await terminal.WaitForKey();
