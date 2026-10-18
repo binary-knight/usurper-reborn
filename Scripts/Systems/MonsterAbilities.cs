@@ -1529,6 +1529,7 @@ public class AbilityResult
     // Damage modifiers
     public float DamageMultiplier { get; set; } = 1.0f;
     public int DirectDamage { get; set; } = 0;
+    // Set by seven abilities and read by no fight path: the swings are not made (1.3.5, text-only call)
     public int ExtraAttacks { get; set; } = 0;
     public bool SkipNormalAttack { get; set; } = false;
 
