@@ -232,6 +232,7 @@ public class TeamJoinSlotClaim1114Tests
         // the first join's full save has not landed (in a test it never does); the claim wrote the team already
         var npc = TeamCornerRig.Npc("tc_t1_npc", "Crowd Npc", "Crowded");
         NPCSpawnSystem.Instance.ActiveNPCs.Add(npc);
+        NPCSpawnSystem.Instance.InvalidateSnapshot();
         var saved = UsurperRemake.Server.SessionContext.Current;
         try
         {
