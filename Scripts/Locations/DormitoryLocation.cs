@@ -814,7 +814,35 @@ public class DormitoryLocation : BaseLocation
             // v1.2.5: the enchant count and kinds (in Description) and the pre-enchant record, so a stolen
             // enchanted item keeps its enchant limit and can still have its enchants removed
             Description = d.Description ?? "",
-            EnchantBase = d.EnchantBase ?? ""
+            EnchantBase = d.EnchantBase ?? "",
+            // The rest of the saved item, so a stolen item arrives whole: enchants, procs, restrictions, curse
+            ArmorType = (ArmorType)d.ArmorType,
+            WeightClass = (ArmorWeightClass)d.WeightClass,
+            StaminaBonus = d.StaminaBonus,
+            CriticalChanceBonus = d.CriticalChanceBonus,
+            CriticalDamageBonus = d.CriticalDamageBonus,
+            MagicResistance = d.MagicResistance,
+            PoisonDamage = d.PoisonDamage,
+            LifeSteal = d.LifeSteal,
+            HasFireEnchant = d.HasFireEnchant,
+            HasFrostEnchant = d.HasFrostEnchant,
+            HasLightningEnchant = d.HasLightningEnchant,
+            HasPoisonEnchant = d.HasPoisonEnchant,
+            HasHolyEnchant = d.HasHolyEnchant,
+            HasShadowEnchant = d.HasShadowEnchant,
+            ManaSteal = d.ManaSteal,
+            ArmorPiercing = d.ArmorPiercing,
+            Thorns = d.Thorns,
+            HPRegen = d.HPRegen,
+            ManaRegen = d.ManaRegen,
+            StrengthRequired = d.StrengthRequired,
+            RequiresGood = d.RequiresGood,
+            RequiresEvil = d.RequiresEvil,
+            ClassRestrictions = d.ClassRestrictions?.Select(c => (CharacterClass)c).ToList() ?? new List<CharacterClass>(),
+            IsUnique = d.IsUnique,
+            HasBossSlayer = d.HasBossSlayer,
+            HasTitanResolve = d.HasTitanResolve,
+            IsCursed = d.IsCursed
         };
 
     private async Task<(string? name, Equipment? equipment)> StealRandomItem(SqlSaveBackend backend, string username, SaveGameData saveData)
