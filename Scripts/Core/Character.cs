@@ -1550,7 +1550,8 @@ public class Character
             Name = equipment.Name,
             Type = itemType,
             Attack = equipment.WeaponPower,
-            Armor = itemType == global::ObjType.Shield ? 0 : equipment.ArmorClass,
+            // 1.3.5: a shield's own armour class (an enchant's AC) rides in Armor beside its ShieldBonus.
+            Armor = equipment.ArmorClass,
             ShieldBonus = equipment.ShieldBonus,
             BlockChance = equipment.BlockChance,
             Value = equipment.Value,
@@ -1645,10 +1646,12 @@ public class Character
             WeaponType = weaponType,
             WeightClass = weightClass,
             WeaponPower = item.Attack,
-            // A shield's defensive value lives in ShieldBonus (Armor stays 0). Math.Max also recovers
-            // legacy saves that stored it in item.Armor. Non-shields keep ArmorClass = item.Armor.
-            ArmorClass = isShield ? 0 : item.Armor,
-            ShieldBonus = isShield ? Math.Max(item.ShieldBonus, item.Armor) : 0,
+            // A shield's defensive value lives in ShieldBonus. 1.3.5: with a ShieldBonus, item.Armor is the
+            // shield's own armour class (an enchant's AC) and is kept. A legacy shield (saved before 0.52.14)
+            // has ShieldBonus 0 and its block value in item.Armor, and still reads it as ShieldBonus.
+            // Non-shields keep ArmorClass = item.Armor.
+            ArmorClass = isShield ? (item.ShieldBonus > 0 ? item.Armor : 0) : item.Armor,
+            ShieldBonus = isShield ? (item.ShieldBonus > 0 ? item.ShieldBonus : item.Armor) : 0,
             BlockChance = item.BlockChance,
             DefenceBonus = item.Defence,
             StrengthBonus = item.Strength,
@@ -1694,8 +1697,10 @@ public class Character
                     break;
                 case LootGenerator.SpecialEffect.HolyDamage: equipment.HasHolyEnchant = true; break;
                 case LootGenerator.SpecialEffect.ShadowDamage: equipment.HasShadowEnchant = true; break;
-                case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, Math.Max(5, value / 2)); break;
-                case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, Math.Max(5, value / 2)); break;
+                // 1.3.5: read back exactly as written (the item shows this number, and ConvertEquipmentToItem
+                // writes the worn value here), so a 3 stays 3 and a 20 stays 20 through any number of bag trips.
+                case LootGenerator.SpecialEffect.LifeSteal: equipment.LifeSteal = Math.Max(equipment.LifeSteal, value); break;
+                case LootGenerator.SpecialEffect.ManaSteal: equipment.ManaSteal = Math.Max(equipment.ManaSteal, value); break;
                 case LootGenerator.SpecialEffect.CriticalStrike: equipment.CriticalChanceBonus = Math.Max(equipment.CriticalChanceBonus, value); break;
                 case LootGenerator.SpecialEffect.CriticalDamage: equipment.CriticalDamageBonus = Math.Max(equipment.CriticalDamageBonus, value); break;
                 case LootGenerator.SpecialEffect.ArmorPiercing: equipment.ArmorPiercing = Math.Max(equipment.ArmorPiercing, value); break;
@@ -1705,10 +1710,15 @@ public class Character
                 case LootGenerator.SpecialEffect.MagicResist: equipment.MagicResistance = Math.Max(equipment.MagicResistance, value); break;
                 case LootGenerator.SpecialEffect.Constitution: equipment.ConstitutionBonus += value; break;
                 case LootGenerator.SpecialEffect.Intelligence: equipment.IntelligenceBonus += value; break;
+                // 1.3.5: the loot generator leaves Max HP and Max Mana to this switch; the item shows "+X".
+                // ConvertEquipmentToItem then carries them in Item.HP and Item.Mana, not as an effect.
+                case LootGenerator.SpecialEffect.MaxHP: equipment.MaxHPBonus += value; break;
+                case LootGenerator.SpecialEffect.MaxMana: equipment.MaxManaBonus += value; break;
                 case LootGenerator.SpecialEffect.AllStats:
+                    // 1.3.5: the loot generator puts Strength, Dexterity, Agility, Wisdom and Charisma on the
+                    // item itself; only Constitution and Intelligence come from the effect, so Charisma counts once.
                     equipment.ConstitutionBonus += value;
                     equipment.IntelligenceBonus += value;
-                    equipment.CharismaBonus += value;
                     break;
                 case LootGenerator.SpecialEffect.BossSlayer: equipment.HasBossSlayer = true; break;
                 case LootGenerator.SpecialEffect.TitanResolve: equipment.HasTitanResolve = true; break;
