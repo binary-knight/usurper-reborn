@@ -12803,7 +12803,7 @@
   "ability.void_rupture.name": "Void Rupture",
   "ability.void_rupture.desc": "Tear the void open. 160 AoE damage. Enemies killed explode for 60 bonus damage to others.",
   "ability.deaths_embrace.name": "Death's Embrace",
-  "ability.deaths_embrace.desc": "Cheat death. If HP reaches 0, revive with 1 HP and become invulnerable for 1 round. Lasts 3 rounds.",
+  "ability.deaths_embrace.desc": "Cheat death. Regenerate for 3 rounds and dodge the next attack. The next time your HP reaches 0 in this fight, revive with 15% of max HP and dodge the next attack.",
   "ability.annihilation.name": "Annihilation",
   "ability.annihilation.desc": "Erase from existence. Costs 50% current HP. 300 damage. Below 50% HP: instant kill (non-boss).",
   "_comment_city": "=== City Control System ===",

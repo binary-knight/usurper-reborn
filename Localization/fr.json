@@ -12563,7 +12563,7 @@
   "ability.void_rupture.name": "Déchirure du Vide",
   "ability.void_rupture.desc": "Ouvrez le vide en grand. 160 dégâts de zone. Les ennemis tués explosent et infligent 60 dégâts bonus aux autres.",
   "ability.deaths_embrace.name": "Étreinte de la Mort",
-  "ability.deaths_embrace.desc": "Trompez la mort. Si vos PV tombent à 0, revenez avec 1 PV et devenez invulnérable pendant 1 tour. Dure 3 tours.",
+  "ability.deaths_embrace.desc": "Trompez la mort. Régénérez vos PV pendant 3 tours et esquivez la prochaine attaque. La prochaine fois que vos PV tombent à 0 dans ce combat, revenez avec 15 % de vos PV max et esquivez la prochaine attaque.",
   "ability.annihilation.name": "Annihilation",
   "ability.annihilation.desc": "Effacez de l'existence. Coûte 50 % des PV actuels. 300 dégâts. Sous 50 % de PV : mort instantanée (hors boss).",
   "_comment_city": "=== Système de contrôle de la ville ===",
