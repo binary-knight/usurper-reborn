@@ -14484,7 +14484,7 @@ public partial class CombatEngine
         string effect = abilityResult.SpecialEffect ?? "";
         if (effect.Contains("aoe") || effect.Contains("distract") || effect.Contains("psychic") || effect.Contains("magic")
             || effect.Contains("charm") || effect.Contains("fear") || effect.Contains("confus")) return false;
-        if (IsMagicalAbilityEffect(effect)) return false;
+        if (IsMagicalAbility(abilityResult)) return false;   // 1.3.5: the ability's one kind, as for its protections and procs
         return effect != "guaranteed_hit";
     }
 

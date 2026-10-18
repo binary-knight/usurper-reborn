@@ -423,6 +423,19 @@ public class BossProtect135Tests
         }
     }
 
+    [Fact]
+    public void BossProtect135_DescriptionRowsInTheBaseBlock_DoNotRollToHit_AsTheAbilitiesGuideSaysOfMagic()
+    {
+        // characters/abilities.md: "Area abilities, magical abilities, ... do not roll"
+        foreach (var id in new[] { "holy_avenger", "purifying_flame", "searing_totem", "corrupting_touch" })
+        {
+            var used = Use(id, 50);
+            CombatEngine.AbilityRollsToHit(used.AbilityUsed!, used, false).Should().BeFalse($"{id} is magical");
+        }
+        var strike = Use("power_strike", 50);
+        CombatEngine.AbilityRollsToHit(strike.AbilityUsed!, strike, false).Should().BeTrue("a physical strike still rolls");
+    }
+
     // ---- the protected paths are unchanged ----
 
     [Fact]
