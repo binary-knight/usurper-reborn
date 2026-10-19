@@ -6354,13 +6354,20 @@ public partial class CombatEngine
         // Pick a random ability. Bosses draw from the phase-filtered pool
         // (SelectBossAbility) -- the single picker, now that the duplicate
         // pre-announcement in ProcessMonsterAction is gone.
+        string? heldBack = null;
         string? abilityName = (BossContext != null && monster.IsBoss)
-            ? SelectBossAbility(BossContext)
+            ? SelectBossAbility(BossContext, out heldBack)
             : tactics
                 ? MonsterTactics.Choose(monster, player, result.CurrentRound, monsterList, random)
                 : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
         if (abilityName == null)
+        {
+            // 1.3.5 (CT-2): a held counter's blocked ability is held back; the god makes its normal attack instead
+            if (heldBack != null && BossContext != null)
+                UIHelper.WriteRow(terminal, Loc.Get("combat.counter_blocked", MonsterNames.Display(monster),
+                    BossAbilityLabel(heldBack), OldGodBossSystem.CounterTierName(BossContext.GodType)), "bright_cyan");
             return false; // 1.2.8: every pick would be wasted, so the monster makes its normal attack
+        }
 
         // Old God boss abilities — handle by name before generic enum parse
         if (BossContext != null && monster.IsBoss)
@@ -32301,15 +32308,24 @@ public partial class CombatEngine
     /// <summary>
     /// Select a random boss ability name based on current phase
     /// </summary>
-    private string SelectBossAbility(BossCombatContext ctx)
+    private string? SelectBossAbility(BossCombatContext ctx, out string? heldBack)
     {
+        heldBack = null;
         // Defense in depth: BossContext should always carry BossData, but if a
         // caller forgets (Noctura betrayal NPE in v0.57.17 was the symptom), fall
         // back to "Divine Strike" rather than crashing combat.
         if (ctx.BossData?.Abilities == null) return "Divine Strike";
         var abilities = ctx.BossData.Abilities.Where(a => a.Phase <= ctx.CurrentPhase).ToList();
         if (abilities.Count == 0) return "Divine Strike";
-        return abilities[random.Next(abilities.Count)].Name;
+        string name = abilities[random.Next(abilities.Count)].Name;
+        // 1.3.5 (CT-2): a held counter's blocked ability is not used: null (the caller's normal attack), no redraw,
+        // so the god's other abilities come no more often; heldBack names it for the caller's line
+        if (ctx.CounterBlockedAbilities != null && ctx.CounterBlockedAbilities.Contains(name))
+        {
+            heldBack = name;
+            return null;
+        }
+        return name;
     }
 
     /// <summary>
@@ -34069,6 +34085,10 @@ public class BossCombatContext
     public string AoEAbilityName { get; set; } = "";      // Loc key (or name) of AoE ability
     public double TankAbsorptionRate { get; set; } = 0.6; // % of AoE damage absorbed by taunting tank
     public double DivineArmorReduction { get; set; } = 0;  // % damage reduction from divine armor (set by OldGodBossSystem)
+    /// <summary>1.3.5 (CT-2): the abilities a held counter takes out of SelectBossAbility's turns (set at the build by
+    /// OldGodBossSystem when the player holds the god's counter); null otherwise. Internal, so it stays off the
+    /// context's public property snapshot.</summary>
+    internal IReadOnlyCollection<string>? CounterBlockedAbilities { get; set; }
 
     /// <summary>
     /// Determine what phase the boss should be in based on HP percentage

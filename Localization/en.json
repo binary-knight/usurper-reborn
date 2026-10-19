@@ -23336,6 +23336,7 @@
   "combat.probability_negates": "Probability shift negates {0}!",
   "combat.probability_shift": "Probability shifts around {0} - attacks will miss!",
   "combat.probability_shift_miss": "Probability shifts: {0}'s attack goes wide!",
+  "combat.counter_blocked": "{0}'s {1} is held back by your {2}.",
   "combat.reflection_destroy": "Your reflection shatters {0}!",
   "combat.sacrifice_blow_strikes": "{0} sacrifices themselves to land a devastating blow!",
   "combat.sacrifice_generic": "{0} makes the ultimate sacrifice!",
