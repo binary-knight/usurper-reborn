@@ -167,8 +167,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// 1.2.8: open the login connection through <see cref="OnlineTransport.Factory"/>: the SSH gateway to the
-        /// relay (Local and Steam), or direct TCP for the BBS door (no SSH client in the door environment; sslh on
-        /// port 4000 routes raw TCP to the MUD server). Null after a failure, which is shown here.
+        /// relay (Local and Steam), or direct TCP for the BBS door (no SSH client in the door environment; the haproxy
+        /// multiplexer on port 4000 routes raw TCP to the MUD server). Null after a failure, which is shown here.
         /// </summary>
         private async Task<IOnlineAuthTransport?> ConnectTransportAsync(string server, int port, bool directTcp)
         {
