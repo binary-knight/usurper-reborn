@@ -59,7 +59,7 @@ You must leave your team before you take the throne, and the game asks first. If
 
 ### Can NPCs take my throne
 
-Yes. An NPC challenges a player ruler only if it is level {{balance:NPCMinLevelToChallenge}} or more, within {{balance:NPCChallengeLevelRange}} levels of the ruler, has an ambition above {{balance:NPCMinAmbitionToChallenge}}, is not in prison and is not a story character; at most {{balance:MaxNPCChallengesPerDay}} NPC challenge comes a day. A failed challenger goes to prison. An NPC on a player's team is not picked to challenge an NPC ruler, and is not crowned on an empty throne as the named heir or as a claimant.
+Yes. An NPC challenges a player ruler only if it is level {{balance:NPCMinLevelToChallenge}} or more, within {{balance:NPCChallengeLevelRange}} levels of the ruler, has an ambition above {{balance:NPCMinAmbitionToChallenge}}, is not in prison and is not a story character; at most {{balance:MaxNPCChallengesPerDay}} NPC challenge comes a day. A failed challenger goes to prison. An NPC on a player's team is not picked to challenge an NPC ruler, does not carry out a challenge against a player ruler once a player hires it, and is not crowned on an empty throne as the named heir or as a claimant.
 
 ## What do I get for being king
 
