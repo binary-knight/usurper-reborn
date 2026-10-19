@@ -7,7 +7,7 @@ history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Enchant removal refuses a cursed item without charging, and enchanting a worn item or removing its enchant leaves it worn.
 ---
-The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 14 enchants.
+The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; the last three, the god counters, go on a main hand or off hand item only.
 
 ## Enchant list and costs
 
@@ -27,6 +27,14 @@ Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapo
 
 Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and crafting materials. With Phoenix Fire, each hit with that weapon has a {{percent:FireEnchantProcChance}} percent chance of extra fire damage equal to {{percent:FireEnchantDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostEnchantProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them.
 
+## God counter enchants
+
+Sunbane, Stonebane and Godbane are the god counters, one for each of the last three Old Gods: Sunbane against Aurelion, Stonebane against Terravok and Godbane against Manwe. A counter adds no stat. Carried on your main hand or off hand into its own god's fight, it holds back two of that god's named abilities and removes the god's divine armor, the cut to your damage: Sunbane holds back Aurelion's Light's Embrace and Sacrifice, Stonebane holds back Terravok's Stone Skin and Entomb, and Godbane holds back Manwe's Word of Creation and Time Stop. Against any other god a counter does nothing.
+
+Sunbane costs 300,000 + 3,000 per level and needs level 80. Stonebane costs 400,000 + 4,000 per level and needs level 88. Godbane costs 500,000 + 5,000 per level and needs level 95. Each also takes crafting materials (below).
+
+A counter goes only on a main hand or off hand item, worn or in your backpack; on armor, a ring, an amulet or any other item the shop refuses it and charges nothing. A weapon carries one counter at most: a second counter, the same one or another, is refused and nothing is charged. A counter takes one of the item's enchant slots, and as a 4th or 5th enchant it can fail like any other. Enchant removal takes it off with the rest.
+
 ## Enchant limit
 
 An item holds at most {{balance:MaxEnchantments}} enchants, and never the same kind twice. Each stat counts as one kind across every stat tier. A higher tier on a stat the item has replaces the lower one (Minor +2 Dexterity, then Superior: +8, not +10); an equal or lower one is refused. An upgrade costs the new price, refunds nothing and keeps the enchant count, so it never fails. Each named enchant is its own kind. A cursed item cannot be enchanted; remove the curse first.
@@ -37,7 +45,7 @@ The 4th enchant on an item fails {{percent:FourthEnchantFailChance}} percent of 
 
 ## Crafting materials for enchants
 
-Mythic takes 1 Fading Starlight Dust. Legendary takes 1 Heart of the Ocean and 1 Shadow Silk Thread. Godforged takes 1 Eye of Manwe and 1 Terravok's Heartstone. Phoenix Fire takes 1 Crimson War Shard and 1 Fading Starlight Dust. Frostbite takes 1 Shadow Silk Thread and 1 Fading Starlight Dust. Materials are spent when you pay, before the failure roll. See [crafting materials](/wiki/en/items/materials/) for where each drops.
+Mythic takes 1 Fading Starlight Dust. Legendary takes 1 Heart of the Ocean and 1 Shadow Silk Thread. Godforged takes 1 Eye of Manwe and 1 Terravok's Heartstone. Phoenix Fire takes 1 Crimson War Shard and 1 Fading Starlight Dust. Frostbite takes 1 Shadow Silk Thread and 1 Fading Starlight Dust. Sunbane takes 2 Fading Starlight Dust and 2 Withered Heart Petal. Stonebane takes 2 Terravok's Heartstone and 2 Iron Judgment Link. Godbane takes 2 Eye of Manwe, 1 Heart of the Ocean, 1 Withered Heart Petal and 1 Iron Judgment Link. Materials are spent when you pay, before the failure roll. See [crafting materials](/wiki/en/items/materials/) for where each drops.
 
 ## Enchant removal cost
 
