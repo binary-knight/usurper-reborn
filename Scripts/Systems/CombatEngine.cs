@@ -30398,7 +30398,17 @@ public partial class CombatEngine
                 // Award to companion through CompanionSystem
                 CompanionSystem.Instance?.AwardSpecificCompanionXP(teammate.DisplayName, slotXP, terminal);
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share", teammate.DisplayName, percent, slotXP, catchUpLabel)}");
+                // v1.3.5: the companion's progress to its next level, as the NPC line shows it. Read from the
+                // Companion itself (the wrapper's Experience is not the companion's), after the award, so a level
+                // gained in this award shows the new level's need. At the cap or not found: the plain line.
+                var awarded = teammate.CompanionId is CompanionId cid ? CompanionSystem.Instance?.GetCompanion(cid) : null;
+                if (awarded != null && awarded.Level < 100)
+                {
+                    long companionNeeded = GameConfig.GetExperienceForLevel(awarded.Level + 1);
+                    terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share_progress", teammate.DisplayName, percent, slotXP, awarded.Experience.ToString("N0"), companionNeeded.ToString("N0"), catchUpLabel)}");
+                }
+                else
+                    terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share", teammate.DisplayName, percent, slotXP, catchUpLabel)}");
             }
             else
             {
