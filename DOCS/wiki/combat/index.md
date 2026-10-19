@@ -101,6 +101,8 @@ Weapon power above 800 counts at half in a swing's damage: 1,000 counts as 900. 
 
 A monster takes your damage minus its armor power, at least 1. A basic swing and Backstab ignore its Defence; Power Attack and Precise Strike first take off its Defence plus a random 0 to Defence / 8. A sleeping monster then takes 50 percent more.
 
+Armor piercing on your gear takes its percent off a monster's armor and Defence on every hit, area attacks and abilities included; the sum over all your gear is at most 50 percent.
+
 ### Area damage
 
 An area attack does full damage to the first monster, 75 percent to the second, 50 percent to the third and 25 percent to the fourth and every later one, in the order the monsters stand, not the one you picked first.
