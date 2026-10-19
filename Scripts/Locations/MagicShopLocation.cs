@@ -1396,7 +1396,7 @@ public partial class MagicShopLocation : BaseLocation
         ("magic_shop.tier_oceans_touch",    0,  20000L, 300, 20, "magic_shop.tier_desc_ocean"),
         ("magic_shop.tier_ward",            0,  12000L, 200, 15, "magic_shop.tier_desc_ward"),
         ("magic_shop.tier_predator",        0,  25000L, 500, 30, "magic_shop.tier_desc_predator"),
-        ("magic_shop.tier_lifedrinker",     0,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),
+        ("magic_shop.tier_lifedrinker",     6,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),   // 1.3.5: the life steal percent
         // New tiers (v0.30.9)
         ("magic_shop.tier_mythic",          24, 180000L, 2000, 55, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_legendary",       30, 300000L, 3000, 65, "magic_shop.tier_desc_one_stat"),
@@ -2176,7 +2176,7 @@ public partial class MagicShopLocation : BaseLocation
             case 6: e.IntelligenceBonus += 6; e.WisdomBonus += 4; break;      // Ocean's Touch
             case 7: e.MagicResistance += 20; e.DefenceBonus += 2; break;      // Ward
             case 8: e.CriticalChanceBonus += 5; e.CriticalDamageBonus += 10; break;   // Predator
-            case 9: e.LifeSteal += 3; break;                                  // Lifedrinker
+            case 9: e.LifeSteal += EnchantTiers[8].bonus; break;              // Lifedrinker (1.3.5: the table's bonus, as its description shows)
             case 13: e.WeaponPower += 20; e.HasFireEnchant = true; break;     // Phoenix Fire
             case 14: e.WeaponPower += 20; e.HasFrostEnchant = true; break;    // Frostbite
         }

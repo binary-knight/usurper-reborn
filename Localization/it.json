@@ -28469,7 +28469,7 @@
   "magic_shop.tier_desc_ocean": "+6 intelligenza, +4 saggezza",
   "magic_shop.tier_desc_ward": "+20 resist. magica, +2 difesa",
   "magic_shop.tier_desc_predator": "+5% crit., +10% danno crit.",
-  "magic_shop.tier_desc_lifedrinker": "+3% furto vitale",
+  "magic_shop.tier_desc_lifedrinker": "+{0}% furto vitale",
   "magic_shop.tier_desc_phoenix": "+20 potenza + danno da fuoco",
   "magic_shop.tier_desc_frostbite": "+20 potenza + può rallentare",
   "magic_shop.req_level": "Liv.{0}+",

@@ -28775,7 +28775,7 @@
   "magic_shop.tier_desc_ocean": "+6 intelligencia, +4 bölcsesség",
   "magic_shop.tier_desc_ward": "+20 mágiaellenállás, +2 véd.",
   "magic_shop.tier_desc_predator": "+5% krit., +10% krit. sebzés",
-  "magic_shop.tier_desc_lifedrinker": "+3% életlopás",
+  "magic_shop.tier_desc_lifedrinker": "+{0}% életlopás",
   "magic_shop.tier_desc_phoenix": "+20 erő + tűzsebzés találatkor",
   "magic_shop.tier_desc_frostbite": "+20 erő + esély lassításra",
   "magic_shop.req_level": "{0}. szint+",

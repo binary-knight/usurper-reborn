@@ -109,7 +109,7 @@ public class FailedEnchant135Tests : IDisposable
         new("str", 1, 2, e => e.StrengthBonus += 2, " +2 Str"),
         new("bless", 5, 0, e => { e.StrengthBonus += 3; e.DexterityBonus += 3; e.DefenceBonus += 3; e.WisdomBonus += 3; e.WeaponPower += 3; e.ArmorClass += 3; }, " (Blessed)"),
         new("ward", 7, 0, e => { e.MagicResistance += 20; e.DefenceBonus += 2; }, " (Warded)"),
-        new("life", 9, 0, e => e.LifeSteal += 3, " (Lifedrinker)"),
+        new("life", 9, 0, e => MagicShopLocation.ApplyNamedEnchant(e, 9), " (Lifedrinker)"),
     };
 
     private static Task<string> Enchant(Character hero, int row, int tier, int stat) =>

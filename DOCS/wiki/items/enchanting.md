@@ -21,7 +21,7 @@ Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add the
 
 ## Named enchants
 
-Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +3 percent life steal.
+Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
 
 ### Phoenix Fire and Frostbite
 
