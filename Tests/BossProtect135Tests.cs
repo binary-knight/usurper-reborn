@@ -311,6 +311,18 @@ public class BossProtect135Tests
         }
     }
 
+    [Fact]
+    public void BossProtect135_BaseBlockKillingBlow_LifedrinkerScalesFromTheHpTheTargetHad()
+    {
+        for (int seed = 0; seed < 10; seed++)
+        {
+            var hero = Hero(lifeSteal: 60);
+            long lost = Act("power_strike", seed, null, hero, Weak())[0];
+            lost.Should().Be(10, "the strike kills the thrall");
+            (hero.HP - 1_000).Should().Be(6, "Lifedrinker heals 60 percent of the 10 HP removed, not of the overkill");
+        }
+    }
+
     // ---- bonus damage riders and the two-hit loops (KINDS section E) ----
 
     [Fact]
