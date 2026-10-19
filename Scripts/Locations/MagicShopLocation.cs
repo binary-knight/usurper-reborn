@@ -1467,9 +1467,6 @@ public partial class MagicShopLocation : BaseLocation
         (9, " (Lifedrinker)"),
         (13, " (Phoenix Fire)"),
         (14, " (Frostbite)"),
-        (15, " (Sunbane)"),
-        (16, " (Stonebane)"),
-        (17, " (Godbane)"),
     };
 
     /// <summary>v1.2.5: every named enchant tag (NamedEnchantTag over every tier).</summary>
@@ -1597,17 +1594,33 @@ public partial class MagicShopLocation : BaseLocation
             if (tail.Count > 0)
             {
                 int tailLen = tail.Sum(t => t.text.Length);
+                int col;
                 if (baseWidth + 2 + tailLen > UIHelper.WrapWidth)
                 {
                     terminal.WriteLine("");
                     terminal.Write(new string(' ', prefix));
+                    col = prefix;
                 }
                 else
-                    terminal.Write("  ");
-                foreach (var (text, color) in tail)
                 {
+                    terminal.Write("  ");
+                    col = baseWidth + 2;
+                }
+                // 1.3.5: a material list longer than a row goes on after a " +" on the next row, under the name.
+                for (int k = 0; k < tail.Count; k++)
+                {
+                    var (text, color) = tail[k];
+                    if (text == " + " && k + 1 < tail.Count && col + text.Length + tail[k + 1].text.Length > UIHelper.WrapWidth)
+                    {
+                        terminal.SetColor(color);
+                        terminal.WriteLine(" +");
+                        terminal.Write(new string(' ', prefix));
+                        col = prefix;
+                        continue;
+                    }
                     terminal.SetColor(color);
                     terminal.Write(text);
+                    col += text.Length;
                 }
             }
             terminal.WriteLine("");
@@ -2144,8 +2157,8 @@ public partial class MagicShopLocation : BaseLocation
                 ApplyNamedEnchant(enchanted, tierChoice);
                 suffix = NamedEnchantTag(tierChoice);
                 break;
-            case 15: case 16: case 17: // 1.3.5: Sunbane, Stonebane, Godbane: no stat, the kind code is the whole effect
-                suffix = NamedEnchantTag(tierChoice);
+            case 15: case 16: case 17: // 1.3.5: Sunbane, Stonebane, Godbane: no stat and no name tag, the kind code is the whole effect
+                suffix = "";
                 break;
             default:
                 suffix = "";
@@ -2306,6 +2319,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             int named = NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
             if (named > 0) { ApplyNamedEnchant(expected, named); continue; }
+            if (Array.IndexOf(CounterKindCodes, kind) >= 0) continue;   // 1.3.5: a god counter adds no stat and no tag
             int stat = Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
             if (stat == 0) return false;
             var unit = new Equipment();

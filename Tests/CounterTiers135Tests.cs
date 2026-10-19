@@ -18,8 +18,8 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// 1.3.5 (CT-1): the three god counter enchants at the Magic Shop, Sunbane (Aurelion), Stonebane (Terravok) and
 /// Godbane (Manwe), tiers 15 to 17 after Frostbite. Each costs its gold and crafting materials, needs its level, goes
-/// on a main or off hand item only, one counter to a weapon, and writes its kind code and name tag without changing a
-/// stat. The cap of 5 and the 4th and 5th enchant failure hold for a counter as for any enchant. The kind code
+/// on a main or off hand item only, one counter to a weapon, and writes its kind code without changing a stat or the
+/// item's name. The cap of 5 and the 4th and 5th enchant failure hold for a counter as for any enchant. The kind code
 /// survives a save and goes with an enchant removal.
 /// State lives in memory on Character instances; the language, the king and the shop's random source are put back in
 /// Dispose and the real save folder is neither read nor written.
@@ -67,7 +67,13 @@ public class CounterTiers135Tests : IDisposable
     {
         var shop = new MagicShopLocation();
         using var output = new MemoryStream();
-        var term = new TerminalEmulator(new LineStream(lines.Concat(Enumerable.Repeat("", 12))), output);
+        // a terminal shows the typed line and its Enter, so each read ends the prompt's row (TownMagic125Tests' pattern)
+        TerminalEmulator term = null!;
+        term = new TerminalEmulator(new LineStream(lines.Concat(Enumerable.Repeat("", 12)), _ =>
+        {
+            term.StreamWriterInternal?.Flush();
+            output.WriteByte((byte)'\n');
+        }), output);
         typeof(BaseLocation).GetField("terminal", F)!.SetValue(shop, term);
         typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(shop, hero);
         var r = typeof(MagicShopLocation).GetMethod(method, F)!.Invoke(shop, new object[] { hero });
@@ -186,7 +192,7 @@ public class CounterTiers135Tests : IDisposable
         foreach (int level in new[] { 80, 88, 95, 100 })
             (row.baseCost + level * row.levelScale).Should().Be(baseCost + level * (long)scale, $"the gold at level {level}");
         MagicShopLocation.IsCounterTier(tier).Should().BeTrue();
-        MagicShopLocation.NamedEnchantTag(tier).Should().Be($" ({name})");
+        MagicShopLocation.NamedEnchantTag(tier).Should().BeEmpty("a counter writes no name tag");
     }
 
     [Fact]
@@ -227,7 +233,7 @@ public class CounterTiers135Tests : IDisposable
         after.GetEnchantedKinds().Should().Equal(new[] { code }, "the counter writes its kind code");
         after.GetEnchantmentCount().Should().Be(1, "and takes one enchant slot");
         Fields(after).Should().Be(statsBefore, "a counter changes no stat");
-        after.Name.Should().Be("Plain Blade" + MagicShopLocation.NamedEnchantTag(tier));
+        after.Name.Should().Be("Plain Blade", "a counter writes no name tag");
     }
 
     [Fact]
@@ -308,7 +314,7 @@ public class CounterTiers135Tests : IDisposable
         back.GetEnchantmentCount().Should().Be(2, "the count comes back");
         back.GetEnchantedKinds().Should().Equal(new[] { "ward", "godbane" }, "the [ES:] marker keeps the counter");
         MagicShopLocation.CarriedCounter(back).Should().Be("godbane");
-        back.Name.Should().EndWith(" (Godbane)");
+        back.Name.Should().Be("Plain Blade (Warded)");
     }
 
     // ---------- weapon only ----------
@@ -352,7 +358,7 @@ public class CounterTiers135Tests : IDisposable
         GiveEveryMaterial(hero);
         await Enchant(hero, Sunbane);
         var item = hero.Inventory.Single();
-        item.Name.Should().Be("Spare Blade (Sunbane)");
+        item.Name.Should().Be("Spare Blade");
         item.EnchantMarkers.Should().Contain("[ES:sunbane]");
     }
 
@@ -422,30 +428,11 @@ public class CounterTiers135Tests : IDisposable
         Worn(hero).GetEnchantmentCount().Should().Be(2, "one existing enchant is destroyed and the counter is not added");
     }
 
-    // ---------- the 40 character name rule ----------
-
-    [Fact]
-    public async Task CounterTiers135_NameTag_KeepsTheFortyCharacterRule()
-    {
-        var hero = Hero();
-        Wear(hero, Blade(new string('a', 27)));
-        GiveEveryMaterial(hero);
-        await Enchant(hero, Stonebane);
-        Worn(hero).Name.Should().Be(new string('a', 27) + " (Stonebane)", "39 characters take the tag");
-
-        hero = Hero();
-        Wear(hero, Blade(new string('a', 28)));
-        GiveEveryMaterial(hero);
-        await Enchant(hero, Stonebane);
-        Worn(hero).Name.Should().Be(new string('a', 28), "40 characters would pass the rule, so no tag");
-        Worn(hero).GetEnchantedKinds().Should().Equal("stonebane", "the kind code is written either way");
-    }
-
     // ---------- removal ----------
 
     [Theory]
     [InlineData(Sunbane)] [InlineData(Stonebane)] [InlineData(Godbane)]
-    public async Task CounterTiers135_Removal_TakesTheCodeAndTheTagOff(int tier)
+    public async Task CounterTiers135_Removal_TakesTheCodeOff(int tier)
     {
         var hero = Hero();
         Wear(hero, Blade());
@@ -470,7 +457,7 @@ public class CounterTiers135Tests : IDisposable
     }
 
     [Fact]
-    public async Task CounterTiers135_DestroyedByAFailure_TakesTheCodeAndTheTagOff_AndNoStat()
+    public async Task CounterTiers135_DestroyedByAFailure_TakesTheCodeOff_AndNoStat()
     {
         var hero = Hero();
         Wear(hero, Blade());
@@ -493,11 +480,11 @@ public class CounterTiers135Tests : IDisposable
         var template = EquipmentDatabase.GetBuiltInTemplates()
             .First(t => t.Slot == EquipmentSlot.MainHand && t.WeaponPower > 0 && MagicShopLocation.StripEnchantTags(t.Name) == t.Name);
         var item = template.Clone();
-        item.Name = template.Name + " (Sunbane)";
+        item.Name = template.Name;
         item.IncrementEnchantmentCount();
         item.AddEnchantedKind("sunbane");
-        MagicShopLocation.VerifiedTemplate(item).Should().NotBeNull("a counter is a named kind with no stat, so the template still matches");
-        MagicShopLocation.StripEnchantTags(item.Name).Should().Be(template.Name);
+        MagicShopLocation.VerifiedTemplate(item).Should().NotBeNull("a counter adds no stat and no tag, so the template still matches");
+        MagicShopLocation.EnchantBaseOf(item).Should().NotBeNull("so its removal knows the form to return to");
     }
 
     // ---------- texts ----------
