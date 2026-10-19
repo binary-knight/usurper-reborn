@@ -177,13 +177,13 @@ public class BossProtect135Tests
 
     [Theory]
     [InlineData("Plain Blade", false, GameConfig.TerravokStoneSkin)]
-    [InlineData("Ember Blade", true, GameConfig.TerravokStoneSkin * (1.0 - GameConfig.BossDivineArmorEnchantedBypass))]
-    [InlineData("Artifact Blade", false, 0.0)]
+    [InlineData("Ember Blade", true, GameConfig.TerravokStoneSkin)]
+    [InlineData("Artifact Blade", false, GameConfig.TerravokStoneSkin)]
     public void BossProtect135_DivineArmour_CutsEveryPathAsTheSwingDoes(string weapon, bool fire, double expected)
     {
         var armed = Hero(weapon, fire);
         double divine = Divine(OldGodType.Terravok, armed);
-        divine.Should().BeApproximately(expected, 1e-9, "full, halved by an enchanted weapon, removed by an Artifact weapon");
+        divine.Should().BeApproximately(expected, 1e-9, "full for a plain, a fire enchanted or an Artifact named weapon; only the god's counter removes it");
         var ctx = new BossCombatContext { DivineArmorReduction = divine };
         for (int seed = 0; seed < 10; seed++)
         {
