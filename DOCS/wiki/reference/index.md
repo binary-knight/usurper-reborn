@@ -1,7 +1,7 @@
 ---
 title: Reference
 path: /wiki/en/reference/
-checked: 1.3.2
+checked: 1.3.4
 sources: Scripts/Systems/WikiDataExporter.cs
 history: 1.3.2 | Guides gain generated tables from new character, party, economy, combat, world and realm exports.
 history: 1.3.0 | The generated spell table shows the level at which a spell can be learned and cast and the mana a cast costs before Wisdom.
