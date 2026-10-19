@@ -1416,6 +1416,11 @@ public partial class MagicShopLocation : BaseLocation
 
     internal static bool IsCounterTier(int tierChoice) => Array.IndexOf(CounterTiers, tierChoice) >= 0;
 
+    /// <summary>1.3.5: a shield, which a god counter never goes on: a shield weapon type, or a block value (a shield
+    /// from the backpack arrives with no weapon type but keeps its ShieldBonus).</summary>
+    internal static bool IsShieldForCounter(Equipment item) =>
+        item.WeaponType is WeaponType.Shield or WeaponType.Buckler or WeaponType.TowerShield || item.ShieldBonus > 0;
+
     /// <summary>1.3.5: the counter kind code this item carries, or "" when it carries none.</summary>
     internal static string CarriedCounter(Equipment item) =>
         item.GetEnchantedKinds().FirstOrDefault(k => Array.IndexOf(CounterKindCodes, k) >= 0) ?? "";
@@ -1927,11 +1932,18 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        // 1.3.5: a god counter goes on a main or off hand item only, and one weapon carries one counter at most
-        // (the same one or another). Refused before any gold or material is taken.
+        // 1.3.5: a god counter goes on a main or off hand weapon only (never a shield), and one weapon carries one
+        // counter at most (the same one or another). Refused before any gold or material is taken.
         if (IsCounterTier(tierChoice))
         {
             if (!selectedEquip.Slot.IsWeaponSlot())
+            {
+                DisplayMessage("");
+                WrappedLine(Loc.Get("magic_shop.counter_weapon_only"), "red");
+                await terminal.WaitForKey();
+                return;
+            }
+            if (IsShieldForCounter(selectedEquip))
             {
                 DisplayMessage("");
                 WrappedLine(Loc.Get("magic_shop.counter_weapon_only"), "red");

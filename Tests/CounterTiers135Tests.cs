@@ -18,7 +18,7 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// 1.3.5 (CT-1): the three god counter enchants at the Magic Shop, Sunbane (Aurelion), Stonebane (Terravok) and
 /// Godbane (Manwe), tiers 15 to 17 after Frostbite. Each costs its gold and crafting materials, needs its level, goes
-/// on a main or off hand item only, one counter to a weapon, and writes its kind code without changing a stat or the
+/// on a main or off hand weapon only (never a shield), one counter to a weapon, and writes its kind code without changing a stat or the
 /// item's name. The cap of 5 and the 4th and 5th enchant failure hold for a counter as for any enchant. The kind code
 /// survives a save and goes with an enchant removal.
 /// State lives in memory on Character instances; the language, the king and the shop's random source are put back in
@@ -360,6 +360,49 @@ public class CounterTiers135Tests : IDisposable
         var item = hero.Inventory.Single();
         item.Name.Should().Be("Spare Blade");
         item.EnchantMarkers.Should().Contain("[ES:sunbane]");
+    }
+
+    [Theory]
+    [InlineData(WeaponType.Shield, 10, Sunbane)] [InlineData(WeaponType.Buckler, 4, Godbane)]
+    [InlineData(WeaponType.TowerShield, 20, Stonebane)] [InlineData(WeaponType.None, 6, Sunbane)]
+    public async Task CounterTiers135_OnAShieldInTheOffHand_IsRefused_NothingTaken(WeaponType type, int block, int tier)
+    {
+        var hero = Hero();
+        var shield = new Equipment
+        {
+            Name = "Plain Shield", Slot = EquipmentSlot.OffHand, WeaponType = type, ShieldBonus = block, ArmorClass = 3,
+            MinLevel = 1, Value = 100,
+        };
+        Wear(hero, shield);
+        GiveEveryMaterial(hero);
+        string before = Whole(Worn(hero, EquipmentSlot.OffHand)), stock = Stock(hero);
+        long gold = hero.Gold;
+
+        string text = await Enchant(hero, tier);
+
+        Shows(text, "magic_shop.counter_weapon_only").Should().BeTrue($"a shield ({type}, block {block}) is not a weapon");
+        hero.Gold.Should().Be(gold, "no gold is taken");
+        Stock(hero).Should().Be(stock, "no material is taken");
+        Whole(Worn(hero, EquipmentSlot.OffHand)).Should().Be(before, "the shield is unchanged");
+    }
+
+    [Fact]
+    public async Task CounterTiers135_OnAShieldInTheBackpack_IsRefused_NothingTaken()
+    {
+        var hero = Hero();
+        hero.Inventory.Add(new Item { Name = "Spare Shield", Type = ObjType.Shield, Armor = 8, Value = 100, IsIdentified = true });
+        GiveEveryMaterial(hero);
+        string stock = Stock(hero);
+        long gold = hero.Gold;
+
+        string text = await Enchant(hero, Godbane);
+
+        Shows(text, "magic_shop.counter_weapon_only").Should().BeTrue("a shield from the backpack keeps its block value and is refused");
+        hero.Gold.Should().Be(gold, "no gold is taken");
+        Stock(hero).Should().Be(stock, "no material is taken");
+        var item = hero.Inventory.Single();
+        item.Name.Should().Be("Spare Shield");
+        (item.EnchantMarkers ?? "").Should().BeEmpty("the shield is unchanged");
     }
 
     // ---------- one per weapon ----------
