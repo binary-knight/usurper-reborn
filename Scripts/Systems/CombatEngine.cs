@@ -9367,8 +9367,8 @@ public partial class CombatEngine
     /// v0.60.0, issue #91: name-based detection for type immunities.
     /// Angels (Celestial family) cannot be hurt by holy damage and you cannot drain
     /// mana from them (Syphon). Demons cannot be hurt by shadow damage and Lifedrinker
-    /// cannot drain life from them. Name matching follows the same pattern the holy
-    /// proc already uses for the +2x undead bonus, so no MonsterClass plumbing needed.
+    /// cannot drain life from them. Angels are matched by name; since 1.3.5 the holy
+    /// proc's +2x undead bonus reads MonsterClass instead.
     /// </summary>
     private static bool IsAngelMonster(Monster target)
     {
@@ -9992,10 +9992,9 @@ public partial class CombatEngine
             }
             else
             {
-                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+                // 1.3.5: undead is the monster's class, as everywhere else in combat, not a name list
+                // (the list missed Ghoul and Wight). Demons are not undead here: the holy texts say undead.
+                bool isUndead = target.MonsterClass == MonsterClass.Undead || target.Undead > 0;
                 float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
                 // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
                 if (attacker.IsAttunedTo("aurelion"))
@@ -10077,120 +10076,6 @@ public partial class CombatEngine
                 terminal.WriteLine(isPlayer
                     ? Loc.Get("combat.enchant_siphon", manaRestored)
                     : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Check for elemental enchant procs in multi-monster combat.
-    /// </summary>
-    private void CheckElementalEnchantProcsMonster(Character attacker, Monster target, long damage)
-    {
-        var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
-        if (weapon == null) return;
-
-        // v0.60.0, issue #88: skip damage-and-status procs when the basic attack
-        // already killed the target. See twin in CheckElementalEnchantProcs.
-        bool targetAlive = target.HP > 0 && target.IsAlive;
-
-        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
-        {
-            long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
-            target.HP -= fireDamage;
-            terminal.SetColor("bright_red");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_fire_multi", fireDamage, MonsterNames.Display(target)));
-            attacker.Statistics?.RecordDamageDealt(fireDamage, false);
-        }
-
-        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
-        {
-            // v0.60.10 (Coosh report): see twin in CheckElementalEnchantProcs above.
-            target.IsSlowed = true;
-            target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
-            terminal.SetColor("bright_cyan");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_frost_multi", MonsterNames.Display(target)));
-        }
-
-        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
-        {
-            long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
-            target.HP -= lightningDamage;
-            // v0.60.0 stun-lock audit: route through TryStunMonster (see single-monster twin)
-            bool stunned = TryStunMonster(target, 1);
-            terminal.SetColor("bright_yellow");
-            UIHelper.WriteRow(terminal, stunned
-                ? Loc.Get("combat.enchant_lightning_stun_multi", lightningDamage, MonsterNames.Display(target))
-                : Loc.Get("combat.enchant_lightning_resist_multi", lightningDamage, MonsterNames.Display(target)));
-            attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
-        }
-
-        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
-        {
-            int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
-            long poisonDamage = Math.Max(1, poisonValue);
-            target.HP -= poisonDamage;
-            terminal.SetColor("green");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_venom_multi", poisonDamage, MonsterNames.Display(target)));
-            attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
-        }
-
-        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
-        {
-            // v0.60.0, issue #91: angels are immune to holy damage.
-            if (IsAngelMonster(target))
-            {
-                terminal.SetColor("bright_white");
-                UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_holy_immune_angel", MonsterNames.Display(target)));
-            }
-            else
-            {
-                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
-                float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
-                // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
-                if (attacker.IsAttunedTo("aurelion"))
-                    holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
-                long holyDamage = Math.Max(1, (long)(damage * holyMult));
-                target.HP -= holyDamage;
-                terminal.SetColor("bright_white");
-                UIHelper.WriteRow(terminal, isUndead
-                    ? Loc.Get("combat.enchant_holy_undead_multi", holyDamage, MonsterNames.Display(target))
-                    : Loc.Get("combat.enchant_holy_multi", holyDamage, MonsterNames.Display(target)));
-                attacker.Statistics?.RecordDamageDealt(holyDamage, false);
-            }
-        }
-
-        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
-        {
-            // v0.60.0, issue #91: demons are immune to shadow damage.
-            if (IsDemonMonster(target))
-            {
-                terminal.SetColor("dark_magenta");
-                UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_shadow_immune_demon", MonsterNames.Display(target)));
-            }
-            else
-            {
-                long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
-                target.HP -= shadowDamage;
-                terminal.SetColor("dark_magenta");
-                UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_shadow_multi", shadowDamage, MonsterNames.Display(target)));
-                attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
-            }
-        }
-
-        // Mana steal proc
-        int manaStealPct = attacker.GetEquipmentManaSteal();
-        if (manaStealPct > 0 && damage > 0)
-        {
-            // v0.60.0, issue #91: angels carry no mana to siphon.
-            if (!IsAngelMonster(target))
-            {
-                long manaRestored = Math.Max(1, damage * manaStealPct / 100);
-                attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
-                terminal.SetColor("blue");
-                terminal.WriteLine(Loc.Get("combat.enchant_siphon_multi", manaRestored));
             }
         }
     }

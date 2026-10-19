@@ -55,7 +55,6 @@ public class ArmoryCoverageTests
         ["ApplySpellEffects"] = "dead monster branch: every live caller passes a null monster",
         ["ExecuteLearnedAbility"] = "dead: no callers",
         ["ProcessTeammateAction"] = "dead: the single-monster teammate turn has no callers",
-        ["CheckElementalEnchantProcsMonster"] = "dead: no callers",
         ["ProcessCorruptionTick"] = "the target is a player-side Character, not an enemy",
         ["ProcessBossAoE"] = "the target is a player-side Character, not an enemy",
     };

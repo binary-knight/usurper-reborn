@@ -16603,10 +16603,15 @@ public class DungeonLocation : BaseLocation
         var names = new[] { "Undead", "Zombie", "Skeleton Warrior" };
         var name = names[dungeonRandom.Next(names.Length)];
 
-        return Monster.CreateMonster(currentDungeonLevel, name,
+        var undead = Monster.CreateMonster(currentDungeonLevel, name,
             currentDungeonLevel * 5, currentDungeonLevel * 2, 0,
             "...", false, false, Loc.Get("dungeon.gear.rusty_sword"), Loc.Get("dungeon.gear.tattered_armor"),
             false, false, currentDungeonLevel * 70, 0, currentDungeonLevel * 2);
+        // 1.3.5: CreateMonster leaves the class Normal, so every undead check in combat (holy enchant,
+        // Turn Undead, Sunforged, Divine Resolve) missed the summoned dead. Mark them undead.
+        undead.MonsterClass = MonsterClass.Undead;
+        undead.Undead = 1;
+        return undead;
     }
 
     /// <summary>
