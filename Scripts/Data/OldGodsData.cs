@@ -696,8 +696,8 @@ namespace UsurperRemake.Data
                 Name = "Manwe, The Weary Creator",
                 Title = "Supreme God of Creation and Balance",
                 Level = 100,          // Final boss - the ultimate challenge
-                HP = 900000,          // The Creator — the ultimate battle, requires everything you've got
-                MaxHP = 900000,
+                HP = 540000,          // The Creator: the last battle (1.3.5: 0.6 of 900000)
+                MaxHP = 540000,
                 Strength = 1700,      // The power of creation itself — overwhelming divine force
                 Defence = 500,
                 Agility = 200,
