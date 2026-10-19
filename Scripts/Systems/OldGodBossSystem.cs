@@ -452,9 +452,11 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ui.level")}: {boss.Level}", "gray");
             terminal.WriteLine($"  {Loc.Get("ui.stat_hp")}: {FightHP(boss):N0}", "red");   // v1.1.10: the fight's HP, not the data's
 
-            // Warning for unenchanted weapons against gods with divine armor
+            // Warning for gods with divine armor. 1.3.5 (CT-3): it names the full cut, which reaches every hit, spells
+            // included, and the counter that removes it; with that counter on either hand it says the counter breaks it.
             double divineArmor = GetDivineArmorReduction(boss.Type, player);
-            if (divineArmor > 0)
+            bool counterHeld = HoldsCounter(boss.Type, player);
+            if (divineArmor > 0 || counterHeld)
             {
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
@@ -466,10 +468,18 @@ namespace UsurperRemake.Systems
                     _ => Loc.Get("old_god.armor_divine")
                 };
                 terminal.WriteLine(Loc.Get("old_god.warning_protected", boss.LocName(), armorName));
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("old_god.warning_less_damage", $"{divineArmor * 100:N0}"));
-                terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("old_god.warning_enchant"));
+                if (counterHeld)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(Loc.Get("old_god.counter_breaks_armour", CounterTierName(boss.Type)));
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("old_god.warning_less_damage", $"{divineArmor * 100:N0}"));
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(Loc.Get("old_god.warning_enchant", CounterTierName(boss.Type)));
+                }
             }
 
             terminal.WriteLine("");
@@ -1799,8 +1809,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Calculate divine armor damage reduction for late-game Old Gods.
-        /// Gods with divine armor resist unenchanted weapons.
-        /// Artifact weapons fully bypass; enchanted weapons partially bypass.
+        /// 1.3.5 (CT-3): only the god's own counter enchant on the main or off hand removes it; any other weapon,
+        /// enchanted or not, takes the full reduction.
         /// </summary>
         private double GetDivineArmorReduction(OldGodType godType, Character player) => DivineArmorReduction(godType, player);
 
@@ -1816,39 +1826,8 @@ namespace UsurperRemake.Systems
             };
             if (baseReduction <= 0) return 0;
 
-            // Check BOTH main hand and off-hand for divine armor bypass
-            var mainHand = player.GetEquipment(EquipmentSlot.MainHand);
-            var offHand = player.GetEquipment(EquipmentSlot.OffHand);
-
-            // Check if either weapon is an artifact (full bypass)
-            foreach (var weapon in new[] { mainHand, offHand })
-            {
-                if (weapon?.Name != null &&
-                    (weapon.Name.Contains("Artifact") || weapon.Name.Contains("Godforged") ||
-                     weapon.Name.Contains("Sunforged") || weapon.Name.Contains("Voidtouched")))
-                {
-                    return 0; // Full bypass
-                }
-            }
-
-            // Check if either weapon has any enchantment (partial bypass)
-            bool hasEnchantment = false;
-            foreach (var weapon in new[] { mainHand, offHand })
-            {
-                if (weapon == null) continue;
-                if (weapon.HasFireEnchant || weapon.HasFrostEnchant || weapon.HasLightningEnchant ||
-                    weapon.HasPoisonEnchant || weapon.HasHolyEnchant || weapon.HasShadowEnchant ||
-                    weapon.GetEnchantmentCount() > 0)
-                {
-                    hasEnchantment = true;
-                    break;
-                }
-            }
-            if (hasEnchantment)
-                return baseReduction * (1.0 - GameConfig.BossDivineArmorEnchantedBypass);
-
-            // No enchantments on either weapon — full divine armor penalty
-            return baseReduction;
+            // 1.3.5 (CT-3): the matching counter removes it; the weapon name bypass and the plain-enchant halving are gone
+            return HoldsCounter(godType, player) ? 0 : baseReduction;
         }
 
         /// <summary>1.3.5 (CT-2): the enchant kind code of a god's counter, "" for a god without one. The shop
