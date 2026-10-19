@@ -5,7 +5,7 @@
 
 **v1.3.4 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
-130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
+Up to 200 autonomous NPCs (59 at the start of a new game) wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
 **Play now:**
 - Browser: https://usurper-reborn.net (no install required)
@@ -50,8 +50,8 @@ Beyond the simulation, there's a deep RPG with 100+ hours of content.
 ### Character Building
 - **12 Base Classes + 5 Prestige Classes** (17 total): Warrior, Paladin, Assassin, Magician, Cleric, Ranger, Bard, Sage, Barbarian, Alchemist, Jester, Mystic Shaman, plus 5 NG+ prestige classes (Tidesworn, Wavecaller, Cyclebreaker, Abysswarden, Voidreaver) unlocked by completing different endings.
 - **10 Races:** Human, Elf, Dwarf, Hobbit, Half-Elf, Orc, Gnome, Troll, Gnoll, Mutant, with race-specific lifespans, stats, and lore.
-- **Specialization System:** Each class has 2 specializations (24 total) selectable at the Level Master, shaping NPC AI ability priorities and giving role-specific stat bonuses (Tank, DPS, Healer, Utility, Debuff).
-- **75+ Spells** across caster classes, **44+ class abilities**, plus 5 universal abilities. Meaningful stat scaling with diminishing returns past natural caps.
+- **Specialization System:** Each base class has 2 specializations, and Paladin has 3 (25 total) selectable at the Level Master, shaping NPC AI ability priorities and giving role-specific stat bonuses (Tank, DPS, Healer, Utility, Debuff).
+- **100 spells** across caster classes, **174 class abilities**, plus 5 universal abilities. Meaningful stat scaling with diminishing returns past natural caps.
 - **Romantic orientation** (Straight / Gay / Bisexual / Asexual) selectable at character creation, affects NPC pool filtering for romance.
 
 ### 100-Floor Dungeon
@@ -75,7 +75,7 @@ You wake with no memory. A letter in your own handwriting warns you: *"The gods 
 - Challenge the throne, recruit guards, manage treasury, navigate court factions, set tax rates and city-control turf.
 - 3 joinable factions: The Crown, The Shadows, The Faith.
 - PvP arena with daily limits, gold theft, and leaderboards.
-- Guild system with 13 chat commands, guild bank, member XP bonus, invite flow.
+- Guild system with 12 chat commands, guild bank, member XP bonus, invite flow.
 - Knighthood with combat buffs and Sir/Dame title prefix.
 
 ### Locations
@@ -164,7 +164,7 @@ The full multi-player stack (game server + SSH gateway + web proxy + Nginx) is d
 ## Technical Details
 
 - **Runtime:** .NET 8.0 (LTS) | **Language:** C# 12
-- **Codebase:** 130,000+ lines across 200+ files, 70+ game systems
+- **Codebase:** 350,000+ lines across 300+ files, 160+ game systems
 - **NPC Simulation:** Goal-based AI with 13 personality traits, importance-weighted memory, lifecycle aging, neighbor-pressure migration
 - **Platforms:** Windows (x64/x86), Linux (x64/ARM64), macOS (Intel/Apple Silicon)
 - **Multiplayer:** SQLite shared backend, SSH gateway, raw-TCP MUD interface, GMCP for Mudlet/MUSHclient/TinTin++, WebSocket browser terminal
@@ -177,7 +177,7 @@ The full multi-player stack (game server + SSH gateway + web proxy + Nginx) is d
 usurper-reborn/
 ├── Scripts/
 │   ├── Core/           # Character, NPC, Item, Monster, GameEngine, GameConfig
-│   ├── Systems/        # 70+ game systems
+│   ├── Systems/        # 160+ game systems
 │   │   ├── OceanPhilosophySystem.cs
 │   │   ├── AmnesiaSystem.cs
 │   │   ├── CompanionSystem.cs
@@ -214,7 +214,7 @@ usurper-reborn/
 - **Difficulty Scaling:** Easy / Medium / Hard / Extreme tiers.
 
 ### Achievement System
-50+ achievements across Combat, Progression, Economy, Exploration, Social, and Challenge categories. Tier-scaled Fame rewards. Server-wide broadcasts for Gold-tier and above unlocks. Steam achievements wired through the same path.
+79 achievements across Combat, Progression, Economy, Exploration, Social, and Challenge categories. Tier-scaled Fame rewards. Server-wide broadcasts for Gold-tier and above unlocks. Steam achievements wired through the same path.
 
 ### Statistics Tracking
 Total monsters killed, gold earned, time played, peak gold, deepest dungeon floor, quests completed, world boss kills, MVP count, achievements unlocked, and dozens of combat / economy / social counters.
