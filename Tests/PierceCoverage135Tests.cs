@@ -20,6 +20,7 @@ public class PierceCoverage135Tests
 {
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
     private const int Seeds = 5;
+    private const int SwingsPerAction = 4;   // the level 60 hero's Attack action lands four swings in this rig (measured: four times one swing's cut)
 
     private static Equipment Piece(EquipmentSlot slot, int pierce, WeaponType type = WeaponType.Sword, string tag = "") => new Equipment
     {
@@ -143,7 +144,7 @@ public class PierceCoverage135Tests
         {
             long plain = Hit("swing", 0, seed);
             plain.Should().BeGreaterThan(0);
-            (Hit("swing", 20, seed) - plain).Should().Be(100, "20 percent of ArmPow 500, as the swing took it before");
+            (Hit("swing", 20, seed) - plain).Should().Be(SwingsPerAction * 100, "20 percent of ArmPow 500 on each swing, as the swing took it before");
         }
     }
 
@@ -180,7 +181,7 @@ public class PierceCoverage135Tests
         GameConfig.MaxArmorPiercingPercent.Should().Be(50);
         Armed(30, 30).GetEquipmentArmorPiercing().Should().Be(50, "30 and 30 is 60, capped at 50");
         for (int seed = 0; seed < Seeds; seed++)
-            (Hit("swing", 30, seed, helmPct: 30) - Hit("swing", 0, seed)).Should().Be(250, "exactly half of ArmPow 500");
+            (Hit("swing", 30, seed, helmPct: 30) - Hit("swing", 0, seed)).Should().Be(SwingsPerAction * 250, "exactly half of ArmPow 500 on each swing");
     }
 
     // T6
@@ -191,6 +192,6 @@ public class PierceCoverage135Tests
         Armed(50).GetEquipmentArmorPiercing().Should().Be(50);
         Armed(10).GetEquipmentArmorPiercing().Should().Be(10);
         for (int seed = 0; seed < Seeds; seed++)
-            (Hit("swing", 30, seed, helmPct: 15) - Hit("swing", 0, seed)).Should().Be(225, "45 percent of ArmPow 500");
+            (Hit("swing", 30, seed, helmPct: 15) - Hit("swing", 0, seed)).Should().Be(SwingsPerAction * 225, "45 percent of ArmPow 500 on each swing");
     }
 }
