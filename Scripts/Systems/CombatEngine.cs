@@ -9367,8 +9367,8 @@ public partial class CombatEngine
     /// v0.60.0, issue #91: name-based detection for type immunities.
     /// Angels (Celestial family) cannot be hurt by holy damage and you cannot drain
     /// mana from them (Syphon). Demons cannot be hurt by shadow damage and Lifedrinker
-    /// cannot drain life from them. Name matching follows the same pattern the holy
-    /// proc already uses for the +2x undead bonus, so no MonsterClass plumbing needed.
+    /// cannot drain life from them. Angels are matched by name; since 1.3.5 the holy
+    /// proc's +2x undead bonus reads MonsterClass instead.
     /// </summary>
     private static bool IsAngelMonster(Monster target)
     {
@@ -9992,10 +9992,9 @@ public partial class CombatEngine
             }
             else
             {
-                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+                // 1.3.5: undead is the monster's class, as everywhere else in combat, not a name list
+                // (the list missed Ghoul and Wight). Demons are not undead here: the holy texts say undead.
+                bool isUndead = target.MonsterClass == MonsterClass.Undead || target.Undead > 0;
                 float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
                 // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
                 if (attacker.IsAttunedTo("aurelion"))
