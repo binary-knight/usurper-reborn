@@ -52,7 +52,7 @@ The floor 50 boss asks you a question first. The right answer is the fourth; any
 :::spoiler Spoiler: Old God fights
 An Old God's HP, Strength and Defence in the table below are multiplied by {{balance:BaseMonsterDifficultyScale}} in the fight; its Strength is then split evenly into Strength and weapon power, and its Defence into Defence and armor. Each artifact you hold adds 10 percent to its HP (at most 40 percent) and 5 percent to its damage (at most 20 percent).
 
-Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 25, 35 and 50 percent lower. Any enchantment on your main hand or off hand weapon halves that reduction, and a weapon whose name holds Artifact, Godforged, Sunforged or Voidtouched removes it.
+Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 25, 35 and 50 percent lower. Any enchantment on your main hand or off hand weapon halves that reduction, and a weapon whose name holds Artifact, Godforged, Sunforged or Voidtouched removes it. A god's own counter enchant on your main hand or off hand weapon (Sunbane for Aurelion, Stonebane for Terravok, Godbane for Manwe) holds back two of its abilities, Aurelion's Light's Embrace and Sacrifice, Terravok's Stone Skin and Entomb, and Manwe's Word of Creation and Time Stop: on a turn it draws one, the god strikes instead.
 
 **Phases.** An Old God enters phase 2 at half its HP and phase 3 at a fifth (Manwe at a tenth). Each phase adds its abilities to those it draws from; it uses one on 70 percent of its turns. Potions in an Old God fight have a cooldown of 1 round.
 
