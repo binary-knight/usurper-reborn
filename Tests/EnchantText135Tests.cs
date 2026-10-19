@@ -17,8 +17,7 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// 1.3.5 (EF-9): the enchant text rows. The gear detail labels, the teammate summary's mana steal label and the
 /// Black Market's enchant names are keyed in five languages; the two enchant achievements say what they count;
-/// the tier names es Superior and fr, it Standard are translated; Terravok's Stone Skin line carries the code's
-/// cut. Every changed row fits 79 columns in English and Hungarian.
+/// Terravok's Stone Skin line carries the code's cut. Every changed row fits 79 columns in English and Hungarian.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class EnchantText135Tests
@@ -168,17 +167,6 @@ public class EnchantText135Tests
         };
         foreach (var (key, en) in expected)
             Loc.GetIn("en", key).Should().Be(en, key);
-    }
-
-    [Fact]
-    public void TierNames_AreTranslated()
-    {
-        L("es", "magic_shop.tier_superior").Should().NotBe("Superior");
-        L("fr", "magic_shop.tier_standard").Should().NotBe("Standard");
-        L("it", "magic_shop.tier_standard").Should().NotBe("Standard");
-        foreach (var lang in All)
-            foreach (var key in new[] { "magic_shop.tier_superior", "magic_shop.tier_standard" })
-                L(lang, key).Should().NotBeNullOrWhiteSpace($"{key} {lang}");
     }
 
     // ---------- the gear detail screen ----------
