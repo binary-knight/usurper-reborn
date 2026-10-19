@@ -33,11 +33,11 @@ test("materials table: each band and what spends the material", () => {
   ]);
   assert.deepEqual(row(html, "Heart of the Ocean"), [
     "50 to 100",
-    "Legendary enchant, 4th Inn stat training, 5th Inn stat training",
+    "Legendary enchant, Godbane enchant, 4th Inn stat training, 5th Inn stat training",
   ]);
   assert.deepEqual(row(html, "Withered Heart Petal"), [
     "35 to 50",
-    "Nothing spends it",
+    "Sunbane enchant, Godbane enchant",
   ]);
   // the god column is not in the open table
   assert.ok(!/Maelketh/.test(html));

@@ -246,7 +246,7 @@ module.exports = [
   ["C6","do chests give crafting materials","/wiki/en/items/materials/","A treasure chest that opens to treasure: 8 percent chance of 1 material.","miss: world/dungeon-features/ ranks first"],
   ["C7","what do old gods drop","/wiki/en/items/materials/","An Old God you defeat or save: 2 of the god's own material","miss: fact outside the excerpt"],
   ["C8","which enchants need materials","/wiki/en/items/enchanting/","Mythic, Legendary and Godforged also take crafting materials.","first"],
-  ["C9","what is withered heart petal used for","/wiki/en/items/materials/","Nothing in the game spends it","first"],
+  ["C9","what is withered heart petal used for","/wiki/en/items/materials/","The counter enchants spend it","first"],
   ["C10","do i lose materials if enchant fails","/wiki/en/items/enchanting/","On a failure the shop keeps the gold and the materials and adds no enchant.","first"],
   ["C11","how do i see my materials","/wiki/en/items/materials/","Type /materials anywhere","miss: fact outside the excerpt"],
   ["C12","how much does stat training at the inn cost","/wiki/en/world/rest/","level x 500 x (trainings of that attribute so far + 1) squared","first"],
