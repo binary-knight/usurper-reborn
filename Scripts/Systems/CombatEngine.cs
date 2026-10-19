@@ -12010,7 +12010,7 @@ public partial class CombatEngine
         if (item.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}:{item.CharismaBonus:+#;-#}");
         if (item.CriticalChanceBonus > 0) stats.Add($"{Loc.Get("ui.stat_crit")}:{item.CriticalChanceBonus}%");
         if (item.LifeSteal > 0) stats.Add($"{Loc.Get("ui.stat_leech")}:{item.LifeSteal}%");
-        if (item.ManaSteal > 0) stats.Add($"Siphon:{item.ManaSteal}%");
+        if (item.ManaSteal > 0) stats.Add($"{Loc.Get("ui.stat_siphon")}:{item.ManaSteal}%");
         if (item.MagicResistance > 0) stats.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance}%");
         // v0.62.1 stat-order consistency.
         stats.Sort(System.StringComparer.Ordinal);

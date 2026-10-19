@@ -676,7 +676,7 @@ namespace UsurperRemake.Data
 
                 SpecialMechanics = new Dictionary<string, string>
                 {
-                    ["StoneSkin"] = "Takes 50% reduced damage from physical attacks",
+                    ["StoneSkin"] = "Takes 35% less damage from every hit and spell unless the attacker holds Stonebane",
                     ["MountainsWeight"] = "Slows player by 50% for 3 rounds",
                     ["WorldBreaker"] = "Massive attack that hits everything; takes 2 rounds to charge"
                 },
