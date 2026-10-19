@@ -5506,18 +5506,6 @@ public partial class CombatEngine
             return;
         }
 
-        // v0.61.6 Cyclebreaker Probability Manipulation: passive per-attack evade.
-        // Unlike DodgeNextAttack (consumed by the first attack), this rolls against
-        // EVERY incoming attack, so the class survives group fights long enough to
-        // ramp its buffs instead of being shredded on the rounds before it acts.
-        if (player.Class == CharacterClass.Cyclebreaker
-            && random.Next(100) < GameConfig.CyclebreakerPassiveEvadePercent)
-        {
-            UIHelper.WriteRow(terminal, Loc.Get("combat.cyclebreaker_evade", MonsterNames.Display(monster)), "bright_cyan");
-            await Pacing.Wait(GetCombatDelay(500));
-            return;
-        }
-
         // Boss ability announcement removed (audit): SelectBossAbility here drew a
         // fresh random name that was stored nowhere, while the actual ability roll in
         // TryMonsterSpecialAbility independently picked its own -- every boss attack
@@ -5558,6 +5546,21 @@ public partial class CombatEngine
             monster.Distracted = true;
             monster.DistractedPenalty = Math.Max(monster.DistractedPenalty, monster.DistractedRoundsPenalty);
             if (monster.DistractedRounds <= 0) monster.DistractedRoundsPenalty = 0;
+        }
+
+        // v0.61.6 Cyclebreaker Probability Manipulation: passive per-attack evade.
+        // Unlike DodgeNextAttack (consumed by the first attack), this rolls against
+        // every incoming attack aimed at the player (no teammate chosen, or the choice
+        // is the player), never one aimed at a companion. It sits after the taunt and
+        // distraction ticks so an evaded first action of a round still runs them.
+        if (player.Class == CharacterClass.Cyclebreaker
+            && player.IsAlive
+            && (targetChoice == null || targetChoice == player)
+            && random.Next(100) < GameConfig.CyclebreakerPassiveEvadePercent)
+        {
+            UIHelper.WriteRow(terminal, Loc.Get("combat.cyclebreaker_evade", MonsterNames.Display(monster)), "bright_cyan");
+            await Pacing.Wait(GetCombatDelay(500));
+            return;
         }
 
         if (aliveTeammates != null && aliveTeammates.Count > 0)
