@@ -414,7 +414,7 @@ public class MagicFix125Tests
         MagicShopLocation.StripEnchantTags("Leather Cap +3").Should().Be("Leather Cap", "the legacy flow wrote a bare +N");
         MagicShopLocation.StripEnchantTags("Leather Cap").Should().Be("Leather Cap");
         MagicShopLocation.AllNamedEnchantTags().Should().BeEquivalentTo(
-            EveryEnchant().Select(e => (string)e[2]).Where(t => t.StartsWith(" (")),
+            EveryEnchant().Select(e => (string)e[2]).Where(t => t.StartsWith(" (")).Concat(new[] { " (Sunbane)", " (Stonebane)", " (Godbane)" }),
             "every named tag the enchant writes is in the strip list");
     }
 

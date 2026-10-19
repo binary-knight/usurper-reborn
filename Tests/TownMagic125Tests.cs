@@ -288,7 +288,7 @@ public class TownMagic125Tests
         string all = await Enchant("hu", 100, 13, LongItem) + await Enchant("hu", 100, 5, LongItem)
                      + await Enchant("hu", 1, 2, LongItem) + await Enchant("hu", 100, 2, LongItem);
         NoEnglishLeft(all, EnchantKeys);
-        for (int i = 0; i < 14; i++)
+        for (int i = 0; i < 17; i++)
             all.Should().Contain(InLang("hu", () => MagicShopLocation.TierName(i)));
         all.Should().Contain(L("hu", "magic_shop.req_level", 10)).And.Contain(L("hu", "magic_shop.req_awakening", 2).Split(' ')[0]);
         all.Should().Contain(L("hu", "ui.stat_dexterity")).And.Contain(L("hu", "magic_shop.slot_bag"));
@@ -572,7 +572,7 @@ public class TownMagic125Tests
     {
         InLang(lang, () =>
         {
-            for (int t = 0; t < 14; t++)
+            for (int t = 0; t < 17; t++)
                 foreach (var row in MagicShopLocation.TemplateRows("  ", Loc.Get("magic_shop.enchant_confirm_line"), "yellow",
                              (LongestItemName(), "white"), (MagicShopLocation.TierName(t), "white"), (MagicShopLocation.TierDescription(t), "white")))
                     row.Sum(p => p.text.Length).Should().BeLessOrEqualTo(MaxWidth);

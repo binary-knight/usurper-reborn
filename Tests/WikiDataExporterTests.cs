@@ -422,12 +422,12 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(35, shard.GetProperty("floorMax").GetInt32());
         Assert.Equal(new[] { 13 }, shard.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         var heart = Find(materials, "id", "heart_of_the_ocean");
-        Assert.Equal(new[] { 11 }, heart.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        Assert.Equal(new[] { 11, 17 }, heart.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         Assert.Equal(new[] { 4, 5 }, heart.GetProperty("statTrainings").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         var dust = Find(materials, "id", "fading_starlight_dust");
-        Assert.Equal(new[] { 10, 13, 14 }, dust.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        Assert.Equal(new[] { 10, 13, 14, 15 }, dust.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         var petal = Find(materials, "id", "withered_heart_petal");
-        Assert.Equal(0, petal.GetProperty("enchants").GetArrayLength());
+        Assert.Equal(new[] { 15, 17 }, petal.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         Assert.Equal(0, petal.GetProperty("statTrainings").GetArrayLength());
         var gods = Economy("materialGods");
         Assert.Equal(7, gods.Length);
@@ -440,7 +440,7 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     public void EconomyEnchantsReadTheShopTiersAndWhatANamedEnchantAdds()
     {
         var enchants = Economy("enchants");
-        Assert.Equal(14, enchants.Length);
+        Assert.Equal(17, enchants.Length);
         var godforged = Find(enchants, "number", "12");
         Assert.Equal("Godforged", godforged.GetProperty("name").GetProperty("en").GetString());
         Assert.True(godforged.GetProperty("oneChosenStat").GetBoolean());

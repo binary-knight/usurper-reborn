@@ -1376,9 +1376,10 @@ public class Equipment
     /// `[ES:code1,code2,...]` in Description alongside the existing `[E:N]` count.
     /// Used by the Magic Shop to refuse a second enchant of the same kind on the
     /// same piece -- without this, a player could stack +6 Dex twice or 5x Divine
-    /// Blessing on one item. Codes are 3-5 char shorthand:
+    /// Blessing on one item. Codes are short lowercase shorthand:
     ///   Stat enchants: pow, str, dex, def, wis, arm, con, int, cha, agi, sta
     ///   Named enchants: bless, ocean, ward, pred, life, fire, frost
+    ///   God counters (1.3.5, weapon only, one per weapon): sunbane, stonebane, godbane
     /// </summary>
     public List<string> GetEnchantedKinds()
     {

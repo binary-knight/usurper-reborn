@@ -1403,7 +1403,22 @@ public partial class MagicShopLocation : BaseLocation
         ("magic_shop.tier_godforged",       38, 500000L, 5000, 75, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_phoenix_fire",    20, 400000L, 4000, 60, "magic_shop.tier_desc_phoenix"),
         ("magic_shop.tier_frostbite",       20, 400000L, 4000, 60, "magic_shop.tier_desc_frostbite"),
+        // 1.3.5: the god counters (CounterKindCodes), weapon only and one per weapon; they change no stat.
+        ("magic_shop.tier_sunbane",         0,  300000L, 3000, 80, "magic_shop.tier_desc_sunbane"),     // Aurelion
+        ("magic_shop.tier_stonebane",       0,  400000L, 4000, 88, "magic_shop.tier_desc_stonebane"),   // Terravok
+        ("magic_shop.tier_godbane",         0,  500000L, 5000, 95, "magic_shop.tier_desc_godbane"),     // Manwe
     };
+
+    /// <summary>1.3.5: the god counter tiers (1 based, Sunbane, Stonebane, Godbane) and the kind code each writes,
+    /// in the same order. A counter goes on a main or off hand item only, and a weapon carries one at most.</summary>
+    internal static readonly int[] CounterTiers = { 15, 16, 17 };
+    internal static readonly string[] CounterKindCodes = { "sunbane", "stonebane", "godbane" };
+
+    internal static bool IsCounterTier(int tierChoice) => Array.IndexOf(CounterTiers, tierChoice) >= 0;
+
+    /// <summary>1.3.5: the counter kind code this item carries, or "" when it carries none.</summary>
+    internal static string CarriedCounter(Equipment item) =>
+        item.GetEnchantedKinds().FirstOrDefault(k => Array.IndexOf(CounterKindCodes, k) >= 0) ?? "";
 
     /// <summary>v1.2.5: a tier's name and description in the player's language.</summary>
     internal static string TierName(int index) => Loc.Get(EnchantTiers[index].name);
@@ -1417,6 +1432,9 @@ public partial class MagicShopLocation : BaseLocation
         [11] = new[] { ("eye_of_manwe", 1), ("terravoks_heartstone", 1) },                     // Godforged
         [12] = new[] { ("crimson_war_shard", 1), ("fading_starlight_dust", 1) },               // Phoenix Fire
         [13] = new[] { ("shadow_silk_thread", 1), ("fading_starlight_dust", 1) },              // Frostbite
+        [14] = new[] { ("fading_starlight_dust", 2), ("withered_heart_petal", 2) },             // Sunbane
+        [15] = new[] { ("terravoks_heartstone", 2), ("iron_judgment_link", 2) },               // Stonebane
+        [16] = new[] { ("eye_of_manwe", 2), ("heart_of_the_ocean", 1), ("withered_heart_petal", 1), ("iron_judgment_link", 1) },   // Godbane
     };
 
     // v1.2.5: the stat an enchant raises, in menu order (ApplyEquipmentStatBonus, GetEnchantKindCode). StatNames
@@ -1449,6 +1467,9 @@ public partial class MagicShopLocation : BaseLocation
         (9, " (Lifedrinker)"),
         (13, " (Phoenix Fire)"),
         (14, " (Frostbite)"),
+        (15, " (Sunbane)"),
+        (16, " (Stonebane)"),
+        (17, " (Godbane)"),
     };
 
     /// <summary>v1.2.5: every named enchant tag (NamedEnchantTag over every tier).</summary>
@@ -1858,7 +1879,7 @@ public partial class MagicShopLocation : BaseLocation
         WriteSectionHeader(Loc.Get("magic_shop.special_enchant"), "white");
         WriteTierSection(player, 4, 9, false);
 
-        // Section: High-tier and Elemental enchants (tiers 10-14)
+        // Section: High-tier and Elemental enchants, then the god counters (tiers 10-17)
         terminal.WriteLine("");
         WriteSectionHeader(Loc.Get("magic_shop.mythic_enchant"), "white");
         WriteTierSection(player, 9, EnchantTiers.Length, true);
@@ -1889,6 +1910,26 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage(Loc.Get("shop.enchant_level_req", selectedTier.minLevel), "red");
             await terminal.WaitForKey();
             return;
+        }
+
+        // 1.3.5: a god counter goes on a main or off hand item only, and one weapon carries one counter at most
+        // (the same one or another). Refused before any gold or material is taken.
+        if (IsCounterTier(tierChoice))
+        {
+            if (!selectedEquip.Slot.IsWeaponSlot())
+            {
+                DisplayMessage("");
+                WrappedLine(Loc.Get("magic_shop.counter_weapon_only"), "red");
+                await terminal.WaitForKey();
+                return;
+            }
+            if (CarriedCounter(selectedEquip).Length > 0)
+            {
+                DisplayMessage("");
+                WrappedLine(Loc.Get("magic_shop.counter_one_per_weapon"), "red");
+                await terminal.WaitForKey();
+                return;
+            }
         }
 
         if (tierChoice == 6 && (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) < 2)
@@ -2103,6 +2144,9 @@ public partial class MagicShopLocation : BaseLocation
                 ApplyNamedEnchant(enchanted, tierChoice);
                 suffix = NamedEnchantTag(tierChoice);
                 break;
+            case 15: case 16: case 17: // 1.3.5: Sunbane, Stonebane, Godbane: no stat, the kind code is the whole effect
+                suffix = NamedEnchantTag(tierChoice);
+                break;
             default:
                 suffix = "";
                 break;
@@ -2181,6 +2225,9 @@ public partial class MagicShopLocation : BaseLocation
             9  => "life",   // Lifedrinker
             13 => "fire",   // Phoenix Fire
             14 => "frost",  // Frostbite
+            15 => "sunbane",    // 1.3.5: the god counters (CounterKindCodes)
+            16 => "stonebane",
+            17 => "godbane",
             _  => ""
         };
     }
