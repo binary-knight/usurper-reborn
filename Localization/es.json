@@ -28492,6 +28492,7 @@
   "magic_shop.missing_material": "Falta: {0}x {1}",
   "magic_shop.materials_hint": "Estos materiales se encuentran en lo profundo de la mazmorra.",
   "magic_shop.enchant_confirm_line": "Encantar {0} con {1} ({2})",
+  "magic_shop.enchant_upgrade_replaces": "Esto sustituye el +{0} {1} del objeto. El número de encantamientos no cambia y no puede fallar.",
   "magic_shop.materials_line": "Materiales: {0}",
   "magic_shop.enchant_risk_1": "AVISO: este objeto ya tiene {0} encantamientos.",
   "magic_shop.enchant_risk_2": "Añadir otro tiene un {0}% de probabilidad de FALLAR.",

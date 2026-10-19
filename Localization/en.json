@@ -28981,6 +28981,7 @@
   "magic_shop.missing_material": "Missing: {0}x {1}",
   "magic_shop.materials_hint": "These materials can be found deep in the dungeon.",
   "magic_shop.enchant_confirm_line": "Enchant {0} with {1} ({2})",
+  "magic_shop.enchant_upgrade_replaces": "This replaces the item's +{0} {1}. The enchant count stays the same and this cannot fail.",
   "magic_shop.materials_line": "Materials: {0}",
   "magic_shop.enchant_risk_1": "WARNING: this item already carries {0} enchantments.",
   "magic_shop.enchant_risk_2": "Adding another has a {0}% chance to FAIL.",

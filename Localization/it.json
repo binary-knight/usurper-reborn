@@ -28481,6 +28481,7 @@
   "magic_shop.missing_material": "Manca: {0}x {1}",
   "magic_shop.materials_hint": "Questi materiali si trovano nelle profondità del dungeon.",
   "magic_shop.enchant_confirm_line": "Incantare {0} con {1} ({2})",
+  "magic_shop.enchant_upgrade_replaces": "Questo sostituisce il +{0} {1} dell'oggetto. Il numero di incantamenti non cambia e non può fallire.",
   "magic_shop.materials_line": "Materiali: {0}",
   "magic_shop.enchant_risk_1": "ATTENZIONE: questo oggetto ha già {0} incantamenti.",
   "magic_shop.enchant_risk_2": "Aggiungerne un altro ha il {0}% di probabilità di FALLIRE.",

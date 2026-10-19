@@ -28481,6 +28481,7 @@
   "magic_shop.missing_material": "Manquant : {0}x {1}",
   "magic_shop.materials_hint": "Ces matériaux se trouvent dans les profondeurs du donjon.",
   "magic_shop.enchant_confirm_line": "Enchanter {0} avec {1} ({2})",
+  "magic_shop.enchant_upgrade_replaces": "Ceci remplace le +{0} {1} de l'objet. Le nombre d'enchantements ne change pas et l'enchantement ne peut pas échouer.",
   "magic_shop.materials_line": "Matériaux : {0}",
   "magic_shop.enchant_risk_1": "ATTENTION : cet objet porte déjà {0} enchantements.",
   "magic_shop.enchant_risk_2": "En ajouter un autre a {0}% de chances d'ÉCHOUER.",

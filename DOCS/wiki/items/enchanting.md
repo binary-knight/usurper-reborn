@@ -29,7 +29,7 @@ Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and craft
 
 ## Enchant limit
 
-An item holds at most {{balance:MaxEnchantments}} enchants, and never the same kind twice. Each stat counts as one kind across every stat tier, so an item with +2 Dexterity from Minor cannot take Dexterity again from Godforged. Each named enchant is its own kind. A cursed item cannot be enchanted; remove the curse first.
+An item holds at most {{balance:MaxEnchantments}} enchants, and never the same kind twice. Each stat counts as one kind across every stat tier. A higher stat tier on a stat the item already has replaces the lower one: an item with +2 Dexterity from Minor that takes Superior has +8 Dexterity, not +10. The upgrade costs the new tier's gold and materials and nothing is refunded. It does not add to the enchant count, so it is never a 4th or 5th enchant and never fails, and an item that already holds {{balance:MaxEnchantments}} enchants can still take it. An equal or lower tier on that stat is refused, and so is an upgrade on an item enchanted before 1.2.5 whose own form the shop cannot tell. Each named enchant is its own kind and can never be put on twice. A cursed item cannot be enchanted; remove the curse first.
 
 ## Can enchanting fail
 

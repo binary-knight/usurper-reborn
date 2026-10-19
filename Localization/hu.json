@@ -28787,6 +28787,7 @@
   "magic_shop.missing_material": "Hiányzik: {0}x {1}",
   "magic_shop.materials_hint": "Ezek az anyagok a kazamata mélyén találhatók.",
   "magic_shop.enchant_confirm_line": "{0} bűvölése ezzel: {1} ({2})",
+  "magic_shop.enchant_upgrade_replaces": "Ez lecseréli a tárgy +{0} {1} bónuszát. A bűvölések száma nem változik, és ez nem hiúsulhat meg.",
   "magic_shop.materials_line": "Anyagok: {0}",
   "magic_shop.enchant_risk_1": "FIGYELEM: ezen a tárgyon már {0} bűvölés van.",
   "magic_shop.enchant_risk_2": "Egy újabb hozzáadása {0}% eséllyel KUDARCOT VALL.",
