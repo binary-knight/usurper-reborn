@@ -69,7 +69,8 @@ public class DeepRamp133Tests
         ("Noctura, The Shadow Weaver", 855000, 1125, 360, 1125, 360),
         ("Aurelion, The Fading Light", 1125000, 1293, 337, 1293, 337),
         ("Terravok, The Sleeping Mountain", 1462500, 1462, 427, 1462, 427),
-        ("Manwe, The Weary Creator", 2025000, 1912, 562, 1912, 562),
+        // 1.3.5 set his HP to 0.6 of 900000 (540000 x 2.25)
+        ("Manwe, The Weary Creator", 1215000, 1912, 562, 1912, 562),
         ("Noctura, The Shadow Ascendant", 675000, 270, 202, 270, 202),
     };
 
