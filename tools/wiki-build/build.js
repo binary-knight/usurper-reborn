@@ -1008,7 +1008,9 @@ function renderers(data) {
           escape(
             e.oneChosenStat
               ? `+${e.statBonus} to one stat you choose`
-              : Object.entries(e.effects).map(enchantEffect).join(", "),
+              : e.counter
+                ? `In ${e.counter.god}'s fight it holds back ${e.counter.abilities.join(" and ")} and removes its divine armor`
+                : Object.entries(e.effects).map(enchantEffect).join(", "),
           ),
           `${num(e.baseCost)} + ${num(e.costPerLevel)} per level`,
           e.minLevel,
