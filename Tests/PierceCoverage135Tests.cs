@@ -63,6 +63,17 @@ public class PierceCoverage135Tests
     /// <summary>One hit on the path; the HP the monster lost. The attacking side carries pct (weapon) plus helmPct (helm).</summary>
     private static long Hit(string path, int pct, int seed, int helmPct = 0)
     {
+        bool hitRoll = GameConfig.PlayerHitRollEnabled;
+        try
+        {
+            GameConfig.PlayerHitRollEnabled = false;
+            return HitRolled(path, pct, seed, helmPct);
+        }
+        finally { GameConfig.PlayerHitRollEnabled = hitRoll; }
+    }
+
+    private static long HitRolled(string path, int pct, int seed, int helmPct)
+    {
         bool bySide = path is "aoe_companion" or "ability_companion";
         var hero = bySide ? Armed(0) : Armed(pct, helmPct, path == "ranged" ? WeaponType.Bow : WeaponType.Sword);
         var mate = bySide ? Armed(pct, helmPct, companion: true, name: "Companion") : Armed(0, companion: true, name: "Companion");
