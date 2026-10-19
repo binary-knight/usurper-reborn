@@ -93,6 +93,26 @@ test("enchants table: costs, levels, effects and materials", () => {
   );
 });
 
+test("enchants table: a counter row names the god and the two abilities", () => {
+  const html = render("table:enchants");
+  assert.equal(
+    row(html, "15")[1],
+    "In Aurelion's fight it holds back Light's Embrace and Sacrifice and removes its divine armor",
+  );
+  assert.equal(
+    row(html, "16")[1],
+    "In Terravok's fight it holds back Stone Skin and Entomb and removes its divine armor",
+  );
+  assert.equal(
+    row(html, "17")[1],
+    "In Manwe's fight it holds back Word of Creation and Time Stop and removes its divine armor",
+  );
+  assert.equal(
+    row(html, "13")[1],
+    "a chance of extra fire damage on a hit, +20 weapon power",
+  );
+});
+
 test("gear sets, loot rarity, herbs and home upgrades", () => {
   const sets = render("table:gear-sets");
   assert.equal(

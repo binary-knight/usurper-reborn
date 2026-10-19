@@ -466,6 +466,29 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     }
 
     [Fact]
+    public void EconomyEnchantsNameTheGodAndAbilitiesEachCounterHoldsBack()
+    {
+        var enchants = Economy("enchants");
+        var expected = new Dictionary<string, (string god, string[] abilities)>
+        {
+            ["15"] = ("Aurelion", new[] { "Light's Embrace", "Sacrifice" }),
+            ["16"] = ("Terravok", new[] { "Stone Skin", "Entomb" }),
+            ["17"] = ("Manwe", new[] { "Word of Creation", "Time Stop" }),
+        };
+        foreach (var (number, want) in expected)
+        {
+            var counter = Find(enchants, "number", number).GetProperty("counter");
+            Assert.Equal(want.god, counter.GetProperty("god").GetString());
+            Assert.Equal(want.abilities, counter.GetProperty("abilities").EnumerateArray().Select(a => a.GetString()).ToArray());
+        }
+        for (int n = 1; n <= 14; n++)
+        {
+            var row = Find(enchants, "number", n.ToString());
+            Assert.True(!row.TryGetProperty("counter", out var c) || c.ValueKind == JsonValueKind.Null, "tier " + n);
+        }
+    }
+
+    [Fact]
     public void EconomyGearSetsRarityHerbsAndHomeComeFromTheGame()
     {
         var sets = Economy("gearSets");

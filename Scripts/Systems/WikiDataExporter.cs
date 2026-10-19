@@ -579,7 +579,23 @@ public static class WikiDataExporter
     private sealed record EnchantMaterial(string id, int count);
 
     private sealed record EnchantRow(int number, Dictionary<string, string> name, bool oneChosenStat, int statBonus,
-        SortedDictionary<string, object> effects, long baseCost, int costPerLevel, int minLevel, EnchantMaterial[] materials);
+        SortedDictionary<string, object> effects, long baseCost, int costPerLevel, int minLevel, EnchantMaterial[] materials,
+        EnchantCounter? counter);
+
+    /// <summary>The god a counter enchant answers and the two abilities it holds back in that god's fight.</summary>
+    private sealed record EnchantCounter(string god, string[] abilities);
+
+    /// <summary>The counter a tier is, read from the shop's CounterTiers and CounterKindCodes and the god's
+    /// OldGodBossSystem.CounterKindCode and CounterBlockedAbilities; null for every other tier.</summary>
+    private static EnchantCounter? CounterOf(int tierChoice)
+    {
+        int i = Array.IndexOf(MagicShopLocation.CounterTiers, tierChoice);
+        if (i < 0) return null;
+        foreach (var god in Enum.GetValues<OldGodType>())
+            if (OldGodBossSystem.CounterKindCode(god) == MagicShopLocation.CounterKindCodes[i])
+                return new EnchantCounter(god.ToString(), OldGodBossSystem.CounterBlockedAbilities(god).ToArray());
+        throw new InvalidOperationException("No god for counter " + MagicShopLocation.CounterKindCodes[i]);
+    }
 
     /// <summary>The Magic Shop enchant tiers in menu order (numbered from 1), with their materials.</summary>
     private static EnchantRow[] Enchants()
@@ -595,7 +611,8 @@ public static class WikiDataExporter
             return new EnchantRow(index + 1, Names(t.name, Loc.GetIn("en", t.name)), oneStat, oneStat ? t.bonus : 0,
                 oneStat ? new SortedDictionary<string, object>() : NamedEnchantEffects(index + 1),
                 t.baseCost, t.levelScale, t.minLevel,
-                materials.TryGetValue(index, out var reqs) ? reqs.Select(r => new EnchantMaterial(r.materialId, r.count)).ToArray() : []);
+                materials.TryGetValue(index, out var reqs) ? reqs.Select(r => new EnchantMaterial(r.materialId, r.count)).ToArray() : [],
+                CounterOf(index + 1));
         }).ToArray();
     }
 
