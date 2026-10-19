@@ -71,7 +71,7 @@ A monster with an evasion buff makes each of your hits miss with its own chance,
 
 Your critical hit chance on a basic swing is 5 percent plus 1 percent per 10 Dexterity, plus the crit chance on your gear, at least 5 percent. The ceiling is 50 percent, plus 1 percent per 30 Dexterity, up to 75 percent: Dexterity 100 with no gear gives 15 percent with a ceiling of 53. Every other crit bonus is kept under the same ceiling.
 
-- **Critical damage:** a Dexterity crit multiplies the swing by 1.5, plus 0.02 per point of Dexterity above 10, plus your gear's crit damage percent / 100, at most 3 times. Dexterity 60 gives 2.5 times; Dexterity 85 reaches 3.
+- **Critical damage:** a Dexterity crit multiplies the swing by 1.5, plus 0.02 per point of Dexterity above 10, at most 3 times from Dexterity; your gear's crit damage percent / 100 adds on top of that. Dexterity 60 gives 2.5 times; Dexterity 85 reaches 3.
 - **Natural 20:** a natural 20 on the hit die is a critical hit for a random 1.5 to 2 times, whatever your Dexterity. It replaces the Dexterity crit on that swing; the two never stack. The Dexterity crit chance is rolled only when the die did not show 20.
 - **From hiding:** the first swing from Hidden is a crit at your Dexterity multiplier.
 - **Valorian's Miracle:** the next swing is a crit for {{balance:MiracleCritMultiplier}} times.

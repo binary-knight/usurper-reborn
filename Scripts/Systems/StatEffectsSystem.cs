@@ -85,13 +85,13 @@ public static class StatEffectsSystem
 
     /// <summary>
     /// Critical hit damage multiplier
-    /// Base 1.5x + 0.02x per Dexterity above 10 (so 20 DEX = 1.7x), capped at 3.0x
-    /// Equipment crit damage bonus adds directly (e.g., +10% = +0.1x)
+    /// Dexterity part: 1.5x + 0.02x per Dexterity above 10 (so 20 DEX = 1.7x), capped at 3.0x.
+    /// Equipment crit damage bonus adds on top of that part and is not capped (e.g., +10% = +0.1x)
     /// </summary>
     public static float GetCriticalDamageMultiplier(long dexterity, int equipmentCritDamageBonus = 0)
     {
-        float multiplier = 1.5f + Math.Max(0, (dexterity - 10) * 0.02f) + (equipmentCritDamageBonus / 100f);
-        return Math.Min(multiplier, 3.0f); // Cap at 3x to prevent exponential damage at high DEX
+        float dexPart = Math.Min(1.5f + Math.Max(0, (dexterity - 10) * 0.02f), 3.0f); // Cap at 3x holds the Dexterity part only
+        return dexPart + (equipmentCritDamageBonus / 100f);
     }
 
     // =====================================================
