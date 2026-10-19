@@ -35,11 +35,11 @@ A Crimson War Shard drops on floors 20 to 35. Its one use is the Phoenix Fire en
 
 ### Withered Heart Petal
 
-A Withered Heart Petal drops on floors 35 to 50. The god counter enchants spend it: Sunbane, the counter to Aurelion, takes 2 with 2 Fading Starlight Dust, and Godbane, the counter to Manwe, takes 1 with 2 Eye of Manwe, 1 Heart of the Ocean and 1 Iron Judgment Link. No training asks for it.
+A Withered Heart Petal drops on floors 35 to 50. The counter enchants spend it: Sunbane, the counter to Aurelion, takes 2 with 2 Fading Starlight Dust, and Godbane, the counter to Manwe, takes 1 with 2 Eye of Manwe, 1 Heart of the Ocean and 1 Iron Judgment Link. No training asks for it.
 
 ### Iron Judgment Link
 
-An Iron Judgment Link drops on floors 50 to 65. The god counter enchants spend it: Stonebane, the counter to Terravok, takes 2 with 2 Terravok's Heartstone, and Godbane, the counter to Manwe, takes 1 with 2 Eye of Manwe, 1 Heart of the Ocean and 1 Withered Heart Petal. No training asks for it.
+An Iron Judgment Link drops on floors 50 to 65. The counter enchants spend it: Stonebane, the counter to Terravok, takes 2 with 2 Terravok's Heartstone, and Godbane, the counter to Manwe, takes 1 with 2 Eye of Manwe, 1 Heart of the Ocean and 1 Withered Heart Petal. No training asks for it.
 
 ### Shadow Silk Thread
 
@@ -47,23 +47,23 @@ A Shadow Silk Thread drops on floors 60 to 75. The Legendary enchant takes 1 wit
 
 ### Fading Starlight Dust
 
-Fading Starlight Dust drops on floors 75 to 90. The Mythic enchant takes 1 on its own, Phoenix Fire takes 1 with 1 Crimson War Shard, and Frostbite takes 1 with 1 Shadow Silk Thread. Sunbane, the god counter to Aurelion, takes 2 with 2 Withered Heart Petal.
+Fading Starlight Dust drops on floors 75 to 90. The Mythic enchant takes 1 on its own, Phoenix Fire takes 1 with 1 Crimson War Shard, and Frostbite takes 1 with 1 Shadow Silk Thread. Sunbane, the counter to Aurelion, takes 2 with 2 Withered Heart Petal.
 
 ### Terravok's Heartstone
 
-Terravok's Heartstone drops on floors 85 to 100. The Godforged enchant takes 1 with 1 Eye of Manwe. Stonebane, the god counter to Terravok, takes 2 with 2 Iron Judgment Link.
+Terravok's Heartstone drops on floors 85 to 100. The Godforged enchant takes 1 with 1 Eye of Manwe. Stonebane, the counter to Terravok, takes 2 with 2 Iron Judgment Link.
 
 ### Eye of Manwe
 
-An Eye of Manwe drops on floors 95 to 100. The Godforged enchant takes 1 with 1 Terravok's Heartstone, and the 5th stat training of an attribute at the Inn takes 1 with 1 Heart of the Ocean. Godbane, the god counter to Manwe, takes 2 with 1 Heart of the Ocean, 1 Withered Heart Petal and 1 Iron Judgment Link.
+An Eye of Manwe drops on floors 95 to 100. The Godforged enchant takes 1 with 1 Terravok's Heartstone, and the 5th stat training of an attribute at the Inn takes 1 with 1 Heart of the Ocean. Godbane, the counter to Manwe, takes 2 with 1 Heart of the Ocean, 1 Withered Heart Petal and 1 Iron Judgment Link.
 
 ### Heart of the Ocean
 
-A Heart of the Ocean drops on floors 50 to 100, the widest band. The Legendary enchant takes 1 with 1 Shadow Silk Thread, the 4th stat training of an attribute at the Inn takes 1, and the 5th takes 1 with 1 Eye of Manwe. Godbane, the god counter to Manwe, takes 1 with 2 Eye of Manwe, 1 Withered Heart Petal and 1 Iron Judgment Link. Every Old God on floor 50 or deeper also leaves 1.
+A Heart of the Ocean drops on floors 50 to 100, the widest band. The Legendary enchant takes 1 with 1 Shadow Silk Thread, the 4th stat training of an attribute at the Inn takes 1, and the 5th takes 1 with 1 Eye of Manwe. Godbane, the counter to Manwe, takes 1 with 2 Eye of Manwe, 1 Withered Heart Petal and 1 Iron Judgment Link. Every Old God on floor 50 or deeper also leaves 1.
 
 ## Spending materials
 
-An enchant takes the count of each material it lists: 1 of each for most, 2 of some for the god counters. The materials are spent when you pay, before the 4th or 5th enchant's failure roll, so a failed enchant still uses them up. See [enchanting](/wiki/en/items/enchanting/).
+An enchant takes the count of each material it lists: 1 of each for most, 2 of some for the counters. The materials are spent when you pay, before the 4th or 5th enchant's failure roll, so a failed enchant still uses them up. See [enchanting](/wiki/en/items/enchanting/).
 
 The Master Trainer at the Inn (W) sells +1 to an attribute 5 times per attribute. The 4th training of an attribute also takes 1 Heart of the Ocean, and the 5th takes 1 Heart of the Ocean and 1 Eye of Manwe. See [the Inn](/wiki/en/world/rest/).
 
