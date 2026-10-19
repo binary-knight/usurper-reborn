@@ -1,7 +1,7 @@
 ---
 title: Achievements
 path: /wiki/en/reference/achievements/
-checked: 1.2.5
+checked: 1.3.4
 sources: Scripts/Systems/AchievementSystem.cs
 history: 1.2.5 | Achievement names and descriptions are shown in all five languages, including on the wiki, and achievement broadcasts reach each player in their own language.
 ---

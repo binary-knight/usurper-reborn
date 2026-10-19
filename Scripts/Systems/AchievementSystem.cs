@@ -888,7 +888,7 @@ public static class AchievementSystem
         {
             Id = "first_enchant",
             Name = "Apprentice Enchanter",
-            Description = "Enchant an equipped item at the Magic Shop",
+            Description = "Enchant an item at the Magic Shop",
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Bronze,
             PointValue = 10,
@@ -900,7 +900,7 @@ public static class AchievementSystem
         {
             Id = "master_enchanter",
             Name = "Master Enchanter",
-            Description = "Enchant 10 equipped items",
+            Description = "Apply 10 enchantments at the Magic Shop",
             Category = AchievementCategory.Economy,
             Tier = AchievementTier.Silver,
             PointValue = 25,
