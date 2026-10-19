@@ -14,7 +14,7 @@ namespace UsurperRemake.Systems
     /// Client-side system for connecting to an online Usurper Reborn MUD server.
     ///
     /// Two connection modes:
-    ///   - BBS door mode: Direct TCP to server:4000 (sslh routes raw TCP to MUD server).
+    ///   - BBS door mode: Direct TCP to server:4000 (the haproxy multiplexer routes raw TCP to the MUD server).
     ///     Sends AUTH header directly on the TCP stream. No SSH overhead or echo issues.
     ///   - Local/Steam mode: SSH to server:4000 as gateway user "usurper"/"play".
     ///     sshd ForceCommand launches relay client which bridges to MUD server.
@@ -1290,7 +1290,7 @@ namespace UsurperRemake.Systems
             var client = new TcpClient { NoDelay = true };
             try
             {
-                // sslh needs a moment to detect protocol: connect with timeout
+                // the haproxy multiplexer needs a moment to detect the protocol: connect with timeout
                 var connectTask = client.ConnectAsync(host, port);
                 if (await Task.WhenAny(connectTask, Task.Delay(10000)) != connectTask)
                     throw new TimeoutException();
