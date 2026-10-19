@@ -1606,11 +1606,13 @@ public partial class MagicShopLocation : BaseLocation
                     terminal.Write("  ");
                     col = baseWidth + 2;
                 }
-                // 1.3.5: a material list longer than a row goes on after a " +" on the next row, under the name.
+                // 1.3.5: a material list longer than a row goes on after a " +" on the next row, under the name. A
+                // material stays on its row only with room after it for the " +" a later material would need.
                 for (int k = 0; k < tail.Count; k++)
                 {
                     var (text, color) = tail[k];
-                    if (text == " + " && k + 1 < tail.Count && col + text.Length + tail[k + 1].text.Length > UIHelper.WrapWidth)
+                    int after = k + 2 < tail.Count ? 2 : 0;
+                    if (text == " + " && k + 1 < tail.Count && col + text.Length + tail[k + 1].text.Length + after > UIHelper.WrapWidth)
                     {
                         terminal.SetColor(color);
                         terminal.WriteLine(" +");
