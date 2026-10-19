@@ -21,7 +21,7 @@ Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add the
 
 ## Named enchants
 
-Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +3 percent life steal.
+Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
 
 ### Phoenix Fire and Frostbite
 
@@ -29,7 +29,7 @@ Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and craft
 
 ## Enchant limit
 
-An item holds at most {{balance:MaxEnchantments}} enchants, and never the same kind twice. Each stat counts as one kind across every stat tier, so an item with +2 Dexterity from Minor cannot take Dexterity again from Godforged. Each named enchant is its own kind. A cursed item cannot be enchanted; remove the curse first.
+An item holds at most {{balance:MaxEnchantments}} enchants, and never the same kind twice. Each stat counts as one kind across every stat tier. A higher tier on a stat the item has replaces the lower one (Minor +2 Dexterity, then Superior: +8, not +10); an equal or lower one is refused. An upgrade costs the new price, refunds nothing and keeps the enchant count, so it never fails. Each named enchant is its own kind. A cursed item cannot be enchanted; remove the curse first.
 
 ## Can enchanting fail
 

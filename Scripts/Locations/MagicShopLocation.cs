@@ -1396,7 +1396,7 @@ public partial class MagicShopLocation : BaseLocation
         ("magic_shop.tier_oceans_touch",    0,  20000L, 300, 20, "magic_shop.tier_desc_ocean"),
         ("magic_shop.tier_ward",            0,  12000L, 200, 15, "magic_shop.tier_desc_ward"),
         ("magic_shop.tier_predator",        0,  25000L, 500, 30, "magic_shop.tier_desc_predator"),
-        ("magic_shop.tier_lifedrinker",     0,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),
+        ("magic_shop.tier_lifedrinker",     6,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),   // 1.3.5: the life steal percent
         // New tiers (v0.30.9)
         ("magic_shop.tier_mythic",          24, 180000L, 2000, 55, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_legendary",       30, 300000L, 3000, 65, "magic_shop.tier_desc_one_stat"),
@@ -1826,7 +1826,9 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        if (selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
+        // 1.3.5: a full item goes on to the tier list only when it carries a stat enchant a higher tier can replace
+        // (an upgrade does not add to the count); every other enchant on it is refused below with this same message.
+        if (selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments && !HasUpgradableStatEnchant(selectedEquip))
         {
             DisplayMessage("");
             DisplayMessage(Loc.Get("shop.max_enchantments", GameConfig.MaxEnchantments), "red");
@@ -1863,7 +1865,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Show warning about 4th/5th enchant failure risk
         int currentEnchants = selectedEquip.GetEnchantmentCount();
-        if (currentEnchants >= 3)
+        if (currentEnchants >= 3 && currentEnchants < GameConfig.MaxEnchantments)
         {
             terminal.WriteLine("");
             float failChance = currentEnchants == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
@@ -1950,13 +1952,30 @@ public partial class MagicShopLocation : BaseLocation
         // enchants -- 5x Divine Blessing was permitted). Each item can carry up
         // to MaxEnchantments different enchants, but the same kind can never be
         // applied twice. Refuse BEFORE gold deduction so it's a clean cancel.
+        // 1.3.5: a stat tier whose bonus is higher than the one the item carries for that stat (CarriedStatBonus,
+        // from the item's EnchantBase record) is an upgrade: it replaces the lower one, the count stays and no
+        // failure roll is made. Equal or lower, or a bonus the item does not record, is refused as before.
         string enchantKindCode = GetEnchantKindCode(tierChoice, statChoice);
+        int? upgradeFrom = null;
         if (!string.IsNullOrEmpty(enchantKindCode) &&
             selectedEquip.GetEnchantedKinds().Contains(enchantKindCode))
         {
+            int? carried = statChoice > 0 ? CarriedStatBonus(selectedEquip, statChoice) : null;
+            if (carried == null || selectedTier.bonus <= carried.Value)
+            {
+                DisplayMessage("");
+                DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_kind", _ownerName), "red");
+                DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_hint"), "cyan");
+                await terminal.WaitForKey();
+                return;
+            }
+            upgradeFrom = carried.Value;
+        }
+        if (upgradeFrom == null && selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
+        {
             DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_kind", _ownerName), "red");
-            DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_hint"), "cyan");
+            DisplayMessage(Loc.Get("shop.max_enchantments", GameConfig.MaxEnchantments), "red");
+            DisplayMessage(Loc.Get("magic_shop.beyond_limits"), "cyan");
             await terminal.WaitForKey();
             return;
         }
@@ -1966,6 +1985,8 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         WriteTemplate("  ", Loc.Get("magic_shop.enchant_confirm_line", "{0}", "{1}", "{2}"), "yellow",
             (ItemNames.Display(selectedEquip), selectedEquip.GetRarityColor()), (TierName(tierChoice - 1), "bright_magenta"), (enchantDesc, "yellow"));
+        if (upgradeFrom != null)
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_upgrade_replaces", upgradeFrom.Value, StatLabel(statChoice))}", "cyan");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("magic_shop.enchant_cost", $"{enchantCost:N0}")}");
         // Show material cost in confirmation
@@ -1986,7 +2007,7 @@ public partial class MagicShopLocation : BaseLocation
         // was only narrated AFTER the gold was spent. This block warns BEFORE
         // commit and forces an extra typed-Y confirmation when the risk is real.
         int existingEnchants = selectedEquip.GetEnchantmentCount();
-        if (existingEnchants >= 3)
+        if (existingEnchants >= 3 && upgradeFrom == null)
         {
             float failPct = existingEnchants == 3
                 ? GameConfig.FourthEnchantFailChance * 100f
@@ -2024,7 +2045,7 @@ public partial class MagicShopLocation : BaseLocation
 
         // Check for failure on 4th/5th enchantment
         int currentEnchantCount = selectedEquip.GetEnchantmentCount();
-        if (currentEnchantCount >= 3)
+        if (currentEnchantCount >= 3 && upgradeFrom == null)
         {
             float failChance = currentEnchantCount == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
             var rng = EnchantRandom;
@@ -2053,7 +2074,8 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // Clone the equipment
-        var enchanted = selectedEquip.Clone();
+        // 1.3.5: an upgrade starts from the item with the lower stat enchant taken off whole (WithoutStatEnchant).
+        var enchanted = upgradeFrom != null ? WithoutStatEnchant(selectedEquip, statChoice, upgradeFrom.Value) : selectedEquip.Clone();
         enchanted.RecordEnchantBase();   // v1.2.5: before the first enchant, keep the item as it is, for full removal
         enchanted.IncrementEnchantmentCount();
         // Record which kind was applied so future enchant attempts can refuse a
@@ -2176,7 +2198,7 @@ public partial class MagicShopLocation : BaseLocation
             case 6: e.IntelligenceBonus += 6; e.WisdomBonus += 4; break;      // Ocean's Touch
             case 7: e.MagicResistance += 20; e.DefenceBonus += 2; break;      // Ward
             case 8: e.CriticalChanceBonus += 5; e.CriticalDamageBonus += 10; break;   // Predator
-            case 9: e.LifeSteal += 3; break;                                  // Lifedrinker
+            case 9: e.LifeSteal += EnchantTiers[8].bonus; break;              // Lifedrinker (1.3.5: the table's bonus, as its description shows)
             case 13: e.WeaponPower += 20; e.HasFireEnchant = true; break;     // Phoenix Fire
             case 14: e.WeaponPower += 20; e.HasFrostEnchant = true; break;    // Frostbite
         }
@@ -2345,13 +2367,7 @@ public partial class MagicShopLocation : BaseLocation
         int have = GetEquipmentStat(item, stat);
         int amount;
         if (baseForm != null)
-        {
-            var baseItem = new Equipment();
-            baseItem.ApplyEnchantBaseRecord(baseForm);
-            int namedOnStat = kinds.Select(NamedTierOf).Where(t => t > 0)
-                .Sum(t => { var d = new Equipment(); ApplyNamedEnchant(d, t); return GetEquipmentStat(d, stat); });
-            amount = Math.Max(0, have - GetEquipmentStat(baseItem, stat) - namedOnStat);
-        }
+            amount = StatBonusOverBase(item, baseForm, stat);
         else
         {
             var statBonuses = Enumerable.Range(1, EnchantTiers.Length).Where(t => t <= 4 || (t >= 10 && t <= 12))
@@ -2363,6 +2379,50 @@ public partial class MagicShopLocation : BaseLocation
         ApplyEquipmentStatBonus(damaged, stat, -amount);
         if (tag.Success) damaged.Name = damaged.Name.Remove(tag.Index, tag.Length);
         return (damaged, kind);
+    }
+
+    /// <summary>1.3.5: what the stat enchant on this stat adds, from the item's base form: the stat less the base
+    /// form's stat less what the named enchants on its kind list add to it, never below zero.</summary>
+    private static int StatBonusOverBase(Equipment item, Equipment.EnchantBaseRecord baseForm, int stat)
+    {
+        var baseItem = new Equipment();
+        baseItem.ApplyEnchantBaseRecord(baseForm);
+        int namedOnStat = item.GetEnchantedKinds().Select(NamedTierOf).Where(t => t > 0)
+            .Sum(t => { var d = new Equipment(); ApplyNamedEnchant(d, t); return GetEquipmentStat(d, stat); });
+        return Math.Max(0, GetEquipmentStat(item, stat) - GetEquipmentStat(baseItem, stat) - namedOnStat);
+    }
+
+    /// <summary>1.3.5: the bonus the item's stat enchant on this stat carries, read from its own record: the
+    /// EnchantBase form (EnchantBaseOf) by DestroyOneEnchant's arithmetic, when every counted enchant is on the kind
+    /// list and that stat's kind is on it; otherwise null (the item does not record it).</summary>
+    internal static int? CarriedStatBonus(Equipment item, int stat)
+    {
+        var kinds = item.GetEnchantedKinds();
+        if (stat < 1 || stat > StatNames.Length || !kinds.Contains(GetEnchantKindCode(1, stat))) return null;
+        if (kinds.Count != item.GetEnchantmentCount()) return null;
+        var baseForm = EnchantBaseOf(item);
+        return baseForm == null ? null : StatBonusOverBase(item, baseForm, stat);
+    }
+
+    /// <summary>1.3.5: whether a full item still has a stat enchant a higher stat tier could replace.</summary>
+    private static bool HasUpgradableStatEnchant(Equipment item)
+    {
+        int top = Enumerable.Range(1, EnchantTiers.Length).Where(t => t <= 4 || (t >= 10 && t <= 12)).Max(t => EnchantTiers[t - 1].bonus);
+        return Enumerable.Range(1, StatNames.Length).Any(st => CarriedStatBonus(item, st) is int b && b < top);
+    }
+
+    /// <summary>1.3.5: a copy of the item with its stat enchant on this stat taken off whole, the way a failure
+    /// destroys one: the bonus, the " +N Xxx" name tag, the kind code and one from the count; every other enchant
+    /// and stat stays and the value keeps what was paid.</summary>
+    internal static Equipment WithoutStatEnchant(Equipment item, int stat, int bonus)
+    {
+        var e = item.Clone();
+        DropOneFromCount(e);
+        RemoveKind(e, GetEnchantKindCode(1, stat));
+        ApplyEquipmentStatBonus(e, stat, -bonus);
+        var tag = System.Text.RegularExpressions.Regex.Match(e.Name, $@"\s\+\d+ {StatNames[stat - 1]}(?!\w)");
+        if (tag.Success) e.Name = e.Name.Remove(tag.Index, tag.Length);
+        return e;
     }
 
     private static void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
