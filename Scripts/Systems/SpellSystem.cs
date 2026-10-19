@@ -1699,9 +1699,8 @@ public static class SpellSystem
                 result.SpecialEffect = "ignore_half_defense";
                 result.Message += $" {Loc.Get("combat.spell_echo_tomorrow_cast", target?.Name2 ?? Loc.Get("combat.sage_the_enemy"), result.Damage)}";
                 break;
-            case 4: // Cycle Rewind - Heal 30% max HP (simplified from "HP 3 rounds ago")
-                int rewindHeal = (int)(caster.MaxHP * 0.30);
-                result.Healing = ScaleHealingEffect(rewindHeal, caster, random, profMult);
+            case 4: // Cycle Rewind - Heal exactly 30% of the caster's max HP (no level, Wisdom or variance scaling)
+                result.Healing = (int)(caster.MaxHP * 0.30);
                 result.SpecialEffect = "cure_disease";
                 result.Message += $" {Loc.Get("combat.spell_cycle_rewind_cast", caster.Name2, result.Healing)}";
                 break;
