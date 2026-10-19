@@ -22800,6 +22800,7 @@
   "combat.probability_negates": "¡El cambio de probabilidad neutraliza {0}!",
   "combat.probability_shift": "La probabilidad cambia alrededor de {0}: ¡los ataques fallarán!",
   "combat.probability_shift_miss": "La probabilidad cambia: ¡el ataque de {0} se desvía!",
+  "combat.counter_blocked": "Tu {2} impide que {0} use {1}.",
   "combat.reflection_destroy": "¡Tu reflejo destroza a {0}!",
   "combat.sacrifice_blow_strikes": "¡{0} se sacrifica para asestar un golpe devastador!",
   "combat.sacrifice_generic": "¡{0} hace el sacrificio máximo!",

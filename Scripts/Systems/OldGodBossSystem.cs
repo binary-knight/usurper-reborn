@@ -1173,6 +1173,10 @@ namespace UsurperRemake.Systems
             // Set divine armor reduction on the combat context so CombatEngine applies it
             ctx.DivineArmorReduction = DivineArmorReduction(boss.Type, player);
 
+            // 1.3.5 (CT-2): a held counter records the god's blocked abilities for SelectBossAbility
+            if (HoldsCounter(boss.Type, player))
+                ctx.CounterBlockedAbilities = CounterBlockedAbilities(boss.Type);
+
             return new BossFight(monster, ctx);
         }
 
@@ -1845,6 +1849,44 @@ namespace UsurperRemake.Systems
 
             // No enchantments on either weapon — full divine armor penalty
             return baseReduction;
+        }
+
+        /// <summary>1.3.5 (CT-2): the enchant kind code of a god's counter, "" for a god without one. The shop
+        /// writes the same codes (MagicShopLocation.CounterKindCodes); a test pins the two together.</summary>
+        internal static string CounterKindCode(OldGodType godType) => godType switch
+        {
+            OldGodType.Aurelion => "sunbane",
+            OldGodType.Terravok => "stonebane",
+            OldGodType.Manwe => "godbane",
+            _ => ""
+        };
+
+        /// <summary>1.3.5 (CT-2): true when the player's main or off hand carries the god's counter code.</summary>
+        internal static bool HoldsCounter(OldGodType godType, Character player)
+        {
+            string code = CounterKindCode(godType);
+            if (code.Length == 0 || player == null) return false;
+            foreach (var weapon in new[] { player.GetEquipment(EquipmentSlot.MainHand), player.GetEquipment(EquipmentSlot.OffHand) })
+                if (weapon != null && weapon.GetEnchantedKinds().Contains(code)) return true;
+            return false;
+        }
+
+        /// <summary>1.3.5 (CT-2): the abilities a held counter takes out of the god's turns; a drawn one becomes
+        /// the god's plain strike.</summary>
+        internal static IReadOnlyCollection<string> CounterBlockedAbilities(OldGodType godType) => godType switch
+        {
+            OldGodType.Aurelion => new[] { "Light's Embrace", "Sacrifice" },
+            OldGodType.Terravok => new[] { "Stone Skin", "Entomb" },
+            OldGodType.Manwe => new[] { "Word of Creation", "Time Stop" },
+            _ => Array.Empty<string>()
+        };
+
+        /// <summary>1.3.5 (CT-2): the shop's tier name of a god's counter in the player's language, "" for a god
+        /// without one.</summary>
+        internal static string CounterTierName(OldGodType godType)
+        {
+            int i = Array.IndexOf(MagicShopLocation.CounterKindCodes, CounterKindCode(godType));
+            return i < 0 ? "" : MagicShopLocation.TierName(MagicShopLocation.CounterTiers[i] - 1);
         }
 
         private string CenterText(string text, int width)

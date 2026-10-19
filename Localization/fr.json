@@ -22789,6 +22789,7 @@
   "combat.probability_negates": "Le glissement de probabilité annule {0} !",
   "combat.probability_shift": "Les probabilités se décalent autour de {0} -- les attaques rateront !",
   "combat.probability_shift_miss": "La probabilité bascule : l'attaque de {0} passe à côté !",
+  "combat.counter_blocked": "Votre {2} empêche {0} d'utiliser {1}.",
   "combat.reflection_destroy": "Votre reflet fracasse {0} !",
   "combat.sacrifice_blow_strikes": "{0} se sacrifie pour porter un coup dévastateur !",
   "combat.sacrifice_generic": "{0} fait l'ultime sacrifice !",
