@@ -73,7 +73,6 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 
 - **Burning:** a burning monster loses 4 to 6 percent of its maximum HP a round (at least 4), plus 1 to (your level / 5 + 1).
 - **Poisoned:** 3 to 5 percent (at least 3), plus the same. Both tick at the monster's first action each round.
-- **Weapon poison:** a hit with a poison weapon has a 20 percent chance to poison the monster for 4 rounds. Each round, at its first action, it loses the larger of 5 percent of that hit and a quarter of the weapon's poison value (raised by your team's Armory, as your hits are), at least 1. A new poisoning while one lasts starts the 4 rounds again and keeps the larger of the two amounts; it never stacks. Physical immunity and divine armor cut each tick as they cut a hit. Weapon poison is separate from Poisoned: a monster can have both, and both tick.
 - **Charmed:** the monster skips its attack {{balance:CharmSkipAttackChance}} percent of the time.
 - **Confused:** the monster loses its action 50 percent of the time; otherwise it hits itself for a third of its Strength 25 percent of the time.
 - **Slowed:** the monster loses its action 50 percent of the time.
@@ -87,5 +86,9 @@ A stun, freeze, sleep or bind on a monster lasts at most {{balance:MaxStunDurati
 ### Can bosses be stunned
 
 A boss or champion resists a stun, freeze, sleep or bind {{percent:BossStunResistChance}} percent of the time and is held {{balance:MaxStunDurationBoss}} round at most. It resists a Sage's control spells {{balance:BossSoftControlResistPercent}} percent of the time, and soft control that lands lasts half as long.
+
+### Weapon poison
+
+A hit with a poison weapon has a 20 percent chance to poison its target for 4 rounds. Each round, at the target's first action, it loses the larger of 5 percent of that hit and a quarter of the weapon's poison value (raised by your team's Armory, as your hits are), at least 1. A new poisoning before the 4 rounds end starts them again and keeps the larger of the two amounts; it never stacks. Physical immunity and divine armor cut each tick as they cut a hit. Weapon poison is separate from Poisoned: a target can have both, and both tick.
 
 Before another expedition, treat the condition itself and restock supplies. See [Mental](/wiki/en/characters/mental/) and [combat](/wiki/en/combat/).

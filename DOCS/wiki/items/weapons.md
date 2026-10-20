@@ -19,4 +19,4 @@ Open an item page for its level, strength, alignment and class restrictions. A u
 
 ## Poison weapons
 
-Shadowfang, Venomstrike and Serpent's Fang, and loot weapons named Venomous or of Venom, poison. Each hit with one has a 20 percent chance to poison the monster for 4 rounds, which deals its damage over those rounds rather than at once. See [statuses on monsters](/wiki/en/characters/afflictions/#statuses-on-monsters) for the damage each round.
+Shadowfang, Venomstrike and Serpent's Fang, and loot weapons named Venomous or of Venom, poison. Each hit with one has a 20 percent chance to poison the target for 4 rounds, which deals its damage over those rounds rather than at once. See [weapon poison](/wiki/en/characters/afflictions/#weapon-poison) for the damage each round.
