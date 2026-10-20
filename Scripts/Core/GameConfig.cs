@@ -2321,10 +2321,10 @@ public static partial class GameConfig
     public const int MaterialDropCountBossMin = 1;             // Boss guaranteed drop min
     public const int MaterialDropCountBossMax = 2;             // Boss guaranteed drop max
 
-    // Divine Armor - late-game Old Gods resist unenchanted weapons
-    public const double AurelionDivineShield = 0.25;           // 25% damage reduction vs unenchanted
-    public const double TerravokStoneSkin = 0.35;              // 35% damage reduction vs unenchanted
-    public const double ManweCreatorsWard = 0.50;              // 50% damage reduction vs unenchanted
+    // Divine Armor - late-game Old Gods cut every hit, lifted only by the god's own counter enchant
+    public const double AurelionDivineShield = 0.25;           // 25% divine armor cut, lifted only by the god's counter
+    public const double TerravokStoneSkin = 0.35;              // 35% divine armor cut, lifted only by the god's counter
+    public const double ManweCreatorsWard = 0.50;              // 50% divine armor cut, lifted only by the god's counter
     public const double ArtifactBossDamageBonus = 0.03;        // +3% player damage per artifact collected
 
     public class CraftingMaterialDef

@@ -1512,7 +1512,7 @@ function renderers(data) {
             "Corruption per stack a round",
             "Doom rounds (phase 3)",
             "Immunity phases",
-            "Cut to unenchanted damage (%)",
+            "Divine armor cut without its counter (%)",
           ],
           data.realm.oldGodMechanics.map((g) => [
             escape(name(g)),
@@ -1524,7 +1524,7 @@ function renderers(data) {
             g.corruptionPerStack || "None",
             g.doomRounds || "None",
             immune(g),
-            g.unenchantedDamageCutPercent || "None",
+            g.divineArmorCutPercent || "None",
           ]),
           "Old God fight mechanics",
         ),

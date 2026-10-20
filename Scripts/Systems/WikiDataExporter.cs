@@ -1316,8 +1316,8 @@ public static class WikiDataExporter
                 physicalImmunityPhase = ctx.HasPhysicalImmunityPhase,
                 magicalImmunityPhase = ctx.HasMagicalImmunityPhase,
                 potionCooldownRounds = ctx.PotionCooldownRounds,
-                // the cut to your damage with no weapon at all (any enchantment halves it, an artifact weapon removes it)
-                unenchantedDamageCutPercent = (int)Math.Round(InvokePrivate<double>(bosses, "GetDivineArmorReduction", g.Type, new Character()) * 100)
+                // the cut to every hit the player deals the god, lifted only by the god's own counter enchant on the main or off hand
+                divineArmorCutPercent = (int)Math.Round(InvokePrivate<double>(bosses, "GetDivineArmorReduction", g.Type, new Character()) * 100)
             };
         }).ToArray(),
         monsterGuards = MonsterGuardTypes.AvailableMonsters.OrderBy(m => m.Level).Select(m => new
