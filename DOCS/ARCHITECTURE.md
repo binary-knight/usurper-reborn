@@ -1146,7 +1146,7 @@ Server-wide raid bosses. Since v1.1.4 a boss spawns daily at 8 PM Eastern (`Worl
 Each with 3 phases, escalating abilities, themed loot. Spawned with `boss_data_json` snapshot for full data preservation across restarts.
 
 ### Combat
-Each player runs their own combat loop against a **shared HP pool** atomically tracked via `SqlSaveBackend.RecordWorldBossDamage`. Returns `(remainingHp, wasKillingBlow)` -- exactly one player wins the kill credit via the conditional UPDATE described in Section 16. World-boss-exclusive loot affixes: `BossSlayer` (+10% damage vs bosses) and `TitanResolve` (+5% defense). Both work in regular combat too.
+Each player runs their own combat loop against a **shared HP pool** atomically tracked via `SqlSaveBackend.RecordWorldBossDamage`. Returns `(remainingHp, wasKillingBlow)` -- exactly one player wins the kill credit via the conditional UPDATE described in Section 16. World-boss-exclusive loot affixes: `BossSlayer` (+10% damage vs bosses) and `TitanResolve` (+5% max HP). Both work in regular combat too.
 
 ### Reward Tiers
 By contribution share: MVP 3.0x, Top 3 2.5x, Top 25% 2.0x, Top 50% 1.5x, Any 1.0x. Plus +25 Fame for kill credit, +15 Fame for any contribution. Achievements: World Slayer, Boss Hunter, Legend Killer, MVP.

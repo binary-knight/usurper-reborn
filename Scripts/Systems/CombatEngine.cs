@@ -5897,11 +5897,7 @@ public partial class CombatEngine
             playerDefense += (long)(playerDefense * GameConfig.GrandChampionDefenseBonus);
         }
 
-        // TitanResolve effect: +5% defense (from world boss exclusive loot)
-        if (WorldBossSystem.HasSpecialEffect(player, LootGenerator.SpecialEffect.TitanResolve))
-        {
-            playerDefense += (long)(playerDefense * 0.05);
-        }
+        // 1.3.6: Titan's Resolve (world boss loot) is +5 percent max HP in RecalculateStats, no defence step here
 
         // Divine Boon passive defense bonus (from worshipped player-god's configured boons)
         var defBoons = player.CachedBoonEffects;

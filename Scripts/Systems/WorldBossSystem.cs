@@ -2060,9 +2060,7 @@ namespace UsurperRemake.Systems
             if (defendingRounds > 0)
                 playerDef *= 2;
 
-            // TitanResolve: +5% max HP effective defense
-            if (HasSpecialEffect(player, LootGenerator.SpecialEffect.TitanResolve))
-                playerDef += (long)(player.MaxHP * 0.05);
+            // 1.3.6: Titan's Resolve is +5 percent max HP (Character.RecalculateStats), no defence add here
 
             // Defense can reduce damage but never below 20% of boss strength
             // World bosses are meant to be dangerous — pure defense stacking shouldn't trivialize them
