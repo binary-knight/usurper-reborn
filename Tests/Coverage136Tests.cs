@@ -103,7 +103,7 @@ public class Coverage136Tests
         "fire" => "(Phoenix Fire)",
         "frost" => "is slowed! (Frostbite)",
         "lightning" => "(Thunderstrike)",
-        "poison" or "poison37" => "poison damage! (Venomstrike)",
+        "poison" or "poison37" => "Venom seeps into the wound!",
         "holy" => "(Radiance)",
         "shadow" => "(Darkstrike)",
         _ => "",
@@ -111,7 +111,7 @@ public class Coverage136Tests
 
     private static string NamedLine(string kind) => kind switch
     {
-        "poison" or "poison37" => "poison damage! (Venom)",
+        "poison" or "poison37" => "'s blade weeps venom!",
         _ => PlayerLine(kind),
     };
 
@@ -658,6 +658,21 @@ public class Coverage136Tests
                 t.Should().NotBe(en, "{0} has its own words for {1}", lang, key);
             }
         }
+    }
+
+    [Fact]
+    public void Coverage136_TheNewPoisonKeys_NameNoWeapon()
+    {
+        // 1.3.6: E2 took the weapon tags off the venom lines; the one hit lines carry none either
+        var tags = new[] { "Venomstrike", "Venom)", "Golpe Venenoso", "Frappe Venimeuse", "Méregcsapás", "Colpo Velenoso", "(Veneno", "(Venin", "(Méreg", "(Veleno" };
+        foreach (var key in new[] { "combat.enchant_venom_hit", "combat.enchant_venom_hit_tm" })
+            foreach (var lang in new[] { "en", "es", "fr", "hu", "it" })
+            {
+                string value = Loc.GetIn(lang, key);
+                value.Should().NotBe(key, "{0} has {1}", lang, key);
+                value.Should().NotContain("(", "{0} {1} names no weapon: {2}", lang, key, value);
+                foreach (var tag in tags) value.Should().NotContain(tag, "{0} {1} names no weapon: {2}", lang, key, value);
+            }
     }
 
     private static string RepoRoot()
