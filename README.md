@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.5; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
@@ -56,7 +56,7 @@ Beyond the simulation, there's a deep RPG with 100+ hours of content.
 
 ### 100-Floor Dungeon
 - Deterministically generated floors with boss encounters, treasure rooms, traps, hidden secrets, settlements, meditation chambers, puzzles, and lever rooms.
-- 7 corrupted Old Gods sealed in the depths (floors 25, 40, 55, 70, 85, 95, 100), each with multi-phase combat, channeled abilities, AoE mechanics, divine armor, and meaningful dialogue choices.
+- 7 corrupted Old Gods sealed in the depths (floors 25, 40, 55, 70, 85, 95, 100), each with multi-phase combat, channeled abilities, AoE mechanics, and meaningful dialogue choices. Aurelion, Terravok and Manwe wear divine armor that only their own counter enchant from the Magic Shop (Sunbane, Stonebane, Godbane) removes.
 - 7 Ancient Seals to collect, unlocking the truth about who you are.
 - 5 endings based on your choices: Conqueror, Savior, Defiant, True, and a secret Dissolution ending.
 - Floor-aware monster loot with full per-slot armor coverage (head, arms, hands, legs, feet, waist, face, cloak, body, weapons, shields, rings, necklaces).
