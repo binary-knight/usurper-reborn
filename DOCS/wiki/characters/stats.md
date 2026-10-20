@@ -45,7 +45,7 @@ Agility does not decide who acts first.
 
 ## Defence
 
-When a monster hits you, your Defence, magic armor bonus and most of your armor power are taken off the damage. A hit always does at least a small minimum, and an ordinary single hit cannot take more than 75 percent of your maximum HP (85 percent from a boss). Defence and armor reduce damage; neither makes you immune.
+When a monster hits you, your Defence, magic armor bonus and most of your armor power are taken off the damage. A hit always does at least a small minimum, and an ordinary single hit cannot take more than 75 percent of your maximum HP (85 percent from a boss). Defence and armor reduce damage; neither makes you immune. [Magic resistance](/wiki/en/items/enchanting/#magic-resistance) on your gear also cuts a monster's breaths and spells, at most by half, except an Old God's.
 
 ## Constitution, Intelligence and Wisdom
 

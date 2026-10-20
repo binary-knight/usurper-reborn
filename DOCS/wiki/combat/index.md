@@ -210,7 +210,7 @@ An ordinary monster's hit can take at most 75 percent of your maximum HP and a b
 
 A monster with abilities uses one on 30 percent of its turns plus 1 percent per 5 levels: a level 50 monster 40 percent of the time. An Old God uses one 70 percent of the time. When every ability would be wasted it makes its normal attack instead ([how monsters choose](/wiki/en/monsters/#how-monsters-fight)).
 
-An ability's direct damage is reduced by your Defence + half your armor power + a ward spell's bonus, with the same minimum and caps as a normal hit. Defend, dodge, Blur and a shield do not help against it.
+An ability's direct damage is reduced by your Defence + half your armor power + a ward spell's bonus, with the same minimum and caps as a normal hit. Defend, dodge, Blur and a shield do not help against it. Last, a monster breath or spell loses the share your gear's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) takes, at most half and even below the minimum; an Old God's never does.
 
 ## Life steal and thorns
 

@@ -6478,6 +6478,8 @@ public partial class CombatEngine
                 actualDamage = ApplyFleeGrace(player, actualDamage);
                 // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
                 actualDamage = Math.Max(Math.Min(actualDamage, GetMinIncomingDamage(player, abilityResult.DirectDamage)), TeamHQBonus.ApplyDefense(player, actualDamage));
+                // 1.3.6: a magical hit loses the share the player's magic resistance takes, last; never an Old God's
+                if (abilityResult.IsMagical && !isOldGodFightAbility) actualDamage = ApplyMagicResist(player, actualDamage);
 
                 player.HP = Math.Max(0, player.HP - actualDamage);
                 EvHurt(player, actualDamage, monKind);   // 1.2.6
@@ -6606,6 +6608,7 @@ public partial class CombatEngine
                 damage = ApplyFleeGrace(player, damage);
                 // v1.1.11: Team HQ Barracks last, before the drain heal reads it; the minimum holds where it held.
                 damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawLifeStealDamage)), TeamHQBonus.ApplyDefense(player, damage));
+                if (abilityResult.IsMagical && !isOldGodFightAbility) damage = ApplyMagicResist(player, damage);   // 1.3.6, before the heal reads it
 
                 player.HP -= damage;
                 EvHurt(player, damage, monKind);   // 1.2.6
@@ -6671,6 +6674,7 @@ public partial class CombatEngine
                 damage = ApplyFleeGrace(player, damage);
                 // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
                 damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawDamage)), TeamHQBonus.ApplyDefense(player, damage));
+                if (abilityResult.IsMagical && !isOldGodFightAbility) damage = ApplyMagicResist(player, damage);   // 1.3.6, last
 
                 player.HP -= damage;
                 EvHurt(player, damage, monKind);   // 1.2.6
@@ -21857,6 +21861,24 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// 1.3.6: the share of a magical hit that magic resistance <paramref name="mr"/> takes off:
+    /// MR / (MR + 100), at most a half (Ward's 20 takes a sixth), none at MR 0 or below.
+    /// </summary>
+    internal static double MagicResistShare(long mr) => mr <= 0 ? 0.0 : Math.Min(0.50, mr / (mr + 100.0));
+
+    /// <summary>
+    /// 1.3.6: a magical hit on <paramref name="target"/> after its equipment magic resistance, at least 1.
+    /// The callers apply it last, after every reduction of today, just before HP is taken: on a monster's
+    /// magical ability (never an Old God's) and on a spell in PvP.
+    /// </summary>
+    internal static long ApplyMagicResist(Character target, long damage)
+    {
+        if (target == null || damage <= 0) return damage;
+        double share = MagicResistShare(target.GetEquipmentMagicResistance());
+        return share <= 0 ? damage : Math.Max(1, (long)Math.Floor(damage * (1.0 - share)));
+    }
+
+    /// <summary>
     /// v1.1.10: what a monster's special ability hit on a companion goes through after defence. It
     /// used to skip the three things that protect a companion from a basic attack and the player
     /// from the same ability: the lower boss cap in a fight's first rounds, the multi-hit
@@ -21958,6 +21980,8 @@ public partial class CombatEngine
                             terminal.WriteLine(Loc.Get("combat.damage_vs_defense", abilityResult.DirectDamage, abilityDefense));
                         }
                         actualDmg = MitigateCompanionAbilityHit(monster, companion, actualDmg, result);
+                        // 1.3.6: the companion's own magic resistance, last; never on an Old God's attack
+                        if (abilityResult.IsMagical && monster.FamilyName != "OldGod") actualDmg = ApplyMagicResist(companion, actualDmg);
                         RecordAllyHit(companion, actualDmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - actualDmg);
                         EvHurt(companion, actualDmg, MonsterAbilityEventKind(abilityType));   // 1.2.6
@@ -21986,6 +22010,7 @@ public partial class CombatEngine
                             terminal.WriteLine(Loc.Get("combat.damage_vs_defense", rawAbilityDmg, abilityDefense));
                         }
                         dmg = MitigateCompanionAbilityHit(monster, companion, dmg, result);
+                        if (abilityResult.IsMagical && monster.FamilyName != "OldGod") dmg = ApplyMagicResist(companion, dmg);   // 1.3.6, last
                         RecordAllyHit(companion, dmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - dmg);
                         EvHurt(companion, dmg, MonsterAbilityEventKind(abilityType));   // 1.2.6
@@ -28164,6 +28189,7 @@ public partial class CombatEngine
             {
                 // v1.1.11: Team HQ Armory, then the defender's Barracks, last.
                 long spellDamage = TeamHQBonus.ApplyDefense(defender, TeamHQBonus.ApplyAttack(attacker, spellResult.Damage));
+                spellDamage = ApplyMagicResist(defender, spellDamage);   // 1.3.6: the defender's magic resistance, last
                 defender.HP = Math.Max(0, defender.HP - spellDamage);
                 terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", defender.DisplayName, spellDamage), "bright_magenta");
             }
@@ -28524,6 +28550,7 @@ public partial class CombatEngine
                             spellDamage = (long)Math.Ceiling(spellDamage / 2.0);
                         spellDamage = TeamHQBonus.ApplyAttack(computer, spellDamage); // v1.1.11: Team HQ Armory, last.
                         spellDamage = TeamHQBonus.ApplyDefense(opponent, spellDamage); // v1.1.11: then the human's Barracks.
+                        spellDamage = ApplyMagicResist(opponent, spellDamage);   // 1.3.6: then the defender's magic resistance, last
                         opponent.HP = Math.Max(0, opponent.HP - spellDamage);
                         terminal.WriteLine(Loc.Get("combat.pvp_magical_damage", opponent.DisplayName, spellDamage), "bright_magenta");
                     }
