@@ -2243,6 +2243,9 @@ public static partial class GameConfig
     public const int MaxEquipmentLifeStealPercent = 60;
     public const int MaxTotalLifestealPercent = 100;
 
+    /// <summary>The most armour piercing percent the equipped gear adds up to (one item still rolls at most 50).</summary>
+    public const int MaxArmorPiercingPercent = 50;
+
     // v0.60.0 stun-lock audit: diminishing-returns and post-recovery immunity.
     // Players were chaining lightning-enchant procs with Magician/Sage stun spells
     // to keep bosses perma-stunned. New rules:

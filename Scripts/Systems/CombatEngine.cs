@@ -13920,6 +13920,7 @@ public partial class CombatEngine
 
             long armor = monster.ArmPow;
             if (monster.IsCorroded) armor = Math.Max(0, (long)(armor * 0.6));
+            armor = ApplyArmorPiercing(armor, attacker ?? spellCaster ?? currentPlayer);   // a null attacker is the player's own spell
             long actualDamage = Math.Max(1, damagePerMonster - armor);
 
             // Marked targets take bonus damage (30%, or what a Sage's mark set)
@@ -14018,6 +14019,18 @@ public partial class CombatEngine
     // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
     // 1.3.5: on-hit effects scale from the HP the hit removed, not from the damage passed in (a phase immunity
     // residual included, never more than the HP the target had); a caller reads it through ApplySingleMonsterDamageDealt.
+    /// <summary>
+    /// The attacker's armour piercing percent taken off an amount of monster armour or Defence that a hit subtracts,
+    /// floored at 0. No attacker, no piercing, or an amount of 0 or less gives the amount as it is.
+    /// </summary>
+    internal static long ApplyArmorPiercing(long amount, Character? attacker)
+    {
+        if (attacker == null || amount <= 0) return amount;
+        int pct = attacker.GetEquipmentArmorPiercing();
+        if (pct <= 0) return amount;
+        return Math.Max(0, amount - amount * pct / 100);
+    }
+
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
@@ -15610,6 +15623,7 @@ public partial class CombatEngine
         // with roughly double armor, making the 15-stamina attack weaker than a free
         // basic swing against armored monsters.
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = ApplyArmorPiercing(defense, player);
         powerDamage = Math.Max(1, powerDamage - defense);
 
         terminal.SetColor("bright_red");
@@ -15697,6 +15711,7 @@ public partial class CombatEngine
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         if (!hitRolled)
             defense = (long)(defense * 0.75);
+        defense = ApplyArmorPiercing(defense, player);
 
         long damage = Math.Max(1, attackPower - defense);
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
@@ -15834,6 +15849,7 @@ public partial class CombatEngine
         rangedDamage += player.GetClassCombatModifiers().RangedBonus;   // 1.3.2: the Ranger's RangedBonus
 
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = ApplyArmorPiercing(defense, player);
         rangedDamage = Math.Max(1, rangedDamage - defense);
         rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
 
@@ -16224,6 +16240,7 @@ public partial class CombatEngine
                 {
                     long defense = target.Defence / 2; // Abilities partially bypass defense
                     if (target.IsCorroded) defense = Math.Max(0, (long)(defense * 0.6));
+                    defense = ApplyArmorPiercing(defense, player);
                     actualDamage = Math.Max(1, actualDamage - defense);
                 }
 
@@ -16743,7 +16760,7 @@ public partial class CombatEngine
                 if (player.HP < player.MaxHP * 0.4 && target != null && target.IsAlive)
                 {
                     long desperateDmg = (long)(abilityResult.Damage * 0.5);
-                    desperateDmg = Math.Max(1, desperateDmg - target.Defence / 4);
+                    desperateDmg = Math.Max(1, desperateDmg - ApplyArmorPiercing(target.Defence / 4, player));
                     desperateDmg = ApplyAbilityBossProtections(target, desperateDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     desperateDmg = TeamHQBonus.ApplyAttack(player, desperateDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= desperateDmg;
@@ -16909,7 +16926,7 @@ public partial class CombatEngine
                         long holyAoeDmg = (long)(abilityResult.Damage * GetAoEDiminishingMultiplier(hi));
                         if (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0)
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
-                        long actualHolyDmg = Math.Max(1, holyAoeDmg - m.ArmPow / 2);
+                        long actualHolyDmg = Math.Max(1, holyAoeDmg - ApplyArmorPiercing(m.ArmPow / 2, player));
                         if (m.IsSleeping) { actualHolyDmg += actualHolyDmg / 2; }
                         actualHolyDmg = ApplyAbilityBossProtections(m, actualHolyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         actualHolyDmg = TeamHQBonus.ApplyAttack(player, actualHolyDmg); // v1.1.11: Team HQ Armory, last.
@@ -17026,7 +17043,7 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.ability_frenzy", extraHits));
                     for (int i = 0; i < extraHits && target.IsAlive; i++)
                     {
-                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - target.Defence / 4);
+                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - ApplyArmorPiercing(target.Defence / 4, player));
                         frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
                         frenzyDmg = ApplyAbilityBossProtections(target, frenzyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         frenzyDmg = TeamHQBonus.ApplyAttack(player, frenzyDmg); // v1.1.11: Team HQ Armory, last.
