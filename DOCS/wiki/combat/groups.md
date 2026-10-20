@@ -50,7 +50,7 @@ A monster's normal attack on a teammate or companion makes no hit roll and canno
 
 ## Teammates regenerate stamina, mana and gear regeneration
 
-At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. Each also regains HP and mana from its own HP Regen and Mana Regen gear, as a share of its maximum. HP regeneration from race and alignment is yours alone.
+At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. Each also regains HP and mana from its own regeneration gear, as a share of its maximum. HP regeneration from race and alignment is yours alone.
 
 ## Curing poison and disease
 

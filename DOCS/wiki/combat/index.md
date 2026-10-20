@@ -225,7 +225,8 @@ At the end of each round every living member of the party regenerates combat sta
 
 {{table:combat-regeneration}}
 
-- **Regeneration gear:** every living party member, from its own gear, regains HP equal to the summed HP Regen value in tenths of a percent of its maximum HP (1.7 percent for a value of 17), and mana the same way from Mana Regen, at least 1 each when it has any and at most 10 percent of the maximum a round, however many items carry it. It is on top of Wisdom for mana and not limited to 15 or to spell classes.
+- **Mana Regen gear:** its summed value in mana every round, in tenths of a percent of the member's maximum mana (a value of 10 on 600 mana is 6), on top of Wisdom and not limited to 15 or to spell classes.
+- **HP Regen gear:** its summed value in HP every round, in tenths of a percent of the member's maximum HP (1.7 percent for a value of 17). Each of the two is at least 1 when the member has any and at most 10 percent of the maximum a round, however many items carry it.
 
 Only you, the fight's leader, also get these:
 
