@@ -34,6 +34,17 @@ The magical attacks are the monster breaths and spells: Fire Breath, Frost Breat
 
 Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and crafting materials. With Phoenix Fire, each hit with that weapon has a {{percent:FireEnchantProcChance}} percent chance of extra fire damage equal to {{percent:FireEnchantDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostEnchantProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them.
 
+### Weapon effects in player fights and on the world boss
+
+The fire, frost, lightning, poison, holy and shadow effects of a weapon and the life steal on your gear also work outside a monster fight:
+
+- **Player fights:** each of your weapon hits may set off the effects of the weapon in the hand that struck, at the same chance and share of the hit as against a monster. Your opponent's strike sets off those of its main hand weapon and heals it by its gear's life steal. See [PvP damage](/wiki/en/combat/pvp/#pvp-damage) for what each one does there.
+- **World boss:** your attack, Power Attack and Precise Strike set off the effects of your main hand weapon and your gear's life steal, and the effects' damage is added to that round's damage. Frost does nothing there and lightning does not stun. See [world boss damage](/wiki/en/online/world-boss/#world-boss-damage-cap).
+- **Weapon poison** is one hit in both: 10 percent of the hit, or the weapon's poison value raised by your team's Armory, not 4 rounds of poison.
+- **Holy** does not do the double damage it does to undead monsters there, and Aurelion's attunement still adds its bonus.
+
+Thorns on a companion's or an ally's own gear return their percent of a monster's normal attack on it, as yours do. Boss Slayer gear (world boss loot) adds 10 percent against a boss or mini boss to your swings, Power Attack and class abilities, never to spells.
+
 ## Sunbane, Stonebane and Godbane
 
 Sunbane, Stonebane and Godbane are counter enchants: Sunbane against Aurelion, Stonebane against Terravok and Godbane against Manwe. A counter adds no stat. Carried on your main hand or off hand into the fight it counters, it holds back two named abilities and lifts the divine armor that cuts your damage: Sunbane holds back Aurelion's Light's Embrace and Sacrifice, Stonebane holds back Terravok's Stone Skin and Entomb, and Godbane holds back Manwe's Word of Creation and Time Stop. In any other fight a counter does nothing.

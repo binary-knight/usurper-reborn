@@ -133,7 +133,7 @@ These actions work for any class unless stated, and each one ends your turn, eve
 
 ### Power Attack (P)
 
-Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
+Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, a Boss Slayer item's +10 percent against a boss or mini-boss, and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
 
 ### Precise Strike (E)
 
@@ -215,7 +215,7 @@ An ability's direct damage is reduced by your Defence + half your armor power + 
 ## Life steal and thorns
 
 - **Life steal:** life steal from gear counts at most {{balance:MaxEquipmentLifeStealPercent}} percent of a hit, and all life steal together never heals more than {{balance:MaxTotalLifestealPercent}} percent of the damage dealt.
-- **Thorns:** thorns on your gear return their summed percent of the damage a monster's normal attack did to you, at least 1. The Reflecting status and the Scales of Law artifact (15 percent) work the same way.
+- **Thorns:** thorns on your gear return their summed percent of the damage a monster's normal attack did to you, at least 1. The Reflecting status and the Scales of Law artifact (15 percent) work the same way. A companion's or an ally's own thorns gear does the same for a monster's normal attack on it.
 
 ## Regeneration in combat
 

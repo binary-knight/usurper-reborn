@@ -816,6 +816,8 @@
   "combat.enchant_shadow": "Le ombre si avvolgono sulla lama! {0} danni d'ombra! (Colpo Oscuro)",
   "combat.enchant_siphon": "La tua arma risucchia {0} mana! (Risucchio)",
   "combat.enchant_venom": "Il veleno penetra nella ferita! Avvelenato per {0} turni, {1} danni a turno!",
+  "combat.enchant_venom_hit": "Il veleno penetra nella ferita! {0} danni da veleno!",
+  "combat.enchant_venom_hit_tm": "La lama di {0} trasuda veleno! +{1} danni da veleno!",
   "combat.gnoll_bite_poison": "Il tuo morso velenoso avvelena {0}!",
   "combat.god_intervenes": "{0} interviene!",
   "combat.boon_drain": "Il potere divino risucchia {0} vita! (Benedizione)",
