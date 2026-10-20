@@ -202,7 +202,7 @@ namespace UsurperRemake.Systems
                     { "Defence", 40 },
                     { "MaxHP", 500 }
                 },
-                SpecialAbility = "Earth's Embrace - Take 50% reduced damage. Immune to knockback and stun. Earthquake attack hits all enemies.",
+                SpecialAbility = "Earth's Embrace: Take 50% reduced damage (75% against Manwe while you hold the Void Key). Manwe's Creation's End deals heavy damage instead of killing you outright.",
                 IconColor = "dark_green"
             };
 

@@ -1636,7 +1636,7 @@ public static class ClassAbilitySystem
         {
             Id = "rockbiter",
             Name = "Rockbiter",
-            Description = "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage and grant +15% armor.",
+            Description = "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage, and you gain flat Defense that grows with your level.",
             LevelRequired = 10,
             ManaCost = 20,
             Cooldown = 0,
