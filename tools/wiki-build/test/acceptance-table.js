@@ -33,7 +33,7 @@ module.exports = [
   ["A9","how much hp does constitution give","/wiki/en/characters/stats/","Maximum HP: 3 per point above 10, plus your level times a fifteenth of your Constitution","first"],
   ["A10","how is max mana calculated","/wiki/en/characters/stats/","Maximum mana for spellcasting classes: 5 per point above 10","miss: items/armor/ ranks first"],
   ["A11","how does mana regenerate in combat","/wiki/en/combat/","Mana: 2 plus a tenth of Wisdom, at most 15 a round","miss: combat/groups/ ranks first"],
-  ["A12","what does mana regen on gear do","/wiki/en/combat/","Mana Regen gear: its summed value in mana every round","first"],
+  ["A12","what does mana regen on gear do","/wiki/en/combat/","Mana Regen gear: its summed value is tenths of a percent of the member's maximum mana","first"],
   ["A13","do teammates regenerate mana","/wiki/en/combat/groups/","each living party member regains combat stamina and, for a class with mana, mana","first"],
   ["A14","how do i lower spell cost","/wiki/en/characters/stats/","Spell mana cost: 1.5 percent cheaper per point above 10, up to half","miss: characters/spells/ ranks first"],
   ["A15","what is my chance to hit","/wiki/en/combat/","Your hit chance against a monster at most 5 levels above you is 95 percent","miss: fact outside the excerpt"],
