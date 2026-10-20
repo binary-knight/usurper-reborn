@@ -8373,8 +8373,8 @@ public abstract class BaseLocation
             if (item.ManaSteal > 0) specials.Add(Loc.Get("base.gear_sp_manasteal", item.ManaSteal));
             if (item.ArmorPiercing > 0) specials.Add(Loc.Get("base.gear_sp_armorpen", item.ArmorPiercing));
             if (item.Thorns > 0) specials.Add(Loc.Get("base.gear_sp_thorns", item.Thorns));
-            if (item.HPRegen > 0) specials.Add(Loc.Get("base.gear_sp_hpregen", item.HPRegen));
-            if (item.ManaRegen > 0) specials.Add(Loc.Get("base.gear_sp_mpregen", item.ManaRegen));
+            if (item.HPRegen > 0) specials.Add(Loc.Get("base.gear_sp_hpregen", LootGenerator.RegenPercentText(item.HPRegen)));
+            if (item.ManaRegen > 0) specials.Add(Loc.Get("base.gear_sp_mpregen", LootGenerator.RegenPercentText(item.ManaRegen)));
             if (item.PoisonDamage > 0) specials.Add(Loc.Get("base.gear_sp_poison_value", item.PoisonDamage));
             if (item.MagicResistance > 0) specials.Add(Loc.Get("base.gear_sp_magres", item.MagicResistance));
             if (item.HasFireEnchant) specials.Add(Loc.Get("base.gear_sp_fire"));

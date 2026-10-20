@@ -1540,7 +1540,9 @@ namespace UsurperRemake.Locations
                     string effKey = LootGenerator.EffectWordKey(effect, "name");
                     string effName = Loc.Has(effKey) ? Loc.Get(effKey) : effect.ToString();
                     terminal.SetColor("magenta");
-                    terminal.WriteLine($"    - {effName}{(value != 0 ? $" ({value})" : "")}");
+                    string shownValue = effect is LootGenerator.SpecialEffect.Regeneration or LootGenerator.SpecialEffect.ManaRegen
+                        ? LootGenerator.RegenPercentText(value) + "%" : value.ToString();   // 1.3.5: gear regeneration is a share of the pool
+                    terminal.WriteLine($"    - {effName}{(value != 0 ? $" ({shownValue})" : "")}");
                 }
             }
 

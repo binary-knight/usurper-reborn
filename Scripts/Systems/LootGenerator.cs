@@ -183,6 +183,10 @@ public static class LootGenerator
         /// <summary>v1.2.5: the English line curse removal stores in Description[1].</summary>
         internal static string PurifiedLine => Loc.GetIn("en", "item.desc_purified");
 
+        /// <summary>1.3.5: a gear regeneration value (tenths of a percent of the pool) as a percent with one decimal, "1.7".</summary>
+        public static string RegenPercentText(int tenths) =>
+            (tenths / 10.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
         /// <summary>
         /// v1.2.5: a stored item description line in the reader's language. A drop stores its lines in English
         /// (the effect list "Fire Damage +5, Life Steal +3", the curse line, the purified line); they are shown
@@ -209,7 +213,10 @@ public static class LootGenerator
                     if (e != SpecialEffect.None && Loc.HasIn("en", key) && Loc.GetIn("en", key) == m.Groups[1].Value) { effect = e; break; }
                 }
                 if (effect == null) return stored;
-                shown.Add($"{GetEffectNameIn(lang, effect.Value)} +{m.Groups[2].Value}");
+                // 1.3.5: gear regeneration is tenths of a percent of the pool, shown as a percent
+                string number = effect is SpecialEffect.Regeneration or SpecialEffect.ManaRegen
+                    ? RegenPercentText(int.Parse(m.Groups[2].Value)) + "%" : m.Groups[2].Value;
+                shown.Add($"{GetEffectNameIn(lang, effect.Value)} +{number}");
             }
             return string.Join(", ", shown);
         }

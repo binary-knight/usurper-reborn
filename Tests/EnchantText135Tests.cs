@@ -124,8 +124,8 @@ public class EnchantText135Tests
     {
         ("base.gear_sp_critdmg", new object[] { 10 }), ("base.gear_sp_lifesteal", new object[] { 6 }),
         ("base.gear_sp_manasteal", new object[] { 4 }), ("base.gear_sp_armorpen", new object[] { 12 }),
-        ("base.gear_sp_thorns", new object[] { 15 }), ("base.gear_sp_hpregen", new object[] { 17 }),
-        ("base.gear_sp_mpregen", new object[] { 9 }), ("base.gear_sp_poison_value", new object[] { 245 }),
+        ("base.gear_sp_thorns", new object[] { 15 }), ("base.gear_sp_hpregen", new object[] { "1.7" }),
+        ("base.gear_sp_mpregen", new object[] { "0.9" }), ("base.gear_sp_poison_value", new object[] { 245 }),
         ("base.gear_sp_magres", new object[] { 20 }), ("base.gear_sp_fire", Array.Empty<object>()),
         ("base.gear_sp_frost", Array.Empty<object>()), ("base.gear_sp_lightning", Array.Empty<object>()),
         ("base.gear_sp_poison", Array.Empty<object>()), ("base.gear_sp_holy", Array.Empty<object>()),
@@ -159,8 +159,8 @@ public class EnchantText135Tests
         {
             ["base.gear_sp_critdmg"] = "CritDmg +{0}%", ["base.gear_sp_lifesteal"] = "Lifesteal {0}%",
             ["base.gear_sp_manasteal"] = "Manasteal {0}%", ["base.gear_sp_armorpen"] = "ArmorPen {0}%",
-            ["base.gear_sp_thorns"] = "Thorns {0}%", ["base.gear_sp_hpregen"] = "HPRegen {0}/rd",
-            ["base.gear_sp_mpregen"] = "MPRegen {0}/rd", ["base.gear_sp_poison_value"] = "Poison {0}",
+            ["base.gear_sp_thorns"] = "Thorns {0}%", ["base.gear_sp_hpregen"] = "HPRegen {0}%/rd",
+            ["base.gear_sp_mpregen"] = "MPRegen {0}%/rd", ["base.gear_sp_poison_value"] = "Poison {0}",
             ["base.gear_sp_magres"] = "MagRes {0}%", ["base.gear_sp_fire"] = "Fire", ["base.gear_sp_frost"] = "Frost",
             ["base.gear_sp_lightning"] = "Lightning", ["base.gear_sp_poison"] = "Poison", ["base.gear_sp_holy"] = "Holy",
             ["base.gear_sp_shadow"] = "Shadow", ["base.gear_sp_cursed"] = "CURSED", ["ui.stat_siphon"] = "Siphon",

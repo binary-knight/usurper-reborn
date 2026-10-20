@@ -48,9 +48,9 @@ A monster's normal attack on a teammate or companion makes no hit roll and canno
 - **Minimum and caps:** a hit does at least the larger of 1, 5 percent of the attack and 0.25 percent of the ally's maximum HP, and at most 75 percent of its maximum HP (85 percent from a boss, {{percent:BossFirstRoundsDamageCapPercent}} percent in a boss fight's first {{balance:BossFirstRoundsDamageCapRounds}} rounds). An ally that defends takes half.
 - **Bosses:** a boss's hit on an ally does at least 1.5 x the boss's level before the cut for several hits in a round. In an Old God fight no single hit on an ally takes more than {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP.
 
-## Teammates regenerate stamina and mana
+## Teammates regenerate stamina, mana and gear regeneration
 
-At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. HP regeneration from gear, race and alignment is yours alone.
+At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. Each also regains HP and mana from its own regeneration gear, as a share of its maximum. HP regeneration from race and alignment is yours alone.
 
 ## Curing poison and disease
 
