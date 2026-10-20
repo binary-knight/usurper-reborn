@@ -270,11 +270,12 @@ public class MagicFix125Tests
     [Fact]
     public async Task AnEnchantedItemStolenInTheDormitory_KeepsItsRecordAndCount_AndRemovalLandsAtBase()
     {
-        var victim = Wearing("Leather Cap", 0);
-        string before = Form(victim.GetEquipment(EquipmentSlot.Head)!);
+        // 1.3.6: Phoenix Fire goes on a weapon only, so the stolen two-enchant item is a Forged Mace in the main hand
+        var victim = WearingWeapon("Forged Mace");
+        string before = Form(victim.GetEquipment(EquipmentSlot.MainHand)!);
         await Enchant(victim, 13);
         await Enchant(victim, 2, 3);
-        var cap = victim.GetEquipment(EquipmentSlot.Head)!;
+        var cap = victim.GetEquipment(EquipmentSlot.MainHand)!;
         var saved = Save(victim).DynamicEquipment.Single(d => d.Name == cap.Name);
 
         // the thief's side: the stolen item, into the bag, and worn
@@ -282,15 +283,15 @@ public class MagicFix125Tests
         EquipmentDatabase.RegisterDynamic(stolen);
         var thief = Hero();
         var bagItem = thief.ConvertEquipmentToLegacyItem(stolen);
-        var worn = Character.BuildEquipmentFromItem(bagItem, EquipmentSlot.Head, WeaponHandedness.None, WeaponType.None);
-        thief.EquippedItems[EquipmentSlot.Head] = EquipmentDatabase.RegisterDynamic(worn);
-        var onThief = thief.GetEquipment(EquipmentSlot.Head)!;
+        var worn = Character.BuildEquipmentFromItem(bagItem, EquipmentSlot.MainHand, WeaponHandedness.OneHanded, WeaponType.Mace);
+        thief.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(worn);
+        var onThief = thief.GetEquipment(EquipmentSlot.MainHand)!;
         onThief.EnchantBase.Should().Be(cap.EnchantBase, "the record comes with the stolen item");
         onThief.GetEnchantmentCount().Should().Be(2, "the enchant count comes with it, so the limit holds");
         onThief.GetEnchantedKinds().Should().BeEquivalentTo(cap.GetEnchantedKinds());
 
         await Remove(thief);
-        Form(thief.GetEquipment(EquipmentSlot.Head)!).Should().Be(before, "removal lands at the item's base");
+        Form(thief.GetEquipment(EquipmentSlot.MainHand)!).Should().Be(before, "removal lands at the item's base");
     }
 
     [Theory]
