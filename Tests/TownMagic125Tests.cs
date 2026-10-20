@@ -299,7 +299,7 @@ public class TownMagic125Tests
     {
         string shown = await Enchant("en", 100, 5, "Steel Helm");
         foreach (var w in new[] { "Divine Blessing", "+3 str/dex/def/wis, weapon+armor power", "Ocean's Touch", "+6 intelligence, +4 wisdom", "+20 magic resist, +2 defence",
-                     "Phoenix Fire", "+20 power + chance to slow enemies", "Weapon  ", "L.Ring", "Bag", "Enchanting: Steel Helm",
+                     "Phoenix Fire", "+30 weapon power, 25% chance to slow on hit", "Weapon  ",   // 1.3.6 E3-T1: the new Frostbite description "L.Ring", "Bag", "Enchanting: Steel Helm",
                      "  Enchant Steel Helm with Divine Blessing (+3 str/dex/def/wis, weapon+armor", "  power)", "  WARNING: this item already carries 3 enchantments.",
                      "  On failure: gold and materials are consumed, AND one of the", "  [0] Cancel" })
             shown.Should().Contain(w);
@@ -314,13 +314,21 @@ public class TownMagic125Tests
         (PlayerData)typeof(SaveSystem).GetMethod("SerializePlayer", F)!.Invoke(SaveSystem.Instance, new object[] { hero })!;
 
     /// <summary>Enchants a worn "Leather Cap" in the given language (tier, stat), confirms, and returns the hero.</summary>
-    private static Task<Character> EnchantCap(string lang, int tier, int stat) => InLanguage(lang, async () =>
+    private static Task<Character> EnchantCap(string lang, int tier, int stat) =>
+        EnchantWorn(lang, tier, stat, new Equipment { Name = "Leather Cap", Slot = EquipmentSlot.Head, ArmorClass = 3, MinLevel = 1, Value = 100 });
+
+    /// <summary>1.3.6: Frostbite goes on a weapon only, so its case enchants a worn "Forged Mace" in the main hand.</summary>
+    private static Task<Character> EnchantMace(string lang, int tier, int stat) =>
+        EnchantWorn(lang, tier, stat, new Equipment
+        {
+            Name = "Forged Mace", Slot = EquipmentSlot.MainHand, WeaponType = WeaponType.Mace, Handedness = WeaponHandedness.OneHanded,
+            WeaponPower = 35, MinLevel = 1, Value = 100,
+        });
+
+    private static Task<Character> EnchantWorn(string lang, int tier, int stat, Equipment worn) => InLanguage(lang, async () =>
     {
         var hero = Hero();
-        hero.EquippedItems[EquipmentSlot.Head] = EquipmentDatabase.RegisterDynamic(new Equipment
-        {
-            Name = "Leather Cap", Slot = EquipmentSlot.Head, ArmorClass = 3, MinLevel = 1, Value = 100,
-        });
+        hero.EquippedItems[worn.Slot] = EquipmentDatabase.RegisterDynamic(worn);
         foreach (var m in GameConfig.CraftingMaterials) hero.AddMaterial(m.Id, 5);
         var s = stat > 0 ? Open(hero, "1", $"{tier}", $"{stat}", "Y") : Open(hero, "1", $"{tier}", "Y");
         await Run(s, "EnchantEquipment", hero);
@@ -333,16 +341,21 @@ public class TownMagic125Tests
     {
         var dex = await EnchantCap(lang, 2, 3);
         var blessed = await EnchantCap(lang, 5, 0);
-        var frost = await EnchantCap(lang, 14, 0);
-        foreach (var (hero, expected) in new[] { (dex, "Leather Cap +4 Dex"), (blessed, "Leather Cap (Blessed)"), (frost, "Leather Cap (Frostbite)") })
+        var frost = await EnchantMace(lang, 14, 0);   // 1.3.6: Frostbite goes on a weapon only
+        foreach (var (hero, expected, slot, kind, family) in new[]
         {
-            var cap = hero.GetEquipment(EquipmentSlot.Head)!;
+            (dex, "Leather Cap +4 Dex", EquipmentSlot.Head, GearSetSlotKind.Head, "Leather Cap"),
+            (blessed, "Leather Cap (Blessed)", EquipmentSlot.Head, GearSetSlotKind.Head, "Leather Cap"),
+            (frost, "Forged Mace (Frostbite)", EquipmentSlot.MainHand, GearSetSlotKind.Weapon, "Forged Mace"),
+        })
+        {
+            var cap = hero.GetEquipment(slot)!;
             cap.Name.Should().Be(expected, $"the enchant writes the English form in {lang}");
             var data = Save(hero);
             string json = JsonSerializer.Serialize(data);
             var back = JsonSerializer.Deserialize<PlayerData>(json)!;
             back.DynamicEquipment.Should().Contain(d => d.Name == expected, "the save keeps the stored form");
-            GearSetFamilyResolver.FamilyOf(null, expected, GearSetSlotKind.Head).Should().Be("Leather Cap", "the gear set resolver reads it");
+            GearSetFamilyResolver.FamilyOf(null, expected, kind).Should().Be(family, "the gear set resolver reads it");
         }
     }
 

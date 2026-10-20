@@ -103,6 +103,20 @@ public class MagicFix125Tests
         return hero;
     }
 
+    /// <summary>1.3.6: a hero wearing a plain one handed weapon of this name in the main hand, as Wearing does a cap.</summary>
+    private static Character WearingWeapon(string name)
+    {
+        var hero = Hero();
+        var blade = new Equipment
+        {
+            Name = name, Slot = EquipmentSlot.MainHand, WeaponType = WeaponType.Mace, Handedness = WeaponHandedness.OneHanded,
+            WeaponPower = 35, MinLevel = 1, Value = 100,
+        };
+        hero.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(blade);
+        foreach (var m in GameConfig.CraftingMaterials) hero.AddMaterial(m.Id, 5);
+        return hero;
+    }
+
     private static async Task Remove(Character hero)
     {
         var s = Open(hero, "1", "Y");
@@ -110,6 +124,9 @@ public class MagicFix125Tests
     }
 
     private static string Family(string name) => GearSetFamilyResolver.FamilyOf(null, name, GearSetSlotKind.Head)!;
+
+    // 1.3.6: the family of a name in a given slot kind (a weapon for Phoenix Fire and Frostbite).
+    private static string Family(string name, GearSetSlotKind kind) => GearSetFamilyResolver.FamilyOf(null, name, kind)!;
 
     // ---------- 1. enchant removal strips every tag ----------
 
@@ -144,27 +161,33 @@ public class MagicFix125Tests
 
     private static async Task EnchantAndRemove(int tier, int stat, string tag)
     {
+        // 1.3.6: Phoenix Fire (13) and Frostbite (14) go on a weapon only, so those two take a Forged Mace in the main
+        // hand; every other tier keeps the worn Leather Cap.
+        bool onWeapon = tier is 13 or 14;
+        string itemName = onWeapon ? "Forged Mace" : "Leather Cap";
+        var slot = onWeapon ? EquipmentSlot.MainHand : EquipmentSlot.Head;
+        var kind = onWeapon ? GearSetSlotKind.Weapon : GearSetSlotKind.Head;
         foreach (var lang in new[] { "en", "hu" })
         {
-            var hero = Wearing("Leather Cap", 0);
-            string before = Form(hero.GetEquipment(EquipmentSlot.Head)!);
+            var hero = onWeapon ? WearingWeapon(itemName) : Wearing("Leather Cap", 0);
+            string before = Form(hero.GetEquipment(slot)!);
             await InLanguage(lang, async () =>
             {
                 var s = stat > 0 ? Open(hero, "1", $"{tier}", $"{stat}", "Y") : Open(hero, "1", $"{tier}", "Y");
                 await Run(s, "EnchantEquipment", hero);
                 return 0;
             });
-            string enchanted = hero.GetEquipment(EquipmentSlot.Head)!.Name;
-            enchanted.Should().Be("Leather Cap" + tag, $"tier {tier} writes its English tag in {lang}");
-            Family(enchanted).Should().Be("Leather Cap", "the resolver reads the enchanted name");
+            string enchanted = hero.GetEquipment(slot)!.Name;
+            enchanted.Should().Be(itemName + tag, $"tier {tier} writes its English tag in {lang}");
+            Family(enchanted, kind).Should().Be(itemName, "the resolver reads the enchanted name");
 
-            Form(hero.GetEquipment(EquipmentSlot.Head)!).Should().NotBe(before, $"tier {tier} changes the item");
+            Form(hero.GetEquipment(slot)!).Should().NotBe(before, $"tier {tier} changes the item");
             long gold = hero.Gold;
 
             await InLanguage(lang, async () => { await Remove(hero); return 0; });
-            var cap = hero.GetEquipment(EquipmentSlot.Head)!;
-            cap.Name.Should().Be("Leather Cap", $"removal strips{tag} in {lang}");
-            Family(cap.Name).Should().Be("Leather Cap", "the resolver reads the stripped name");
+            var cap = hero.GetEquipment(slot)!;
+            cap.Name.Should().Be(itemName, $"removal strips{tag} in {lang}");
+            Family(cap.Name, kind).Should().Be(itemName, "the resolver reads the stripped name");
             Form(cap).Should().Be(before, $"removal returns every stat, flag, the value and the name of tier {tier} to base");
             cap.HasFireEnchant.Should().BeFalse(); cap.HasFrostEnchant.Should().BeFalse();
             cap.GetEnchantmentCount().Should().Be(0); cap.GetEnchantedKinds().Should().BeEmpty();
@@ -283,7 +306,7 @@ public class MagicFix125Tests
         hero.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(sword);
         foreach (var m in GameConfig.CraftingMaterials) hero.AddMaterial(m.Id, 5);
         await Enchant(hero, 2, 3);     // +4 Dex
-        await Enchant(hero, 13);       // Phoenix Fire, +20 power and the fire flag
+        await Enchant(hero, 13);       // Phoenix Fire, +30 power (1.3.6, kind "phoenix") and the fire flag
         var weapon = hero.GetEquipment(EquipmentSlot.MainHand)!;
         weapon.Name.Should().Be("Broadsword +4 Dex (Phoenix Fire)");
 
@@ -295,7 +318,7 @@ public class MagicFix125Tests
         back.Name.Should().Be("Broadsword");
         back.HasFireEnchant.Should().BeFalse("the fire enchant goes");
         back.DexterityBonus.Should().Be(Math.Max(0, reforged.DexterityBonus - 4), "the reforged Dexterity less the enchant's 4");
-        back.WeaponPower.Should().Be(Math.Max(0, reforged.WeaponPower - 20), "the reforged power less Phoenix Fire's 20");
+        back.WeaponPower.Should().Be(Math.Max(0, reforged.WeaponPower - 30), "a new enchant adds 30: the reforged power less Phoenix Fire's 30");
         back.StrengthBonus.Should().Be(reforged.StrengthBonus, "a stat no enchant touched keeps its reforged value");
         back.Rarity.Should().Be(reforged.Rarity, "the reforge's rarity stays");
         foreach (var (got, max) in new[] { (back.DexterityBonus, reforged.DexterityBonus), (back.WeaponPower, reforged.WeaponPower),
