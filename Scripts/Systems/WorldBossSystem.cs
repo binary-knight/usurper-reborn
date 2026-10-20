@@ -1591,9 +1591,9 @@ namespace UsurperRemake.Systems
             var weapon = player.GetEquipment(EquipmentSlot.MainHand);
             if (weapon != null)
             {
-                if (weapon.HasFireEnchant && rng.NextDouble() < GameConfig.FireEnchantProcChance)
+                if (weapon.HasFireEnchant && rng.NextDouble() < global::CombatEngine.WeaponFireChance(weapon))   // 1.3.6: Phoenix Fire or loot fire
                 {
-                    long d = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+                    long d = Math.Max(1, (long)(damage * global::CombatEngine.WeaponFireShare(weapon)));
                     extra += d;
                     UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_fire", d)}", "bright_red");
                 }
