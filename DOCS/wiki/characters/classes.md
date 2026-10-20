@@ -1,8 +1,9 @@
 ---
 title: Classes
 path: /wiki/en/characters/classes/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/Character.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs, Scripts/Data/SpecializationData.cs, Scripts/Data/EquipmentData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/TeamCornerLocation.cs
+history: 1.3.5 | The Cyclebreaker's evade stops only monster attacks aimed at the Cyclebreaker, not those aimed at companions, Cycle Rewind heals exactly 30 percent of maximum HP, and the Rockbiter and Death's Embrace descriptions say what they do.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | The Warrior, Assassin, Barbarian, Paladin, Ranger and Mystic Shaman combat bonuses apply in fights, the Mystic Shaman follows its own equipment rules and regains mana each round, and prestige class spells start at Average.

@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | A living companion now takes 75 percent of the experience from a room feature you examine, as an NPC teammate does.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Floors keep their special rooms, a failed riddle charges its damage once, and the Outskirts Prison buff halves room and chest trap damage.

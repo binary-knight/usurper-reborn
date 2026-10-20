@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
+<!-- doc: checked 1.3.5; sources: docker-compose.yml, Dockerfile, docker, web/ssh-proxy.js, web/account, Scripts/BBS/DoorMode.cs, Scripts/Server/MudServer.cs, Scripts/Systems/AccountMail.cs -->
 # Usurper Reborn: Docker Deployment Guide
 
 Host your own Usurper Reborn MUD server using Docker.

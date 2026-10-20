@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | From monster level 25 monster groups grow a little with each level and monsters have more HP and hit harder, so the deep floors are built for a full team of five.
 history: 1.3.2 | Floors keep their outposts and special rooms, and dungeon entry names a saved party member who is dead.

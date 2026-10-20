@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: Scripts/BBS, Console/Bootstrap/Program.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/SysOpConsoleManager.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudServer.cs, scripts-server/updatecheck.sh, scripts-server/updatecheck.ps1 -->
+<!-- doc: checked 1.3.5; sources: Scripts/BBS, Console/Bootstrap/Program.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/SysOpConsoleManager.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudServer.cs, scripts-server/updatecheck.sh, scripts-server/updatecheck.ps1 -->
 # Usurper Reborn - BBS Door Setup Guide
 
 This guide explains how to configure Usurper Reborn to run as a door game on BBS software like Synchronet, Mystic, EleBBS, WWIV, GameSrv, ENiGMA, or other systems that support DOOR32.SYS drop files.
