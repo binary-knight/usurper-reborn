@@ -16,3 +16,7 @@ A character has two weapon slots: Main Hand and Off Hand. The off hand takes a s
 {{table:items slot=MainHand}}
 
 Open an item page for its level, strength, alignment and class restrictions. A unique or cursed flag also matters when [offering an item](/wiki/en/gods/favor/).
+
+## Poison weapons
+
+Shadowfang, Venomstrike and Serpent's Fang, and loot weapons named Venomous or of Venom, poison. Each hit with one has a 20 percent chance to poison the monster for 4 rounds, which deals its damage over those rounds rather than at once. See [statuses on monsters](/wiki/en/characters/afflictions/#statuses-on-monsters) for the damage each round.
