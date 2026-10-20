@@ -222,6 +222,12 @@ public class Monster
     public int CorruptingDotRounds { get; set; } = 0;
     public long CorruptingDotTickDamage { get; set; } = 0;
 
+    // 1.3.6: weapon poison over time, set by a poison weapon's proc: the rounds left and the damage of each tick. A
+    // state of its own, never the 3 to 5 percent max-HP Poisoned status (PoisonRounds); both can tick on one monster.
+    // Internal: the fixture tests list every public Monster property by reflection.
+    internal int EnchantPoisonRounds { get; set; } = 0;
+    internal long EnchantPoisonTick { get; set; } = 0;
+
     // Boss end-game party mechanics (v0.52.1)
     public bool IsChanneling { get; set; } = false;        // Boss is charging a devastating ability
     public int ChannelingRoundsLeft { get; set; } = 0;     // Rounds until channel completes
