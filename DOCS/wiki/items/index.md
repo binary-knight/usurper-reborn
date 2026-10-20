@@ -30,6 +30,8 @@ A monster whose name holds Boss, Chief, Lord or King has a fixed 35 percent chan
 
 A mini-boss (a champion) always drops 2 items. Each is at least Uncommon, with its rarity rolled as if the monster were 10 levels higher. A floor boss always drops 1 item of at least Epic rarity, rolled as if 25 levels higher.
 
+A [world boss](/wiki/en/online/world-boss/) armor item (not a weapon) of Epic rarity or better carries Titan's Resolve: 5 percent more maximum HP for whoever wears it, a companion or ally included, once however many worn items carry it.
+
 ## Weapon or armor, and which slot
 
 An ordinary drop is a weapon 45 percent of the time and armor 55 percent; a mini-boss item 35 and 65, a boss item 40 and 60. An armor drop's slot: body 22 percent, head 10, legs 9, feet 9, arms 8, hands 8, cloak 8, waist 7, shield 6, face 5, ring 4, necklace 4.
