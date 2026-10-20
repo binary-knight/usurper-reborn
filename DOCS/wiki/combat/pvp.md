@@ -34,6 +34,13 @@ A spell that hits for damage in a player fight, yours or your opponent's, is cut
 
 Your opponent's swing at you, when the game fights for it (an NPC, or the Arena's copy of a player), is one swing a turn with no crit, and it does half damage while you defend.
 
+Weapon enchants work in a player fight. Each of your weapon hits can set off the fire, frost, lightning, poison, holy and shadow effects of the weapon in the hand that struck, with the same chance and share of the hit as against a monster, taken from the hit after the Team HQ Armory and Barracks. Your opponent's strike sets off those of its main hand weapon and heals it by its gear's life steal, as your life steal heals you.
+
+- **Holy:** not the double damage it does to undead monsters; Aurelion's attunement still adds its bonus.
+- **Lightning:** its stun follows the hold rules of a player fight: no new hold on a fighter who already cannot act or has just shaken a hold off, and each hold soon after another is shorter.
+- **Frost:** slows for {{balance:FrostEnchantDuration}} rounds. A slowed fighter's basic attack makes half its swings, at least one; your opponent's strike is one swing a turn anyway, so frost does not change it.
+- **Poison:** one hit of 10 percent of the hit, or the weapon's poison value raised by the Armory, not 4 rounds of poison.
+
 ## PvP rewards
 
 A win pays experience: 50 x the loser's level, times 1 + 0.15 x (the loser's level - your level), kept between 0.25 and 2, at least 10. Beating a level 12 at level 10 pays 50 x 12 x 1.3 = 780. Nothing is paid for a spare, an escape or a loss.

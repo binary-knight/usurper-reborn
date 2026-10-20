@@ -34,6 +34,8 @@ One visit lasts at most {{balance:WorldBossMaxRoundsPerSession}} rounds, then yo
 
 Your damage in one round counts for at most 0.6 percent of the boss's maximum HP, 1.5 times that (0.9 percent) while it is staggered. A player below the boss's level has the damage scaled down by N(your level) / N(boss level), where N(L) = 2 x L + 1.5 x L^1.05: at level 30 against a level 40 boss that is about 0.75.
 
+Your attack, Power Attack and Precise Strike set off the fire, lightning, poison, holy and shadow effects of your main hand weapon, at the same chance and share of the hit as against a monster, and their damage is added to that round's damage before the cap. Lightning does not stun the boss, frost does nothing here, holy does not do the double damage it does to undead monsters, and weapon poison is one hit of 10 percent of the hit or the weapon's poison value, not 4 rounds of poison. Your gear's life steal heals you by its percent of the hit. Spells, class abilities and items set off none of them.
+
 ### World boss phases, focus and telegraphs
 
 - **Phases:** phase 2 starts at {{percent:WorldBossPhase2Threshold}} percent of its HP and phase 3 at {{percent:WorldBossPhase3Threshold}} percent.

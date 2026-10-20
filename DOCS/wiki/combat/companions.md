@@ -58,6 +58,10 @@ A living companion and a living NPC teammate in your dungeon party each take 75 
 
 A companion can train a skill up to Superb; an NPC ally stops at Expert. At the Level Master, H (help a team member) gives an active companion, an NPC on your team or your spouse up to half of your own experience, which leaves your total.
 
+## Companion gear in a fight
+
+A companion fights with its own gear. Thorns on it return their summed percent of the damage a monster's normal attack did to the companion, at least 1, as yours do, and a monster the thorns kill counts as killed. Its own HP and mana regeneration gear restores a share each round (see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat)), and Titan's Resolve raises its maximum HP as it does yours.
+
 ## Companion loyalty
 
 Loyalty runs from 0 to 100 and starts at 50. Each level a companion gains adds 1. At the Inn, P (manage party), the companion's number, then G gives a gift: 50 gold for 3 loyalty, 200 gold for 8, 500 gold for 15. There is no daily limit on gifts.
