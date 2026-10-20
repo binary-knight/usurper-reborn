@@ -26,7 +26,7 @@ Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapo
 
 ### Magic resistance
 
-Magic resistance on your gear (Ward gives 20, and found items can carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defence and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
+Magic resistance on your gear (Ward gives 20, and found gear may carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defence and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
 
 The magical attacks are the monster breaths and spells: Fire Breath, Frost Breath, Poison Cloud, Poison Gas, Spellcasting, Ancient Magic, Hellfire, Immolate, Fireball, Inferno, Lightning, Holy Smite, Divine Judgment, Madness, Terror, Nightmare, Reality Break, Overload, Whirlpool and Tidal Wave, and also Boulder, Earthquake and Root Entangle. A monster's normal blows and its other abilities, Crushing Blow and Life Drain among them, are not magical. Old God attacks are excluded: magic resistance does nothing against an Old God, whatever the attack. A world boss's attacks are not magical either. In a fight between players, magic resistance cuts the damage of every spell that hits you the same way, after the Team HQ Barracks.
 
