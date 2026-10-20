@@ -1,8 +1,9 @@
 ---
 title: The Music Shop
 path: /wiki/en/world/music-shop/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/MusicShopLocation.cs, Scripts/Data/EquipmentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | A bought instrument is put on at the counter only for a Bard or a prestige class, not for a Mystic Shaman.

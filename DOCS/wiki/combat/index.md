@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.5 | Gear HP and mana regeneration restores a share of the maximum each round, at most 10 percent, armor piercing also lowers monster Defence against abilities and area attacks and adds up to at most 50 percent, and gear crit damage adds on top of the 3 times Dexterity cap.
 history: 1.3.4 | A Cyclebreaker's Probability Shift makes 30 percent of a monster's hits on you miss and turns its natural 20 into an ordinary hit, and the difficulty's monster damage now applies to Manwe's named abilities.
 history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
 history: 1.3.2 | Class combat bonuses, divine damage bonuses, the Blood Price cut and the world boss Boss Slayer bonus apply on your swings, a monster's Thorns costs a melee attacker a quarter of the damage dealt, and every party member regains stamina and mana at round end.

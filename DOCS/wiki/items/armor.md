@@ -1,8 +1,9 @@
 ---
 title: Armor and accessories
 path: /wiki/en/items/armor/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Systems/GearSetSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/InventorySystem.cs
+history: 1.3.5 | A shield keeps the armor class an enchant gave it when it goes through the backpack, and the Max HP and Max Mana loot effects add to your maximum when worn.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | A Mystic Shaman follows its own armor weight limit.

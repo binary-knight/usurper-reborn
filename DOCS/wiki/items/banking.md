@@ -1,8 +1,9 @@
 ---
 title: Gold, shops and banking
 path: /wiki/en/items/banking/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/BankLocation.cs, Scripts/Systems/BankVaultSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/DailySystemManager.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | A bank robbery you lose leaves you at 1 HP and the bank takes its fine, with no death.

@@ -1,8 +1,9 @@
 ---
 title: Crime, prison and the law
 path: /wiki/en/world/law/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/PrisonLocation.cs, Scripts/Systems/PrisonActivitySystem.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Locations/QuestHallLocation.cs, Scripts/Locations/PrisonWalkLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/ChurchLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/SocialInfluenceSystem.cs, Scripts/Core/NPC.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | The Blood Price damage cut applies on your swings, Status names only that cut, and a jailbreak can be tried once a day.
