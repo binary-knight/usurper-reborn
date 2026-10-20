@@ -18,12 +18,19 @@ namespace UsurperReborn.Tests;
 [Collection("SharedGameSingletons")]
 public class GmcpSpellCost135Tests
 {
-    private static Character Hero(CharacterClass cls, int level, long wisdom) => new Character
+    private static Character Hero(CharacterClass cls, int level, long wisdom)
     {
-        Name1 = "hero", Name2 = "Hero", AI = CharacterAI.Human,
-        Class = cls, Race = CharacterRace.Human,
-        Level = level, HP = 100, MaxHP = 100, Wisdom = wisdom,
-    };
+        var hero = new Character
+        {
+            Name1 = "hero", Name2 = "Hero", AI = CharacterAI.Human,
+            Class = cls, Race = CharacterRace.Human,
+            Level = level, HP = 100, MaxHP = 100, Wisdom = wisdom,
+        };
+        // GetAvailableSpells lists only learned spells: mark every slot learned.
+        hero.Spell = new List<List<bool>>();
+        for (int i = 0; i < 30; i++) hero.Spell.Add(new List<bool> { true, false });
+        return hero;
+    }
 
     private static JsonElement Capture(Character hero)
     {
