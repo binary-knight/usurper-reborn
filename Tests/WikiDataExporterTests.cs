@@ -941,7 +941,7 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.True(manwe.GetProperty("physicalImmunityPhase").GetBoolean());
         Assert.True(manwe.GetProperty("magicalImmunityPhase").GetBoolean());
         Assert.Equal(10, manwe.GetProperty("phase3AtHpPercent").GetInt32());
-        Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), manwe.GetProperty("unenchantedDamageCutPercent").GetInt32());
+        Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), manwe.GetProperty("divineArmorCutPercent").GetInt32());
         var noctura = One(gods, "Noctura");
         Assert.True(noctura.GetProperty("physicalImmunityPhase").GetBoolean());
         Assert.Equal(35, noctura.GetProperty("corruptionPerStack").GetInt32());
