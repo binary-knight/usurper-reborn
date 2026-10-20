@@ -37,9 +37,30 @@ internal sealed class Coverage136Random : Random
 /// world boss is one hit of the 1.3.5 amount (supervisor, ledger 2026-10-20T17:50:03Z, C1 and C2).
 /// </summary>
 [Collection("SharedGameSingletons")]
-public class Coverage136Tests
+public class Coverage136Tests : IDisposable
 {
     private const BindingFlags F = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    // Every item this class registers goes through Item and is named "C136 ..."; each test removes its own items when it
+    // ends, so no test after it sees them in EquipmentDatabase.GetAll() (DashWidth124 reads the widest name there). The
+    // class runs one test at a time (the SharedGameSingletons collection), so one list serves.
+    private static readonly List<int> Registered = new();
+
+    public void Dispose() => RemoveRegistered();
+
+    private static void RemoveRegistered()
+    {
+        var db = typeof(EquipmentDatabase);
+        var all = (Dictionary<int, Equipment>)db.GetField("_allEquipment", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+        var gate = db.GetField("_lock", BindingFlags.NonPublic | BindingFlags.Static)!.GetValue(null)!;
+        lock (Registered)
+        {
+            lock (gate)
+                foreach (int id in Registered)
+                    all.Remove(id);
+            Registered.Clear();
+        }
+    }
 
     private static T InLanguage<T>(string lang, Func<T> body)
     {
@@ -62,7 +83,21 @@ public class Coverage136Tests
             WeaponPower = slot == EquipmentSlot.MainHand ? 50 : 0,
         };
         set(e);
-        return EquipmentDatabase.RegisterDynamic(e);
+        int id = EquipmentDatabase.RegisterDynamic(e);
+        lock (Registered) Registered.Add(id);
+        return id;
+    }
+
+    /// <summary>A hero with weapons of this class's own (removed when the test ends), in place of G.Hero's main and off.</summary>
+    private static Character Armed(Character hero, string tag, int main, WeaponType type, int? off = null)
+    {
+        hero.EquippedItems[EquipmentSlot.MainHand] = Item($"C136 {tag} main", EquipmentSlot.MainHand, e => { e.WeaponType = type; e.WeaponPower = main; });
+        if (off.HasValue)
+            hero.EquippedItems[EquipmentSlot.OffHand] = Item($"C136 {tag} off", EquipmentSlot.OffHand, e =>
+            { e.WeaponType = WeaponType.Sword; e.Handedness = WeaponHandedness.OneHanded; e.WeaponPower = off.Value; });
+        hero.RecalculateStats();
+        hero.HP = hero.MaxHP;
+        return hero;
     }
 
     /// <summary>The enchant kinds a weapon proc can carry; "poison37" is weapon poison with a fixed PoisonDamage of 37.</summary>
@@ -243,7 +278,7 @@ public class Coverage136Tests
     {
         // The finding behind frost in PvP: the duel's basic attack counts its swings through GetAttackCount,
         // which halves them for a slowed fighter. The NPC's own turn is one swing and does not read it.
-        var hero = G.Hero(9000, 120, 12, CharacterClass.Assassin, main: 40, off: 35);
+        var hero = Armed(G.Hero(9000, 120, 12, CharacterClass.Assassin), "slow", 40, WeaponType.Sword, off: 35);
         var engine = new CombatEngine(new TerminalEmulator(new MemoryStream(), new MemoryStream()));
         typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new Coverage136Random(0.99));
         var count = typeof(CombatEngine).GetMethod("GetAttackCount", F)!;
@@ -577,7 +612,7 @@ public class Coverage136Tests
         // Every Magic Missile cast against a boss takes exactly the damage the spell rolled (after the difficulty
         // multiplier), Boss Slayer or not; the spell's own roll comes from the shared random, so each cast is
         // checked against its own line.
-        var hero = G.Hero(cls: CharacterClass.Magician, main: 30, mainType: WeaponType.Staff);
+        var hero = Armed(G.Hero(cls: CharacterClass.Magician), "spell", 30, WeaponType.Staff);
         hero.Intelligence = hero.BaseIntelligence = 300;
         hero.Mana = hero.MaxMana = 1_000_000;
         hero.EquippedItems[EquipmentSlot.Body] = Slayer("spell");
@@ -673,6 +708,29 @@ public class Coverage136Tests
                 value.Should().NotContain("(", "{0} {1} names no weapon: {2}", lang, key, value);
                 foreach (var tag in tags) value.Should().NotContain(tag, "{0} {1} names no weapon: {2}", lang, key, value);
             }
+    }
+
+    [Fact]
+    public void Coverage136_ARunLeavesTheItemDatabaseAsItFoundIt()
+    {
+        // Runs every other test of this class, each on its own instance disposed after it, as xUnit runs them. Other test
+        // classes may run at the same time and register their own items, so the check is on this class's "C136 " names.
+        var before = EquipmentDatabase.GetAll().Select(e => e.Id).ToHashSet();
+        int registered = 0;
+        foreach (var m in typeof(Coverage136Tests).GetMethods().Where(m => m.Name.StartsWith("Coverage136_") && m.Name != nameof(Coverage136_ARunLeavesTheItemDatabaseAsItFoundIt)))
+        {
+            var cases = m.GetCustomAttributes<InlineDataAttribute>().Select(a => a.GetData(m).First()).ToList();
+            if (cases.Count == 0) cases.Add(Array.Empty<object>());
+            foreach (var args in cases)
+            {
+                var test = new Coverage136Tests();
+                try { m.Invoke(test, args); }
+                finally { lock (Registered) registered += Registered.Count; test.Dispose(); }
+            }
+        }
+        registered.Should().BeGreaterThan(50, "the run registers its gear, or this proves nothing");
+        EquipmentDatabase.GetAll().Where(e => !before.Contains(e.Id) && e.Name.StartsWith("C136 ")).Select(e => $"{e.Name} ({e.Name.Length})")
+            .Should().BeEmpty("each test removes the items it registered");
     }
 
     private static string RepoRoot()
