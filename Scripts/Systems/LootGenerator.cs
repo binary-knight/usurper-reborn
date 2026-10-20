@@ -183,16 +183,16 @@ public static class LootGenerator
         /// <summary>v1.2.5: the English line curse removal stores in Description[1].</summary>
         internal static string PurifiedLine => Loc.GetIn("en", "item.desc_purified");
 
+        /// <summary>1.3.5: a gear regeneration value (tenths of a percent of the pool) as a percent with one decimal, "1.7".</summary>
+        public static string RegenPercentText(int tenths) =>
+            (tenths / 10.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
         /// <summary>
         /// v1.2.5: a stored item description line in the reader's language. A drop stores its lines in English
         /// (the effect list "Fire Damage +5, Life Steal +3", the curse line, the purified line); they are shown
         /// through their keys. Any other line (a drop rolled before 1.2.5 in its finder's language, an item's own
         /// text) shows as stored. Nothing is written back.
         /// </summary>
-        /// <summary>1.3.5: a gear regeneration value (tenths of a percent of the pool) as a percent with one decimal, "1.7".</summary>
-        public static string RegenPercentText(int tenths) =>
-            (tenths / 10.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
-
         public static string DescriptionLine(string? stored) => DescriptionLineIn(GameConfig.Language, stored);
 
         public static string DescriptionLineIn(string lang, string? stored)
