@@ -320,7 +320,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.FireBreath:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.5f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
@@ -330,7 +330,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.FrostBreath:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.2f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.2f, rng);
                 result.InflictStatus = StatusEffect.Frozen;
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
@@ -340,7 +340,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.PoisonCloud:
-                result.DirectDamage = CalculateBreathDamage(monster, 0.8f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 0.8f, rng);
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 6;
                 result.StatusChance = 70;
@@ -661,7 +661,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Spellcasting:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.3f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.3f, rng);
                 result.InflictStatus = rng.Next(3) switch { 0 => StatusEffect.Cursed, 1 => StatusEffect.Weakened, _ => StatusEffect.Silenced };
                 result.StatusDuration = 3;
                 result.StatusChance = 40;
@@ -748,7 +748,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.AncientMagic:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.0f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 2.0f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.dragon_magic", MonsterNames.Display(monster));
                 result.MessageColor = "bright_magenta";
@@ -777,7 +777,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Hellfire:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.8f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.8f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 4;
                 result.StatusChance = 60;
@@ -806,7 +806,7 @@ public static class MonsterAbilities
 
             // Giant
             case AbilityType.Boulder:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.5f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 30;
@@ -832,7 +832,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Lightning:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.7f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.7f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
@@ -842,7 +842,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Earthquake:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.4f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.4f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 50;
@@ -905,7 +905,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Immolate:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.6f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.6f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 4;
                 result.StatusChance = 70;
@@ -915,7 +915,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Fireball:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.5f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.fireball", MonsterNames.Display(monster));
                 result.MessageColor = "bright_red";
@@ -941,7 +941,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Inferno:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.0f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 2.0f, rng);
                 result.InflictStatus = StatusEffect.Burning;
                 result.StatusDuration = 5;
                 result.StatusChance = 80;
@@ -997,7 +997,7 @@ public static class MonsterAbilities
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2;
                 result.StatusChance = 35;
-                result.DirectDamage = CalculateBreathDamage(monster, 0.8f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 0.8f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = (isPlayerTarget ? Loc.Get("mability.madness.you", MonsterNames.Display(monster)) : Loc.Get("mability.madness.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_magenta";
@@ -1101,7 +1101,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.PoisonGas:
-                result.DirectDamage = CalculateBreathDamage(monster, 0.9f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 0.9f, rng);
                 result.InflictStatus = StatusEffect.Poisoned;
                 result.StatusDuration = 5;
                 result.StatusChance = 65;
@@ -1137,7 +1137,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Overload:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.5f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 2.5f, rng);
                 monster.HP = Math.Max(1, monster.HP - monster.MaxHP / 5); // Self-damage
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.overload", MonsterNames.Display(monster));
@@ -1189,7 +1189,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.RootEntangle:
-                result.DirectDamage = CalculateBreathDamage(monster, 0.8f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 0.8f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
@@ -1240,7 +1240,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Whirlpool:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.5f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.5f, rng);
                 result.InflictStatus = StatusEffect.Stunned;
                 result.StatusDuration = 2; // +1 for ProcessStatusEffects off-by-one = 1 effective round of stun
                 result.StatusChance = 40;
@@ -1250,7 +1250,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.TidalWave:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.0f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 2.0f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.tidal_wave", MonsterNames.Display(monster));
                 result.MessageColor = "bright_blue";
@@ -1258,7 +1258,7 @@ public static class MonsterAbilities
 
             // Celestial
             case AbilityType.HolySmite:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.6f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.6f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = Loc.Get("mability.holy_smite", MonsterNames.Display(monster));
                 result.MessageColor = "bright_yellow";
@@ -1275,7 +1275,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.DivineJudgment:
-                result.DirectDamage = CalculateBreathDamage(monster, 2.2f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 2.2f, rng);
                 result.SkipNormalAttack = true;
                 result.Message = (isPlayerTarget ? Loc.Get("mability.divine_judgment.you", MonsterNames.Display(monster)) : Loc.Get("mability.divine_judgment.ally", MonsterNames.Display(monster), target.Name));
                 result.MessageColor = "bright_yellow";
@@ -1317,7 +1317,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Terror:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.0f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.0f, rng);
                 result.InflictStatus = StatusEffect.Feared;
                 result.StatusDuration = 3;
                 result.StatusChance = 45;
@@ -1337,7 +1337,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.Nightmare:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.3f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.3f, rng);
                 result.InflictStatus = StatusEffect.Feared;
                 result.StatusDuration = 2;
                 result.StatusChance = 50;
@@ -1363,7 +1363,7 @@ public static class MonsterAbilities
                 break;
 
             case AbilityType.RealityBreak:
-                result.DirectDamage = CalculateBreathDamage(monster, 1.8f, rng);
+                result.DirectDamage = MagicalBreath(result, monster, 1.8f, rng);
                 result.InflictStatus = rng.Next(4) switch
                 {
                     0 => StatusEffect.Stunned,
@@ -1379,7 +1379,20 @@ public static class MonsterAbilities
                 break;
         }
 
+        // 1.3.6: a monster spell (the event stream's spell list) is magical too; the mark draws nothing
+        if (CombatEngine.MonsterSpellAbilities.Contains(ability)) result.IsMagical = true;
+
         return result;
+    }
+
+    /// <summary>
+    /// 1.3.6: the breath and spell damage roll, which marks the result magical, so the target's magic
+    /// resistance takes its share. The roll is CalculateBreathDamage's, unchanged (no draw added).
+    /// </summary>
+    private static int MagicalBreath(AbilityResult result, Monster monster, float multiplier, Random rng)
+    {
+        result.IsMagical = true;
+        return CalculateBreathDamage(monster, multiplier, rng);
     }
 
     /// <summary>
@@ -1529,6 +1542,9 @@ public class AbilityResult
     // Damage modifiers
     public float DamageMultiplier { get; set; } = 1.0f;
     public int DirectDamage { get; set; } = 0;
+    // 1.3.6: set by every ability that rolls the breath damage and by the monster spells; the target's magic
+    // resistance takes its share of a magical hit (CombatEngine.ApplyMagicResist), except an Old God's
+    public bool IsMagical { get; set; } = false;
     // Set by seven abilities and read by no fight path: the swings are not made (1.3.5, text-only call)
     public int ExtraAttacks { get; set; } = 0;
     public bool SkipNormalAttack { get; set; } = false;
