@@ -30,6 +30,16 @@ public partial class CombatEngine
     private TerminalEmulator terminal;
     private Random random = Random.Shared;
 
+    /// <summary>1.3.6: the rounds a weapon poison proc poisons for, and the share of the hit each tick deals.</summary>
+    internal const int EnchantPoisonDotRounds = 4;
+    internal const int EnchantPoisonDotHitPercent = 5;
+
+    /// <summary>
+    /// 1.3.6: the combatant whose poison proc set the tick a monster carries, so each tick is counted to that
+    /// attacker. Held here, not on Monster; a weak table, so a fight's monsters leave with the fight.
+    /// </summary>
+    private readonly System.Runtime.CompilerServices.ConditionalWeakTable<Monster, Character> _enchantPoisonSource = new();
+
     /// <summary>
     /// v1.1.14: test-only. Gives this engine its own RNG from a seed, so a test that drives a fight gets the
     /// same rolls every run. Every roll the engine makes itself goes through this field; a game never calls
@@ -5214,6 +5224,37 @@ public partial class CombatEngine
             if (monster.PoisonRounds == 0) monster.Poisoned = false;
         }
 
+        // 1.3.6: weapon poison over time (its own state, beside the Poisoned status above; both tick). The tick set by
+        // the proc goes through phase immunity (a weapon hit is physical) and divine armour, as a swing does.
+        if (firstActionThisRound && monster.EnchantPoisonRounds > 0)
+        {
+            long poisonTick = monster.EnchantPoisonTick;
+            if (monster.IsPhysicalImmune)
+                poisonTick = ApplyPhaseImmunityDamage(monster, poisonTick, isMagicalDamage: false);
+            if (BossContext != null && BossContext.DivineArmorReduction > 0)
+                poisonTick = (long)(poisonTick * (1.0 - BossContext.DivineArmorReduction));
+            poisonTick = Math.Max(1, poisonTick);
+            monster.HP = Math.Max(0, monster.HP - poisonTick); // hq-armory: out (the tick was set from the boosted hit and the boosted fixed value)
+            Character poisoner = _enchantPoisonSource.TryGetValue(monster, out var source) ? source : player;
+            EvHit(poisoner, poisonTick, CombatEventKind.Dot);
+            poisoner.Statistics?.RecordDamageDealt(poisonTick, false);
+            result.TotalDamageDealt += poisonTick;
+            monster.EnchantPoisonRounds--;
+            if (monster.EnchantPoisonRounds == 0)
+            {
+                monster.EnchantPoisonTick = 0;
+                _enchantPoisonSource.Remove(monster);
+            }
+            UIHelper.WriteRow(terminal, Loc.Get("combat.poison_burn", MonsterNames.Display(monster), poisonTick), "dark_green");
+            if (!monster.IsAlive)
+            {
+                terminal.WriteLine(Loc.Get("combat.monster_poison_death", MonsterNames.Display(monster)), "dark_green");
+                if (!result.DefeatedMonsters.Contains(monster))
+                    result.DefeatedMonsters.Add(monster);
+                return;
+            }
+        }
+
         // v0.57.2 — Abysswarden Corrupting Touch DoT: damages target AND heals caster each round.
         // The ability's description says "Each tick heals you"; previously the implementation used
         // a generic Lifesteal status that only fired on player ATTACKS, not on DoT ticks, so the
@@ -9891,6 +9932,25 @@ public partial class CombatEngine
         return true;
     }
 
+    /// <summary>
+    /// 1.3.6: a weapon poison proc. The tick is the larger of 5 percent of the hit and a quarter of the weapon's fixed
+    /// PoisonDamage (after the Armory, which the hit already carries), at least 1, for 4 rounds. On a monster still
+    /// poisoned this way the rounds start again at 4 and the larger tick stays (no stacking); the attacker whose tick
+    /// stays is the one each tick is counted to. Returns the tick the monster now carries.
+    /// </summary>
+    private long ApplyEnchantPoison(Character attacker, Monster target, Equipment weapon, long damage)
+    {
+        long fixedPoison = weapon.PoisonDamage > 0 ? Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage)) : 0;
+        long tick = Math.Max(1, Math.Max(damage * EnchantPoisonDotHitPercent / 100, fixedPoison / 4));
+        if (target.EnchantPoisonRounds <= 0 || tick >= target.EnchantPoisonTick)
+        {
+            target.EnchantPoisonTick = tick;
+            _enchantPoisonSource.AddOrUpdate(target, attacker);
+        }
+        target.EnchantPoisonRounds = EnchantPoisonDotRounds;
+        return target.EnchantPoisonTick;
+    }
+
     private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
     {
         // v0.60.10: read elemental enchants from the source weapon (passed via
@@ -9980,19 +10040,13 @@ public partial class CombatEngine
 
         if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
         {
-            // v1.1.11: a fixed PoisonDamage does not come from the (Armory-boosted) hit, so it takes the Armory itself
-            long poisonDamage = weapon.PoisonDamage > 0
-                ? Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage))
-                : Math.Max(1, (int)(damage * 0.10));
-            target.HP = Math.Max(0, target.HP - poisonDamage); // hq-armory: out (percentage rider of the boosted hit; the fixed value applies it above)
-            EvHit(attacker, poisonDamage);   // 1.2.6
+            // 1.3.6: the proc poisons over time and deals nothing now; the monster's status step takes each tick.
+            long poisonTick = ApplyEnchantPoison(attacker, target, weapon, damage);
             terminal.SetColor("green");
             // v0.60.10 (druidah report): attribute teammate procs by name (see frost note above).
-            terminal.WriteLine(isPlayer
-                ? Loc.Get("combat.enchant_venom", poisonDamage)
-                : Loc.Get("combat.enchant_venom_tm", name, poisonDamage));
-            result.TotalDamageDealt += poisonDamage;
-            attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
+            UIHelper.WriteRow(terminal, isPlayer
+                ? Loc.Get("combat.enchant_venom", EnchantPoisonDotRounds, poisonTick)
+                : Loc.Get("combat.enchant_venom_tm", name, EnchantPoisonDotRounds, poisonTick), "green");
         }
 
         if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)

@@ -87,4 +87,8 @@ A stun, freeze, sleep or bind on a monster lasts at most {{balance:MaxStunDurati
 
 A boss or champion resists a stun, freeze, sleep or bind {{percent:BossStunResistChance}} percent of the time and is held {{balance:MaxStunDurationBoss}} round at most. It resists a Sage's control spells {{balance:BossSoftControlResistPercent}} percent of the time, and soft control that lands lasts half as long.
 
+### Weapon poison
+
+A hit with a poison weapon has a 20 percent chance to poison its target for 4 rounds. Each round, at the target's first action, it loses the larger of 5 percent of that hit and a quarter of the weapon's poison value (raised by your team's Armory, as your hits are), at least 1. A new poisoning before the 4 rounds end starts them again and keeps the larger of the two amounts; it never stacks. Physical immunity and divine armor cut each tick as they cut a hit. Weapon poison is separate from Poisoned: a target can have both, and both tick.
+
 Before another expedition, treat the condition itself and restock supplies. See [Mental](/wiki/en/characters/mental/) and [combat](/wiki/en/combat/).

@@ -89,7 +89,7 @@ Each basic attack a Jester makes has a {{balance:JesterTrickstersLuckChance}} pe
 
 ### Lethal Precision (Assassin)
 
-Lethal Precision works on an Assassin's basic attacks. A critical hit with a dagger in the main hand adds {{percent:AssassinLethalPrecisionCritBonus}} percent of the swing's attack power, and a swing at a poisoned monster adds {{percent:AssassinLethalPrecisionPoisonBonus}} percent.
+Lethal Precision works on an Assassin's basic attacks. A critical hit with a dagger in the main hand adds {{percent:AssassinLethalPrecisionCritBonus}} percent of the swing's attack power, and a swing at a monster with the Poisoned status adds {{percent:AssassinLethalPrecisionPoisonBonus}} percent (weapon poison alone does not count).
 
 ### Elemental Mastery (Mystic Shaman)
 
