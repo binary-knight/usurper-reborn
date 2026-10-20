@@ -1104,258 +1104,6 @@ public partial class MagicShopLocation : BaseLocation
     }
 
     /// <summary>
-    /// Enchant or bless items - add magical properties
-    /// </summary>
-    private async Task EnchantItem(Character player)
-    {
-        DisplayMessage("");
-        WriteSectionHeader(Loc.Get("magic_shop.enchant_bless"), "magenta");
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_waves", _ownerName), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_intro"), "cyan");
-        DisplayMessage("");
-
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_1"), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_2"), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_3"), "gray");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_4"), "blue");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_5"), "cyan");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_6"), "yellow");
-        DisplayMessage("");
-
-        var input = await terminal.GetInput(Loc.Get("magic_shop.old_enchant_prompt"));
-        if (!int.TryParse(input, out int enchantChoice) || enchantChoice <= 0 || enchantChoice > 6)
-            return;
-
-        long[] costs = { 0, 2000, 5000, 12000, 25000, 15000, 8000 };
-        long cost = costs[enchantChoice];
-        var (enchKingTax, enchCityTax, enchTotalWithTax) = CityControlSystem.CalculateTaxedPrice(cost);
-
-        if (player.Gold < enchTotalWithTax)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_enchant_no_gold"), "cyan");
-            DisplayMessage(Loc.Get("shop.insufficient_gold_enchant", $"{enchTotalWithTax:N0}"), "red");
-            await terminal.WaitForKey();
-            return;
-        }
-
-        // Show items that can be enchanted
-        var enchantableItems = player.Inventory.Where(i =>
-            i.Type == ObjType.Magic || i.MagicType != MagicItemType.None).ToList();
-
-        if (enchantableItems.Count == 0)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_no_enchantable"), "gray");
-            DisplayMessage(Loc.Get("magic_shop.old_bring_items"), "cyan");
-            await terminal.WaitForKey();
-            return;
-        }
-
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchantable_items"), "cyan");
-        for (int i = 0; i < enchantableItems.Count; i++)
-        {
-            var item = enchantableItems[i];
-            string status = item.IsCursed ? Loc.Get("shop.cursed_no_enchant") : "";
-            DisplayMessage($"{i + 1}. {ItemNames.Display(item)}{status}", item.IsCursed ? "red" : "white");
-        }
-
-        DisplayMessage("");
-        input = await terminal.GetInput(Loc.Get("magic_shop.old_choose_item"));
-
-        if (!int.TryParse(input, out int itemIndex) || itemIndex <= 0 || itemIndex > enchantableItems.Count)
-            return;
-
-        var targetItem = enchantableItems[itemIndex - 1];
-
-        if (targetItem.IsCursed)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_cursed_enchant"), "red");
-            DisplayMessage(Loc.Get("magic_shop.old_remove_first"), "cyan");
-            await terminal.WaitForKey();
-            return;
-        }
-
-        // For stat-boosting enchants, let player choose the stat.
-        // v0.57.9 (Lumina report: "there are only these stats available: WP, STR, DEX,
-        // DEF, WIS, AP. What about the rest?"): expanded from 5 options to 13 so casters
-        // can actually enhance INT/Mana, tanks can buff HP/CON, dex builds get Agility,
-        // etc. The first 5 cases are identical to the legacy behavior; cases 6-13 cover
-        // every remaining Item stat field (Armor, HP, Mana, Agility, Charisma, Stamina)
-        // plus the two fields that live in the LootEffects list (Constitution, Intelligence).
-        int statChoice = 0;
-        if (enchantChoice >= 1 && enchantChoice <= 3)
-        {
-            DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.old_choose_stat"), "cyan");
-            DisplayMessage(Loc.Get("magic_shop.old_stat_options"), "gray");
-            DisplayMessage(Loc.Get("magic_shop.old_stat_options_2"), "gray");
-            DisplayMessage(Loc.Get("magic_shop.old_stat_options_3"), "gray");
-            input = await terminal.GetInput(Loc.Get("ui.choice"));
-            if (!int.TryParse(input, out statChoice) || statChoice <= 0 || statChoice > 13)
-                return;
-        }
-
-        DisplayMessage("");
-        CityControlSystem.Instance.DisplayTaxBreakdown(terminal, "Enchantment", cost);
-        // v1.1.15: yesno-convert-a, strict (Y/N)
-        if (!await terminal.AskYesNoAsync(UIHelper.PromptRows(terminal, Loc.Get("magic_shop.old_enchant_confirm", ItemNames.Display(targetItem), $"{enchTotalWithTax:N0}"))))
-            return;
-
-        player.Gold -= enchTotalWithTax;
-        CityControlSystem.Instance.ProcessSaleTax(cost);
-
-        // Apply the enchantment
-        int bonus = enchantChoice switch
-        {
-            1 => 2,
-            2 => 4,
-            3 => 6,
-            _ => 0
-        };
-
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_ritual", _ownerName), "gray");
-        await Pacing.Wait(500);
-
-        switch (enchantChoice)
-        {
-            case 1:
-            case 2:
-            case 3:
-                ApplyStatEnchant(targetItem, statChoice, bonus);
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_flows", ItemNames.Display(targetItem)), "magenta");
-                break;
-
-            case 4: // Divine Blessing
-                targetItem.Strength += 3;
-                targetItem.Defence += 3;
-                targetItem.Dexterity += 3;
-                targetItem.Wisdom += 3;
-                targetItem.Attack += 3;
-                targetItem.MagicProperties.Wisdom += 3;
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_divine"), "bright_yellow");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_blessed", ItemNames.Display(targetItem)), "blue");
-                break;
-
-            case 5: // Ocean's Touch
-                targetItem.MagicProperties.Mana += 30;
-                targetItem.Wisdom += 2;
-                targetItem.MagicProperties.Wisdom += 2;
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_salt"), "cyan");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_ocean", ItemNames.Display(targetItem)), "blue");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_waves_remember"), "gray");
-                break;
-
-            case 6: // Ward Against Evil
-                targetItem.MagicProperties.MagicResistance += 20;
-                targetItem.Defence += 2;
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_runes"), "yellow");
-                DisplayMessage(Loc.Get("magic_shop.old_enchant_protect", ItemNames.Display(targetItem)), "green");
-                break;
-        }
-
-        // Update item name to show it's been enchanted (if not already)
-        if (!targetItem.Name.Contains("+") && !targetItem.Name.Contains("Blessed") &&
-            !targetItem.Name.Contains("Enchanted"))
-        {
-            string suffix = enchantChoice switch
-            {
-                4 or 5 or 6 => NamedEnchantTag(enchantChoice + 1),   // Blessed, Ocean-Touched, Warded
-                _ => $" +{bonus}"
-            };
-
-            // Only add suffix if name isn't too long
-            if (targetItem.Name.Length + suffix.Length < 35)
-                targetItem.Name += suffix;
-        }
-
-        // v1.1.7: an enchant adds what it cost, never a multiple of what the item was worth. The old
-        // x1.5 compounded without limit for a flat fee. (This legacy flow has no caller; kept honest.)
-        targetItem.Value = Math.Min(GameConfig.MaxItemValue, Math.Clamp(targetItem.Value, 0, GameConfig.MaxItemValue) + Math.Clamp(cost, 0, GameConfig.MaxItemValue));
-        targetItem.ClampStats();
-
-        DisplayMessage("");
-        DisplayMessage(Loc.Get("magic_shop.old_enchant_complete"), "bright_green");
-
-        player.Statistics?.RecordGoldSpent(enchTotalWithTax);
-        player.Statistics?.RecordMagicShopPurchase(enchTotalWithTax);
-    }
-
-    private void ApplyStatEnchant(Item item, int statChoice, int bonus)
-    {
-        switch (statChoice)
-        {
-            case 1:
-                item.Strength += bonus;
-                break;
-            case 2:
-                item.Defence += bonus;
-                break;
-            case 3:
-                item.Dexterity += bonus;
-                item.MagicProperties.Dexterity += bonus;
-                break;
-            case 4:
-                item.Wisdom += bonus;
-                item.MagicProperties.Wisdom += bonus;
-                break;
-            case 5:
-                item.Attack += bonus;
-                break;
-            case 6:
-                item.Armor += bonus;
-                break;
-            case 7:
-                item.HP += bonus;
-                break;
-            case 8:
-                item.Mana += bonus;
-                break;
-            case 9:
-                item.Agility += bonus;
-                break;
-            case 10:
-                item.Charisma += bonus;
-                break;
-            case 11:
-                item.Stamina += bonus;
-                break;
-            case 12:
-                IncrementLootEffect(item, (int)LootGenerator.SpecialEffect.Constitution, bonus);
-                break;
-            case 13:
-                IncrementLootEffect(item, (int)LootGenerator.SpecialEffect.Intelligence, bonus);
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Increment (or add) a value on an Item.LootEffects entry. Used for Constitution /
-    /// Intelligence enchants, which live in the LootEffects list rather than as direct
-    /// Item fields. Tuple elements aren't mutable in place, so an existing entry is
-    /// replaced with a new tuple carrying the summed value.
-    /// </summary>
-    private static void IncrementLootEffect(Item item, int effectType, int bonus)
-    {
-        if (item.LootEffects == null) return;
-        int existing = item.LootEffects.FindIndex(e => e.EffectType == effectType);
-        if (existing >= 0)
-        {
-            var (type, value) = item.LootEffects[existing];
-            item.LootEffects[existing] = (type, value + bonus);
-        }
-        else
-        {
-            item.LootEffects.Add((effectType, bonus));
-        }
-    }
-
-
-    /// <summary>
     /// Buy a Dungeon Reset Scroll to reset a dungeon floor's monsters.
     /// Permanently cleared floors (seal / secret boss) and Old God boss floors
     /// are excluded — those cannot be rolled back by a scroll.
@@ -1648,14 +1396,34 @@ public partial class MagicShopLocation : BaseLocation
         ("magic_shop.tier_oceans_touch",    0,  20000L, 300, 20, "magic_shop.tier_desc_ocean"),
         ("magic_shop.tier_ward",            0,  12000L, 200, 15, "magic_shop.tier_desc_ward"),
         ("magic_shop.tier_predator",        0,  25000L, 500, 30, "magic_shop.tier_desc_predator"),
-        ("magic_shop.tier_lifedrinker",     0,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),
+        ("magic_shop.tier_lifedrinker",     6,  30000L, 500, 35, "magic_shop.tier_desc_lifedrinker"),   // 1.3.5: the life steal percent
         // New tiers (v0.30.9)
         ("magic_shop.tier_mythic",          24, 180000L, 2000, 55, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_legendary",       30, 300000L, 3000, 65, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_godforged",       38, 500000L, 5000, 75, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_phoenix_fire",    20, 400000L, 4000, 60, "magic_shop.tier_desc_phoenix"),
         ("magic_shop.tier_frostbite",       20, 400000L, 4000, 60, "magic_shop.tier_desc_frostbite"),
+        // 1.3.5: the god counters (CounterKindCodes), weapon only and one per weapon; they change no stat.
+        ("magic_shop.tier_sunbane",         0,  300000L, 3000, 80, "magic_shop.tier_desc_sunbane"),     // Aurelion
+        ("magic_shop.tier_stonebane",       0,  400000L, 4000, 88, "magic_shop.tier_desc_stonebane"),   // Terravok
+        ("magic_shop.tier_godbane",         0,  500000L, 5000, 95, "magic_shop.tier_desc_godbane"),     // Manwe
     };
+
+    /// <summary>1.3.5: the god counter tiers (1 based, Sunbane, Stonebane, Godbane) and the kind code each writes,
+    /// in the same order. A counter goes on a main or off hand item only, and a weapon carries one at most.</summary>
+    internal static readonly int[] CounterTiers = { 15, 16, 17 };
+    internal static readonly string[] CounterKindCodes = { "sunbane", "stonebane", "godbane" };
+
+    internal static bool IsCounterTier(int tierChoice) => Array.IndexOf(CounterTiers, tierChoice) >= 0;
+
+    /// <summary>1.3.5: a shield, which a god counter never goes on: a shield weapon type, or a block value (a shield
+    /// from the backpack arrives with no weapon type but keeps its ShieldBonus).</summary>
+    internal static bool IsShieldForCounter(Equipment item) =>
+        item.WeaponType is WeaponType.Shield or WeaponType.Buckler or WeaponType.TowerShield || item.ShieldBonus > 0;
+
+    /// <summary>1.3.5: the counter kind code this item carries, or "" when it carries none.</summary>
+    internal static string CarriedCounter(Equipment item) =>
+        item.GetEnchantedKinds().FirstOrDefault(k => Array.IndexOf(CounterKindCodes, k) >= 0) ?? "";
 
     /// <summary>v1.2.5: a tier's name and description in the player's language.</summary>
     internal static string TierName(int index) => Loc.Get(EnchantTiers[index].name);
@@ -1669,6 +1437,9 @@ public partial class MagicShopLocation : BaseLocation
         [11] = new[] { ("eye_of_manwe", 1), ("terravoks_heartstone", 1) },                     // Godforged
         [12] = new[] { ("crimson_war_shard", 1), ("fading_starlight_dust", 1) },               // Phoenix Fire
         [13] = new[] { ("shadow_silk_thread", 1), ("fading_starlight_dust", 1) },              // Frostbite
+        [14] = new[] { ("fading_starlight_dust", 2), ("withered_heart_petal", 2) },             // Sunbane
+        [15] = new[] { ("terravoks_heartstone", 2), ("iron_judgment_link", 2) },               // Stonebane
+        [16] = new[] { ("eye_of_manwe", 2), ("heart_of_the_ocean", 1), ("withered_heart_petal", 1), ("iron_judgment_link", 1) },   // Godbane
     };
 
     // v1.2.5: the stat an enchant raises, in menu order (ApplyEquipmentStatBonus, GetEnchantKindCode). StatNames
@@ -1686,12 +1457,12 @@ public partial class MagicShopLocation : BaseLocation
     internal static string StatSuffix(int bonus, int statChoice) => $" +{bonus} {StatNames[statChoice - 1]}";
 
     /// <summary>v1.2.5: the English tag a named enchant appends to the item's stored name, by enchant tier
-    /// (both enchant flows write it from here, the legacy one by its own choice + 1), "" for a stat tier.
+    /// (the enchant flow writes it from here), "" for a stat tier.
     /// RemoveEnchantment strips every tag this returns, so a new tag is stripped as soon as it is written.</summary>
     internal static string NamedEnchantTag(int tierChoice) =>
         NamedEnchantTags.FirstOrDefault(t => t.Tier == tierChoice).Tag ?? "";
 
-    // v1.2.5: the named enchant tags by tier, the one list both enchant flows write from and removal strips.
+    // v1.2.5: the named enchant tags by tier, the one list the enchant flow writes from and removal strips.
     private static readonly (int Tier, string Tag)[] NamedEnchantTags =
     {
         (5, " (Blessed)"),
@@ -1708,7 +1479,7 @@ public partial class MagicShopLocation : BaseLocation
         Enumerable.Range(1, EnchantTiers.Length).Select(NamedEnchantTag).Where(t => t.Length > 0);
 
     /// <summary>v1.2.5: the stored name with every enchant tag taken out: each named tag, each stat suffix
-    /// (" +6 Dex", StatSuffix) and the legacy flow's bare " +N". Used by RemoveEnchantment.</summary>
+    /// (" +6 Dex", StatSuffix) and the bare " +N" the old enchant menu (removed in 1.3.5) wrote. Used by RemoveEnchantment.</summary>
     internal static string StripEnchantTags(string name)
     {
         foreach (var tag in AllNamedEnchantTags())
@@ -1828,17 +1599,35 @@ public partial class MagicShopLocation : BaseLocation
             if (tail.Count > 0)
             {
                 int tailLen = tail.Sum(t => t.text.Length);
+                int col;
                 if (baseWidth + 2 + tailLen > UIHelper.WrapWidth)
                 {
                     terminal.WriteLine("");
                     terminal.Write(new string(' ', prefix));
+                    col = prefix;
                 }
                 else
-                    terminal.Write("  ");
-                foreach (var (text, color) in tail)
                 {
+                    terminal.Write("  ");
+                    col = baseWidth + 2;
+                }
+                // 1.3.5: a material list longer than a row goes on after a " +" on the next row, under the name. A
+                // material stays on its row only with room after it for the " +" a later material would need.
+                for (int k = 0; k < tail.Count; k++)
+                {
+                    var (text, color) = tail[k];
+                    int after = k + 2 < tail.Count ? 2 : 0;
+                    if (text == " + " && k + 1 < tail.Count && col + text.Length + tail[k + 1].text.Length + after > UIHelper.WrapWidth)
+                    {
+                        terminal.SetColor(color);
+                        terminal.WriteLine(" +");
+                        terminal.Write(new string(' ', prefix));
+                        col = prefix;
+                        continue;
+                    }
                     terminal.SetColor(color);
                     terminal.Write(text);
+                    col += text.Length;
                 }
             }
             terminal.WriteLine("");
@@ -2078,7 +1867,9 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        if (selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
+        // 1.3.5: a full item goes on to the tier list only when it carries a stat enchant a higher tier can replace
+        // (an upgrade does not add to the count); every other enchant on it is refused below with this same message.
+        if (selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments && !HasUpgradableStatEnchant(selectedEquip))
         {
             DisplayMessage("");
             DisplayMessage(Loc.Get("shop.max_enchantments", GameConfig.MaxEnchantments), "red");
@@ -2108,14 +1899,14 @@ public partial class MagicShopLocation : BaseLocation
         WriteSectionHeader(Loc.Get("magic_shop.special_enchant"), "white");
         WriteTierSection(player, 4, 9, false);
 
-        // Section: High-tier and Elemental enchants (tiers 10-14)
+        // Section: High-tier and Elemental enchants, then the god counters (tiers 10-17)
         terminal.WriteLine("");
         WriteSectionHeader(Loc.Get("magic_shop.mythic_enchant"), "white");
         WriteTierSection(player, 9, EnchantTiers.Length, true);
 
         // Show warning about 4th/5th enchant failure risk
         int currentEnchants = selectedEquip.GetEnchantmentCount();
-        if (currentEnchants >= 3)
+        if (currentEnchants >= 3 && currentEnchants < GameConfig.MaxEnchantments)
         {
             terminal.WriteLine("");
             float failChance = currentEnchants == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
@@ -2139,6 +1930,33 @@ public partial class MagicShopLocation : BaseLocation
             DisplayMessage(Loc.Get("shop.enchant_level_req", selectedTier.minLevel), "red");
             await terminal.WaitForKey();
             return;
+        }
+
+        // 1.3.5: a god counter goes on a main or off hand weapon only (never a shield), and one weapon carries one
+        // counter at most (the same one or another). Refused before any gold or material is taken.
+        if (IsCounterTier(tierChoice))
+        {
+            if (!selectedEquip.Slot.IsWeaponSlot())
+            {
+                DisplayMessage("");
+                WrappedLine(Loc.Get("magic_shop.counter_weapon_only"), "red");
+                await terminal.WaitForKey();
+                return;
+            }
+            if (IsShieldForCounter(selectedEquip))
+            {
+                DisplayMessage("");
+                WrappedLine(Loc.Get("magic_shop.counter_weapon_only"), "red");
+                await terminal.WaitForKey();
+                return;
+            }
+            if (CarriedCounter(selectedEquip).Length > 0)
+            {
+                DisplayMessage("");
+                WrappedLine(Loc.Get("magic_shop.counter_one_per_weapon"), "red");
+                await terminal.WaitForKey();
+                return;
+            }
         }
 
         if (tierChoice == 6 && (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) < 2)
@@ -2202,13 +2020,30 @@ public partial class MagicShopLocation : BaseLocation
         // enchants -- 5x Divine Blessing was permitted). Each item can carry up
         // to MaxEnchantments different enchants, but the same kind can never be
         // applied twice. Refuse BEFORE gold deduction so it's a clean cancel.
+        // 1.3.5: a stat tier whose bonus is higher than the one the item carries for that stat (CarriedStatBonus,
+        // from the item's EnchantBase record) is an upgrade: it replaces the lower one, the count stays and no
+        // failure roll is made. Equal or lower, or a bonus the item does not record, is refused as before.
         string enchantKindCode = GetEnchantKindCode(tierChoice, statChoice);
+        int? upgradeFrom = null;
         if (!string.IsNullOrEmpty(enchantKindCode) &&
             selectedEquip.GetEnchantedKinds().Contains(enchantKindCode))
         {
+            int? carried = statChoice > 0 ? CarriedStatBonus(selectedEquip, statChoice) : null;
+            if (carried == null || selectedTier.bonus <= carried.Value)
+            {
+                DisplayMessage("");
+                DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_kind", _ownerName), "red");
+                DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_hint"), "cyan");
+                await terminal.WaitForKey();
+                return;
+            }
+            upgradeFrom = carried.Value;
+        }
+        if (upgradeFrom == null && selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
+        {
             DisplayMessage("");
-            DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_kind", _ownerName), "red");
-            DisplayMessage(Loc.Get("magic_shop.enchant_duplicate_hint"), "cyan");
+            DisplayMessage(Loc.Get("shop.max_enchantments", GameConfig.MaxEnchantments), "red");
+            DisplayMessage(Loc.Get("magic_shop.beyond_limits"), "cyan");
             await terminal.WaitForKey();
             return;
         }
@@ -2218,6 +2053,8 @@ public partial class MagicShopLocation : BaseLocation
         terminal.WriteLine("");
         WriteTemplate("  ", Loc.Get("magic_shop.enchant_confirm_line", "{0}", "{1}", "{2}"), "yellow",
             (ItemNames.Display(selectedEquip), selectedEquip.GetRarityColor()), (TierName(tierChoice - 1), "bright_magenta"), (enchantDesc, "yellow"));
+        if (upgradeFrom != null)
+            WrappedLine($"  {Loc.Get("magic_shop.enchant_upgrade_replaces", upgradeFrom.Value, StatLabel(statChoice))}", "cyan");
         terminal.SetColor("yellow");
         terminal.WriteLine($"  {Loc.Get("magic_shop.enchant_cost", $"{enchantCost:N0}")}");
         // Show material cost in confirmation
@@ -2238,7 +2075,7 @@ public partial class MagicShopLocation : BaseLocation
         // was only narrated AFTER the gold was spent. This block warns BEFORE
         // commit and forces an extra typed-Y confirmation when the risk is real.
         int existingEnchants = selectedEquip.GetEnchantmentCount();
-        if (existingEnchants >= 3)
+        if (existingEnchants >= 3 && upgradeFrom == null)
         {
             float failPct = existingEnchants == 3
                 ? GameConfig.FourthEnchantFailChance * 100f
@@ -2276,10 +2113,10 @@ public partial class MagicShopLocation : BaseLocation
 
         // Check for failure on 4th/5th enchantment
         int currentEnchantCount = selectedEquip.GetEnchantmentCount();
-        if (currentEnchantCount >= 3)
+        if (currentEnchantCount >= 3 && upgradeFrom == null)
         {
             float failChance = currentEnchantCount == 3 ? GameConfig.FourthEnchantFailChance : GameConfig.FifthEnchantFailChance;
-            var rng = Random.Shared;
+            var rng = EnchantRandom;
             if (rng.NextDouble() < failChance)
             {
                 // FAILURE — gold consumed, random existing enchant destroyed
@@ -2291,33 +2128,8 @@ public partial class MagicShopLocation : BaseLocation
                 DisplayMessage(Loc.Get("magic_shop.fail_crack"), "bright_red");
                 await Pacing.Wait(500);
 
-                // Destroy one random existing enchant by decrementing count
-                var damaged = selectedEquip.Clone();
-                int oldCount = damaged.GetEnchantmentCount();
-                if (oldCount > 0)
-                {
-                    // Replace the enchant marker with decremented count
-                    string newMarker = oldCount > 1 ? $"[E:{oldCount - 1}]" : "";
-                    damaged.Description = System.Text.RegularExpressions.Regex.Replace(
-                        damaged.Description ?? "", @"\[E:\d+\]", newMarker).Trim();
-                    // v1.1.7: the lost enchant frees its kind too. The markers persist now, so a kind
-                    // list left behind would bar the player from ever replacing what the failure took.
-                    damaged.TrimEnchantedKindsTo(oldCount - 1);
-
-                    // Reduce a random stat bonus as if one enchant was lost
-                    var rngStat = rng.Next(6);
-                    switch (rngStat)
-                    {
-                        case 0: damaged.WeaponPower = Math.Max(0, damaged.WeaponPower - 5); break;
-                        case 1: damaged.StrengthBonus = Math.Max(0, damaged.StrengthBonus - 5); break;
-                        case 2: damaged.DexterityBonus = Math.Max(0, damaged.DexterityBonus - 5); break;
-                        case 3: damaged.DefenceBonus = Math.Max(0, damaged.DefenceBonus - 5); break;
-                        case 4: damaged.WisdomBonus = Math.Max(0, damaged.WisdomBonus - 5); break;
-                        case 5: damaged.ArmorClass = Math.Max(0, damaged.ArmorClass - 5); break;
-                    }
-
-                    writeBack(damaged);
-                }
+                // 1.3.5: one existing enchant, picked at random, is destroyed whole (DestroyOneEnchant).
+                writeBack(DestroyOneEnchant(selectedEquip, rng).Item);
 
                 DisplayMessage("");
                 DisplayMessage(Loc.Get("magic_shop.fail_destroyed"), "bright_red");
@@ -2330,7 +2142,8 @@ public partial class MagicShopLocation : BaseLocation
         }
 
         // Clone the equipment
-        var enchanted = selectedEquip.Clone();
+        // 1.3.5: an upgrade starts from the item with the lower stat enchant taken off whole (WithoutStatEnchant).
+        var enchanted = upgradeFrom != null ? WithoutStatEnchant(selectedEquip, statChoice, upgradeFrom.Value) : selectedEquip.Clone();
         enchanted.RecordEnchantBase();   // v1.2.5: before the first enchant, keep the item as it is, for full removal
         enchanted.IncrementEnchantmentCount();
         // Record which kind was applied so future enchant attempts can refuse a
@@ -2357,6 +2170,9 @@ public partial class MagicShopLocation : BaseLocation
             case 13: case 14: // Phoenix Fire, Frostbite
                 ApplyNamedEnchant(enchanted, tierChoice);
                 suffix = NamedEnchantTag(tierChoice);
+                break;
+            case 15: case 16: case 17: // 1.3.5: Sunbane, Stonebane, Godbane: no stat and no name tag, the kind code is the whole effect
+                suffix = "";
                 break;
             default:
                 suffix = "";
@@ -2436,6 +2252,9 @@ public partial class MagicShopLocation : BaseLocation
             9  => "life",   // Lifedrinker
             13 => "fire",   // Phoenix Fire
             14 => "frost",  // Frostbite
+            15 => "sunbane",    // 1.3.5: the god counters (CounterKindCodes)
+            16 => "stonebane",
+            17 => "godbane",
             _  => ""
         };
     }
@@ -2453,7 +2272,7 @@ public partial class MagicShopLocation : BaseLocation
             case 6: e.IntelligenceBonus += 6; e.WisdomBonus += 4; break;      // Ocean's Touch
             case 7: e.MagicResistance += 20; e.DefenceBonus += 2; break;      // Ward
             case 8: e.CriticalChanceBonus += 5; e.CriticalDamageBonus += 10; break;   // Predator
-            case 9: e.LifeSteal += 3; break;                                  // Lifedrinker
+            case 9: e.LifeSteal += EnchantTiers[8].bonus; break;              // Lifedrinker (1.3.5: the table's bonus, as its description shows)
             case 13: e.WeaponPower += 20; e.HasFireEnchant = true; break;     // Phoenix Fire
             case 14: e.WeaponPower += 20; e.HasFrostEnchant = true; break;    // Frostbite
         }
@@ -2514,6 +2333,7 @@ public partial class MagicShopLocation : BaseLocation
         {
             int named = NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
             if (named > 0) { ApplyNamedEnchant(expected, named); continue; }
+            if (Array.IndexOf(CounterKindCodes, kind) >= 0) continue;   // 1.3.5: a god counter adds no stat and no tag
             int stat = Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
             if (stat == 0) return false;
             var unit = new Equipment();
@@ -2529,6 +2349,155 @@ public partial class MagicShopLocation : BaseLocation
             if (statFields.Contains(i) ? !statBonuses.Contains(extra) : extra != 0) return false;
         }
         return true;
+    }
+
+    /// <summary>1.3.5: the random source of the 4th and 5th enchant failure roll and of the enchant a failure
+    /// destroys. A test sets its own and puts this back.</summary>
+    internal static Random EnchantRandom = Random.Shared;
+
+    private static int NamedTierOf(string kind) =>
+        NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
+
+    private static int StatOf(string kind) =>
+        Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
+
+    private static int GetEquipmentStat(Equipment e, int statChoice) => statChoice switch
+    {
+        1 => e.WeaponPower, 2 => e.StrengthBonus, 3 => e.DexterityBonus, 4 => e.DefenceBonus, 5 => e.WisdomBonus,
+        6 => e.ArmorClass, 7 => e.ConstitutionBonus, 8 => e.IntelligenceBonus, 9 => e.CharismaBonus,
+        10 => e.AgilityBonus, 11 => e.StaminaBonus, _ => 0,
+    };
+
+    // 1.3.5: the [E:N] count one lower (the marker goes at zero), and one code off the [ES:...] kind list.
+    private static void DropOneFromCount(Equipment e)
+    {
+        int current = e.GetEnchantmentCount();
+        if (current <= 0) return;
+        string marker = current > 1 ? $" [E:{current - 1}]" : "";
+        e.Description = System.Text.RegularExpressions.Regex.Replace(e.Description ?? "", @"\s*\[E:\d+\]", marker).Trim();
+    }
+
+    private static void RemoveKind(Equipment e, string code)
+    {
+        var kinds = e.GetEnchantedKinds();
+        if (!kinds.Remove(code)) return;
+        string marker = kinds.Count > 0 ? $" [ES:{string.Join(",", kinds)}]" : "";
+        e.Description = System.Text.RegularExpressions.Regex.Replace(e.Description ?? "", @"\s*\[ES:[a-z,]+\]", marker).Trim();
+    }
+
+    /// <summary>1.3.5: a failed 4th or 5th enchant destroys one existing enchant picked at random, as
+    /// enchant_failure_warning and enchant_risk_4 say. When the item's base form is known (EnchantBaseOf) and every
+    /// counted enchant is on its kind list, the item keeps its base form plus every other enchant: the destroyed
+    /// one's stats, fire or frost flag, name tag and kind go, and nothing else moves (the value keeps what was paid).
+    /// A stat enchant's amount is its stat above the base form less what the named enchants on the list add to it.
+    /// Otherwise (an item enchanted before 1.2.5 that matches no template, or a kind list shorter than the count) one
+    /// of the counted enchants is picked: a named kind loses its own fixed amounts and its flag, a stat kind the amount
+    /// in its name tag, or with no tag the largest stat tier bonus its stat still holds (all of it when
+    /// that is less than the smallest), never below zero; an enchant
+    /// the kind list never recorded lowers the count only. In every path the count drops by one.
+    /// Returns the changed copy and the destroyed kind ("" for one the list never recorded).</summary>
+    internal static (Equipment Item, string Kind) DestroyOneEnchant(Equipment item, Random rng)
+    {
+        var damaged = item.Clone();
+        var kinds = item.GetEnchantedKinds();
+        int count = item.GetEnchantmentCount();
+        if (count <= 0) return (damaged, "");
+        var baseForm = kinds.Count == count ? EnchantBaseOf(item) : null;
+        string kind;
+        if (baseForm != null)
+            kind = kinds[rng.Next(kinds.Count)];
+        else
+        {
+            int pick = rng.Next(count);
+            kind = pick < kinds.Count ? kinds[pick] : "";
+        }
+        DropOneFromCount(damaged);
+        if (kind.Length == 0) return (damaged, "");
+        RemoveKind(damaged, kind);
+
+        int named = NamedTierOf(kind);
+        if (named > 0)
+        {
+            var delta = new Equipment();
+            ApplyNamedEnchant(delta, named);
+            var now = damaged.ToEnchantBaseRecord();
+            var off = delta.ToEnchantBaseRecord();
+            foreach (var prop in typeof(Equipment.EnchantBaseRecord).GetProperties().Where(p => p.PropertyType == typeof(int)))
+            {
+                int v = (int)prop.GetValue(now)!, d = (int)prop.GetValue(off)!;
+                prop.SetValue(now, baseForm != null ? v - d : Math.Max(Math.Min(v, 0), v - d));
+            }
+            damaged.ApplyEnchantBaseRecord(now);
+            if (delta.HasFireEnchant) damaged.HasFireEnchant = baseForm?.HasFireEnchant ?? false;
+            if (delta.HasFrostEnchant) damaged.HasFrostEnchant = baseForm?.HasFrostEnchant ?? false;
+            string namedTag = NamedEnchantTag(named);
+            int at = damaged.Name.IndexOf(namedTag, StringComparison.Ordinal);
+            if (at >= 0) damaged.Name = damaged.Name.Remove(at, namedTag.Length);
+            return (damaged, kind);
+        }
+
+        int stat = StatOf(kind);
+        if (stat == 0) return (damaged, kind);
+        var tag = System.Text.RegularExpressions.Regex.Match(damaged.Name, $@"\s\+(\d+) {StatNames[stat - 1]}(?!\w)");
+        int have = GetEquipmentStat(item, stat);
+        int amount;
+        if (baseForm != null)
+            amount = StatBonusOverBase(item, baseForm, stat);
+        else
+        {
+            var statBonuses = Enumerable.Range(1, EnchantTiers.Length).Where(t => t <= 4 || (t >= 10 && t <= 12))
+                .Select(t => EnchantTiers[t - 1].bonus);
+            amount = tag.Success ? int.Parse(tag.Groups[1].Value)
+                : statBonuses.Where(b => b <= have).DefaultIfEmpty(Math.Max(0, have)).Max();
+            amount = Math.Min(amount, Math.Max(0, have));
+        }
+        ApplyEquipmentStatBonus(damaged, stat, -amount);
+        if (tag.Success) damaged.Name = damaged.Name.Remove(tag.Index, tag.Length);
+        return (damaged, kind);
+    }
+
+    /// <summary>1.3.5: what the stat enchant on this stat adds, from the item's base form: the stat less the base
+    /// form's stat less what the named enchants on its kind list add to it, never below zero.</summary>
+    private static int StatBonusOverBase(Equipment item, Equipment.EnchantBaseRecord baseForm, int stat)
+    {
+        var baseItem = new Equipment();
+        baseItem.ApplyEnchantBaseRecord(baseForm);
+        int namedOnStat = item.GetEnchantedKinds().Select(NamedTierOf).Where(t => t > 0)
+            .Sum(t => { var d = new Equipment(); ApplyNamedEnchant(d, t); return GetEquipmentStat(d, stat); });
+        return Math.Max(0, GetEquipmentStat(item, stat) - GetEquipmentStat(baseItem, stat) - namedOnStat);
+    }
+
+    /// <summary>1.3.5: the bonus the item's stat enchant on this stat carries, read from its own record: the
+    /// EnchantBase form (EnchantBaseOf) by DestroyOneEnchant's arithmetic, when every counted enchant is on the kind
+    /// list and that stat's kind is on it; otherwise null (the item does not record it).</summary>
+    internal static int? CarriedStatBonus(Equipment item, int stat)
+    {
+        var kinds = item.GetEnchantedKinds();
+        if (stat < 1 || stat > StatNames.Length || !kinds.Contains(GetEnchantKindCode(1, stat))) return null;
+        if (kinds.Count != item.GetEnchantmentCount()) return null;
+        var baseForm = EnchantBaseOf(item);
+        return baseForm == null ? null : StatBonusOverBase(item, baseForm, stat);
+    }
+
+    /// <summary>1.3.5: whether a full item still has a stat enchant a higher stat tier could replace.</summary>
+    private static bool HasUpgradableStatEnchant(Equipment item)
+    {
+        int top = Enumerable.Range(1, EnchantTiers.Length).Where(t => t <= 4 || (t >= 10 && t <= 12)).Max(t => EnchantTiers[t - 1].bonus);
+        return Enumerable.Range(1, StatNames.Length).Any(st => CarriedStatBonus(item, st) is int b && b < top);
+    }
+
+    /// <summary>1.3.5: a copy of the item with its stat enchant on this stat taken off whole, the way a failure
+    /// destroys one: the bonus, the " +N Xxx" name tag, the kind code and one from the count; every other enchant
+    /// and stat stays and the value keeps what was paid.</summary>
+    internal static Equipment WithoutStatEnchant(Equipment item, int stat, int bonus)
+    {
+        var e = item.Clone();
+        DropOneFromCount(e);
+        RemoveKind(e, GetEnchantKindCode(1, stat));
+        ApplyEquipmentStatBonus(e, stat, -bonus);
+        var tag = System.Text.RegularExpressions.Regex.Match(e.Name, $@"\s\+\d+ {StatNames[stat - 1]}(?!\w)");
+        if (tag.Success) e.Name = e.Name.Remove(tag.Index, tag.Length);
+        return e;
     }
 
     private static void ApplyEquipmentStatBonus(Equipment equip, int statChoice, int bonus)
@@ -2553,6 +2522,11 @@ public partial class MagicShopLocation : BaseLocation
     // ENCHANTMENT REMOVAL - Remove enchantments from dynamic equipment
     // ═══════════════════════════════════════════════════════════════════════════
 
+    /// <summary>1.3.5: one row of the enchant removal list: number, slot label (EnchantSlotLabel, or the bag label),
+    /// the shown name with its enchant count, and the cursed tag.</summary>
+    internal static string RemovalRow(int number, string label, Equipment equip) =>
+        $"  ({number}) {label}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]{(equip.IsCursed ? Loc.Get("shop.cursed_tag") : "")}";
+
     private async Task RemoveEnchantment(Character player)
     {
         terminal.ClearScreen();
@@ -2569,19 +2543,42 @@ public partial class MagicShopLocation : BaseLocation
             EquipmentSlot.Neck, EquipmentSlot.LFinger, EquipmentSlot.RFinger
         };
 
-        var enchantedItems = new List<(EquipmentSlot slot, Equipment equip)>();
-        int idx = 1;
+        // 1.3.5: worn items first, then enchanted items in the backpack, each with a writeBack to where it came from
+        // (the enchant list's pattern), labelled as the enchant list labels them.
+        var enchantedItems = new List<(string label, Equipment equip, System.Action<Equipment> writeBack)>();
         foreach (var slot in enchantableSlots)
         {
             var equip = player.GetEquipment(slot);
-            if (equip != null && equip.GetEnchantmentCount() > 0)
+            if (equip == null || equip.GetEnchantmentCount() <= 0) continue;
+            var capturedSlot = slot;
+            enchantedItems.Add((EnchantSlotLabel(slot), equip, (newEq) =>
             {
-                enchantedItems.Add((slot, equip));
-                string cursedTag = equip.IsCursed ? Loc.Get("shop.cursed_tag") : "";
-                DisplayMessage($"  ({idx}) {slot}: {ItemNames.Display(equip)} [E:{equip.GetEnchantmentCount()}]{cursedTag}", equip.IsCursed ? "red" : equip.GetRarityColor());
-                idx++;
+                // 1.3.1: straight back into the slot it came from, as the enchant write does.
+                EquipmentDatabase.RegisterDynamic(newEq);
+                player.EquippedItems[capturedSlot] = newEq.Id;
+                player.RecalculateStats();
+            }));
+        }
+        if (player.Inventory != null)
+        {
+            for (int i = 0; i < player.Inventory.Count; i++)
+            {
+                var item = player.Inventory[i];
+                if (!IsEnchantableInventoryItem(item)) continue;
+                var equipFromBag = ConvertInventoryItemToEquipmentForEnchant(item);
+                if (equipFromBag.GetEnchantmentCount() <= 0) continue;
+                var capturedIdx = i;
+                enchantedItems.Add((Loc.Get("magic_shop.slot_bag"), equipFromBag, (newEq) =>
+                {
+                    EquipmentDatabase.RegisterDynamic(newEq);
+                    if (capturedIdx >= 0 && capturedIdx < player.Inventory.Count)
+                        player.Inventory[capturedIdx] = player.ConvertEquipmentToLegacyItem(newEq);
+                }));
             }
         }
+        for (int i = 0; i < enchantedItems.Count; i++)
+            DisplayMessage(RemovalRow(i + 1, enchantedItems[i].label, enchantedItems[i].equip),
+                enchantedItems[i].equip.IsCursed ? "red" : enchantedItems[i].equip.GetRarityColor());
 
         if (enchantedItems.Count == 0)
         {
@@ -2602,7 +2599,7 @@ public partial class MagicShopLocation : BaseLocation
             return;
         }
 
-        var (rmSlot, rmEquip) = enchantedItems[choice - 1];
+        var (_, rmEquip, rmWriteBack) = enchantedItems[choice - 1];
         // 1.3.2: a cursed item is refused here as it is for enchanting: nothing is charged or changed.
         if (rmEquip.IsCursed)
         {
@@ -2650,14 +2647,12 @@ public partial class MagicShopLocation : BaseLocation
         // Frostbite are stripped too, and so is a stale tag on the base name)
         stripped.Name = StripEnchantTags(stripped.Name);
 
-        // 1.3.1: straight back into the slot it came from, as the enchant write does.
-        EquipmentDatabase.RegisterDynamic(stripped);
-        player.EquippedItems[rmSlot] = stripped.Id;
-        player.RecalculateStats();
+        // 1.3.1: straight back to where it came from (1.3.5: a worn slot or its backpack place).
+        rmWriteBack(stripped);
 
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.remove_dissolve"), "magenta");
-        DisplayMessage(Loc.Get("magic_shop.remove_restored", stripped.Name), "yellow");
+        DisplayMessage(Loc.Get("magic_shop.remove_restored", ItemNames.Display(stripped)), "yellow");
         player.Statistics?.RecordGoldSpent(removalCost);
 
         await terminal.WaitForKey();

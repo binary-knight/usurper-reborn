@@ -1,8 +1,9 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.5 | Each party member's own HP and mana regeneration gear restores a share of its maximum HP and mana each round, at most 10 percent.
 history: 1.3.4 | A monster under a Cyclebreaker's Probability Shift misses a teammate or companion with 30 percent of its normal attacks.
 history: 1.3.3 | An NPC of your team at 0 HP in your fight is Downed, and the oath-mark speaks only when a monster finishes it.
 history: 1.3.2 | Every party member regains stamina and mana at round end, a Cleric teammate cures poison and disease with Purify, and a living Paladin on your side makes monsters roll against 2 more armor class.
@@ -48,9 +49,9 @@ A monster's normal attack on a teammate or companion makes no hit roll and canno
 - **Minimum and caps:** a hit does at least the larger of 1, 5 percent of the attack and 0.25 percent of the ally's maximum HP, and at most 75 percent of its maximum HP (85 percent from a boss, {{percent:BossFirstRoundsDamageCapPercent}} percent in a boss fight's first {{balance:BossFirstRoundsDamageCapRounds}} rounds). An ally that defends takes half.
 - **Bosses:** a boss's hit on an ally does at least 1.5 x the boss's level before the cut for several hits in a round. In an Old God fight no single hit on an ally takes more than {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP.
 
-## Teammates regenerate stamina and mana
+## Teammates regenerate stamina, mana and gear regeneration
 
-At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. HP regeneration from gear, race and alignment is yours alone.
+At the end of every round each living party member regains combat stamina and, for a class with mana, mana, by the same rule as you on its own stats: see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat). It happens also after you have fallen. Each also regains HP and mana from its own regeneration gear, as a share of its maximum. HP regeneration from race and alignment is yours alone.
 
 ## Curing poison and disease
 

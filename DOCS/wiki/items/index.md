@@ -1,8 +1,9 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | Shadowfang, Venomstrike and Serpent's Fang can now deal their poison damage on a hit, the Max HP, Max Mana and all stats loot effects count as shown, and gear regeneration is shown as a percent of the pool.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Loot for a Mystic Shaman follows its own class rules, and the Steel Faceplate no longer lists the Mystic Shaman.

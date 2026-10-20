@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.5 | Critical damage from gear adds on top of the 3 times cap, which now holds only for the Dexterity part.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Status shows the buff block for a Bard, an Assassin and a Mystic Shaman, its Blood Price lines name only the damage cut, and each finished story companion grief adds 5 Wisdom, at most 25.
@@ -26,7 +27,7 @@ Strength:
 Dexterity:
 
 - Critical hit chance: 5 percent plus one percent per 10 Dexterity, plus equipment. The ceiling is 50 percent, raised by one percent per 30 Dexterity up to 75 percent.
-- Critical damage: 1.5 times, plus 0.02 per point above 10, plus equipment, at most 3 times.
+- Critical damage: 1.5 times, plus 0.02 per point above 10, at most 3 times from Dexterity; the crit damage on your gear adds on top of that.
 - Your armor class against monster attacks, which makes their swings miss more often.
 - Fleeing a monster fight: 40 percent plus half your Dexterity plus a third of your level. A Ranger or an Assassin adds 15 and a Jester or a Bard adds 10. The chance is never more than 75 percent. Floor bosses use the same chance; an Old God fight has its own (see [fleeing an Old God](/wiki/en/combat/fleeing/#fleeing-an-old-god)).
 - Backstab, Hide and Disarm success, many dungeon traps and several street and Dark Alley checks.

@@ -119,7 +119,10 @@ public class ChallengeSystem
             {
                 // Execute the pending challenge
                 var pendingChallenger = NPCSpawnSystem.Instance?.GetNPCByName(_pendingChallenge.ChallengerName);
-                if (pendingChallenger != null && pendingChallenger.IsAlive && king.IsActive)
+                // 1.3.5 (F12 rest): a challenger that a player hired inside the warning ticks stays on that
+                // team; the challenge is dropped silently, as for a dead or missing challenger.
+                bool hired = pendingChallenger != null && WorldSimulator.IsPlayerTeam(pendingChallenger.Team);
+                if (pendingChallenger != null && pendingChallenger.IsAlive && king.IsActive && !hired)
                 {
                     NewsSystem.Instance?.Newsy(true, Loc.Get("challenge.news_storms_castle", pendingChallenger.Name, king.TitleLabel(), king.Name));
                     ExecuteNPCThroneChallenge(pendingChallenger, king);

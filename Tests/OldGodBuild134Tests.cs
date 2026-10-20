@@ -190,7 +190,7 @@ public class OldGodBuild134Tests
             finally { OldGodBuild134Support.RestoreArtifacts(before); }
         }
         var body = RunBossCombatSource();
-        body.Should().Contain("BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player)");
+        body.Should().Contain("BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player, CountLivingFighters(player, dungeonTeammates))");
         body.Should().NotContain("new BossCombatContext", "the context is built in one place");
         body.Should().NotContain("CreateBossMonster(", "the god is built in one place");
     }

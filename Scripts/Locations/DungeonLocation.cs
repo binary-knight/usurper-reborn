@@ -6494,6 +6494,16 @@ public class DungeonLocation : BaseLocation
             );
         }
 
+        SplitFeatureOutcome(player!, feature, outcome);
+    }
+
+    /// <summary>
+    /// The feature outcome's split over the party, after the leader took all of it: gold to grouped
+    /// players, experience to grouped players by the group rules and 0.75 of it to each living NPC
+    /// teammate and companion, then the broadcast. 1.3.5: split out of InteractWithFeature.
+    /// </summary>
+    private void SplitFeatureOutcome(Character player, RoomFeature feature, FeatureOutcome outcome)
+    {
         // Post-hoc reward split: FeatureInteractionSystem already awarded full amount to leader.
         // Reduce leader to their share and distribute to grouped players.
         //
@@ -6507,7 +6517,8 @@ public class DungeonLocation : BaseLocation
         // NPCs are extensions of the player's party, not independent recipients.
         // Fix: filter the gold-split list to grouped players only, mirroring
         // ShareEventRewardsWithGroup's pattern. XP still splits to NPC mates
-        // at 0.75x (gives them progression) but companions are excluded as before.
+        // at 0.75x (gives them progression). 1.3.5: a living companion takes the
+        // same 0.75x, paid to its own Companion record with its level up check.
         if (teammates.Count > 0 && (outcome.GoldGained > 0 || outcome.ExperienceGained > 0))
         {
             var groupedPlayers = teammates.Where(t => t != null && t.IsAlive && t.IsGroupedPlayer).ToList();
@@ -6536,7 +6547,7 @@ public class DungeonLocation : BaseLocation
                     {
                         float mult = GroupSystem.GetGroupXPMultiplier(t.Level, highestLevel);
                         xpShare = (long)(outcome.ExperienceGained * mult);
-                        t.Experience += xpShare;
+                        t.Experience += xpShare; // hq-training: out (room feature, not combat)
                     }
 
                     // Notify grouped player of their share (gold, XP, or both)
@@ -6552,10 +6563,16 @@ public class DungeonLocation : BaseLocation
                             $"\u001b[33m  {string.Join("  ", parts)}\u001b[0m");
                     }
                 }
+                else if (t.IsCompanion && !t.IsEcho)
+                {
+                    // 1.3.5: the NPC teammate's share, on the Companion's own record (the wrapper's Experience is not it).
+                    if (outcome.ExperienceGained > 0)
+                        CompanionSystem.Instance?.AwardSpecificCompanionXP(t.DisplayName, (long)(outcome.ExperienceGained * 0.75), terminal);
+                }
                 else if (!t.IsCompanion && !t.IsEcho)
                 {
                     if (outcome.ExperienceGained > 0)
-                        t.Experience += (long)(outcome.ExperienceGained * 0.75);
+                        t.Experience += (long)(outcome.ExperienceGained * 0.75); // hq-training: out (room feature, NPC teammate share)
                 }
             }
 
@@ -16603,10 +16620,15 @@ public class DungeonLocation : BaseLocation
         var names = new[] { "Undead", "Zombie", "Skeleton Warrior" };
         var name = names[dungeonRandom.Next(names.Length)];
 
-        return Monster.CreateMonster(currentDungeonLevel, name,
+        var undead = Monster.CreateMonster(currentDungeonLevel, name,
             currentDungeonLevel * 5, currentDungeonLevel * 2, 0,
             "...", false, false, Loc.Get("dungeon.gear.rusty_sword"), Loc.Get("dungeon.gear.tattered_armor"),
             false, false, currentDungeonLevel * 70, 0, currentDungeonLevel * 2);
+        // 1.3.5: CreateMonster leaves the class Normal, so every undead check in combat (holy enchant,
+        // Turn Undead, Sunforged, Divine Resolve) missed the summoned dead. Mark them undead.
+        undead.MonsterClass = MonsterClass.Undead;
+        undead.Undead = 1;
+        return undead;
     }
 
     /// <summary>
@@ -18603,7 +18625,7 @@ public class DungeonLocation : BaseLocation
     /// Gold: divided evenly by party size.
     /// XP for grouped players: full XP with level gap penalty.
     /// XP for NPC teammates: 75% of total XP (matches AwardTeammateExperience rate).
-    /// Companions are skipped (handled by CompanionSystem).
+    /// 1.3.5: a living companion takes the same 0.75, paid to its Companion record by CompanionSystem.
     /// Returns (leaderXP, leaderGold).
     /// </summary>
     private (long leaderXP, long leaderGold) SplitPartyRewards(long totalXP, long totalGold, string sourceKey, bool fromCombat = false)
@@ -18652,6 +18674,11 @@ public class DungeonLocation : BaseLocation
                         $"\u001b[1;32m  ═══ {Loc.GetIn(shareLang, "dungeon.feature_your_share", Loc.GetIn(shareLang, sourceKey))} ═══\u001b[0m\n" +
                         $"\u001b[33m  {Loc.GetIn(shareLang, "dungeon.share_gold_xp", $"{goldPerMember:N0}", $"{memberXP:N0}", penalty)}\u001b[0m");
                 }
+            }
+            else if (teammate.IsCompanion && !teammate.IsEcho)
+            {
+                // 1.3.5: a companion takes the NPC teammate's 0.75, on its own Companion record.
+                CompanionSystem.Instance?.AwardSpecificCompanionXP(teammate.DisplayName, (long)(totalXP * 0.75), terminal);
             }
             else if (!teammate.IsCompanion && !teammate.IsEcho)
             {
@@ -19199,6 +19226,15 @@ public class DungeonLocation : BaseLocation
     /// </summary>
     private static async Task ShowFollowerInventory(Character player, TerminalEmulator term)
     {
+        // v1.3.5: an item name ends each list row; a name longer than the rest of the row in this language
+        // (a world boss drop in Spanish) is cut with a closing period, so the row fits 79 columns. No English
+        // name is that long.
+        static string FitRow(string shown, int used)
+        {
+            int room = UsurperRemake.UI.UIHelper.WrapWidth - used;
+            return shown.Length <= room ? shown : shown.Substring(0, room - 1).TrimEnd() + ".";
+        }
+
         while (true)
         {
             term.ClearScreen();
@@ -19253,7 +19289,7 @@ public class DungeonLocation : BaseLocation
                     term.SetColor("gray");
                     term.Write($"    {name.PadRight(slotWidth)}");
                     term.SetColor("yellow");
-                    term.WriteLine($"{ItemNames.Display(equip)}");
+                    term.WriteLine(FitRow(ItemNames.Display(equip), 4 + slotWidth));
                 }
             }
 
@@ -19271,9 +19307,10 @@ public class DungeonLocation : BaseLocation
                 for (int i = 0; i < player.Inventory.Count; i++)
                 {
                     term.SetColor("gray");
-                    term.Write($"    {i + 1}. ");
+                    string number = $"    {i + 1}. ";
+                    term.Write(number);
                     term.SetColor("cyan");
-                    term.WriteLine(ItemNames.Display(player.Inventory[i]));
+                    term.WriteLine(FitRow(ItemNames.Display(player.Inventory[i]), number.Length));
                 }
             }
 
@@ -19315,7 +19352,7 @@ public class DungeonLocation : BaseLocation
                 if (!item.CanUse(player))
                 {
                     term.SetColor("red");
-                    term.WriteLine(Loc.Get("dungeon.cannot_equip_item", ItemNames.Display(item)));
+                    UsurperRemake.UI.UIHelper.WriteRow(term, Loc.Get("dungeon.cannot_equip_item", ItemNames.Display(item)));
                     await Pacing.Wait(1500);
                     continue;
                 }
@@ -19329,7 +19366,7 @@ public class DungeonLocation : BaseLocation
                     {
                         player.Inventory.RemoveAt(itemNum - 1);
                         term.SetColor("bright_green");
-                        term.WriteLine(Loc.Get("dungeon.equipped_item_self", ItemNames.Display(knownEquip)));
+                        UsurperRemake.UI.UIHelper.WriteRow(term, Loc.Get("dungeon.equipped_item_self", ItemNames.Display(knownEquip)));
                         if (!string.IsNullOrEmpty(equipMsg))
                         {
                             term.SetColor("gray");
@@ -19345,7 +19382,7 @@ public class DungeonLocation : BaseLocation
                 else
                 {
                     term.SetColor("red");
-                    term.WriteLine($"  {Loc.Get("dungeon.follower_cannot_be_equipped", ItemNames.Display(item))}");
+                    UsurperRemake.UI.UIHelper.WriteRow(term, $"  {Loc.Get("dungeon.follower_cannot_be_equipped", ItemNames.Display(item))}");
                 }
                 await Pacing.Wait(1500);
                 continue;
@@ -19359,11 +19396,12 @@ public class DungeonLocation : BaseLocation
                 for (int i = 0; i < equippedList.Count; i++)
                 {
                     term.SetColor("gray");
-                    term.Write($"    {i + 1}. ");
+                    string number = $"    {i + 1}. ", slotLabel = $"{equippedList[i].name}: ";
+                    term.Write(number);
                     term.SetColor("yellow");
-                    term.Write($"{equippedList[i].name}: ");
+                    term.Write(slotLabel);
                     term.SetColor("cyan");
-                    term.WriteLine(ItemNames.Display(equippedList[i].equip));
+                    term.WriteLine(FitRow(ItemNames.Display(equippedList[i].equip), number.Length + slotLabel.Length));
                 }
                 term.SetColor("gray");
                 term.Write($"  {Loc.Get("dungeon.follower_unequip_prompt")}");
@@ -19380,7 +19418,7 @@ public class DungeonLocation : BaseLocation
                         player.RecalculateStats();
 
                         term.SetColor("bright_yellow");
-                        term.WriteLine($"  {Loc.Get("dungeon.follower_unequipped", ItemNames.Display(unequipped))}");
+                        UsurperRemake.UI.UIHelper.WriteRow(term, $"  {Loc.Get("dungeon.follower_unequipped", ItemNames.Display(unequipped))}");
                     }
                     else
                     {

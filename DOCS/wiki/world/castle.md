@@ -1,8 +1,9 @@
 ---
 title: Castle, king and throne
 path: /wiki/en/world/castle/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/CastleLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/King.cs, Scripts/Systems/ChallengeSystem.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/StreetEncounterSystem.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | An NPC that a player hires before its throne challenge comes due stays on that team and does not carry out the challenge.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Crown monster bounties pay twice their tier's gold and experience, the royal quest offer shows its advance and pay, and the monster market shows the costs and stats the King charges and gives.
@@ -59,7 +60,7 @@ You must leave your team before you take the throne, and the game asks first. If
 
 ### Can NPCs take my throne
 
-Yes. An NPC challenges a player ruler only if it is level {{balance:NPCMinLevelToChallenge}} or more, within {{balance:NPCChallengeLevelRange}} levels of the ruler, has an ambition above {{balance:NPCMinAmbitionToChallenge}}, is not in prison and is not a story character; at most {{balance:MaxNPCChallengesPerDay}} NPC challenge comes a day. A failed challenger goes to prison. An NPC on a player's team is not picked to challenge an NPC ruler, and is not crowned on an empty throne as the named heir or as a claimant.
+Yes. An NPC challenges a player ruler only if it is level {{balance:NPCMinLevelToChallenge}} or more, within {{balance:NPCChallengeLevelRange}} levels of the ruler, has an ambition above {{balance:NPCMinAmbitionToChallenge}}, is not in prison and is not a story character; at most {{balance:MaxNPCChallengesPerDay}} NPC challenge comes a day. A failed challenger goes to prison. An NPC on a player's team is not picked to challenge an NPC ruler, does not carry out a challenge against a player ruler once a player hires it, and is not crowned on an empty throne as the named heir or as a claimant.
 
 ## What do I get for being king
 

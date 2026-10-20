@@ -1636,7 +1636,7 @@ public static class ClassAbilitySystem
         {
             Id = "rockbiter",
             Name = "Rockbiter",
-            Description = "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage and grant +15% armor.",
+            Description = "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage, and you gain flat Defense that grows with your level.",
             LevelRequired = 10,
             ManaCost = 20,
             Cooldown = 0,
@@ -2428,7 +2428,7 @@ public static class ClassAbilitySystem
         {
             Id = "deaths_embrace",
             Name = "Death's Embrace",
-            Description = "Cheat death. If HP reaches 0, revive with 1 HP and become invulnerable for 1 round. Lasts 3 rounds.",
+            Description = "Cheat death. Regenerate for 3 rounds and dodge the next attack. The next time your HP reaches 0 in this fight, revive with 15% of max HP and dodge the next attack.",
             LevelRequired = 90, StaminaCost = 100, Cooldown = 9,
             Type = AbilityType.Buff, Duration = 3,
             SpecialEffect = "deaths_embrace",

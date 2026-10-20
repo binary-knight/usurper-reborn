@@ -1,8 +1,9 @@
 ---
 title: Death and resurrection
 path: /wiki/en/combat/death/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/TempleLocation.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | A Downed companion cannot take a killing blow in your place, and allies still Downed when you die stand up with half their maximum HP.
 history: 1.3.2 | none

@@ -57,12 +57,24 @@ public class HuntRoundOneTests
     }
 
     [Fact]
-    public void EveryLiveRiderCaller_PassesTheArmoryBoostedHit()
+    public void EveryLiveRiderCaller_PassesTheHpRemoved_ArmoryInside()
     {
+        // 1.3.5: the riders scale from the HP the hit removed, which ApplySingleMonsterDamage takes after the Armory
         string src = Source("Scripts/Systems/CombatEngine.cs");
-        Regex.Matches(src, @"ApplyPlayerSwingOnHitEffects\(player, \w+, TeamHQBonus\.ApplyAttack\(player, ").Count.Should().Be(3);
-        src.Should().Contain("ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage)");
-        src.Should().Contain("ApplyPostHitEnchantments(teammate, target, TeamHQBonus.ApplyAttack(teammate, damage)");
+        src.Should().Contain("long swingDealt = await ApplySingleMonsterDamageDealt(target, damage, result, ");
+        src.Should().Contain("ApplyPlayerSwingOnHitEffects(player, target, swingDealt, isOffHandAttack, result);");
+        src.Should().Contain("long powerDealt = await ApplySingleMonsterDamageDealt(target, powerDamage, result, ");
+        src.Should().Contain("ApplyPlayerSwingOnHitEffects(player, target, powerDealt, isOffHandAttack: false, result);");
+        Regex.Matches(src, @"long ohDealt = (ohLands \? )?await ApplySingleMonsterDamageDealt\(offHandTarget, ohDamage, result, ").Count.Should().Be(2);
+        src.Should().Contain("ApplyPlayerSwingOnHitEffects(player, offHandTarget, ohDealt, isOffHandAttack: true, result);");
+        src.Should().Contain("ApplyPostHitEnchantments(player, offHandTarget, ohDealt, result, ");
+        Regex.IsMatch(src, @"long tmDealt = await ApplySingleMonsterDamageDealt\(target, damage, result, [^\n]*, teammate, isSpellDamage: false").Should().BeTrue();
+        src.Should().Contain("ApplyPostHitEnchantments(teammate, target, tmDealt, result, ");
+        string body = MethodBody(src, "private async Task<bool> ApplySingleMonsterDamage(");
+        int armory = body.IndexOf("actualDamage = TeamHQBonus.ApplyAttack(attacker, actualDamage);", StringComparison.Ordinal);
+        int removed = body.IndexOf("long hpRemoved = ", StringComparison.Ordinal);
+        armory.Should().BeGreaterThan(0, "the Armory is applied to the hit");
+        removed.Should().BeGreaterThan(armory, "the HP removed is taken after the Armory");
         // riders that do not come from the hit take the Armory themselves
         src.Should().Contain("enchantDamage = TeamHQBonus.ApplyAttack(player, enchantDamage);");
         src.Should().Contain("Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage))");

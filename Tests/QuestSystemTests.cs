@@ -6,6 +6,7 @@ namespace UsurperReborn.Tests;
 /// <summary>
 /// Tests for QuestSystem, focusing on expedition quest floor targeting (v0.52.5)
 /// </summary>
+[Collection("SharedGameSingletons")]
 public class QuestSystemTests
 {
     [Fact]

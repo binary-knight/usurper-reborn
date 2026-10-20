@@ -33,11 +33,11 @@ test("materials table: each band and what spends the material", () => {
   ]);
   assert.deepEqual(row(html, "Heart of the Ocean"), [
     "50 to 100",
-    "Legendary enchant, 4th Inn stat training, 5th Inn stat training",
+    "Legendary enchant, Godbane enchant, 4th Inn stat training, 5th Inn stat training",
   ]);
   assert.deepEqual(row(html, "Withered Heart Petal"), [
     "35 to 50",
-    "Nothing spends it",
+    "Sunbane enchant, Godbane enchant",
   ]);
   // the god column is not in the open table
   assert.ok(!/Maelketh/.test(html));
@@ -86,6 +86,26 @@ test("enchants table: costs, levels, effects and materials", () => {
   assert.equal(
     row(html, "8")[1],
     "+5 percent critical hit chance, +10 percent critical damage",
+  );
+  assert.equal(
+    row(html, "13")[1],
+    "a chance of extra fire damage on a hit, +20 weapon power",
+  );
+});
+
+test("enchants table: a counter row names the god and the two abilities", () => {
+  const html = render("table:enchants");
+  assert.equal(
+    row(html, "15")[1],
+    "In Aurelion's fight it holds back Light's Embrace and Sacrifice and removes its divine armor",
+  );
+  assert.equal(
+    row(html, "16")[1],
+    "In Terravok's fight it holds back Stone Skin and Entomb and removes its divine armor",
+  );
+  assert.equal(
+    row(html, "17")[1],
+    "In Manwe's fight it holds back Word of Creation and Time Stop and removes its divine armor",
   );
   assert.equal(
     row(html, "13")[1],

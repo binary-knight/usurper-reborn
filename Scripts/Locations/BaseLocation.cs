@@ -8366,23 +8366,24 @@ public abstract class BaseLocation
 
             // Line 2: Special properties (enchantments, procs, etc.)
             var specials = new List<string>();
-            if (item.CriticalChanceBonus > 0) specials.Add($"Crit +{item.CriticalChanceBonus}%");
-            if (item.CriticalDamageBonus > 0) specials.Add($"CritDmg +{item.CriticalDamageBonus}%");
-            if (item.LifeSteal > 0) specials.Add($"Lifesteal {item.LifeSteal}%");
-            if (item.ManaSteal > 0) specials.Add($"Manasteal {item.ManaSteal}%");
-            if (item.ArmorPiercing > 0) specials.Add($"ArmorPen {item.ArmorPiercing}%");
-            if (item.Thorns > 0) specials.Add($"Thorns {item.Thorns}%");
-            if (item.HPRegen > 0) specials.Add($"HPRegen {item.HPRegen}/rd");
-            if (item.ManaRegen > 0) specials.Add($"MPRegen {item.ManaRegen}/rd");
-            if (item.PoisonDamage > 0) specials.Add($"Poison {item.PoisonDamage}");
-            if (item.MagicResistance > 0) specials.Add($"MagRes {item.MagicResistance}%");
-            if (item.HasFireEnchant) specials.Add("Fire");
-            if (item.HasFrostEnchant) specials.Add("Frost");
-            if (item.HasLightningEnchant) specials.Add("Lightning");
-            if (item.HasPoisonEnchant) specials.Add("Poison");
-            if (item.HasHolyEnchant) specials.Add("Holy");
-            if (item.HasShadowEnchant) specials.Add("Shadow");
-            if (item.IsCursed) specials.Add("CURSED");
+            // 1.3.5: the labels through base.gear_sp_* keys (Crit through ui.stat_crit); the English is as before
+            if (item.CriticalChanceBonus > 0) specials.Add($"{Loc.Get("ui.stat_crit")} +{item.CriticalChanceBonus}%");
+            if (item.CriticalDamageBonus > 0) specials.Add(Loc.Get("base.gear_sp_critdmg", item.CriticalDamageBonus));
+            if (item.LifeSteal > 0) specials.Add(Loc.Get("base.gear_sp_lifesteal", item.LifeSteal));
+            if (item.ManaSteal > 0) specials.Add(Loc.Get("base.gear_sp_manasteal", item.ManaSteal));
+            if (item.ArmorPiercing > 0) specials.Add(Loc.Get("base.gear_sp_armorpen", item.ArmorPiercing));
+            if (item.Thorns > 0) specials.Add(Loc.Get("base.gear_sp_thorns", item.Thorns));
+            if (item.HPRegen > 0) specials.Add(Loc.Get("base.gear_sp_hpregen", LootGenerator.RegenPercentText(item.HPRegen)));
+            if (item.ManaRegen > 0) specials.Add(Loc.Get("base.gear_sp_mpregen", LootGenerator.RegenPercentText(item.ManaRegen)));
+            if (item.PoisonDamage > 0) specials.Add(Loc.Get("base.gear_sp_poison_value", item.PoisonDamage));
+            if (item.MagicResistance > 0) specials.Add(Loc.Get("base.gear_sp_magres", item.MagicResistance));
+            if (item.HasFireEnchant) specials.Add(Loc.Get("base.gear_sp_fire"));
+            if (item.HasFrostEnchant) specials.Add(Loc.Get("base.gear_sp_frost"));
+            if (item.HasLightningEnchant) specials.Add(Loc.Get("base.gear_sp_lightning"));
+            if (item.HasPoisonEnchant) specials.Add(Loc.Get("base.gear_sp_poison"));
+            if (item.HasHolyEnchant) specials.Add(Loc.Get("base.gear_sp_holy"));
+            if (item.HasShadowEnchant) specials.Add(Loc.Get("base.gear_sp_shadow"));
+            if (item.IsCursed) specials.Add(Loc.Get("base.gear_sp_cursed"));
 
             if (specials.Count > 0)
             {
@@ -10171,7 +10172,7 @@ public abstract class BaseLocation
         var items = new Item?[listings.Count];
         for (int i = 0; i < listings.Count; i++)
         {
-            try { items[i] = System.Text.Json.JsonSerializer.Deserialize<Item>(listings[i].ItemJson); ItemLimits.Heal(items[i], "auction"); }
+            try { items[i] = ItemJson.ReadStore(listings[i].ItemJson); ItemLimits.Heal(items[i], "auction"); }
             catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[BrowseAuctions] Failed to deserialize auction item: {ex.Message}"); items[i] = null; }
         }
 
@@ -10425,7 +10426,7 @@ public abstract class BaseLocation
         Item? purchasedItem = null;
         try
         {
-            purchasedItem = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson); ItemLimits.Heal(purchasedItem, "auction");
+            purchasedItem = ItemJson.ReadStore(listing.ItemJson); ItemLimits.Heal(purchasedItem, "auction");
         }
         catch (Exception ex)
         {
@@ -10598,7 +10599,7 @@ public abstract class BaseLocation
         terminal.Write(UIHelper.PromptRows(terminal, Loc.Get("base.auction_list_confirm", ItemNames.Display(item), price.ToString("N0"), chosenLabel, listingFee.ToString("N0"))));   // v1.2.5: fits 79
         if (!await terminal.AskYesNoAsync("")) return;
 
-        string itemJson = System.Text.Json.JsonSerializer.Serialize(item);
+        string itemJson = ItemJson.WriteStore(item);
         int id = await backend.CreateAuctionListing(currentPlayer.DisplayName.ToLower(), item.Name, itemJson, price, chosenHours);
         if (id > 0)
         {
@@ -10778,7 +10779,7 @@ public abstract class BaseLocation
                 {
                     try
                     {
-                        var item = System.Text.Json.JsonSerializer.Deserialize<Item>(l.ItemJson); ItemLimits.Heal(item, "auction");
+                        var item = ItemJson.ReadStore(l.ItemJson); ItemLimits.Heal(item, "auction");
                         if (item != null) { currentPlayer.Inventory.Add(item); collected++; }
                     }
                     catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[ShowMyAuctions] Failed to deserialize expired auction item: {ex.Message}"); }
@@ -10811,7 +10812,7 @@ public abstract class BaseLocation
             {
                 try
                 {
-                    var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson); ItemLimits.Heal(item, "auction");
+                    var item = ItemJson.ReadStore(listing.ItemJson); ItemLimits.Heal(item, "auction");
                     if (item != null) currentPlayer.Inventory.Add(item);
                 }
                 catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[ShowMyAuctions] Failed to deserialize collected auction item: {ex.Message}"); }
@@ -10841,7 +10842,7 @@ public abstract class BaseLocation
             // Return item to inventory
             try
             {
-                var item = System.Text.Json.JsonSerializer.Deserialize<Item>(listing.ItemJson); ItemLimits.Heal(item, "auction");
+                var item = ItemJson.ReadStore(listing.ItemJson); ItemLimits.Heal(item, "auction");
                 if (item != null) currentPlayer.Inventory.Add(item);
             }
             catch (Exception ex) { DebugLogger.Instance.LogError("LOCATION", $"[ShowMyAuctions] Failed to deserialize cancelled auction item: {ex.Message}"); }

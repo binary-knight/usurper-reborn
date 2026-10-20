@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.5 | Only an Old God's own counter enchant, Sunbane, Stonebane or Godbane, removes its divine armor and it also holds back two of the god's abilities, Maelketh has less health with two to four fighters, and Manwe has 40 percent less HP.
 history: 1.3.4 | Doom starts at Aurelion, Shadow Incarnate's message says Manwe heals, and Manwe's named abilities follow the difficulty, Shield Wall Formation, a failed flee, Divine Mandate and Death's Embrace.
 history: 1.3.3 | From floor 25 floor bosses have more HP and hit harder and bring more escorts as the floor's groups grow, and every boss can finish a Downed ally.
 history: 1.3.2 | Dispel Evil on an enraged boss takes back its enrage, floors keep their secret boss rooms, and Boss Slayer gear adds its damage against bosses and mini bosses.
@@ -52,7 +53,7 @@ The floor 50 boss asks you a question first. The right answer is the fourth; any
 :::spoiler Spoiler: Old God fights
 An Old God's HP, Strength and Defence in the table below are multiplied by {{balance:BaseMonsterDifficultyScale}} in the fight; its Strength is then split evenly into Strength and weapon power, and its Defence into Defence and armor. Each artifact you hold adds 10 percent to its HP (at most 40 percent) and 5 percent to its damage (at most 20 percent).
 
-Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 25, 35 and 50 percent lower. Any enchantment on your main hand or off hand weapon halves that reduction, and a weapon whose name holds Artifact, Godforged, Sunforged or Voidtouched removes it.
+Aurelion, Terravok and Manwe wear divine armor: every hit you deal them, spells and abilities included, does 25, 35 and 50 percent less damage. Burn, poison and Corrupting Touch ticks, reflected damage and the added damage of a Mystic Shaman's weapon enchant are not cut. Only that god's own counter enchant on your main hand or off hand weapon (Sunbane for Aurelion, Stonebane for Terravok, Godbane for Manwe) removes it; any other enchant, or a weapon's name, does not change it. The counter also holds back two of the god's abilities, Aurelion's Light's Embrace and Sacrifice, Terravok's Stone Skin and Entomb, and Manwe's Word of Creation and Time Stop: on a turn it draws one, the god strikes instead.
 
 **Phases.** An Old God enters phase 2 at half its HP and phase 3 at a fifth (Manwe at a tenth). Each phase adds its abilities to those it draws from; it uses one on 70 percent of its turns. Potions in an Old God fight have a cooldown of 1 round.
 
@@ -66,9 +67,11 @@ Aurelion, Terravok and Manwe resist unenchanted weapons: your damage to them is 
 
 **Fighting alone.** With no living NPC teammate or companion, an Old God's named abilities deal {{percent:OldGodSoloDamageBonus}} percent more damage and you then take {{percent:OldGodSoloPlayerDamageReduction}} percent less, 0.92 times in all. Manwe's own abilities skip this.
 
+**Maelketh and a small party.** With fewer than five fighters his health is lower: three quarters with four, a half with three and a quarter with two. The fighters are you and every living teammate, companion or ally, counted once as the fight starts, so a fall during the fight does not change it. Alone or with five or more his health is as above. No other Old God changes with the party's size.
+
 **Most damage from one hit.** An Old God's area attack and channel have no cap on the damage to you; a teammate takes at most {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP from one hit. Manwe's own abilities take at most 85 percent of your maximum HP from the first round, without the lower cap of the first rounds.
 
-**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Shadow Incarnate heals him 30 percent of the damage it deals, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you below a fifth of your HP unless you hold the Worldstone.
+**Named abilities.** An Old God's ability works from its attack power: a heavy one hits for 2 or 3 times it and a medium one for 1.5 times, less your Defence; a self heal restores 5 or 10 percent of the god's maximum HP; a war cry adds 30 percent attack for 3 rounds. Maelketh calls 2 Spectral Soldiers at phase 2, then 1 or 2 more every 3 rounds while fewer than 6 foes stand; a soldier has 50 + 5 x his level HP, 190 at level 28. Manwe's Word of Creation heals him 8 percent, his Shadow Incarnate heals him 30 percent of the damage it deals, his Split Form adds a Shadow of Manwe of 25,000 HP once, and his Creation's End kills you outright below a fifth of your HP; with the Worldstone it deals heavy damage instead, which can still kill you.
 :::
 
 {{table:old-god-mechanics}}

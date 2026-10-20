@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: Console/Bootstrap/Program.cs, Scripts/Systems/GameDataLoader.cs, Scripts/Data, Scripts/Editor -->
+<!-- doc: checked 1.3.5; sources: Console/Bootstrap/Program.cs, Scripts/Systems/GameDataLoader.cs, Scripts/Data, Scripts/Editor -->
 # Modding Usurper Reborn
 
 Usurper Reborn ships with a modding system and a standalone editor tool, analogous to the old DOS-era `USEDIT.EXE` companion tool that shipped with the original game. There are two ways to modify game content:

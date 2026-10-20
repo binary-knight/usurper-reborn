@@ -1,8 +1,9 @@
 ---
 title: The story, Old Gods and endings
 path: /wiki/en/world/story/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/OpeningStorySystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Systems/OceanPhilosophySystem.cs, Scripts/Systems/AwakeningScreens.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Locations/TempleLocation.cs, Scripts/Systems/AmnesiaSystem.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MoralParadoxSystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodEchoSystem.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Core/GameEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | Only an Old God's own counter enchant removes its divine armor, Maelketh has less health with two to four fighters, and Manwe has 40 percent less HP.
 history: 1.3.4 | Maelketh, Veloura, Thorgrim and Noctura, her betrayal fight included, no longer put Doom on the party.
 history: 1.3.3 | none
 history: 1.3.2 | An alliance with Noctura hands over the Shadow Crown, and the ending checks and the ending screen count the same saved and destroyed gods.
@@ -47,7 +48,7 @@ A god killed or saved leaves 2 of its crafting material, and each of the first s
 
 **Saving in the fight.** With V in the fight you can save a god that can be saved: you need the Soulweaver's Loom, the god at half its HP or less, and Chivalry at least 200 above your Darkness. Veloura and Aurelion can be saved this way only once you hold their own artifact, Noctura and Terravok on a first meeting.
 
-**How the answers change the fight.** An answer can change your damage, the god's damage and the god's defence. Your damage changes the god's HP instead: 25 percent more damage means the god has 1 / 1.25 of its HP, so Maelketh's 49,500 becomes 39,600. The god's damage is its own factor divided by your defence factor, never more than {{balance:OldGodDialogueBossDamageCap}} times, and it also scales the god's area attacks, channels and corruption.
+**How the answers change the fight.** An answer can change your damage, the god's damage and the god's defence. Your damage changes the god's HP instead: 25 percent more damage means the god has 1 / 1.25 of its HP, so Maelketh's 49,500, alone or with five or more fighters, becomes 39,600. The god's damage is its own factor divided by your defence factor, never more than {{balance:OldGodDialogueBossDamageCap}} times, and it also scales the god's area attacks, channels and corruption.
 
 - **Maelketh:** challenging him gives you 25 percent more damage, 15 percent less defence, 10 points more critical hit chance and bloodlust. Asking him to teach you gives 20 percent more defence, his damage x0.85 and a dodge of his first attack. The answer of peace changes nothing.
 - **Veloura:** hostility gives you 15 percent more damage and her damage x1.10. Empathy weakens her (Strength x0.85) and sets her damage x0.80; a mercy kill weakens her and sets her defence x0.70. Mira in your party multiplies her damage by 0.9 more.

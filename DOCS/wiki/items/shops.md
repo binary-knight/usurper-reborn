@@ -1,8 +1,11 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.3.2
+checked: 1.3.5
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Core/King.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/MarketplaceSystem.cs
+history: 1.3.5 | Enchant removal lists enchanted items in your backpack, a failed 4th or 5th enchant destroys one random enchant whole, and items sold at the auction keep their loot effects, such as fire, frost and life steal.
+history: 1.3.4 | none
+history: 1.3.3 | none
 history: 1.3.2 | A Troll pays 10 percent less for a weapon, purifying any cursed armor piece removes the curse's armor boost, and the Magic Shop refuses to remove an enchant from a cursed item.
 history: 1.2.5 | Magic Shop enchant removal now returns an item to its base form, taking off every stat, effect, value and name tag its enchants added.
 history: 1.2.4 | The Magic Shop lets you haggle over rings and necklaces, 3 tries a day, and being thrown out bars you from it until the next day.
@@ -59,7 +62,7 @@ You are thrown out only when you ask to haggle with no tries left and then insis
 
 ## Magic services
 
-The Magic Shop offers class-relevant magic and services such as identification, curse removal and enchanting. These have different target and cost rules. Removing a curse from an owned item is not the same action as replacing its base template. Enchant removal (W) works on equipment you are wearing and returns the item to its base form: the stats, fire and frost effects, value and name tags its enchants added are taken off, and the enchant limit applies again from that form. If the item's base form is not on record, the shop refuses and charges nothing. A cursed item is refused too, as it is for enchanting, and nothing is charged; have the curse removed first. An enchant or an enchant removal on a worn item puts the changed item straight back in the slot it came from, even when you could not equip that item now, and nothing else you wear moves.
+The Magic Shop offers class-relevant magic and services such as identification, curse removal and enchanting. These have different target and cost rules. Removing a curse from an owned item is not the same action as replacing its base template. Enchant removal (W) works on equipment you are wearing and on enchanted items in your backpack, and returns the item to its base form: the stats, fire and frost effects, value and name tags its enchants added are taken off, and the enchant limit applies again from that form. If the item's base form is not on record, the shop refuses and charges nothing. A cursed item is refused too, as it is for enchanting, and nothing is charged; have the curse removed first. An enchant or an enchant removal on a worn item puts the changed item straight back in the slot it came from, even when you could not equip that item now, and nothing else you wear moves; a backpack item goes back to its place in the backpack.
 
 Read the selected item and confirmation, especially when a service can act on teammate equipment.
 

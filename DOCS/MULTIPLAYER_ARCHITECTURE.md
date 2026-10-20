@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.5; sources: Scripts/Server/MudServer.cs, Scripts/BBS/DoorMode.cs, Scripts/Systems/SqlSaveBackend.cs, Scripts/Systems/SqlSaveBackend.AccountMail.cs, Scripts/Systems/AccountMail.cs, Scripts/Systems/OnlineStateManager.cs, Scripts/Systems/OnlineChatSystem.cs, Scripts/Systems/OnlinePlaySystem.cs, Scripts/Systems/OnlineLoginStore.cs, web/ssh-proxy.js, scripts-server, usurper-reloaded.csproj -->
 # Usurper Reborn - Online Multiplayer Architecture
 
 > HISTORICAL DESIGN NOTE (kept for reference). This document describes the ORIGINAL per-process,

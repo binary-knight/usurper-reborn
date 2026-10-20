@@ -44,7 +44,7 @@ const DB_PATH = process.env.DB_PATH || '/var/usurper/usurper_online.db';
 
 // MUD mode: connect directly to MUD TCP server instead of through SSH
 // Default ON since the MUD server now listens directly on port 4001.
-// Connects to 4001 directly (bypassing sslh on 4000) so X-IP forwarding works.
+// Connects to 4001 directly (bypassing the haproxy multiplexer on 4000) so X-IP forwarding works.
 // Set MUD_MODE=0 to fall back to legacy SSH mode if needed.
 const MUD_MODE = process.env.MUD_MODE !== '0';
 

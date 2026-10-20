@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.5 | Gear HP and mana regeneration restores a share of the maximum each round, at most 10 percent, armor piercing also lowers monster Defence against abilities and area attacks and adds up to at most 50 percent, and gear crit damage adds on top of the 3 times Dexterity cap.
 history: 1.3.4 | A Cyclebreaker's Probability Shift makes 30 percent of a monster's hits on you miss and turns its natural 20 into an ordinary hit, and the difficulty's monster damage now applies to Manwe's named abilities.
 history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
 history: 1.3.2 | Class combat bonuses, divine damage bonuses, the Blood Price cut and the world boss Boss Slayer bonus apply on your swings, a monster's Thorns costs a melee attacker a quarter of the damage dealt, and every party member regains stamina and mana at round end.
@@ -28,7 +29,7 @@ There is no initiative roll and Agility does not decide who acts first. Each rou
 2. You act.
 3. Your teammates and companions act, each ticking its own statuses first.
 4. Every living monster attacks once. An Old God makes its own number of attacks.
-5. Everyone in the party regains combat stamina and mana (see [regeneration in combat](#regeneration-in-combat)).
+5. Everyone in the party regains combat stamina, mana and, from gear, HP and mana (see [regeneration in combat](#regeneration-in-combat)).
 
 ### Ambushes
 
@@ -71,7 +72,7 @@ A monster with an evasion buff makes each of your hits miss with its own chance,
 
 Your critical hit chance on a basic swing is 5 percent plus 1 percent per 10 Dexterity, plus the crit chance on your gear, at least 5 percent. The ceiling is 50 percent, plus 1 percent per 30 Dexterity, up to 75 percent: Dexterity 100 with no gear gives 15 percent with a ceiling of 53. Every other crit bonus is kept under the same ceiling.
 
-- **Critical damage:** a Dexterity crit multiplies the swing by 1.5, plus 0.02 per point of Dexterity above 10, plus your gear's crit damage percent / 100, at most 3 times. Dexterity 60 gives 2.5 times; Dexterity 85 reaches 3.
+- **Critical damage:** a Dexterity crit multiplies the swing by 1.5, plus 0.02 per point of Dexterity above 10, at most 3 times from Dexterity; your gear's crit damage percent / 100 adds on top of that. Dexterity 60 gives 2.5 times; Dexterity 85 reaches 3.
 - **Natural 20:** a natural 20 on the hit die is a critical hit for a random 1.5 to 2 times, whatever your Dexterity. It replaces the Dexterity crit on that swing; the two never stack. The Dexterity crit chance is rolled only when the die did not show 20.
 - **From hiding:** the first swing from Hidden is a crit at your Dexterity multiplier.
 - **Valorian's Miracle:** the next swing is a crit for {{balance:MiracleCritMultiplier}} times.
@@ -100,6 +101,8 @@ Weapon power above 800 counts at half in a swing's damage: 1,000 counts as 900. 
 ### Monster armor and Defence
 
 A monster takes your damage minus its armor power, at least 1. A basic swing and Backstab ignore its Defence; Power Attack and Precise Strike first take off its Defence plus a random 0 to Defence / 8. A sleeping monster then takes 50 percent more.
+
+Armor piercing on your gear takes its percent off the armor or Defence a monster sets against your basic attacks, abilities and area attacks; the sum over all your gear is at most 50 percent.
 
 ### Area damage
 
@@ -216,17 +219,18 @@ An ability's direct damage is reduced by your Defence + half your armor power + 
 
 ## Regeneration in combat
 
-At the end of each round every living member of the party regenerates combat stamina and, for a class with mana, mana:
+At the end of each round every living member of the party regenerates combat stamina and, for a class with mana, mana, and regains HP and mana from its own regeneration gear:
 
 - **Mana:** 2 plus a tenth of Wisdom, at most 15 a round (Wisdom 130). Arcanus's boon adds to it. A Mystic Shaman regains mana this way too.
 - **Combat stamina:** 3 plus a fifteenth of Stamina, plus 2 in light armor or with no armor, or 1 in medium armor. Combat stamina is full at the start of every fight; mana is not.
 
 {{table:combat-regeneration}}
 
+- **Mana Regen gear:** its summed value is tenths of a percent of the member's maximum mana, restored every round (a value of 10 on 600 mana is 6), on top of Wisdom and not limited to 15 or to spell classes.
+- **HP Regen gear:** its summed value is tenths of a percent of the member's maximum HP, restored every round (1.7 percent for a value of 17). Each of the two is at least 1 when the member has any and at most 10 percent of the maximum a round, however many items carry it.
+
 Only you, the fight's leader, also get these:
 
-- **Mana Regen gear:** its summed value in mana every round, on top of Wisdom and not limited to 15 or to spell classes.
-- **HP Regen gear:** its summed value in HP every round.
 - **Troll:** 2 percent of maximum HP a round, at least 3.
 - **Terravok shrine attunement:** 5 HP a round.
 - **Alignment:** Good 2 percent and Holy 4 percent of maximum HP a round.

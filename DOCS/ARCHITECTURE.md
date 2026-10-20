@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.4; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.5; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.4. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.5. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -369,7 +369,9 @@ Floors with `LastVisitedAt > 1 hour ago` repopulate non-boss monster rooms on ne
 ### Old God Boss Mechanics
 **File**: `Scripts/Systems/OldGodBossSystem.cs`, `Scripts/Data/OldGodsData.cs`
 
-Per-boss `BossContext` carries: 3 phase HP thresholds, per-phase ability lists, AoE % MaxHP cap (with first-3-rounds 15% per-hit damage cap), channel/interrupt mechanics, status immunities (physical / magical), corruption stacks, doom countdown, divine armor (boss self-protection scaled by player's equipped artifact count), enrage timer with extra-attack count, potion cooldown, phase-transition dialogue. Any single hit on a companion or NPC teammate is capped at `OldGodTeammateDamageCapPercent` (75%) of MaxHP. Solo Old God fights apply +15% boss damage AND -20% player damage (preserves the 1v1 tension while staying winnable). NG+ "Divine Scaling" buffs remaining gods +10% HP / +5% damage per artifact already collected (cap +40% / +20%).
+Per-boss `BossContext` carries: 3 phase HP thresholds, per-phase ability lists, AoE % MaxHP cap (with first-3-rounds 15% per-hit damage cap), channel/interrupt mechanics, status immunities (physical / magical), corruption stacks, doom countdown, divine armor, enrage timer with extra-attack count, potion cooldown, phase-transition dialogue. Any single hit on a companion or NPC teammate is capped at `OldGodTeammateDamageCapPercent` (75%) of MaxHP. Solo Old God fights apply +15% boss damage AND -20% player damage (preserves the 1v1 tension while staying winnable). NG+ "Divine Scaling" buffs remaining gods +10% HP / +5% damage per artifact already collected (cap +40% / +20%).
+
+Divine armor (1.3.5): Aurelion, Terravok and Manwe cut every hit the player deals them, spells and class abilities included, by 25%, 35% and 50% (`AurelionDivineShield`, `TerravokStoneSkin`, `ManweCreatorsWard`). Only the god's own counter enchant on the main or off hand removes the cut: Sunbane, Stonebane and Godbane, Magic Shop tiers 15 to 17 (`MagicShopLocation.CounterTiers`), weapon only, one per weapon. Other enchants and artifact weapons no longer lower it. A held counter also takes two of that god's abilities out of its turns (`OldGodBossSystem.CounterBlockedAbilities`). Maelketh's fight HP scales with the living fighters counted when the fight is built (`OldGodBossSystem.PartyHpScale`, step `MaelkethPartyHpScaleK = 0.25`): x0.25 with 2, x0.5 with 3, x0.75 with 4, unchanged alone or with 5 or more.
 
 ### Floor Locking
 Special floors lock the player until cleared:
@@ -636,6 +638,7 @@ Born via `FamilySystem.CreateNPCChild()`. Auto-convert to full NPCs at age 18 vi
 
 ### Natural Death, Divorce, Polyamory
 - Natural death: `IsAgedDeath = true` -> permanent, never respawned; widowed spouse gets bereavement memory
+- Corpse pruning: every 120 ticks `WorldSimulator.PrunePermanentlyDeadNPCs` removes NPCs aged out or permadead more than 7 days ago (or with no death date) from the roster through `NPCSpawnSystem.RemoveNPC` (in MUD mode `ActiveNPCs` is a snapshot copy)
 - Divorce: 0.3% base per tick in single player, 0.02% online, modulated by personality and alignment compatibility
 - Affairs: flirtatious married NPCs (>0.6) have 15% chance of conceiving with non-spouse
 - Polyamory: NPCs with `RelationshipPreference.Polyamorous` / `OpenRelationship` can seek partners while married
@@ -836,6 +839,8 @@ CREATE TABLE trade_offers (id, from_player, to_player, items_json, gold, status,
 CREATE TABLE auction_listings (id, seller, item_name, item_json, price, listed_at, expires_at, buyer, status, gold_collected);  -- fixed price, no bidding
 CREATE TABLE bounties (id, target_player, placed_by, amount, placed_at, claimed_by, claimed_at, status);
 ```
+
+An `item_json` value in the auction listings and the guild bank is written and read through `ItemJson.WriteStore` and `ItemJson.ReadStore` (`Scripts/Core/ItemJson.cs`, 1.3.5): PascalCase names with `IncludeFields = true`, so an item's loot effects are kept. The inheritance queue uses `ItemJson.Inheritance` (camelCase with `IncludeFields`).
 
 ### World Bosses & Permadeath Memorial
 
@@ -1081,7 +1086,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 Strict opt-in: SSH-relayed, web terminal, BBS, and Electron sessions skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. Synchronous per-stream lock prevents interleaved frames.
 
 ### Shipped Since
-The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). `Core.Supports.Set` is recorded per session but changes nothing yet.
+The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). Each spell in `Char.Skills.List` carries the mana a cast costs that player (`SpellSystem.CalculateManaCost`) and the level at which the spell opens for the class (`SpellSystem.GetLevelRequired`), since 1.3.5. `Core.Supports.Set` is recorded per session but changes nothing yet.
 
 ---
 
@@ -1691,7 +1696,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.4"
+Version = "1.3.5"
 VersionName = "Reckoning"
 ```
 
@@ -1915,7 +1920,7 @@ Scripts/
 │   ├── SettlementSystem.cs         Outskirts NPC settlement
 │   ├── DivineBlessingSystem.cs     Prayer / lifesteal
 │   ├── GodSystem.cs                Pantheon registry
-│   ├── ArtifactSystem.cs           7 artifacts + divine armor
+│   ├── ArtifactSystem.cs           7 artifacts
 │   ├── AmnesiaSystem.cs            Memory recovery story
 │   ├── MetaProgressionSystem.cs    Account-scope progression
 │   ├── BugReportSystem.cs          ! key reports to Discord
@@ -1947,7 +1952,7 @@ Scripts/
 │   ├── BankLocation.cs             Bank + robbery
 │   ├── WeaponShopLocation.cs       Procedural weapons
 │   ├── ArmorShopLocation.cs        Procedural armor
-│   ├── MagicShopLocation.cs        Spells, accessories
+│   ├── MagicShopLocation.cs        Spells, accessories, enchants
 │   ├── MusicShopLocation.cs        Instruments, Melodia, lore songs
 │   ├── MarketplaceLocation.cs      Auction house
 │   ├── DarkAlleyLocation.cs        Crime, fence, drugs

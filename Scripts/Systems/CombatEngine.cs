@@ -4398,8 +4398,13 @@ public partial class CombatEngine
             // are now real Slow status applications.
             if (attacker.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+                // 1.3.5: through the boss soft-control resist, as the frost proc; a resisted slow does nothing
+                int frostbrandRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+                if (frostbrandRounds > 0)
+                {
+                    target.IsSlowed = true;
+                    target.SlowDuration = Math.Max(target.SlowDuration, frostbrandRounds);
+                }
             }
 
             // Ancestral Guidance: 25% of enchant damage dealt heals the party
@@ -5452,7 +5457,10 @@ public partial class CombatEngine
         // Check if monster is slowed (from Slow spell)
         if (monster.IsSlowed)
         {
-            monster.SlowDuration--;
+            // 1.3.5: every slow counts down once a round, as its rounds say, not on each action of a boss that
+            // acts more than once
+            if (firstActionThisRound)
+                monster.SlowDuration--;
             if (random.Next(100) < 50)
             {
                 terminal.WriteLine(Loc.Get("combat.monster_sluggish", MonsterNames.Display(monster)), "gray");
@@ -5498,18 +5506,6 @@ public partial class CombatEngine
             return;
         }
 
-        // v0.61.6 Cyclebreaker Probability Manipulation: passive per-attack evade.
-        // Unlike DodgeNextAttack (consumed by the first attack), this rolls against
-        // EVERY incoming attack, so the class survives group fights long enough to
-        // ramp its buffs instead of being shredded on the rounds before it acts.
-        if (player.Class == CharacterClass.Cyclebreaker
-            && random.Next(100) < GameConfig.CyclebreakerPassiveEvadePercent)
-        {
-            UIHelper.WriteRow(terminal, Loc.Get("combat.cyclebreaker_evade", MonsterNames.Display(monster)), "bright_cyan");
-            await Pacing.Wait(GetCombatDelay(500));
-            return;
-        }
-
         // Boss ability announcement removed (audit): SelectBossAbility here drew a
         // fresh random name that was stored nowhere, while the actual ability roll in
         // TryMonsterSpecialAbility independently picked its own -- every boss attack
@@ -5550,6 +5546,21 @@ public partial class CombatEngine
             monster.Distracted = true;
             monster.DistractedPenalty = Math.Max(monster.DistractedPenalty, monster.DistractedRoundsPenalty);
             if (monster.DistractedRounds <= 0) monster.DistractedRoundsPenalty = 0;
+        }
+
+        // v0.61.6 Cyclebreaker Probability Manipulation: passive per-attack evade.
+        // Unlike DodgeNextAttack (consumed by the first attack), this rolls against
+        // every incoming attack aimed at the player (no teammate chosen, or the choice
+        // is the player), never one aimed at a companion. It sits after the taunt and
+        // distraction ticks so an evaded first action of a round still runs them.
+        if (player.Class == CharacterClass.Cyclebreaker
+            && player.IsAlive
+            && (targetChoice == null || targetChoice == player)
+            && random.Next(100) < GameConfig.CyclebreakerPassiveEvadePercent)
+        {
+            UIHelper.WriteRow(terminal, Loc.Get("combat.cyclebreaker_evade", MonsterNames.Display(monster)), "bright_cyan");
+            await Pacing.Wait(GetCombatDelay(500));
+            return;
         }
 
         if (aliveTeammates != null && aliveTeammates.Count > 0)
@@ -6346,13 +6357,20 @@ public partial class CombatEngine
         // Pick a random ability. Bosses draw from the phase-filtered pool
         // (SelectBossAbility) -- the single picker, now that the duplicate
         // pre-announcement in ProcessMonsterAction is gone.
+        string? heldBack = null;
         string? abilityName = (BossContext != null && monster.IsBoss)
-            ? SelectBossAbility(BossContext)
+            ? SelectBossAbility(BossContext, out heldBack)
             : tactics
                 ? MonsterTactics.Choose(monster, player, result.CurrentRound, monsterList, random)
                 : monster.SpecialAbilities[random.Next(monster.SpecialAbilities.Count)];
         if (abilityName == null)
+        {
+            // 1.3.5 (CT-2): a held counter's blocked ability is held back; the god makes its normal attack instead
+            if (heldBack != null && BossContext != null)
+                UIHelper.WriteRow(terminal, Loc.Get("combat.counter_blocked", MonsterNames.Display(monster),
+                    BossAbilityLabel(heldBack), OldGodBossSystem.CounterTierName(BossContext.GodType)), "bright_cyan");
             return false; // 1.2.8: every pick would be wasted, so the monster makes its normal attack
+        }
 
         // Old God boss abilities — handle by name before generic enum parse
         if (BossContext != null && monster.IsBoss)
@@ -8904,6 +8922,61 @@ public partial class CombatEngine
         return !string.IsNullOrEmpty(specialEffect) && MagicalAbilityEffects.Contains(specialEffect);
     }
 
+    /// <summary>
+    /// 1.3.5: abilities whose own description makes their damage magical where the effect id alone would read it as
+    /// physical (keyed by ability, since an effect id can be shared). The rest take the kind of MagicalAbilityEffects.
+    /// </summary>
+    private static readonly HashSet<string> MagicalAbilityIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // single target: holy, fire, totem and corruption with no weapon named, and the prestige handlers
+        "holy_avenger", "purifying_flame", "searing_totem", "corrupting_touch",
+        "fracture_reality", "seal_fracture", "soul_leech", "consume_soul", "annihilation",
+        // area handlers that take HP themselves
+        "judgment_day", "wrath_of_heaven", "void_rupture", "chain_lightning", "sanctified_torrent",
+        "entropy_cascade", "singularity", "abyssal_eruption", "abyss_unchained",
+    };
+
+    /// <summary>1.3.5: the one kind of a class ability hit (magical or physical), for the boss protections and the weapon procs.</summary>
+    internal static bool IsMagicalAbility(ClassAbilityResult? abilityResult)
+    {
+        if (abilityResult == null) return false;
+        var id = abilityResult.AbilityUsed?.Id;
+        if (!string.IsNullOrEmpty(id) && MagicalAbilityIds.Contains(id)) return true;
+        return IsMagicalAbilityEffect(abilityResult.SpecialEffect);
+    }
+
+    // 1.3.5: the targets whose immunity message this ability action has printed (one line per target per action)
+    private readonly HashSet<Monster> _abilityImmunityAnnounced = new();
+
+    /// <summary>
+    /// 1.3.5: the boss protections on a class ability hit that takes HP itself (the handler helper, the base block,
+    /// the area handlers and their riders), as the swing, the area core and the single-target path apply them:
+    /// phase immunity of the hit's kind cuts it to the residual, then divine armour (floor 1).
+    /// </summary>
+    private long ApplyAbilityBossProtections(Monster target, long damage, ClassAbilityResult abilityResult)
+    {
+        if (target == null || damage <= 0) return damage;
+        bool magical = IsMagicalAbility(abilityResult);
+        if (magical ? target.IsMagicalImmune : target.IsPhysicalImmune)
+        {
+            damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: magical);
+            if (_abilityImmunityAnnounced.Add(target))
+            {
+                terminal.SetColor("dark_magenta");
+                UIHelper.WriteRow(terminal, Loc.Get(magical ? "combat.magical_immunity_absorbs" : "combat.physical_immunity_absorbs", MonsterNames.Display(target)));
+            }
+        }
+        if (BossContext != null && BossContext.DivineArmorReduction > 0 && damage > 0)
+        {
+            damage = (long)(damage * (1.0 - BossContext.DivineArmorReduction));
+            damage = Math.Max(1, damage);
+        }
+        return damage;
+    }
+
+    // 1.3.5: the HP the last ApplyHandlerAbilityDamage hit removed (no overkill), for the riders that heal from it
+    private long _lastHandlerHpRemoved;
+
     /// <summary>1.3.2: what a monster's Thorns costs the attacker for a melee hit that dealt `dealt`: percent of
     /// it, at least 1, and never so much that the attacker drops below 1 HP (an attacker at 1 HP loses nothing).</summary>
     internal static long ThornsReflectAmount(long dealt, int percent, long attackerHP)
@@ -8964,6 +9037,7 @@ public partial class CombatEngine
     private long ApplyHandlerAbilityDamage(Character player, Monster target, long rawDamage,
         CombatResult result, ClassAbilityResult abilityResult)
     {
+        _lastHandlerHpRemoved = 0;
         if (target == null || rawDamage <= 0) return 0;
 
         long actualDamage = rawDamage;
@@ -8994,6 +9068,9 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.ability_critical"), "bright_yellow");
         }
 
+        // 1.3.5: phase immunity of the hit's kind, then divine armour, before the rest of the hit's modifiers
+        actualDamage = ApplyAbilityBossProtections(target, actualDamage, abilityResult);
+
         if (target.IsMarked)
         {
             long markedBonus = MarkedBonusDamage(target, actualDamage);
@@ -9005,17 +9082,24 @@ public partial class CombatEngine
         // v1.1.11: Team HQ Armory, after every other modifier of the hit.
         actualDamage = TeamHQBonus.ApplyAttack(player, actualDamage);
 
+        long hpBeforeHit = target.HP;
         target.HP -= actualDamage;
         EvHit(player, actualDamage);   // 1.2.6
         result.TotalDamageDealt += actualDamage;
         result.Player?.Statistics.RecordDamageDealt(actualDamage, crit || alreadyCrit);
+        // 1.3.5: on-hit effects scale from the HP the hit removed, never more than the target had (no overkill)
+        long hpRemoved = Math.Min(actualDamage, Math.Max(0, hpBeforeHit));
 
-        ApplyPostHitEnchantments(player, target, actualDamage, result,
-            notMelee: IsMagicalAbilityEffect(abilityResult.SpecialEffect) || IsRangedAbility(abilityResult.AbilityUsed));   // the Gnoll bite is melee only
+        // 1.3.5: a magical ability fires no weapon proc and no Lifedrinker, as on the generic ability path
+        bool magicalHit = IsMagicalAbility(abilityResult);
+        ApplyPostHitEnchantments(player, target, hpRemoved, result,
+            isSpellDamage: magicalHit,
+            notMelee: magicalHit || IsRangedAbility(abilityResult.AbilityUsed));   // the Gnoll bite is melee only
 
-        if (!IsMagicalAbilityEffect(abilityResult.SpecialEffect) && !IsRangedAbility(abilityResult.AbilityUsed))
+        if (!magicalHit && !IsRangedAbility(abilityResult.AbilityUsed))
             ReflectMonsterThorns(player, target, actualDamage);   // 1.3.2: a melee ability hit on Thorns
 
+        _lastHandlerHpRemoved = hpRemoved;   // set last, for the riders that heal from the hit
         return actualDamage;
     }
 
@@ -9293,8 +9377,8 @@ public partial class CombatEngine
     /// v0.60.0, issue #91: name-based detection for type immunities.
     /// Angels (Celestial family) cannot be hurt by holy damage and you cannot drain
     /// mana from them (Syphon). Demons cannot be hurt by shadow damage and Lifedrinker
-    /// cannot drain life from them. Name matching follows the same pattern the holy
-    /// proc already uses for the +2x undead bonus, so no MonsterClass plumbing needed.
+    /// cannot drain life from them. Angels are matched by name; since 1.3.5 the holy
+    /// proc's +2x undead bonus reads MonsterClass instead.
     /// </summary>
     private static bool IsAngelMonster(Monster target)
     {
@@ -9845,18 +9929,23 @@ public partial class CombatEngine
             // description "+20 power + chance to slow enemies". Now applies the real Slow
             // status (Monster.IsSlowed halves attack count via CombatEngine:4266), refreshing
             // duration on repeat procs to FrostEnchantDuration (2 rounds).
-            target.IsSlowed = true;
-            target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
-            terminal.SetColor("bright_cyan");
-            // v0.60.10 (druidah Lv.20 Cleric report): "Somehow Lyris can use the frost effect
-            // sometimes." The proc was correctly reading the source weapon's HasFrostEnchant,
-            // but the message had no attacker attribution -- so when a teammate's frost-enchanted
-            // weapon procced, the player saw "Frost spreads from the impact!" with no name and
-            // assumed her own staff's enchant had leaked across characters. Mirror the
-            // fire/lightning pattern that already differentiates player vs teammate.
-            UIHelper.WriteRow(terminal, isPlayer
-                ? Loc.Get("combat.enchant_frost", MonsterNames.Display(target))
-                : Loc.Get("combat.enchant_frost_tm", name, MonsterNames.Display(target)));
+            // 1.3.5: through the boss soft-control resist, as every other slow; a resisted proc does nothing.
+            int frostRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+            if (frostRounds > 0)
+            {
+                target.IsSlowed = true;
+                target.SlowDuration = Math.Max(target.SlowDuration, frostRounds);
+                terminal.SetColor("bright_cyan");
+                // v0.60.10 (druidah Lv.20 Cleric report): "Somehow Lyris can use the frost effect
+                // sometimes." The proc was correctly reading the source weapon's HasFrostEnchant,
+                // but the message had no attacker attribution -- so when a teammate's frost-enchanted
+                // weapon procced, the player saw "Frost spreads from the impact!" with no name and
+                // assumed her own staff's enchant had leaked across characters. Mirror the
+                // fire/lightning pattern that already differentiates player vs teammate.
+                UIHelper.WriteRow(terminal, isPlayer
+                    ? Loc.Get("combat.enchant_frost", MonsterNames.Display(target))
+                    : Loc.Get("combat.enchant_frost_tm", name, MonsterNames.Display(target)));
+            }
         }
 
         if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
@@ -9913,10 +10002,9 @@ public partial class CombatEngine
             }
             else
             {
-                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
+                // 1.3.5: undead is the monster's class, as everywhere else in combat, not a name list
+                // (the list missed Ghoul and Wight). Demons are not undead here: the holy texts say undead.
+                bool isUndead = target.MonsterClass == MonsterClass.Undead || target.Undead > 0;
                 float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
                 // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
                 if (attacker.IsAttunedTo("aurelion"))
@@ -9998,120 +10086,6 @@ public partial class CombatEngine
                 terminal.WriteLine(isPlayer
                     ? Loc.Get("combat.enchant_siphon", manaRestored)
                     : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
-            }
-        }
-    }
-
-    /// <summary>
-    /// Check for elemental enchant procs in multi-monster combat.
-    /// </summary>
-    private void CheckElementalEnchantProcsMonster(Character attacker, Monster target, long damage)
-    {
-        var weapon = attacker.GetEquipment(EquipmentSlot.MainHand);
-        if (weapon == null) return;
-
-        // v0.60.0, issue #88: skip damage-and-status procs when the basic attack
-        // already killed the target. See twin in CheckElementalEnchantProcs.
-        bool targetAlive = target.HP > 0 && target.IsAlive;
-
-        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
-        {
-            long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
-            target.HP -= fireDamage;
-            terminal.SetColor("bright_red");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_fire_multi", fireDamage, MonsterNames.Display(target)));
-            attacker.Statistics?.RecordDamageDealt(fireDamage, false);
-        }
-
-        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
-        {
-            // v0.60.10 (Coosh report): see twin in CheckElementalEnchantProcs above.
-            target.IsSlowed = true;
-            target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
-            terminal.SetColor("bright_cyan");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_frost_multi", MonsterNames.Display(target)));
-        }
-
-        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
-        {
-            long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
-            target.HP -= lightningDamage;
-            // v0.60.0 stun-lock audit: route through TryStunMonster (see single-monster twin)
-            bool stunned = TryStunMonster(target, 1);
-            terminal.SetColor("bright_yellow");
-            UIHelper.WriteRow(terminal, stunned
-                ? Loc.Get("combat.enchant_lightning_stun_multi", lightningDamage, MonsterNames.Display(target))
-                : Loc.Get("combat.enchant_lightning_resist_multi", lightningDamage, MonsterNames.Display(target)));
-            attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
-        }
-
-        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
-        {
-            int poisonValue = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : (int)(damage * 0.10);
-            long poisonDamage = Math.Max(1, poisonValue);
-            target.HP -= poisonDamage;
-            terminal.SetColor("green");
-            UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_venom_multi", poisonDamage, MonsterNames.Display(target)));
-            attacker.Statistics?.RecordDamageDealt(poisonDamage, false);
-        }
-
-        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
-        {
-            // v0.60.0, issue #91: angels are immune to holy damage.
-            if (IsAngelMonster(target))
-            {
-                terminal.SetColor("bright_white");
-                UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_holy_immune_angel", MonsterNames.Display(target)));
-            }
-            else
-            {
-                bool isUndead = target.Name.Contains("Skeleton") || target.Name.Contains("Zombie") ||
-                                target.Name.Contains("Ghost") || target.Name.Contains("Lich") ||
-                                target.Name.Contains("Wraith") || target.Name.Contains("Vampire") ||
-                                target.Name.Contains("Undead") || target.Name.Contains("Revenant");
-                float holyMult = isUndead ? GameConfig.HolyEnchantDamageMultiplier * 2 : GameConfig.HolyEnchantDamageMultiplier;
-                // v0.61.0 Druid's Shrines: Aurelion attunement = +25% holy enchant proc damage.
-                if (attacker.IsAttunedTo("aurelion"))
-                    holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
-                long holyDamage = Math.Max(1, (long)(damage * holyMult));
-                target.HP -= holyDamage;
-                terminal.SetColor("bright_white");
-                UIHelper.WriteRow(terminal, isUndead
-                    ? Loc.Get("combat.enchant_holy_undead_multi", holyDamage, MonsterNames.Display(target))
-                    : Loc.Get("combat.enchant_holy_multi", holyDamage, MonsterNames.Display(target)));
-                attacker.Statistics?.RecordDamageDealt(holyDamage, false);
-            }
-        }
-
-        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
-        {
-            // v0.60.0, issue #91: demons are immune to shadow damage.
-            if (IsDemonMonster(target))
-            {
-                terminal.SetColor("dark_magenta");
-                UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_shadow_immune_demon", MonsterNames.Display(target)));
-            }
-            else
-            {
-                long shadowDamage = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
-                target.HP -= shadowDamage;
-                terminal.SetColor("dark_magenta");
-                UIHelper.WriteRow(terminal, Loc.Get("combat.enchant_shadow_multi", shadowDamage, MonsterNames.Display(target)));
-                attacker.Statistics?.RecordDamageDealt(shadowDamage, false);
-            }
-        }
-
-        // Mana steal proc
-        int manaStealPct = attacker.GetEquipmentManaSteal();
-        if (manaStealPct > 0 && damage > 0)
-        {
-            // v0.60.0, issue #91: angels carry no mana to siphon.
-            if (!IsAngelMonster(target))
-            {
-                long manaRestored = Math.Max(1, damage * manaStealPct / 100);
-                attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
-                terminal.SetColor("blue");
-                terminal.WriteLine(Loc.Get("combat.enchant_siphon_multi", manaRestored));
             }
         }
     }
@@ -12039,7 +12013,7 @@ public partial class CombatEngine
         if (item.CharismaBonus != 0) stats.Add($"{Loc.Get("ui.stat_cha")}:{item.CharismaBonus:+#;-#}");
         if (item.CriticalChanceBonus > 0) stats.Add($"{Loc.Get("ui.stat_crit")}:{item.CriticalChanceBonus}%");
         if (item.LifeSteal > 0) stats.Add($"{Loc.Get("ui.stat_leech")}:{item.LifeSteal}%");
-        if (item.ManaSteal > 0) stats.Add($"Siphon:{item.ManaSteal}%");
+        if (item.ManaSteal > 0) stats.Add($"{Loc.Get("ui.stat_siphon")}:{item.ManaSteal}%");
         if (item.MagicResistance > 0) stats.Add($"{Loc.Get("ui.stat_mr")}:{item.MagicResistance}%");
         // v0.62.1 stat-order consistency.
         stats.Sort(System.StringComparer.Ordinal);
@@ -13946,6 +13920,7 @@ public partial class CombatEngine
 
             long armor = monster.ArmPow;
             if (monster.IsCorroded) armor = Math.Max(0, (long)(armor * 0.6));
+            armor = ApplyArmorPiercing(armor, attacker ?? spellCaster ?? currentPlayer);   // a null attacker is the player's own spell
             long actualDamage = Math.Max(1, damagePerMonster - armor);
 
             // Marked targets take bonus damage (30%, or what a Sage's mark set)
@@ -14042,6 +14017,20 @@ public partial class CombatEngine
     // was invalid/dead. Callers MUST skip post-hit effects (lifesteal and other enchant procs,
     // weapon-enchant riders, on-hit heals) when this returns false -- an evaded swing passes
     // through for 0 damage and must not trigger those (issue: lifesteal fired on an evaded hit).
+    // 1.3.5: on-hit effects scale from the HP the hit removed, not from the damage passed in (a phase immunity
+    // residual included, never more than the HP the target had); a caller reads it through ApplySingleMonsterDamageDealt.
+    /// <summary>
+    /// The attacker's armour piercing percent taken off an amount of monster armour or Defence that a hit subtracts,
+    /// floored at 0. No attacker, no piercing, or an amount of 0 or less gives the amount as it is.
+    /// </summary>
+    internal static long ApplyArmorPiercing(long amount, Character? attacker)
+    {
+        if (attacker == null || amount <= 0) return amount;
+        int pct = attacker.GetEquipmentArmorPiercing();
+        if (pct <= 0) return amount;
+        return Math.Max(0, amount - amount * pct / 100);
+    }
+
     private async Task<bool> ApplySingleMonsterDamage(Monster target, long damage, CombatResult result, string damageSource = "attack", Character? attacker = null, bool isSpellDamage = false)
     {
         // 1.2.8 (the player to-hit roll): set only by ApplySingleMonsterDamageChecked, for this one call
@@ -14050,6 +14039,7 @@ public partial class CombatEngine
         // 1.3.4: set only by ApplySpellDamageIgnoringArmor, for this one call
         int armorIgnoredPercent = _armorIgnoredPercent;
         _armorIgnoredPercent = 0;
+        _lastHitOnHitDamage = 0;
         if (target == null || !target.IsAlive) return false;
 
         // v0.61.2 (player report: "The monster becoming incorporeal combat ability
@@ -14159,8 +14149,13 @@ public partial class CombatEngine
         if (attacker != null)
             actualDamage = TeamHQBonus.ApplyAttack(attacker, actualDamage);
 
+        long hpBeforeHit = target.HP;
         target.HP -= actualDamage;
         EvHit(attacker, actualDamage);   // 1.2.6
+        // 1.3.5: the figure on-hit effects scale from: the HP removed, after armour, divine armour and the Armory,
+        // never more than the HP the target had (no overkill)
+        long hpRemoved = Math.Min(actualDamage, hpBeforeHit);
+        long onHitDamage = hpRemoved;   // a phase immunity residual counts as any other hit, as on the area and older paths
 
         // Track damage dealt statistics (only for player attacks)
         if (attacker == currentPlayer || attacker == result.Player)
@@ -14259,7 +14254,21 @@ public partial class CombatEngine
             ReflectMonsterThorns(attacker, target, actualDamage);   // 1.3.2: a melee swing on Thorns
 
         result.CombatLog.Add($"{target.Name} took {actualDamage} damage from {damageSource}");
+        _lastHitOnHitDamage = onHitDamage;   // set last: a call made above (a kill, thorns) does not overwrite it
         return true; // attack landed -- caller may apply post-hit effects
+    }
+
+    // 1.3.5: the on-hit figure of the last ApplySingleMonsterDamage call; 0 when it landed nothing
+    private long _lastHitOnHitDamage;
+
+    /// <summary>1.3.5: ApplySingleMonsterDamageChecked for a caller that runs on-hit effects. Returns the HP the hit
+    /// removed, after armour, divine armour and the Armory and never more than the target had, which every on-hit
+    /// effect scales from; 0 when the hit was evaded or found no target, and then the caller runs no on-hit effect.</summary>
+    private async Task<long> ApplySingleMonsterDamageDealt(Monster target, long damage, CombatResult result, string damageSource, Character attacker, bool isSpellDamage, bool evasionChecked)
+    {
+        if (!await ApplySingleMonsterDamageChecked(target, damage, result, damageSource, attacker, isSpellDamage, evasionChecked))
+            return 0;
+        return _lastHitOnHitDamage;
     }
 
     // 1.2.8 (the player to-hit roll): true while the one ApplySingleMonsterDamage call made by
@@ -14383,7 +14392,7 @@ public partial class CombatEngine
         string effect = abilityResult.SpecialEffect ?? "";
         if (effect.Contains("aoe") || effect.Contains("distract") || effect.Contains("psychic") || effect.Contains("magic")
             || effect.Contains("charm") || effect.Contains("fear") || effect.Contains("confus")) return false;
-        if (IsMagicalAbilityEffect(effect)) return false;
+        if (IsMagicalAbility(abilityResult)) return false;   // 1.3.5: the ability's one kind, as for its protections and procs
         return effect != "guaranteed_hit";
     }
 
@@ -14444,8 +14453,13 @@ public partial class CombatEngine
             // now real Slow status.
             if (player.ShamanEnchantType == 2 && target.IsAlive)
             {
-                target.IsSlowed = true;
-                target.SlowDuration = Math.Max(target.SlowDuration, GameConfig.FrostEnchantDuration);
+                // 1.3.5: through the boss soft-control resist, as the frost proc; a resisted slow does nothing
+                int frostbrandRounds = SoftControlRounds(target, GameConfig.FrostEnchantDuration);
+                if (frostbrandRounds > 0)
+                {
+                    target.IsSlowed = true;
+                    target.SlowDuration = Math.Max(target.SlowDuration, frostbrandRounds);
+                }
             }
 
             // Ancestral Guidance: 25% of damage dealt heals the party
@@ -15246,7 +15260,7 @@ public partial class CombatEngine
 
                         long damage = ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, hitNatural);
 
-                        bool swingLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
+                        long swingDealt = await ApplySingleMonsterDamageDealt(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
 
                         // If the swing was evaded (Incorporeal / Phase / etc. -- the attack passes
                         // through for 0 damage), skip EVERY on-hit effect for this swing: lifesteal
@@ -15254,13 +15268,13 @@ public partial class CombatEngine
                         // damage/procs, and the Ancestral Guidance heal below. Player report: life
                         // steal still triggered when the attack passed through the enemy. The evasion
                         // flavor line was already printed inside ApplySingleMonsterDamage.
-                        if (!swingLanded)
+                        if (swingDealt <= 0)
                             continue;
 
                         // All landed-swing on-hit effects (post-hit enchants + Shaman weapon-enchant
                         // rider + Ancestral Guidance) run through the shared helper so the [P] Power
                         // Attack fires the identical pipeline.
-                        ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, damage), isOffHandAttack, result);   // v1.1.11: riders scale from the hit, Armory included
+                        ApplyPlayerSwingOnHitEffects(player, target, swingDealt, isOffHandAttack, result);   // 1.3.5: riders scale from the HP removed, Armory included (v1.1.11)
                     }
 
                     // 1.3.2: the attack action can improve basic attack proficiency, once an action, up to Good
@@ -15609,6 +15623,7 @@ public partial class CombatEngine
         // with roughly double armor, making the 15-stamina attack weaker than a free
         // basic swing against armored monsters.
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = ApplyArmorPiercing(defense, player);
         powerDamage = Math.Max(1, powerDamage - defense);
 
         terminal.SetColor("bright_red");
@@ -15617,8 +15632,9 @@ public partial class CombatEngine
         // Power Attack runs the same on-hit enchant pipeline as a basic swing (lifesteal, elemental
         // procs, Sunforged, poison, Shaman rider). Gated on the swing landing so an evaded swing
         // (Incorporeal/Phase, ApplySingleMonsterDamage returns false) procs nothing.
-        if (await ApplySingleMonsterDamageChecked(target, powerDamage, result, "power attack", player, isSpellDamage: false, evasionChecked: hitRolled))
-            ApplyPlayerSwingOnHitEffects(player, target, TeamHQBonus.ApplyAttack(player, powerDamage), isOffHandAttack: false, result);   // v1.1.11
+        long powerDealt = await ApplySingleMonsterDamageDealt(target, powerDamage, result, "power attack", player, isSpellDamage: false, evasionChecked: hitRolled);
+        if (powerDealt > 0)
+            ApplyPlayerSwingOnHitEffects(player, target, powerDealt, isOffHandAttack: false, result);   // 1.3.5: from the HP removed (v1.1.11 Armory inside)
 
         await PowerAttackOffHandFollowUp(player, target, monsters, result, hitRolled);
     }
@@ -15656,8 +15672,9 @@ public partial class CombatEngine
 
                 // Off-hand follow-up procs its enchants only if it actually connected (same evade
                 // gate + shared on-hit pipeline as the basic-attack off-hand swing).
-                if (await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
-                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), isOffHandAttack: true, result);   // v1.1.11
+                long ohDealt = await ApplySingleMonsterDamageDealt(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled);
+                if (ohDealt > 0)
+                    ApplyPlayerSwingOnHitEffects(player, offHandTarget, ohDealt, isOffHandAttack: true, result);   // 1.3.5: from the HP removed (v1.1.11 Armory inside)
             }
         }
     }
@@ -15694,6 +15711,7 @@ public partial class CombatEngine
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
         if (!hitRolled)
             defense = (long)(defense * 0.75);
+        defense = ApplyArmorPiercing(defense, player);
 
         long damage = Math.Max(1, attackPower - defense);
         damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
@@ -15831,6 +15849,7 @@ public partial class CombatEngine
         rangedDamage += player.GetClassCombatModifiers().RangedBonus;   // 1.3.2: the Ranger's RangedBonus
 
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = ApplyArmorPiercing(defense, player);
         rangedDamage = Math.Max(1, rangedDamage - defense);
         rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
 
@@ -16022,6 +16041,7 @@ public partial class CombatEngine
         if (ability == null) return;
         using var evKind = ActAs(CombatEventKind.Ability);   // 1.2.6: every hit and heal below is an ability's
         EvUse(player, CombatEventKind.Ability);
+        _abilityImmunityAnnounced.Clear();   // 1.3.5: one immunity line per target for this action
 
         // Determine if this is the player or an AI teammate for message formatting
         bool isPlayer = (player == currentPlayer);
@@ -16212,11 +16232,15 @@ public partial class CombatEngine
             // Apply single target damage (unless AoE)
             if (actualDamage > 0)
             {
+                // 1.3.5: phase immunity of the hit's kind, then divine armour, before the defence and the rest
+                actualDamage = ApplyAbilityBossProtections(target, actualDamage, abilityResult);
+
                 // Apply defense unless armor_pierce
                 if (abilityResult.SpecialEffect != "armor_pierce")
                 {
                     long defense = target.Defence / 2; // Abilities partially bypass defense
                     if (target.IsCorroded) defense = Math.Max(0, (long)(defense * 0.6));
+                    defense = ApplyArmorPiercing(defense, player);
                     actualDamage = Math.Max(1, actualDamage - defense);
                 }
 
@@ -16236,9 +16260,12 @@ public partial class CombatEngine
                 // v1.1.11: Team HQ Armory, after every other modifier of the hit.
                 actualDamage = TeamHQBonus.ApplyAttack(player, actualDamage);
 
+                long hpBeforeAbilityHit = target.HP;
                 target.HP -= actualDamage;
                 EvHit(player, actualDamage);   // 1.2.6
                 result.TotalDamageDealt += actualDamage;
+                // 1.3.5: on-hit effects scale from the HP the hit removed, never more than the target had (no overkill)
+                long abilityHpRemoved = Math.Min(actualDamage, Math.Max(0, hpBeforeAbilityHit));
 
                 // Track damage dealt statistics
                 result.Player?.Statistics.RecordDamageDealt(actualDamage, abilityCrit);
@@ -16248,9 +16275,10 @@ public partial class CombatEngine
 
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
-                ApplyPostHitEnchantments(player, target, actualDamage, result, isSpellDamage: IsMagicalAbilityEffect(abilityResult.SpecialEffect), notMelee: IsRangedAbility(ability));
+                bool magicalAbilityHit = IsMagicalAbility(abilityResult);
+                ApplyPostHitEnchantments(player, target, abilityHpRemoved, result, isSpellDamage: magicalAbilityHit, notMelee: IsRangedAbility(ability));
 
-                if (!IsMagicalAbilityEffect(abilityResult.SpecialEffect) && !IsRangedAbility(ability))
+                if (!magicalAbilityHit && !IsRangedAbility(ability))
                     ReflectMonsterThorns(player, target, actualDamage);   // 1.3.2: a melee ability hit on Thorns
 
                 // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals the caster. Applied
@@ -16372,8 +16400,9 @@ public partial class CombatEngine
 
                 // Off-hand follow-up only procs its enchants if it actually connected; an evaded
                 // swing (Incorporeal/Phase) passes through for 0 damage and must not lifesteal.
-                if (ohLands && await ApplySingleMonsterDamageChecked(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled))
-                    ApplyPostHitEnchantments(player, offHandTarget, TeamHQBonus.ApplyAttack(player, ohDamage), result, weaponSlot: EquipmentSlot.OffHand);   // v1.1.11: riders scale from the boosted hit, as at every other caller
+                long ohDealt = ohLands ? await ApplySingleMonsterDamageDealt(offHandTarget, ohDamage, result, "off-hand strike", player, isSpellDamage: false, evasionChecked: hitRolled) : 0;
+                if (ohDealt > 0)
+                    ApplyPostHitEnchantments(player, offHandTarget, ohDealt, result, weaponSlot: EquipmentSlot.OffHand);   // 1.3.5: from the HP removed (v1.1.11 Armory inside), as at every other caller
             }
         }
 
@@ -16563,6 +16592,7 @@ public partial class CombatEngine
                     if (hpPercentMM < 0.30)
                     {
                         long executeBonusMM = abilityResult.Damage;
+                        executeBonusMM = ApplyAbilityBossProtections(target, executeBonusMM, abilityResult);   // 1.3.5: boss protections, before the Armory
                         executeBonusMM = TeamHQBonus.ApplyAttack(player, executeBonusMM); // v1.1.11: Team HQ Armory, last.
                         target.HP = Math.Max(0, target.HP - executeBonusMM);
                         EvHit(player, executeBonusMM);   // 1.2.6
@@ -16574,6 +16604,7 @@ public partial class CombatEngine
                     else if (hpPercentMM < 0.50)
                     {
                         long executeBonusMM = abilityResult.Damage / 2;
+                        executeBonusMM = ApplyAbilityBossProtections(target, executeBonusMM, abilityResult);   // 1.3.5: boss protections, before the Armory
                         executeBonusMM = TeamHQBonus.ApplyAttack(player, executeBonusMM); // v1.1.11: Team HQ Armory, last.
                         target.HP = Math.Max(0, target.HP - executeBonusMM);
                         EvHit(player, executeBonusMM);   // 1.2.6
@@ -16729,7 +16760,8 @@ public partial class CombatEngine
                 if (player.HP < player.MaxHP * 0.4 && target != null && target.IsAlive)
                 {
                     long desperateDmg = (long)(abilityResult.Damage * 0.5);
-                    desperateDmg = Math.Max(1, desperateDmg - target.Defence / 4);
+                    desperateDmg = Math.Max(1, desperateDmg - ApplyArmorPiercing(target.Defence / 4, player));
+                    desperateDmg = ApplyAbilityBossProtections(target, desperateDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     desperateDmg = TeamHQBonus.ApplyAttack(player, desperateDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= desperateDmg;
                     EvHit(player, desperateDmg);   // 1.2.6
@@ -16755,6 +16787,7 @@ public partial class CombatEngine
                     if (fireVulnerable)
                     {
                         long fireBonusDmg = abilityResult.Damage / 2;
+                        fireBonusDmg = ApplyAbilityBossProtections(target, fireBonusDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         fireBonusDmg = TeamHQBonus.ApplyAttack(player, fireBonusDmg); // v1.1.11: Team HQ Armory, last.
                         target.HP -= fireBonusDmg;
                         EvHit(player, fireBonusDmg);   // 1.2.6
@@ -16796,6 +16829,7 @@ public partial class CombatEngine
                     // v0.61.0 Druid's Shrines: Aurelion attunement = +5% holy ability damage.
                     if (result.Player != null && result.Player.IsAttunedTo("aurelion"))
                         holyBonusDmg = (long)(holyBonusDmg * (1f + GameConfig.ShrineAurelionHolyDamageBonus));
+                    holyBonusDmg = ApplyAbilityBossProtections(target, holyBonusDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     holyBonusDmg = TeamHQBonus.ApplyAttack(player, holyBonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= holyBonusDmg;
                     EvHit(player, holyBonusDmg);   // 1.2.6
@@ -16824,6 +16858,7 @@ public partial class CombatEngine
                     (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
                 {
                     long avengerBonusDmg = (long)(abilityResult.Damage * 0.75);
+                    avengerBonusDmg = ApplyAbilityBossProtections(target, avengerBonusDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     avengerBonusDmg = TeamHQBonus.ApplyAttack(player, avengerBonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= avengerBonusDmg;
                     EvHit(player, avengerBonusDmg);   // 1.2.6
@@ -16891,8 +16926,9 @@ public partial class CombatEngine
                         long holyAoeDmg = (long)(abilityResult.Damage * GetAoEDiminishingMultiplier(hi));
                         if (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0)
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
-                        long actualHolyDmg = Math.Max(1, holyAoeDmg - m.ArmPow / 2);
+                        long actualHolyDmg = Math.Max(1, holyAoeDmg - ApplyArmorPiercing(m.ArmPow / 2, player));
                         if (m.IsSleeping) { actualHolyDmg += actualHolyDmg / 2; }
+                        actualHolyDmg = ApplyAbilityBossProtections(m, actualHolyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         actualHolyDmg = TeamHQBonus.ApplyAttack(player, actualHolyDmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= actualHolyDmg;
                         EvHit(player, actualHolyDmg);   // 1.2.6
@@ -17007,8 +17043,9 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.ability_frenzy", extraHits));
                     for (int i = 0; i < extraHits && target.IsAlive; i++)
                     {
-                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - target.Defence / 4);
+                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - ApplyArmorPiercing(target.Defence / 4, player));
                         frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
+                        frenzyDmg = ApplyAbilityBossProtections(target, frenzyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         frenzyDmg = TeamHQBonus.ApplyAttack(player, frenzyDmg); // v1.1.11: Team HQ Armory, last.
                         target.HP -= frenzyDmg;
                         EvHit(player, frenzyDmg);   // 1.2.6
@@ -17041,6 +17078,7 @@ public partial class CombatEngine
                         bool isExecute = m.HP < m.MaxHP * 0.3;
                         if (isExecute) blossomDmg *= 2;
                         if (m.IsSleeping) blossomDmg += blossomDmg / 2;
+                        blossomDmg = ApplyAbilityBossProtections(m, blossomDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         blossomDmg = TeamHQBonus.ApplyAttack(player, blossomDmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= blossomDmg;
                         EvHit(player, blossomDmg);   // 1.2.6
@@ -17246,6 +17284,7 @@ public partial class CombatEngine
                     var corrodeTarget = corrodeTargets[ci];
                     long corrodeDmg = abilityResult.Damage > 0 ? abilityResult.Damage : 50 + player.Intelligence * 2;
                     corrodeDmg = (long)(corrodeDmg * GetAoEDiminishingMultiplier(ci));
+                    corrodeDmg = ApplyAbilityBossProtections(corrodeTarget, corrodeDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     corrodeDmg = TeamHQBonus.ApplyAttack(player, corrodeDmg); // v1.1.11: Team HQ Armory, last.
                     corrodeTarget.HP -= (int)corrodeDmg;
                     EvHit(player, (int)corrodeDmg);   // 1.2.6
@@ -17429,6 +17468,7 @@ public partial class CombatEngine
                         // AoE diminishing returns per target
                         float aoeMult = targetIdx switch { 0 => 1.0f, 1 => 0.75f, 2 => 0.50f, _ => 0.25f };
                         dmg = Math.Max(1, (int)(dmg * aoeMult));
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -17521,6 +17561,7 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int dmg = abilityResult.Damage;
+                    long wrathHealBase = dmg;
                     bool instantKill = !target.IsBoss && target.HP < (int)(target.MaxHP * 0.30);
                     if (instantKill)
                     {
@@ -17532,10 +17573,11 @@ public partial class CombatEngine
                     else
                     {
                         dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
+                        wrathHealBase = _lastHandlerHpRemoved;   // 1.3.5: the heal takes the HP the protected hit removed
                         terminal.SetColor("bright_cyan");
                         UIHelper.WriteRow(terminal, Loc.Get("combat.ability_wrath_deep", MonsterNames.Display(target), dmg));
                     }
-                    int heal = (int)(dmg * 0.50);
+                    int heal = (int)(wrathHealBase * 0.50);
                     EvHeal(player, player, HealRoom(player, heal));   // 1.2.6
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("bright_green");
@@ -17593,6 +17635,7 @@ public partial class CombatEngine
                     {
                         var m = crescLiving[ci];
                         int dmg = (int)((abilityResult.Damage + bonusDmg) * GetAoEDiminishingMultiplier(ci));
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -17640,6 +17683,7 @@ public partial class CombatEngine
                     {
                         var m = gfLiving[gi];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(gi));
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -17715,6 +17759,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = (int)(abilityResult.Damage * multiplier);
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -17781,6 +17826,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage + bonusDmg;
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -17849,6 +17895,7 @@ public partial class CombatEngine
                     UIHelper.WriteRow(terminal, Loc.Get("combat.ability_echo_25", MonsterNames.Display(target), dmg));
                     if (random.Next(100) < 25)
                     {
+                        // 1.3.5: the echo repeats the helper's hit, which has had the boss protections once already
                         target.HP -= dmg; // hq-armory: out (echo reuses the boosted helper hit)
                         EvHit(player, dmg);   // 1.2.6
                         terminal.SetColor("bright_magenta");
@@ -17882,6 +17929,7 @@ public partial class CombatEngine
                     {
                         var m = entropyLiving[ei];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(ei));
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -17946,6 +17994,7 @@ public partial class CombatEngine
                     {
                         int dmg = abilityResult.Damage;
                         if (m.Stunned || m.IsStunned) dmg *= 2;
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -18073,6 +18122,7 @@ public partial class CombatEngine
                         {
                             var m = overflowLiving[oi];
                             int spreadDmg = (int)(spreadDmgBase * GetAoEDiminishingMultiplier(oi));
+                            spreadDmg = (int)ApplyAbilityBossProtections(m, spreadDmg, abilityResult);   // 1.3.5: boss protections on each spread hit
                             m.HP -= spreadDmg; // hq-armory: out (spread is derived from the boosted helper hit)
                             EvHit(player, spreadDmg);   // 1.2.6
                             terminal.SetColor("bright_red");
@@ -18104,7 +18154,7 @@ public partial class CombatEngine
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     bool isPoisoned = target.Poisoned;
                     float leechRate = isPoisoned ? 0.60f : 0.40f;
-                    int heal = (int)(dmg * leechRate);
+                    int heal = (int)(_lastHandlerHpRemoved * leechRate);   // 1.3.5: from the HP the protected hit removed
                     EvHeal(player, player, HealRoom(player, heal));   // 1.2.6
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("dark_red");
@@ -18127,6 +18177,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -18206,6 +18257,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -18331,7 +18383,7 @@ public partial class CombatEngine
                     int dmg = abilityResult.Damage;
                     if (player.HP < (int)(player.MaxHP * 0.30)) dmg = (int)(dmg * 1.5);
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
-                    int heal = (int)(dmg * 0.30);
+                    int heal = (int)(_lastHandlerHpRemoved * 0.30);   // 1.3.5: from the HP the protected hit removed
                     EvHeal(player, player, HealRoom(player, heal));   // 1.2.6
                     player.HP = Math.Min(player.MaxHP, player.HP + heal);
                     terminal.SetColor("red");
@@ -18392,6 +18444,7 @@ public partial class CombatEngine
                     {
                         var m = vrLiving[vi];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(vi));
+                        dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
@@ -18411,6 +18464,7 @@ public partial class CombatEngine
                         foreach (var m in monsters.Where(m => m.IsAlive))
                         {
                             int explosionDmg = explosionBase * kills;
+                            explosionDmg = (int)ApplyAbilityBossProtections(m, explosionDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                             explosionDmg = (int)TeamHQBonus.ApplyAttack(player, explosionDmg); // v1.1.11: Team HQ Armory, last.
                             m.HP -= explosionDmg;
                             EvHit(player, explosionDmg);   // 1.2.6
@@ -18567,7 +18621,7 @@ public partial class CombatEngine
                 // Hit primary target
                 if (target != null && target.IsAlive)
                 {
-                    long primaryHit = TeamHQBonus.ApplyAttack(player, chainDamage); // v1.1.11: Team HQ Armory, last.
+                    long primaryHit = TeamHQBonus.ApplyAttack(player, ApplyAbilityBossProtections(target, chainDamage, abilityResult)); // v1.1.11: Team HQ Armory, last; 1.3.5: boss protections first
                     target.HP -= (int)primaryHit;
                     EvHit(player, (int)primaryHit);   // 1.2.6
                     result.TotalDamageDealt += primaryHit;
@@ -18582,6 +18636,7 @@ public partial class CombatEngine
                     {
                         var m = chainTargets[chi];
                         long chainHit = (long)(chainReduced * GetAoEDiminishingMultiplier(chi));
+                        chainHit = ApplyAbilityBossProtections(m, chainHit, abilityResult);   // 1.3.5: boss protections, before the Armory
                         chainHit = TeamHQBonus.ApplyAttack(player, chainHit); // v1.1.11: Team HQ Armory, last.
                         m.HP -= (int)chainHit;
                         EvHit(player, (int)chainHit);   // 1.2.6
@@ -20268,12 +20323,13 @@ public partial class CombatEngine
 
                 long damage = Math.Max(1, attackPower);
                 damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
-                bool tmLanded = await ApplySingleMonsterDamageChecked(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
+                long tmDealt = await ApplySingleMonsterDamageDealt(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
 
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
-                if (tmLanded)
-                    ApplyPostHitEnchantments(teammate, target, TeamHQBonus.ApplyAttack(teammate, damage), result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 (0 for NPCs)
+                // 1.3.5: the riders scale from the HP removed.
+                if (tmDealt > 0)
+                    ApplyPostHitEnchantments(teammate, target, tmDealt, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 Armory inside (0 for NPCs)
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -27338,7 +27394,38 @@ public partial class CombatEngine
                 long manaRegen = GodBoonSystem.ManaRegen(tm, StatEffectsSystem.GetManaRegenPerRound(tm.Wisdom));
                 tm.Mana = Math.Min(tm.MaxMana, tm.Mana + manaRegen);
             }
+            ApplyMemberGearRegenShare(tm);
         }
+    }
+
+    /// <summary>
+    /// 1.3.5: the equipment regeneration a round. The summed gear value is tenths of a percent of the pool
+    /// (17 is 1.7 percent), at most GameConfig.MaxGearRegenTenthsPercent however many items carry it, and at
+    /// least 1 when the gear has any. A value of 0 gives 0.
+    /// </summary>
+    internal static long GearRegenAmount(long pool, int summedValue)
+    {
+        if (summedValue <= 0) return 0;
+        int tenths = Math.Min(GameConfig.MaxGearRegenTenthsPercent, summedValue);
+        return Math.Max(1, pool * tenths / 1000);
+    }
+
+    /// <summary>
+    /// 1.3.5: a companion's or teammate's own gear regeneration at the round end, silent like the rest of the
+    /// party step. A companion's HP is synced to CompanionSystem.
+    /// </summary>
+    private static void ApplyMemberGearRegenShare(Character tm)
+    {
+        int hpRegen = tm.GetEquipmentHPRegen();
+        if (hpRegen > 0 && tm.HP < tm.MaxHP)
+        {
+            tm.HP = Math.Min(tm.MaxHP, tm.HP + GearRegenAmount(tm.MaxHP, hpRegen));
+            if (tm.IsCompanion && tm.CompanionId.HasValue)
+                CompanionSystem.Instance.SyncCompanionHP(tm);
+        }
+        int manaRegen = tm.GetEquipmentManaRegen();
+        if (manaRegen > 0 && tm.Mana < tm.MaxMana)
+            tm.Mana = Math.Min(tm.MaxMana, tm.Mana + GearRegenAmount(tm.MaxMana, manaRegen));
     }
 
     /// <summary>
@@ -27384,7 +27471,7 @@ public partial class CombatEngine
         if (equipHPRegen > 0 && player.HP < player.MaxHP)
         {
             long oldHP = player.HP;
-            player.HP = Math.Min(player.MaxHP, player.HP + equipHPRegen);
+            player.HP = Math.Min(player.MaxHP, player.HP + GearRegenAmount(player.MaxHP, equipHPRegen));
             long healed = player.HP - oldHP;
             if (healed > 0)
             {
@@ -27398,7 +27485,7 @@ public partial class CombatEngine
         if (equipManaRegen > 0 && player.Mana < player.MaxMana)
         {
             long oldMana = player.Mana;
-            player.Mana = Math.Min(player.MaxMana, player.Mana + equipManaRegen);
+            player.Mana = Math.Min(player.MaxMana, player.Mana + GearRegenAmount(player.MaxMana, equipManaRegen));
             long restored = player.Mana - oldMana;
             if (restored > 0)
             {
@@ -30369,7 +30456,17 @@ public partial class CombatEngine
                 // Award to companion through CompanionSystem
                 CompanionSystem.Instance?.AwardSpecificCompanionXP(teammate.DisplayName, slotXP, terminal);
                 terminal.SetColor("bright_magenta");
-                terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share", teammate.DisplayName, percent, slotXP, catchUpLabel)}");
+                // v1.3.5: the companion's progress to its next level, as the NPC line shows it. Read from the
+                // Companion itself (the wrapper's Experience is not the companion's), after the award, so a level
+                // gained in this award shows the new level's need. At the cap or not found: the plain line.
+                var awarded = teammate.CompanionId is CompanionId cid ? CompanionSystem.Instance?.GetCompanion(cid) : null;
+                if (awarded != null && awarded.Level < 100)
+                {
+                    long companionNeeded = GameConfig.GetExperienceForLevel(awarded.Level + 1);
+                    terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share_progress", teammate.DisplayName, percent, slotXP, awarded.Experience.ToString("N0"), companionNeeded.ToString("N0"), catchUpLabel)}");
+                }
+                else
+                    terminal.WriteLine($"  {Loc.Get("combat.teammate_xp_share", teammate.DisplayName, percent, slotXP, catchUpLabel)}");
             }
             else
             {
@@ -32262,15 +32359,24 @@ public partial class CombatEngine
     /// <summary>
     /// Select a random boss ability name based on current phase
     /// </summary>
-    private string SelectBossAbility(BossCombatContext ctx)
+    private string? SelectBossAbility(BossCombatContext ctx, out string? heldBack)
     {
+        heldBack = null;
         // Defense in depth: BossContext should always carry BossData, but if a
         // caller forgets (Noctura betrayal NPE in v0.57.17 was the symptom), fall
         // back to "Divine Strike" rather than crashing combat.
         if (ctx.BossData?.Abilities == null) return "Divine Strike";
         var abilities = ctx.BossData.Abilities.Where(a => a.Phase <= ctx.CurrentPhase).ToList();
         if (abilities.Count == 0) return "Divine Strike";
-        return abilities[random.Next(abilities.Count)].Name;
+        string name = abilities[random.Next(abilities.Count)].Name;
+        // 1.3.5 (CT-2): a held counter's blocked ability is not used: null (the caller's normal attack), no redraw,
+        // so the god's other abilities come no more often; heldBack names it for the caller's line
+        if (ctx.CounterBlockedAbilities != null && ctx.CounterBlockedAbilities.Contains(name))
+        {
+            heldBack = name;
+            return null;
+        }
+        return name;
     }
 
     /// <summary>
@@ -34030,6 +34136,10 @@ public class BossCombatContext
     public string AoEAbilityName { get; set; } = "";      // Loc key (or name) of AoE ability
     public double TankAbsorptionRate { get; set; } = 0.6; // % of AoE damage absorbed by taunting tank
     public double DivineArmorReduction { get; set; } = 0;  // % damage reduction from divine armor (set by OldGodBossSystem)
+    /// <summary>1.3.5 (CT-2): the abilities a held counter takes out of SelectBossAbility's turns (set at the build by
+    /// OldGodBossSystem when the player holds the god's counter); null otherwise. Internal, so it stays off the
+    /// context's public property snapshot.</summary>
+    internal IReadOnlyCollection<string>? CounterBlockedAbilities { get; set; }
 
     /// <summary>
     /// Determine what phase the boss should be in based on HP percentage

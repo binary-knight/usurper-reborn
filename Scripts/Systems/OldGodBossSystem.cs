@@ -452,9 +452,11 @@ namespace UsurperRemake.Systems
             terminal.WriteLine($"  {Loc.Get("ui.level")}: {boss.Level}", "gray");
             terminal.WriteLine($"  {Loc.Get("ui.stat_hp")}: {FightHP(boss):N0}", "red");   // v1.1.10: the fight's HP, not the data's
 
-            // Warning for unenchanted weapons against gods with divine armor
+            // Warning for gods with divine armor. 1.3.5 (CT-3): it names the full cut, which reaches every hit, spells
+            // included, and the counter that removes it; with that counter on either hand it says the counter breaks it.
             double divineArmor = GetDivineArmorReduction(boss.Type, player);
-            if (divineArmor > 0)
+            bool counterHeld = HoldsCounter(boss.Type, player);
+            if (divineArmor > 0 || counterHeld)
             {
                 terminal.WriteLine("");
                 terminal.SetColor("bright_red");
@@ -466,10 +468,18 @@ namespace UsurperRemake.Systems
                     _ => Loc.Get("old_god.armor_divine")
                 };
                 terminal.WriteLine(Loc.Get("old_god.warning_protected", boss.LocName(), armorName));
-                terminal.SetColor("red");
-                terminal.WriteLine(Loc.Get("old_god.warning_less_damage", $"{divineArmor * 100:N0}"));
-                terminal.SetColor("yellow");
-                terminal.WriteLine(Loc.Get("old_god.warning_enchant"));
+                if (counterHeld)
+                {
+                    terminal.SetColor("bright_green");
+                    terminal.WriteLine(Loc.Get("old_god.counter_breaks_armour", CounterTierName(boss.Type)));
+                }
+                else
+                {
+                    terminal.SetColor("red");
+                    terminal.WriteLine(Loc.Get("old_god.warning_less_damage", $"{divineArmor * 100:N0}"));
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(Loc.Get("old_god.warning_enchant", CounterTierName(boss.Type)));
+                }
             }
 
             terminal.WriteLine("");
@@ -842,8 +852,9 @@ namespace UsurperRemake.Systems
             player.RecalculateStats();
 
             // 1.3.4: the god and its context come from BuildBossFight, the one build the balance
-            // simulator calls too; the artifact count and the dialogue's modifiers are passed in
-            var fight = BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player);
+            // simulator calls too; the artifact count and the dialogue's modifiers are passed in.
+            // 1.3.5 (B1): and the living fighters, counted once here (the god's HP is not recounted)
+            var fight = BuildBossFight(boss, ArtifactSystem.Instance.GetCollectedCount(), activeCombatModifiers.ToDialogue(), player, CountLivingFighters(player, dungeonTeammates));
             var bossMonster = fight.Monster;
             if (AnnounceFightHP(bossMonster, boss, terminal))
                 await Pacing.Wait(1500);   // the fight clears the screen as it starts
@@ -1089,13 +1100,54 @@ namespace UsurperRemake.Systems
         internal static BossFight BuildBossFight(OldGodType type, int artifactCount, BossDialogue dialogue, Character player) =>
             BuildBossFight(OldGodsData.GetGodBossData(type), artifactCount, dialogue, player);
 
-        /// <summary>1.3.4: BuildBossFight for a boss row (Noctura has two: her own and the betrayal's).</summary>
-        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player)
+        /// <summary>1.3.5 (B1): BuildBossFight with the living fighters n, counted once by the caller.</summary>
+        internal static BossFight BuildBossFight(OldGodType type, int artifactCount, BossDialogue dialogue, Character player, int fighters) =>
+            BuildBossFight(OldGodsData.GetGodBossData(type), artifactCount, dialogue, player, fighters);
+
+        /// <summary>1.3.4: BuildBossFight for a boss row (Noctura has two: her own and the betrayal's). One fighter.</summary>
+        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player) =>
+            BuildBossFight(boss, artifactCount, dialogue, player, 1);
+
+        /// <summary>
+        /// 1.3.5 (B1): the party HP factor s(n) of a god's fight, n the living fighters (the player and every
+        /// teammate, companion or NPC ally) counted once when the fight is built: 1.0 for n of 1 (solo, its own
+        /// rule unchanged) and for 5 or more, 1 - 3k for 2, 1 - 2k for 3, 1 - k for 4, k being
+        /// GameConfig.MaelkethPartyHpScaleK. 1.0 for every god but GameConfig.MaelkethPartyHpScaleGod.
+        /// </summary>
+        internal static double PartyHpScale(OldGodType god, int fighters)
+        {
+            if (god != GameConfig.MaelkethPartyHpScaleGod) return 1.0;
+            const double k = GameConfig.MaelkethPartyHpScaleK;
+            return fighters switch
+            {
+                2 => 1.0 - 3 * k,
+                3 => 1.0 - 2 * k,
+                4 => 1.0 - k,
+                _ => 1.0,
+            };
+        }
+
+        /// <summary>1.3.5 (B1): the living fighters at a fight's start: the player and every living teammate
+        /// (companions and NPC allies alike). Read once, when the fight is built.</summary>
+        internal static int CountLivingFighters(Character player, IEnumerable<Character>? teammates) =>
+            (player.IsAlive ? 1 : 0) + (teammates?.Count(t => t != null && t.IsAlive) ?? 0);
+
+        /// <summary>1.3.5 (B1): BuildBossFight with the living fighters n; the god's fight HP is scaled by
+        /// PartyHpScale(n) before the dialogue's adjustments. n is not read again during the fight.</summary>
+        internal static BossFight BuildBossFight(OldGodBossData boss, int artifactCount, BossDialogue dialogue, Character player, int fighters)
         {
             dialogue ??= BossDialogue.None;
 
             // Create a Monster from boss data
             var monster = BuildBossMonster(boss, artifactCount);
+
+            // 1.3.5 (B1): the party HP scale, once, from the fighters counted at the build
+            double partyScale = PartyHpScale(boss.Type, fighters);
+            if (partyScale != 1.0)
+            {
+                monster.MaxHP = Math.Max(1, (long)(monster.MaxHP * partyScale));
+                monster.HP = monster.MaxHP;
+            }
 
             // Apply dialogue-based stat adjustments to the monster
             ApplyDialogueToMonster(monster, player, dialogue);
@@ -1130,6 +1182,10 @@ namespace UsurperRemake.Systems
 
             // Set divine armor reduction on the combat context so CombatEngine applies it
             ctx.DivineArmorReduction = DivineArmorReduction(boss.Type, player);
+
+            // 1.3.5 (CT-2): a held counter records the god's blocked abilities for SelectBossAbility
+            if (HoldsCounter(boss.Type, player))
+                ctx.CounterBlockedAbilities = CounterBlockedAbilities(boss.Type);
 
             return new BossFight(monster, ctx);
         }
@@ -1753,8 +1809,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// Calculate divine armor damage reduction for late-game Old Gods.
-        /// Gods with divine armor resist unenchanted weapons.
-        /// Artifact weapons fully bypass; enchanted weapons partially bypass.
+        /// 1.3.5 (CT-3): only the god's own counter enchant on the main or off hand removes it; any other weapon,
+        /// enchanted or not, takes the full reduction.
         /// </summary>
         private double GetDivineArmorReduction(OldGodType godType, Character player) => DivineArmorReduction(godType, player);
 
@@ -1770,39 +1826,46 @@ namespace UsurperRemake.Systems
             };
             if (baseReduction <= 0) return 0;
 
-            // Check BOTH main hand and off-hand for divine armor bypass
-            var mainHand = player.GetEquipment(EquipmentSlot.MainHand);
-            var offHand = player.GetEquipment(EquipmentSlot.OffHand);
+            // 1.3.5 (CT-3): the matching counter removes it; the weapon name bypass and the plain-enchant halving are gone
+            return HoldsCounter(godType, player) ? 0 : baseReduction;
+        }
 
-            // Check if either weapon is an artifact (full bypass)
-            foreach (var weapon in new[] { mainHand, offHand })
-            {
-                if (weapon?.Name != null &&
-                    (weapon.Name.Contains("Artifact") || weapon.Name.Contains("Godforged") ||
-                     weapon.Name.Contains("Sunforged") || weapon.Name.Contains("Voidtouched")))
-                {
-                    return 0; // Full bypass
-                }
-            }
+        /// <summary>1.3.5 (CT-2): the enchant kind code of a god's counter, "" for a god without one. The shop
+        /// writes the same codes (MagicShopLocation.CounterKindCodes); a test pins the two together.</summary>
+        internal static string CounterKindCode(OldGodType godType) => godType switch
+        {
+            OldGodType.Aurelion => "sunbane",
+            OldGodType.Terravok => "stonebane",
+            OldGodType.Manwe => "godbane",
+            _ => ""
+        };
 
-            // Check if either weapon has any enchantment (partial bypass)
-            bool hasEnchantment = false;
-            foreach (var weapon in new[] { mainHand, offHand })
-            {
-                if (weapon == null) continue;
-                if (weapon.HasFireEnchant || weapon.HasFrostEnchant || weapon.HasLightningEnchant ||
-                    weapon.HasPoisonEnchant || weapon.HasHolyEnchant || weapon.HasShadowEnchant ||
-                    weapon.GetEnchantmentCount() > 0)
-                {
-                    hasEnchantment = true;
-                    break;
-                }
-            }
-            if (hasEnchantment)
-                return baseReduction * (1.0 - GameConfig.BossDivineArmorEnchantedBypass);
+        /// <summary>1.3.5 (CT-2): true when the player's main or off hand carries the god's counter code.</summary>
+        internal static bool HoldsCounter(OldGodType godType, Character player)
+        {
+            string code = CounterKindCode(godType);
+            if (code.Length == 0 || player == null) return false;
+            foreach (var weapon in new[] { player.GetEquipment(EquipmentSlot.MainHand), player.GetEquipment(EquipmentSlot.OffHand) })
+                if (weapon != null && weapon.GetEnchantedKinds().Contains(code)) return true;
+            return false;
+        }
 
-            // No enchantments on either weapon — full divine armor penalty
-            return baseReduction;
+        /// <summary>1.3.5 (CT-2): the abilities a held counter takes out of the god's turns; a drawn one becomes
+        /// the god's plain strike.</summary>
+        internal static IReadOnlyCollection<string> CounterBlockedAbilities(OldGodType godType) => godType switch
+        {
+            OldGodType.Aurelion => new[] { "Light's Embrace", "Sacrifice" },
+            OldGodType.Terravok => new[] { "Stone Skin", "Entomb" },
+            OldGodType.Manwe => new[] { "Word of Creation", "Time Stop" },
+            _ => Array.Empty<string>()
+        };
+
+        /// <summary>1.3.5 (CT-2): the shop's tier name of a god's counter in the player's language, "" for a god
+        /// without one.</summary>
+        internal static string CounterTierName(OldGodType godType)
+        {
+            int i = Array.IndexOf(MagicShopLocation.CounterKindCodes, CounterKindCode(godType));
+            return i < 0 ? "" : MagicShopLocation.TierName(MagicShopLocation.CounterTiers[i] - 1);
         }
 
         private string CenterText(string text, int width)

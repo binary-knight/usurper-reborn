@@ -202,7 +202,10 @@ public static class GmcpBridge
     /// and current cooldown state. Called at character login and after each
     /// combat round (cooldowns tick down per round). Spells emitted as a separate
     /// 'spells' array so MUD client scripts can render the two skill types
-    /// independently if they want. Cheap no-op when GMCP isn't negotiated.
+    /// independently if they want. Each spell entry carries the mana a cast charges
+    /// (SpellSystem.CalculateManaCost for this player) and the level at which the spell
+    /// opens (SpellSystem.GetLevelRequired), not the SpellInfo table values.
+    /// Cheap no-op when GMCP isn't negotiated.
     /// </summary>
     public static void EmitSkillsList(global::Character? player)
     {
@@ -231,8 +234,8 @@ public static class GmcpBridge
             spells.Add(new
             {
                 name = spell.DisplayName,
-                manaCost = spell.ManaCost,
-                requiresLevel = spell.LevelRequired
+                manaCost = SpellSystem.CalculateManaCost(spell, player),
+                requiresLevel = SpellSystem.GetLevelRequired(player.Class, spell.Level)
             });
         }
 

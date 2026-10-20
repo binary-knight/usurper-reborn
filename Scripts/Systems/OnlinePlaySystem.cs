@@ -14,7 +14,7 @@ namespace UsurperRemake.Systems
     /// Client-side system for connecting to an online Usurper Reborn MUD server.
     ///
     /// Two connection modes:
-    ///   - BBS door mode: Direct TCP to server:4000 (sslh routes raw TCP to MUD server).
+    ///   - BBS door mode: Direct TCP to server:4000 (the haproxy multiplexer routes raw TCP to the MUD server).
     ///     Sends AUTH header directly on the TCP stream. No SSH overhead or echo issues.
     ///   - Local/Steam mode: SSH to server:4000 as gateway user "usurper"/"play".
     ///     sshd ForceCommand launches relay client which bridges to MUD server.
@@ -167,8 +167,8 @@ namespace UsurperRemake.Systems
 
         /// <summary>
         /// 1.2.8: open the login connection through <see cref="OnlineTransport.Factory"/>: the SSH gateway to the
-        /// relay (Local and Steam), or direct TCP for the BBS door (no SSH client in the door environment; sslh on
-        /// port 4000 routes raw TCP to the MUD server). Null after a failure, which is shown here.
+        /// relay (Local and Steam), or direct TCP for the BBS door (no SSH client in the door environment; the haproxy
+        /// multiplexer on port 4000 routes raw TCP to the MUD server). Null after a failure, which is shown here.
         /// </summary>
         private async Task<IOnlineAuthTransport?> ConnectTransportAsync(string server, int port, bool directTcp)
         {
@@ -1290,7 +1290,7 @@ namespace UsurperRemake.Systems
             var client = new TcpClient { NoDelay = true };
             try
             {
-                // sslh needs a moment to detect protocol: connect with timeout
+                // the haproxy multiplexer needs a moment to detect the protocol: connect with timeout
                 var connectTask = client.ConnectAsync(host, port);
                 if (await Task.WhenAny(connectTask, Task.Delay(10000)) != connectTask)
                     throw new TimeoutException();

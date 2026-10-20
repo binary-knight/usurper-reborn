@@ -1535,9 +1535,14 @@ namespace UsurperRemake.Locations
                 terminal.WriteLine($"  {Loc.Get("dark_alley.bm_inspect_enchants")}");
                 foreach (var (effectType, value) in item.LootEffects)
                 {
-                    string effName = ((LootGenerator.SpecialEffect)effectType).ToString();
+                    // 1.3.5: the effect's shown name (item.effect.*.name), not the enum identifier
+                    var effect = (LootGenerator.SpecialEffect)effectType;
+                    string effKey = LootGenerator.EffectWordKey(effect, "name");
+                    string effName = Loc.Has(effKey) ? Loc.Get(effKey) : effect.ToString();
                     terminal.SetColor("magenta");
-                    terminal.WriteLine($"    - {effName}{(value != 0 ? $" ({value})" : "")}");
+                    string shownValue = effect is LootGenerator.SpecialEffect.Regeneration or LootGenerator.SpecialEffect.ManaRegen
+                        ? LootGenerator.RegenPercentText(value) + "%" : value.ToString();   // 1.3.5: gear regeneration is a share of the pool
+                    terminal.WriteLine($"    - {effName}{(value != 0 ? $" ({shownValue})" : "")}");
                 }
             }
 

@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Locations/PrisonLocation.cs, Scripts/Locations/MusicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Core/Character.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.5 | A living companion takes the NPC teammate's 75 percent share of the experience from room features and shared rewards, the experience line after a fight shows how close it is to its next level, and its own regeneration gear restores a share of its HP and mana each round.
 history: 1.3.4 | none
 history: 1.3.3 | A companion at 0 HP in a fight is Downed and dies only when a monster finishes it or when, still standing, it takes a killing blow in your place; leaving it to die now means holding a healing potion and not rescuing it while it is Downed.
 history: 1.3.2 | Companions regain stamina and mana at the end of each round, and when your gold does not cover every entry fee only the NPCs you cannot pay for stay at the dungeon entrance.
@@ -52,6 +53,8 @@ At the Music Shop press T. From level 20 Melodia offers to join and Y accepts; b
 ## Companion levels and growth
 
 A companion uses the same experience table as you and stops at level 100. Each level gained adds 12 to 24 HP plus 1 for every 10 levels; a Tank gets 8 more, a Healer 2 more and a Bard 1 more. Other gains follow the role: a Tank gains 2 or 3 defence and 1 or 2 attack, a Damage companion 3 or 4 attack, 1 or 2 speed and 1 defence, a Healer 4 or 5 healing, 2 or 3 magic and 1 defence, a Bard 3 or 4 magic, 2 or 3 healing, 1 or 2 speed and 1 attack.
+
+A living companion and a living NPC teammate in your dungeon party each take 75 percent of the experience you gain from a room feature you examine. In a group with another player they also each take 75 percent of the experience from treasure, a treasure chest, a cleared floor and the floor boss bonus, on top of their part of the fight's experience.
 
 A companion can train a skill up to Superb; an NPC ally stops at Expert. At the Level Master, H (help a team member) gives an active companion, an NPC on your team or your spouse up to half of your own experience, which leaves your total.
 

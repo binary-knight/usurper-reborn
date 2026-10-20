@@ -422,12 +422,12 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(35, shard.GetProperty("floorMax").GetInt32());
         Assert.Equal(new[] { 13 }, shard.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         var heart = Find(materials, "id", "heart_of_the_ocean");
-        Assert.Equal(new[] { 11 }, heart.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        Assert.Equal(new[] { 11, 17 }, heart.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         Assert.Equal(new[] { 4, 5 }, heart.GetProperty("statTrainings").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         var dust = Find(materials, "id", "fading_starlight_dust");
-        Assert.Equal(new[] { 10, 13, 14 }, dust.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
+        Assert.Equal(new[] { 10, 13, 14, 15 }, dust.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         var petal = Find(materials, "id", "withered_heart_petal");
-        Assert.Equal(0, petal.GetProperty("enchants").GetArrayLength());
+        Assert.Equal(new[] { 15, 17 }, petal.GetProperty("enchants").EnumerateArray().Select(e => e.GetInt32()).ToArray());
         Assert.Equal(0, petal.GetProperty("statTrainings").GetArrayLength());
         var gods = Economy("materialGods");
         Assert.Equal(7, gods.Length);
@@ -440,7 +440,7 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
     public void EconomyEnchantsReadTheShopTiersAndWhatANamedEnchantAdds()
     {
         var enchants = Economy("enchants");
-        Assert.Equal(14, enchants.Length);
+        Assert.Equal(17, enchants.Length);
         var godforged = Find(enchants, "number", "12");
         Assert.Equal("Godforged", godforged.GetProperty("name").GetProperty("en").GetString());
         Assert.True(godforged.GetProperty("oneChosenStat").GetBoolean());
@@ -463,6 +463,29 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.True(phoenix.GetProperty("HasFireEnchant").GetBoolean());
         Assert.Equal(20, phoenix.GetProperty("WeaponPower").GetDouble());
         Assert.Equal(0, Find(enchants, "number", "1").GetProperty("materials").GetArrayLength());
+    }
+
+    [Fact]
+    public void EconomyEnchantsNameTheGodAndAbilitiesEachCounterHoldsBack()
+    {
+        var enchants = Economy("enchants");
+        var expected = new Dictionary<string, (string god, string[] abilities)>
+        {
+            ["15"] = ("Aurelion", new[] { "Light's Embrace", "Sacrifice" }),
+            ["16"] = ("Terravok", new[] { "Stone Skin", "Entomb" }),
+            ["17"] = ("Manwe", new[] { "Word of Creation", "Time Stop" }),
+        };
+        foreach (var (number, want) in expected)
+        {
+            var counter = Find(enchants, "number", number).GetProperty("counter");
+            Assert.Equal(want.god, counter.GetProperty("god").GetString());
+            Assert.Equal(want.abilities, counter.GetProperty("abilities").EnumerateArray().Select(a => a.GetString()).ToArray());
+        }
+        for (int n = 1; n <= 14; n++)
+        {
+            var row = Find(enchants, "number", n.ToString());
+            Assert.True(!row.TryGetProperty("counter", out var c) || c.ValueKind == JsonValueKind.Null, "tier " + n);
+        }
     }
 
     [Fact]
@@ -918,11 +941,28 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.True(manwe.GetProperty("physicalImmunityPhase").GetBoolean());
         Assert.True(manwe.GetProperty("magicalImmunityPhase").GetBoolean());
         Assert.Equal(10, manwe.GetProperty("phase3AtHpPercent").GetInt32());
-        Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), manwe.GetProperty("unenchantedDamageCutPercent").GetInt32());
+        Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), manwe.GetProperty("divineArmorCutPercent").GetInt32());
         var noctura = One(gods, "Noctura");
         Assert.True(noctura.GetProperty("physicalImmunityPhase").GetBoolean());
         Assert.Equal(35, noctura.GetProperty("corruptionPerStack").GetInt32());
         Assert.Equal(GameConfig.BossPotionCooldownRounds, noctura.GetProperty("potionCooldownRounds").GetInt32());
+    }
+
+    [Fact]
+    public void OldGodMechanicsCarryTheDivineArmorCutUnderItsOwnName()
+    {
+        var gods = _export.Data("realm").GetProperty("oldGodMechanics").EnumerateArray().ToArray();
+        int Cut(string id)
+        {
+            var god = gods.Single(g => g.GetProperty("id").GetString() == id);
+            return god.TryGetProperty("divineArmorCutPercent", out var v) && v.ValueKind == JsonValueKind.Number ? v.GetInt32() : 0;
+        }
+        Assert.Equal((int)Math.Round(GameConfig.AurelionDivineShield * 100), Cut("Aurelion"));
+        Assert.Equal((int)Math.Round(GameConfig.TerravokStoneSkin * 100), Cut("Terravok"));
+        Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), Cut("Manwe"));
+        Assert.Equal(0, Cut("Maelketh"));
+        Assert.All(gods, g => Assert.False(g.TryGetProperty("unenchantedDamageCutPercent", out _),
+            "no Old God row carries the stale unenchantedDamageCutPercent field"));
     }
 
     [Fact]

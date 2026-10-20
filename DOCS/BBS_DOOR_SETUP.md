@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: Scripts/BBS, Console/Bootstrap/Program.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/SysOpConsoleManager.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudServer.cs, scripts-server/updatecheck.sh, scripts-server/updatecheck.ps1 -->
+<!-- doc: checked 1.3.5; sources: Scripts/BBS, Console/Bootstrap/Program.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/SysOpConsoleManager.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/AccountMail.cs, Scripts/Server/MudServer.cs, scripts-server/updatecheck.sh, scripts-server/updatecheck.ps1 -->
 # Usurper Reborn - BBS Door Setup Guide
 
 This guide explains how to configure Usurper Reborn to run as a door game on BBS software like Synchronet, Mystic, EleBBS, WWIV, GameSrv, ENiGMA, or other systems that support DOOR32.SYS drop files.
@@ -32,13 +32,13 @@ UsurperReborn --door32 <path-to-door32.sys>
 
 | BBS Software | I/O Mode | Auto-Detected? | Status |
 |--------------|----------|----------------|--------|
-| **Synchronet** | Standard I/O | ✅ Yes (by name) | ✅ Fully tested |
-| **EleBBS** | Socket | (default) | ✅ Fully tested |
-| **Mystic BBS (telnet)** | Socket | (default) | ✅ Fully tested |
-| **Mystic BBS (SSH)** | Standard I/O | ✅ Yes (redirected I/O) | ✅ Fully tested |
-| **WWIV** | Standard I/O | ✅ Yes (by name) | Should work |
-| **GameSrv** | Standard I/O | ✅ Yes (by name) | Should work |
-| **ENiGMA½** | Standard I/O | ✅ Yes (by name) | Should work |
+| **Synchronet** | Standard I/O | Yes (by name) | Fully tested |
+| **EleBBS** | Socket | (default) | Fully tested |
+| **Mystic BBS (telnet)** | Socket | (default) | Fully tested |
+| **Mystic BBS (SSH)** | Standard I/O | Yes (redirected I/O) | Fully tested |
+| **WWIV** | Standard I/O | Yes (by name) | Should work |
+| **GameSrv** | Standard I/O | Yes (by name) | Should work |
+| **ENiGMA½** | Standard I/O | Yes (by name) | Should work |
 
 > **Auto-Detection:** The game uses two methods to auto-detect the correct I/O mode:
 > 1. **BBS name** (from DOOR32.SYS line 4): Synchronet, GameSrv, ENiGMA, and WWIV are detected by name
@@ -340,7 +340,7 @@ UsurperReborn --local
 
 **Important:** Usurper Reborn does **not** echo typed characters back to the user in BBS door mode. Your BBS software must handle character echo.
 
-Most BBS software handles this automatically via telnet's WILL ECHO negotiation — characters typed by the user are echoed back by the BBS before they reach the door. If players report seeing no characters when they type, or seeing double characters, check these settings:
+Most BBS software handles this automatically via telnet's WILL ECHO negotiation (characters typed by the user are echoed back by the BBS before they reach the door). If players report seeing no characters when they type, or seeing double characters, check these settings:
 
 | BBS Software | Echo Setting | Notes |
 |--------------|-------------|-------|
@@ -362,7 +362,7 @@ The BBS is not echoing input. Check:
 
 Both the BBS and the terminal client are echoing. Fix:
 1. Turn **off** local echo in the terminal client (SyncTERM: File → Properties → uncheck "Local Echo")
-2. Or check your BBS telnet settings — most should have WILL ECHO enabled by default
+2. Or check your BBS telnet settings: most should have WILL ECHO enabled by default
 
 ---
 
@@ -486,11 +486,11 @@ A door runs in online mode, where the settings the SysOp Console changes (MOTD, 
 
 BBS doors use a shared SQLite database instead of file-based saves. All callers read/write to the same database, so changes one player makes (killing an NPC, becoming king, posting chat) are immediately visible to others.
 
-The **world simulator** runs automatically inside player sessions — no separate process needed. When the first player connects, their session starts the world sim. When they disconnect, the next player's session takes over. NPCs level up, form relationships, get married, have children, and age while players are connected. When nobody's online, the world pauses (just like the original 1993 Usurper).
+The **world simulator** runs automatically inside player sessions (no separate process needed). When the first player connects, their session starts the world sim. When they disconnect, the next player's session takes over. NPCs level up, form relationships, get married, have children, and age while players are connected. When nobody's online, the world pauses (just like the original 1993 Usurper).
 
 ### Quick Setup
 
-**Just use your normal door command** — online mode is automatic:
+**Just use your normal door command**: online mode is automatic:
 
 | BBS Software | Door Command |
 |--------------|-------------|
@@ -501,7 +501,7 @@ The **world simulator** runs automatically inside player sessions — no separat
 | GameSrv | `UsurperReborn --door32 door32.sys` |
 | ENiGMA | `"--door32", "{dropFilePath}"` |
 
-> **Note:** Existing commands with `--online` still work — the flag is accepted for backwards compatibility.
+> **Note:** Existing commands with `--online` still work: the flag is accepted for backwards compatibility.
 
 The database (`usurper_online.db`) is created automatically in the game directory. The world simulator starts automatically in the first player's session. **No background processes, no database setup, no services to configure.**
 
@@ -520,7 +520,7 @@ All multiplayer features activate automatically:
 | **News Feed** | Real-time events: level ups, boss kills, marriages, deaths, births |
 | **While You Were Gone** | Login summary of what happened since last session |
 | **Dormitory Sleep** | Players who disconnect are registered as sleeping (protects their state) |
-| **Living World** | NPCs age, marry, have children, die of old age — the world evolves while players are online |
+| **Living World** | NPCs age, marry, have children, die of old age: the world evolves while players are online |
 
 ### Authentication
 
@@ -537,7 +537,7 @@ Password reset by email belongs to a self hosted game server (the MUD server wit
 The world simulator uses database-level leader election to ensure only one session runs it at a time:
 
 1. When a player connects, their session checks for a worldsim lock in the database
-2. If no lock exists (or the lock is stale — heartbeat > 90 seconds old), this session becomes the worldsim host
+2. If no lock exists (or the lock is stale, heartbeat > 90 seconds old), this session becomes the worldsim host
 3. The worldsim runs as a background thread in the host session, sharing NPCs and game state directly
 4. The host updates a heartbeat in the database every tick so other sessions know it's active
 5. When the host disconnects, the lock is released and the next session to connect takes over
@@ -547,7 +547,7 @@ This means the first player to connect gets slightly more responsive NPC behavio
 
 ### Optional: 24/7 World Simulator
 
-If you want the world to continue evolving even when nobody is playing, you can run a standalone world simulator process. This is **entirely optional** — the auto worldsim handles everything for most setups.
+If you want the world to continue evolving even when nobody is playing, you can run a standalone world simulator process. This is **entirely optional**: the auto worldsim handles everything for most setups.
 
 When a standalone worldsim is running, player sessions detect its active heartbeat and skip the auto worldsim.
 
@@ -604,11 +604,11 @@ nssm start UsurperWorldSim
 
 ### Database Location
 
-By default, the database is created as `usurper_online.db` in the same directory as the executable. This happens automatically on first run — no manual setup needed.
+By default, the database is created as `usurper_online.db` in the same directory as the executable. This happens automatically on first run: no manual setup needed.
 
 If you use `--db <path>` to put the database elsewhere, use the **same path** on both the door command and any standalone world simulator. Ensure the directory exists and the game process has write permissions.
 
-For multi-node BBSes, all nodes use the same database file — SQLite handles concurrent access via WAL mode.
+For multi-node BBSes, all nodes use the same database file; SQLite handles concurrent access via WAL mode.
 
 ### Migrating from Single-Player to Online
 
@@ -624,7 +624,7 @@ Existing single-player BBS saves (JSON files in `Saves/`) are **not** automatica
 - The previous session didn't disconnect cleanly. The new login clears it and continues; nothing to do.
 
 #### World seems dead (no NPC activity)
-- Check stderr for `[WORLDSIM]` messages — one session should show "Acquired worldsim lock"
+- Check stderr for `[WORLDSIM]` messages: one session should show "Acquired worldsim lock"
 - If using standalone `--worldsim`, check it's running: `systemctl status usurper-worldsim`
 
 #### Database locked errors

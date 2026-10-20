@@ -1,11 +1,11 @@
-<!-- doc: checked 1.3.4; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
+<!-- doc: checked 1.3.5; sources: Scripts, Console, Localization, web, launchers, docker-compose.yml, usurper-reloaded.csproj -->
 # Usurper Reborn
 
 ## A Persistent Online Text RPG with a Living World
 
-**v1.3.4 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
+**v1.3.5 "Reckoning"** | **FREE AND OPEN SOURCE** | **GPL v2**
 
-130+ autonomous NPCs wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
+Up to 200 autonomous NPCs (59 at the start of a new game) wake up, go to work, visit taverns, fall in love, get married, have children, age, and eventually die of old age, all while you're offline. Log back in, read the news feed, and discover that the blacksmith married the barmaid, the king was assassinated, or a new generation just came of age. The world doesn't wait for you.
 
 **Play now:**
 - Browser: https://usurper-reborn.net (no install required)
@@ -50,13 +50,13 @@ Beyond the simulation, there's a deep RPG with 100+ hours of content.
 ### Character Building
 - **12 Base Classes + 5 Prestige Classes** (17 total): Warrior, Paladin, Assassin, Magician, Cleric, Ranger, Bard, Sage, Barbarian, Alchemist, Jester, Mystic Shaman, plus 5 NG+ prestige classes (Tidesworn, Wavecaller, Cyclebreaker, Abysswarden, Voidreaver) unlocked by completing different endings.
 - **10 Races:** Human, Elf, Dwarf, Hobbit, Half-Elf, Orc, Gnome, Troll, Gnoll, Mutant, with race-specific lifespans, stats, and lore.
-- **Specialization System:** Each class has 2 specializations (24 total) selectable at the Level Master, shaping NPC AI ability priorities and giving role-specific stat bonuses (Tank, DPS, Healer, Utility, Debuff).
-- **75+ Spells** across caster classes, **44+ class abilities**, plus 5 universal abilities. Meaningful stat scaling with diminishing returns past natural caps.
+- **Specialization System:** Each base class has 2 specializations, and Paladin has 3 (25 total) selectable at the Level Master, shaping NPC AI ability priorities and giving role-specific stat bonuses (Tank, DPS, Healer, Utility, Debuff).
+- **100 spells** across caster classes, **174 class abilities**, plus 5 universal abilities. Meaningful stat scaling with diminishing returns past natural caps.
 - **Romantic orientation** (Straight / Gay / Bisexual / Asexual) selectable at character creation, affects NPC pool filtering for romance.
 
 ### 100-Floor Dungeon
 - Deterministically generated floors with boss encounters, treasure rooms, traps, hidden secrets, settlements, meditation chambers, puzzles, and lever rooms.
-- 7 corrupted Old Gods sealed in the depths (floors 25, 40, 55, 70, 85, 95, 100), each with multi-phase combat, channeled abilities, AoE mechanics, divine armor, and meaningful dialogue choices.
+- 7 corrupted Old Gods sealed in the depths (floors 25, 40, 55, 70, 85, 95, 100), each with multi-phase combat, channeled abilities, AoE mechanics, and meaningful dialogue choices. Aurelion, Terravok and Manwe wear divine armor that only their own counter enchant from the Magic Shop (Sunbane, Stonebane, Godbane) removes.
 - 7 Ancient Seals to collect, unlocking the truth about who you are.
 - 5 endings based on your choices: Conqueror, Savior, Defiant, True, and a secret Dissolution ending.
 - Floor-aware monster loot with full per-slot armor coverage (head, arms, hands, legs, feet, waist, face, cloak, body, weapons, shields, rings, necklaces).
@@ -75,7 +75,7 @@ You wake with no memory. A letter in your own handwriting warns you: *"The gods 
 - Challenge the throne, recruit guards, manage treasury, navigate court factions, set tax rates and city-control turf.
 - 3 joinable factions: The Crown, The Shadows, The Faith.
 - PvP arena with daily limits, gold theft, and leaderboards.
-- Guild system with 13 chat commands, guild bank, member XP bonus, invite flow.
+- Guild system with 12 chat commands, guild bank, member XP bonus, invite flow.
 - Knighthood with combat buffs and Sir/Dame title prefix.
 
 ### Locations
@@ -164,7 +164,7 @@ The full multi-player stack (game server + SSH gateway + web proxy + Nginx) is d
 ## Technical Details
 
 - **Runtime:** .NET 8.0 (LTS) | **Language:** C# 12
-- **Codebase:** 130,000+ lines across 200+ files, 70+ game systems
+- **Codebase:** 350,000+ lines across 300+ files, 160+ game systems
 - **NPC Simulation:** Goal-based AI with 13 personality traits, importance-weighted memory, lifecycle aging, neighbor-pressure migration
 - **Platforms:** Windows (x64/x86), Linux (x64/ARM64), macOS (Intel/Apple Silicon)
 - **Multiplayer:** SQLite shared backend, SSH gateway, raw-TCP MUD interface, GMCP for Mudlet/MUSHclient/TinTin++, WebSocket browser terminal
@@ -177,7 +177,7 @@ The full multi-player stack (game server + SSH gateway + web proxy + Nginx) is d
 usurper-reborn/
 ├── Scripts/
 │   ├── Core/           # Character, NPC, Item, Monster, GameEngine, GameConfig
-│   ├── Systems/        # 70+ game systems
+│   ├── Systems/        # 160+ game systems
 │   │   ├── OceanPhilosophySystem.cs
 │   │   ├── AmnesiaSystem.cs
 │   │   ├── CompanionSystem.cs
@@ -214,7 +214,7 @@ usurper-reborn/
 - **Difficulty Scaling:** Easy / Medium / Hard / Extreme tiers.
 
 ### Achievement System
-50+ achievements across Combat, Progression, Economy, Exploration, Social, and Challenge categories. Tier-scaled Fame rewards. Server-wide broadcasts for Gold-tier and above unlocks. Steam achievements wired through the same path.
+79 achievements across Combat, Progression, Economy, Exploration, Social, and Challenge categories. Tier-scaled Fame rewards. Server-wide broadcasts for Gold-tier and above unlocks. Steam achievements wired through the same path.
 
 ### Statistics Tracking
 Total monsters killed, gold earned, time played, peak gold, deepest dungeon floor, quests completed, world boss kills, MVP count, achievements unlocked, and dozens of combat / economy / social counters.
@@ -328,6 +328,7 @@ The game ships small patches frequently. Each version has a dedicated release no
 - **v1.1.1:** a bug pass. Five review agents each took a domain of the codebase and about seventy findings were verified and fixed: NPCs losing their innate power on load, the world simulator editing the wrong player's relationships, a restored character unable to save, one player's autosave starving everyone else's, the Black Market re-rolling on relog, a closed connection spinning the server, bank and gambling exploits, buffs consumed a fight early, and raw placeholders in the text. See `DOCS/release-notes/RELEASE_NOTES_1.1.1.md`.
 - **v1.1.2:** seven of the eight open design items, each designed twice (Codex and Claude), reconciled against the code, and reviewed before implementation: grouped followers get their own cooldowns and a real death; haggling finally has a way in and its attempts persist; the bank vault is one persisted reserve per world, atomic online; relationships cool with neglect measured in days you were present; NPCs left to die while you held a heal remember it; ability and spell numbers are moddable from `GameData/`; the two intimacy lines that really dropped a name are fixed. Docker stack refreshed and verified. See `DOCS/release-notes/RELEASE_NOTES_1.1.2.md`.
 - **v1.1.3:** party survivability. Wounded allies shield up, brace (half damage on ordinary hits, specials, and life drain), and drink their own potion first; NPC allies who die in your party roll the 2 percent team permadeath rate they were always meant to; three stances per ally (Aggressive, Balanced, Cautious) set from the dungeon party menu or the Inn and saved with the character; monsters no longer prefer a wounded target and an ally's brace no longer pulls hits unless it is Aggressive; a shared potion belt (off by default, two loans per fight, never the player's last three), give-a-number, and the one-personal-potion rule; a fight summary per ally, a warning before a voluntary fight with an ally below 30 percent, and a floor guard that offers Cautious to an ally eleven levels behind. Planned by a council of Codex, a Claude design agent, and the supervisor session in `DOCS/PARTY_SURVIVABILITY_PLAN.md`; the downed state is the next release.
+- **v1.3.5:** 46 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.5.md
 - **v1.3.4:** 27 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.4.md
 - **v1.3.3:** 15 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.3.md
 - **v1.3.2:** 72 changes; the Changelist is in DOCS/release-notes/RELEASE_NOTES_1.3.2.md
@@ -404,7 +405,7 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 *"You are not a wave fighting the ocean. You ARE the ocean, dreaming of being a wave."*
 
-## Known Issues (v1.3.4)
+## Known Issues (v1.3.5)
 
 - Save files from the earliest alpha versions may not be fully compatible.
 - BBS FOSSIL mode not natively supported (use `--stdio` flag for FOSSIL-based BBSes via host pipe).
@@ -418,4 +419,4 @@ Join Discord for discussions, feedback, and updates: **https://discord.gg/EZhwgD
 
 ---
 
-**Status:** v1.3.4 "Reckoning". The world is running. [Watch it live.](https://usurper-reborn.net)
+**Status:** v1.3.5 "Reckoning". The world is running. [Watch it live.](https://usurper-reborn.net)

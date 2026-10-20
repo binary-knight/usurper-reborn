@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.5 | The Multiattack and Time Stop messages announce the one strike these abilities make.
 history: 1.3.4 | none
 history: 1.3.3 | From level 25 monsters have more HP and hit harder and groups grow a little each level with no jump at level 31 or 61, monsters keep growing past level 50, and Beast, Insectoid, Shadow and Undead monsters can finish a Downed ally.
 history: 1.3.2 | Thorns costs a melee attacker a quarter of the damage dealt for 3 rounds, summon, flee and drain abilities no longer land a hit, and difficulty multiplies kill experience and gold once.
@@ -84,7 +85,7 @@ The table shows what one use does for a level {{balance:AbilityProbeLevel}} mons
 
 ### Monster abilities that depend on the situation
 
-- **Multiattack, Frenzy, Swarm and Time Stop** announce extra attacks, but only the one hit in the table lands.
+- **Multiattack, Frenzy, Swarm and Time Stop** strike once; the table shows that one hit.
 - **Thorns** covers the monster in thorns for 3 rounds, and the monster then makes its normal attack. While they last, each melee hit on it (a weapon swing or a melee ability, yours, a teammate's or a companion's) costs the attacker 25 percent of the damage it dealt, at least 1, but never below 1 HP. Spells, bow shots and the Ranged Attack are not reflected. Only the Gauntlet champion Korr Stonewarden has Thorns.
 - **Possess** deals direct damage equal to half your Strength.
 - **Devour** deals damage equal to your current HP when you are below a fifth of your maximum HP; **Devour Soul** does so 5 percent of the time. The most damage one hit can do still applies.

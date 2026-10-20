@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: usurper-reloaded.csproj, Tests/Tests.csproj, Tests/Localization, Localization, Scripts/Systems/SaveSystem.cs -->
+<!-- doc: checked 1.3.5; sources: usurper-reloaded.csproj, Tests/Tests.csproj, Tests/Localization, Localization, Scripts/Systems/SaveSystem.cs -->
 # Contributing to Usurper Reborn
 
 Thanks for wanting to contribute. This project is a modern C# recreation of the 1993 BBS door game Usurper. It's developed in the open on GitHub and licensed under GPL v2.
@@ -42,7 +42,7 @@ Good contributions, roughly in order of how happy they make me:
 1. **Build the project.** `dotnet build usurper-reloaded.csproj` must succeed with zero errors.
 2. **Run the tests.** `dotnet test Tests/Tests.csproj` must pass.
 3. **Play the change.** Boot the local build, reach the system you changed, verify the fix or feature works as intended. Include the steps you tested in your PR description.
-4. **Check recent commits** around the file you're touching. If a system was changed recently, there's usually a reason — understand it before you alter it.
+4. **Check recent commits** around the file you're touching. If a system was changed recently, there's usually a reason: understand it before you alter it.
 
 ## Workflow
 
@@ -50,7 +50,7 @@ Standard GitHub fork-and-PR flow:
 
 1. Fork the repo.
 2. Create a branch off `main` with a short, descriptive name (`fix-assassin-backstab-crit`, `add-confession-temple`, `localize-fr-dungeon-keys`).
-3. Make your change. Keep the diff focused on one thing — a PR that fixes a bug AND refactors three unrelated files will be asked to split.
+3. Make your change. Keep the diff focused on one thing. A PR that fixes a bug AND refactors three unrelated files will be asked to split.
 4. Commit with a clear message. Follow the style of recent commits (`git log --oneline` to see). Imperative mood, short summary line, body if the change needs explaining.
 5. Push to your fork and open a PR against `main`.
 6. Fill out the PR description. See below.
@@ -65,7 +65,7 @@ A mergeable PR description answers these questions:
 - **How did you test it?** (What you built, what you ran, what you played through.)
 - **What could regress?** (Systems that share state with the one you touched.)
 
-If the change is user-visible, add a line for the release notes. Don't bump the version in `GameConfig.cs` yourself — I bump versions at release time and consolidate changelog entries.
+If the change is user-visible, add a line for the release notes. Don't bump the version in `GameConfig.cs` yourself. I bump versions at release time and consolidate changelog entries.
 
 ## Code Expectations
 
@@ -73,7 +73,7 @@ If the change is user-visible, add a line for the release notes. Don't bump the 
 - **No emojis in code, comments, commit messages, or release notes** unless a specific user-facing feature needs them. (Project convention.)
 - **Keep comments tight.** Comment the *why* when it's non-obvious. Don't narrate the *what*.
 - **Don't pre-emptively abstract.** Three similar lines beats a premature helper.
-- **Trust internal code.** Don't add null-guards or error-handling for scenarios that can't happen — only validate at system boundaries (user input, external APIs, save loads).
+- **Trust internal code.** Don't add null-guards or error-handling for scenarios that can't happen; only validate at system boundaries (user input, external APIs, save loads).
 - **Localize user-facing text.** Any new string the player can see goes through `Loc.Get("key")` with keys added to all five language files. See existing keys in [Localization/en.json](Localization/en.json) for naming conventions.
 
 ## Save-Compatibility Rules
@@ -88,7 +88,7 @@ The game has months/years of player saves on public BBSes and the online server.
 ## Localization Rules
 
 - Every new user-facing string needs keys in all five files: `en.json`, `es.json`, `fr.json`, `hu.json`, `it.json`.
-- Keys stay identical across languages — only values differ.
+- Keys stay identical across languages; only values differ.
 - `{0}`, `{1}` format args must be present in all translations.
 - If you don't speak a language, English-to-machine-translation with a note in the PR (`"[MT, needs review]"`) is acceptable for non-English files, as long as the English version is correct.
 - Don't translate localization keys themselves, only values.

@@ -956,15 +956,18 @@ public class WorldSimulator
 
             if (toRemove.Count == 0) return;
 
+            // Remove through the spawn system: in MUD mode ActiveNPCs is a snapshot copy,
+            // so a Remove on it would leave the corpse in the real roster.
+            int removed = 0;
             foreach (var corpse in toRemove)
             {
-                spawnSystem.ActiveNPCs.Remove(corpse);
+                if (spawnSystem.RemoveNPC(corpse)) removed++;
                 // Also clear the respawn timer just in case it lingered.
                 deadNPCRespawnTimers.Remove(corpse.Id ?? corpse.Name);
             }
 
             DebugLogger.Instance.LogInfo("LIFECYCLE",
-                $"PrunePermanentlyDeadNPCs: removed {toRemove.Count} aged/permadead corpse(s) " +
+                $"PrunePermanentlyDeadNPCs: removed {removed} aged/permadead corpse(s) " +
                 $"from active list. Remaining: {spawnSystem.ActiveNPCs.Count}.");
         }
         catch (Exception ex)
@@ -1794,11 +1797,7 @@ public class WorldSimulator
             // so an admin fixing the key meanwhile cannot strand part of the estate under the old one
 
             int queued = 0;
-            var jsonOpts = new System.Text.Json.JsonSerializerOptions
-            {
-                PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
-                IncludeFields = true
-            };
+            var jsonOpts = ItemJson.Inheritance;   // v1.3.5: the one shared setting (camelCase, IncludeFields)
 
             // Equipped items: walk EquippedItems dict, resolve each ID to an Item,
             // queue. EquipmentDatabase has the full item registry.
@@ -6143,7 +6142,7 @@ public class WorldSimulator
         {
             var item = npc.MarketInventory[random.Next(npc.MarketInventory.Count)];
             long price = MarketplaceSystem.Instance.CalculateNPCPrice(item, npc);
-            string itemJson = JsonSerializer.Serialize(item);
+            string itemJson = ItemJson.WriteStore(item);
             npc.MarketInventory.Remove(item);
 
             _ = Task.Run(async () =>
@@ -6183,7 +6182,7 @@ public class WorldSimulator
                     var chosen = affordable[random.Next(affordable.Count)];
 
                     // Deserialize the item to check if NPC wants it
-                    var item = JsonSerializer.Deserialize<Item>(chosen.ItemJson); ItemLimits.Heal(item, "auction");
+                    var item = ItemJson.ReadStore(chosen.ItemJson); ItemLimits.Heal(item, "auction");
                     if (item == null) return;
 
                     var tempListing = new MarketplaceSystem.MarketListing

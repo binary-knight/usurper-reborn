@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.3.4";
+    public const string Version = "1.3.5";
     public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -85,8 +85,6 @@ public static partial class GameConfig
     public const double BossPhaseImmunityResidual = 0.10;   // 10% damage still gets through immunity
     public const int BossChannelInterruptSpeedThreshold = 80; // Agility needed to attempt interrupt
     public const double BossChannelInterruptChance = 0.60;  // Base chance to interrupt a channel
-    public const double BossDivineArmorArtifactBypass = 1.0; // Artifact weapons fully bypass divine armor
-    public const double BossDivineArmorEnchantedBypass = 0.5; // Enchanted weapons bypass 50% of divine armor (not 100%)
 
     // Two-handed weapons hit harder per swing. Applied to basic attacks (GetWeaponConfigDamageModifier)
     // AND to physical weapon-strike abilities so a 2H Power Strike isn't weaker than a free swing
@@ -900,6 +898,7 @@ public static partial class GameConfig
     // authored item is 4,000,000. Anything beyond these bounds was made by a bug, and is clamped at
     // every place an item enters play: load, conversion, enchant, reforge, storage reads, sale.
     public const int MaxItemPower = 5000;            // attack, armor, weapon power, armor class, shield bonus
+    public const int MaxGearRegenTenthsPercent = 100; // 1.3.5: the summed gear HP or mana regeneration a round, in tenths of a percent of the pool (10 percent)
     public const int MaxItemStatBonus = 2000;        // every other flat bonus, elemental damage, regen, crit damage
     public const int MaxItemVitalBonus = 20000;      // max HP and max mana bonuses
     public const int MaxItemPercent = 100;           // block, crit chance, resistances, steals, piercing, thorns
@@ -1693,6 +1692,16 @@ public static partial class GameConfig
     public const float OldGodDivineScalingDamagePerArtifact = 0.05f;   // +5% damage per collected artifact (cap +20% after 4 artifacts)
     public const float OldGodSoloDamageBonus = 0.15f;                  // Solo Old God fight: god does +15% damage
     public const float OldGodSoloPlayerDamageReduction = 0.20f;         // Solo Old God fight: player takes -20% damage
+
+    /// <summary>
+    /// 1.3.5 (B1): the step k of the party HP scale of an Old God fight (OldGodBossSystem.PartyHpScale). The
+    /// god's fight HP is times 1.0 alone, 1 - 3k with 2 fighters, 1 - 2k with 3, 1 - k with 4 and 1.0 with 5
+    /// or more, the living fighters counted once when the fight is built. Measured pick 0.25 (B1-REPORT).
+    /// </summary>
+    public const double MaelkethPartyHpScaleK = 0.25;
+
+    /// <summary>1.3.5 (B1): the one god the party HP scale applies to; every other god is unchanged.</summary>
+    public const OldGodType MaelkethPartyHpScaleGod = OldGodType.Maelketh;
     public const float BossFirstRoundsDamageCapPercent = 0.15f;        // First 3 rounds of boss fight: cap hit at 15% MaxHP
     public const int BossFirstRoundsDamageCapRounds = 3;
 
@@ -2235,6 +2244,9 @@ public static partial class GameConfig
     public const int MaxEquipmentLifeStealPercent = 60;
     public const int MaxTotalLifestealPercent = 100;
 
+    /// <summary>The most armour piercing percent the equipped gear adds up to (one item still rolls at most 50).</summary>
+    public const int MaxArmorPiercingPercent = 50;
+
     // v0.60.0 stun-lock audit: diminishing-returns and post-recovery immunity.
     // Players were chaining lightning-enchant procs with Magician/Sage stun spells
     // to keep bosses perma-stunned. New rules:
@@ -2309,10 +2321,10 @@ public static partial class GameConfig
     public const int MaterialDropCountBossMin = 1;             // Boss guaranteed drop min
     public const int MaterialDropCountBossMax = 2;             // Boss guaranteed drop max
 
-    // Divine Armor - late-game Old Gods resist unenchanted weapons
-    public const double AurelionDivineShield = 0.25;           // 25% damage reduction vs unenchanted
-    public const double TerravokStoneSkin = 0.35;              // 35% damage reduction vs unenchanted
-    public const double ManweCreatorsWard = 0.50;              // 50% damage reduction vs unenchanted
+    // Divine Armor - late-game Old Gods cut every hit, lifted only by the god's own counter enchant
+    public const double AurelionDivineShield = 0.25;           // 25% divine armor cut, lifted only by the god's counter
+    public const double TerravokStoneSkin = 0.35;              // 35% divine armor cut, lifted only by the god's counter
+    public const double ManweCreatorsWard = 0.50;              // 50% divine armor cut, lifted only by the god's counter
     public const double ArtifactBossDamageBonus = 0.03;        // +3% player damage per artifact collected
 
     public class CraftingMaterialDef
