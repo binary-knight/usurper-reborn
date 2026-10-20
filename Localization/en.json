@@ -12659,7 +12659,7 @@
   "ability.healing_totem.name": "Healing Totem",
   "ability.healing_totem.desc": "Summon a healing totem that restores 10% MaxHP to all allies each round for 4 rounds.",
   "ability.rockbiter.name": "Rockbiter",
-  "ability.rockbiter.desc": "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage, and you gain flat Defence that grows with your level.",
+  "ability.rockbiter.desc": "Enchant your weapon with earth for 5 rounds. Attacks deal bonus earth damage, and you gain flat Defense that grows with your level.",
   "ability.earthbind_totem.name": "Earthbind Totem",
   "ability.earthbind_totem.desc": "Summon an earthbind totem that slows enemies, reducing their attack by 20% for 4 rounds.",
   "ability.lightning_bolt.name": "Lightning Bolt",
