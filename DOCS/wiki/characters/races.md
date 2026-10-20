@@ -1,8 +1,9 @@
 ---
 title: Races
 path: /wiki/en/characters/races/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Core/GameConfig.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/WeaponShopLocation.cs
+history: 1.3.5 | The Gnoll's Poisonous Bite, like weapon procs and life steal, no longer comes from the magical class abilities that were counted as melee hits.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | A Troll pays 10 percent less for a weapon at the Weapon Shop.

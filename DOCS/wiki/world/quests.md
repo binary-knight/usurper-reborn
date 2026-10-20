@@ -1,8 +1,9 @@
 ---
 title: Quests and discoveries
 path: /wiki/en/world/quests/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/QuestHallLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Quest.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/CastleLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Crown monster bounties pay twice their tier's gold and experience, and the Bandits on the Trade Road contract can be finished.

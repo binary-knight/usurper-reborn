@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | none

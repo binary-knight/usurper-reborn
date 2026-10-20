@@ -1,8 +1,9 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/ArenaLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DormitoryLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.5 | An item you take from a sleeper you beat in the Dormitory keeps its enchantments, effects and curse.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | none

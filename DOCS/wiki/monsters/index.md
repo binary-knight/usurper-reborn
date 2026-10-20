@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.5 | The Multiattack and Time Stop messages announce the one strike these abilities make.
 history: 1.3.4 | none
 history: 1.3.3 | From level 25 monsters have more HP and hit harder and groups grow a little each level with no jump at level 31 or 61, monsters keep growing past level 50, and Beast, Insectoid, Shadow and Undead monsters can finish a Downed ally.
 history: 1.3.2 | Thorns costs a melee attacker a quarter of the damage dealt for 3 rounds, summon, flee and drain abilities no longer land a hit, and difficulty multiplies kill experience and gold once.

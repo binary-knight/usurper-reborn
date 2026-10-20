@@ -1,8 +1,9 @@
 ---
 title: New Game Plus (NG+) and cycles
 path: /wiki/en/characters/new-game-plus/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/EndingsSystem.cs, Scripts/Systems/OpeningSequence.cs, Scripts/Core/GameEngine.cs, Scripts/Systems/StoryProgressionSystem.cs, Scripts/Systems/MetaProgressionSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ArtifactSystem.cs, Scripts/Core/Items.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Prestige class spells start at Average proficiency, and a saved prestige class spell below Average is raised to Average when the character loads.

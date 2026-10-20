@@ -1,8 +1,9 @@
 ---
 title: The Outskirts settlement
 path: /wiki/en/world/settlement/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Locations/SettlementLocation.cs, Scripts/Systems/SettlementSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/GodBoonSystem.cs
+history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | The Workshop and Arena damage buffs apply to your attacks in fights, the Prison buff also halves trap damage, the Herbalist Hut gives only herbs below their limit, and the Mystic Circle spends its day only when it gives something.

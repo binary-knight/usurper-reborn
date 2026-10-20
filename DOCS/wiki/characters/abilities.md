@@ -1,8 +1,9 @@
 ---
 title: Martial and class abilities
 path: /wiki/en/characters/abilities/
-checked: 1.3.4
+checked: 1.3.5
 sources: Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.5 | Holy Avenger, Purifying Flame, Searing Totem and Corrupting Touch no longer roll to hit, magical class abilities no longer trigger weapon procs or life steal, class abilities are cut by an Old God's divine armor and phase immunity, and armor piercing on gear also lowers the Defence a monster sets against abilities.
 history: 1.3.4 | Shield Wall Formation, Divine Mandate and Death's Embrace now also work against Manwe's named abilities.
 history: 1.3.3 | none
 history: 1.3.2 | Backstab and Smite are shown on the combat menus of the classes that can use them, Smite spends one of the day's charges, and a Ranger's bow abilities deal 4 more damage.
