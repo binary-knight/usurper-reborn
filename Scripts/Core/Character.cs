@@ -1901,11 +1901,11 @@ public class Character
         _boonOutMaxMana = MaxMana;
         _boonRecorded = true;
 
-        // Apply Fountain of Vitality bonus HP
-        if (BonusMaxHP > 0)
-        {
-            MaxHP += BonusMaxHP;
-        }
+        // Apply Fountain of Vitality bonus HP, then (1.3.6) Titan's Resolve. The inputs are recorded
+        // so RecalculateBoonShare carries a boon change through the same steps.
+        _boonTailBonusMaxHP = BonusMaxHP;
+        _boonTailTitanItems = EquippedTitanResolveCount();
+        MaxHP = AfterBoonSegmentMaxHP(MaxHP, _boonTailBonusMaxHP, _boonTailTitanItems);
 
         // Apply permanent weapon/armor power bonuses (Infernal Forge, artifacts, etc.)
         if (BonusWeapPow > 0)
@@ -1949,6 +1949,25 @@ public class Character
     private long _boonPreMaxHP, _boonPreMaxMana, _boonOutMaxHP, _boonOutMaxMana;
     private double _boonAwakeningHP, _boonAwakeningMana;
     private bool _boonRecorded;
+    // 1.3.6: the inputs of the steps after the boon segment (Fountain bonus, Titan's Resolve items)
+    private long _boonTailBonusMaxHP;
+    private int _boonTailTitanItems;
+
+    /// <summary>1.3.6: Titan's Resolve gives 5 percent more max HP, once however many equipped items carry it.</summary>
+    public const double TitanResolveMaxHPMultiplier = 1.05;
+
+    /// <summary>1.3.6: how many equipped items carry Titan's Resolve (the bonus applies once when any does).</summary>
+    internal int EquippedTitanResolveCount() =>
+        EquippedItems.Values.Count(id => id > 0 && EquipmentDatabase.GetById(id)?.HasTitanResolve == true);
+
+    /// <summary>1.3.6: max HP after the boon segment, before the floor of 1: the Fountain bonus, then Titan's Resolve.</summary>
+    private static long AfterBoonSegmentMaxHP(long boonOut, long bonusMaxHP, int titanItems)
+    {
+        long hp = boonOut;
+        if (bonusMaxHP > 0) hp += bonusMaxHP;
+        if (titanItems > 0) hp = (long)(hp * TitanResolveMaxHPMultiplier);
+        return hp;
+    }
 
     /// <summary>1.2.0: max HP after the configured boon, the awakening and Terran, from the pre-boon max HP.</summary>
     private long BoonSegmentMaxHP(long pre, double awakeningHP)
@@ -1989,7 +2008,8 @@ public class Character
         }
         long hp = BoonSegmentMaxHP(_boonPreMaxHP, _boonAwakeningHP);
         long mana = BoonSegmentMaxMana(_boonPreMaxMana, _boonAwakeningMana);
-        MaxHP = Math.Max(1, MaxHP + hp - _boonOutMaxHP);
+        // 1.3.6: the difference is taken after the Fountain bonus and Titan's Resolve, as a full recalculation applies them
+        MaxHP = Math.Max(1, MaxHP + AfterBoonSegmentMaxHP(hp, _boonTailBonusMaxHP, _boonTailTitanItems) - AfterBoonSegmentMaxHP(_boonOutMaxHP, _boonTailBonusMaxHP, _boonTailTitanItems));
         MaxMana = Math.Max(0, MaxMana + mana - _boonOutMaxMana);
         _boonOutMaxHP = hp;
         _boonOutMaxMana = mana;
