@@ -15,7 +15,7 @@ namespace UsurperReborn.Tests;
 public class Bump135Tests
 {
     private static readonly string[] Languages = { "en", "es", "fr", "hu", "it" };
-    private static readonly Regex DashOrEmoji = new(@"[–—]|[☀-➿]|️|[\uD83C-\uD83E][\uDC00-\uDFFF]");
+    private static readonly Regex DashOrEmoji = new(@"[\u2013\u2014]|[\u2600-\u27BF]|\uFE0F|[\uD83C-\uD83E][\uDC00-\uDFFF]");
 
     private static Dictionary<string, string> WebLang(string lang) =>
         JsonSerializer.Deserialize<Dictionary<string, string>>(Bump130Tests.Repo($"web/lang/{lang}.json"))!;
