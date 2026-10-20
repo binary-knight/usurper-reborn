@@ -32,7 +32,7 @@ Some floors have a guardian that must be dealt with before you can go deeper; se
 
 ### Old God fights: enrage, channels and marks
 
-Old Gods enrage after a set number of rounds, channel attacks that hit the whole party and mark party members with lasting harm, so a healer teammate and a fast teammate who can interrupt matter. The numbers for each are in the spoilers below.
+Old Gods enrage after a set number of rounds, channel attacks that hit the whole party and mark party members with lasting harm, so a healer teammate and a fast teammate who can interrupt matter. The numbers for each are in the spoilers below. [Magic resistance](/wiki/en/items/enchanting/#magic-resistance) from gear does not reduce any Old God attack.
 
 ## World bosses
 

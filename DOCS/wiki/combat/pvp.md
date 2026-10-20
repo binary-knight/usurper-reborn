@@ -30,6 +30,8 @@ Your swing in a player fight does Strength + the weapon power of that hand + a r
 - **Shield:** the defender blocks 20 percent of the time and adds its shield's bonus to Defence for that hit.
 - **Blinded:** a blinded fighter misses {{balance:PvPBlindedMissPercent}} percent of weapon swings.
 
+A spell that hits for damage in a player fight, yours or your opponent's, is cut by the target's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) last, after the Team HQ Barracks: MR / (MR + 100) of the hit, at most half, at least 1 left. Weapon swings are not cut by it.
+
 Your opponent's swing at you, when the game fights for it (an NPC, or the Arena's copy of a player), is one swing a turn with no crit, and it does half damage while you defend.
 
 ## PvP rewards
