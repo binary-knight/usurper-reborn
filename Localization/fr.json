@@ -816,6 +816,8 @@
   "combat.enchant_shadow": "Des ombres s’enroulent autour de la lame! {0} dégâts d’ombre! (Frappe Sombre)",
   "combat.enchant_siphon": "Votre arme siphonne {0} mana! (Siphon)",
   "combat.enchant_venom": "Le venin s’infiltre dans la blessure! Empoisonné pour {0} tours, {1} dégâts par tour!",
+  "combat.enchant_venom_hit": "Le venin s’infiltre dans la blessure! {0} dégâts de poison! (Frappe Venimeuse)",
+  "combat.enchant_venom_hit_tm": "La lame de {0} suinte du venin! +{1} dégâts de poison! (Venin)",
   "combat.gnoll_bite_poison": "Votre morsure venimeuse empoisonne {0}!",
   "combat.god_intervenes": "{0} intervient!",
   "combat.boon_drain": "La puissance divine draine {0} de vie! (Grâce)",

@@ -1521,6 +1521,7 @@ namespace UsurperRemake.Systems
                     damage = CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
 
                 case "C": // Cast spell
@@ -1539,10 +1540,12 @@ namespace UsurperRemake.Systems
 
                 case "P": // Power attack (high damage, lower accuracy)
                     damage = CalculatePowerAttackDamage(player, bossDef, bossData, rng, terminal);
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
 
                 case "E": // Precise strike (higher crit chance)
                     damage = CalculatePreciseStrikeDamage(player, bossDef, bossData, rng, terminal);
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
 
                 case "L": // Class ability
@@ -1565,10 +1568,72 @@ namespace UsurperRemake.Systems
                     damage = CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
             }
 
             return damage;
+        }
+
+        /// <summary>
+        /// 1.3.6: the main hand's weapon procs and the gear lifesteal on a world boss weapon hit of
+        /// <paramref name="damage"/>, with the dungeon chances and shares. Fire, lightning (no stun), holy
+        /// (the Aurelion attunement bonus, no undead double), shadow, and poison as one hit (10 percent of
+        /// the hit, or the weapon's fixed poison; the 4 round poison is a monster's only); frost has no
+        /// slow here. Returns the damage the procs add to the pooled hit, which takes the Team HQ Armory
+        /// after; lifesteal heals its percent of the hit. A miss draws nothing, and a weapon without an
+        /// enchant draws nothing for it.
+        /// </summary>
+        internal static long WeaponHitRiders(Character player, long damage, string bossName, Random rng, TerminalEmulator? terminal)
+        {
+            if (player == null || damage <= 0) return 0;
+            long extra = 0;
+            var weapon = player.GetEquipment(EquipmentSlot.MainHand);
+            if (weapon != null)
+            {
+                if (weapon.HasFireEnchant && rng.NextDouble() < GameConfig.FireEnchantProcChance)
+                {
+                    long d = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_fire", d)}", "bright_red");
+                }
+                if (weapon.HasLightningEnchant && rng.NextDouble() < GameConfig.LightningEnchantProcChance)
+                {
+                    long d = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_lightning_resist", d, bossName)}", "bright_yellow");
+                }
+                if (weapon.HasPoisonEnchant && rng.NextDouble() < GameConfig.PoisonEnchantProcChance)
+                {
+                    long d = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : Math.Max(1, (int)(damage * 0.10));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_venom_hit", d)}", "green");
+                }
+                if (weapon.HasHolyEnchant && rng.NextDouble() < GameConfig.HolyEnchantProcChance)
+                {
+                    float holyMult = GameConfig.HolyEnchantDamageMultiplier;
+                    if (player.IsAttunedTo("aurelion"))
+                        holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
+                    long d = Math.Max(1, (long)(damage * holyMult));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_holy", d)}", "bright_white");
+                }
+                if (weapon.HasShadowEnchant && rng.NextDouble() < GameConfig.ShadowEnchantProcChance)
+                {
+                    long d = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_shadow", d)}", "dark_magenta");
+                }
+            }
+            int pct = player.GetEffectiveLifeStealPercent(EquipmentSlot.MainHand);
+            if (pct > 0 && player.HP < player.MaxHP)
+            {
+                long before = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + Math.Max(1, damage * pct / 100));
+                if (player.HP > before)
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.lifedrinker", player.HP - before)}", "dark_green");
+            }
+            return extra;
         }
 
         private long CalculatePlayerDamage(Character player, WorldBossDefinition bossDef,

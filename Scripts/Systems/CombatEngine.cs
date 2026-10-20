@@ -8990,6 +8990,17 @@ public partial class CombatEngine
     private readonly HashSet<Monster> _abilityImmunityAnnounced = new();
 
     /// <summary>
+    /// 1.3.6: Boss Slayer (world boss loot) on a Power Attack or a class ability hit: +10 percent against a boss or
+    /// mini-boss, the swing's condition and amount. A spell never calls it.
+    /// </summary>
+    internal static long ApplyBossSlayer(Character? attacker, Monster? target, long damage)
+    {
+        if (attacker == null || target == null || damage <= 0 || !(target.IsBoss || target.IsMiniBoss)) return damage;
+        if (!WorldBossSystem.HasSpecialEffect(attacker, LootGenerator.SpecialEffect.BossSlayer)) return damage;
+        return damage + (long)(damage * 0.10);
+    }
+
+    /// <summary>
     /// 1.3.5: the boss protections on a class ability hit that takes HP itself (the handler helper, the base block,
     /// the area handlers and their riders), as the swing, the area core and the single-target path apply them:
     /// phase immunity of the hit's kind cuts it to the residual, then divine armour (floor 1).
@@ -9109,6 +9120,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.ability_critical"), "bright_yellow");
         }
 
+        actualDamage = ApplyBossSlayer(player, target, actualDamage);   // 1.3.6: Boss Slayer, as on the swing
         // 1.3.5: phase immunity of the hit's kind, then divine armour, before the rest of the hit's modifiers
         actualDamage = ApplyAbilityBossProtections(target, actualDamage, abilityResult);
 
@@ -15672,6 +15684,8 @@ public partial class CombatEngine
             powerDamage = (long)(powerDamage * (1.0 + GameConfig.PaladinDivineResolveDamageBonus));
         }
 
+        powerDamage = ApplyBossSlayer(player, target, powerDamage);   // 1.3.6: Boss Slayer, as on the swing
+
         // Defense: Defence only. ArmPow is NOT subtracted here -- ApplySingleMonsterDamage
         // below subtracts the target's armor itself, and doing both taxed Power Attack
         // with roughly double armor, making the 15-stamina attack weaker than a free
@@ -16286,6 +16300,7 @@ public partial class CombatEngine
             // Apply single target damage (unless AoE)
             if (actualDamage > 0)
             {
+                actualDamage = ApplyBossSlayer(player, target, actualDamage);   // 1.3.6: Boss Slayer, as on the swing
                 // 1.3.5: phase immunity of the hit's kind, then divine armour, before the defence and the rest
                 actualDamage = ApplyAbilityBossProtections(target, actualDamage, abilityResult);
 
@@ -21978,6 +21993,27 @@ public partial class CombatEngine
         return Math.Max(Math.Min(damage, bossFloor), TeamHQBonus.ApplyDefense(companion, damage));
     }
 
+    /// <summary>
+    /// 1.3.6: a companion's or teammate's own equipment thorns on a monster's basic attack that landed
+    /// <paramref name="damage"/> on it: the player's rule (the summed Thorns percent of the hit, at least 1),
+    /// and a reflection that kills counts the kill.
+    /// </summary>
+    private void ApplyCompanionEquipmentThorns(Monster monster, Character companion, long damage, CombatResult result)
+    {
+        int thornsPct = companion.GetEquipmentThorns();
+        if (thornsPct <= 0 || damage <= 0 || !monster.IsAlive) return;
+        long thornsDamage = Math.Max(1, damage * thornsPct / 100);
+        monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
+        EvHit(companion, thornsDamage, CombatEventKind.Basic);
+        UIHelper.WriteRow(terminal, Loc.Get("combat.thorns_reflect", thornsDamage, MonsterNames.Display(monster)), "yellow");
+        if (monster.HP <= 0)
+        {
+            UIHelper.WriteRow(terminal, Loc.Get("combat.destroyed_by_reflect", MonsterNames.Display(monster)), "bright_yellow");
+            if (!result.DefeatedMonsters.Contains(monster))
+                result.DefeatedMonsters.Add(monster);
+        }
+    }
+
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
     {
         // Check if companion will dodge (from Time Stop, abilities, etc.)
@@ -22317,6 +22353,9 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion_hp", actualDamage, companion.DisplayName, companion.HP, companion.MaxHP));
         if (actualDamage > 0 && companion.IsAlive && EliteVenomLands(monster, companion))   // 1.2.8
             ApplyEliteVenom(companion, isLeader: false);
+
+        // 1.3.6: the companion's own equipment thorns answer the basic attack, as the player's do
+        ApplyCompanionEquipmentThorns(monster, companion, actualDamage, result);
 
         // Divine Mandate thorn reflect (v0.56.0, NPC tank)
         if (companion.TempThornReflectPercent > 0 && companion.TempThornReflectDuration > 0 && monster.IsAlive && actualDamage > 0)
@@ -28066,9 +28105,8 @@ public partial class CombatEngine
         // swing count -- GetAttackCount returns dual-wield off-hand + class extra attacks +
         // windfury proc -- and apply per-hand lifesteal after each hit. Off-hand damage
         // reduction comes from GetWeaponConfigDamageModifier(attacker, isOffHand), the same
-        // modifier PvE uses, so dual-wielders swing twice at the correct power. (Elemental /
-        // thorns / other enchant procs stay PvE-only for now: ApplyPostHitEnchantments is
-        // Monster-typed; a Character-target overload is a larger follow-up.)
+        // modifier PvE uses, so dual-wielders swing twice at the correct power. 1.3.6: each
+        // hit's weapon procs go through ApplyPvPPostHit, the Character-target post-hit step.
         var (swings, windfuryProc) = GetAttackCount(attacker);
         int baseSwings = 1 + attacker.GetClassCombatModifiers().ExtraAttacks + (windfuryProc ? 1 : 0);
 
@@ -28076,6 +28114,82 @@ public partial class CombatEngine
         {
             bool isOffHand = attacker.IsDualWielding && s >= baseSwings;
             await ExecutePvPSingleHit(attacker, defender, result, isOffHand);
+        }
+    }
+
+    /// <summary>
+    /// 1.3.6: the post-hit step of a PvP weapon hit that landed <paramref name="damage"/> on a character (after the
+    /// Armory and the Barracks): the gear lifesteal when asked (the player's hit keeps its own), then the procs of
+    /// the weapon in <paramref name="slot"/> with the dungeon chances and shares. Holy has the Aurelion attunement
+    /// bonus and no undead double; lightning's stun goes through the PvP control rules; frost is a Slow; poison is
+    /// one hit of 10 percent of the hit, or the weapon's fixed poison after the Armory (the 4 round poison is a
+    /// monster's only). Each draw is behind its enchant, so a weapon without one draws nothing for it.
+    /// </summary>
+    private void ApplyPvPPostHit(Character attacker, Character defender, long damage, EquipmentSlot slot, bool lifesteal)
+    {
+        if (attacker == null || defender == null || damage <= 0) return;
+        bool human = attacker.AI == CharacterAI.Human;
+        string name = attacker.DisplayName;
+        if (lifesteal)
+        {
+            int pct = attacker.GetEffectiveLifeStealPercent(slot);
+            if (pct > 0 && attacker.HP < attacker.MaxHP)
+            {
+                long before = attacker.HP;
+                attacker.HP = Math.Min(attacker.MaxHP, attacker.HP + Math.Max(1, damage * pct / 100));
+                long healed = attacker.HP - before;
+                if (healed > 0)
+                    terminal.WriteLine(human ? Loc.Get("combat.lifedrinker", healed) : Loc.Get("combat.tm_lifedrinker", name, healed), "dark_green");
+            }
+        }
+        var weapon = attacker.GetEquipment(slot);
+        if (weapon == null) return;
+        if (defender.HP > 0 && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        {
+            long fire = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+            defender.HP = Math.Max(0, defender.HP - fire); // hq-armory: out (PvP rider of a boosted hit) hq-barracks: out (PvP rider of a cut hit)
+            terminal.WriteLine(human ? Loc.Get("combat.enchant_fire", fire) : Loc.Get("combat.enchant_fire_tm", name, fire), "bright_red");
+        }
+        if (defender.HP > 0 && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        {
+            defender.ApplyStatus(StatusEffect.Slow, GameConfig.FrostEnchantDuration);
+            UIHelper.WriteRow(terminal, human
+                ? Loc.Get("combat.enchant_frost", defender.DisplayName)
+                : Loc.Get("combat.enchant_frost_tm", name, defender.DisplayName), "bright_cyan");
+        }
+        if (defender.HP > 0 && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        {
+            long bolt = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
+            defender.HP = Math.Max(0, defender.HP - bolt); // hq-armory: out (PvP rider of a boosted hit) hq-barracks: out (PvP rider of a cut hit)
+            bool stunned = defender.HP > 0 && TryApplyPvPControl(defender, StatusEffect.Stunned, 1);
+            UIHelper.WriteRow(terminal, stunned
+                ? (human ? Loc.Get("combat.enchant_lightning_stun", bolt, defender.DisplayName) : Loc.Get("combat.enchant_lightning_stun_tm", name, bolt, defender.DisplayName))
+                : (human ? Loc.Get("combat.enchant_lightning_resist", bolt, defender.DisplayName) : Loc.Get("combat.enchant_lightning_resist_tm", name, bolt, defender.DisplayName)), "bright_yellow");
+        }
+        if (defender.HP > 0 && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        {
+            long venom = weapon.PoisonDamage > 0
+                ? Math.Max(1, TeamHQBonus.ApplyAttack(attacker, weapon.PoisonDamage))
+                : Math.Max(1, (int)(damage * 0.10));
+            defender.HP = Math.Max(0, defender.HP - venom); // hq-armory: out (PvP rider; the fixed value applies it above) hq-barracks: out (PvP rider, as 1.3.5)
+            UIHelper.WriteRow(terminal, human
+                ? Loc.Get("combat.enchant_venom_hit", venom)
+                : Loc.Get("combat.enchant_venom_hit_tm", name, venom), "green");
+        }
+        if (defender.HP > 0 && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        {
+            float holyMult = GameConfig.HolyEnchantDamageMultiplier;
+            if (attacker.IsAttunedTo("aurelion"))
+                holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
+            long holy = Math.Max(1, (long)(damage * holyMult));
+            defender.HP = Math.Max(0, defender.HP - holy); // hq-armory: out (PvP rider of a boosted hit) hq-barracks: out (PvP rider of a cut hit)
+            terminal.WriteLine(human ? Loc.Get("combat.enchant_holy", holy) : Loc.Get("combat.enchant_holy_tm", name, holy), "bright_white");
+        }
+        if (defender.HP > 0 && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        {
+            long shadow = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+            defender.HP = Math.Max(0, defender.HP - shadow); // hq-armory: out (PvP rider of a boosted hit) hq-barracks: out (PvP rider of a cut hit)
+            terminal.WriteLine(human ? Loc.Get("combat.enchant_shadow", shadow) : Loc.Get("combat.enchant_shadow_tm", name, shadow), "dark_magenta");
         }
     }
 
@@ -28149,10 +28263,10 @@ public partial class CombatEngine
         // already capped. Heal applies for any attacker; the "your weapon" message is
         // gated to a human attacker for correct attribution. NOTE: today only the human
         // attacker reaches this method -- the NPC/opponent turn runs through
-        // ProcessComputerPlayerAction, which keeps its own (still single-swing, no
-        // lifesteal) attack. The gate is defensive so this stays correct if the NPC
-        // turn is ever routed here. NPC-side dual-wield/lifesteal parity (and the
-        // perspective-correct HP display it would require) is a deferred follow-up.
+        // ProcessComputerPlayerAction, which keeps its own single-swing attack (1.3.6:
+        // with its lifesteal and procs through ApplyPvPPostHit). The gate is defensive so
+        // this stays correct if the NPC turn is ever routed here. NPC-side dual-wield
+        // parity (and the perspective-correct HP display it would require) is a follow-up.
         int lifestealPct = attacker.GetEffectiveLifeStealPercent(isOffHand ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
         if (lifestealPct > 0 && damage > 0 && attacker.HP < attacker.MaxHP)
         {
@@ -28166,6 +28280,9 @@ public partial class CombatEngine
                 terminal.WriteLine(Loc.Get("combat.lifedrinker", actual));
             }
         }
+
+        // 1.3.6: the weapon procs of the attacking hand (its lifesteal is above)
+        ApplyPvPPostHit(attacker, defender, damage, isOffHand ? EquipmentSlot.OffHand : EquipmentSlot.MainHand, lifesteal: false);
 
         terminal.SetColor("cyan");
         terminal.WriteLine(Loc.Get("combat.pvp_your_hp", attacker.HP, attacker.MaxHP));
@@ -28712,6 +28829,8 @@ public partial class CombatEngine
         damage = TeamHQBonus.ApplyDefense(opponent, damage); // v1.1.11: then the human's Barracks.
         opponent.HP = Math.Max(0, opponent.HP - damage);
         terminal.WriteLine(Loc.Get("combat.pvp_ai_strikes", computer.DisplayName, damage), "red");
+        // 1.3.6: the NPC's main hand procs and its gear lifesteal, as the player's hit has them
+        ApplyPvPPostHit(computer, opponent, damage, EquipmentSlot.MainHand, lifesteal: true);
         result.CombatLog.Add($"{computer.DisplayName} hits {opponent.DisplayName} for {damage}");
         await Pacing.Wait(GetCombatDelay(800));
     }

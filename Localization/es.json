@@ -816,6 +816,8 @@
   "combat.enchant_shadow": "¡Las sombras se enroscan desde la hoja! ¡{0} de daño de sombra! (Golpe Oscuro)",
   "combat.enchant_siphon": "¡Tu arma absorbe {0} de maná! (Sifón)",
   "combat.enchant_venom": "¡El veneno se filtra en la herida! ¡Envenenado por {0} rondas, {1} de daño por ronda!",
+  "combat.enchant_venom_hit": "¡El veneno se filtra en la herida! ¡{0} de daño por veneno! (Golpe Venenoso)",
+  "combat.enchant_venom_hit_tm": "¡La hoja de {0} rezuma veneno! ¡+{1} daño de veneno! (Veneno)",
   "combat.gnoll_bite_poison": "¡Tu mordida venenosa envenena a {0}!",
   "combat.god_intervenes": "¡{0} interviene!",
   "combat.boon_drain": "¡El poder divino drena {0} de vida! (Bendición)",

@@ -816,6 +816,8 @@
   "combat.enchant_shadow": "Árnyak tekeregnek a pengén! {0} árnyéksebzés! (Sötét csapás)",
   "combat.enchant_siphon": "A fegyvered {0} manát szív el! (Elszívás)",
   "combat.enchant_venom": "Méreg szivárog a sebbe! {0} körön át mérgez, körönként {1} sebzés!",
+  "combat.enchant_venom_hit": "Méreg szivárog a sebbe! {0} méregsebzés! (Méregcsapás)",
+  "combat.enchant_venom_hit_tm": "{0} pengéje mérget szivárogtat! +{1} mérgezési sebzés! (Méreg)",
   "combat.gnoll_bite_poison": "Mérgező harapásod megmérgezte {0}-t!",
   "combat.god_intervenes": "{0} közbelép!",
   "combat.boon_drain": "Isteni erő {0} életerőt szív el! (Áldás)",
