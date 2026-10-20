@@ -67,8 +67,8 @@ public class Bump135Tests
             dict["r1.road_135_t"].Should().StartWith("1.3.5 -- ", lang);
             dict["r1.road_134_t"].Should().StartWith("1.3.4 -- ", lang);
             dict["r1.road_135_d"].Should().Contain("11", lang).And.Contain("34", lang);
-            dict["r1.road_14_d"].Should().Contain("1.3.3", lang);
             foreach (string word in districtWords[lang]) dict["r1.road_14_d"].Should().NotContain(word, $"{lang} road_14_d has no Player District text");
+            dict["r1.road_14_d"].Should().Contain("1.3.3", lang);
             foreach (string n in next) dict["r1.road_" + n + "_when"].Should().Contain(after[n], $"{lang} {n}");
             foreach (var pair in dict.Where(p => p.Key.StartsWith("r1.road_", StringComparison.Ordinal)))
                 DashOrEmoji.IsMatch(pair.Value).Should().BeFalse($"{lang} {pair.Key}");
