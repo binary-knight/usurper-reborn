@@ -944,6 +944,9 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal((int)Math.Round(GameConfig.ManweCreatorsWard * 100), manwe.GetProperty("divineArmorCutPercent").GetInt32());
         var noctura = One(gods, "Noctura");
         Assert.True(noctura.GetProperty("physicalImmunityPhase").GetBoolean());
+        Assert.Equal(35, noctura.GetProperty("corruptionPerStack").GetInt32());
+        Assert.Equal(GameConfig.BossPotionCooldownRounds, noctura.GetProperty("potionCooldownRounds").GetInt32());
+    }
 
     [Fact]
     public void OldGodMechanicsCarryTheDivineArmorCutUnderItsOwnName()
@@ -960,9 +963,6 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(0, Cut("Maelketh"));
         Assert.All(gods, g => Assert.False(g.TryGetProperty("unenchantedDamageCutPercent", out _),
             "no Old God row carries the stale unenchantedDamageCutPercent field"));
-    }
-        Assert.Equal(35, noctura.GetProperty("corruptionPerStack").GetInt32());
-        Assert.Equal(GameConfig.BossPotionCooldownRounds, noctura.GetProperty("potionCooldownRounds").GetInt32());
     }
 
     [Fact]
