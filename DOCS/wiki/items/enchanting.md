@@ -8,7 +8,7 @@ history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Enchant removal refuses a cursed item without charging, and enchanting a worn item or removing its enchant leaves it worn.
 ---
-The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; the last three, the counters, go on a weapon only.
+The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; Phoenix Fire, Frostbite and the last three, the counters, go on a weapon only.
 
 ## Enchant list and costs
 
@@ -32,7 +32,7 @@ The magical attacks are the monster breaths and spells: Fire Breath, Frost Breat
 
 ### Phoenix Fire and Frostbite
 
-Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and crafting materials. With Phoenix Fire, each hit with that weapon has a {{percent:FireEnchantProcChance}} percent chance of extra fire damage equal to {{percent:FireEnchantDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostEnchantProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them.
+Phoenix Fire and Frostbite go on a weapon in the main or off hand only, never on a shield, and need level 60 and crafting materials. Each adds +{{balance:ElementEnchantWeaponPower}} weapon power. A weapon enchanted with one before version 1.3.6 keeps the +{{balance:LegacyElementEnchantWeaponPower}} it got then, and takes the chances below like a new one. A weapon holds one fire and one frost effect at most: Phoenix Fire is refused on a weapon that already has fire, from the shop or found with it, and Frostbite on one that already has frost, before any gold is taken. With Phoenix Fire, each hit with that weapon has a {{percent:PhoenixFireProcChance}} percent chance of extra fire damage equal to {{percent:PhoenixFireDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostbiteProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them. A found weapon with fire or frost keeps its own chances: fire {{percent:FireEnchantProcChance}} percent for {{percent:FireEnchantDamageMultiplier}} percent of the hit, frost {{percent:FrostEnchantProcChance}} percent to slow.
 
 ### Weapon effects in player fights and on the world boss
 
