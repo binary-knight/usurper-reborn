@@ -28,7 +28,7 @@ There is no initiative roll and Agility does not decide who acts first. Each rou
 2. You act.
 3. Your teammates and companions act, each ticking its own statuses first.
 4. Every living monster attacks once. An Old God makes its own number of attacks.
-5. Everyone in the party regains combat stamina and mana (see [regeneration in combat](#regeneration-in-combat)).
+5. Everyone in the party regains combat stamina, mana and, from gear, HP and mana (see [regeneration in combat](#regeneration-in-combat)).
 
 ### Ambushes
 
@@ -218,17 +218,17 @@ An ability's direct damage is reduced by your Defence + half your armor power + 
 
 ## Regeneration in combat
 
-At the end of each round every living member of the party regenerates combat stamina and, for a class with mana, mana:
+At the end of each round every living member of the party regenerates combat stamina and, for a class with mana, mana, and regains HP and mana from its own regeneration gear:
 
 - **Mana:** 2 plus a tenth of Wisdom, at most 15 a round (Wisdom 130). Arcanus's boon adds to it. A Mystic Shaman regains mana this way too.
 - **Combat stamina:** 3 plus a fifteenth of Stamina, plus 2 in light armor or with no armor, or 1 in medium armor. Combat stamina is full at the start of every fight; mana is not.
 
 {{table:combat-regeneration}}
 
+- **Regeneration gear:** every living party member, from its own gear, regains HP equal to the summed HP Regen value in tenths of a percent of its maximum HP (1.7 percent for a value of 17), and mana the same way from Mana Regen, at least 1 each when it has any and at most 10 percent of the maximum a round, however many items carry it. It is on top of Wisdom for mana and not limited to 15 or to spell classes.
+
 Only you, the fight's leader, also get these:
 
-- **Mana Regen gear:** its summed value in mana every round, on top of Wisdom and not limited to 15 or to spell classes.
-- **HP Regen gear:** its summed value in HP every round.
 - **Troll:** 2 percent of maximum HP a round, at least 3.
 - **Terravok shrine attunement:** 5 HP a round.
 - **Alignment:** Good 2 percent and Holy 4 percent of maximum HP a round.

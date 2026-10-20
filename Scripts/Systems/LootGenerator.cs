@@ -189,6 +189,10 @@ public static class LootGenerator
         /// through their keys. Any other line (a drop rolled before 1.2.5 in its finder's language, an item's own
         /// text) shows as stored. Nothing is written back.
         /// </summary>
+        /// <summary>1.3.5: a gear regeneration value (tenths of a percent of the pool) as a percent with one decimal, "1.7".</summary>
+        public static string RegenPercentText(int tenths) =>
+            (tenths / 10.0).ToString("0.0", System.Globalization.CultureInfo.InvariantCulture);
+
         public static string DescriptionLine(string? stored) => DescriptionLineIn(GameConfig.Language, stored);
 
         public static string DescriptionLineIn(string lang, string? stored)
@@ -209,7 +213,10 @@ public static class LootGenerator
                     if (e != SpecialEffect.None && Loc.HasIn("en", key) && Loc.GetIn("en", key) == m.Groups[1].Value) { effect = e; break; }
                 }
                 if (effect == null) return stored;
-                shown.Add($"{GetEffectNameIn(lang, effect.Value)} +{m.Groups[2].Value}");
+                // 1.3.5: gear regeneration is tenths of a percent of the pool, shown as a percent
+                string number = effect is SpecialEffect.Regeneration or SpecialEffect.ManaRegen
+                    ? RegenPercentText(int.Parse(m.Groups[2].Value)) + "%" : m.Groups[2].Value;
+                shown.Add($"{GetEffectNameIn(lang, effect.Value)} +{number}");
             }
             return string.Join(", ", shown);
         }

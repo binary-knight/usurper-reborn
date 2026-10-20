@@ -898,6 +898,7 @@ public static partial class GameConfig
     // authored item is 4,000,000. Anything beyond these bounds was made by a bug, and is clamped at
     // every place an item enters play: load, conversion, enchant, reforge, storage reads, sale.
     public const int MaxItemPower = 5000;            // attack, armor, weapon power, armor class, shield bonus
+    public const int MaxGearRegenTenthsPercent = 100; // 1.3.5: the summed gear HP or mana regeneration a round, in tenths of a percent of the pool (10 percent)
     public const int MaxItemStatBonus = 2000;        // every other flat bonus, elemental damage, regen, crit damage
     public const int MaxItemVitalBonus = 20000;      // max HP and max mana bonuses
     public const int MaxItemPercent = 100;           // block, crit chance, resistances, steals, piercing, thorns

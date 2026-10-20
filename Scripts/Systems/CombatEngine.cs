@@ -27394,7 +27394,38 @@ public partial class CombatEngine
                 long manaRegen = GodBoonSystem.ManaRegen(tm, StatEffectsSystem.GetManaRegenPerRound(tm.Wisdom));
                 tm.Mana = Math.Min(tm.MaxMana, tm.Mana + manaRegen);
             }
+            ApplyMemberGearRegenShare(tm);
         }
+    }
+
+    /// <summary>
+    /// 1.3.5: the equipment regeneration a round. The summed gear value is tenths of a percent of the pool
+    /// (17 is 1.7 percent), at most GameConfig.MaxGearRegenTenthsPercent however many items carry it, and at
+    /// least 1 when the gear has any. A value of 0 gives 0.
+    /// </summary>
+    internal static long GearRegenAmount(long pool, int summedValue)
+    {
+        if (summedValue <= 0) return 0;
+        int tenths = Math.Min(GameConfig.MaxGearRegenTenthsPercent, summedValue);
+        return Math.Max(1, pool * tenths / 1000);
+    }
+
+    /// <summary>
+    /// 1.3.5: a companion's or teammate's own gear regeneration at the round end, silent like the rest of the
+    /// party step. A companion's HP is synced to CompanionSystem.
+    /// </summary>
+    private static void ApplyMemberGearRegenShare(Character tm)
+    {
+        int hpRegen = tm.GetEquipmentHPRegen();
+        if (hpRegen > 0 && tm.HP < tm.MaxHP)
+        {
+            tm.HP = Math.Min(tm.MaxHP, tm.HP + GearRegenAmount(tm.MaxHP, hpRegen));
+            if (tm.IsCompanion && tm.CompanionId.HasValue)
+                CompanionSystem.Instance.SyncCompanionHP(tm);
+        }
+        int manaRegen = tm.GetEquipmentManaRegen();
+        if (manaRegen > 0 && tm.Mana < tm.MaxMana)
+            tm.Mana = Math.Min(tm.MaxMana, tm.Mana + GearRegenAmount(tm.MaxMana, manaRegen));
     }
 
     /// <summary>
@@ -27440,7 +27471,7 @@ public partial class CombatEngine
         if (equipHPRegen > 0 && player.HP < player.MaxHP)
         {
             long oldHP = player.HP;
-            player.HP = Math.Min(player.MaxHP, player.HP + equipHPRegen);
+            player.HP = Math.Min(player.MaxHP, player.HP + GearRegenAmount(player.MaxHP, equipHPRegen));
             long healed = player.HP - oldHP;
             if (healed > 0)
             {
@@ -27454,7 +27485,7 @@ public partial class CombatEngine
         if (equipManaRegen > 0 && player.Mana < player.MaxMana)
         {
             long oldMana = player.Mana;
-            player.Mana = Math.Min(player.MaxMana, player.Mana + equipManaRegen);
+            player.Mana = Math.Min(player.MaxMana, player.Mana + GearRegenAmount(player.MaxMana, equipManaRegen));
             long restored = player.Mana - oldMana;
             if (restored > 0)
             {
