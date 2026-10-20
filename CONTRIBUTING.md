@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: usurper-reloaded.csproj, Tests/Tests.csproj, Tests/Localization, Localization, Scripts/Systems/SaveSystem.cs -->
+<!-- doc: checked 1.3.5; sources: usurper-reloaded.csproj, Tests/Tests.csproj, Tests/Localization, Localization, Scripts/Systems/SaveSystem.cs -->
 # Contributing to Usurper Reborn
 
 Thanks for wanting to contribute. This project is a modern C# recreation of the 1993 BBS door game Usurper. It's developed in the open on GitHub and licensed under GPL v2.

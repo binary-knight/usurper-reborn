@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.4; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
+<!-- doc: checked 1.3.5; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
 # Wiki build and review
 
 The launch wiki has English prose in `DOCS/wiki/`, generated references and a
@@ -130,7 +130,9 @@ may not reuse a name another dataset prints.
 `home-upgrades` and `herbs` come from `economy.json`. The enchant tiers, the
 loot rarity table and the Home upgrade prices are private to their game files
 and are read by reflection, so renaming one fails the export. A named enchant's
-effect is what the game's own enchant code adds to a bare item.
+effect is what the game's own enchant code adds to a bare item. A counter
+enchant's row says instead which Old God's fight it is for, the two abilities
+it holds back there and that it removes that god's divine armor.
 `old-god-rewards` folds itself under a spoiler: it names each Old God's material
 and the artifacts. The economy constants print like the party constants and
 may not reuse a name either.
