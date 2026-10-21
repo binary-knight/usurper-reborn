@@ -56,6 +56,12 @@ Frost Touch slows its target, and Ice Storm every enemy still standing, for 2 ro
 
 Drugs, herbs, food and god boons can add to these results. A healer [specialization](/wiki/en/characters/specializations/) adds 20 percent to spell healing.
 
+## Casting on an ally
+
+A single-target heal or buff spell can be aimed at an ally and lands on that ally. A spell that cures, Purify or Purifying Surge, also removes the ally's Poisoned and Diseased statuses and trap poison. Cycle Rewind and Blood Pact act only on the caster: no ally can be chosen for them, and the cast always lands on the one who casts it.
+
+Deluge of Sanctity and Unmaking each have a cooldown in a fight. It counts down once a round for every party member who cast one, a grouped player or an NPC ally as well as you.
+
 ## Spells that move alignment
 
 Two Cleric spells change your alignment each time you cast them. Cure Critical removes up to 10 Darkness, or adds 10 Chivalry if you have no Darkness. Judgment removes up to 30 Darkness, or adds 30 Chivalry if you have no Darkness. See [alignment](/wiki/en/characters/stats/#alignment).

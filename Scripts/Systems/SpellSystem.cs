@@ -605,6 +605,13 @@ public static class SpellSystem
     public static bool IsPurify(CharacterClass characterClass, SpellInfo? spell) =>
         spell != null && characterClass == CharacterClass.Cleric && spell.Level == 3;
 
+    /// <summary>1.3.6 G6 (CP10): a spell that acts on the caster alone, as its text says: the Cyclebreaker's Cycle
+    /// Rewind (slot 4, "your body") and the Voidreaver's Blood Pact (slot 2, the caster's own HP for the caster's
+    /// attack). By class and slot, as IsPurify. No prompt offers an ally for it and no cast lands on one.</summary>
+    public static bool IsCasterOnly(CharacterClass characterClass, SpellInfo? spell) =>
+        spell != null && ((characterClass == CharacterClass.Cyclebreaker && spell.Level == 4)
+                          || (characterClass == CharacterClass.Voidreaver && spell.Level == 2));
+
     /// <summary>
     /// Check if character can cast specific spell
     /// </summary>
