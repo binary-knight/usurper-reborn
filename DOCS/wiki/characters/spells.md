@@ -54,11 +54,13 @@ Spells do not use the ability scaling, and a spell does not make the [hit roll](
 
 Frost Touch slows its target, and Ice Storm every enemy still standing, for 2 rounds. A boss or champion shrugs the slow off {{balance:BossSoftControlResistPercent}} percent of the time and is otherwise slowed 1 round. The slow counts down once a round, and a slowed enemy loses its action half the time.
 
+Steal Life and Energy Drain heal you half of the HP the target lost to the hit, after its armor, a boss's protections and its remaining HP.
+
 Drugs, herbs, food and god boons can add to these results. A healer [specialization](/wiki/en/characters/specializations/) adds 20 percent to spell healing.
 
 ## Casting on an ally
 
-A single-target heal or buff spell can be aimed at an ally and lands on that ally. A spell that cures, Purify or Purifying Surge, also removes the ally's Poisoned and Diseased statuses and trap poison. Cycle Rewind and Blood Pact act only on the caster: no ally can be chosen for them, and the cast always lands on the one who casts it.
+A single-target heal or buff spell can be aimed at an ally and lands on that ally. A spell that cures, Purify or Purifying Surge, also removes the ally's Poisoned and Diseased statuses and trap poison. Cycle Rewind and Blood Pact act only on the caster: no ally can be chosen for them, and the cast always lands on the one who casts it. Summon Angel and Summon Demon are cast on yourself too: no monster or ally is asked for, the attack bonus lasts the whole fight, and each makes you dodge the next attack.
 
 Deluge of Sanctity and Unmaking each have a cooldown in a fight. It counts down once a round for every party member who cast one, a grouped player or an NPC ally as well as you.
 
