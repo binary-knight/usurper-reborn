@@ -61,7 +61,7 @@ Intelligence:
 
 - Maximum mana for spellcasting classes: 5 per point above 10, plus your level times an eighth of your Intelligence.
 - Spell damage, spell critical chance and protection spells (see [spells](/wiki/en/characters/spells/)).
-- Alchemist attack abilities and Debuff abilities scale with it.
+- Alchemist attack abilities, the Mystic Shaman's Lightning Bolt, Chain Lightning and Searing Totem, and Debuff abilities scale with it.
 - [Training points](/wiki/en/characters/leveling/#training-points-per-level) at each level: one more for every 40 points of Intelligence and Wisdom combined.
 
 Wisdom:

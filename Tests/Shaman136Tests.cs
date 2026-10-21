@@ -16,7 +16,9 @@ namespace UsurperReborn.Tests;
 /// run on every live swing of a party member, the player's and the NPC teammate's, from one helper, at the
 /// swinger's own enchant, and the heal goes to the swinger and the rest of the party once each; a teammate's
 /// enchant counts down its own rounds. Rule 3: Guidance heals 25 percent of the whole hit, the swing's HP removed
-/// plus the enchant's extra. In memory only.
+/// plus the enchant's extra. Rule 2: the Shaman's Lightning Bolt, Chain Lightning and Searing Totem scale with
+/// Intelligence (4 percent a point above 10) and Dexterity (1.5 percent), not Strength; Desperate Strike keeps
+/// Strength. In memory only.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class Shaman136Tests : IDisposable
@@ -283,6 +285,116 @@ public class Shaman136Tests : IDisposable
         rig.Rec.Hits(CombatSide.Team).Count(h => h == rider).Should().Be(swings.Count, "one rider a landed swing");
         long expected = swings.Sum(b => (long)((b + rider) * 25 / 100.0));
         (rig.Mate.HP - mateHp).Should().Be(expected, "each swing heals a quarter of its HP removed plus the enchant's extra");
+    }
+
+    // ---------- rule 2: the Shaman's own attacks scale with Intelligence ----------
+
+    /// <summary>A level 50 caster with no weapon: Strength, Intelligence and Dexterity as given.</summary>
+    private static Character Caster(CharacterClass cls, int str, int intel, int dex = 30) => new Character
+    {
+        Name1 = "Caster", Name2 = "Caster", Class = cls, Race = CharacterRace.Troll, Level = 50,
+        Strength = str, Intelligence = intel, Dexterity = dex, Constitution = 30, Wisdom = 20, Charisma = 20,
+        HP = 100_000, MaxHP = 100_000, CombatSpeed = CombatSpeed.Instant,
+    };
+
+    private static long Use(Character c, string id) => ClassAbilitySystem.UseAbility(c, id, new FixedRandom()).Damage;
+
+    /// <summary>The template's centre value: base x level scale x stat scale, the 10 percent spread at its middle.</summary>
+    private static long Centre(string id, int primary, int dex)
+    {
+        var a = ClassAbilitySystem.GetAbility(id)!;
+        double levelScale = 1.0 + (50 * 0.03);
+        double statScale = 1.0;
+        statScale += Math.Max(0, (primary - 10) * 0.04);
+        statScale += Math.Max(0, (dex - 10) * 0.015);
+        statScale = Math.Min(statScale, 4.5);
+        double scaled = (a.BaseDamage + 0 * 0.25) * (levelScale * statScale);
+        return (long)(scaled * (0.9 + 0.5 * 0.2));
+    }
+
+    [Theory]
+    [InlineData("lightning_bolt")]
+    [InlineData("chain_lightning")]
+    [InlineData("searing_totem")]
+    public void Shaman136_R2_TheShamansOwnAttacks_GrowWithIntelligence_NotStrength(string id)
+    {
+        var plain = Caster(CharacterClass.MysticShaman, 10, 10);
+        var wise = Caster(CharacterClass.MysticShaman, 10, 80);
+        var strong = Caster(CharacterClass.MysticShaman, 80, 10);
+        Use(wise, id).Should().BeGreaterThan(Use(plain, id), "Intelligence raises it");
+        Use(strong, id).Should().Be(Use(plain, id), "Strength does not");
+        Use(wise, id).Should().Be(Centre(id, 80, 30), "4 percent a point of Intelligence above 10 and the Dexterity term");
+        Use(Caster(CharacterClass.MysticShaman, 10, 10, dex: 70), id).Should().BeGreaterThan(Use(plain, id), "the Dexterity term is kept");
+    }
+
+    [Fact]
+    public void Shaman136_R2_DesperateStrike_KeepsStrength_ForAShamanAndAWarrior()
+    {
+        foreach (var cls in new[] { CharacterClass.MysticShaman, CharacterClass.Warrior })
+        {
+            var plain = Caster(cls, 10, 10);
+            Use(Caster(cls, 80, 10), "desperate_strike").Should().Be(Centre("desperate_strike", 80, 30), cls.ToString());
+            Use(Caster(cls, 10, 80), "desperate_strike").Should().Be(Use(plain, "desperate_strike"), $"{cls}: Intelligence does not raise a melee strike");
+        }
+        ClassAbilitySystem.ScalesWithShamanIntelligence(ClassAbilitySystem.GetAbility("desperate_strike")!).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Shaman136_R2_AStrengthClass_IsUnchanged()
+    {
+        var plain = Caster(CharacterClass.Warrior, 10, 10);
+        Use(Caster(CharacterClass.Warrior, 80, 10), "desperate_strike").Should().BeGreaterThan(Use(plain, "desperate_strike"));
+        Use(Caster(CharacterClass.Warrior, 10, 80), "desperate_strike").Should().Be(Use(plain, "desperate_strike"));
+    }
+
+    [Fact]
+    public void Shaman136_R2_OnlyTheThreeShamanAttacks_TakeTheIntelligenceBranch()
+    {
+        var shamanAttacks = ClassAbilitySystem.GetAvailableAbilities(new Character { Class = CharacterClass.MysticShaman, Level = 100 })
+            .Where(ClassAbilitySystem.ScalesWithShamanIntelligence).Select(a => a.Id).OrderBy(x => x).ToList();
+        shamanAttacks.Should().Equal("chain_lightning", "lightning_bolt", "searing_totem");
+    }
+
+    private static Rig SearingRig(Character caster)
+    {
+        var rig = NewRig();
+        typeof(CombatEngine).GetField("currentPlayer", F)!.SetValue(rig.Engine, caster);
+        typeof(CombatEngine).GetField("currentTeammates", F)!.SetValue(rig.Engine, new List<Character>());
+        rig.Result = new CombatResult { Player = caster, Teammates = new List<Character>() };
+        typeof(CombatEngine).GetMethod("BeginFightEvents", F)!.Invoke(rig.Engine, new object[] { rig.Result });
+        rig.Engine.Observer = rig.Rec;
+        return rig;
+    }
+
+    /// <summary>Searing Totem cast through the live ability effects, then one totem pulse: the hit, the power, the tick.</summary>
+    private static (long hit, int power, long tick) Searing(Character caster)
+    {
+        var rig = SearingRig(caster);
+        var monsters = new List<Monster> { rig.Target };
+        var use = ClassAbilitySystem.UseAbility(caster, "searing_totem", new FixedRandom());
+        long before = rig.Target.HP;
+        ((Task)typeof(CombatEngine).GetMethod("ApplyAbilityEffectsMultiMonster", F)!
+            .Invoke(rig.Engine, new object?[] { caster, rig.Target, monsters, use, rig.Result })!).GetAwaiter().GetResult();
+        long hit = before - rig.Target.HP;
+        caster.ActiveTotemType.Should().Be(3);
+        before = rig.Target.HP;
+        typeof(CombatEngine).GetMethod("ProcessShamanTotemEffects", F)!.Invoke(rig.Engine, new object?[] { caster, monsters, rig.Result });
+        return (hit, caster.ActiveTotemPower, before - rig.Target.HP);
+    }
+
+    [Fact]
+    public void Shaman136_R2_SearingTotem_HitAndTick_GrowWithIntelligence_NotStrength()
+    {
+        var plain = Searing(Caster(CharacterClass.MysticShaman, 10, 10));
+        var wise = Searing(Caster(CharacterClass.MysticShaman, 10, 80));
+        var strong = Searing(Caster(CharacterClass.MysticShaman, 80, 10));
+        plain.power.Should().Be((int)Centre("searing_totem", 10, 30));
+        wise.power.Should().Be((int)Centre("searing_totem", 80, 30), "the totem's power is the Intelligence scaled damage");
+        wise.hit.Should().BeGreaterThan(plain.hit);
+        wise.tick.Should().BeGreaterThan(plain.tick);
+        strong.power.Should().Be(plain.power, "Strength does not raise it");
+        strong.hit.Should().Be(plain.hit);
+        strong.tick.Should().Be(plain.tick);
     }
 
     private static string RepoRoot()
