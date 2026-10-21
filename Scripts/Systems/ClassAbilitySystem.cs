@@ -2640,6 +2640,14 @@ public static class ClassAbilitySystem
         ability.ManaCost > 0 ? Loc.Get("ability.cost_mp", ability.ManaCost) : Loc.Get("ability.cost_st", GetEffectiveStaminaCost(ability));
 
     /// <summary>
+    /// 1.3.6 G10 (Q10): the Mystic Shaman's own Attack abilities, whose effect names start "shaman_" (Lightning Bolt,
+    /// Chain Lightning, Searing Totem), scale with Intelligence. Desperate Strike, the shared melee strike a Shaman can
+    /// also use, keeps Strength.
+    /// </summary>
+    internal static bool ScalesWithShamanIntelligence(ClassAbility ability) =>
+        ability.Type == AbilityType.Attack && (ability.SpecialEffect ?? "").StartsWith("shaman_", StringComparison.Ordinal);
+
+    /// <summary>
     /// Use an ability and return the result
     /// </summary>
     public static ClassAbilityResult UseAbility(Character user, string abilityId, Random? random = null)
@@ -2685,6 +2693,14 @@ public static class ClassAbilitySystem
                 statScale += Math.Max(0, (user.Intelligence - 10) * 0.04);
                 // Dexterity adds accuracy bonus for throwing
                 statScale += Math.Max(0, (user.Dexterity - 10) * 0.02);
+            }
+            else if (user.Class == CharacterClass.MysticShaman && ScalesWithShamanIntelligence(ability))
+            {
+                // 1.3.6 G10 (Q10): a Mystic Shaman's own attacks (Lightning Bolt, Chain Lightning, Searing Totem) scale
+                // with Intelligence, as their text says, in place of Strength
+                statScale += Math.Max(0, (user.Intelligence - 10) * 0.04);
+                // the default Attack branch's Dexterity term, kept
+                statScale += Math.Max(0, (user.Dexterity - 10) * 0.015);
             }
             else if (user.Class == CharacterClass.Bard || user.Class == CharacterClass.Jester)
             {

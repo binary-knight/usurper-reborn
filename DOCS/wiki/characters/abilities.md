@@ -33,7 +33,7 @@ An ability's damage, healing and bonuses grow from its listed base value. Two mu
 
 Which stats count depends on the ability's type, shown on each ability page:
 
-- Attack abilities: Strength (4 percent a point) and Dexterity (1.5 percent). Bard and Jester attacks use Charisma (4 percent) and Dexterity (2 percent) instead. Alchemist attacks use Intelligence (4 percent) and Dexterity (2 percent).
+- Attack abilities: Strength (4 percent a point) and Dexterity (1.5 percent). Bard and Jester attacks use Charisma (4 percent) and Dexterity (2 percent) instead. Alchemist attacks use Intelligence (4 percent) and Dexterity (2 percent). A Mystic Shaman's Lightning Bolt, Chain Lightning and Searing Totem use Intelligence (4 percent) and Dexterity (1.5 percent); its Desperate Strike uses Strength and Dexterity.
 - Healing abilities: Constitution (3 percent) and Wisdom (2 percent).
 - Defense abilities: Constitution (2.5 percent). A Paladin also adds Wisdom (2 percent).
 - Buff abilities: Charisma (2.5 percent).
