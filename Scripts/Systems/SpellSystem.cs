@@ -235,7 +235,7 @@ public static class SpellSystem
         // ═══════════════════════════════════════════════════════════════════════════════
         [CharacterClass.Tidesworn] = new Dictionary<int, SpellInfo>
         {
-            [1] = new SpellInfo(1, "Alethia's Ward", "Invoke the grace of Aurelion's lost beloved. Protection: +20, reflects 10% melee damage. Duration: whole fight.", 20, 1, "Alethiavardarie", false, "Buff"),
+            [1] = new SpellInfo(1, "Alethia's Ward", "Invoke the grace of Aurelion's lost beloved. Protection: +15 + 2 per level, reflects 15% melee damage. Duration: whole fight.", 20, 1, "Alethiavardarie", false, "Buff"),
             [2] = new SpellInfo(2, "Purifying Surge", "A wave of sacred water cleanses and mends. Effect: 40-60 hp + removes poison/disease. Duration: 1 turn.", 35, 5, "Surgiapurarie", false, "Heal"),
             [3] = new SpellInfo(3, "Ocean's Rebuke", "Call forth a crashing wave of consecrated water. Damage: 70-95. Extra vs undead/evil. Duration: 1 turn.", 60, 10, "Oceanrebuquarie", false, "Attack"),
             [4] = new SpellInfo(4, "Covenant of the Deep", "The Ocean itself shields the faithful. All allies: +40 protection, +20 attack. Duration: whole fight.", 100, 17, "Covendeepmarie", true, "Buff"),
@@ -1584,19 +1584,22 @@ public static class SpellSystem
     // PRESTIGE CLASS SPELL IMPLEMENTATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
 
+    /// <summary>1.3.6 G11 (Q20): Alethia's Ward's one reflect, the Reflecting status's 15 percent of a melee hit
+    /// (CombatEngine's Reflecting read in ProcessMonsterAction), as its cast line states it.</summary>
+    internal const int AlethiasWardReflectPercent = 15;
+
     private static void ExecuteTideswornSpell(Character caster, int spellLevel, Character target, List<Character> allTargets, SpellResult result, Random random, float profMult = 1.0f)
     {
         switch (spellLevel)
         {
-            case 1: // Alethia's Ward - Protection (scales with level) + thorn reflect (scales with INT)
-                // v0.56.0 rework: scaling protection (was +20 flat, now +15 + Level*2) and scaling reflect (was flat 10%, now 10% + INT*0.1%)
+            case 1: // Alethia's Ward - Protection (scales with level) + the Reflecting status's reflect
+                // v0.56.0 rework: scaling protection (was +20 flat, now +15 + Level*2).
+                // 1.3.6 G11 (Q20, "One reflect"): the one reflect is the Reflecting status that tidal_reflect gives, 15
+                // percent of a melee hit; the thorn reflect (10 percent + INT/10) this case also set is gone.
                 result.ProtectionBonus = ScaleProtectionEffect(15 + (caster.Level * 2), caster, profMult);
-                int reflectPct = 10 + (int)(caster.Intelligence * 0.1);
-                caster.TempThornReflectPercent = Math.Max(caster.TempThornReflectPercent, reflectPct);
-                caster.TempThornReflectDuration = 999;
                 result.Duration = 999;
                 result.SpecialEffect = "tidal_reflect";
-                result.Message += $" {Loc.Get("combat.spell_alethias_ward_cast", caster.Name2, result.ProtectionBonus, reflectPct)}";
+                result.Message += $" {Loc.Get("combat.spell_alethias_ward_cast", caster.Name2, result.ProtectionBonus, AlethiasWardReflectPercent)}";
                 break;
             case 2: // Purifying Surge - 40-60 heal + cure disease/poison
                 int tideHeal2 = 40 + random.Next(21);
@@ -1788,8 +1791,9 @@ public static class SpellSystem
                 result.Message += $" {Loc.Get("combat.spell_void_bolt_cast", result.Damage)}";
                 break;
             case 4: // Consume the Fallen - Heal 100+ HP (simplified from "50% of last killed")
-                int consumeHeal = Math.Max(100, (int)(caster.MaxHP * 0.25));
-                result.Healing = ScaleHealingEffect(consumeHeal, caster, random, profMult);
+                // 1.3.6 G11 (Q14, "Flat 25 percent"): exactly 25 percent of max HP, at least 100, with no level, Wisdom
+                // or variance scaling, as Cycle Rewind
+                result.Healing = Math.Max(100, (int)(caster.MaxHP * 0.25));
                 result.Message += $" {Loc.Get("combat.spell_consume_fallen_cast", caster.Name2, result.Healing)}";
                 break;
             case 5: // Unmaking - 200-280 damage, costs 25% current HP (reduced from 350-450)

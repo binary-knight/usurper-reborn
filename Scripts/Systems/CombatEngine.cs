@@ -570,6 +570,7 @@ public partial class CombatEngine
     private static void ScrubTransientCombatState(Character c)
     {
         c.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+        c.ClearPrestigeCombatState();   // 1.3.6 G11
         c.MagicACBonus = 0;
         c.HasOceanMemory = false; // v1.1.15
         c.DodgeNextAttack = false;
@@ -1158,6 +1159,7 @@ public partial class CombatEngine
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
         player.IsRaging = false;
         player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+        player.ClearPrestigeCombatState();   // 1.3.6 G11
         player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
         player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
         player.DodgeNextAttack = false;
@@ -1347,6 +1349,7 @@ public partial class CombatEngine
                     // StatusLifestealPercent/DeathsEmbraceActive/CalmWatersRounds leaked between fights).
                     // Mirrors the per-player init block above.
                     teammate.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+                    teammate.ClearPrestigeCombatState();   // 1.3.6 G11
                     teammate.MagicACBonus = 0;
                     teammate.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
                     teammate.DodgeNextAttack = false;
@@ -2101,6 +2104,7 @@ public partial class CombatEngine
             }
 
             // Process end-of-round effects: decrement ability cooldowns and buff durations
+            TickDominatedMonsters(monsters);   // 1.3.6 G11 (rule 4): Prison Warden's Command, once a round
             if (player.IsAlive)
             {
                 ProcessEndOfRoundAbilityEffects(player);
@@ -2356,6 +2360,7 @@ public partial class CombatEngine
         player.IsRaging = false;
         player.TempCritChanceBonus = 0;   // v1.1.10
         player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+        player.ClearPrestigeCombatState();   // 1.3.6 G11
         player.MagicACBonus = 0;
         player.HasOceanMemory = false; // v1.1.15: it never ended before
         player.DodgeNextAttack = false;
@@ -2393,6 +2398,7 @@ public partial class CombatEngine
             {
                 if (teammate == null) continue;
                 teammate.HasOceanMemory = false; // v1.1.15: the Sage's party spells end with the fight
+                teammate.ClearPrestigeCombatState();   // 1.3.6 G11
                 teammate.RemoveStatus(StatusEffect.Blur);
                 teammate.RemoveStatus(StatusEffect.Protected);
                 teammate.RemoveStatus(StatusEffect.Blessed);
@@ -9125,6 +9131,33 @@ public partial class CombatEngine
     };
 
     internal static IReadOnlyCollection<string> HandlerCasterPartEffects => HandlerCasterParts.Keys;
+
+    // ═══ 1.3.6 G11: the prestige singles ═══
+
+    /// <summary>1.3.6 G11 (rule 1): Living Waters' heal on each Regenerating tick of its rounds ("20 HP/round").</summary>
+    internal const int LivingWatersRegenPerRound = 20;
+
+    /// <summary>1.3.6 G11 (rule 3): the nine buff statuses Harmonic Crescendo counts and consumes.</summary>
+    internal static bool IsGrandFinaleBuff(StatusEffect s) =>
+        s == StatusEffect.Blessed || s == StatusEffect.Raging ||
+        s == StatusEffect.Haste || s == StatusEffect.Regenerating ||
+        s == StatusEffect.Shielded || s == StatusEffect.Empowered ||
+        s == StatusEffect.Protected || s == StatusEffect.Stoneskin ||
+        s == StatusEffect.Reflecting;
+
+    /// <summary>1.3.6 G11 (rule 4): Prison Warden's Command's cut, 50 percent, half that on a boss or a mini boss.</summary>
+    internal static int PrisonWardensCutPercent(Monster m) => m.IsBoss || m.IsMiniBoss ? 25 : 50;
+
+    /// <summary>1.3.6 G11 (rule 4): the round end tick of Prison Warden's Command's cut on every monster.</summary>
+    internal static void TickDominatedMonsters(IEnumerable<Monster>? monsters)
+    {
+        if (monsters == null) return;
+        foreach (var m in monsters)
+        {
+            if (m == null || m.DominatedRounds <= 0) continue;
+            if (--m.DominatedRounds == 0) m.DominatedCutPercent = 0;
+        }
+    }
 
     internal static CasterPart HandlerAppliesToCaster(string? effect) =>
         !string.IsNullOrEmpty(effect) && HandlerCasterParts.TryGetValue(effect, out var parts) ? parts : CasterPart.None;
@@ -17780,12 +17813,19 @@ public partial class CombatEngine
                 break;
 
             case "regen_20":
-                // 20 HP/round regen for duration
-                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Regenerating))
-                    player.ActiveStatuses[StatusEffect.Regenerating] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+            {
+                // 20 HP/round regen for duration. 1.3.6 G11 (rule 1): the Regenerating status runs at least these rounds,
+                // and each of its ticks in them heals the flat 20 (Character.FlatRegenAmount) in place of the 1d6 a tick
+                // other Regenerating sources keep. Living Waters is a caster only heal, so no party share applies.
+                int regenRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                player.ActiveStatuses[StatusEffect.Regenerating] =
+                    Math.Max(player.ActiveStatuses.TryGetValue(StatusEffect.Regenerating, out int heldRegen) ? heldRegen : 0, regenRounds);
+                player.FlatRegenAmount = LivingWatersRegenPerRound;
+                player.FlatRegenRounds = regenRounds;
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("combat.ability_regen_20"));
                 break;
+            }
 
             case "abyssal_anchor":
             {
@@ -18170,13 +18210,11 @@ public partial class CombatEngine
 
             case "grand_finale":
             {
-                // 300 AoE + 50 per active buff, consumes buffs
-                int buffCount = player.ActiveStatuses.Count(kvp =>
-                    kvp.Key == StatusEffect.Blessed || kvp.Key == StatusEffect.Raging ||
-                    kvp.Key == StatusEffect.Haste || kvp.Key == StatusEffect.Regenerating ||
-                    kvp.Key == StatusEffect.Shielded || kvp.Key == StatusEffect.Empowered ||
-                    kvp.Key == StatusEffect.Protected || kvp.Key == StatusEffect.Stoneskin ||
-                    kvp.Key == StatusEffect.Reflecting);
+                // 300 AoE + 50 per active buff, consumes buffs. 1.3.6 G11 (rule 3): "per active buff on party": the nine
+                // buff statuses are counted on every living member of the party (LivingPartyOf: the caster, its living
+                // teammates and the fight's player) and consumed from every member, not the caster's alone.
+                var finaleParty = LivingPartyOf(player, result);
+                int buffCount = finaleParty.Sum(member => member.ActiveStatuses.Keys.Count(IsGrandFinaleBuff));
                 int bonusDmg = buffCount * 50;
                 if (monsters != null)
                 {
@@ -18200,14 +18238,10 @@ public partial class CombatEngine
                         }
                     }
                 }
-                // Consume buffs
-                var toRemove = player.ActiveStatuses.Keys.Where(k =>
-                    k == StatusEffect.Blessed || k == StatusEffect.Raging ||
-                    k == StatusEffect.Haste || k == StatusEffect.Regenerating ||
-                    k == StatusEffect.Shielded || k == StatusEffect.Empowered ||
-                    k == StatusEffect.Protected || k == StatusEffect.Stoneskin ||
-                    k == StatusEffect.Reflecting).ToList();
-                foreach (var key in toRemove) player.ActiveStatuses.Remove(key);
+                // Consume buffs, from every member counted
+                foreach (var member in finaleParty)
+                    foreach (var key in member.ActiveStatuses.Keys.Where(IsGrandFinaleBuff).ToList())
+                        member.ActiveStatuses.Remove(key);
                 if (buffCount > 0)
                 {
                     terminal.SetColor("yellow");
@@ -18577,19 +18611,21 @@ public partial class CombatEngine
             }
 
             case "prison_wardens_command":
-                // -50% ATK/DEF to target (boss: half) - Weakened + Vulnerable + direct stat reduction
+                // -50% ATK/DEF to target (boss: half) - Weakened + Vulnerable + a timed cut. 1.3.6 G11 (rule 4): the
+                // cut is Monster.DominatedRounds and DominatedCutPercent, read in GetAttackPower and WeakenDefenceCut,
+                // for the ability's rounds; it edits no base stat (it cut Strength and Defence for the rest of the fight
+                // and compounded on a recast). A boss or a mini boss takes half (the Q5 reading of "bosses"). The Weaken
+                // and Marked riders stay as they were.
                 if (target != null && target.IsAlive)
                 {
-                    float mult = target.IsBoss ? 0.25f : 0.50f;
-                    int atkReduction = (int)(target.Strength * mult);
-                    int defReduction = (int)(target.Defence * mult);
-                    target.Strength = Math.Max(1, target.Strength - atkReduction);
-                    target.Defence = Math.Max(0, target.Defence - defReduction);
+                    int cutPct = PrisonWardensCutPercent(target);
+                    target.DominatedRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
+                    target.DominatedCutPercent = cutPct;
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
                     target.IsMarked = true;
                     target.MarkedDuration = Math.Max(target.MarkedDuration, abilityResult.Duration);
                     terminal.SetColor("dark_red");
-                    UIHelper.WriteRow(terminal, Loc.Get("combat.ability_prison_wardens_command", MonsterNames.Display(target), atkReduction, defReduction));
+                    UIHelper.WriteRow(terminal, Loc.Get("combat.ability_prison_wardens_command", MonsterNames.Display(target), cutPct, cutPct));
                 }
                 break;
 
@@ -18709,12 +18745,12 @@ public partial class CombatEngine
                         target.HP = 0;
                         if (!result.DefeatedMonsters.Contains(target))
                             result.DefeatedMonsters.Add(target);
-                        // Kill resets Reap cooldown
-                        if (CooldownsFor(player).ContainsKey("reap"))
-                        {
-                            CooldownsFor(player)["reap"] = 0;
-                            terminal.WriteLine(Loc.Get("combat.reap_cooldown_reset"), "bright_red");
-                        }
+                        // Kill resets Reap cooldown. 1.3.6 G11 (rule 5): a teammate's cooldown was written before this
+                        // handler; the player's is written after it from CooldownApplied, so that goes to 0 too and the
+                        // reset is not overwritten.
+                        CooldownsFor(player).Remove("reap");
+                        abilityResult.CooldownApplied = 0;
+                        terminal.WriteLine(Loc.Get("combat.reap_cooldown_reset"), "bright_red");
                     }
                 }
                 break;

@@ -486,6 +486,21 @@ public class Character
     public bool HasBloodlust { get; set; } = false;      // Barbarian: heal on kill
     public bool HasStatusImmunity { get; set; } = false;  // Immune to debuffs
     public int StatusLifestealPercent { get; set; } = 0;  // Lifesteal % from abilities (e.g. 10, 25)
+
+    /// <summary>1.3.6 G11 (rule 1): Living Waters' heal a Regenerating tick gives while FlatRegenRounds last, in place
+    /// of the status's 1d6 (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int FlatRegenAmount { get; set; }
+    /// <summary>1.3.6 G11 (rule 1): the Regenerating ticks left that heal FlatRegenAmount (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int FlatRegenRounds { get; set; }
+
+    /// <summary>1.3.6 G11: clears the combat only state of the prestige singles (Living Waters' flat regen, Apotheosis
+    /// of Ruin's area swings, Empathic Link), at a fight's start and end with the other transient buffs.</summary>
+    internal void ClearPrestigeCombatState()
+    {
+        FlatRegenAmount = 0; FlatRegenRounds = 0;
+    }
     public bool DeathsEmbraceActive { get; set; } = false; // Voidreaver: revive on death once (combat-transient)
     public int StatusImmunityDuration { get; set; } = 0;
 
@@ -2871,7 +2886,9 @@ public class Character
                     break;
 
                 case StatusEffect.Regenerating:
-                    var heal = rnd.Next(1, 7); // 1d6
+                    // 1.3.6 G11 (rule 1): Living Waters' flat amount for its own rounds; any other source keeps its 1d6
+                    var heal = FlatRegenRounds > 0 ? FlatRegenAmount : rnd.Next(1, 7); // 1d6
+                    if (FlatRegenRounds > 0 && --FlatRegenRounds == 0) FlatRegenAmount = 0;
                     HP = Math.Min(HP + heal, MaxHP);
                     messages.Add((Loc.Get("status.tick_regen", DisplayName, heal), "bright_green"));
                     break;
@@ -2945,6 +2962,10 @@ public class Character
                 case StatusEffect.Lifesteal:
                     StatusLifestealPercent = 0;
                     messages.Add((Loc.Get("status.end_lifesteal", DisplayName), ColorRole.Notice));
+                    break;
+                case StatusEffect.Regenerating:
+                    FlatRegenAmount = 0; FlatRegenRounds = 0;   // 1.3.6 G11: the flat regen ends with the status
+                    messages.Add((Loc.Get("status.end_wears_off", DisplayName, effectName), ColorRole.Notice));
                     break;
                 default:
                     messages.Add((Loc.Get("status.end_wears_off", DisplayName, effectName), ColorRole.Notice));
