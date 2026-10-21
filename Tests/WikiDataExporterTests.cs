@@ -461,7 +461,7 @@ public class WikiDataExporterTests : IClassFixture<WikiDataFixture>
         Assert.Equal(4, ocean.GetProperty("WisdomBonus").GetDouble());
         var phoenix = Find(enchants, "number", "13").GetProperty("effects");
         Assert.True(phoenix.GetProperty("HasFireEnchant").GetBoolean());
-        Assert.Equal(20, phoenix.GetProperty("WeaponPower").GetDouble());
+        Assert.Equal(30, phoenix.GetProperty("WeaponPower").GetDouble());   // 1.3.6: a new enchant adds 30
         Assert.Equal(0, Find(enchants, "number", "1").GetProperty("materials").GetArrayLength());
     }
 

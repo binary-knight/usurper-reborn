@@ -9959,6 +9959,25 @@ public partial class CombatEngine
         return target.EnchantPoisonTick;
     }
 
+    /// <summary>1.3.6: a Phoenix Fire weapon: its enchant kinds hold "fire" (before 1.3.6) or "phoenix" (from 1.3.6).
+    /// A loot fire weapon carries no kind code.</summary>
+    internal static bool IsPhoenixWeapon(Equipment weapon) => weapon.GetEnchantedKinds().Any(MagicShopLocation.IsPhoenixKind);
+
+    /// <summary>1.3.6: a Frostbite weapon: its enchant kinds hold "frost" or "frostbite".</summary>
+    internal static bool IsFrostbiteWeapon(Equipment weapon) => weapon.GetEnchantedKinds().Any(MagicShopLocation.IsFrostbiteKind);
+
+    /// <summary>1.3.6: the fire proc chance of a weapon hit: Phoenix Fire's, or a loot fire weapon's.</summary>
+    internal static float WeaponFireChance(Equipment weapon) =>
+        IsPhoenixWeapon(weapon) ? GameConfig.PhoenixFireProcChance : GameConfig.FireEnchantProcChance;
+
+    /// <summary>1.3.6: the share of the hit a fire proc deals: Phoenix Fire's, or a loot fire weapon's.</summary>
+    internal static float WeaponFireShare(Equipment weapon) =>
+        IsPhoenixWeapon(weapon) ? GameConfig.PhoenixFireDamageMultiplier : GameConfig.FireEnchantDamageMultiplier;
+
+    /// <summary>1.3.6: the frost slow chance of a weapon hit: Frostbite's, or a loot frost weapon's.</summary>
+    internal static float WeaponFrostChance(Equipment weapon) =>
+        IsFrostbiteWeapon(weapon) ? GameConfig.FrostbiteProcChance : GameConfig.FrostEnchantProcChance;
+
     private void CheckElementalEnchantProcs(Character attacker, Monster target, long damage, CombatResult result, EquipmentSlot weaponSlot = EquipmentSlot.MainHand)
     {
         // v0.60.10: read elemental enchants from the source weapon (passed via
@@ -9979,9 +9998,9 @@ public partial class CombatEngine
         // attacker-side resource gain that's still useful when the target dies.
         bool targetAlive = target.HP > 0 && target.IsAlive;
 
-        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < WeaponFireChance(weapon))   // 1.3.6: Phoenix Fire or loot fire
         {
-            long fireDamage = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+            long fireDamage = Math.Max(1, (long)(damage * WeaponFireShare(weapon)));
             target.HP = Math.Max(0, target.HP - fireDamage); // hq-armory: out (post-hit rider)
             EvHit(attacker, fireDamage);   // 1.2.6
             terminal.SetColor("bright_red");
@@ -9992,7 +10011,7 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
 
-        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < WeaponFrostChance(weapon))   // 1.3.6: Frostbite or loot frost
         {
             // v0.60.10 (Coosh Lv.83 Warrior report): "Frostbite says chance to apply slow
             // but instead it just decreases defences, and by a small amount." Pre-fix this
@@ -28144,13 +28163,13 @@ public partial class CombatEngine
         }
         var weapon = attacker.GetEquipment(slot);
         if (weapon == null) return;
-        if (defender.HP > 0 && weapon.HasFireEnchant && random.NextDouble() < GameConfig.FireEnchantProcChance)
+        if (defender.HP > 0 && weapon.HasFireEnchant && random.NextDouble() < WeaponFireChance(weapon))   // 1.3.6: Phoenix Fire or loot fire
         {
-            long fire = Math.Max(1, (long)(damage * GameConfig.FireEnchantDamageMultiplier));
+            long fire = Math.Max(1, (long)(damage * WeaponFireShare(weapon)));
             defender.HP = Math.Max(0, defender.HP - fire); // hq-armory: out (PvP rider of a boosted hit) hq-barracks: out (PvP rider of a cut hit)
             terminal.WriteLine(human ? Loc.Get("combat.enchant_fire", fire) : Loc.Get("combat.enchant_fire_tm", name, fire), "bright_red");
         }
-        if (defender.HP > 0 && weapon.HasFrostEnchant && random.NextDouble() < GameConfig.FrostEnchantProcChance)
+        if (defender.HP > 0 && weapon.HasFrostEnchant && random.NextDouble() < WeaponFrostChance(weapon))   // 1.3.6: Frostbite or loot frost
         {
             defender.ApplyStatus(StatusEffect.Slow, GameConfig.FrostEnchantDuration);
             UIHelper.WriteRow(terminal, human

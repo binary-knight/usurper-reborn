@@ -89,7 +89,8 @@ test("enchants table: costs, levels, effects and materials", () => {
   );
   assert.equal(
     row(html, "13")[1],
-    "a chance of extra fire damage on a hit, +20 weapon power",
+    "a chance of extra fire damage on a hit, +30 weapon power",
+    "1.3.6: a new Phoenix Fire enchant adds 30 weapon power",
   );
 });
 
@@ -109,7 +110,8 @@ test("enchants table: a counter row names the god and the two abilities", () => 
   );
   assert.equal(
     row(html, "13")[1],
-    "a chance of extra fire damage on a hit, +20 weapon power",
+    "a chance of extra fire damage on a hit, +30 weapon power",
+    "1.3.6: a new Phoenix Fire enchant adds 30 weapon power",
   );
 });
 

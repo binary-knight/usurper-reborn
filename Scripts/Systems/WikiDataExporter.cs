@@ -621,7 +621,7 @@ public static class WikiDataExporter
     {
         var bare = new Equipment();
         var enchanted = new Equipment();
-        MagicShopLocation.ApplyNamedEnchant(enchanted, tierChoice);
+        MagicShopLocation.ApplyNamedTier(enchanted, tierChoice);   // 1.3.6: what the shop writes now
         var effects = new SortedDictionary<string, object>(StringComparer.Ordinal);
         foreach (var p in typeof(Equipment).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {
@@ -724,6 +724,9 @@ public static class WikiDataExporter
         nameof(GameConfig.FourthEnchantFailChance), nameof(GameConfig.FifthEnchantFailChance),
         nameof(GameConfig.FireEnchantProcChance), nameof(GameConfig.FireEnchantDamageMultiplier),
         nameof(GameConfig.FrostEnchantProcChance), nameof(GameConfig.FrostEnchantDuration),
+        nameof(GameConfig.PhoenixFireProcChance), nameof(GameConfig.PhoenixFireDamageMultiplier),
+        nameof(GameConfig.FrostbiteProcChance), nameof(GameConfig.ElementEnchantWeaponPower),
+        nameof(GameConfig.LegacyElementEnchantWeaponPower),
         nameof(GameConfig.LootBaseDropChance), nameof(GameConfig.LootLevelDropScale),
         nameof(GameConfig.LootPartyBonusPerMember), nameof(GameConfig.LootMaxDropChance),
         nameof(GameConfig.LootTeammateTargetChance), nameof(GameConfig.ShopPriceMultiplier),

@@ -135,8 +135,8 @@ public class Coverage136Tests : IDisposable
     // The English words of each proc's line, the player's form and the named form.
     private static string PlayerLine(string kind) => kind switch
     {
-        "fire" => "(Phoenix Fire)",
-        "frost" => "is slowed! (Frostbite)",
+        "fire" => "fire damage!",   // 1.3.6 W2: the fire line names no enchant
+        "frost" => "is slowed!",    // 1.3.6 W2: the frost line names no enchant
         "lightning" => "(Thunderstrike)",
         "poison" or "poison37" => "Venom seeps into the wound!",
         "holy" => "(Radiance)",
@@ -269,7 +269,7 @@ public class Coverage136Tests : IDisposable
         run.Loss.Should().Be(run.Hit, "frost deals nothing");
         run.Defender.HasStatus(StatusEffect.Slow).Should().BeTrue();
         run.Defender.ActiveStatuses[StatusEffect.Slow].Should().Be(GameConfig.FrostEnchantDuration);
-        run.Shown.Should().Contain("Defender is slowed! (Frostbite)");
+        run.Shown.Should().Contain("Defender is slowed!", "W2: the frost line names no enchant");
         return 0;
     });
 
