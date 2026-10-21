@@ -72,12 +72,12 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 ## Statuses on monsters
 
 - **Burning:** a burning monster loses 4 to 6 percent of its maximum HP a round (at least 4), plus 1 to (your level / 5 + 1).
-- **Poisoned:** 3 to 5 percent (at least 3), plus the same. Both tick at the monster's first action each round.
+- **Poisoned:** 3 to 5 percent (at least 3), plus the same. Both tick at the monster's first action each round. On a boss, physical immunity and divine armor cut each Poisoned tick, as they cut weapon poison. A Poisoned monster does not hit any harder.
 - **Charmed:** the monster skips its attack {{balance:CharmSkipAttackChance}} percent of the time.
 - **Confused:** the monster loses its action 50 percent of the time; otherwise it hits itself for a third of its Strength 25 percent of the time.
 - **Slowed:** the monster loses its action 50 percent of the time.
 - **Feared:** the monster loses every action while the fear lasts.
-- **Weakened:** the monster's attack is 0.70 times.
+- **Weakened:** the monster's attack is 0.70 times, and the Defence and armor it sets against every hit you deal it are 0.80 times.
 - **Probability Shift:** a Cyclebreaker spell. For 3 rounds the monster never scores a critical hit, and 30 percent of its normal attacks that would hit you or an ally miss. Its special abilities are not affected.
 
 ### Stuns and holds on monsters
