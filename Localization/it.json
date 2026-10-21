@@ -10776,7 +10776,7 @@
   "spell.sage.8.name": "Autocolpo",
   "spell.sage.8.desc": "Costringe il bersaglio a colpire se stesso. Danni: 40-55. Durata: 1 turno.",
   "spell.sage.9.name": "Fuga",
-  "spell.sage.9.desc": "Scompare istantaneamente dal combattimento. Successo basato sul livello. Effetto: termina il combattimento.",
+  "spell.sage.9.desc": "Scompare dal combattimento. Sicuro contro la maggior parte dei nemici; contro un boss o un Antico Dio tenta la probabilità di fuga, e in Incubo non c'è scampo. Effetto: termina il combattimento.",
   "spell.sage.11.name": "Rubare Vita",
   "spell.sage.11.desc": "Prosciuga la vitalità del nemico. Danni: 35-50, cura la metà. Durata: 1 turno.",
   "spell.sage.13.name": "Manto d'Ombra",

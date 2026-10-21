@@ -11016,7 +11016,7 @@
   "spell.sage.8.name": "Hit Self",
   "spell.sage.8.desc": "Force the target to strike itself. Damage: 40-55. Duration: 1 turn.",
   "spell.sage.9.name": "Escape",
-  "spell.sage.9.desc": "Vanish from battle instantly. Success based on level. Effect: ends combat.",
+  "spell.sage.9.desc": "Vanish from battle. Certain against most foes; against a boss or Old God it rolls the flee chance, and on Nightmare there is no escape. Effect: ends combat.",
   "spell.sage.11.name": "Steal Life",
   "spell.sage.11.desc": "Drain the enemy's vitality. Damage: 35-50, heals half. Duration: 1 turn.",
   "spell.sage.13.name": "Shadow Cloak",

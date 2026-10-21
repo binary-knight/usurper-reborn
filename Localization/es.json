@@ -10776,7 +10776,7 @@
   "spell.sage.8.name": "Autogolpe",
   "spell.sage.8.desc": "Obliga al objetivo a golpearse a sí mismo. Daño: 40-55. Duración: 1 turno.",
   "spell.sage.9.name": "Escapar",
-  "spell.sage.9.desc": "Desaparece del combate al instante. Éxito según el nivel. Efecto: termina el combate.",
+  "spell.sage.9.desc": "Desaparece del combate. Seguro contra la mayoría de enemigos; contra un jefe o un Dios Antiguo tira la probabilidad de huida, y en Pesadilla no hay escape. Efecto: termina el combate.",
   "spell.sage.11.name": "Robar Vida",
   "spell.sage.11.desc": "Drena la vitalidad del enemigo. Daño: 35-50, cura la mitad. Duración: 1 turno.",
   "spell.sage.13.name": "Manto de Sombra",

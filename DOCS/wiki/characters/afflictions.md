@@ -76,6 +76,7 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 - **Charmed:** the monster skips its attack {{balance:CharmSkipAttackChance}} percent of the time.
 - **Confused:** the monster loses its action 50 percent of the time; otherwise it hits itself for a third of its Strength 25 percent of the time.
 - **Slowed:** the monster loses its action 50 percent of the time.
+- **Feared:** the monster loses every action while the fear lasts.
 - **Weakened:** the monster's attack is 0.70 times.
 - **Probability Shift:** a Cyclebreaker spell. For 3 rounds the monster never scores a critical hit, and 30 percent of its normal attacks that would hit you or an ally miss. Its special abilities are not affected.
 
@@ -85,7 +86,11 @@ A stun, freeze, sleep or bind on a monster lasts at most {{balance:MaxStunDurati
 
 ### Can bosses be stunned
 
-A boss or champion resists a stun, freeze, sleep or bind {{percent:BossStunResistChance}} percent of the time and is held {{balance:MaxStunDurationBoss}} round at most. It resists a Sage's control spells {{balance:BossSoftControlResistPercent}} percent of the time, and soft control that lands lasts half as long.
+A boss or champion resists a stun, freeze, sleep or bind {{percent:BossStunResistChance}} percent of the time and is held {{balance:MaxStunDurationBoss}} round at most.
+
+Fear on a boss, an Old God or a champion is a hold too: from the Fear spell, Soul Rend, Intimidating Roar and Dissonant Whispers it is resisted {{percent:BossStunResistChance}} percent of the time, lasts {{balance:MaxStunDurationBoss}} round at most, counts in the same hold budget and is followed by the same immunity, and no other hold lands while it lasts. On other monsters fear lasts its full rounds, outside the hold budget.
+
+A boss or champion resists soft control {{balance:BossSoftControlResistPercent}} percent of the time, and soft control that lands lasts half as long. This covers a Sage's control spells, the slow of Frost Touch and Ice Storm, and the confusion of Mind Spike, Psychic Scream, Primal Scream, Carnival of Chaos, Causality Loop, Deadly Joke and Last Laugh (the last two roll their own chance first). A confusion holds a boss 2 rounds at most.
 
 ### Weapon poison
 

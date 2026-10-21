@@ -10776,7 +10776,7 @@
   "spell.sage.8.name": "Auto-Frappe",
   "spell.sage.8.desc": "Force la cible à se frapper elle-même. Dégâts : 40-55. Durée : 1 tour.",
   "spell.sage.9.name": "Fuite",
-  "spell.sage.9.desc": "Disparaît instantanément du combat. Réussite selon le niveau. Effet : met fin au combat.",
+  "spell.sage.9.desc": "Disparaît du combat. Sûr contre la plupart des ennemis ; contre un boss ou un Ancien Dieu, il tente la chance de fuite, et en Cauchemar il n'y a pas d'issue. Effet : met fin au combat.",
   "spell.sage.11.name": "Vol de Vie",
   "spell.sage.11.desc": "Draine la vitalité de l'ennemi. Dégâts : 35-50, soigne la moitié. Durée : 1 tour.",
   "spell.sage.13.name": "Cape d'Ombre",
