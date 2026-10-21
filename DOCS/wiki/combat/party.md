@@ -101,6 +101,8 @@ Only the ruler can hire royal mercenaries, at the Castle with B (bodyguards). Yo
 
 ## When an ally falls
 
+An ally under Death's Embrace that a monster's hit brings to 0 HP rises at once with 15 percent of its maximum HP and dodges the next attack, as you do. It is not Downed and does not fall; the next hit that brings it to 0 HP is handled as below.
+
 ### Downed allies
 
 A story companion, an NPC ally, your spouse or lover, or a fighting beast at 0 HP in a fight is Downed: it stays in the party at 0 HP, takes no turn, and no monster attack, heal or spell reaches it. The allies box of the combat screen shows a Downed ally as DOWN in place of its HP. A royal mercenary, a player echo and a grouped player are never Downed; they fall as below.

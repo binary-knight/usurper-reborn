@@ -19004,6 +19004,12 @@ public partial class CombatEngine
             return;
         }
 
+        // 1.3.6 G6 (CP10): Cycle Rewind and Blood Pact act on the caster alone, whatever ally a prompt or a
+        // typed target named, so an ally never receives them.
+        bool casterOnly = SpellSystem.IsCasterOnly(player.Class, spellInfo);
+        int? allyTargetIndex = casterOnly ? null : action.AllyTargetIndex;
+        Character? healTargetOverride = casterOnly ? null : action.HealTargetOverride;
+
         // Check weapon requirement for spell casting
         if (!SpellSystem.HasRequiredSpellWeapon(player))
         {
@@ -19034,8 +19040,8 @@ public partial class CombatEngine
         // When targeting an ally, strip the spell effect portion from the message
         // (caster-named heal/buff text) since the correct target messages are shown by ApplySpellEffects
         var displayMsg = spellResult.Message;
-        if ((action.AllyTargetIndex.HasValue
-                || (action.HealTargetOverride != null && action.HealTargetOverride != player))
+        if ((allyTargetIndex.HasValue
+                || (healTargetOverride != null && healTargetOverride != player))
             && (spellInfo.SpellType == "Heal" || spellInfo.SpellType == "Buff"))
         {
             // Keep the incantation and the critical tag, strip the spell-specific effect message
@@ -19067,8 +19073,9 @@ public partial class CombatEngine
             // override branch and the leader's existing AllyTargetIndex branch.
             void ApplyHealTo(Character tgt)
             {
-                // 1.3.2: Purify aimed at an ally cures that ally's poison and disease
-                if (SpellSystem.IsPurify(player.Class, spellInfo)) PurifyAlly(tgt);
+                // 1.3.2: Purify aimed at an ally cures that ally's poison and disease; 1.3.6 G6 (CP10): so does every
+                // spell whose effect cures (Purifying Surge too), on the target and not the caster
+                if (CuresTarget(spellResult)) PurifyAlly(tgt);
                 if (spellResult.Healing > 0)
                 {
                     spellResult.Healing = ApplyHealerSpecBonus(player, spellResult.Healing, monsters);
@@ -19095,9 +19102,9 @@ public partial class CombatEngine
             // v0.65.1: group-follower direct heal/buff target. Reaches the leader (who is NOT in
             // currentTeammates) and self/any teammate. Highest precedence; only set on the
             // follower path so the leader's own combat is unaffected.
-            if (action.HealTargetOverride != null && !spellInfo.IsMultiTarget)
+            if (healTargetOverride != null && !spellInfo.IsMultiTarget)
             {
-                var overrideTgt = action.HealTargetOverride;
+                var overrideTgt = healTargetOverride;
                 if (!overrideTgt.IsAlive || overrideTgt == player)
                 {
                     // Dead target or self -> apply to caster (matches the dead-ally fallback).
@@ -19234,10 +19241,10 @@ public partial class CombatEngine
 
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on the whole party.");
             }
-            else if (action.AllyTargetIndex.HasValue && currentTeammates != null
-                && action.AllyTargetIndex.Value < currentTeammates.Count)
+            else if (allyTargetIndex.HasValue && currentTeammates != null
+                && allyTargetIndex.Value < currentTeammates.Count)
             {
-                var allyTarget = currentTeammates[action.AllyTargetIndex.Value];
+                var allyTarget = currentTeammates[allyTargetIndex.Value];
 
                 if (!allyTarget.IsAlive)
                 {
@@ -20209,6 +20216,10 @@ public partial class CombatEngine
             var menuMessage = menuPurify && spellResult.Success && spellResult.CastLine.Length > 0 ? spellResult.CastLine : spellResult.Message;
             foreach (var row in SpellSystem.MessageRows(menuMessage)) terminal.WriteLine(row);   // v1.2.5: fits 79 columns
 
+            // 1.3.6 G6 (CP10): a spell whose effect cures (Purify, Purifying Surge) cures the ally, then heals it
+            if (spellResult.Success && CuresTarget(spellResult))
+                PurifyAlly(targetAlly);   // 1.3.2: the ally's poison and disease
+
             if (spellResult.Success && spellResult.Healing > 0)
             {
                 // v0.56.0 healer spec bonus on ally heal-spell
@@ -20233,10 +20244,6 @@ public partial class CombatEngine
                 if (spellResult.ProtectionBonus > 0)
                     WardAlly(targetAlly, spellResult.ProtectionBonus, spellResult.Duration > 0 ? spellResult.Duration : 999);
             }
-            else if (menuPurify && spellResult.Success)
-            {
-                PurifyAlly(targetAlly);   // 1.3.2: the ally's poison and disease
-            }
             else if (!spellResult.Success)
             {
                 terminal.SetColor("yellow");
@@ -20259,8 +20266,10 @@ public partial class CombatEngine
         // gate affordability on CanCastSpell, which uses the real CalculateManaCost
         // rather than the raw table value the menu used to check (raw-cost passes
         // that then failed inside CastSpell consumed the turn for nothing).
+        // 1.3.6 G6 (CP10): this list heals an ally, so a spell that acts on the caster alone (Cycle Rewind) is not on it
         return SpellSystem.GetAvailableSpells(player)
-            .Where(s => s.SpellType == "Heal" && SpellSystem.CanCastSpell(player, s.Level))
+            .Where(s => s.SpellType == "Heal" && SpellSystem.CanCastSpell(player, s.Level)
+                        && !SpellSystem.IsCasterOnly(player.Class, s))
             .ToList();
     }
 
@@ -20588,7 +20597,7 @@ public partial class CombatEngine
         double injuredPercent = (double)mostInjured.HP / mostInjured.MaxHP;
 
         // Check if teammate can heal with spells (any class with mana and healing spells)
-        bool canHealWithSpells = teammate.Mana > 10 && GetBestHealSpell(teammate) != null;
+        bool canHealWithSpells = teammate.Mana > 10 && GetBestHealSpell(teammate, mostInjured) != null;
         bool hasPotion = teammate.Healing > 0;
 
         // v1.2: about to die, a teammate drinks its own potion first; the old order potioned the
@@ -20697,6 +20706,11 @@ public partial class CombatEngine
     /// 1.3.2: a Purify landing on an ally: cures it and says so by the ally's name; a companion is
     /// synced the way a teammate's heal syncs it.
     /// </summary>
+    /// <summary>1.3.6 G6 (CP10): a cast whose effect cures (cure_disease: Purify, Purifying Surge, Cycle Rewind), so a
+    /// cast aimed at an ally cures the ally, not only the Cleric's Purify.</summary>
+    internal static bool CuresTarget(SpellSystem.SpellResult spellResult) =>
+        spellResult != null && spellResult.SpecialEffect == "cure_disease";
+
     private void PurifyAlly(Character ally)
     {
         bool cured = RemovePurifyAfflictions(ally);
@@ -20794,7 +20808,7 @@ public partial class CombatEngine
         // raw SpellInfo.ManaCost table value. Checking the raw value let mid-mana
         // healers pass here, fizzle inside CastSpell, and burn every remaining turn
         // re-attempting the same impossible heal with no potion fallback.
-        var healSpell = GetBestHealSpell(teammate);
+        var healSpell = GetBestHealSpell(teammate, target);
         if (healSpell == null || !SpellSystem.CanCastSpell(teammate, healSpell.Level))
         {
             return false;
@@ -20847,6 +20861,8 @@ public partial class CombatEngine
                 // Single-target heal
                 string targetName = target == currentPlayer ? Loc.Get("combat.you_lowercase") : target.DisplayName;
                 UIHelper.WriteRow(terminal, Loc.Get("combat.teammate_casts_on", teammate.DisplayName, healSpell.DisplayName, targetName));
+                // 1.3.6 G6 (CP10): a heal whose effect cures (Purifying Surge, Cycle Rewind on the caster) cures the target
+                if (CuresTarget(spellResult)) PurifyAlly(target);
 
                 long oldHP = target.HP;
                 target.HP = Math.Min(target.MaxHP, target.HP + spellResult.Healing);
@@ -20969,7 +20985,7 @@ public partial class CombatEngine
     /// <summary>
     /// Get the best healing spell the character can cast based on their current mana
     /// </summary>
-    private SpellSystem.SpellInfo? GetBestHealSpell(Character caster)
+    private SpellSystem.SpellInfo? GetBestHealSpell(Character caster, Character? target = null)
     {
         var spells = SpellSystem.GetAllSpellsForClass(caster.Class);
         if (spells == null || spells.Count == 0) return null;
@@ -20988,6 +21004,8 @@ public partial class CombatEngine
                         // Affordability must use the real cast gate (CalculateManaCost +
                         // spell weapon), not the raw table ManaCost -- see TeammateHealWithSpell.
                         SpellSystem.CanCastSpell(caster, s.Level) &&
+                        // 1.3.6 G6 (CP10): a spell on the caster alone (Cycle Rewind) heals only the caster
+                        (target == null || target == caster || !SpellSystem.IsCasterOnly(caster.Class, s)) &&
                         !disabledSpells.Contains(s.Name))
             .OrderByDescending(s => s.Level) // Prefer higher level heals
             .FirstOrDefault();
@@ -22177,6 +22195,57 @@ public partial class CombatEngine
         }
     }
 
+    /// <summary>
+    /// 1.3.6 G6 (CP4): a monster's hit on an invulnerable teammate, companion or grouped follower does no damage, as
+    /// the leader's paths block it (Invulnerable is the status Divine Shield, Avatar of Light, Divine Intervention,
+    /// Avatar of Grace and Eternal Vigil give). Reads the status directly; GetDamageTakenModifier is not called, so the
+    /// companion path's own Defending half is not applied twice. True when the hit is blocked; the line is shown, and
+    /// a grouped follower gets it on its own screen (the leader's capture skips a hit on a grouped player).
+    /// </summary>
+    private bool AllyBlocksMonsterHit(Monster monster, Character ally, CombatResult result, string? abilityName)
+    {
+        if (!ally.HasStatus(StatusEffect.Invulnerable)) return false;
+        UIHelper.WriteRow(terminal, Loc.Get("combat.ally_invulnerable_block", ally.DisplayName), "bright_white");
+        result.CombatLog.Add(abilityName != null
+            ? $"{monster.Name}'s {abilityName} on {ally.DisplayName} blocked by Invulnerable"
+            : $"{monster.Name}'s attack on {ally.DisplayName} blocked by Invulnerable");
+        SendAllyLines(ally,
+            lang => GroupLineWrapped(lang, "\u001b[1;37m", abilityName != null ? "combat.divine_shield_ability" : "combat.invulnerable_block"),
+            lang => GroupLineWrapped(lang, "\u001b[1;37m", "combat.ally_invulnerable_block", ally.DisplayName));
+        return true;
+    }
+
+    /// <summary>
+    /// 1.3.6 G6 (CP4): Death's Embrace on a teammate, companion or grouped follower, as on the leader: a monster's hit
+    /// that brings it to 0 HP revives it once with 15 percent of its maximum HP and it dodges the next attack. Called
+    /// right after each hit, so the death check that follows finds it alive and the death dispatch does not run.
+    /// </summary>
+    private bool AllyDeathsEmbraceRevive(Character ally, CombatResult result)
+    {
+        if (ally.HP > 0 || !ally.DeathsEmbraceActive) return false;
+        ally.HP = Math.Max(1, (long)(ally.MaxHP * 0.15));
+        ally.DeathsEmbraceActive = false;
+        ally.DodgeNextAttack = true;
+        UIHelper.WriteRow(terminal, Loc.Get("combat.ally_deaths_embrace_revived", ally.DisplayName, ally.HP), "bright_red");
+        result.CombatLog.Add($"{ally.DisplayName} cheats death with Death's Embrace at {ally.HP} HP");
+        long hp = ally.HP;
+        SendAllyLines(ally,
+            lang => GroupLineWrapped(lang, "\u001b[1;31m", "combat.deaths_embrace_trigger") + "\n"
+                  + GroupLineWrapped(lang, "\u001b[31m", "combat.deaths_embrace_revived", hp),
+            lang => GroupLineWrapped(lang, "\u001b[1;31m", "combat.ally_deaths_embrace_revived", ally.DisplayName, hp));
+        return true;
+    }
+
+    /// <summary>1.3.6 G6: a line for a grouped follower's own screen and one for the rest of its group, as the basic
+    /// hit's broadcast; nothing for an NPC ally (the leader's capture carries those).</summary>
+    private static void SendAllyLines(Character ally, Func<string, string> toAlly, Func<string, string> toOthers)
+    {
+        if (!ally.IsGroupedPlayer || ally.GroupPlayerUsername == null) return;
+        var group = GroupSystem.Instance?.GetGroupFor(ally.GroupPlayerUsername);
+        if (group == null) return;
+        GroupSystem.Instance!.BroadcastToGroupSessionsLocalized(group, ally.GroupPlayerUsername, toAlly, toOthers, inDungeonOnly: true);
+    }
+
     private async Task MonsterAttacksCompanion(Monster monster, Character companion, CombatResult result, List<Monster>? liveMonsterList = null)
     {
         // Check if companion will dodge (from Time Stop, abilities, etc.)
@@ -22217,7 +22286,11 @@ public partial class CombatEngine
                         terminal.SetColor(abilityResult.MessageColor ?? "red");
                         UIHelper.WriteRow(terminal, abilityResult.Message);
                     }
-                    if (abilityResult.DirectDamage > 0)
+                    // 1.3.6 G6 (CP4): an invulnerable ally takes no damage from the ability, as on the leader's path;
+                    // its status and mana drain still land
+                    bool abilityBlocked = (abilityResult.DirectDamage > 0 || abilityResult.DamageMultiplier > 0)
+                        && AllyBlocksMonsterHit(monster, companion, result, abilityName);
+                    if (!abilityBlocked && abilityResult.DirectDamage > 0)
                     {
                         // Ability defense: Defence stat + 50% ArmPow (abilities partially bypass armor)
                         long abilityDefense = companion.Defence + (companion.ArmPow / 2);
@@ -22236,9 +22309,10 @@ public partial class CombatEngine
                         EvHurt(companion, actualDmg, MonsterAbilityEventKind(abilityType));   // 1.2.6
                         UIHelper.WriteRow(terminal, Loc.Get("combat.target_takes_damage_flat", companion.DisplayName, actualDmg), "red");
                         result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {actualDmg}");
+                        AllyDeathsEmbraceRevive(companion, result);   // 1.3.6 G6 (CP4)
                     }
                     // DamageMultiplier abilities (CrushingBlow, LifeDrain, CriticalStrike, etc.)
-                    if (abilityResult.DamageMultiplier > 0 && abilityResult.DirectDamage == 0)
+                    if (!abilityBlocked && abilityResult.DamageMultiplier > 0 && abilityResult.DirectDamage == 0)
                     {
                         // Use full physical defense for melee-type abilities (CriticalStrike, CrushingBlow)
                         // instead of sqrt-scaled defense which is meant for magical abilities
@@ -22275,6 +22349,7 @@ public partial class CombatEngine
                             UIHelper.WriteRow(terminal, Loc.Get("combat.target_takes_damage_flat", companion.DisplayName, dmg), "red");
                             result.CombatLog.Add($"{monster.Name} uses {abilityName} on {companion.DisplayName} for {dmg}");
                         }
+                        AllyDeathsEmbraceRevive(companion, result);   // 1.3.6 G6 (CP4)
                     }
                     if (abilityResult.ManaDrain > 0)
                     {
@@ -22414,6 +22489,15 @@ public partial class CombatEngine
             return;
         }
 
+        // 1.3.6 G6 (CP4): an invulnerable ally (Divine Shield, Avatar of Light, Divine Intervention, Avatar of Grace,
+        // Eternal Vigil) takes no damage from the normal attack, as the leader's path blocks it. Before the damage
+        // and the count of hits this round, so a blocked attack is not a hit.
+        if (AllyBlocksMonsterHit(monster, companion, result, null))
+        {
+            await Pacing.Wait(GetCombatDelay(600));
+            return;
+        }
+
         // Calculate monster damage
         long monsterAttack = monster.GetAttackPower();
         monsterAttack += random.Next(0, 10);
@@ -22514,6 +22598,7 @@ public partial class CombatEngine
 
         terminal.SetColor(ColorRole.Notice);
         terminal.WriteLine(Loc.Get("combat.monster_hits_companion_hp", actualDamage, companion.DisplayName, companion.HP, companion.MaxHP));
+        AllyDeathsEmbraceRevive(companion, result);   // 1.3.6 G6 (CP4): after the hit line, before the venom and the death check
         if (actualDamage > 0 && companion.IsAlive && EliteVenomLands(monster, companion))   // 1.2.8
             ApplyEliteVenom(companion, isLeader: false);
 
@@ -27611,6 +27696,9 @@ public partial class CombatEngine
     private void RegeneratePartyAtRoundEnd(Character leader)
     {
         if (currentTeammates == null) return;
+        // 1.3.6 G6 (CP11): this runs once a round with the leader alive (from ProcessEndOfRoundAbilityEffects) or
+        // fallen (the round end's other branch), so every teammate's and grouped follower's spell cooldowns tick here
+        TickTeammateSpellCooldowns(currentTeammates.Where(tm => !ReferenceEquals(tm, leader)));
         var done = new HashSet<Character>(ReferenceEqualityComparer.Instance);
         foreach (var tm in currentTeammates)
         {
@@ -27653,6 +27741,23 @@ public partial class CombatEngine
         int manaRegen = tm.GetEquipmentManaRegen();
         if (manaRegen > 0 && tm.Mana < tm.MaxMana)
             tm.Mana = Math.Min(tm.MaxMana, tm.Mana + GearRegenAmount(tm.MaxMana, manaRegen));
+    }
+
+    /// <summary>
+    /// 1.3.6 G6 (CP11): the Deluge of Sanctity and Unmaking cooldowns of every teammate and grouped follower go
+    /// down by one at round end, as the leader's do in ProcessEndOfRoundAbilityEffects; the cast sets them on the
+    /// caster, so before this a follower's stayed set for the rest of the fight. Called once a round from
+    /// RegeneratePartyAtRoundEnd, whether or not the leader is alive; a Downed ally's ticks too.
+    /// </summary>
+    internal static void TickTeammateSpellCooldowns(IEnumerable<Character>? teammates)
+    {
+        if (teammates == null) return;
+        foreach (var tm in teammates)
+        {
+            if (tm == null) continue;
+            if (tm.UnmakingCooldown > 0) tm.UnmakingCooldown--;
+            if (tm.DelugeCooldown > 0) tm.DelugeCooldown--;
+        }
     }
 
     /// <summary>
@@ -31562,7 +31667,9 @@ public partial class CombatEngine
             {
                 int? allyTarget = null;
                 // Multi-target buff/heal (e.g. Alethia's Grace, Tidecall Barrier) — skip target prompt
-                if (!spellInfo.IsMultiTarget && currentTeammates?.Any(t => t.IsAlive) == true)
+                // 1.3.6 G6 (CP10): Cycle Rewind and Blood Pact act on the caster alone, so no prompt for them either
+                if (!spellInfo.IsMultiTarget && !SpellSystem.IsCasterOnly(player.Class, spellInfo)
+                    && currentTeammates?.Any(t => t.IsAlive) == true)
                 {
                     // 1.3.2: Purify also prompts for an ally who is poisoned or diseased at full health
                     bool qbPurify = SpellSystem.IsPurify(player.Class, spellInfo);
@@ -33164,7 +33271,9 @@ public partial class CombatEngine
                         // v0.65.1: heal/buff an ALLY via T# (T1=self, T2=leader, T3+=teammates).
                         // No/invalid T# -> most-injured (heal) or self (buff).
                         var healTargets = BuildFollowerHealTargets(teammate, leader);
-                        if (targetNum >= 1 && targetNum <= healTargets.Count)
+                        if (SpellSystem.IsCasterOnly(teammate.Class, spell))
+                            action.HealTargetOverride = teammate;   // 1.3.6 G6 (CP10): on the caster alone, whatever T# says
+                        else if (targetNum >= 1 && targetNum <= healTargets.Count)
                             action.HealTargetOverride = healTargets[targetNum - 1];
                         else
                             action.HealTargetOverride = PickDefaultHealTarget(healTargets, spell.SpellType == "Heal");
@@ -33200,7 +33309,7 @@ public partial class CombatEngine
             // v0.65.1: a pure healer (no Attack spell) pressing bare C casts their best heal
             // on the most-injured party member -- so "C = cast best spell" is true for healers.
             var bestHeal = spells
-                .Where(s => SpellSystem.RestoresHitPoints(teammate.Class, s))
+                .Where(s => SpellSystem.RestoresHitPoints(teammate.Class, s) && !SpellSystem.IsCasterOnly(teammate.Class, s))   // 1.3.6 G6: heals the most injured
                 .OrderByDescending(s => s.Level)
                 .FirstOrDefault();
             if (bestHeal != null)
@@ -33252,7 +33361,8 @@ public partial class CombatEngine
             if (anyInjured && ClassAbilitySystem.IsSpellcaster(teammate.Class) && teammate.Mana > 0)
             {
                 var castableHeal = SpellSystem.GetAvailableSpells(teammate)
-                    .Where(s => SpellSystem.RestoresHitPoints(teammate.Class, s) && teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
+                    .Where(s => SpellSystem.RestoresHitPoints(teammate.Class, s) && !SpellSystem.IsCasterOnly(teammate.Class, s)   // 1.3.6 G6: heals an ally
+                                && teammate.Mana >= SpellSystem.CalculateManaCost(s, teammate))
                     .OrderByDescending(s => s.Level)
                     .FirstOrDefault();
                 if (castableHeal != null)
