@@ -29,6 +29,9 @@ public class Monster
     public long HP { get; set; }                        // hitpoints
     public long Punch { get; set; }                     // punch, temporary battle var
     public bool Poisoned { get; set; }                  // poisoned?, temporary battle var
+    // 1.3.6 G8 (X5): poisonous by its own data (CreateMonster's poisoned argument), the one source of the +5 attack;
+    // the Poisoned status a hit puts on it adds nothing. Not public: not saved and not in the state dumps.
+    internal bool PoisonousByData { get; set; }
     public bool IsBurning { get; set; }                  // burning (fire DoT), temporary battle var
     public int BurnRounds { get; set; } = 0;             // remaining rounds of fire DoT (independent of PoisonRounds)
     public bool Stunned { get; set; }                   // stunned?, temporary battle var
@@ -314,6 +317,7 @@ public class Monster
             Weapon = weapon,
             Armor = armor,
             Poisoned = poisoned,
+            PoisonousByData = poisoned,
             Disease = disease,
             Punch = punch,
             ArmPow = armpow,
@@ -449,8 +453,8 @@ public class Monster
             attack = (long)(attack * 1.3f);
         }
 
-        // Add poison damage if poisoned
-        if (Poisoned)
+        // Add poison damage if poisonous by its own data (1.3.6 G8: never from the Poisoned status a hit puts on it)
+        if (PoisonousByData)
         {
             attack += 5;
         }
@@ -484,13 +488,16 @@ public class Monster
         }
 
         // v0.57.1 — Weaken debuff reduces effective defense by 20% for the duration.
-        if (WeakenRounds > 0)
-        {
-            defense = (long)(defense * 0.80f);
-        }
+        defense = WeakenDefenceCut(defense);
 
         return Math.Max(0, defense);
     }
+
+    /// <summary>
+    /// 1.3.6 G8 (Q4): the Weaken status's defence cut, 20 percent off a defence value while WeakenRounds > 0. Every
+    /// live hit path that takes the monster's Defence or ArmPow off a hit applies it once to what it reads.
+    /// </summary>
+    public long WeakenDefenceCut(long defence) => WeakenRounds > 0 ? (long)(defence * 0.80f) : defence;
     
     /// <summary>
     /// Take damage (Pascal compatible)

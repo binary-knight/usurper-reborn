@@ -5232,6 +5232,8 @@ public partial class CombatEngine
         {
             int baseDmg = Math.Max(3, (int)(monster.MaxHP * (0.03 + random.NextDouble() * 0.02)));
             int dmg = baseDmg + random.Next(1, player.Level / 5 + 2);
+            // 1.3.6 G8 (Q3): physical phase immunity and divine armour cut the tick, as the weapon poison tick below
+            dmg = (int)ApplyPoisonTickBossProtections(monster, dmg);
             monster.HP = Math.Max(0, monster.HP - dmg); // hq-armory: out (poison tick, no caster recorded)
             EvHit(player, dmg, CombatEventKind.Dot);   // 1.2.6: no caster recorded, counted to the player
             monster.PoisonRounds--;
@@ -5250,12 +5252,7 @@ public partial class CombatEngine
         // the proc goes through phase immunity (a weapon hit is physical) and divine armour, as a swing does.
         if (firstActionThisRound && monster.EnchantPoisonRounds > 0)
         {
-            long poisonTick = monster.EnchantPoisonTick;
-            if (monster.IsPhysicalImmune)
-                poisonTick = ApplyPhaseImmunityDamage(monster, poisonTick, isMagicalDamage: false);
-            if (BossContext != null && BossContext.DivineArmorReduction > 0)
-                poisonTick = (long)(poisonTick * (1.0 - BossContext.DivineArmorReduction));
-            poisonTick = Math.Max(1, poisonTick);
+            long poisonTick = ApplyPoisonTickBossProtections(monster, monster.EnchantPoisonTick);
             monster.HP = Math.Max(0, monster.HP - poisonTick); // hq-armory: out (the tick was set from the boosted hit and the boosted fixed value)
             Character poisoner = _enchantPoisonSource.TryGetValue(monster, out var source) ? source : player;
             EvHit(poisoner, poisonTick, CombatEventKind.Dot);
@@ -5284,6 +5281,8 @@ public partial class CombatEngine
         if (firstActionThisRound && monster.CorruptingDotRounds > 0)
         {
             long corruptDmg = Math.Max(1, monster.CorruptingDotTickDamage);
+            // 1.3.6 G8 (CP7): the tick of a magical class ability (corrupting_touch): its phase immunity and divine armour
+            corruptDmg = Math.Max(1, ApplyAbilityBossProtections(monster, corruptDmg, magical: true, announce: false));
             monster.HP = Math.Max(0, monster.HP - corruptDmg); // hq-armory: out (Corrupting Touch tick, scaled once at cast)
             EvHit(player, corruptDmg, CombatEventKind.Dot);   // 1.2.6
             long heal = Math.Max(1, corruptDmg / 2);
@@ -9213,13 +9212,19 @@ public partial class CombatEngine
     /// phase immunity of the hit's kind cuts it to the residual, then divine armour (floor 1).
     /// </summary>
     private long ApplyAbilityBossProtections(Monster target, long damage, ClassAbilityResult abilityResult)
+        => ApplyAbilityBossProtections(target, damage, IsMagicalAbility(abilityResult), announce: true);
+
+    /// <summary>
+    /// 1.3.6 G8 (CP7): the same class ability protections for a hit of a known kind that has no ability result of its
+    /// own (the Searing Totem tick, the Corrupting Touch tick). A tick does not print the immunity line.
+    /// </summary>
+    private long ApplyAbilityBossProtections(Monster target, long damage, bool magical, bool announce)
     {
         if (target == null || damage <= 0) return damage;
-        bool magical = IsMagicalAbility(abilityResult);
         if (magical ? target.IsMagicalImmune : target.IsPhysicalImmune)
         {
             damage = ApplyPhaseImmunityDamage(target, damage, isMagicalDamage: magical);
-            if (_abilityImmunityAnnounced.Add(target))
+            if (announce && _abilityImmunityAnnounced.Add(target))
             {
                 terminal.SetColor("dark_magenta");
                 UIHelper.WriteRow(terminal, Loc.Get(magical ? "combat.magical_immunity_absorbs" : "combat.physical_immunity_absorbs", MonsterNames.Display(target)));
@@ -14300,7 +14305,7 @@ public partial class CombatEngine
                 damagePerMonster = Math.Max(1, damagePerMonster);
             }
 
-            long armor = monster.ArmPow;
+            long armor = monster.WeakenDefenceCut(monster.ArmPow);   // 1.3.6 G8 (Q4): Weaken's defence cut
             if (monster.IsCorroded) armor = Math.Max(0, (long)(armor * 0.6));
             armor = ApplyArmorPiercing(armor, attacker ?? spellCaster ?? currentPlayer);   // a null attacker is the player's own spell
             long actualDamage = Math.Max(1, damagePerMonster - armor);
@@ -14452,7 +14457,7 @@ public partial class CombatEngine
         }
 
         // Armor piercing enchantment reduces effective monster armor
-        long effectiveArmor = target.ArmPow;
+        long effectiveArmor = target.WeakenDefenceCut(target.ArmPow);   // 1.3.6 G8 (Q4): Weaken's defence cut
         if (attacker != null)
         {
             int armorPiercePct = attacker.GetEquipmentArmorPiercing();
@@ -15989,6 +15994,7 @@ public partial class CombatEngine
         // with roughly double armor, making the 15-stamina attack weaker than a free
         // basic swing against armored monsters.
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = target.WeakenDefenceCut(defense);   // 1.3.6 G8 (Q4): Weaken's defence cut, the Defence half here
         defense = ApplyArmorPiercing(defense, player);
         powerDamage = Math.Max(1, powerDamage - defense);
 
@@ -16075,6 +16081,7 @@ public partial class CombatEngine
         // ApplySingleMonsterDamage below subtracts armor itself; doing both double-taxed
         // Precise Strike against armored monsters (same fix as Power Attack).
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = target.WeakenDefenceCut(defense);   // 1.3.6 G8 (Q4): Weaken's defence cut, the Defence half here
         if (!hitRolled)
             defense = (long)(defense * 0.75);
         defense = ApplyArmorPiercing(defense, player);
@@ -16215,6 +16222,7 @@ public partial class CombatEngine
         rangedDamage += player.GetClassCombatModifiers().RangedBonus;   // 1.3.2: the Ranger's RangedBonus
 
         long defense = target.Defence + random.Next(0, (int)Math.Max(1, target.Defence / 8));
+        defense = target.WeakenDefenceCut(defense);   // 1.3.6 G8 (Q4): Weaken's defence cut, the Defence half here
         defense = ApplyArmorPiercing(defense, player);
         rangedDamage = Math.Max(1, rangedDamage - defense);
         rangedDamage = DifficultySystem.ApplyPlayerDamageMultiplier(rangedDamage);
@@ -16570,6 +16578,7 @@ public partial class CombatEngine
                 if (abilityResult.SpecialEffect != "armor_pierce")
                 {
                     long defense = target.Defence / 2; // Abilities partially bypass defense
+                    defense = target.WeakenDefenceCut(defense);   // 1.3.6 G8 (Q4): Weaken's defence cut
                     if (target.IsCorroded) defense = Math.Max(0, (long)(defense * 0.6));
                     defense = ApplyArmorPiercing(defense, player);
                     actualDamage = Math.Max(1, actualDamage - defense);
@@ -17083,7 +17092,7 @@ public partial class CombatEngine
                 if (player.HP < player.MaxHP * 0.4 && target != null && target.IsAlive)
                 {
                     long desperateDmg = (long)(abilityResult.Damage * 0.5);
-                    desperateDmg = Math.Max(1, desperateDmg - ApplyArmorPiercing(target.Defence / 4, player));
+                    desperateDmg = Math.Max(1, desperateDmg - ApplyArmorPiercing(target.WeakenDefenceCut(target.Defence / 4), player));   // 1.3.6 G8 (Q4): Weaken's cut
                     desperateDmg = ApplyBossSlayer(player, target, desperateDmg);   // 1.3.6: Boss Slayer, as on the swing
                     desperateDmg = ApplyAbilityBossProtections(target, desperateDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     desperateDmg = TeamHQBonus.ApplyAttack(player, desperateDmg); // v1.1.11: Team HQ Armory, last.
@@ -17253,7 +17262,7 @@ public partial class CombatEngine
                         long holyAoeDmg = (long)(abilityResult.Damage * GetAoEDiminishingMultiplier(hi));
                         if (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0)
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
-                        long actualHolyDmg = Math.Max(1, holyAoeDmg - ApplyArmorPiercing(m.ArmPow / 2, player));
+                        long actualHolyDmg = Math.Max(1, holyAoeDmg - ApplyArmorPiercing(m.WeakenDefenceCut(m.ArmPow / 2), player));   // 1.3.6 G8 (Q4): Weaken's cut
                         if (m.IsSleeping) { actualHolyDmg += actualHolyDmg / 2; }
                         actualHolyDmg = ApplyBossSlayer(player, m, actualHolyDmg);   // 1.3.6: Boss Slayer, as on the swing
                         actualHolyDmg = ApplyAbilityBossProtections(m, actualHolyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
@@ -17376,7 +17385,7 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.ability_frenzy", extraHits));
                     for (int i = 0; i < extraHits && target.IsAlive; i++)
                     {
-                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - ApplyArmorPiercing(target.Defence / 4, player));
+                        long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - ApplyArmorPiercing(target.WeakenDefenceCut(target.Defence / 4), player));   // 1.3.6 G8 (Q4): Weaken's cut
                         frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
                         frenzyDmg = ApplyBossSlayer(player, target, frenzyDmg);   // 1.3.6: Boss Slayer, as on the swing
                         frenzyDmg = ApplyAbilityBossProtections(target, frenzyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
@@ -18363,9 +18372,8 @@ public partial class CombatEngine
                 int cycleBonus = Math.Min(250, (StoryProgressionSystem.Instance?.CurrentCycle ?? 1) * 50);
                 if (target != null && target.IsAlive)
                 {
+                    // 1.3.6 G8 (CP8): none of the target's Defence is added; the own-damage helper takes no defence off
                     int dmg = abilityResult.Damage + cycleBonus;
-                    // Ignore 50% defense by adding back half the defense reduction
-                    dmg += (int)(target.Defence * 0.25);
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("bright_magenta");
                     UIHelper.WriteRow(terminal, Loc.Get("combat.ability_cycles_end", MonsterNames.Display(target), dmg));
@@ -18734,7 +18742,8 @@ public partial class CombatEngine
                 player.HP = Math.Max(1, player.HP - hpCost);
                 if (target != null && target.IsAlive)
                 {
-                    int dmg = abilityResult.Damage + (int)(target.Defence * 0.5);
+                    // 1.3.6 G8 (CP8): none of the target's Defence is added; the own-damage helper takes no defence off
+                    int dmg = abilityResult.Damage;
                     dmg = (int)ApplyHandlerAbilityDamage(player, target, dmg, result, abilityResult);
                     terminal.SetColor("bright_red");
                     UIHelper.WriteRow(terminal, Loc.Get("combat.ability_entropic_blade", MonsterNames.Display(target), dmg, hpCost));
@@ -19644,6 +19653,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long bonusDmg = Math.Max(1, target.ArmPow);
+                    bonusDmg = ApplyBossSpellProtections(target, bonusDmg, announce: false);   // 1.3.6 G8 (CP7): a spell's rider, before the Armory
                     bonusDmg = TeamHQBonus.ApplyAttack(player, bonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= bonusDmg;
                     EvHit(player, bonusDmg, CombatEventKind.Spell);   // 1.2.6
@@ -19663,6 +19673,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long shadowBonus = Math.Max(1, target.ArmPow);
+                    shadowBonus = ApplyBossSpellProtections(target, shadowBonus, announce: false);   // 1.3.6 G8 (CP7): a spell's rider, before the Armory
                     shadowBonus = TeamHQBonus.ApplyAttack(player, shadowBonus); // v1.1.11: Team HQ Armory, last.
                     target.HP -= shadowBonus;
                     EvHit(player, shadowBonus, CombatEventKind.Spell);   // 1.2.6
@@ -19740,6 +19751,7 @@ public partial class CombatEngine
                 if (target.IsAlive && target.ArmPow > 0)
                 {
                     long pierceDmg = Math.Max(1, target.ArmPow);
+                    pierceDmg = ApplyBossSpellProtections(target, pierceDmg, announce: false);   // 1.3.6 G8 (CP7): a spell's rider, before the Armory
                     pierceDmg = TeamHQBonus.ApplyAttack(player, pierceDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= pierceDmg;
                     EvHit(player, pierceDmg, CombatEventKind.Spell);   // 1.2.6
@@ -19803,6 +19815,7 @@ public partial class CombatEngine
                 if (target.IsAlive && result.TotalDamageDealt > 0)
                 {
                     long paradoxBonus = (long)(result.TotalDamageDealt * 0.10);
+                    paradoxBonus = ApplyBossSpellProtections(target, paradoxBonus, announce: false);   // 1.3.6 G8 (CP7): a spell's bonus
                     if (paradoxBonus > 0)
                     {
                         target.HP -= (int)paradoxBonus; // hq-armory: out (derived from TotalDamageDealt, which already carries it)
@@ -28146,6 +28159,9 @@ public partial class CombatEngine
                     foreach (var m in allLiving)
                     {
                         long searingDmg = player.ActiveTotemPower + random.Next(20);
+                        // 1.3.6 G8 (CP7): the tick of a magical class ability (searing_totem): its phase immunity and
+                        // divine armour, before the Armory
+                        searingDmg = ApplyAbilityBossProtections(m, searingDmg, magical: true, announce: false);
                         // v1.1.11: Team HQ Armory of the totem's owner.
                         searingDmg = TeamHQBonus.ApplyAttack(player, searingDmg);
                         m.HP -= (int)searingDmg;
@@ -32668,6 +32684,19 @@ public partial class CombatEngine
         if (BossContext == null || damage <= 0 || target == null) return damage;
         long cap = Math.Max(1, (long)(target.MaxHP * GameConfig.OldGodTeammateDamageCapPercent));
         return damage > cap ? cap : damage;
+    }
+
+    /// <summary>
+    /// 1.3.6: a poison tick on a monster (weapon poison, and from G8 the Poisoned status too): physical phase immunity
+    /// (a weapon hit is physical), then divine armour, at least 1, as a swing.
+    /// </summary>
+    private long ApplyPoisonTickBossProtections(Monster monster, long tick)
+    {
+        if (monster.IsPhysicalImmune)
+            tick = ApplyPhaseImmunityDamage(monster, tick, isMagicalDamage: false);
+        if (BossContext != null && BossContext.DivineArmorReduction > 0)
+            tick = (long)(tick * (1.0 - BossContext.DivineArmorReduction));
+        return Math.Max(1, tick);
     }
 
     /// <summary>
