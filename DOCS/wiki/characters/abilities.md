@@ -45,7 +45,7 @@ Damage and healing then vary by up to 10 percent either way, and your training p
 
 ## The hit roll
 
-Against a monster, an Attack ability that deals physical damage to one target rolls to hit, as a basic swing does: see [the hit roll](/wiki/en/combat/#the-hit-roll). Area abilities, magical abilities, abilities that work on the mind (Cutting Words among them), the Alchemist's thrown bombs and an ability that promises a certain hit do not roll. An ability used from hiding does not roll either. A thrown bomb and Cutting Words are not melee hits: they set off no weapon enchant and no Thorns.
+Against a monster, an Attack ability that deals physical damage to one target rolls to hit, as a basic swing does: see [the hit roll](/wiki/en/combat/#the-hit-roll). Area abilities, magical abilities, abilities that work on the mind (Cutting Words among them), the Alchemist's thrown bombs and an ability that promises a certain hit do not roll. An ability used from hiding does not roll either. A thrown bomb and Cutting Words are not melee hits: they set off no weapon enchant, life steal or Thorns.
 
 A missed ability does nothing: no damage, no healing, no bonus and no special effect. When you dual wield, the off-hand swing that follows an ability rolls on its own, also after a miss. No off-hand swing follows an area ability, Seal Fracture, an ability that works on the mind, a thrown bomb or Cutting Words.
 

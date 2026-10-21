@@ -115,7 +115,7 @@ public class AbilityKinds136Tests
         ["carnival_of_chaos"] = K.Area | K.Mind,
         ["last_laugh"] = K.Mind,
         ["legend_incarnate"] = K.None,
-        ["throw_bomb"] = K.None,
+        ["throw_bomb"] = K.NotMelee,
         ["curative_tincture"] = K.None,
         ["healing_elixir"] = K.None,
         ["mending_meditation"] = K.None,
@@ -145,7 +145,7 @@ public class AbilityKinds136Tests
         ["searing_totem"] = K.None,
         ["stormstrike"] = K.None,
         ["windfury_totem"] = K.None,
-        ["chain_lightning"] = K.Area | K.OwnDamage,
+        ["chain_lightning"] = K.Area | K.OwnDamage | K.Primary,
         ["spirit_link_totem"] = K.None,
         ["ancestral_guidance"] = K.None,
         ["second_wind"] = K.None,
@@ -171,10 +171,10 @@ public class AbilityKinds136Tests
         ["crescendo"] = K.Area | K.OwnDamage,
         ["harmonic_shield"] = K.None,
         ["dissonant_wave"] = K.Area | K.OwnDamage,
-        ["resonance_cascade"] = K.Area,
+        ["resonance_cascade"] = K.Area | K.OwnDamage,
         ["tidal_harmony"] = K.None,
         ["oceans_voice"] = K.None,
-        ["harmonic_crescendo"] = K.Area,
+        ["harmonic_crescendo"] = K.Area | K.OwnDamage,
         ["temporal_feint"] = K.None,
         ["borrowed_power"] = K.None,
         ["fracture_reality"] = K.OwnDamage,
@@ -228,12 +228,33 @@ public class AbilityKinds136Tests
     public void AbilityKinds136_AreaAbilities_TakeNoTarget_SealFracture_AsksForOne()
     {
         foreach (var id in new[] { "maelstrom_faithful", "sanctified_torrent", "resonance_cascade", "harmonic_crescendo", "singularity",
-                     "abyssal_eruption", "abyss_unchained", "void_rupture", "whirlwind", "death_blossom", "grand_finale", "chain_lightning",
+                     "abyssal_eruption", "abyss_unchained", "void_rupture", "whirlwind", "death_blossom", "grand_finale",
                      "dissonant_wave", "corrosive_cloud", "thundering_roar" })
             CombatEngine.QuickbarAbilityAsksForTarget(Ability(id)).Should().BeFalse($"{id} is an area ability");
         foreach (var id in new[] { "seal_fracture", "power_strike", "throw_bomb", "assassinate", "cutting_words", "acid_splash", "death_mark" })
             CombatEngine.QuickbarAbilityAsksForTarget(Ability(id)).Should().BeTrue($"{id} hits one target");
         CombatEngine.QuickbarAbilityAsksForTarget(Ability("shield_wall")).Should().BeFalse("a defense takes no monster target");
+    }
+
+    // ---- ruling 2: an area ability that treats its chosen target differently keeps the prompt ----
+
+    [Fact]
+    public void AbilityKinds136_ChainLightning_KeepsTheTargetPrompt_TheOtherAreaAbilitiesDoNot()
+    {
+        CombatEngine.QuickbarAbilityAsksForTarget(Ability("chain_lightning")).Should().BeTrue("its chosen target takes the full hit, the rest half");
+        foreach (var a in ClassAbilitySystem.GetAllAbilities().Where(a => (Kinds[a.Id] & K.Area) != 0 && a.Id != "chain_lightning"))
+            CombatEngine.QuickbarAbilityAsksForTarget(a).Should().BeFalse($"{a.Id} hits every foe the same");
+        ClassAbilitySystem.GetAllAbilities().Where(a => (Kinds[a.Id] & K.Primary) != 0).Select(a => a.Id).Should().Equal("chain_lightning");
+    }
+
+    [Fact]
+    public void AbilityKinds136_ChainLightning_HitsItsChosenTargetInFull_TheOtherHalf()
+    {
+        var first = Foe();
+        var chosen = Foe();
+        Use("chain_lightning", 20, Hero(dualWield: false), chosen, first);
+        (chosen.MaxHP - chosen.HP).Should().Be(D, "the chosen target takes the full hit");
+        (first.MaxHP - first.HP).Should().Be(D / 2, "the other takes half");
     }
 
     // ---- rule 4: the teammate picks ----
@@ -373,6 +394,7 @@ public class AbilityKinds136Tests
     [InlineData("philosophers_bomb")]
     [InlineData("cataclysm_bomb")]
     [InlineData("cutting_words")]
+    [InlineData("throw_bomb")]
     public void AbilityKinds136_ABombAndCuttingWords_DoNotMiss_ProcNothing_TakeNoThorns_AndGiveNoOffHandSwing(string id)
     {
         var shot = Use(id, 1, Hero(dualWield: true, lifeSteal: 50), Foe(), Foe());
@@ -411,6 +433,23 @@ public class AbilityKinds136Tests
             CombatEngine.AbilityGivesOffHandSwing(CombatEngine.AbilityKinds(a)).Should().Be(expected, a.Id);
         }
         CombatEngine.AbilityGivesOffHandSwing(CombatEngine.AbilityKinds(Ability("seal_fracture"))).Should().BeFalse("its spread is an area hit");
+    }
+
+    // ---- rule 2: Resonance Cascade and Harmonic Crescendo hit each target once ----
+
+    [Theory]
+    [InlineData("resonance_cascade", 1.0, 1.25)]   // +25 percent per additional enemy
+    [InlineData("harmonic_crescendo", 1.0, 1.0)]   // no buffs to consume
+    public void AbilityKinds136_ResonanceCascadeAndHarmonicCrescendo_HitEachTargetOnce(string id, double oneShare, double twoShare)
+    {
+        var alone = Foe();
+        Use(id, 20, Hero(dualWield: false), alone);
+        (alone.MaxHP - alone.HP).Should().Be((long)(D * oneShare), "one target takes D once");
+        var a = Foe();
+        var b = Foe();
+        Use(id, 20, Hero(dualWield: false), a, b);
+        (a.MaxHP - a.HP).Should().Be((long)(D * twoShare), "the first of two takes its share once");
+        (b.MaxHP - b.HP).Should().Be((long)(D * twoShare), "the second of two takes its share once");
     }
 
     // ---- rule 2, the roll half: Resonance Cascade and Harmonic Crescendo never miss as a whole ----

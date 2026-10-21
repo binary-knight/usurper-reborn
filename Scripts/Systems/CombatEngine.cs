@@ -9003,6 +9003,9 @@ public partial class CombatEngine
         Mind = 16,
         /// <summary>A thrown or spoken hit, not a melee one: no hit roll, no weapon procs, no Thorns, no off-hand swing.</summary>
         NotMelee = 32,
+        /// <summary>An area hit whose handler strikes the chosen target differently from the rest (Chain Lightning: full
+        /// damage on it, half and diminishing on the others), so it keeps the target prompt.</summary>
+        Primary = 64,
     }
 
     /// <summary>1.3.6: area effects (every foe at once). Keyed by effect, as the handlers are.</summary>
@@ -9013,6 +9016,9 @@ public partial class CombatEngine
         "shaman_chain_lightning", "maelstrom_faithful", "sanctified_torrent", "singularity",
         "abyssal_eruption", "abyss_unchained", "void_rupture",
     };
+
+    /// <summary>1.3.6: area effects whose handler treats the chosen target differently from the rest.</summary>
+    private static readonly HashSet<string> PrimaryAbilityEffects = new(StringComparer.OrdinalIgnoreCase) { "shaman_chain_lightning" };
 
     /// <summary>1.3.6: a single target hit that spreads to every foe on a kill.</summary>
     private static readonly HashSet<string> SpreadAbilityEffects = new(StringComparer.OrdinalIgnoreCase) { "overflow_aoe" };
@@ -9031,6 +9037,7 @@ public partial class CombatEngine
     private static readonly HashSet<string> NotMeleeAbilityIds = new(StringComparer.OrdinalIgnoreCase)
     {
         "acid_splash", "frost_bomb", "explosive_flask", "philosophers_bomb", "cataclysm_bomb", "cutting_words",
+        "throw_bomb",
     };
 
     /// <summary>1.3.6: the one source for an ability's kinds, read by the base block, the hit roll, the off-hand
@@ -9041,6 +9048,7 @@ public partial class CombatEngine
         if (!string.IsNullOrEmpty(effect))
         {
             if (AreaAbilityEffects.Contains(effect)) kinds |= AbilityKind.Area;
+            if (PrimaryAbilityEffects.Contains(effect)) kinds |= AbilityKind.Primary;
             if (SpreadAbilityEffects.Contains(effect)) kinds |= AbilityKind.Spread;
             // The own-damage list: each handler applies its own damage loop or hit, so the generic base damage block
             // skips these (it would hit a second time). The "aoe" and "aoe_confusion" handler is INSIDE the base block,
@@ -9057,7 +9065,9 @@ public partial class CombatEngine
                 or "annihilation" or "wrath_deep" or "shaman_lightning_bolt"
                 or "sanctified_torrent" or "maelstrom_faithful" or "aoe_corrode"
                 or "entropy_aoe" or "singularity" or "abyssal_eruption"
-                or "abyss_unchained";
+                or "abyss_unchained"
+                // 1.3.6: the handler hits every foe once; the base block also hit (and rolled for) the first one
+                or "resonance_cascade" or "grand_finale";
             if (isAoEAbility) kinds |= AbilityKind.OwnDamage;
             if (ExecuteAbilityEffects.Contains(effect)) kinds |= AbilityKind.Execute;
             if (MindAbilityEffects.Contains(effect)) kinds |= AbilityKind.Mind;
@@ -9076,10 +9086,11 @@ public partial class CombatEngine
     internal static bool AbilityGivesOffHandSwing(AbilityKind kinds) =>
         (kinds & (AbilityKind.Area | AbilityKind.Spread | AbilityKind.Mind | AbilityKind.NotMelee)) == 0;
 
-    /// <summary>1.3.6: the quickbar asks for a target for an Attack or Debuff ability that is not an area one.</summary>
+    /// <summary>1.3.6: the quickbar asks for a target for an Attack or Debuff ability that is not an area one, or that
+    /// is an area one whose handler treats the chosen target differently (Primary).</summary>
     internal static bool QuickbarAbilityAsksForTarget(ClassAbilitySystem.ClassAbility ability) =>
         (ability.Type == ClassAbilitySystem.AbilityType.Attack || ability.Type == ClassAbilitySystem.AbilityType.Debuff)
-        && (AbilityKinds(ability) & AbilityKind.Area) == 0;
+        && ((AbilityKinds(ability) & AbilityKind.Area) == 0 || (AbilityKinds(ability) & AbilityKind.Primary) != 0);
 
     /// <summary>1.3.6: the teammate's pick at 3 or more foes: its first area ability.</summary>
     internal static ClassAbilitySystem.ClassAbility? TeammateAreaPick(IEnumerable<ClassAbilitySystem.ClassAbility> attackAbilities) =>
@@ -31617,7 +31628,7 @@ public partial class CombatEngine
         var abilityDef = ClassAbilitySystem.GetAbility(matched.slotId);
         if (abilityDef != null && (abilityDef.Type == ClassAbilitySystem.AbilityType.Attack || abilityDef.Type == ClassAbilitySystem.AbilityType.Debuff))
         {
-            // 1.3.6: an area ability takes every foe; a single target one (Seal Fracture too) asks (AbilityKinds)
+            // 1.3.6: an area ability takes every foe; a single target one (Seal Fracture too) and Chain Lightning ask (AbilityKinds)
             if (!QuickbarAbilityAsksForTarget(abilityDef))
             {
                 return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, true);
