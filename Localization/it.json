@@ -6816,7 +6816,7 @@
   "combat.ability_abyss_unchained_heal": "L'abisso ti riporta a piena salute e purga ogni afflizione!",
   "combat.ability_lifesteal_drain": "Il tuo colpo famelico dilania {0} per {1} danni! Ti nutri di {2} PV!",
   "combat.ability_lifesteal_capped": "Il tuo colpo famelico dilania {0} per {1} danni! (Già ai PV massimi -- nessun drenaggio assorbito.)",
-  "combat.ability_offer_flesh_desperate": "Offri {0} PV! POTERE DISPERATO -- bonus DOPPIO! (+120 ATT totali)",
+  "combat.ability_offer_flesh_desperate": "Offri {0} PV! POTERE DISPERATO -- bonus DOPPIO! (+{1} ATT totali)",
   "combat.ability_offer_flesh": "Sacrifichi {0} PV al vuoto! Il potere oscuro scorre in te!",
   "combat.ability_execute_reap_triple": "MIETITURA! Il debole {0} viene raccolto per {1} danni TRIPLI!",
   "combat.ability_execute_reap": "Mieti {0} per {1} danni!",

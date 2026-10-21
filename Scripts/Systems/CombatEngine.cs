@@ -18512,9 +18512,11 @@ public partial class CombatEngine
                 bool desperate = player.HP < (int)(player.MaxHP * 0.25);
                 if (desperate)
                 {
-                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Attack, SlotSource(abilityResult)) + 60, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    // 1.3.6 G4 (Q13): twice the scaled bonus, not a flat +60 on top
+                    int doubled = 2 * abilityResult.AttackBonus;
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), doubled, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_offer_flesh_desperate", sacrifice));
+                    terminal.WriteLine(Loc.Get("combat.ability_offer_flesh_desperate", sacrifice, doubled));
                 }
                 else
                 {
@@ -18758,7 +18760,7 @@ public partial class CombatEngine
                 player.ShamanEnchantType = 3;
                 player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
                 player.ShamanEnchantPower = GameConfig.GetShamanEnchantPower(player.Intelligence);
-                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Defense, SlotSource(abilityResult)) + abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration);   // 1.3.6 G4: Rockbiter still adds per cast (OneApply136 pins it; the supervisor's word changes it)
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration);   // 1.3.6 G4: its own entry; a recast refreshes the rounds and does not stack
                 terminal.WriteLine(Loc.Get("combat.shaman_enchant_earth", GameConfig.GetShamanEnchantPower(player.Intelligence), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration), "bright_green");
                 break;
 
@@ -27273,9 +27275,11 @@ public partial class CombatEngine
                 bool ofDesperate = player.HP < (int)(player.MaxHP * 0.25);
                 if (ofDesperate)
                 {
-                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Attack, SlotSource(abilityResult)) + 60, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    // 1.3.6 G4 (Q13): twice the scaled bonus, not a flat +60 on top
+                    int ofDoubled = 2 * abilityResult.AttackBonus;
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), ofDoubled, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.ability_offer_flesh_desperate", ofSacrifice));
+                    terminal.WriteLine(Loc.Get("combat.ability_offer_flesh_desperate", ofSacrifice, ofDoubled));
                 }
                 else
                 {
@@ -27483,7 +27487,7 @@ public partial class CombatEngine
                 player.ShamanEnchantType = 3;
                 player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
                 player.ShamanEnchantPower = GameConfig.GetShamanEnchantPower(player.Intelligence);
-                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Defense, SlotSource(abilityResult)) + abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration);   // 1.3.6 G4: Rockbiter still adds per cast (OneApply136 pins it; the supervisor's word changes it)
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration);   // 1.3.6 G4: its own entry; a recast refreshes the rounds and does not stack
                 terminal.WriteLine(Loc.Get("combat.shaman_enchant_earth", GameConfig.GetShamanEnchantPower(player.Intelligence), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration), "bright_green");
                 break;
 

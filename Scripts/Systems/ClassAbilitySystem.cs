@@ -1803,7 +1803,7 @@ public static class ClassAbilitySystem
             Cooldown = 2,
             Type = AbilityType.Buff,
             AttackBonus = 20,  // Buff - scales with CHA
-            Duration = 1,
+            Duration = 2,      // 1.3.6 G4: 1 ended at the round end it was cast in, before any swing
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,

@@ -7062,7 +7062,7 @@
   "combat.ability_abyss_unchained_heal": "The abyss restores you to full health and purges all afflictions!",
   "combat.ability_lifesteal_drain": "Your hungering strike tears into {0} for {1} damage! You feast on {2} HP!",
   "combat.ability_lifesteal_capped": "Your hungering strike tears into {0} for {1} damage! (Already at full HP -- no drain absorbed.)",
-  "combat.ability_offer_flesh_desperate": "You offer {0} HP! DESPERATE POWER surges -- DOUBLE bonus! (+120 ATK total)",
+  "combat.ability_offer_flesh_desperate": "You offer {0} HP! DESPERATE POWER surges -- DOUBLE bonus! (+{1} ATK total)",
   "combat.ability_offer_flesh": "You sacrifice {0} HP to the void! Dark power flows through you!",
   "combat.ability_execute_reap_triple": "REAP! The weakened {0} is harvested for {1} TRIPLE damage!",
   "combat.ability_execute_reap": "You reap at {0} for {1} damage!",

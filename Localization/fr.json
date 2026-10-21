@@ -6816,7 +6816,7 @@
   "combat.ability_abyss_unchained_heal": "L’abîme vous restaure complètement et purifie toutes les afflictions!",
   "combat.ability_lifesteal_drain": "Votre frappe affamée lacère {0} pour {1} dégâts! Vous dévorez {2} PV!",
   "combat.ability_lifesteal_capped": "Votre frappe affamée lacère {0} pour {1} dégâts ! (Déjà aux PV maximum -- aucun drain absorbé.)",
-  "combat.ability_offer_flesh_desperate": "Vous offrez {0} PV! LA PUISSANCE DÉSESPÉRÉE surgit -- BONUS DOUBLÉ! (+120 ATK total)",
+  "combat.ability_offer_flesh_desperate": "Vous offrez {0} PV! LA PUISSANCE DÉSESPÉRÉE surgit -- BONUS DOUBLÉ! (+{1} ATK total)",
   "combat.ability_offer_flesh": "Vous sacrifiez {0} PV au vide! Une puissance sombre vous traverse!",
   "combat.ability_execute_reap_triple": "RÉCOLTE! Le/la faible {0} est moissonné(e) pour {1} dégâts TRIPLES!",
   "combat.ability_execute_reap": "Vous moissonnez {0} pour {1} dégâts!",

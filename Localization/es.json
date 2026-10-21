@@ -6816,7 +6816,7 @@
   "combat.ability_abyss_unchained_heal": "¡El abismo te restaura a plena salud y purifica todas las aflicciones!",
   "combat.ability_lifesteal_drain": "¡Tu golpe hambriento desgarra a {0} por {1} de daño! ¡Te alimentas de {2} PV!",
   "combat.ability_lifesteal_capped": "¡Tu golpe hambriento desgarra a {0} por {1} de daño! (Ya a PV completos -- no absorbes drenaje.)",
-  "combat.ability_offer_flesh_desperate": "¡Ofreces {0} PV! ¡El PODER DESESPERADO surge -- ¡DOBLE bonus! (+120 ATQ total)",
+  "combat.ability_offer_flesh_desperate": "¡Ofreces {0} PV! ¡El PODER DESESPERADO surge -- ¡DOBLE bonus! (+{1} ATQ total)",
   "combat.ability_offer_flesh": "¡Sacrificas {0} PV al vacío! ¡El poder oscuro fluye a través de ti!",
   "combat.ability_execute_reap_triple": "¡COSECHA! ¡El debilitado {0} es segado por {1} de TRIPLE daño!",
   "combat.ability_execute_reap": "¡Siegas a {0} por {1} de daño!",

@@ -431,6 +431,20 @@ public class BonusSlots136Tests
     }
 
     [Fact]
+    public void BonusSlots136_Focus_ReachesTheNextSwing()
+    {
+        ClassAbilitySystem.GetAbility("focus")!.Duration.Should().Be(2);
+        var hero = Fresh(); hero.Class = CharacterClass.Warrior;
+        var rig = RigFor(hero);
+        NoHitRoll(() => { Apply(rig, hero, "focus"); return 0; });
+        hero.TempAttackBonus.Should().BeGreaterThan(0);
+        EndRound(rig);
+        hero.TempAttackBonus.Should().BeGreaterThan(0, "the bonus is still there for the swing of the next round");
+        EndRound(rig);
+        hero.TempAttackBonus.Should().Be(0);
+    }
+
+    [Fact]
     public void BonusSlots136_TimeStop_ReachesTheNextSwing()
     {
         var mage = Caster(CharacterClass.Magician, 18, level: 100);
@@ -524,6 +538,21 @@ public class BonusSlots136Tests
     }
 
     [Fact]
+    public void BonusSlots136_OfferFlesh_BelowAQuarter_DoublesTheScaledBonus_AndTheLineShowsIt()
+    {
+        var low = OneApply136Tests.Caster(CharacterClass.Voidreaver);
+        low.MaxHP = 1000; low.HP = 300;
+        var c = OneApply136Tests.Run("offer_flesh", CharacterClass.Voidreaver, caster: low);
+        low.HP.Should().BeLessThan(250);
+        c.Attack.Should().Be(2 * c.Result.AttackBonus, "twice the scaled bonus, not a flat +60 on top");
+        c.Shown.Should().Contain($"(+{2 * c.Result.AttackBonus} ATK total)");
+        var high = OneApply136Tests.Caster(CharacterClass.Voidreaver);
+        high.MaxHP = 1000; high.HP = 1000;
+        var h = OneApply136Tests.Run("offer_flesh", CharacterClass.Voidreaver, caster: high);
+        h.Attack.Should().Be(h.Result.AttackBonus, "above a quarter the scaled bonus alone");
+    }
+
+    [Fact]
     public void BonusSlots136_AvatarOfDestruction_HitGrowsWithStrength_NotCharisma()
     {
         int Hit(long str, long cha)
@@ -604,6 +633,7 @@ public class BonusSlots136Tests
                 foreach (var row in new[]
                 {
                     Loc.Get("spell.magician.7.desc"), Loc.Get("spell.magician.18.desc"),
+                    Loc.Get("combat.ability_offer_flesh_desperate", 99999, 9999),
                 })
                     row.Length.Should().BeLessOrEqualTo(79, $"{lang}: {row}");
     }
