@@ -44,10 +44,6 @@ A Smoke Bomb, if you carry one, is used first when you press R and gets you out 
 
 On Nightmare difficulty you cannot flee at all, and a Smoke Bomb cannot be used either.
 
-### Escape abilities
-
-The Jester's Disappearing Act and the Sage's Escape spell follow the flee rules. On Nightmare they do not get you out and the turn is spent. In an Old God fight, or while a floor boss is among the living monsters, they succeed at the Old God flee chance above; a failure is your turn, with the failed flee message, and it does not halve the hits on you that round. Against other monsters they always get you out.
-
 ## What fleeing costs
 
 A successful flee from a monster fight costs 1 Fame and {{balance:MentalFleeLoss}} Mental (Umbrath's ward can lower the Mental loss), and Valorian counts it as a taboo: {{balance:GodTabooMinor}} Favor lost for his followers. Read the outcome messages rather than assuming escape is free.
@@ -57,3 +53,7 @@ A successful flee from a monster fight costs 1 Fame and {{balance:MentalFleeLoss
 Umbrath's available Miracle can remove you from a monster fight without the ordinary flee penalties: no Fame, Mental or taboo is lost. Miracles have a daily use, require the relevant Favor tier, and are not an unlimited escape button.
 
 See [Favor and Miracles](/wiki/en/gods/favor/) and [Mental](/wiki/en/characters/mental/) before relying on either protection.
+
+## Escape abilities
+
+The Jester's Disappearing Act and the Sage's Escape spell work by the flee rules on this page. On Nightmare they do not get you out and the turn is spent. In an Old God fight, or while a floor boss is among the living monsters, they succeed at the Old God chance from Fleeing an Old God; a failure is your turn, with the same failure message, and it does not halve the hits on you that round. Against other monsters they always get you out.
