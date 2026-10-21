@@ -316,12 +316,15 @@ public class ProcFix135Tests
         var engine = Engine(hero, 135);
         var spellEffect = typeof(CombatEngine).GetMethod("HandleSpecialSpellEffectOnMonster", F)!;
         var boss = God();
+        // 1.3.6 G7 (rule 3, supervisor 2026-10-21T14:10:03Z): a frost slow on a boss takes the soft control rule, half of
+        // its 2 rounds; the cast is past the 25 percent resist
+        typeof(CombatEngine).GetField("random", F)!.SetValue(engine, new HighRandom());
         spellEffect.Invoke(engine, new object?[] { boss, "frost", 0, hero, 0L, new CombatResult { Player = hero } });
-        boss.SlowDuration.Should().Be(2, "Frost Touch and Ice Storm slow for 2 rounds");
-        Round(engine, boss, hero, 2);
-        boss.SlowDuration.Should().Be(1, "a frost spell's slow joins the once-a-round countdown");
+        engine.SeedRandomForTests(135);
+        boss.SlowDuration.Should().Be(1, "Frost Touch and Ice Storm slow a God for half of 2 rounds");
         boss.IsSlowed.Should().BeTrue();
         Round(engine, boss, hero, 2);
+        boss.SlowDuration.Should().Be(0, "a frost spell's slow joins the once-a-round countdown");
         boss.IsSlowed.Should().BeFalse();
     }
 

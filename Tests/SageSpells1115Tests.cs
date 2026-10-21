@@ -315,7 +315,7 @@ public class SageSpells1115Tests
         var unveil = B(); SpellEffect(engine, unveil, "unveil_pattern", 2); unveil.MarkedDuration.Should().Be(1);
         var scream = B(); SpellEffect(engine, scream, "psychic_scream", 2); scream.DistractedRounds.Should().Be(1);
         var compel = B(); SpellEffect(engine, compel, "compel", 2); compel.TauntRoundsLeft.Should().Be(1); compel.WeakenRounds.Should().Be(1);
-        var conf = B(); SpellEffect(engine, conf, "confusion", 6); conf.ConfusedDuration.Should().Be(3);
+        var conf = B(); SpellEffect(engine, conf, "confusion", 6); conf.ConfusedDuration.Should().Be(2, "half, then at most 2 (1.3.6 G7)");
         var mass = B(); SpellEffect(engine, mass, "mass_confusion", 6); mass.ConfusedDuration.Should().Be(2, "half, then at most 2");
 
         var ogre = Ogre(); SpellEffect(engine, ogre, "confusion", 6); ogre.ConfusedDuration.Should().Be(6, "a normal monster takes it all");
