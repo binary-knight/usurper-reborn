@@ -375,15 +375,20 @@ public class GodBoons1115Tests
 
         // Spell self-heals: ApplySpellEffects's own healing block, called from every combat spell
         // path except the PvP AI (Character-vs-Character, no monsters to test).
-        var spellAllowlist = new[] { "ApplySpellEffects(computer, null, spellResult);" };
+        // 1.3.6 G4: the combat paths call ApplySpellEffectsAs (the spell's slot source as its 4th argument, so a
+        // positional monsters is its 6th); the wrapper's declaration is skipped by name, as the method's is.
+        var spellAllowlist = new[] { "ApplySpellEffectsAs(computer, null, spellResult, SpellSlotSource(computer, spellResult, chosen.Level));" };
         var spellCalls = src.Split('\n')
-            .Where(l => l.Contains("ApplySpellEffects(") && !l.Contains("private void ApplySpellEffects"))
+            .Where(l => (l.Contains("ApplySpellEffects(") || l.Contains("ApplySpellEffectsAs("))
+                && !l.Contains("private void ApplySpellEffects(") && !l.Contains("private void ApplySpellEffectsAs("))
             .Select(l => l.Trim())
             .ToList();
         spellCalls.Should().NotBeEmpty();
         foreach (var line in spellCalls)
         {
-            bool passesMonsters = line.Contains("monsters:") || CallArgCount(line, "ApplySpellEffects(") >= 5;
+            bool wrapper = line.Contains("ApplySpellEffectsAs(");
+            bool passesMonsters = line.Contains("monsters:")
+                || CallArgCount(line, wrapper ? "ApplySpellEffectsAs(" : "ApplySpellEffects(") >= (wrapper ? 6 : 5);
             if (!passesMonsters)
                 spellAllowlist.Should().Contain(line, $"a combat spell self-heal without the monsters context must be allowlisted: {line}");
         }
@@ -393,7 +398,7 @@ public class GodBoons1115Tests
         Body("Scripts/Systems/CombatEngine.cs", "private void ApplySpellEffects(")
             .Should().Contain("GodBoonSystem.CastHeal(healer ?? caster, spellResult.Healing, monsters)");
         // A buff with a heal part cast on an ally: the boon is the caster's, not the ally's.
-        src.Should().Contain("ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);");
+        src.Should().Contain("ApplySpellEffectsAs(tgt, null, spellResult, SpellSlotSource(player, spellResult, spellInfo.Level), monsters: monsters, healer: player);");
         Body("Scripts/Systems/CombatEngine.cs", "private async Task<bool> TeammateHealWithSpell(")
             .Should().Contain("ApplyHealerSpecBonus(teammate, spellResult.Healing, result.Monsters)");
         // The helper wrappers: every spell and ability heal (ApplyHealerSpecBonus) and every potion (PotionBonus).
