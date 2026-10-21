@@ -236,7 +236,7 @@ Only you, the fight's leader, also get these:
 - **Alignment:** Good 2 percent and Holy 4 percent of maximum HP a round.
 - **Tidesworn:** 3 percent of maximum HP a round, 5 percent below half HP.
 
-The Regenerating status heals 1 to 6 HP a round for whoever has it. There is no other HP regeneration in a fight.
+The Regenerating status heals 1 to 6 HP a round for whoever has it; the Tidesworn's Living Waters makes it heal 20 a round for its 3 rounds. There is no other HP regeneration in a fight.
 
 ### Mana outside a fight
 

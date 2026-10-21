@@ -6090,6 +6090,7 @@ public partial class CombatEngine
         // (Invulnerable is checked earlier, before divine intervention / sacrifice.)
 
         // Apply damage
+        actualDamage = ShareLinkedHit(player, actualDamage, result, CombatEventKind.Basic);   // 1.3.6 G11: Empathic Link
         player.HP = Math.Max(0, player.HP - actualDamage);
         EvHurt(player, actualDamage, CombatEventKind.Basic);   // 1.2.6
         bool venomLanded = actualDamage > 0 && player.IsAlive && EliteVenomLands(monster, player);   // 1.2.8: the line follows the hit line
@@ -6551,6 +6552,7 @@ public partial class CombatEngine
                 // 1.3.6: a magical hit loses the share the player's magic resistance takes, last; never an Old God's
                 if (abilityResult.IsMagical && !isOldGodFightAbility) actualDamage = ApplyMagicResist(player, actualDamage);
 
+                actualDamage = ShareLinkedHit(player, actualDamage, result, monKind);   // 1.3.6 G11: Empathic Link
                 player.HP = Math.Max(0, player.HP - actualDamage);
                 EvHurt(player, actualDamage, monKind);   // 1.2.6
 
@@ -6676,6 +6678,7 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
+                damage = ShareLinkedHit(player, damage, result, monKind);   // 1.3.6 G11: Empathic Link, ahead of the last steps the order tests pin; they apply to the ally's half
                 // v1.1.11: Team HQ Barracks last, before the drain heal reads it; the minimum holds where it held.
                 damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawLifeStealDamage)), TeamHQBonus.ApplyDefense(player, damage));
                 if (abilityResult.IsMagical && !isOldGodFightAbility) damage = ApplyMagicResist(player, damage);   // 1.3.6, before the heal reads it
@@ -6742,6 +6745,7 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
+                damage = ShareLinkedHit(player, damage, result, monKind);   // 1.3.6 G11: Empathic Link, ahead of the last steps the order tests pin; they apply to the ally's half
                 // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
                 damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawDamage)), TeamHQBonus.ApplyDefense(player, damage));
                 if (abilityResult.IsMagical && !isOldGodFightAbility) damage = ApplyMagicResist(player, damage);   // 1.3.6, last
@@ -6863,6 +6867,7 @@ public partial class CombatEngine
         actualDamage = ApplyFleeGrace(player, actualDamage);
         actualDamage = TeamHQBonus.ApplyDefense(player, actualDamage); // v1.1.11: Team HQ Barracks, last
 
+        actualDamage = ShareLinkedHit(player, actualDamage, result, CombatEventKind.Ability);   // 1.3.6 G11: Empathic Link
         player.HP = Math.Max(0, player.HP - actualDamage);
         EvHurt(player, actualDamage, CombatEventKind.Ability);   // 1.2.6
 
@@ -7247,6 +7252,7 @@ public partial class CombatEngine
         actualDamage = ApplyFleeGrace(player, actualDamage);
         actualDamage = TeamHQBonus.ApplyDefense(player, actualDamage); // v1.1.11: Team HQ Barracks, last
 
+        actualDamage = ShareLinkedHit(player, actualDamage, result, CombatEventKind.Ability);   // 1.3.6 G11: Empathic Link
         player.HP = Math.Max(0, player.HP - actualDamage);
         EvHurt(player, actualDamage, CombatEventKind.Ability);   // 1.2.6
 
@@ -9136,6 +9142,104 @@ public partial class CombatEngine
 
     /// <summary>1.3.6 G11 (rule 1): Living Waters' heal on each Regenerating tick of its rounds ("20 HP/round").</summary>
     internal const int LivingWatersRegenPerRound = 20;
+
+    /// <summary>1.3.6 G11 (rule 2): effects whose defence bonus goes to the linked ally, not the caster; the generic
+    /// block skips the caster's for them (HandlerCasterParts stays the G3 table of caster parts).</summary>
+    internal static bool AllyOnlyDefense(string? effect) => effect == "empathic_link";
+
+    /// <summary>1.3.6 G11 (rule 2): the player's Empathic Link pick, set before the cost and read once by the handler.</summary>
+    private Character? _empathicLinkPick;
+
+    /// <summary>1.3.6 G11 (rule 2): the allies Empathic Link can link: every living member of LivingPartyOf but the
+    /// caster.</summary>
+    private List<Character> EmpathicLinkAllies(Character caster, CombatResult? result) =>
+        LivingPartyOf(caster, result).Where(c => c != caster).ToList();
+
+    /// <summary>1.3.6 G11 (rule 2): the ally to link: the player's pick when it is still a living ally, else the most
+    /// hurt living ally (an NPC caster's pick, and the player's on Enter); null with no living ally.</summary>
+    private Character? EmpathicLinkTarget(Character caster, CombatResult? result)
+    {
+        var pick = _empathicLinkPick;
+        _empathicLinkPick = null;
+        var allies = EmpathicLinkAllies(caster, result);
+        if (pick != null && allies.Contains(pick)) return pick;
+        return allies.OrderBy(c => (double)c.HP / Math.Max(1, c.MaxHP)).FirstOrDefault();
+    }
+
+    /// <summary>
+    /// 1.3.6 G11 (rule 2): Empathic Link's split. A monster's hit on a linked ally is split, half to the ally and half
+    /// to the caster, while the link's rounds last and both are alive. Called before the HP write on every monster hit
+    /// path a party member takes: the three of MonsterAttacksCompanion that G6 listed (the ability's direct damage, its
+    /// multiplier damage with life drain, the normal attack) and, since an NPC caster can link the player, the leader's
+    /// (ProcessMonsterAction's normal attack, TryMonsterSpecialAbility's direct damage, life drain and multiplier
+    /// damage, the boss and Manwe ability hits). The boss party blast and channel are not changed, as G6 left them.
+    /// The caster's half never takes it below 1 HP; what it cannot take stays with the ally. Returns the ally's share.
+    /// On the leader's life drain and multiplier branches and the companion's multiplier branch the split comes ahead
+    /// of the Barracks, the companion mitigation and magic resistance, whose place last is pinned by MagicResist136, so
+    /// those steps apply to the ally's half; elsewhere it is the last step before the HP write.
+    /// </summary>
+    internal long ShareLinkedHit(Character victim, long damage, CombatResult? result, CombatEventKind kind)
+    {
+        var caster = victim?.EmpathicLinkCaster;
+        if (victim == null || caster == null || damage < 2 || victim.EmpathicLinkRounds <= 0 || !victim.IsAlive || !caster.IsAlive)
+            return damage;
+        long take = Math.Min(damage / 2, caster.HP - 1);
+        if (take <= 0) return damage;
+        caster.HP -= take;   // hq-armory: out (a party member's share of a monster hit, not an enemy) hq-barracks: out (the Empathic Link caster's half of a monster hit on its linked ally)
+        EvHurt(caster, take, kind);
+        UIHelper.WriteRow(terminal, Loc.Get("combat.empathic_link_share", caster.DisplayName, take, victim.DisplayName), "magenta");
+        result?.CombatLog.Add($"{caster.DisplayName} takes {take} of the hit on {victim.DisplayName} through Empathic Link");
+        return damage - take;
+    }
+
+    /// <summary>1.3.6 G11 (rule 6): Apotheosis of Ruin's life steal ("10% lifesteal").</summary>
+    internal const int ApotheosisLifestealPercent = 10;
+
+    /// <summary>
+    /// 1.3.6 G11 (rule 6): Apotheosis of Ruin's "hit all enemies". The game has no area swing for a basic attack (the
+    /// Cleave and Whirlwind cases are monster abilities), so while the swinger holds AreaSwingRounds each basic swing
+    /// also hits every other living enemy for one swing's damage against that enemy, diminishing by the area core's
+    /// steps (GetAoEDiminishingMultiplier: the swing's own target is the first, then 75, 50 and 25 percent). Each hit
+    /// rolls to hit on its own and runs the swing's on-hit effects (the Lifesteal status among them). The player's
+    /// swing and a teammate's call it after the swing on the target.
+    /// </summary>
+    private async Task SweepOtherFoes(Character swinger, Monster target, List<Monster> monsters, bool isOffHandAttack, int s, int swings,
+        CombatResult result, Func<Monster, long> teammateSwing)
+    {
+        if (swinger.AreaSwingRounds <= 0 || monsters == null) return;
+        var others = monsters.Where(m => m != null && m.IsAlive && m != target).ToList();
+        if (others.Count == 0) return;
+        bool isPlayer = swinger == currentPlayer;
+        terminal.SetColor("bright_red");
+        UIHelper.WriteRow(terminal, isPlayer ? Loc.Get("combat.apotheosis_sweep") : Loc.Get("combat.apotheosis_sweep_npc", swinger.DisplayName));
+        bool hitRolled = GameConfig.PlayerHitRollEnabled;
+        for (int i = 0; i < others.Count; i++)
+        {
+            var m = others[i];
+            if (!m.IsAlive) continue;
+            int natural = 0;
+            if (hitRolled)
+            {
+                var check = ResolvePlayerHit(swinger, m, result, certain: isPlayer && swinger.HasStatus(StatusEffect.Hidden));
+                if (!check.Lands) continue;
+                natural = check.Natural;
+            }
+            long swing = isPlayer
+                ? ComputePlayerSwingDamageRolled(swinger, m, isOffHandAttack, s, swings, natural)
+                : teammateSwing(m);
+            long dmg = Math.Max(1, (long)(swing * GetAoEDiminishingMultiplier(i + 1)));
+            long dealt = await ApplySingleMonsterDamageDealt(m, dmg, result,
+                isPlayer ? "your attack" : $"{swinger.DisplayName}'s attack", swinger, isSpellDamage: false, evasionChecked: hitRolled);
+            if (dealt <= 0) continue;
+            if (isPlayer)
+                ApplyPlayerSwingOnHitEffects(swinger, m, dealt, isOffHandAttack, result);
+            else
+            {
+                ApplyPostHitEnchantments(swinger, m, dealt, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
+                ApplyShamanSwingRiders(swinger, m, dealt, isOffHandAttack, result);
+            }
+        }
+    }
 
     /// <summary>1.3.6 G11 (rule 3): the nine buff statuses Harmonic Crescendo counts and consumes.</summary>
     internal static bool IsGrandFinaleBuff(StatusEffect s) =>
@@ -15665,14 +15769,16 @@ public partial class CombatEngine
                         // hiding or with a Miracle crit is certain. A miss deals nothing and runs no on-hit effect.
                         bool hitRolled = GameConfig.PlayerHitRollEnabled;
                         int hitNatural = 0;
+                        bool swingLands = true;   // 1.3.6 G11: a miss on the target still lets the sweep below run
                         if (hitRolled)
                         {
                             var hitCheck = ResolvePlayerHit(player, target, result, certain: player.MiracleCritPending || player.HasStatus(StatusEffect.Hidden));
-                            if (!hitCheck.Lands)
-                                continue;
+                            swingLands = hitCheck.Lands;
                             hitNatural = hitCheck.Natural;
                         }
 
+                        if (swingLands)
+                        {
                         long damage = ComputePlayerSwingDamageRolled(player, target, isOffHandAttack, s, swings, hitNatural);
 
                         long swingDealt = await ApplySingleMonsterDamageDealt(target, damage, result, isOffHandAttack ? "off-hand strike" : "your attack", player, isSpellDamage: false, evasionChecked: hitRolled);
@@ -15683,13 +15789,15 @@ public partial class CombatEngine
                         // damage/procs, and the Ancestral Guidance heal below. Player report: life
                         // steal still triggered when the attack passed through the enemy. The evasion
                         // flavor line was already printed inside ApplySingleMonsterDamage.
-                        if (swingDealt <= 0)
-                            continue;
-
                         // All landed-swing on-hit effects (post-hit enchants + Shaman weapon-enchant
                         // rider + Ancestral Guidance) run through the shared helper so the [P] Power
                         // Attack fires the identical pipeline.
-                        ApplyPlayerSwingOnHitEffects(player, target, swingDealt, isOffHandAttack, result);   // 1.3.5: riders scale from the HP removed, Armory included (v1.1.11)
+                        if (swingDealt > 0)
+                            ApplyPlayerSwingOnHitEffects(player, target, swingDealt, isOffHandAttack, result);   // 1.3.5: riders scale from the HP removed, Armory included (v1.1.11)
+                        }
+
+                        // 1.3.6 G11 (rule 6): Apotheosis of Ruin, the swing also hits every other living enemy
+                        await SweepOtherFoes(player, target, monsters, isOffHandAttack, s, swings, result, null!);
                     }
 
                     // 1.3.2: the attack action can improve basic attack proficiency, once an action, up to Good
@@ -16345,6 +16453,29 @@ public partial class CombatEngine
                 return;
             }
 
+            // 1.3.6 G11 (rule 2): Empathic Link links an ally. With no living ally it is refused before any cost, as the
+            // aid menu refuses (HandleHealAlly, combat.no_allies_to_aid). The player picks from the buff target menu
+            // (Q, C or X cancels before any cost; Enter or 0 links the most hurt ally); a grouped follower takes the
+            // most hurt ally, as an NPC caster does.
+            _empathicLinkPick = null;
+            if (ability.SpecialEffect == "empathic_link")
+            {
+                var linkAllies = EmpathicLinkAllies(player, result);
+                if (linkAllies.Count == 0)
+                {
+                    terminal.WriteLine(Loc.Get("combat.no_allies_to_aid"), "yellow");
+                    await Pacing.Wait(GetCombatDelay(1000));
+                    return;
+                }
+                if (player == currentPlayer && !player.IsGroupedPlayer && currentTeammates?.Any(t => t.IsAlive) == true)
+                {
+                    int? linkIdx = await SelectBuffTarget(player);
+                    if (linkIdx == TargetCancelled) return;
+                    if (linkIdx.HasValue && linkIdx.Value >= 0 && linkIdx.Value < currentTeammates.Count)
+                        _empathicLinkPick = currentTeammates[linkIdx.Value];
+                }
+            }
+
             // Check stamina (v0.56.1 tier-scaled cost)
             int effectiveStamCost = ClassAbilitySystem.GetEffectiveStaminaCost(ability);
             if (!player.HasEnoughStamina(effectiveStamCost))
@@ -16888,7 +17019,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_attack_up" : "combat.ability_attack_up_npc", actorName, abilityResult.AttackBonus, abilityResult.Duration));
         }
 
-        if (abilityResult.DefenseBonus > 0 && !abilityMissed && (handlerParts & CasterPart.Defense) == 0)
+        if (abilityResult.DefenseBonus > 0 && !abilityMissed && (handlerParts & CasterPart.Defense) == 0
+            && !AllyOnlyDefense(abilityResult.SpecialEffect))
         {
             // 1.3.6 G4: this ability's own entry; the highest entry shows, a recast refreshes and does not stack
             player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
@@ -18014,12 +18146,28 @@ public partial class CombatEngine
                 break;
 
             case "empathic_link":
-                // +30 DEF to self (handled), damage sharing proxy
-                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
-                    player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
+            {
+                // 1.3.6 G11 (rule 2), code to the text: the caster links one ally (the player's pick, or the most hurt
+                // living ally); for the rounds a monster's hit on that ally is split half and half with the caster
+                // (ShareLinkedHit, on every monster hit path a party member takes); the ally gets the +30 defence as a
+                // G4 entry. The caster gets neither the defence (AllyOnlyDefense skips the generic block) nor the
+                // Reflecting it used to get, which the text does not state.
+                var linked = EmpathicLinkTarget(player, result);
+                if (linked == null)
+                {
+                    terminal.WriteLine(Loc.Get("combat.no_allies_to_aid"), "yellow");
+                    break;
+                }
+                int linkRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                int linkDefense = ability.DefenseBonus;   // the text's flat +30, as the G4 party entries give
+                linked.EmpathicLinkCaster = player;
+                linked.EmpathicLinkRounds = linkRounds;
+                linked.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), linkDefense, linkRounds);
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("combat.ability_empathic_link"));
+                UIHelper.WriteRow(terminal, Loc.Get("combat.empathic_link_formed", linked.DisplayName, player.DisplayName, linkRounds, linkDefense));
                 break;
+            }
 
             case "crescendo_aoe":
             {
@@ -18767,14 +18915,17 @@ public partial class CombatEngine
             case "apotheosis":
             {
                 // Burn 40% HP. 3 rounds: +60 ATK (handled), hit all, 10% lifesteal (rebalanced)
+                // 1.3.6 G11 (rule 6): "hit all enemies" is AreaSwingRounds, read by the player's and the teammate's
+                // basic swing (SweepOtherFoes); the +60 is the generic block's attack entry for the same rounds; the 10
+                // percent is the Lifesteal status, which every landed hit reads (ApplyPostHitEnchantments). Raging's
+                // x1.5 swing power is not in the text and is gone.
+                int apoRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                 int sacrifice = (int)(player.MaxHP * 0.40);
                 player.HP = Math.Max(1, player.HP - sacrifice);
-                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Lifesteal))
-                    player.ActiveStatuses[StatusEffect.Lifesteal] = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
-                player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, 10); // Reduced from 20%
-                player.IsRaging = true;
-                if (!player.ActiveStatuses.ContainsKey(StatusEffect.Raging))
-                    player.ActiveStatuses[StatusEffect.Raging] = abilityResult.Duration > 0 ? abilityResult.Duration : 4;
+                player.ActiveStatuses[StatusEffect.Lifesteal] =
+                    Math.Max(player.ActiveStatuses.TryGetValue(StatusEffect.Lifesteal, out int heldSteal) ? heldSteal : 0, apoRounds);
+                player.StatusLifestealPercent = Math.Max(player.StatusLifestealPercent, ApotheosisLifestealPercent); // Reduced from 20%
+                player.AreaSwingRounds = Math.Max(player.AreaSwingRounds, apoRounds);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.ability_apotheosis", sacrifice));
                 terminal.WriteLine(Loc.Get("combat.ability_apotheosis_detail"), "red");
@@ -20770,20 +20921,25 @@ public partial class CombatEngine
 
                 // 1.2.8: the to-hit roll with the teammate's own stats, each swing on its own (evasion first)
                 bool hitRolled = GameConfig.PlayerHitRollEnabled;
-                if (hitRolled && !ResolvePlayerHit(teammate, target, result).Lands)
-                    continue;
+                bool tmLands = !hitRolled || ResolvePlayerHit(teammate, target, result).Lands;   // 1.3.6 G11: a miss still sweeps
 
                 // Calculate teammate attack damage (with weapon soft cap)
-                long attackPower = teammate.Strength + GetEffectiveWeapPow(teammate.SwingWeapPow(isOffHandAttack)) + random.Next(1, 16);
-                attackPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
-                attackPower += ClassSwingBonus(teammate, isOffHandAttack);   // 1.3.2: Warrior AttackBonus, Ranger bow RangedBonus
+                long TeammateSwing(Monster _)
+                {
+                long tmPower = teammate.Strength + GetEffectiveWeapPow(teammate.SwingWeapPow(isOffHandAttack)) + random.Next(1, 16);
+                tmPower += teammate.TempAttackBonus; // Apply buff abilities (Stimulant Brew, etc.)
+                tmPower += ClassSwingBonus(teammate, isOffHandAttack);   // 1.3.2: Warrior AttackBonus, Ranger bow RangedBonus
 
                 // Apply weapon configuration damage modifier (includes alignment bonuses, off-hand penalty)
-                double damageModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
-                attackPower = (long)(attackPower * damageModifier);
+                double tmModifier = GetWeaponConfigDamageModifier(teammate, isOffHandAttack);
+                tmPower = (long)(tmPower * tmModifier);
 
-                long damage = Math.Max(1, attackPower);
-                damage = DifficultySystem.ApplyPlayerDamageMultiplier(damage);
+                return DifficultySystem.ApplyPlayerDamageMultiplier(Math.Max(1, tmPower));
+                }
+
+                if (tmLands)
+                {
+                long damage = TeammateSwing(target);
                 long tmDealt = await ApplySingleMonsterDamageDealt(target, damage, result, isOffHandAttack ? $"{teammate.DisplayName}'s off-hand strike" : $"{teammate.DisplayName}'s attack", teammate, isSpellDamage: false, evasionChecked: hitRolled);
 
                 // Apply post-hit enchantment effects only if the attack landed -- an evaded swing
@@ -20794,6 +20950,10 @@ public partial class CombatEngine
                     ApplyPostHitEnchantments(teammate, target, tmDealt, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 Armory inside (0 for NPCs)
                     ApplyShamanSwingRiders(teammate, target, tmDealt, isOffHandAttack, result);   // 1.3.6 G10 (CP12): its own enchant and Guidance, as on the player's swing
                 }
+                }
+
+                // 1.3.6 G11 (rule 6): Apotheosis of Ruin, the swing also hits every other living enemy
+                await SweepOtherFoes(teammate, target, monsters, isOffHandAttack, s, swings, result, TeammateSwing);
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -21638,6 +21798,9 @@ public partial class CombatEngine
         // 1.3.6 G5 (B F6): a teammate never takes an escape ability (Disappearing Act); it would spend the turn, the
         // stamina and the cooldown and leave the fight as it was
         availableAbilities = availableAbilities.Where(a => a.SpecialEffect != "escape").ToList();
+        // 1.3.6 G11 (rule 2): nor Empathic Link with no living ally to link
+        if (EmpathicLinkAllies(teammate, result).Count == 0)
+            availableAbilities = availableAbilities.Where(a => a.SpecialEffect != "empathic_link").ToList();
         if (availableAbilities.Count == 0) return false;
 
         // Filter out abilities the player has disabled for this companion
@@ -22538,6 +22701,7 @@ public partial class CombatEngine
                         actualDmg = MitigateCompanionAbilityHit(monster, companion, actualDmg, result);
                         // 1.3.6: the companion's own magic resistance, last; never on an Old God's attack
                         if (abilityResult.IsMagical && monster.FamilyName != "OldGod") actualDmg = ApplyMagicResist(companion, actualDmg);
+                        actualDmg = ShareLinkedHit(companion, actualDmg, result, MonsterAbilityEventKind(abilityType));   // 1.3.6 G11: Empathic Link
                         RecordAllyHit(companion, actualDmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - actualDmg);
                         EvHurt(companion, actualDmg, MonsterAbilityEventKind(abilityType));   // 1.2.6
@@ -22566,6 +22730,7 @@ public partial class CombatEngine
                             terminal.SetColor("dark_gray");
                             terminal.WriteLine(Loc.Get("combat.damage_vs_defense", rawAbilityDmg, abilityDefense));
                         }
+                        dmg = ShareLinkedHit(companion, dmg, result, MonsterAbilityEventKind(abilityType));   // 1.3.6 G11: Empathic Link, ahead of the last steps the order tests pin; they apply to the ally's half
                         dmg = MitigateCompanionAbilityHit(monster, companion, dmg, result);
                         if (abilityResult.IsMagical && monster.FamilyName != "OldGod") dmg = ApplyMagicResist(companion, dmg);   // 1.3.6, last
                         RecordAllyHit(companion, dmg); // v1.1.3
@@ -22826,6 +22991,7 @@ public partial class CombatEngine
         actualDamage = Math.Max(Math.Min(actualDamage, companionFloor), TeamHQBonus.ApplyDefense(companion, actualDamage));
 
         // Apply damage to companion
+        actualDamage = ShareLinkedHit(companion, actualDamage, result, CombatEventKind.Basic);   // 1.3.6 G11: Empathic Link
         RecordAllyHit(companion, actualDamage); // v1.1.3
         companion.HP = Math.Max(0, companion.HP - actualDamage);
         EvHurt(companion, actualDamage, CombatEventKind.Basic);   // 1.2.6
@@ -28123,6 +28289,7 @@ public partial class CombatEngine
 
         // Temporary attack and defence bonuses: each entry loses a round (1.3.6 G4: the next highest shows when one ends)
         player.TickSlotBonuses();
+        player.TickPrestigeRounds();   // 1.3.6 G11
         TickBloodlust(player);
 
         // Tank ability buffs (v0.56.0 — Shield Wall Formation, Divine Mandate, Rage Challenge)
@@ -28139,6 +28306,7 @@ public partial class CombatEngine
             foreach (var tm in currentTeammates.Where(t => t.IsAlive))
             {
                 tm.TickSlotBonuses();   // 1.3.6 G4
+                tm.TickPrestigeRounds();   // 1.3.6 G11
                 TickBloodlust(tm);
                 // v0.57.7 (Lumina): teammate status-immunity duration wasn't being ticked,
                 // only the player's was. Iron Will's 3-round immunity would persist the whole

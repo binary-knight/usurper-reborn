@@ -500,6 +500,28 @@ public class Character
     internal void ClearPrestigeCombatState()
     {
         FlatRegenAmount = 0; FlatRegenRounds = 0;
+        AreaSwingRounds = 0;
+        EmpathicLinkCaster = null; EmpathicLinkRounds = 0;
+    }
+
+    /// <summary>1.3.6 G11 (rule 2): the Wavecaller whose Empathic Link holds this ally; while EmpathicLinkRounds last,
+    /// half of a monster's hit on this ally goes to the caster (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal Character? EmpathicLinkCaster { get; set; }
+    /// <summary>1.3.6 G11 (rule 2): the rounds left on the link (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int EmpathicLinkRounds { get; set; }
+
+    /// <summary>1.3.6 G11 (rule 6): Apotheosis of Ruin's rounds in which this character's basic swings hit every living
+    /// enemy (combat only, not saved). Counts down at round end with the attack and defence entries.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int AreaSwingRounds { get; set; }
+
+    /// <summary>1.3.6 G11: the round end tick of the prestige singles' rounds, beside TickSlotBonuses.</summary>
+    internal void TickPrestigeRounds()
+    {
+        if (AreaSwingRounds > 0) AreaSwingRounds--;
+        if (EmpathicLinkRounds > 0 && --EmpathicLinkRounds == 0) EmpathicLinkCaster = null;
     }
     public bool DeathsEmbraceActive { get; set; } = false; // Voidreaver: revive on death once (combat-transient)
     public int StatusImmunityDuration { get; set; } = 0;
