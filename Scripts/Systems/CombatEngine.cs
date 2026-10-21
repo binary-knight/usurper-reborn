@@ -14784,10 +14784,23 @@ public partial class CombatEngine
         // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
         ApplyPostHitEnchantments(player, target, damage, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
 
+        ApplyShamanSwingRiders(player, target, damage, isOffHandAttack, result);   // 1.3.6 G10 (CP12): the one helper, shared with the teammate swing
+    }
+
+    /// <summary>
+    /// 1.3.6 G10 (CP12): the Mystic Shaman's weapon enchant rider (Flametongue, Frostbrand, Rockbiter, Stormstrike)
+    /// and the Ancestral Guidance heal for one landed melee swing, from the swinger's own enchant (type, rounds, power)
+    /// and its own Guidance. Called by every live swing path of a party member: the player's (ApplyPlayerSwingOnHitEffects,
+    /// a connected grouped follower included) and the NPC teammate, companion and grouped follower swing in
+    /// ProcessTeammateActionMultiMonster. The dead single monster path (ExecuteSingleAttack) keeps its own copy.
+    /// Callers gate it on the swing landing; damage is the HP the swing removed. Synchronous: no awaits.
+    /// </summary>
+    private void ApplyShamanSwingRiders(Character player, Monster target, long damage, bool isOffHandAttack, CombatResult result)
+    {
         // Mystic Shaman weapon enchantment bonus damage
-        // v0.57.13: same fix as single-monster path at ~line 3299 — scale off raw
+        // v0.57.13: same fix as the single monster path: scale off raw
         // weapon power of the hitting hand, not the final post-multiplier damage,
-        // so "+3% per INT" produces a rider bonus instead of a 30× attack multiplier.
+        // so "+3% per INT" produces a rider bonus instead of a 30x attack multiplier.
         if (player.ShamanEnchantType > 0 && player.ShamanEnchantRounds > 0)
         {
             var shamanWeaponMM = player.GetEquipment(isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
@@ -20745,7 +20758,10 @@ public partial class CombatEngine
                 // (Incorporeal/Phase) must not proc the teammate's lifesteal/enchants either.
                 // 1.3.5: the riders scale from the HP removed.
                 if (tmDealt > 0)
+                {
                     ApplyPostHitEnchantments(teammate, target, tmDealt, result, weaponSlot: isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);   // v1.1.11 Armory inside (0 for NPCs)
+                    ApplyShamanSwingRiders(teammate, target, tmDealt, isOffHandAttack, result);   // 1.3.6 G10 (CP12): its own enchant and Guidance, as on the player's swing
+                }
 
                 // If target died, retarget to next weakest
                 if (!target.IsAlive)
@@ -27885,6 +27901,7 @@ public partial class CombatEngine
         // 1.3.6 G6 (CP11): this runs once a round with the leader alive (from ProcessEndOfRoundAbilityEffects) or
         // fallen (the round end's other branch), so every teammate's and grouped follower's spell cooldowns tick here
         TickTeammateSpellCooldowns(currentTeammates.Where(tm => !ReferenceEquals(tm, leader)));
+        TickTeammateEnchants(currentTeammates.Where(tm => !ReferenceEquals(tm, leader)));   // 1.3.6 G10 (CP12)
         var done = new HashSet<Character>(ReferenceEqualityComparer.Instance);
         foreach (var tm in currentTeammates)
         {
@@ -27927,6 +27944,27 @@ public partial class CombatEngine
         int manaRegen = tm.GetEquipmentManaRegen();
         if (manaRegen > 0 && tm.Mana < tm.MaxMana)
             tm.Mana = Math.Min(tm.MaxMana, tm.Mana + GearRegenAmount(tm.MaxMana, manaRegen));
+    }
+
+    /// <summary>
+    /// 1.3.6 G10 (CP12): every teammate's and grouped follower's Mystic Shaman weapon enchant counts down one round at
+    /// round end, as the leader's does in ProcessEndOfRoundAbilityEffects, and ends at 0, silently like the rest of the
+    /// party step. Before this a follower's enchant never counted down; its rider now fires on the follower's swing, so
+    /// its rounds are its duration. Called once a round from RegeneratePartyAtRoundEnd.
+    /// </summary>
+    internal static void TickTeammateEnchants(IEnumerable<Character>? teammates)
+    {
+        if (teammates == null) return;
+        foreach (var tm in teammates)
+        {
+            if (tm == null || tm.ShamanEnchantRounds <= 0) continue;
+            tm.ShamanEnchantRounds--;
+            if (tm.ShamanEnchantRounds <= 0)
+            {
+                tm.ShamanEnchantType = 0;
+                tm.ShamanEnchantPower = 0;
+            }
+        }
     }
 
     /// <summary>
@@ -28117,7 +28155,9 @@ public partial class CombatEngine
     }
 
     /// <summary>
-    /// Ancestral Guidance: distribute healing to player and all living teammates.
+    /// Ancestral Guidance: distribute healing to the Shaman who dealt the hit and every other living party member.
+    /// 1.3.6 G10 (CP12): the others are PartyReachOthers, so an NPC Shaman's heal reaches the player and is not
+    /// taken twice by the Shaman itself.
     /// </summary>
     private void ApplyAncestralGuidanceHealing(Character player, long totalHeal, CombatResult result)
     {
@@ -28132,18 +28172,15 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.shaman_ancestral_heal", playerHeal), "bright_magenta");
         }
 
-        // Heal teammates
-        if (result?.Teammates != null)
+        // Heal the rest of the party (1.3.6 G10: the player included when an NPC Shaman deals the hit)
+        foreach (var tm in PartyReachOthers(player, result))
         {
-            foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+            long tmHeal = Math.Min(totalHeal, tm.MaxHP - tm.HP);
+            if (tmHeal > 0)
             {
-                long tmHeal = Math.Min(totalHeal, tm.MaxHP - tm.HP);
-                if (tmHeal > 0)
-                {
-                    tm.HP += tmHeal;
-                    EvHeal(player, tm, tmHeal);   // 1.2.6
-                    terminal.WriteLine($"  {Loc.Get("combat.ally_healed_for", tm.DisplayName, tmHeal)}", "bright_magenta");
-                }
+                tm.HP += tmHeal;
+                EvHeal(player, tm, tmHeal);   // 1.2.6
+                terminal.WriteLine($"  {Loc.Get("combat.ally_healed_for", tm.DisplayName, tmHeal)}", "bright_magenta");
             }
         }
     }
