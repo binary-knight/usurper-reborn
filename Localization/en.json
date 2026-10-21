@@ -23338,6 +23338,7 @@
   "class.mystic_shaman_desc": "A tribal melee-caster who summons totems and enchants weapons with elemental power. Available to Trolls, Orcs, and Gnolls.",
   "combat.abyssal_siphon": "Abyssal Siphon drains {0} HP!",
   "combat.bloodlust_trigger": "Bloodlust! You heal {0} HP from the kill!",
+  "combat.bloodlust_trigger_npc": "Bloodlust! {0} heals {1} HP from the kill!",
   "combat.chrono_surge_cooldown": "Chrono Surge! Cooldown reduced by {0} rounds!",
   "combat.cleric_beacon_self": "Beacon of Faith heals you for {0} HP! (+{1} DEF for {2} rounds)",
   "combat.cleric_beacon_other": "{0} casts Beacon of Faith! Heals {1} HP! (+{2} DEF for {3} rounds)",

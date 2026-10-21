@@ -22802,6 +22802,7 @@
   "class.mystic_shaman_desc": "Un lanzador cuerpo a cuerpo tribal que convoca tótems y encanta armas con poder elemental. Disponible para Trolls, Orcos y Gnolls.",
   "combat.abyssal_siphon": "¡El Sifón Abisal drena {0} PV!",
   "combat.bloodlust_trigger": "¡Sed de sangre! ¡Recuperas {0} PV por la muerte!",
+  "combat.bloodlust_trigger_npc": "¡Sed de sangre! ¡{0} recupera {1} PV por la muerte!",
   "combat.chrono_surge_cooldown": "¡Oleada Cronológica! ¡Tiempo de recarga reducido {0} rondas!",
   "combat.cleric_beacon_self": "¡Faro de Fe te sana {0} PV! (+{1} DEF por {2} rondas)",
   "combat.cleric_beacon_other": "¡{0} lanza Faro de Fe! ¡Sana {1} PV! (+{2} DEF por {3} rondas)",

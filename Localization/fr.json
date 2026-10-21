@@ -22791,6 +22791,7 @@
   "class.mystic_shaman_desc": "Un guerrier-mage tribal qui invoque des totems et enchante ses armes de puissance élémentaire. Disponible pour les Trolls, les Orcs et les Gnolls.",
   "combat.abyssal_siphon": "Siphon Abyssal draine {0} PV !",
   "combat.bloodlust_trigger": "Soif de sang ! Vous récupérez {0} PV grâce au meurtre !",
+  "combat.bloodlust_trigger_npc": "Soif de sang ! {0} récupère {1} PV grâce au meurtre !",
   "combat.chrono_surge_cooldown": "Chrono Surge ! Temps de recharge réduit de {0} tours !",
   "combat.cleric_beacon_self": "Phare de Foi vous soigne de {0} PV ! (+{1} DEF pendant {2} tours)",
   "combat.cleric_beacon_other": "{0} lance Phare de Foi ! Soigne {1} PV ! (+{2} DEF pendant {3} tours)",

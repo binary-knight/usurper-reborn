@@ -22791,6 +22791,7 @@
   "class.mystic_shaman_desc": "Un caster-melee tribale che evoca totem e incanta armi con potere elementale. Disponibile per Troll, Orchi e Gnoll.",
   "combat.abyssal_siphon": "Il Sifone Abissale drena {0} PV!",
   "combat.bloodlust_trigger": "Sete di Sangue! Recuperi {0} PV dall'uccisione!",
+  "combat.bloodlust_trigger_npc": "Sete di Sangue! {0} recupera {1} PV dall'uccisione!",
   "combat.chrono_surge_cooldown": "Ondata Cronica! Tempo di recupero ridotto di {0} turni!",
   "combat.cleric_beacon_self": "Il Faro della Fede ti cura per {0} PV! (+{1} DIF per {2} turni)",
   "combat.cleric_beacon_other": "{0} lancia Faro della Fede! Cura {1} PV! (+{2} DIF per {3} turni)",

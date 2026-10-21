@@ -60,6 +60,8 @@ An ally that is about to die drinks its own potion before helping anyone. An all
 
 When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a member who is poisoned or diseased: you first, then the member with the lowest share of HP.
 
+An ally's party ability, such as a Bard's song, a Cleric's party prayer, an Alchemist's brew, a Wavecaller's or Tidesworn's party ability or a Shaman's totem, reaches you and every other living member once at the share it gives teammates, and the ally once at its own share. An ally's healing ability, such as Lay on Hands, heals the member with the lowest share of HP, you included, when that share is below the ally's own. An ally's Earthbind Totem slows the monsters' attacks as yours does, and an ally holding Bloodlust heals on its own kills. An ally casts Turn Undead only on an undead or demon foe and never uses Disappearing Act.
+
 ## Potions and rest for allies
 
 A rest at Home, a night at the Inn and the daily reset refill the potions of your active companions and of every NPC on your team or in your dungeon party, and the rest at Home and the night at the Inn also heal all of them to full. An NPC ally that casts spells is filled to 2 healing potions plus half its level, any other to 5 plus half its level, never above 5 plus its level; a caster also gets 3 mana potions plus a third of its level, never above 3 plus half its level. A refill never lowers what an NPC ally already carries. Companion potions are on [companions and beasts](/wiki/en/combat/companions/#companion-potions-and-rest).

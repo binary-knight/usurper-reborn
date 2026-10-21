@@ -142,12 +142,13 @@ public class OneApply136Tests
     }
 
     [Fact]
-    public void OneApply136_NpcCasterInTheTeammateList_StillTakesItsShare_TheG5Part()
+    public void OneApply136_NpcCasterInTheTeammateList_TakesItsOwnShareOnce_TheG5Part()
     {
-        // When the NPC caster is itself in result.Teammates (as in a real party), the handler also gives it a teammate's
-        // 75 percent share. That share and the list are G5's (CP1); G3 removes only the generic block's second heal.
+        // When the NPC caster is itself in result.Teammates (as in a real party), G5 (CP1) gives it its own share once and
+        // no teammate's 75 percent share on top; G3 removed the generic block's second heal.
         var c = Run("healing_mist", CharacterClass.Alchemist, npc: true, mates: 1, casterInTeammates: true);
-        c.Healed.Should().Be(c.Result.Healing + (long)(c.Result.Healing * 0.75));
+        c.Healed.Should().Be(c.Result.Healing);
+        c.MateHealed.Should().AllBeEquivalentTo((long)(c.Result.Healing * 0.75), "the teammate's share is unchanged");
     }
 
     // attack and defence bonuses: once per cast
