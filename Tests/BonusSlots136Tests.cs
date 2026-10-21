@@ -412,4 +412,199 @@ public class BonusSlots136Tests
         hero.TickSlotBonuses();
         hero.TempDefenseBonus.Should().Be(300, "the one round penalty ended; the held bonus is whole again");
     }
+
+    // ---------------------------------------------------------------- the value rows (rule 5)
+
+    private static Monster Frail(string name = "Rat") => new Monster
+    {
+        Name = name, TierName = name, Level = 1, HP = 1, MaxHP = 1, Strength = 1, Defence = 0, Experience = 1, Gold = 0, IsActive = true,
+    };
+
+    private static G.Rig RigFor(Character hero, List<Character>? team = null, params Monster[] foes) =>
+        G.NewRig(hero, new G.RecordingRandom(136), team ?? new List<Character>(), foes.Length > 0 ? foes : new[] { G.Dummy() });
+
+    private static T NoHitRoll<T>(Func<T> body)
+    {
+        bool saved = GameConfig.PlayerHitRollEnabled;
+        try { GameConfig.PlayerHitRollEnabled = false; return body(); }
+        finally { GameConfig.PlayerHitRollEnabled = saved; }
+    }
+
+    [Fact]
+    public void BonusSlots136_TimeStop_ReachesTheNextSwing()
+    {
+        var mage = Caster(CharacterClass.Magician, 18, level: 100);
+        var rig = RigFor(mage);
+        var r = CastOk(mage, 18);
+        r.Duration.Should().Be(2);
+        ApplySpell(rig, mage, r);
+        mage.TempAttackBonus.Should().Be(r.AttackBonus);
+        EndRound(rig);
+        mage.TempAttackBonus.Should().Be(r.AttackBonus, "Time Stop's bonus is there for the next round's swing");
+    }
+
+    [Theory]
+    [InlineData("temporal_feint", CharacterClass.Cyclebreaker)]
+    [InlineData("umbral_step", CharacterClass.Abysswarden)]
+    public void BonusSlots136_FeintAndUmbralStep_HoldNo999_AndStillHitForSure(string id, CharacterClass cls)
+    {
+        var hero = Fresh(); hero.Class = cls;
+        hero.AddSlotBonus(Atk, "battle_cry", 40, 3);
+        var rig = RigFor(hero);
+        NoHitRoll(() => { Apply(rig, hero, id); return 0; });
+        hero.TempAttackBonus.Should().Be(40, $"{id} adds no +999; the held bonus shows");
+        hero.AttackBonusEntries.Should().NotContain(e => e.Value >= 999, id);
+        hero.HasStatus(StatusEffect.Hidden).Should().BeTrue($"{id}: Hidden gives the sure hit and the crit");
+        EndRound(rig);
+        hero.TempAttackBonus.Should().Be(40, $"{id}: its round end no longer zeroes the held bonus");
+    }
+
+    [Fact]
+    public void BonusSlots136_ConsumeSoul_GrowsBy5AKill_AndSurvivesALargerTimedBonus()
+    {
+        var hero = Fresh(); hero.Class = CharacterClass.Abysswarden; hero.Level = 100;
+        hero.CurrentCombatStamina = 10_000;
+        var rig = RigFor(hero, null, Frail("Rat1"), Frail("Rat2"));
+        NoHitRoll(() =>
+        {
+            foreach (var foe in rig.Monsters.ToList())
+            {
+                var r = ClassAbilitySystem.UseAbility(hero, "consume_soul", new Random(136));
+                ((Task)typeof(CombatEngine).GetMethod("ApplyAbilityEffectsMultiMonster", F)!
+                    .Invoke(rig.Engine, new object?[] { hero, foe, rig.Monsters, r, rig.Result })!).GetAwaiter().GetResult();
+            }
+            return 0;
+        });
+        rig.Monsters.Should().OnlyContain(m => m.HP <= 0);
+        hero.SlotBonusValue(Atk, "consume_soul").Should().Be(10, "+5 for each of the two kills");
+        hero.AddSlotBonus(Atk, "battle_cry", 200, 1);
+        hero.TempAttackBonus.Should().Be(200);
+        hero.TickSlotBonuses();
+        hero.TempAttackBonus.Should().Be(10, "the larger timed bonus ended; Consume Soul's whole fight entry shows again");
+    }
+
+    [Fact]
+    public void BonusSlots136_Wish_SurvivesATimedBonusEnding()
+    {
+        var mage = Caster(CharacterClass.Magician, 25, level: 100);
+        mage.Strength = 300; mage.Defence = 120;
+        var rig = RigFor(mage);
+        var r = CastOk(mage, 25);
+        r.SpecialEffect.Should().Be("wish");
+        ApplySpell(rig, mage, r);
+        mage.TempAttackBonus.Should().Be(300);
+        mage.TempAttackBonusDuration.Should().Be(999, "one whole fight entry");
+        mage.TempDefenseBonus.Should().Be(120);
+        mage.AddSlotBonus(Atk, "battle_cry", 500, 1);
+        EndRound(rig);
+        mage.TempAttackBonus.Should().Be(300, "a timed bonus ending leaves Wish's entry");
+        mage.TempDefenseBonus.Should().Be(120);
+    }
+
+    [Fact]
+    public void BonusSlots136_Haste_TwoDoubledTurns_AndItsBonusLastsThem()
+    {
+        var mage = Caster(CharacterClass.Magician, 7);
+        var rig = RigFor(mage);
+        var r = CastOk(mage, 7);
+        r.Duration.Should().Be(3);
+        ApplySpell(rig, mage, r);          // round 1: the cast is the turn
+        EndRound(rig);
+        int doubled = 0;
+        for (int round = 2; round <= 5; round++)
+        {
+            mage.ProcessStatusEffects();   // the round's start
+            bool hasted = mage.HasStatus(StatusEffect.Haste);
+            if (hasted) doubled++;
+            (mage.TempAttackBonus > 0).Should().Be(hasted, $"round {round}: the bonus lasts exactly the hasted turns");
+            EndRound(rig);
+        }
+        doubled.Should().Be(2, "two doubled turns");
+        mage.TempAttackBonus.Should().Be(0);
+    }
+
+    [Fact]
+    public void BonusSlots136_AvatarOfDestruction_HitGrowsWithStrength_NotCharisma()
+    {
+        int Hit(long str, long cha)
+        {
+            var b = G.Hero(hp: 100_000, strength: str, level: 90, cls: CharacterClass.Barbarian);
+            b.Charisma = cha; b.BaseCharisma = cha;
+            var r = ClassAbilitySystem.UseAbility(b, "avatar_of_destruction", new Random(11));
+            r.Success.Should().BeTrue();
+            return r.Damage;
+        }
+        Hit(150, 10).Should().BeGreaterThan(Hit(50, 10), "more Strength, a bigger hit");
+        Hit(50, 150).Should().Be(Hit(50, 10), "Charisma does not change the hit");
+    }
+
+    [Fact]
+    public void BonusSlots136_BerserkerRage_FromTheAbility_EndsAfterItsRounds()
+    {
+        var hero = Fresh(); hero.Class = CharacterClass.Barbarian;
+        var rig = RigFor(hero);
+        NoHitRoll(() => { Apply(rig, hero, "rage"); return 0; });
+        hero.IsRaging.Should().BeTrue();
+        hero.HasStatus(StatusEffect.Raging).Should().BeTrue("the Raging status, as the [G] key gives");
+        hero.TempDefenseBonus.Should().BeLessThan(0);
+        for (int i = 0; i < 5; i++) { hero.ProcessStatusEffects(); EndRound(rig); }
+        hero.IsRaging.Should().BeFalse("the rage ends with its 5 rounds");
+        hero.TempDefenseBonus.Should().Be(0, "and so does its penalty");
+    }
+
+    [Fact]
+    public void BonusSlots136_Bloodlust_EndsAfter5Rounds()
+    {
+        var hero = Fresh(); hero.Class = CharacterClass.Barbarian;
+        var rig = RigFor(hero);
+        NoHitRoll(() => { Apply(rig, hero, "bloodlust"); return 0; });
+        hero.HasBloodlust.Should().BeTrue();
+        for (int i = 0; i < 4; i++) EndRound(rig);
+        hero.HasBloodlust.Should().BeTrue("4 rounds in");
+        EndRound(rig);
+        hero.HasBloodlust.Should().BeFalse("the template's 5 rounds, not the whole fight");
+    }
+
+    [Fact]
+    public void BonusSlots136_Bloodlust_HealsOnItsHoldersOwnAbilityKill()
+    {
+        var hero = Fresh(); hero.Class = CharacterClass.Barbarian; hero.MaxHP = 100_000; hero.HP = 1000;
+        hero.CurrentCombatStamina = 10_000;
+        var rig = RigFor(hero, null, Frail());
+        NoHitRoll(() => { Apply(rig, hero, "bloodlust"); return 0; });
+        long before = hero.HP;
+        NoHitRoll(() => { Apply(rig, hero, "reckless_attack"); return 0; });
+        rig.Monsters[0].HP.Should().BeLessOrEqualTo(0);
+        hero.HP.Should().Be(before + hero.Level * 2 + 20, "a single target ability kill heals the holder");
+    }
+
+    [Fact]
+    public void BonusSlots136_Bloodlust_DoesNotHealOnATeammatesSwing()
+    {
+        var hero = Fresh(); hero.Class = CharacterClass.Barbarian; hero.MaxHP = 100_000; hero.HP = 1000;
+        var mate = G.Mate("Ally");
+        var rig = RigFor(hero, new List<Character> { mate }, Frail());
+        NoHitRoll(() => { Apply(rig, hero, "bloodlust"); return 0; });
+        long before = hero.HP;
+        ((Task<bool>)typeof(CombatEngine).GetMethod("ApplySingleMonsterDamage", F)!
+            .Invoke(rig.Engine, new object?[] { rig.Monsters[0], 50L, rig.Result, "attack", mate, false })!).GetAwaiter().GetResult();
+        rig.Monsters[0].HP.Should().BeLessOrEqualTo(0, "the teammate's swing kills");
+        hero.HP.Should().Be(before, "a teammate's kill does not heal the holder");
+        var own = Frail("Rat2"); rig.Monsters.Add(own);
+        ((Task<bool>)typeof(CombatEngine).GetMethod("ApplySingleMonsterDamage", F)!
+            .Invoke(rig.Engine, new object?[] { own, 50L, rig.Result, "attack", hero, false })!).GetAwaiter().GetResult();
+        hero.HP.Should().Be(before + hero.Level * 2 + 20, "the holder's own swing heals");
+    }
+
+    [Fact]
+    public void BonusSlots136_TheChangedRows_Fit79Columns()
+    {
+        foreach (var lang in new[] { "en", "hu" })
+            using (Loc.RenderLanguage(lang))
+                foreach (var row in new[]
+                {
+                    Loc.Get("spell.magician.7.desc"), Loc.Get("spell.magician.18.desc"),
+                })
+                    row.Length.Should().BeLessOrEqualTo(79, $"{lang}: {row}");
+    }
 }

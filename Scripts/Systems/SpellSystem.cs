@@ -162,7 +162,7 @@ public static class SpellSystem
             [4] = new SpellInfo(4, "Sleep", "Lull the target into magical slumber. Effect: target cannot act. Duration: varies.", 12, 4, "Exdamarie", false, "Debuff"),
             [5] = new SpellInfo(5, "Frost Touch", "Chill your enemy to the bone. Damage: 40-58. Duration: 1 turn.", 14, 5, "Frostarie", false, "Attack"),
             [6] = new SpellInfo(6, "Web", "Conjure sticky strands to trap your foe. Effect: cannot move. Duration: varies.", 22, 6, "Exmasesamamarie", false, "Debuff"),
-            [7] = new SpellInfo(7, "Haste", "Accelerate time around yourself. Extra attacks per round. Duration: whole fight.", 25, 7, "Quicksilvarie", false, "Buff"),
+            [7] = new SpellInfo(7, "Haste", "Accelerate time around yourself. Two doubled turns; a recast refreshes them.", 25, 7, "Quicksilvarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Journeyman Sorcery ---
             [8] = new SpellInfo(8, "Power Hat", "Regenerate health and bolster defenses. Effect: 50-75 hp + protection. Duration: whole fight.", 30, 8, "Excadammarie", false, "Heal"),
@@ -177,7 +177,7 @@ public static class SpellSystem
             [15] = new SpellInfo(15, "Chain Lightning", "Lightning arcs between multiple foes. Damage: 80-105 to all. Duration: 1 turn.", 75, 15, "Chainlightarie", true, "Attack"),
             [16] = new SpellInfo(16, "Disintegrate", "Unravel the target's physical form. Damage: 110-150. Duration: 1 turn.", 85, 16, "Disintegrarie", false, "Attack"),
             [17] = new SpellInfo(17, "Pillar of Fire", "A column of flame that penetrates all armor. Damage: 120-160. Duration: 1 turn.", 95, 17, "Exdammasumarie", false, "Attack"),
-            [18] = new SpellInfo(18, "Time Stop", "Briefly halt time itself. Extra turn + protection. Duration: 1 round.", 110, 18, "Timestoparie", false, "Buff"),
+            [18] = new SpellInfo(18, "Time Stop", "Briefly halt time itself. Extra turn + protection. Duration: 2 rounds.", 110, 18, "Timestoparie", false, "Buff"),
             [19] = new SpellInfo(19, "Meteor Swarm", "Call down flaming rocks from the sky. Damage: 130-180 to all. Duration: 1 turn.", 125, 19, "Meteorarie", true, "Attack"),
             [20] = new SpellInfo(20, "Arcane Immunity", "Become immune to lesser magics. Protection: +65. Duration: whole fight.", 140, 20, "Immunemagarie", false, "Buff"),
 
@@ -1199,7 +1199,7 @@ public static class SpellSystem
             case 7: // Haste - Attack bonus
                 int baseAttack7 = (int)((18 + (caster.Level / 5)) * profMult);
                 result.AttackBonus = baseAttack7;
-                result.Duration = 999;
+                result.Duration = 3;   // 1.3.6 G4 (Q12): the bonus lasts the Haste status's 2 doubled turns
                 result.SpecialEffect = "haste";
                 result.Message += $" {Loc.Get("combat.spell_haste_cast", caster.Name2, result.AttackBonus)}";
                 break;
@@ -1279,7 +1279,7 @@ public static class SpellSystem
                 int baseBonus18 = (int)((35 + (caster.Level / 3)) * profMult);
                 result.AttackBonus = baseBonus18;
                 result.ProtectionBonus = ScaleProtectionEffect(35 + (caster.Level / 3), caster, profMult);
-                result.Duration = 1;
+                result.Duration = 2;   // 1.3.6 G4: 1 ended at the round end it was cast in, before any swing
                 result.SpecialEffect = "timestop";
                 result.Message += $" {Loc.Get("combat.spell_time_stop_cast", result.AttackBonus, result.ProtectionBonus)}";
                 break;

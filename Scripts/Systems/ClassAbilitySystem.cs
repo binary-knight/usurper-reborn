@@ -2745,7 +2745,12 @@ public static class ClassAbilitySystem
             // BALANCE: Add weapon power contribution to ability damage
             // This ensures abilities scale with gear and always beat basic attacks
             double weaponBonus = user.AbilityWeapPow * 0.25; // 25% of weapon power added (1.2.8: dual-wield reads main hand plus half the off hand)
-            double scaledDamage = (ability.BaseDamage + weaponBonus) * totalScale;
+            // 1.3.6 G4 (Q11): a Buff ability's own hit (Avatar of Destruction's activation) grows with Strength, not
+            // with the Charisma its bonus uses
+            double damageScale = ability.Type == AbilityType.Buff
+                ? levelScale * Math.Min(4.5, 1.0 + Math.Max(0, (user.Strength - 10) * 0.04))
+                : totalScale;
+            double scaledDamage = (ability.BaseDamage + weaponBonus) * damageScale;
 
             // v0.57.0 shield-scaling damage — Shield Bash / Holy Shield Slam use the equipped shield's
             // BlockChance and half the armor power, so investment in a higher-tier shield directly

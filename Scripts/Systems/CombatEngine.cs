@@ -780,6 +780,7 @@ public partial class CombatEngine
         attacker.MagicACBonus = 0;
         attacker.DodgeNextAttack = false;
         attacker.HasBloodlust = false;
+        _bloodlustRounds.Clear();   // 1.3.6 G4
         attacker.HasStatusImmunity = false;
         attacker.StatusImmunityDuration = 0;
         attacker.DeathsEmbraceActive = false;
@@ -1161,6 +1162,7 @@ public partial class CombatEngine
         player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
+        _bloodlustRounds.Clear();   // 1.3.6 G4
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.TempCritChanceBonus = 0;
@@ -2358,6 +2360,7 @@ public partial class CombatEngine
         player.HasOceanMemory = false; // v1.1.15: it never ended before
         player.DodgeNextAttack = false;
         player.HasBloodlust = false;
+        _bloodlustRounds.Clear();   // 1.3.6 G4
         player.HasStatusImmunity = false;
         player.StatusImmunityDuration = 0;
         player.DeathsEmbraceActive = false;
@@ -9086,6 +9089,39 @@ public partial class CombatEngine
     internal static CasterPart HandlerAppliesToCaster(string? effect) =>
         !string.IsNullOrEmpty(effect) && HandlerCasterParts.TryGetValue(effect, out var parts) ? parts : CasterPart.None;
 
+    /// <summary>1.3.6 G4 (A F2): the round ends left on each holder's Bloodlust from the ability (not from an Old God's
+    /// answer, which lasts the fight).</summary>
+    private readonly Dictionary<Character, int> _bloodlustRounds = new();
+
+    private void StartBloodlust(Character holder, ClassAbilityResult abilityResult)
+    {
+        holder.HasBloodlust = true;
+        int rounds = abilityResult.Duration > 0 && abilityResult.Duration < 999 ? abilityResult.Duration : 5;
+        _bloodlustRounds[holder] = Math.Max(rounds, _bloodlustRounds.TryGetValue(holder, out int held) ? held : 0);
+    }
+
+    /// <summary>1.3.6 G4 (A F2): the round end tick of the ability's Bloodlust; it ends with its last round.</summary>
+    private void TickBloodlust(Character holder)
+    {
+        if (!_bloodlustRounds.TryGetValue(holder, out int left)) return;
+        if (--left > 0) { _bloodlustRounds[holder] = left; return; }
+        _bloodlustRounds.Remove(holder);
+        holder.HasBloodlust = false;
+    }
+
+    /// <summary>1.3.6 G4 (A F2): the Bloodlust kill heal for the fight's player, on their own kill only (attacker null is
+    /// their own spell or area hit), never on a teammate's.</summary>
+    private void BloodlustKillHeal(CombatResult result, Character? attacker, string key)
+    {
+        var holder = result.Player;
+        if (holder == null || !holder.HasBloodlust || (attacker != null && attacker != holder)) return;
+        long heal = Math.Min(holder.Level * 2 + 20, holder.MaxHP - holder.HP);
+        if (heal <= 0) return;
+        holder.HP += heal;
+        terminal.SetColor("bright_red");
+        terminal.WriteLine(Loc.Get(key, heal));
+    }
+
     /// <summary>1.3.6 G4: the source name an ability's attack or defence entry is held under (its id).</summary>
     internal static string SlotSource(ClassAbilityResult? abilityResult) =>
         abilityResult?.AbilityUsed?.Id ?? (string.IsNullOrEmpty(abilityResult?.SpecialEffect) ? "ability" : abilityResult!.SpecialEffect);
@@ -14188,8 +14224,8 @@ public partial class CombatEngine
                 terminal.WriteLine($"  {Loc.Get("combat.you_kill", MonsterNames.Display(monster))}");
                 result.DefeatedMonsters.Add(monster);
 
-                // Bloodlust heal-on-kill
-                if (result.Player != null && result.Player.HasBloodlust)
+                // Bloodlust heal-on-kill (1.3.6 G4, A F2: on the holder's own kill, not a teammate's)
+                if (result.Player != null && result.Player.HasBloodlust && (attacker == null || attacker == result.Player))
                 {
                     long bloodlustHeal = Math.Min(result.Player.Level * 2 + 20, result.Player.MaxHP - result.Player.HP);
                     if (bloodlustHeal > 0)
@@ -14439,8 +14475,8 @@ public partial class CombatEngine
 
             result.DefeatedMonsters.Add(target);
 
-            // Bloodlust heal-on-kill
-            if (result.Player != null && result.Player.HasBloodlust)
+            // Bloodlust heal-on-kill (1.3.6 G4, A F2: on the holder's own kill, not a teammate's)
+            if (result.Player != null && result.Player.HasBloodlust && (attacker == null || attacker == result.Player))
             {
                 long bloodlustHeal = Math.Min(result.Player.Level * 2 + 20, result.Player.MaxHP - result.Player.HP);
                 if (bloodlustHeal > 0)
@@ -16521,6 +16557,7 @@ public partial class CombatEngine
                     terminal.SetColor("bright_green");
                     terminal.WriteLine(Loc.Get("combat.ability_target_slain", MonsterNames.Display(target)));
                     result.DefeatedMonsters.Add(target);
+                    BloodlustKillHeal(result, player, "combat.bloodlust_trigger");   // 1.3.6 G4 (A F2): an ability kill heals too
                 }
             }
         }
@@ -16839,6 +16876,8 @@ public partial class CombatEngine
 
             case "rage":
                 player.IsRaging = true;
+                // 1.3.6 G4 (A F1): the Raging status for the ability's rounds, as the [G] key gives, so the rage ends
+                player.ApplyStatus(StatusEffect.Raging, abilityResult.Duration > 0 ? abilityResult.Duration : 5);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_berserker_rage" : "combat.ability_berserker_rage_npc", actorName));
                 break;
@@ -17298,7 +17337,7 @@ public partial class CombatEngine
                 break;
 
             case "bloodlust":
-                player.HasBloodlust = true;
+                StartBloodlust(player, abilityResult);   // 1.3.6 G4 (A F2): for the template's rounds
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_bloodlust" : "combat.ability_bloodlust_npc", actorName));
                 break;
@@ -18027,7 +18066,6 @@ public partial class CombatEngine
             case "temporal_feint":
                 // Auto-hit/crit next attack, dodge this round
                 player.DodgeNextAttack = true;
-                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1); // Guarantee hit
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2; // Crit bonus from stealth
@@ -18247,7 +18285,6 @@ public partial class CombatEngine
             case "umbral_step":
                 // Guaranteed crit + evade all attacks
                 player.DodgeNextAttack = true;
-                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -25865,6 +25902,7 @@ public partial class CombatEngine
 
             case "rage":
                 player.IsRaging = true;
+                player.ApplyStatus(StatusEffect.Raging, abilityResult.Duration > 0 ? abilityResult.Duration : 5);   // 1.3.6 G4 (A F1)
                 terminal.WriteLine(Loc.Get("combat.berserker_rage_fury"), "bright_red");
                 break;
 
@@ -26205,7 +26243,7 @@ public partial class CombatEngine
                 break;
 
             case "bloodlust":
-                player.HasBloodlust = true;
+                StartBloodlust(player, abilityResult);   // 1.3.6 G4 (A F2)
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.bloodlust_heal"));
                 break;
@@ -26860,7 +26898,6 @@ public partial class CombatEngine
             case "temporal_feint":
                 // Auto-hit/crit next attack, dodge this round
                 player.DodgeNextAttack = true;
-                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -27054,7 +27091,6 @@ public partial class CombatEngine
             case "umbral_step":
                 // Guaranteed crit + evade all attacks
                 player.DodgeNextAttack = true;
-                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -27689,6 +27725,7 @@ public partial class CombatEngine
 
         // Temporary attack and defence bonuses: each entry loses a round (1.3.6 G4: the next highest shows when one ends)
         player.TickSlotBonuses();
+        TickBloodlust(player);
 
         // Tank ability buffs (v0.56.0 — Shield Wall Formation, Divine Mandate, Rage Challenge)
         ProcessTankBuff(player);
@@ -27704,6 +27741,7 @@ public partial class CombatEngine
             foreach (var tm in currentTeammates.Where(t => t.IsAlive))
             {
                 tm.TickSlotBonuses();   // 1.3.6 G4
+                TickBloodlust(tm);
                 // v0.57.7 (Lumina): teammate status-immunity duration wasn't being ticked,
                 // only the player's was. Iron Will's 3-round immunity would persist the whole
                 // fight on NPC teammates. Mirror the player-side tick below.
@@ -29657,8 +29695,8 @@ public partial class CombatEngine
 
             case "wish":
                 // Wish: double all combat stats
-                caster.AddSlotBonus(BonusSlot.Attack, "spell_wish", (int)caster.Strength, 0);   // 1.3.6 G4: Wish's own entries
-                caster.AddSlotBonus(BonusSlot.Defense, "spell_wish", (int)caster.Defense, 0);
+                caster.AddSlotBonus(BonusSlot.Attack, "spell_wish", (int)caster.Strength, 999);   // 1.3.6 G4: one whole fight entry per slot
+                caster.AddSlotBonus(BonusSlot.Defense, "spell_wish", (int)caster.Defense, 999);
                 terminal.WriteLine(Loc.Get("combat.wish_reshapes_reality", caster.DisplayName), "bright_magenta");
                 break;
 
@@ -29861,8 +29899,8 @@ public partial class CombatEngine
                 break;
 
             case "wish":
-                caster.AddSlotBonus(BonusSlot.Attack, "spell_wish", (int)caster.Strength, 0);   // 1.3.6 G4: Wish's own entries
-                caster.AddSlotBonus(BonusSlot.Defense, "spell_wish", (int)caster.Defense, 0);
+                caster.AddSlotBonus(BonusSlot.Attack, "spell_wish", (int)caster.Strength, 999);   // 1.3.6 G4: one whole fight entry per slot
+                caster.AddSlotBonus(BonusSlot.Defense, "spell_wish", (int)caster.Defense, 999);
                 terminal.WriteLine(Loc.Get("combat.wish_reshapes_reality", caster.DisplayName), "bright_magenta");
                 break;
 
