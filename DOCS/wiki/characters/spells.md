@@ -60,7 +60,7 @@ Drugs, herbs, food and god boons can add to these results. A healer [specializat
 
 ## Casting on an ally
 
-A single-target heal or buff spell can be aimed at an ally and lands on that ally. A spell that cures, Purify or Purifying Surge, also removes the ally's Poisoned and Diseased statuses and trap poison. Cycle Rewind and Blood Pact act only on the caster: no ally can be chosen for them, and the cast always lands on the one who casts it. Summon Angel and Summon Demon are cast on yourself too: no monster or ally is asked for, the attack bonus lasts the whole fight, and each makes you dodge the next attack.
+A single-target heal or buff spell can be aimed at an ally and lands on that ally. A spell that cures, Purify or Purifying Surge, also removes the ally's Poisoned and Diseased statuses and trap poison. Cycle Rewind and Blood Pact act only on the caster: no ally can be chosen for them, and the cast always lands on the one who casts it. Summon Angel and Summon Demon are cast on yourself too: no target is asked for, the attack bonus lasts the whole fight, and each makes you dodge the next attack.
 
 Deluge of Sanctity and Unmaking each have a cooldown in a fight. It counts down once a round for every party member who cast one, a grouped player or an NPC ally as well as you.
 
