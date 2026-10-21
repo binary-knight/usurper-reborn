@@ -14797,6 +14797,8 @@ public partial class CombatEngine
     /// </summary>
     private void ApplyShamanSwingRiders(Character player, Monster target, long damage, bool isOffHandAttack, CombatResult result)
     {
+        long enchantDamage = 0;   // 1.3.6 G10 (Q18): the enchant's extra, 0 without an enchant
+
         // Mystic Shaman weapon enchantment bonus damage
         // v0.57.13: same fix as the single monster path: scale off raw
         // weapon power of the hitting hand, not the final post-multiplier damage,
@@ -14805,7 +14807,7 @@ public partial class CombatEngine
         {
             var shamanWeaponMM = player.GetEquipment(isOffHandAttack ? EquipmentSlot.OffHand : EquipmentSlot.MainHand);
             long shamanWeapPowMM = shamanWeaponMM?.WeaponPower ?? 0;
-            long enchantDamage = (long)(shamanWeapPowMM * player.ShamanEnchantPower / 100.0);
+            enchantDamage = (long)(shamanWeapPowMM * player.ShamanEnchantPower / 100.0);
             enchantDamage = Math.Max(1, enchantDamage);
             enchantDamage = TeamHQBonus.ApplyAttack(player, enchantDamage);   // v1.1.11: from weapon power, not the hit, so it takes the Armory itself
             target.HP -= (int)enchantDamage;
@@ -14848,13 +14850,6 @@ public partial class CombatEngine
                 }
             }
 
-            // Ancestral Guidance: 25% of damage dealt heals the party
-            if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0)
-            {
-                long ancestralHeal = (long)(enchantDamage * player.ActiveTotemPower / 100.0);
-                ApplyAncestralGuidanceHealing(player, ancestralHeal, result);
-            }
-
             if (target.HP <= 0)
             {
                 target.HP = 0;
@@ -14863,10 +14858,11 @@ public partial class CombatEngine
             }
         }
 
-        // Ancestral Guidance: 25% of base damage dealt heals the party
-        if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0 && player.ShamanEnchantType == 0 && damage > 0)
+        // Ancestral Guidance: 25% of the whole hit dealt heals the party. 1.3.6 G10 (Q18): the swing's HP removed plus
+        // the enchant's extra; it was the enchant's extra alone while an enchant was up
+        if (player.ActiveTotemType == 6 && player.ActiveTotemRounds > 0 && damage + enchantDamage > 0)
         {
-            long ancestralHeal = (long)(damage * player.ActiveTotemPower / 100.0);
+            long ancestralHeal = (long)((damage + enchantDamage) * player.ActiveTotemPower / 100.0);
             ApplyAncestralGuidanceHealing(player, ancestralHeal, result);
         }
     }

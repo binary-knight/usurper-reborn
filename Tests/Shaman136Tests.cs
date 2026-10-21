@@ -15,7 +15,8 @@ namespace UsurperReborn.Tests;
 /// 1.3.6 G10 (CP12, Q10, Q18). Rule 1: the Mystic Shaman's weapon enchant riders and the Ancestral Guidance heal
 /// run on every live swing of a party member, the player's and the NPC teammate's, from one helper, at the
 /// swinger's own enchant, and the heal goes to the swinger and the rest of the party once each; a teammate's
-/// enchant counts down its own rounds. In memory only.
+/// enchant counts down its own rounds. Rule 3: Guidance heals 25 percent of the whole hit, the swing's HP removed
+/// plus the enchant's extra. In memory only.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class Shaman136Tests : IDisposable
@@ -232,6 +233,56 @@ public class Shaman136Tests : IDisposable
         Count("ApplyShamanSwingRiders(player, target, damage, isOffHandAttack, result);").Should().Be(1, "the player's swing");
         Count("ApplyShamanSwingRiders(teammate, target, tmDealt, isOffHandAttack, result);").Should().Be(1, "the teammate's swing");
         Count("combat.shaman_enchant_fire_hit").Should().Be(2, "the helper and the dead single monster path's own copy");
+    }
+
+    // ---------- rule 3: Guidance heals 25 percent of the whole hit ----------
+
+    [Fact]
+    public void Shaman136_R3_ThePlayersGuidance_HealsAQuarterOfTheSwingPlusTheEnchant()
+    {
+        var rig = NewRig();
+        Guidance(rig.Leader);
+        Enchant(rig.Leader, 1, LeaderPower);
+        rig.Leader.HP = rig.Leader.MaxHP - 50_000;
+        rig.Mate.HP = rig.Mate.MaxHP - 50_000;
+        long leaderHp = rig.Leader.HP, mateHp = rig.Mate.HP;
+
+        PlayerOnHit(rig, 1000);
+
+        long extra = WeaponPower * LeaderPower / 100;   // 90
+        long expected = (long)((1000 + extra) * 25 / 100.0);   // 272, not the 22 of the enchant's extra alone
+        (rig.Leader.HP - leaderHp).Should().Be(expected, "a quarter of the whole hit, the enchant's extra included");
+        (rig.Mate.HP - mateHp).Should().Be(expected, "the same heal reaches every other member");
+    }
+
+    [Fact]
+    public void Shaman136_R3_WithNoEnchant_GuidanceHealsAQuarterOfTheSwing_AsBefore()
+    {
+        var rig = NewRig();
+        Guidance(rig.Leader);
+        rig.Leader.HP = rig.Leader.MaxHP - 50_000;
+        long leaderHp = rig.Leader.HP;
+        PlayerOnHit(rig, 1000);
+        (rig.Leader.HP - leaderHp).Should().Be(250);
+    }
+
+    [Fact]
+    public async Task Shaman136_R3_ATeammatesGuidance_HealsAQuarterOfEachWholeHit()
+    {
+        var rig = NewRig();
+        Guidance(rig.Mate);
+        Enchant(rig.Mate, 3, MatePower);
+        rig.Mate.HP = rig.Mate.MaxHP - 50_000;
+        long mateHp = rig.Mate.HP;
+
+        await MateTurn(rig);
+
+        long rider = WeaponPower * MatePower / 100;
+        var swings = rig.Rec.Hits(CombatSide.Team).Where(h => h != rider).ToList();
+        swings.Should().NotBeEmpty();
+        rig.Rec.Hits(CombatSide.Team).Count(h => h == rider).Should().Be(swings.Count, "one rider a landed swing");
+        long expected = swings.Sum(b => (long)((b + rider) * 25 / 100.0));
+        (rig.Mate.HP - mateHp).Should().Be(expected, "each swing heals a quarter of its HP removed plus the enchant's extra");
     }
 
     private static string RepoRoot()
