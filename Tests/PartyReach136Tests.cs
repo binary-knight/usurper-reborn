@@ -117,6 +117,44 @@ public class PartyReach136Tests
         return (NewRig(hero, new List<Character> { a, b }), hero, a, b);
     }
 
+    // ---------------------------------------------------------------- rule 1: Alchemist
+
+    [Theory]
+    [InlineData("healing_mist")]
+    [InlineData("grand_remedy")]
+    public void PartyReach136_Alchemist_NpcHeal_ReachesThePlayerOnce_AndItselfOnce(string id)
+    {
+        var (rig, hero, caster, mate) = NpcParty(CharacterClass.Alchemist);
+        Apply(rig, caster, id, healing: 400);
+        hero.HP.Should().Be(1300, $"{id}: the player takes the teammates' 75 percent share once");
+        caster.HP.Should().Be(1400, $"{id}: the Alchemist takes its own share once, not a teammate's share on top");
+        mate.HP.Should().Be(1300);
+    }
+
+    [Fact]
+    public void PartyReach136_Alchemist_NpcBrews_ReachThePlayer()
+    {
+        var (rig, hero, caster, mate) = NpcParty(CharacterClass.Alchemist);
+        Apply(rig, caster, "stimulant_brew", attack: 40, duration: 3);
+        Entry(hero, BonusSlot.Attack, "stimulant_brew").Should().Be(30, "the player takes 75 percent of the attack bonus");
+        Entry(caster, BonusSlot.Attack, "stimulant_brew").Should().Be(40);
+        Entry(mate, BonusSlot.Attack, "stimulant_brew").Should().Be(30);
+
+        hero.Poison = 5; hero.PoisonTurns = 3; hero.ApplyStatus(StatusEffect.Poisoned, 3);
+        Apply(rig, caster, "antidote_bomb");
+        hero.PoisonTurns.Should().Be(0, "the NPC Alchemist's antidote cures the player");
+    }
+
+    [Fact]
+    public void PartyReach136_Alchemist_PlayerCaster_Unchanged()
+    {
+        var (rig, hero, a, b) = PlayerParty(CharacterClass.Alchemist);
+        Apply(rig, hero, "healing_mist", healing: 400);
+        hero.HP.Should().Be(1400);
+        a.HP.Should().Be(1300);
+        b.HP.Should().Be(1300);
+    }
+
     // ---------------------------------------------------------------- rule 1: Cleric
 
     [Theory]

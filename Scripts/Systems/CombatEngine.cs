@@ -8653,7 +8653,7 @@ public partial class CombatEngine
     /// </summary>
     private void ApplyAlchemistPartyEffect(Character alchemist, ClassAbilityResult abilityResult, CombatResult result, string effectType, bool isPlayer = true)
     {
-        var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
+        var teammates = PartyReachOthers(alchemist, result);   // 1.3.6 G5 (CP1): the rest of the party, the player included
 
         switch (effectType)
         {

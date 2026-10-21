@@ -60,7 +60,7 @@ An ally that is about to die drinks its own potion before helping anyone. An all
 
 When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a member who is poisoned or diseased: you first, then the member with the lowest share of HP.
 
-An ally's party ability, such as a Bard's song, a Cleric's party prayer, a Wavecaller's or Tidesworn's party ability or a Shaman's totem, reaches you and every other living member once at the share it gives teammates, and the ally once at its own share. An ally's healing ability, such as Lay on Hands, heals the member with the lowest share of HP, you included, when that share is below the ally's own. An ally's Earthbind Totem slows the monsters' attacks as yours does, and an ally holding Bloodlust heals on its own kills. An ally casts Turn Undead only on an undead or demon foe and never uses Disappearing Act.
+An ally's party ability, such as a Bard's song, a Cleric's party prayer, an Alchemist's brew, a Wavecaller's or Tidesworn's party ability or a Shaman's totem, reaches you and every other living member once at the share it gives teammates, and the ally once at its own share. An ally's healing ability, such as Lay on Hands, heals the member with the lowest share of HP, you included, when that share is below the ally's own. An ally's Earthbind Totem slows the monsters' attacks as yours does, and an ally holding Bloodlust heals on its own kills. An ally casts Turn Undead only on an undead or demon foe and never uses Disappearing Act.
 
 ## Potions and rest for allies
 
