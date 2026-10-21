@@ -5003,6 +5003,38 @@ public partial class CombatEngine
         return Math.Min(75, chance);
     }
 
+    /// <summary>
+    /// 1.3.6 (Q6): Disappearing Act and the Escape spell follow the flee rules. Where fleeing is off
+    /// (DifficultySystem.CanFlee false) there is no escape: the Run action's line, and the turn is spent. A boss fight
+    /// (an Old God or betrayal fight, BossContext set, as the Run action tests it, or a dungeon boss among the living
+    /// monsters) rolls the Run action's boss chance, CalculateFleeChance with the boss flag; a failed roll is a spent
+    /// turn with the Run action's fail line. Against other monsters the escape is certain. True when the caster got
+    /// away: the caller's vanish line is shown and globalEscape is set.
+    /// </summary>
+    internal bool TryAbilityEscape(Character caster, IEnumerable<Monster>? monsters, Action showVanish)
+    {
+        if (!DifficultySystem.CanFlee())
+        {
+            terminal.SetColor("bright_red");
+            terminal.WriteLine(Loc.Get("combat.no_escape"));
+            return false;
+        }
+        var living = monsters?.Where(m => m != null && m.IsAlive).ToList() ?? new List<Monster>();
+        bool bossFight = BossContext != null || living.Any(m => m.IsBoss);
+        if (bossFight && random.Next(1, 101) > CalculateFleeChance(caster, true))
+        {
+            terminal.SetColor("red");
+            if (BossContext != null)
+                terminal.WriteLine(Loc.Get("combat.boss_blocks_escape", living.FirstOrDefault(m => m.IsBoss)?.Name ?? Loc.Get("combat.the_old_god")));
+            else
+                terminal.WriteLine(Loc.Get("combat.flee_fail"));
+            return false;
+        }
+        showVanish();
+        globalEscape = true;
+        return true;
+    }
+
     private async Task ExecuteRetreat(Character player, Monster monster, CombatResult result)
     {
         // Check if fleeing is allowed on current difficulty
@@ -5384,7 +5416,9 @@ public partial class CombatEngine
         if (monster.IsFeared)
         {
             terminal.WriteLine(Loc.Get("combat.feared", MonsterNames.Display(monster)), "yellow");
-            monster.FearDuration--;
+            // 1.3.6 (CP6): fear counts down once a round (a later action this round already returned above)
+            if (firstActionThisRound)
+                monster.FearDuration--;
             if (monster.FearDuration <= 0)
             {
                 monster.IsFeared = false;
@@ -5502,8 +5536,9 @@ public partial class CombatEngine
             if (monster.SlowDuration <= 0) monster.IsSlowed = false;
         }
 
-        // Tick down marked duration
-        if (monster.IsMarked)
+        // Tick down marked duration. 1.3.6 (CP6): once a round, as slow and confusion do, not on each action of a
+        // boss that acts more than once
+        if (monster.IsMarked && firstActionThisRound)
         {
             monster.MarkedDuration--;
             if (monster.MarkedDuration <= 0)
@@ -9757,6 +9792,32 @@ public partial class CombatEngine
     }
 
     /// <summary>
+    /// 1.3.6 (Q2): confusion follows the soft control rule. A boss or mini-boss shrugs it off
+    /// GameConfig.BossSoftControlResistPercent of the time and otherwise takes half the rounds, at least one and at most
+    /// GameConfig.MassConfusionBossMaxRounds. Other monsters take the rounds asked. Returns the rounds; 0 when resisted.
+    /// </summary>
+    internal int ConfusionRounds(Monster target, int rounds)
+    {
+        int r = SoftControlRounds(target, rounds);
+        if (r > 0 && (target.IsBoss || target.IsMiniBoss)) r = Math.Min(r, GameConfig.MassConfusionBossMaxRounds);
+        return r;
+    }
+
+    /// <summary>
+    /// 1.3.6 (Q2): confuses a living monster for ConfusionRounds(rounds); a confusion already up keeps the longer of the
+    /// two. True when it landed, false when a boss shrugged it off.
+    /// </summary>
+    internal bool TryConfuseMonster(Monster target, int rounds)
+    {
+        if (target == null || !target.IsAlive) return false;
+        int r = ConfusionRounds(target, rounds);
+        if (r == 0) return false;
+        target.IsConfused = true;
+        target.ConfusedDuration = Math.Max(target.ConfusedDuration, r);
+        return true;
+    }
+
+    /// <summary>
     /// v1.1.15: an area spell deals damage when it rolled some, or when it is an attack spell (which
     /// then takes the level-based fallback). A control spell with no damage of its own deals none.
     /// </summary>
@@ -10052,11 +10113,13 @@ public partial class CombatEngine
             case "psychic_scream":
             {
                 // the old psychic rider stays: a quarter of the time the blast confuses for a round
+                // 1.3.6 (Q2): the confusion follows the soft control rule
                 if (random.Next(100) < 25)
                 {
-                    target.IsConfused = true;
-                    target.ConfusedDuration = Math.Max(target.ConfusedDuration, 1);
-                    terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
+                    if (TryConfuseMonster(target, 1))
+                        terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow");
                 }
                 int rounds = SoftControlRounds(target, duration > 0 ? duration : 2);
                 if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
@@ -10093,10 +10156,9 @@ public partial class CombatEngine
             case "confusion":
             case "mass_confusion":
             {
-                int rounds = SoftControlRounds(target, duration > 0 ? duration : 3);
+                // 1.3.6 (Q2): the boss cap of Mass Confusion holds for Confusion too
+                int rounds = ConfusionRounds(target, duration > 0 ? duration : 3);
                 if (rounds == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); return true; }
-                if (effect == "mass_confusion" && (target.IsBoss || target.IsMiniBoss))
-                    rounds = Math.Min(rounds, GameConfig.MassConfusionBossMaxRounds);
                 target.IsConfused = true;
                 target.ConfusedDuration = rounds;
                 terminal.WriteLine(Loc.Get(effect == "confusion" ? "combat.confusion_stumble" : "combat.spell_mass_confusion", MonsterNames.Display(target)), "magenta");
@@ -16428,10 +16490,11 @@ public partial class CombatEngine
                 // AoE confusion: confuse surviving monsters
                 if (abilityResult.SpecialEffect == "aoe_confusion")
                 {
+                    // 1.3.6 (Q2): each survivor through the soft control rule; a boss that shrugs it off is named
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
-                        m.IsConfused = true;
-                        m.ConfusedDuration = Math.Max(m.ConfusedDuration, 2);
+                        if (!TryConfuseMonster(m, 2))
+                            terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(m)), "yellow");
                     }
                     terminal.SetColor("bright_magenta");
                     terminal.WriteLine(Loc.Get("combat.ability_aoe_confusion"));
@@ -16762,9 +16825,18 @@ public partial class CombatEngine
         switch (abilityMissed ? "" : abilityResult.SpecialEffect)
         {
             case "escape":
+                if (isPlayer)
+                {
+                    // 1.3.6 (Q6): the flee rules decide whether the trick gets the player away
+                    TryAbilityEscape(player, monsters, () =>
+                    {
+                        terminal.SetColor("magenta");
+                        terminal.WriteLine(Loc.Get("combat.ability_escape", actorName));
+                    });
+                    break;
+                }
                 terminal.SetColor("magenta");
-                terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_escape" : "combat.ability_escape_npc", actorName));
-                if (isPlayer) globalEscape = true;
+                terminal.WriteLine(Loc.Get("combat.ability_escape_npc", actorName));
                 break;
 
             case "stun":
@@ -17242,7 +17314,8 @@ public partial class CombatEngine
             // === KILL/MULTI-HIT EFFECTS ===
 
             case "instant_kill":
-                if (target != null && target.IsAlive && target.HP < target.MaxHP * 0.25 && !target.IsBoss)
+                // 1.3.6 (Q5): no instant kill on a boss or a mini boss; the ability's damage has landed as on any hit
+                if (target != null && target.IsAlive && target.HP < target.MaxHP * 0.25 && !target.IsBoss && !target.IsMiniBoss)
                 {
                     if (random.Next(100) < 50)
                     {
@@ -17793,7 +17866,7 @@ public partial class CombatEngine
                 {
                     int dmg = abilityResult.Damage;
                     long wrathHealBase = dmg;
-                    bool instantKill = !target.IsBoss && target.HP < (int)(target.MaxHP * 0.30);
+                    bool instantKill = !target.IsBoss && !target.IsMiniBoss && target.HP < (int)(target.MaxHP * 0.30);   // 1.3.6 (Q5): minis too
                     if (instantKill)
                     {
                         EvHit(player, target.HP);   // 1.2.6: instant kill, the HP it took
@@ -18177,11 +18250,13 @@ public partial class CombatEngine
                 // Enemy trapped in loop - confused + weakened
                 if (target != null && target.IsAlive)
                 {
-                    target.IsConfused = true;
-                    target.ConfusedDuration = Math.Max(target.ConfusedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    // 1.3.6 (Q2): the confusion follows the soft control rule; the weaken stays
+                    bool looped = TryConfuseMonster(target, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_magenta");
                     UIHelper.WriteRow(terminal, Loc.Get("combat.ability_causality_loop", MonsterNames.Display(target)));
+                    if (!looped)
+                        terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow");
                 }
                 break;
 
@@ -18725,7 +18800,7 @@ public partial class CombatEngine
                 player.HP = Math.Max(1, player.HP - hpCost);
                 if (target != null && target.IsAlive)
                 {
-                    bool instantKill = !target.IsBoss && target.HP < (int)(target.MaxHP * 0.50);
+                    bool instantKill = !target.IsBoss && !target.IsMiniBoss && target.HP < (int)(target.MaxHP * 0.50);   // 1.3.6 (Q5): minis too
                     if (instantKill)
                     {
                         EvHit(player, target.HP);   // 1.2.6: instant kill, the HP it took
@@ -19435,10 +19510,15 @@ public partial class CombatEngine
                 break;
 
             case "frost":
+            {
+                // 1.3.6 (CP6): Frost Touch and Ice Storm slow through the soft control rule like every other slow
+                int frostSlow = SoftControlRounds(target, duration > 0 ? duration : 2);
+                if (frostSlow == 0) { terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow"); break; }
                 target.IsSlowed = true;
-                target.SlowDuration = duration > 0 ? duration : 2;
+                target.SlowDuration = frostSlow;
                 terminal.WriteLine(Loc.Get("combat.spell_chilled", MonsterNames.Display(target)), "cyan");
                 break;
+            }
 
             case "web":
                 if (TryStunMonster(target, duration > 0 ? duration : 2))
@@ -19651,12 +19731,13 @@ public partial class CombatEngine
                 break;
 
             case "psychic":
-                // 25% chance to confuse target for 1 round
+                // 25% chance to confuse target for 1 round (1.3.6 Q2: through the soft control rule)
                 if (random.Next(100) < 25)
                 {
-                    target.IsConfused = true;
-                    target.ConfusedDuration = 1;
-                    terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
+                    if (TryConfuseMonster(target, 1))
+                        terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
+                    else
+                        terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow");
                 }
                 break;
 
@@ -19795,8 +19876,9 @@ public partial class CombatEngine
             }
 
             case "escape":
-                terminal.WriteLine(Loc.Get("combat.spell_escape", player.DisplayName), "magenta");
-                globalEscape = true;
+                // 1.3.6 (Q6): the flee rules decide whether the spell gets the caster away
+                TryAbilityEscape(player, (result?.Monsters ?? new List<Monster>()).Append(target),
+                    () => terminal.WriteLine(Loc.Get("combat.spell_escape", player.DisplayName), "magenta"));
                 break;
         }
     }
