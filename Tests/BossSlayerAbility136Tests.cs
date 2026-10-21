@@ -53,17 +53,17 @@ public class BossSlayerAbility136Tests : IDisposable
 
     private static long Slay(long d) => d + (long)(d * 0.10);
 
-    /// <summary>A monster of the given kind: "boss", "mini", "plain", with ":undead" or ":beast" and "@0.2" for its HP share.</summary>
+    /// <summary>A monster of the given kind: "boss", "mini", "plain", with ":undead" or ":beast" and "%0.2" for its HP share.</summary>
     private static Monster Foe(string spec)
     {
         var m = G.Dummy();
-        string kind = spec.Split(':', '@')[0];
+        string kind = spec.Split(':', '%')[0];
         if (kind == "boss") m.IsBoss = true;
         if (kind == "mini") m.IsMiniBoss = true;
         if (kind == "weak") { m.HP = 10; m.MaxHP = 10; }
         if (spec.Contains(":undead")) m.MonsterClass = MonsterClass.Undead;
         if (spec.Contains(":beast")) m.MonsterClass = MonsterClass.Beast;
-        int at = spec.IndexOf('@');
+        int at = spec.IndexOf('%');
         if (at >= 0) m.HP = (long)(m.MaxHP * double.Parse(spec[(at + 1)..], System.Globalization.CultureInfo.InvariantCulture));
         return m;
     }
@@ -126,8 +126,8 @@ public class BossSlayerAbility136Tests : IDisposable
         new object[] { "whirlwind", "boss,plain", false },            // the area core, through the base block's "aoe"
         new object[] { "whirlwind", "plain,boss", false },            // the area core, the boss second (75 percent share)
         new object[] { "maelstrom_faithful", "boss,plain", false },   // the area core, a magical class ability
-        new object[] { "execute", "boss@0.2", false },                // own handler, single target, the 30 percent tier
-        new object[] { "execute", "boss@0.4", false },                // own handler, single target, the 50 percent tier
+        new object[] { "execute", "boss%0.2", false },                // own handler, single target, the 30 percent tier
+        new object[] { "execute", "boss%0.4", false },                // own handler, single target, the 50 percent tier
         new object[] { "desperate_strike", "boss", true },            // own handler rider
         new object[] { "throw_bomb", "boss:beast", false },           // fire bonus rider
         new object[] { "divine_smite", "boss:undead", false },        // holy bonus rider
@@ -166,7 +166,7 @@ public class BossSlayerAbility136Tests : IDisposable
 
     [Theory]
     [InlineData("whirlwind", "mini,plain")]
-    [InlineData("execute", "mini@0.2")]
+    [InlineData("execute", "mini%0.2")]
     [InlineData("judgment_day", "mini,plain")]
     [InlineData("frenzy", "mini")]
     [InlineData("chain_lightning", "plain,mini")]
@@ -222,8 +222,8 @@ public class BossSlayerAbility136Tests : IDisposable
     {
         // Seal Fracture: the helper hit (which has Boss Slayer) kills a boss of 10 HP; its overkill spreads to the next
         // boss. The spread is derived from the boosted hit, so it takes no second 10 percent.
-        var without = Act("seal_fracture", "boss@0.00000001,boss", heroGear: false);
-        var with = Act("seal_fracture", "boss@0.00000001,boss", heroGear: true);
+        var without = Act("seal_fracture", "boss%0.00000001,boss", heroGear: false);
+        var with = Act("seal_fracture", "boss%0.00000001,boss", heroGear: true);
         with.Draws.Should().Equal(without.Draws);
         long primary0 = without.Lost[1] + 10;   // the helper hit: its overkill over 10 HP is the spread
         without.Lost[0].Should().Be(10);
@@ -232,7 +232,7 @@ public class BossSlayerAbility136Tests : IDisposable
 
     [Theory]
     [InlineData("whirlwind", "boss,plain")]
-    [InlineData("execute", "boss@0.2")]
+    [InlineData("execute", "boss%0.2")]
     [InlineData("judgment_day", "boss,plain")]
     [InlineData("frenzy", "boss")]
     [InlineData("chain_lightning", "plain,boss")]
