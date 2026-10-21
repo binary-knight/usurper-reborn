@@ -17820,6 +17820,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         totalHeal += (int)(dmg * 0.20);
                         terminal.SetColor(isHoly ? "bright_yellow" : "bright_cyan");
                         terminal.WriteLine(Loc.Get(isHoly ? "combat.ability_sanctified_torrent_holy" : "combat.ability_sanctified_torrent", MonsterNames.Display(m), dmg));
@@ -17987,6 +17989,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_cyan");
                         UIHelper.WriteRow(terminal, Loc.Get("combat.ability_crescendo_aoe", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
@@ -18107,6 +18111,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_cyan");
                         UIHelper.WriteRow(terminal, Loc.Get("combat.ability_resonance_cascade", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
@@ -18173,6 +18179,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_yellow");
                         UIHelper.WriteRow(terminal, Loc.Get("combat.ability_grand_finale", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
@@ -18237,6 +18245,8 @@ public partial class CombatEngine
                         // 1.3.5: the echo repeats the helper's hit, which has had the boss protections once already
                         target.HP -= dmg; // hq-armory: out (echo reuses the boosted helper hit)
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine(Loc.Get("combat.ability_echo_25_echo", dmg));
                     }
@@ -18273,6 +18283,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         m.IsMarked = true;
                         m.MarkedDuration = Math.Max(m.MarkedDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 4);
                         terminal.SetColor("magenta");
@@ -18341,6 +18353,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_magenta");
                         terminal.WriteLine(Loc.Get(m.Stunned ? "combat.ability_singularity_stun" : "combat.ability_singularity", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
@@ -18523,6 +18537,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         m.Poisoned = true;
                         m.PoisonRounds = Math.Max(m.PoisonRounds, 3);
                         terminal.SetColor("dark_red");
@@ -18603,6 +18619,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_red");
                         UIHelper.WriteRow(terminal, Loc.Get("combat.ability_abyss_unchained", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
@@ -18793,6 +18811,8 @@ public partial class CombatEngine
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
                         EvHit(player, dmg);   // 1.2.6
+                        result.TotalDamageDealt += dmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                        result.Player?.Statistics.RecordDamageDealt(dmg, false);
                         terminal.SetColor("bright_red");
                         UIHelper.WriteRow(terminal, Loc.Get("combat.ability_void_rupture", MonsterNames.Display(m), dmg));
                         if (m.HP <= 0)
@@ -18814,6 +18834,8 @@ public partial class CombatEngine
                             explosionDmg = (int)TeamHQBonus.ApplyAttack(player, explosionDmg); // v1.1.11: Team HQ Armory, last.
                             m.HP -= explosionDmg;
                             EvHit(player, explosionDmg);   // 1.2.6
+                            result.TotalDamageDealt += explosionDmg;   // 1.3.6 G9 (ruling 4): counted as Death Blossom's is
+                            result.Player?.Statistics.RecordDamageDealt(explosionDmg, false);
                             terminal.SetColor("bright_red");
                             UIHelper.WriteRow(terminal, Loc.Get("combat.ability_void_rupture_explode", kills, MonsterNames.Display(m), explosionDmg));
                             if (m.HP <= 0)
@@ -21382,7 +21404,9 @@ public partial class CombatEngine
                 }
 
                 // Apply spell special effect to target (same as player single-target path)
-                if (target.IsAlive && !string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
+                // 1.3.6 G9 (ruling 3): a drain also runs on the target it killed, so it heals half of the HP the target had;
+                // every other effect still needs a living target
+                if ((target.IsAlive || spellResult.SpecialEffect == "drain") && !string.IsNullOrEmpty(spellResult.SpecialEffect) && spellResult.SpecialEffect != "fizzle" && spellResult.SpecialEffect != "fail")
                 {
                     HandleSpecialSpellEffectOnMonsterDealt(target, spellResult.SpecialEffect, spellResult.Duration, teammate, spellResult.Damage, actualDamage, result);   // 1.3.6 G9 (Q7)
                 }

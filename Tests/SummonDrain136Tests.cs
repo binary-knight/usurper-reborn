@@ -371,4 +371,99 @@ public class SummonDrain136Tests
         }
         finally { GameConfig.PlayerHitRollEnabled = saved; }
     }
+
+    // ---------------------------------------------------------------- resume ruling 3: an NPC teammate's killing drain
+
+    [Fact]
+    public void SummonDrain136_AKillingDrainByAnNpcSageTeammate_HealsHalfTheHpTheTargetHad()
+    {
+        for (int seed = 1; seed <= 40; seed++)
+        {
+            var sage = Caster(Member("Sage Mate", CharacterClass.Sage, level: 55));
+            var target = Wolf(hp: 60);
+            var rig = Rig(G.Hero(1000), new List<Character> { sage }, target);
+            typeof(CombatEngine).GetField("random", F)!.SetValue(rig.Engine, new Random(seed));
+            long hp = sage.HP;
+            bool acted = ((Task<bool>)typeof(CombatEngine).GetMethod("TryTeammateOffensiveSpell", F)!
+                .Invoke(rig.Engine, new object[] { sage, rig.Monsters, rig.Result })!).GetAwaiter().GetResult();
+            if (!acted || target.HP == 60) continue;
+            rig.Result.CombatLog.Should().Contain(l => l.Contains("casts Energy Drain"));
+            target.HP.Should().Be(0, "the drain killed the 60 HP target");
+            (sage.HP - hp).Should().Be(30, "half of the 60 HP the target had");
+            return;
+        }
+        throw new Exception("the teammate never cast its drain in 40 seeds");
+    }
+
+    // ---------------------------------------------------------------- resume ruling 4: the ten area cases counted
+
+    public static IEnumerable<object[]> AreaCases() => new[]
+    {
+        new object[] { "sanctified_torrent", CharacterClass.Tidesworn },
+        new object[] { "crescendo", CharacterClass.Wavecaller },
+        new object[] { "resonance_cascade", CharacterClass.Wavecaller },
+        new object[] { "harmonic_crescendo", CharacterClass.Wavecaller },
+        new object[] { "fracture_reality", CharacterClass.Cyclebreaker },
+        new object[] { "entropy_cascade", CharacterClass.Cyclebreaker },
+        new object[] { "singularity", CharacterClass.Cyclebreaker },
+        new object[] { "abyssal_eruption", CharacterClass.Abysswarden },
+        new object[] { "abyss_unchained", CharacterClass.Abysswarden },
+        new object[] { "void_rupture", CharacterClass.Voidreaver },
+    };
+
+    /// <summary>One use of the ability through ApplyAbilityEffectsMultiMonster on the given monsters, the first one the
+    /// target; the HP they lost, the rise of the fight total and of the player's recorded damage, and the screen.</summary>
+    private static (long lost, long total, long recorded, string shown) Area(string id, CharacterClass cls, int seed, params Monster[] foes)
+    {
+        bool saved = GameConfig.PlayerHitRollEnabled;
+        try
+        {
+            GameConfig.PlayerHitRollEnabled = false;
+            var hero = Member("Hero", cls);
+            var rig = Rig(hero, new List<Character>(), foes);
+            typeof(CombatEngine).GetField("random", F)!.SetValue(rig.Engine, new Random(seed));
+            var ability = ClassAbilitySystem.GetAbility(id);
+            ability.Should().NotBeNull(id);
+            var use = new ClassAbilityResult { Success = true, AbilityUsed = ability, Damage = 1000, SpecialEffect = ability!.SpecialEffect };
+            long before = foes.Sum(m => m.HP), total = rig.Result.TotalDamageDealt, recorded = hero.Statistics.TotalDamageDealt;
+            ((Task)typeof(CombatEngine).GetMethod("ApplyAbilityEffectsMultiMonster", F)!
+                .Invoke(rig.Engine, new object?[] { hero, foes[0], rig.Monsters, use, rig.Result })!).GetAwaiter().GetResult();
+            return (before - foes.Sum(m => m.HP), rig.Result.TotalDamageDealt - total, hero.Statistics.TotalDamageDealt - recorded, rig.Shown());
+        }
+        finally { GameConfig.PlayerHitRollEnabled = saved; }
+    }
+
+    [Theory]
+    [MemberData(nameof(AreaCases))]
+    public void SummonDrain136_AnAreaAbility_AddsTheHpItTookToTheFightTotalAndThePlayersRecordOnce(string id, CharacterClass cls)
+    {
+        var (lost, total, recorded, _) = Area(id, cls, 136, Wolf(), Wolf(), Wolf());
+        lost.Should().BeGreaterThan(0, id);
+        total.Should().Be(lost, $"{id}: the fight total rises by exactly the HP the targets lost");
+        recorded.Should().Be(lost, $"{id}: and so does the player's recorded damage");
+    }
+
+    [Fact]
+    public void SummonDrain136_FractureRealitysEcho_IsCountedOnce()
+    {
+        string echo = Loc.Get("combat.ability_echo_25_echo", "|").Split('|')[0].Trim();
+        for (int seed = 1; seed <= 60; seed++)
+        {
+            var (lost, total, recorded, shown) = Area("fracture_reality", CharacterClass.Cyclebreaker, seed, Wolf());
+            total.Should().Be(lost, $"seed {seed}");
+            recorded.Should().Be(lost, $"seed {seed}");
+            if (System.Text.RegularExpressions.Regex.Replace(shown, "\u001b\\[[0-9;]*m", "").Contains(echo)) return;
+        }
+        throw new Exception("the echo never fired in 60 seeds");
+    }
+
+    [Fact]
+    public void SummonDrain136_VoidRupturesExplosion_IsCounted()
+    {
+        var (lost, total, recorded, shown) = Area("void_rupture", CharacterClass.Voidreaver, 136, Wolf(hp: 1000), Wolf(), Wolf());
+        string explode = Loc.Get("combat.ability_void_rupture_explode", 1, "|", 0).Split('|')[0].Trim();
+        System.Text.RegularExpressions.Regex.Replace(shown, "\u001b\\[[0-9;]*m", "").Should().Contain(explode, "the kill set off the explosion");
+        total.Should().Be(lost, "the hits and the explosion, each counted once");
+        recorded.Should().Be(lost);
+    }
 }
