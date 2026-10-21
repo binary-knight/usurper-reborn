@@ -588,6 +588,44 @@ public class PartyReach136Tests
         inspired.Should().BeTrue("an NPC Bard's ability use runs Bardic Inspiration");
     }
 
+    /// <summary>Bardic Inspiration from <paramref name="bard"/> over many seeds: who got the entry (the chance roll passes
+    /// on about 15 percent of them).</summary>
+    private static HashSet<Character> InspiredOverSeeds(Character hero, Character bard, List<Character> team)
+    {
+        var got = new HashSet<Character>();
+        for (int seed = 1; seed <= 400; seed++)
+        {
+            var rig = NewRig(hero, team, seed: seed);
+            foreach (var c in team.Append(hero)) c.ClearSlotBonuses();
+            typeof(CombatEngine).GetMethod("ApplyBardicInspiration", F)!.Invoke(rig.Engine, new object?[] { bard, rig.Result });
+            foreach (var c in team.Append(hero))
+                if (c.AttackBonusEntries.Any(e => e.Source == "bardic_inspiration")) got.Add(c);
+        }
+        return got;
+    }
+
+    [Fact]
+    public void PartyReach136_NpcBard_Inspiration_ReachesThePlayer_NeverItself()
+    {
+        var hero = Hero();
+        var bard = Npc("Minstrel", CharacterClass.Bard);
+        var mate = Npc("Mate");
+        var got = InspiredOverSeeds(hero, bard, new List<Character> { bard, mate });
+        got.Should().Contain(hero, "an NPC Bard's pool holds the player");
+        got.Should().Contain(mate);
+        got.Should().NotContain(bard, "an NPC Bard never inspires itself");
+    }
+
+    [Fact]
+    public void PartyReach136_PlayerBard_InspirationPool_Unchanged()
+    {
+        var hero = Hero(CharacterClass.Bard);
+        var a = Npc("MateA"); var b = Npc("MateB");
+        var got = InspiredOverSeeds(hero, hero, new List<Character> { a, b });
+        got.Should().Contain(a).And.Contain(b, "the player Bard inspires a living teammate");
+        got.Should().NotContain(hero, "never itself");
+    }
+
     // ---------------------------------------------------------------- rule 7: no Disappearing Act for a teammate
 
     [Fact]

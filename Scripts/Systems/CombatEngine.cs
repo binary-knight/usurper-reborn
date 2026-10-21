@@ -8560,7 +8560,11 @@ public partial class CombatEngine
     {
         if (random.Next(100) >= GameConfig.BardInspirationChance) return;
 
-        var teammates = result.Teammates?.Where(t => t.IsAlive && !t.IsGroupedPlayer).ToList();
+        // 1.3.6 G5 (B X3): a Bard who is not the fight's player inspires the rest of the party, the player included and
+        // never itself; the player Bard's pool is as before
+        var teammates = bard == result.Player
+            ? result.Teammates?.Where(t => t.IsAlive && !t.IsGroupedPlayer).ToList()
+            : PartyReachOthers(bard, result).Where(t => !t.IsGroupedPlayer).ToList();
         if (teammates == null || teammates.Count == 0) return;
 
         var target = teammates[random.Next(teammates.Count)];
