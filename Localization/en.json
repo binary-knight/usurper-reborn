@@ -26174,7 +26174,7 @@
   "combat.converted_to_cause": "{0} is converted to your cause!",
   "combat.resists_conversion": "{0} resists the conversion attempt!",
   "combat.examines_belongings": "{0} examines their belongings carefully...",
-  "combat.channels_divine_power": "{0} channels divine power! (+55 ATK/DEF)",
+  "combat.channels_divine_power": "{0} channels divine power!",
   "combat.wish_reshapes_reality": "{0}'s wish reshapes reality!",
   "combat.freezes_time": "{0} freezes time! (dodge next attack)",
   "combat.impenetrable_fortress": "{0}'s mind becomes an impenetrable fortress!",

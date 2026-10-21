@@ -25627,7 +25627,7 @@
   "combat.converted_to_cause": "{0} se rallie à votre cause !",
   "combat.resists_conversion": "{0} résiste à la tentative de conversion !",
   "combat.examines_belongings": "{0} examine soigneusement ses affaires...",
-  "combat.channels_divine_power": "{0} canalise la puissance divine ! (+55 ATQ/DÉF)",
+  "combat.channels_divine_power": "{0} canalise la puissance divine !",
   "combat.wish_reshapes_reality": "Le souhait de {0} remodèle la réalité !",
   "combat.freezes_time": "{0} gèle le temps ! (esquive la prochaine attaque)",
   "combat.impenetrable_fortress": "L'esprit de {0} devient une forteresse impénétrable !",
