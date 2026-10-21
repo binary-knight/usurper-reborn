@@ -53,3 +53,7 @@ A successful flee from a monster fight costs 1 Fame and {{balance:MentalFleeLoss
 Umbrath's available Miracle can remove you from a monster fight without the ordinary flee penalties: no Fame, Mental or taboo is lost. Miracles have a daily use, require the relevant Favor tier, and are not an unlimited escape button.
 
 See [Favor and Miracles](/wiki/en/gods/favor/) and [Mental](/wiki/en/characters/mental/) before relying on either protection.
+
+## Escape abilities
+
+The Jester's Disappearing Act and the Sage's Escape spell work by the flee rules on this page. On Nightmare they do not get you out and the turn is spent. In an Old God fight, or while a floor boss is among the living monsters, they succeed at the Old God chance from Fleeing an Old God; a failure is your turn, with the same failure message, and it does not halve the hits on you that round. Against other monsters they always get you out.

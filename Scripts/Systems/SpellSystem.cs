@@ -206,7 +206,7 @@ public static class SpellSystem
 
             // --- MID TIER (Levels 26-50) - Second Awakening (Tide Reader) ---
             [8] = new SpellInfo(8, "Hit Self", "Force the target to strike itself. Damage: 40-55. Duration: 1 turn.", 30, 8, "Exadliemasumarie", false, "Attack"),
-            [9] = new SpellInfo(9, "Escape", "Vanish from battle instantly. Success based on level. Effect: ends combat.", 35, 9, "Exemarie", false, "Escape"),
+            [9] = new SpellInfo(9, "Escape", "Vanish from battle. Certain against most foes; against a boss or Old God it rolls the flee chance, and on Nightmare there is no escape. Effect: ends combat.", 35, 9, "Exemarie", false, "Escape"),
             [10] = new SpellInfo(10, "Slumber Mist", "A drowsy mist settles on the enemy. Effect: all enemies asleep, any damage wakes them, bosses immune. Duration: 2 rounds.", 40, 10, "Excadmassumarie", true, "Debuff"),
             [11] = new SpellInfo(11, "Steal Life", "Drain the enemy's vitality. Damage: 35-50, heals half. Duration: 1 turn.", 45, 11, "Steallifearie", false, "Attack"),
             [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all, and their accuracy drops. Duration: 2 rounds.", 50, 12, "Psychscrearie", true, "Attack"),
