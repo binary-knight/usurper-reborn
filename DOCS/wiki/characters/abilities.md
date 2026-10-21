@@ -58,7 +58,7 @@ Inspiring Tune is a Bard Buff ability that needs an instrument. Its base values 
 
 A level 20 Bard with 50 Charisma has a level scale of 1.6 and a Charisma scale of 2.0 (1 plus 40 points at 2.5 percent). The Bard gains 80 attack and 32 defense for 5 rounds. Each living teammate gains 60 percent of each: 48 attack and 19 defense.
 
-Bonuses do not stack. Anyone already holding an attack or defense bonus keeps whichever of the old and the new value is higher.
+Bonuses do not stack. Each ability, spell or other source holds its own attack or defense bonus, and only the highest one applies; when it ends, the next highest applies again for the rounds it has left. Using the same ability or spell again refreshes its bonus instead of adding to it; Consume Soul's bonus grows by 5 with each kill it makes. A penalty, such as Berserker Rage's lower defense or Reckless Attack's 20 defense, comes off on top of the highest bonus without removing it.
 
 ## Song of Rest and other party songs
 

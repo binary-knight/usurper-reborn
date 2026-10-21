@@ -1197,10 +1197,7 @@ namespace UsurperRemake.Systems
         {
             player.HasBloodlust = false;
             player.DodgeNextAttack = false;
-            player.TempAttackBonus = 0;
-            player.TempDefenseBonus = 0;
-            player.TempAttackBonusDuration = 0;
-            player.TempDefenseBonusDuration = 0;
+            player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
             player.TempCritChanceBonus = 0;
         }
 

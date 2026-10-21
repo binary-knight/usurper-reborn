@@ -252,12 +252,13 @@ public class OneApply136Tests
     }
 
     [Fact]
-    public void OneApply136_Rockbiter_TwoCastsInARow_AddOnceEach()
+    public void OneApply136_Rockbiter_TwoCastsInARow_GiveTheBonusOnce_WithTheRoundsRefreshed()
     {
-        // Cooldown 0: each recast adds again under the handler's += (the slot rule is G4's). Today the first cast gave
-        // twice the bonus and the second a third; G3 removes the second add per cast, so two casts give twice.
+        // Cooldown 0: 1.3.6 G4 (supervisor 2026-10-21T09:13:44Z), Rockbiter is its own slot entry, so a recast refreshes
+        // its rounds and does not stack.
         var c = Run("rockbiter", CharacterClass.MysticShaman, casts: 2);
-        c.Defense.Should().Be(2 * c.Result.DefenseBonus);
+        c.Defense.Should().Be(c.Result.DefenseBonus);
+        c.DefenseRounds.Should().Be(GameConfig.ShamanEnchantDuration);
     }
 
     [Theory]
@@ -357,7 +358,10 @@ public class OneApply136Tests
         var r = c.Result;
         if (r.Healing > 0)
             c.Healed.Should().BeLessThan(2L * r.Healing, $"{id}: its heal does not land twice on the caster");
-        if (r.AttackBonus > 0)
+        if (r.AttackBonus > 0 && id == "offer_flesh")
+            // 1.3.6 G4 (Q13): twice the scaled bonus below a quarter of maximum HP after the sacrifice, once otherwise
+            c.Attack.Should().Be(c.Actor.HP < c.Actor.MaxHP / 4 ? 2 * r.AttackBonus : r.AttackBonus, $"{id}: its exact bonus");
+        else if (r.AttackBonus > 0)
             c.Attack.Should().BeLessThan(2 * r.AttackBonus, $"{id}: its attack bonus does not land twice");
         if (r.DefenseBonus > 0)
             c.Defense.Should().BeLessThan(2 * r.DefenseBonus, $"{id}: its defence bonus does not land twice");

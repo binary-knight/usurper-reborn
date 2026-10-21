@@ -336,11 +336,139 @@ public class Character
     public bool HasOceanMemory { get; set; } = false;  // Ocean's Memory spell - half mana cost
     public int SmiteChargesRemaining { get; set; } = 0; // Paladin daily smite uses left
 
-    // Temporary combat bonuses from abilities
+    // Temporary combat bonuses from abilities. 1.3.6 G4: every write goes through AddSlotBonus, ClearSlotBonus,
+    // ClearSlotBonuses or TickSlotBonuses below, which keep each slot equal to its highest live positive entry plus
+    // the sum of its live penalties; the Duration is the rounds left on the entry shown. Readers read these four.
     public int TempAttackBonus { get; set; } = 0;
     public int TempAttackBonusDuration { get; set; } = 0;
     public int TempDefenseBonus { get; set; } = 0;
     public int TempDefenseBonusDuration { get; set; } = 0;
+
+    /// <summary>1.3.6 G4: the timed entries behind the attack slot (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<SlotBonusEntry> AttackBonusEntries { get; } = new();
+    /// <summary>1.3.6 G4: the timed entries behind the defence slot (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<SlotBonusEntry> DefenseBonusEntries { get; } = new();
+
+    /// <summary>The source name a value set on the slot fields directly (a test, an older caller) is held under.</summary>
+    public const string RawSlotSource = "slot";
+
+    private List<SlotBonusEntry> SlotEntries(BonusSlot slot) => slot == BonusSlot.Attack ? AttackBonusEntries : DefenseBonusEntries;
+
+    /// <summary>
+    /// 1.3.6 G4: one bonus or penalty on a slot from one source for <paramref name="rounds"/> round ends (0: until the
+    /// next clear, as a slot write with no duration was). The same source again takes the new value only if it is
+    /// higher and keeps the longer rounds, so a recast does not stack. A new source is its own entry; the slot shows
+    /// the highest positive entry plus every penalty, so a penalty never wipes a bonus.
+    /// </summary>
+    public void AddSlotBonus(BonusSlot slot, string source, int value, int rounds)
+    {
+        if (value == 0 || string.IsNullOrEmpty(source)) return;
+        AdoptRawSlot(slot);
+        var list = SlotEntries(slot);
+        rounds = Math.Max(0, rounds);
+        var held = list.Find(e => e.Source == source);
+        if (held == null)
+            list.Add(new SlotBonusEntry { Source = source, Value = value, Rounds = rounds });
+        else
+        {
+            if (value > held.Value) held.Value = value;
+            held.Rounds = held.Rounds == 0 || rounds == 0 ? 0 : Math.Max(held.Rounds, rounds);
+        }
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>1.3.6 G4: the value one source holds on a slot now (0 when it holds none).</summary>
+    public int SlotBonusValue(BonusSlot slot, string source)
+    {
+        AdoptRawSlot(slot);
+        return SlotEntries(slot).Find(e => e.Source == source)?.Value ?? 0;
+    }
+
+    /// <summary>1.3.6 G4: empties a slot: every entry and the shown value and rounds.</summary>
+    public void ClearSlotBonus(BonusSlot slot)
+    {
+        SlotEntries(slot).Clear();
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>1.3.6 G4: drops one source's entry from a slot; the next highest shows.</summary>
+    public void ClearSlotBonus(BonusSlot slot, string source)
+    {
+        AdoptRawSlot(slot);
+        SlotEntries(slot).RemoveAll(e => e.Source == source);
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>1.3.6 G4: empties both slots (fight start, fight end, a boss fight's reset).</summary>
+    public void ClearSlotBonuses()
+    {
+        ClearSlotBonus(BonusSlot.Attack);
+        ClearSlotBonus(BonusSlot.Defense);
+    }
+
+    /// <summary>
+    /// 1.3.6 G4: the round-end tick. Each timed entry loses a round and the ones that reach 0 end; untimed entries stay.
+    /// The slot then shows the highest live entry again, so an ending short bonus no longer zeroes a longer one.
+    /// </summary>
+    public void TickSlotBonuses()
+    {
+        TickSlot(BonusSlot.Attack);
+        TickSlot(BonusSlot.Defense);
+    }
+
+    private void TickSlot(BonusSlot slot)
+    {
+        AdoptRawSlot(slot);
+        var list = SlotEntries(slot);
+        if (list.Count == 0) return;
+        list.RemoveAll(e =>
+        {
+            if (e.Rounds <= 0) return false;   // untimed: until the next clear
+            e.Rounds--;
+            return e.Rounds == 0;
+        });
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>
+    /// A value written on the slot fields directly, with no entry behind it, becomes one entry first, so it ticks and
+    /// shows as it always did.
+    /// </summary>
+    private void AdoptRawSlot(BonusSlot slot)
+    {
+        var list = SlotEntries(slot);
+        if (list.Count > 0) return;
+        int value = slot == BonusSlot.Attack ? TempAttackBonus : TempDefenseBonus;
+        int rounds = slot == BonusSlot.Attack ? TempAttackBonusDuration : TempDefenseBonusDuration;
+        if (value != 0)
+            list.Add(new SlotBonusEntry { Source = RawSlotSource, Value = value, Rounds = Math.Max(0, rounds) });
+    }
+
+    private void RecomputeSlot(BonusSlot slot)
+    {
+        var list = SlotEntries(slot);
+        SlotBonusEntry? shown = null;
+        int penalty = 0, penaltyRounds = 0;
+        foreach (var e in list)
+        {
+            if (e.Value > 0)
+            {
+                if (shown == null || e.Value > shown.Value || (e.Value == shown.Value && e.Rounds > shown.Rounds))
+                    shown = e;
+            }
+            else
+            {
+                penalty += e.Value;
+                penaltyRounds = Math.Max(penaltyRounds, e.Rounds);
+            }
+        }
+        int value = (shown?.Value ?? 0) + penalty;
+        int rounds = shown != null ? shown.Rounds : penaltyRounds;
+        if (slot == BonusSlot.Attack) { TempAttackBonus = value; TempAttackBonusDuration = rounds; }
+        else { TempDefenseBonus = value; TempDefenseBonusDuration = rounds; }
+    }
     public int TempCritChanceBonus { get; set; } = 0;        // v1.1.10: percentage points for this fight (an Old God's dialogue); not saved
     public bool DodgeNextAttack { get; set; } = false;
 
@@ -3799,4 +3927,16 @@ public static class PoisonData
         PoisonType.Deathbane => GameConfig.DeathbaneDamageBonus,
         _ => 0f
     };
+}
+
+/// <summary>1.3.6 G4: the two bonus slots of a character in a fight.</summary>
+public enum BonusSlot { Attack, Defense }
+
+/// <summary>1.3.6 G4: one timed bonus or penalty on a slot (combat only, not saved).</summary>
+public sealed class SlotBonusEntry
+{
+    public string Source { get; set; } = "";
+    public int Value { get; set; }
+    /// <summary>Round ends left; 0 means until the next clear.</summary>
+    public int Rounds { get; set; }
 }

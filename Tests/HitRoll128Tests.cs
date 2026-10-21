@@ -782,7 +782,7 @@ public class HitRoll128Tests
         // 1.3.2: party members regain stamina and mana at round end, which changes this long fight's draws
         // 1.3.2: the basic attack improves by use, which changes this fight's draws
         // 1.3.2: the class combat modifiers apply, which changes this fight's draws
-        ["boss context, one teammate"] = "558:FC26FC8BBDF4CA88:Victory in 47",
+        ["boss context, one teammate"] = "556:5E3DAD275D0DAFE7:Victory in 47",   // 1.3.6 G4: the teammate's Focus lasts a round longer
     };
 
     /// <summary>Written there too: thirty of each action on a seeded engine, the draws, a hash of them and the damage done.</summary>
