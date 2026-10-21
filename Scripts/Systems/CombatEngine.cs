@@ -569,8 +569,7 @@ public partial class CombatEngine
     /// </summary>
     private static void ScrubTransientCombatState(Character c)
     {
-        c.TempAttackBonus = 0; c.TempAttackBonusDuration = 0;
-        c.TempDefenseBonus = 0; c.TempDefenseBonusDuration = 0;
+        c.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
         c.MagicACBonus = 0;
         c.HasOceanMemory = false; // v1.1.15
         c.DodgeNextAttack = false;
@@ -777,10 +776,7 @@ public partial class CombatEngine
         attacker.IsRaging = false;
         defender.IsRaging = false;
         ScrubTransientCombatState(defender); // v1.1.1: the defender got a partial reset; the attacker a full one
-        attacker.TempAttackBonus = 0;
-        attacker.TempAttackBonusDuration = 0;
-        attacker.TempDefenseBonus = 0;
-        attacker.TempDefenseBonusDuration = 0;
+        attacker.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
         attacker.MagicACBonus = 0;
         attacker.DodgeNextAttack = false;
         attacker.HasBloodlust = false;
@@ -1160,10 +1156,7 @@ public partial class CombatEngine
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
         player.IsRaging = false;
-        player.TempAttackBonus = 0;
-        player.TempAttackBonusDuration = 0;
-        player.TempDefenseBonus = 0;
-        player.TempDefenseBonusDuration = 0;
+        player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
         player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
         player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
         player.DodgeNextAttack = false;
@@ -1351,10 +1344,7 @@ public partial class CombatEngine
                     // tank buffs were cleared here, so legacy Temp*/MagicACBonus/DodgeNextAttack/
                     // StatusLifestealPercent/DeathsEmbraceActive/CalmWatersRounds leaked between fights).
                     // Mirrors the per-player init block above.
-                    teammate.TempAttackBonus = 0;
-                    teammate.TempAttackBonusDuration = 0;
-                    teammate.TempDefenseBonus = 0;
-                    teammate.TempDefenseBonusDuration = 0;
+                    teammate.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
                     teammate.MagicACBonus = 0;
                     teammate.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight
                     teammate.DodgeNextAttack = false;
@@ -2363,10 +2353,7 @@ public partial class CombatEngine
         // Clean up temporary combat buffs (matches single-monster/PvP cleanup)
         player.IsRaging = false;
         player.TempCritChanceBonus = 0;   // v1.1.10
-        player.TempAttackBonus = 0;
-        player.TempAttackBonusDuration = 0;
-        player.TempDefenseBonus = 0;
-        player.TempDefenseBonusDuration = 0;
+        player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
         player.MagicACBonus = 0;
         player.HasOceanMemory = false; // v1.1.15: it never ended before
         player.DodgeNextAttack = false;
@@ -27805,25 +27792,8 @@ public partial class CombatEngine
             }
         }
 
-        // Decrement temporary attack bonus duration
-        if (player.TempAttackBonusDuration > 0)
-        {
-            player.TempAttackBonusDuration--;
-            if (player.TempAttackBonusDuration <= 0)
-            {
-                player.TempAttackBonus = 0;
-            }
-        }
-
-        // Decrement temporary defense bonus duration
-        if (player.TempDefenseBonusDuration > 0)
-        {
-            player.TempDefenseBonusDuration--;
-            if (player.TempDefenseBonusDuration <= 0)
-            {
-                player.TempDefenseBonus = 0;
-            }
-        }
+        // Temporary attack and defence bonuses: each entry loses a round (1.3.6 G4: the next highest shows when one ends)
+        player.TickSlotBonuses();
 
         // Tank ability buffs (v0.56.0 — Shield Wall Formation, Divine Mandate, Rage Challenge)
         ProcessTankBuff(player);
@@ -27838,18 +27808,7 @@ public partial class CombatEngine
         {
             foreach (var tm in currentTeammates.Where(t => t.IsAlive))
             {
-                if (tm.TempAttackBonusDuration > 0)
-                {
-                    tm.TempAttackBonusDuration--;
-                    if (tm.TempAttackBonusDuration <= 0)
-                        tm.TempAttackBonus = 0;
-                }
-                if (tm.TempDefenseBonusDuration > 0)
-                {
-                    tm.TempDefenseBonusDuration--;
-                    if (tm.TempDefenseBonusDuration <= 0)
-                        tm.TempDefenseBonus = 0;
-                }
+                tm.TickSlotBonuses();   // 1.3.6 G4
                 // v0.57.7 (Lumina): teammate status-immunity duration wasn't being ticked,
                 // only the player's was. Iron Will's 3-round immunity would persist the whole
                 // fight on NPC teammates. Mirror the player-side tick below.

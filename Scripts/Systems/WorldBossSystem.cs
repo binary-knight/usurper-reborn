@@ -991,10 +991,7 @@ namespace UsurperRemake.Systems
 
             // Reset transient combat buffs so leftover buffs from a previous fight (dungeon, etc.)
             // don't carry into the world boss, and so ability/spell buffs applied this fight start clean.
-            player.TempAttackBonus = 0;
-            player.TempAttackBonusDuration = 0;
-            player.TempDefenseBonus = 0;
-            player.TempDefenseBonusDuration = 0;
+            player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
             player.TempDamageReductionPercent = 0;
             player.TempDamageReductionDuration = 0;
             player.HasStatusImmunity = false;
@@ -1220,10 +1217,7 @@ namespace UsurperRemake.Systems
 
                 // Tick buff durations (attack/defense/damage-reduction/status-immunity) so ability
                 // and spell buffs expire on schedule, mirroring the main combat engine.
-                if (player.TempAttackBonusDuration > 0 && --player.TempAttackBonusDuration <= 0)
-                    player.TempAttackBonus = 0;
-                if (player.TempDefenseBonusDuration > 0 && --player.TempDefenseBonusDuration <= 0)
-                    player.TempDefenseBonus = 0;
+                player.TickSlotBonuses();   // 1.3.6 G4: the attack and defence entries
                 if (player.TempDamageReductionDuration > 0 && --player.TempDamageReductionDuration <= 0)
                     player.TempDamageReductionPercent = 0;
                 if (player.StatusImmunityDuration > 0 && --player.StatusImmunityDuration <= 0)
