@@ -13980,6 +13980,11 @@ public partial class CombatEngine
             if (isSpellDamage && attacker == null && echoCaster != null)
                 damagePerMonster += OldGodEchoSystem.BonusDamage(echoCaster, monster, damagePerMonster);
 
+            // 1.3.6: Boss Slayer on a class ability's share, as on the swing. A class ability passes its user as the
+            // attacker (the base block's "aoe", Maelstrom of the Faithful); a spell passes none, so it never takes it.
+            if (attacker != null)
+                damagePerMonster = ApplyBossSlayer(attacker, monster, damagePerMonster);
+
             // v0.65.5: boss phase-immunity + divine-armor reduction, matching ApplySingleMonsterDamage.
             // Pre-fix ApplyAoEDamage applied NEITHER, so AoE spells/abilities (Fireball, Chain Lightning,
             // Maelstrom) full-damaged Old Gods during immune phases and ignored divine armor, while the
@@ -16680,6 +16685,7 @@ public partial class CombatEngine
                     if (hpPercentMM < 0.30)
                     {
                         long executeBonusMM = abilityResult.Damage;
+                        executeBonusMM = ApplyBossSlayer(player, target, executeBonusMM);   // 1.3.6: Boss Slayer, as on the swing
                         executeBonusMM = ApplyAbilityBossProtections(target, executeBonusMM, abilityResult);   // 1.3.5: boss protections, before the Armory
                         executeBonusMM = TeamHQBonus.ApplyAttack(player, executeBonusMM); // v1.1.11: Team HQ Armory, last.
                         target.HP = Math.Max(0, target.HP - executeBonusMM);
@@ -16692,6 +16698,7 @@ public partial class CombatEngine
                     else if (hpPercentMM < 0.50)
                     {
                         long executeBonusMM = abilityResult.Damage / 2;
+                        executeBonusMM = ApplyBossSlayer(player, target, executeBonusMM);   // 1.3.6: Boss Slayer, as on the swing
                         executeBonusMM = ApplyAbilityBossProtections(target, executeBonusMM, abilityResult);   // 1.3.5: boss protections, before the Armory
                         executeBonusMM = TeamHQBonus.ApplyAttack(player, executeBonusMM); // v1.1.11: Team HQ Armory, last.
                         target.HP = Math.Max(0, target.HP - executeBonusMM);
@@ -16849,6 +16856,7 @@ public partial class CombatEngine
                 {
                     long desperateDmg = (long)(abilityResult.Damage * 0.5);
                     desperateDmg = Math.Max(1, desperateDmg - ApplyArmorPiercing(target.Defence / 4, player));
+                    desperateDmg = ApplyBossSlayer(player, target, desperateDmg);   // 1.3.6: Boss Slayer, as on the swing
                     desperateDmg = ApplyAbilityBossProtections(target, desperateDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     desperateDmg = TeamHQBonus.ApplyAttack(player, desperateDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= desperateDmg;
@@ -16875,6 +16883,7 @@ public partial class CombatEngine
                     if (fireVulnerable)
                     {
                         long fireBonusDmg = abilityResult.Damage / 2;
+                        fireBonusDmg = ApplyBossSlayer(player, target, fireBonusDmg);   // 1.3.6: Boss Slayer, as on the swing
                         fireBonusDmg = ApplyAbilityBossProtections(target, fireBonusDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         fireBonusDmg = TeamHQBonus.ApplyAttack(player, fireBonusDmg); // v1.1.11: Team HQ Armory, last.
                         target.HP -= fireBonusDmg;
@@ -16917,6 +16926,7 @@ public partial class CombatEngine
                     // v0.61.0 Druid's Shrines: Aurelion attunement = +5% holy ability damage.
                     if (result.Player != null && result.Player.IsAttunedTo("aurelion"))
                         holyBonusDmg = (long)(holyBonusDmg * (1f + GameConfig.ShrineAurelionHolyDamageBonus));
+                    holyBonusDmg = ApplyBossSlayer(player, target, holyBonusDmg);   // 1.3.6: Boss Slayer, as on the swing
                     holyBonusDmg = ApplyAbilityBossProtections(target, holyBonusDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     holyBonusDmg = TeamHQBonus.ApplyAttack(player, holyBonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= holyBonusDmg;
@@ -16946,6 +16956,7 @@ public partial class CombatEngine
                     (target.MonsterClass == MonsterClass.Undead || target.MonsterClass == MonsterClass.Demon || target.Undead > 0))
                 {
                     long avengerBonusDmg = (long)(abilityResult.Damage * 0.75);
+                    avengerBonusDmg = ApplyBossSlayer(player, target, avengerBonusDmg);   // 1.3.6: Boss Slayer, as on the swing
                     avengerBonusDmg = ApplyAbilityBossProtections(target, avengerBonusDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     avengerBonusDmg = TeamHQBonus.ApplyAttack(player, avengerBonusDmg); // v1.1.11: Team HQ Armory, last.
                     target.HP -= avengerBonusDmg;
@@ -17016,6 +17027,7 @@ public partial class CombatEngine
                             holyAoeDmg = (long)(holyAoeDmg * 1.5);
                         long actualHolyDmg = Math.Max(1, holyAoeDmg - ApplyArmorPiercing(m.ArmPow / 2, player));
                         if (m.IsSleeping) { actualHolyDmg += actualHolyDmg / 2; }
+                        actualHolyDmg = ApplyBossSlayer(player, m, actualHolyDmg);   // 1.3.6: Boss Slayer, as on the swing
                         actualHolyDmg = ApplyAbilityBossProtections(m, actualHolyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         actualHolyDmg = TeamHQBonus.ApplyAttack(player, actualHolyDmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= actualHolyDmg;
@@ -17133,6 +17145,7 @@ public partial class CombatEngine
                     {
                         long frenzyDmg = Math.Max(1, abilityResult.Damage / 3 - ApplyArmorPiercing(target.Defence / 4, player));
                         frenzyDmg = (long)(frenzyDmg * (0.8 + random.NextDouble() * 0.4));
+                        frenzyDmg = ApplyBossSlayer(player, target, frenzyDmg);   // 1.3.6: Boss Slayer, as on the swing
                         frenzyDmg = ApplyAbilityBossProtections(target, frenzyDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         frenzyDmg = TeamHQBonus.ApplyAttack(player, frenzyDmg); // v1.1.11: Team HQ Armory, last.
                         target.HP -= frenzyDmg;
@@ -17166,6 +17179,7 @@ public partial class CombatEngine
                         bool isExecute = m.HP < m.MaxHP * 0.3;
                         if (isExecute) blossomDmg *= 2;
                         if (m.IsSleeping) blossomDmg += blossomDmg / 2;
+                        blossomDmg = ApplyBossSlayer(player, m, blossomDmg);   // 1.3.6: Boss Slayer, as on the swing
                         blossomDmg = ApplyAbilityBossProtections(m, blossomDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         blossomDmg = TeamHQBonus.ApplyAttack(player, blossomDmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= blossomDmg;
@@ -17372,6 +17386,7 @@ public partial class CombatEngine
                     var corrodeTarget = corrodeTargets[ci];
                     long corrodeDmg = abilityResult.Damage > 0 ? abilityResult.Damage : 50 + player.Intelligence * 2;
                     corrodeDmg = (long)(corrodeDmg * GetAoEDiminishingMultiplier(ci));
+                    corrodeDmg = ApplyBossSlayer(player, corrodeTarget, corrodeDmg);   // 1.3.6: Boss Slayer, as on the swing
                     corrodeDmg = ApplyAbilityBossProtections(corrodeTarget, corrodeDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                     corrodeDmg = TeamHQBonus.ApplyAttack(player, corrodeDmg); // v1.1.11: Team HQ Armory, last.
                     corrodeTarget.HP -= (int)corrodeDmg;
@@ -17556,6 +17571,7 @@ public partial class CombatEngine
                         // AoE diminishing returns per target
                         float aoeMult = targetIdx switch { 0 => 1.0f, 1 => 0.75f, 2 => 0.50f, _ => 0.25f };
                         dmg = Math.Max(1, (int)(dmg * aoeMult));
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -17723,6 +17739,7 @@ public partial class CombatEngine
                     {
                         var m = crescLiving[ci];
                         int dmg = (int)((abilityResult.Damage + bonusDmg) * GetAoEDiminishingMultiplier(ci));
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -17771,6 +17788,7 @@ public partial class CombatEngine
                     {
                         var m = gfLiving[gi];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(gi));
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -17847,6 +17865,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = (int)(abilityResult.Damage * multiplier);
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -17914,6 +17933,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage + bonusDmg;
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -18017,6 +18037,7 @@ public partial class CombatEngine
                     {
                         var m = entropyLiving[ei];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(ei));
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -18082,6 +18103,7 @@ public partial class CombatEngine
                     {
                         int dmg = abilityResult.Damage;
                         if (m.Stunned || m.IsStunned) dmg *= 2;
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -18210,6 +18232,7 @@ public partial class CombatEngine
                         {
                             var m = overflowLiving[oi];
                             int spreadDmg = (int)(spreadDmgBase * GetAoEDiminishingMultiplier(oi));
+                            // 1.3.6: no Boss Slayer here; the spread is derived from the helper hit, which had it
                             spreadDmg = (int)ApplyAbilityBossProtections(m, spreadDmg, abilityResult);   // 1.3.5: boss protections on each spread hit
                             m.HP -= spreadDmg; // hq-armory: out (spread is derived from the boosted helper hit)
                             EvHit(player, spreadDmg);   // 1.2.6
@@ -18265,6 +18288,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -18345,6 +18369,7 @@ public partial class CombatEngine
                     foreach (var m in monsters.Where(m => m.IsAlive))
                     {
                         int dmg = abilityResult.Damage;
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -18532,6 +18557,7 @@ public partial class CombatEngine
                     {
                         var m = vrLiving[vi];
                         int dmg = (int)(abilityResult.Damage * GetAoEDiminishingMultiplier(vi));
+                        dmg = (int)ApplyBossSlayer(player, m, dmg);   // 1.3.6: Boss Slayer, as on the swing
                         dmg = (int)ApplyAbilityBossProtections(m, dmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                         dmg = (int)TeamHQBonus.ApplyAttack(player, dmg); // v1.1.11: Team HQ Armory, last.
                         m.HP -= dmg;
@@ -18552,6 +18578,7 @@ public partial class CombatEngine
                         foreach (var m in monsters.Where(m => m.IsAlive))
                         {
                             int explosionDmg = explosionBase * kills;
+                            explosionDmg = (int)ApplyBossSlayer(player, m, explosionDmg);   // 1.3.6: Boss Slayer, as on the swing
                             explosionDmg = (int)ApplyAbilityBossProtections(m, explosionDmg, abilityResult);   // 1.3.5: boss protections, before the Armory
                             explosionDmg = (int)TeamHQBonus.ApplyAttack(player, explosionDmg); // v1.1.11: Team HQ Armory, last.
                             m.HP -= explosionDmg;
@@ -18709,7 +18736,8 @@ public partial class CombatEngine
                 // Hit primary target
                 if (target != null && target.IsAlive)
                 {
-                    long primaryHit = TeamHQBonus.ApplyAttack(player, ApplyAbilityBossProtections(target, chainDamage, abilityResult)); // v1.1.11: Team HQ Armory, last; 1.3.5: boss protections first
+                    long primaryHit = ApplyBossSlayer(player, target, chainDamage);   // 1.3.6: Boss Slayer, as on the swing
+                    primaryHit = TeamHQBonus.ApplyAttack(player, ApplyAbilityBossProtections(target, primaryHit, abilityResult)); // v1.1.11: Team HQ Armory, last; 1.3.5: boss protections first
                     target.HP -= (int)primaryHit;
                     EvHit(player, (int)primaryHit);   // 1.2.6
                     result.TotalDamageDealt += primaryHit;
@@ -18724,6 +18752,7 @@ public partial class CombatEngine
                     {
                         var m = chainTargets[chi];
                         long chainHit = (long)(chainReduced * GetAoEDiminishingMultiplier(chi));
+                        chainHit = ApplyBossSlayer(player, m, chainHit);   // 1.3.6: Boss Slayer, as on the swing
                         chainHit = ApplyAbilityBossProtections(m, chainHit, abilityResult);   // 1.3.5: boss protections, before the Armory
                         chainHit = TeamHQBonus.ApplyAttack(player, chainHit); // v1.1.11: Team HQ Armory, last.
                         m.HP -= (int)chainHit;
