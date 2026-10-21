@@ -451,7 +451,7 @@ public class MagicResist136PveTests
     {
         // No magical ability sets a life steal today, so this branch is pinned by its source.
         string src = MagicResist136Rig.Source("Scripts/Systems/CombatEngine.cs");
-        Regex.IsMatch(src, @"TeamHQBonus\.ApplyDefense\(player, damage\)\);\n\s*if \(abilityResult\.IsMagical && !isOldGodFightAbility\) damage = ApplyMagicResist\(player, damage\);[^\n]*\n\s*\n\s*player\.HP -= damage;\n[^\n]*\n\s*long healAmount = damage \* abilityResult\.LifeStealPercent / 100;")
+        Regex.IsMatch(src, @"TeamHQBonus\.ApplyDefense\(player, damage\)\);\n\s*if \(abilityResult\.IsMagical && !isOldGodFightAbility\) damage = ApplyMagicResist\(player, damage\);[^\n]*\n\s*\n\s*(?:damage = ShareLinkedHit\(player, damage, result, monKind\);[^\n]*\n\s*)?player\.HP -= damage;\n[^\n]*\n\s*long healAmount = damage \* abilityResult\.LifeStealPercent / 100;")
             .Should().BeTrue("the life steal branch takes the share after the Barracks and before the heal reads the damage");
     }
 
@@ -460,7 +460,7 @@ public class MagicResist136PveTests
     {
         // A magical result always carries direct damage today, so this branch is pinned by its source.
         string src = MagicResist136Rig.Source("Scripts/Systems/CombatEngine.cs");
-        Regex.IsMatch(src, @"GetMinIncomingDamage\(player, rawDamage\)\), TeamHQBonus\.ApplyDefense\(player, damage\)\);\n\s*if \(abilityResult\.IsMagical && !isOldGodFightAbility\) damage = ApplyMagicResist\(player, damage\);[^\n]*\n\s*\n\s*player\.HP -= damage;")
+        Regex.IsMatch(src, @"GetMinIncomingDamage\(player, rawDamage\)\), TeamHQBonus\.ApplyDefense\(player, damage\)\);\n\s*if \(abilityResult\.IsMagical && !isOldGodFightAbility\) damage = ApplyMagicResist\(player, damage\);[^\n]*\n\s*\n\s*(?:damage = ShareLinkedHit\(player, damage, result, monKind\);[^\n]*\n\s*)?player\.HP -= damage;")
             .Should().BeTrue("the multiplier branch takes the share after the Barracks, just before the HP write");
     }
 
@@ -469,7 +469,7 @@ public class MagicResist136PveTests
     {
         // A magical result always carries direct damage today, so this branch is pinned by its source.
         string src = MagicResist136Rig.Source("Scripts/Systems/CombatEngine.cs");
-        Regex.IsMatch(src, @"dmg = MitigateCompanionAbilityHit\(monster, companion, dmg, result\);\n\s*if \(abilityResult\.IsMagical && monster\.FamilyName != ""OldGod""\) dmg = ApplyMagicResist\(companion, dmg\);[^\n]*\n\s*RecordAllyHit\(companion, dmg\);")
+        Regex.IsMatch(src, @"dmg = MitigateCompanionAbilityHit\(monster, companion, dmg, result\);\n\s*if \(abilityResult\.IsMagical && monster\.FamilyName != ""OldGod""\) dmg = ApplyMagicResist\(companion, dmg\);[^\n]*\n\s*(?:dmg = ShareLinkedHit\(companion, dmg, result, MonsterAbilityEventKind\(abilityType\)\);[^\n]*\n\s*)?RecordAllyHit\(companion, dmg\);")
             .Should().BeTrue("the companion multiplier branch takes the share after the mitigation, never on an Old God's attack");
     }
 }

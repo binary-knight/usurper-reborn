@@ -6678,11 +6678,11 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
-                damage = ShareLinkedHit(player, damage, result, monKind);   // 1.3.6 G11: Empathic Link, ahead of the last steps the order tests pin; they apply to the ally's half
                 // v1.1.11: Team HQ Barracks last, before the drain heal reads it; the minimum holds where it held.
                 damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawLifeStealDamage)), TeamHQBonus.ApplyDefense(player, damage));
                 if (abilityResult.IsMagical && !isOldGodFightAbility) damage = ApplyMagicResist(player, damage);   // 1.3.6, before the heal reads it
 
+                damage = ShareLinkedHit(player, damage, result, monKind);   // 1.3.6 G11: Empathic Link, after the ally's own reductions (ruling 2026-10-21T22:57:03Z)
                 player.HP -= damage;
                 EvHurt(player, damage, monKind);   // 1.2.6
                 long healAmount = damage * abilityResult.LifeStealPercent / 100;
@@ -6745,11 +6745,11 @@ public partial class CombatEngine
 
                 // v0.65.8 (R3): failed flee this round -> guarded half-round
                 damage = ApplyFleeGrace(player, damage);
-                damage = ShareLinkedHit(player, damage, result, monKind);   // 1.3.6 G11: Empathic Link, ahead of the last steps the order tests pin; they apply to the ally's half
                 // v1.1.11: Team HQ Barracks last; the anti-tank minimum holds where it held before.
                 damage = Math.Max(Math.Min(damage, GetMinIncomingDamage(player, rawDamage)), TeamHQBonus.ApplyDefense(player, damage));
                 if (abilityResult.IsMagical && !isOldGodFightAbility) damage = ApplyMagicResist(player, damage);   // 1.3.6, last
 
+                damage = ShareLinkedHit(player, damage, result, monKind);   // 1.3.6 G11: Empathic Link, after the ally's own reductions (ruling 2026-10-21T22:57:03Z)
                 player.HP -= damage;
                 EvHurt(player, damage, monKind);   // 1.2.6
                 terminal.WriteLine(Loc.Get("combat.you_take_damage", damage), "red");
@@ -9174,9 +9174,9 @@ public partial class CombatEngine
     /// (ProcessMonsterAction's normal attack, TryMonsterSpecialAbility's direct damage, life drain and multiplier
     /// damage, the boss and Manwe ability hits). The boss party blast and channel are not changed, as G6 left them.
     /// The caster's half never takes it below 1 HP; what it cannot take stays with the ally. Returns the ally's share.
-    /// On the leader's life drain and multiplier branches and the companion's multiplier branch the split comes ahead
-    /// of the Barracks, the companion mitigation and magic resistance, whose place last is pinned by MagicResist136, so
-    /// those steps apply to the ally's half; elsewhere it is the last step before the HP write.
+    /// On every path the split takes the ally's damage after the ally's own reductions on that path (the Barracks, the
+    /// companion mitigation, magic resistance) and halves it: it is the last step before the HP write (supervisor ruling,
+    /// ledger 2026-10-21T22:57:03Z), so the pair never takes more than the ally alone would have.
     /// </summary>
     internal long ShareLinkedHit(Character victim, long damage, CombatResult? result, CombatEventKind kind)
     {
@@ -18759,19 +18759,16 @@ public partial class CombatEngine
             }
 
             case "prison_wardens_command":
-                // -50% ATK/DEF to target (boss: half) - Weakened + Vulnerable + a timed cut. 1.3.6 G11 (rule 4): the
-                // cut is Monster.DominatedRounds and DominatedCutPercent, read in GetAttackPower and WeakenDefenceCut,
-                // for the ability's rounds; it edits no base stat (it cut Strength and Defence for the rest of the fight
-                // and compounded on a recast). A boss or a mini boss takes half (the Q5 reading of "bosses"). The Weaken
-                // and Marked riders stay as they were.
+                // -50% ATK/DEF to target (boss: half), a timed cut. 1.3.6 G11 (rule 4): the cut is
+                // Monster.DominatedRounds and DominatedCutPercent, read in GetAttackPower and WeakenDefenceCut, for the
+                // ability's rounds; it edits no base stat (it cut Strength and Defence for the rest of the fight and
+                // compounded on a recast). A boss or a mini boss takes half (the Q5 reading of "bosses"). The Weaken and
+                // Marked riders are gone, code to the text (supervisor ruling, ledger 2026-10-21T22:57:03Z).
                 if (target != null && target.IsAlive)
                 {
                     int cutPct = PrisonWardensCutPercent(target);
                     target.DominatedRounds = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                     target.DominatedCutPercent = cutPct;
-                    target.WeakenRounds = Math.Max(target.WeakenRounds, abilityResult.Duration);
-                    target.IsMarked = true;
-                    target.MarkedDuration = Math.Max(target.MarkedDuration, abilityResult.Duration);
                     terminal.SetColor("dark_red");
                     UIHelper.WriteRow(terminal, Loc.Get("combat.ability_prison_wardens_command", MonsterNames.Display(target), cutPct, cutPct));
                 }
@@ -22730,9 +22727,9 @@ public partial class CombatEngine
                             terminal.SetColor("dark_gray");
                             terminal.WriteLine(Loc.Get("combat.damage_vs_defense", rawAbilityDmg, abilityDefense));
                         }
-                        dmg = ShareLinkedHit(companion, dmg, result, MonsterAbilityEventKind(abilityType));   // 1.3.6 G11: Empathic Link, ahead of the last steps the order tests pin; they apply to the ally's half
                         dmg = MitigateCompanionAbilityHit(monster, companion, dmg, result);
                         if (abilityResult.IsMagical && monster.FamilyName != "OldGod") dmg = ApplyMagicResist(companion, dmg);   // 1.3.6, last
+                        dmg = ShareLinkedHit(companion, dmg, result, MonsterAbilityEventKind(abilityType));   // 1.3.6 G11: Empathic Link, after the ally's own reductions (ruling 2026-10-21T22:57:03Z)
                         RecordAllyHit(companion, dmg); // v1.1.3
                         companion.HP = Math.Max(0, companion.HP - dmg);
                         EvHurt(companion, dmg, MonsterAbilityEventKind(abilityType));   // 1.2.6
