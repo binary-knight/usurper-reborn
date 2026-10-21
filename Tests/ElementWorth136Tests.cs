@@ -586,6 +586,28 @@ public class ElementWorth136Tests : IDisposable
         MagicShopLocation.CarriedStatBonus(Enchanted("frost", "phoenix", "pow"), 1).Should().Be(24, "both elements, the reverse");
     }
 
+    // ---------- the wiki export ----------
+
+    [Fact]
+    public void ElementWorth136_WikiExport_PhoenixFireAndFrostbiteRowsShowThirty()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "ew136-wiki-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            WikiDataExporter.Export(dir);
+            using var economy = System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "economy.json")));
+            var rows = economy.RootElement.GetProperty("data").GetProperty("enchants").EnumerateArray()
+                .ToDictionary(r => r.GetProperty("number").GetInt32());
+            foreach (var (tier, flag) in new[] { (Phoenix, "HasFireEnchant"), (Frostbite, "HasFrostEnchant") })
+            {
+                var effects = rows[tier].GetProperty("effects");
+                effects.GetProperty("WeaponPower").GetInt32().Should().Be(30, "the wiki table shows what the shop writes now for tier {0}", tier);
+                effects.GetProperty(flag).GetBoolean().Should().BeTrue();
+            }
+        }
+        finally { try { Directory.Delete(dir, true); } catch (IOException) { } }
+    }
+
     // ---------- text ----------
 
     [Theory]

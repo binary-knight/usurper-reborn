@@ -621,7 +621,7 @@ public static class WikiDataExporter
     {
         var bare = new Equipment();
         var enchanted = new Equipment();
-        MagicShopLocation.ApplyNamedEnchant(enchanted, tierChoice);
+        MagicShopLocation.ApplyNamedTier(enchanted, tierChoice);   // 1.3.6: what the shop writes now
         var effects = new SortedDictionary<string, object>(StringComparer.Ordinal);
         foreach (var p in typeof(Equipment).GetProperties(BindingFlags.Public | BindingFlags.Instance))
         {

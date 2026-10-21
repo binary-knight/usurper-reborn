@@ -2330,6 +2330,10 @@ public partial class MagicShopLocation : BaseLocation
         if (tier > 0) ApplyNamedEnchant(e, tier, ElementKindWeaponPower(kind));
     }
 
+    /// <summary>1.3.6: what a named enchant tier writes now, as the shop does (its kind code from 1.3.6: Phoenix Fire
+    /// and Frostbite "phoenix" and "frostbite", +30 weapon power). The wiki export reads it.</summary>
+    internal static void ApplyNamedTier(Equipment e, int tier) => ApplyNamedKind(e, GetEnchantKindCode(tier, 0));
+
     private static void ApplyNamedEnchant(Equipment e, int tierChoice, int elementPower)
     {
         switch (tierChoice)
