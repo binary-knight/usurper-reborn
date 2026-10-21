@@ -23107,6 +23107,7 @@
   "class.mystic_shaman_desc": "Törzsi közelharcos-varázsló, aki totémeket idéz és fegyvereit elemi erővel varázsolja meg. Trollok, Orkok és Gnollok számára elérhető.",
   "combat.abyssal_siphon": "A Mélységi Szifón {0} ÉP-t szív el!",
   "combat.bloodlust_trigger": "Vérszomj! {0} ÉP-t gyógyulsz a gyilkosságból!",
+  "combat.bloodlust_trigger_npc": "Vérszomj! {0} {1} ÉP-t gyógyul a gyilkosságból!",
   "combat.chrono_surge_cooldown": "Időhullám! A visszatöltési idő {0} körrel csökkent!",
   "combat.cleric_beacon_self": "A Hit Fényjele {0} ÉP-t gyógyít neked! (+{1} VÉD {2} körre)",
   "combat.cleric_beacon_other": "{0} megidézi a Hit Fényjelét! {1} ÉP gyógyítás! (+{2} VÉD {3} körre)",

@@ -5739,8 +5739,8 @@ public partial class CombatEngine
             monsterAttack = (long)(monsterAttack * GameConfig.BloodMoonMonsterBuff);
         }
 
-        // Earthbind Totem: -20% monster attack
-        if (player.ActiveTotemType == 2 && player.ActiveTotemRounds > 0)
+        // Earthbind Totem: -20% monster attack (1.3.6 G5, C D10: an NPC Shaman's own totem slows too)
+        if (PartyEarthbindActive(player, result, currentTeammates))
         {
             monsterAttack = (long)(monsterAttack * 0.80);
         }
@@ -8491,8 +8491,8 @@ public partial class CombatEngine
     /// </summary>
     private void ApplyBardSongToParty(Character bard, ClassAbilityResult abilityResult, CombatResult result, bool isPlayer = true)
     {
-        var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
-        if (teammates == null || teammates.Count == 0) return;
+        var teammates = PartyReachOthers(bard, result);   // 1.3.6 G5 (CP1): the rest of the party, the player included
+        if (teammates.Count == 0) return;
 
         // 1.2.0: abilityResult.Healing already carries the healer spec bonus and the gods' boons:
         // both ability paths run ApplyHealerSpecBonus on it before the party_song effect, so a
@@ -8579,9 +8579,8 @@ public partial class CombatEngine
         // Cleanse self
         cleansed += CleanseCombatStatuses(bard);
 
-        // Cleanse teammates
-        var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
-        if (teammates != null)
+        // Cleanse teammates (1.3.6 G5, CP1: the rest of the party, the player included)
+        var teammates = PartyReachOthers(bard, result);
         {
             foreach (var tm in teammates)
             {
@@ -8808,7 +8807,7 @@ public partial class CombatEngine
     /// </summary>
     private void ApplyClericPartyEffect(Character cleric, ClassAbilityResult abilityResult, CombatResult result, string effectType, bool isPlayer = true)
     {
-        var teammates = result.Teammates?.Where(t => t.IsAlive).ToList();
+        var teammates = PartyReachOthers(cleric, result);   // 1.3.6 G5 (CP1): the rest of the party, the player included
 
         switch (effectType)
         {
@@ -9109,17 +9108,19 @@ public partial class CombatEngine
         holder.HasBloodlust = false;
     }
 
-    /// <summary>1.3.6 G4 (A F2): the Bloodlust kill heal for the fight's player, on their own kill only (attacker null is
-    /// their own spell or area hit), never on a teammate's.</summary>
-    private void BloodlustKillHeal(CombatResult result, Character? attacker, string key)
+    /// <summary>1.3.6 G4 (A F2): the Bloodlust kill heal, on the holder's own kill only, never on a teammate's. 1.3.6 G5:
+    /// the holder is the killer (attacker null is the fight's player's own spell or area hit), so a teammate holding
+    /// Bloodlust heals on its own kill. Returns true when the killer holds Bloodlust (healed or already full).</summary>
+    private bool BloodlustKillHeal(CombatResult result, Character? attacker, string key)
     {
-        var holder = result.Player;
-        if (holder == null || !holder.HasBloodlust || (attacker != null && attacker != holder)) return;
+        var holder = attacker ?? result.Player;
+        if (holder == null || !holder.HasBloodlust) return false;
         long heal = Math.Min(holder.Level * 2 + 20, holder.MaxHP - holder.HP);
-        if (heal <= 0) return;
+        if (heal <= 0) return true;
         holder.HP += heal;
         terminal.SetColor("bright_red");
-        terminal.WriteLine(Loc.Get(key, heal));
+        terminal.WriteLine(holder == result.Player ? Loc.Get(key, heal) : Loc.Get("combat.bloodlust_trigger_npc", holder.DisplayName, heal));
+        return true;
     }
 
     /// <summary>1.3.6 G4: the source name an ability's attack or defence entry is held under (its id).</summary>
@@ -9854,6 +9855,36 @@ public partial class CombatEngine
         if (result?.Player != null && result.Player.IsAlive && !party.Contains(result.Player)) party.Add(result.Player);
         return party;
     }
+
+    /// <summary>
+    /// 1.3.6 G5 (CP1): the living members a caster's party effect reaches besides the caster itself: every living
+    /// teammate and the fight's player, each once, in the order of LivingPartyOf (result.Teammates is currentTeammates
+    /// in a fight). The caster takes its own share on its own and never a teammate's share on top; an NPC caster's
+    /// effect reaches the player. A fight with no teammates list (a duel) reaches no one, as before.
+    /// </summary>
+    internal static List<Character> PartyReachOthers(Character caster, CombatResult? result)
+    {
+        var others = new List<Character>();
+        if (result?.Teammates == null || result.Opponent != null) return others;
+        foreach (var t in result.Teammates)
+            if (t != null && t != caster && t.IsAlive && !others.Contains(t)) others.Add(t);
+        if (result.Player != null && result.Player != caster && result.Player.IsAlive && !others.Contains(result.Player))
+            others.Add(result.Player);
+        return others;
+    }
+
+    /// <summary>1.3.6 G5 (C D10): an Earthbind Totem slows every monster attack while the fight's player, the attacked
+    /// player or any living teammate holds one; one totem or several, the attack is slowed once.</summary>
+    internal static bool PartyEarthbindActive(Character? attacked, CombatResult? result, IEnumerable<Character>? teammates)
+    {
+        static bool Holds(Character? c) => c != null && c.ActiveTotemType == 2 && c.ActiveTotemRounds > 0;
+        if (Holds(attacked) || Holds(result?.Player)) return true;
+        return teammates != null && teammates.Any(t => t != null && t.IsAlive && Holds(t));
+    }
+
+    /// <summary>1.3.6 G5 (C D8): a monster Turn Undead bites, the player paths' test: undead or demon.</summary>
+    internal static bool TurnUndeadBites(Monster m) =>
+        m != null && m.IsAlive && (m.MonsterClass == MonsterClass.Undead || m.MonsterClass == MonsterClass.Demon || m.Undead > 0);
 
     /// <summary>v1.1.15: the seal bonus to a Sage's ward strength for a number of seals, capped.</summary>
     internal static int SageSealWardPercentFor(int seals) =>
@@ -14224,22 +14255,13 @@ public partial class CombatEngine
                 terminal.WriteLine($"  {Loc.Get("combat.you_kill", MonsterNames.Display(monster))}");
                 result.DefeatedMonsters.Add(monster);
 
-                // Bloodlust heal-on-kill (1.3.6 G4, A F2: on the holder's own kill, not a teammate's)
-                if (result.Player != null && result.Player.HasBloodlust && (attacker == null || attacker == result.Player))
-                {
-                    long bloodlustHeal = Math.Min(result.Player.Level * 2 + 20, result.Player.MaxHP - result.Player.HP);
-                    if (bloodlustHeal > 0)
-                    {
-                        result.Player.HP += bloodlustHeal;
-                        terminal.SetColor("bright_red");
-                        terminal.WriteLine(Loc.Get("combat.bloodlust_heal", bloodlustHeal));
-                    }
-                }
+                // Bloodlust heal-on-kill (1.3.6 G4, A F2: on the holder's own kill, not a teammate's; G5: the killer holds it)
+                bool killerHeldBloodlust = BloodlustKillHeal(result, attacker ?? spellCaster, "combat.bloodlust_heal");
                 // v0.65.3: Barbarian innate early heal-on-kill (pre-Bloodlust L36). else-if so it
                 // never stacks with a real Bloodlust cast; fades out at L36 when the ability exists.
                 // attacker gate (matches the single-target site) so a future teammate-AoE route can't
                 // heal a Barbarian player off a teammate's kill; attacker==null = player's own AoE/spell.
-                else if (result.Player != null
+                if (!killerHeldBloodlust && result.Player != null
                          && (attacker == null || attacker == result.Player)
                          && result.Player.Class == CharacterClass.Barbarian
                          && result.Player.Level <= GameConfig.BarbarianInnateBloodlustMaxLevel)
@@ -14475,20 +14497,11 @@ public partial class CombatEngine
 
             result.DefeatedMonsters.Add(target);
 
-            // Bloodlust heal-on-kill (1.3.6 G4, A F2: on the holder's own kill, not a teammate's)
-            if (result.Player != null && result.Player.HasBloodlust && (attacker == null || attacker == result.Player))
-            {
-                long bloodlustHeal = Math.Min(result.Player.Level * 2 + 20, result.Player.MaxHP - result.Player.HP);
-                if (bloodlustHeal > 0)
-                {
-                    result.Player.HP += bloodlustHeal;
-                    terminal.SetColor("bright_red");
-                    terminal.WriteLine(Loc.Get("combat.bloodlust_trigger", bloodlustHeal));
-                }
-            }
+            // Bloodlust heal-on-kill (1.3.6 G4, A F2: on the holder's own kill, not a teammate's; G5: the killer holds it)
+            bool killerHeldBloodlust = BloodlustKillHeal(result, attacker, "combat.bloodlust_trigger");
             // v0.65.3: Barbarian innate early heal-on-kill (pre-Bloodlust L36). Gated to the player's
             // own kill (attacker == player) so a teammate's kill doesn't heal a Barbarian player.
-            else if (result.Player != null
+            if (!killerHeldBloodlust && result.Player != null
                      && (attacker == null || attacker == result.Player)
                      && result.Player.Class == CharacterClass.Barbarian
                      && result.Player.Level <= GameConfig.BarbarianInnateBloodlustMaxLevel)
@@ -16647,7 +16660,9 @@ public partial class CombatEngine
             if (ability.CanTargetAlly && result?.Teammates != null)
             {
                 var aliveTeammates = result.Teammates.Where(t => t.IsAlive).ToList();
-                if (aliveTeammates.Count > 0)
+                // 1.3.6 G5: the AI pick (an NPC, a grouped follower) reads the rest of the party, the player included
+                bool aiHealPick = !(isPlayer && !player.IsGroupedPlayer);
+                if (aliveTeammates.Count > 0 || aiHealPick)
                 {
                     // Grouped followers count as isPlayer here (currentPlayer is swapped to
                     // the follower for their turn) but have no interactive prompt channel --
@@ -16681,7 +16696,8 @@ public partial class CombatEngine
                     else
                     {
                         // NPC AI: heal the most injured party member (including player leader if available)
-                        var mostInjured = aliveTeammates
+                        // 1.3.6 G5: from the rest of the party, the player included (A F6); the caster heals itself below
+                        var mostInjured = PartyReachOthers(player, result)
                             .Where(t => t.HP < t.MaxHP)
                             .OrderBy(t => (double)t.HP / Math.Max(1, t.MaxHP))
                             .FirstOrDefault();
@@ -17381,7 +17397,7 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.calm_waters_wash"));
                     terminal.WriteLine(Loc.Get("combat.gains_debuff_resistance", player.DisplayName, duration), "cyan");
                     // Apply to all living teammates
-                    var shieldTargets = result.Teammates?.Where(t => t.IsAlive).ToList();
+                    var shieldTargets = PartyReachOthers(player, result);
                     if (shieldTargets != null)
                     {
                         foreach (var tm in shieldTargets)
@@ -17732,7 +17748,7 @@ public partial class CombatEngine
                 // Also heal companions
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         EvHeal(player, tm, HealRoom(tm, abilityResult.Healing));   // 1.2.6
                         tm.HP = Math.Min(tm.MaxHP, tm.HP + abilityResult.Healing);
@@ -17810,7 +17826,7 @@ public partial class CombatEngine
                 // +25 ATK to all allies (handled by AttackBonus for self)
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, abilityResult.Duration);
                     }
@@ -17836,7 +17852,7 @@ public partial class CombatEngine
             case "crescendo_aoe":
             {
                 // 180 AoE + 50 per ally in party + inspire buff
-                int allyCount = result?.Teammates?.Count(t => t.IsAlive) ?? 0;
+                int allyCount = PartyReachOthers(player, result).Count;
                 int bonusDmg = allyCount * 50;
                 if (monsters != null)
                 {
@@ -17870,7 +17886,7 @@ public partial class CombatEngine
                 player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, 3);
                         tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
@@ -17907,7 +17923,7 @@ public partial class CombatEngine
                 }
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                     }
@@ -17925,7 +17941,7 @@ public partial class CombatEngine
                     player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, abilityResult.Duration);
                         if (!tm.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
@@ -17990,7 +18006,7 @@ public partial class CombatEngine
                 // Heal 200 all allies (handled for self by BaseHealing) + self ATK buff (handled)
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         long tidalHp0 = tm.HP; tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.CastHeal(player, 200, result.Monsters)); EvHeal(player, tm, tm.HP - tidalHp0); // 1.2.0: Amara and Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
@@ -18004,7 +18020,7 @@ public partial class CombatEngine
                 // All allies: +50 ATK, +30 DEF (handled for self)
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 50, abilityResult.Duration);
                         tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 30, abilityResult.Duration);
@@ -21021,11 +21037,7 @@ public partial class CombatEngine
         // enemies, so a Cleric companion in a fight against orcs would burn a turn
         // on a guaranteed no-op. Drop it from the candidate list when no valid
         // target exists.
-        bool hasUndeadOrDemonTarget = availableTargets != null &&
-            availableTargets.Any(m => m.IsAlive &&
-                (m.MonsterClass == MonsterClass.Undead ||
-                 m.MonsterClass == MonsterClass.Demon ||
-                 m.Undead > 0));
+        bool hasUndeadOrDemonTarget = availableTargets != null && availableTargets.Any(TurnUndeadBites);
 
         var availableAttacks = spells
             .Where(s => s.SpellType == "Attack" &&
@@ -21079,6 +21091,14 @@ public partial class CombatEngine
 
         // 70% chance to cast spell instead of attacking (don't always spam spells)
         if (random.Next(100) >= 70) return false;
+
+        // 1.3.6 G5 (D item 8): Turn Undead lands only on an undead or demon foe, as on the player paths. The pick
+        // above keeps it only while one is present; its target comes from those foes alone.
+        if (spell.Name == "Turn Undead")
+        {
+            livingMonsters = livingMonsters.Where(TurnUndeadBites).ToList();
+            if (livingMonsters.Count == 0) return false;
+        }
 
         // Cast the spell. NO manual pre-deduction here: CastSpell itself deducts
         // CalculateManaCost on success -- the old pre-deduct made teammate casters
@@ -21358,6 +21378,11 @@ public partial class CombatEngine
         // Get all abilities available to this teammate's class and level
         var availableAbilities = ClassAbilitySystem.GetAvailableAbilities(teammate);
         if (availableAbilities == null || availableAbilities.Count == 0) return false;
+
+        // 1.3.6 G5 (B F6): a teammate never takes an escape ability (Disappearing Act); it would spend the turn, the
+        // stamina and the cooldown and leave the fight as it was
+        availableAbilities = availableAbilities.Where(a => a.SpecialEffect != "escape").ToList();
+        if (availableAbilities.Count == 0) return false;
 
         // Filter out abilities the player has disabled for this companion
         if (teammate.IsCompanion && teammate.CompanionId.HasValue)
@@ -21689,6 +21714,10 @@ public partial class CombatEngine
 
         // Apply ability effects through the full system (same as player path)
         await ApplyAbilityEffectsMultiMonster(teammate, target, livingMonsters, abilityResult, result);
+
+        // 1.3.6 G5 (B X3): an NPC Bard's ability use runs the Bard passive, Bardic Inspiration, as the player's does
+        if (teammate.Class == CharacterClass.Bard)
+            ApplyBardicInspiration(teammate, result);
 
         // Log the action
         result.CombatLog.Add($"{teammate.DisplayName} uses {chosenAbility.Name}");
@@ -22388,8 +22417,8 @@ public partial class CombatEngine
         // Apply difficulty modifier
         monsterAttack = DifficultySystem.ApplyMonsterDamageMultiplier(monsterAttack);
 
-        // Earthbind Totem: -20% monster attack (player's totem affects all monster attacks)
-        if (result.Player != null && result.Player.ActiveTotemType == 2 && result.Player.ActiveTotemRounds > 0)
+        // Earthbind Totem: -20% monster attack (the player's totem and, 1.3.6 G5 C D10, an NPC Shaman's own)
+        if (PartyEarthbindActive(null, result, currentTeammates))
         {
             monsterAttack = (long)(monsterAttack * 0.80);
         }
@@ -26287,7 +26316,7 @@ public partial class CombatEngine
                     terminal.SetColor("bright_cyan");
                     terminal.WriteLine(Loc.Get("combat.calm_waters_wash"));
                     terminal.WriteLine(Loc.Get("combat.gains_debuff_resistance", player.DisplayName, duration), "cyan");
-                    var shieldTargets = result.Teammates?.Where(t => t.IsAlive).ToList();
+                    var shieldTargets = PartyReachOthers(player, result);
                     if (shieldTargets != null)
                     {
                         foreach (var tm in shieldTargets)
@@ -26613,7 +26642,7 @@ public partial class CombatEngine
                 // Also heal companions
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.HP = Math.Min(tm.MaxHP, tm.HP + abilityResult.Healing);
                         terminal.WriteLine(Loc.Get("combat.ability_oceans_embrace_ally", tm.Name, abilityResult.Healing), "cyan");
@@ -26685,7 +26714,7 @@ public partial class CombatEngine
                 // +25 ATK to all allies (handled by AttackBonus for self)
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, abilityResult.Duration);
                     }
@@ -26710,7 +26739,7 @@ public partial class CombatEngine
             case "crescendo_aoe":
             {
                 // 180 AoE + 50 per ally in party + inspire buff
-                int caAllyCount = result?.Teammates?.Count(t => t.IsAlive) ?? 0;
+                int caAllyCount = PartyReachOthers(player, result).Count;
                 int caBonusDmg = caAllyCount * 50;
                 if (monster != null && monster.IsAlive)
                 {
@@ -26735,7 +26764,7 @@ public partial class CombatEngine
                 player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, 3);
                         tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
@@ -26753,7 +26782,7 @@ public partial class CombatEngine
                     player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, abilityResult.Duration);
                         if (!tm.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
@@ -26797,7 +26826,7 @@ public partial class CombatEngine
                 player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                     }
@@ -26830,7 +26859,7 @@ public partial class CombatEngine
                 // Heal 200 all allies (handled for self by BaseHealing) + self ATK buff (handled)
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.HP = Math.Min(tm.MaxHP, tm.HP + GodBoonSystem.CastHeal(player, 200, result.Monsters)); // 1.2.0: Amara and Solarius
                         terminal.WriteLine(Loc.Get("combat.ability_tidal_harmony_ally", tm.Name), "cyan");
@@ -26844,7 +26873,7 @@ public partial class CombatEngine
                 // All allies: +50 ATK, +30 DEF (handled for self)
                 if (result?.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in PartyReachOthers(player, result))
                     {
                         tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 50, abilityResult.Duration);
                         tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 30, abilityResult.Duration);
@@ -27843,8 +27872,9 @@ public partial class CombatEngine
                 // tick for EVERYONE including the caster (ShamanTotemHealPercentGroup). Pre-v0.57.13 the
                 // totem healed 10% of each member's MaxHP every round regardless of party size — at a
                 // 4-member party that's 40% total group healing/round and trivialized group PvE.
-                bool hasLivingTeammate = result.Teammates != null
-                    && result.Teammates.Any(t => t.IsAlive);
+                // 1.3.6 G5 (CP1): the rest of the party, the player included when an NPC Shaman holds the totem
+                var totemOthers = PartyReachOthers(player, result);
+                bool hasLivingTeammate = totemOthers.Count > 0;
                 float rate = hasLivingTeammate
                     ? GameConfig.ShamanTotemHealPercentGroup
                     : GameConfig.ShamanTotemHealPercent;
@@ -27860,9 +27890,8 @@ public partial class CombatEngine
                     totalHealed += playerHeal;
                 }
                 // Heal teammates/companions at the same rate
-                if (result.Teammates != null)
                 {
-                    foreach (var tm in result.Teammates.Where(t => t.IsAlive))
+                    foreach (var tm in totemOthers)
                     {
                         long tmPower = (long)(tm.MaxHP * rate);
                         long tmHeal = Math.Min(tmPower, tm.MaxHP - tm.HP);
@@ -27918,9 +27947,12 @@ public partial class CombatEngine
                 break;
             case 5: // Spirit Link — redistribute HP among party (solo: self-heal 15% MaxHP)
             {
-                if (result.Teammates != null && result.Teammates.Count > 0)
+                // 1.3.6 G5: the holder once and every other living member (the player included when an NPC Shaman holds
+                // it); with no other living member (none listed, or every listed teammate dead) the solo heal (C D11)
+                var linkOthers = PartyReachOthers(player, result);
+                if (linkOthers.Count > 0)
                 {
-                    var alive = result.Teammates.Where(t => t.IsAlive).Concat(new[] { player }).ToList();
+                    var alive = linkOthers.Concat(new[] { player }).ToList();
                     long totalHP = alive.Sum(a => a.HP);
                     long totalMaxHP = alive.Sum(a => a.MaxHP);
                     if (totalMaxHP > 0)

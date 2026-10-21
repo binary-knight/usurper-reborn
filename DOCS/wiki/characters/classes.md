@@ -81,7 +81,7 @@ Divine Resolve gives a Paladin {{percent:PaladinDivineResolveDamageBonus}} perce
 
 ### Bardic Inspiration (Bard)
 
-After each ability a Bard uses there is a {{balance:BardInspirationChance}} percent chance of Bardic Inspiration: one random living companion or NPC teammate gains {{balance:BardInspirationAttackBonus}} attack for at least {{balance:BardInspirationDuration}} rounds. With no such teammate it does nothing.
+After each ability a Bard uses there is a {{balance:BardInspirationChance}} percent chance of Bardic Inspiration: one random living companion or NPC teammate gains {{balance:BardInspirationAttackBonus}} attack for at least {{balance:BardInspirationDuration}} rounds. With no such teammate it does nothing. A Bard ally's abilities have the same chance.
 
 ### Trickster's Luck (Jester)
 

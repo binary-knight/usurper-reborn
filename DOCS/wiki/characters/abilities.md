@@ -74,6 +74,6 @@ The Healing, Earthbind, Searing and Windfury totems last {{balance:ShamanTotemBa
 
 - Healing Totem heals {{percent:ShamanTotemHealPercent}} percent of maximum HP each round when the Shaman fights alone. With any living teammate it heals the Shaman and each teammate {{percent:ShamanTotemHealPercentGroup}} percent each round.
 - Windfury Totem gives a {{balance:ShamanWindfuryProcChance}} percent chance each round of one more attack.
-- Spirit Link Totem shares out the party's HP each round, so that every living member holds the same share of its own maximum. A Shaman with no teammates is healed {{percent:ShamanSpiritLinkPercent}} percent of maximum HP instead.
+- Spirit Link Totem shares out the party's HP each round, so that every living member holds the same share of its own maximum. A Shaman with no living teammate is healed {{percent:ShamanSpiritLinkPercent}} percent of maximum HP instead.
 
 The Shaman's weapon enchants are under [Elemental Mastery](/wiki/en/characters/classes/#elemental-mastery-mystic-shaman).
