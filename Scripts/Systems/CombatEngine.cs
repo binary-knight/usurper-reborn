@@ -8986,6 +8986,120 @@ public partial class CombatEngine
         return IsMagicalAbilityEffect(abilityResult.SpecialEffect);
     }
 
+    /// <summary>1.3.6: the kinds of a class ability, from one table (AbilityKinds). An ability can have several.</summary>
+    [Flags]
+    internal enum AbilityKind
+    {
+        None = 0,
+        /// <summary>Hits every foe at once: no target prompt, no hit roll, no off-hand swing, the teammate area pick.</summary>
+        Area = 1,
+        /// <summary>One target, spreading to every foe on a kill (Seal Fracture): a target prompt, no off-hand swing.</summary>
+        Spread = 2,
+        /// <summary>Its own handler deals its damage: the base block does not also hit, and it does not roll.</summary>
+        OwnDamage = 4,
+        /// <summary>A finishing blow on a wounded foe: the teammate execute pick.</summary>
+        Execute = 8,
+        /// <summary>Works on the mind: no hit roll, no off-hand swing.</summary>
+        Mind = 16,
+        /// <summary>A thrown or spoken hit, not a melee one: no hit roll, no weapon procs, no Thorns, no off-hand swing.</summary>
+        NotMelee = 32,
+        /// <summary>An area hit whose handler strikes the chosen target differently from the rest (Chain Lightning: full
+        /// damage on it, half and diminishing on the others), so it keeps the target prompt.</summary>
+        Primary = 64,
+    }
+
+    /// <summary>1.3.6: area effects (every foe at once). Keyed by effect, as the handlers are.</summary>
+    private static readonly HashSet<string> AreaAbilityEffects = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "aoe", "aoe_confusion", "aoe_holy", "aoe_taunt", "aoe_corrode", "crescendo_aoe", "entropy_aoe",
+        "execute_all", "grand_finale_jester", "grand_finale", "resonance_cascade", "dissonant_wave",
+        "shaman_chain_lightning", "maelstrom_faithful", "sanctified_torrent", "singularity",
+        "abyssal_eruption", "abyss_unchained", "void_rupture",
+    };
+
+    /// <summary>1.3.6: area effects whose handler treats the chosen target differently from the rest.</summary>
+    private static readonly HashSet<string> PrimaryAbilityEffects = new(StringComparer.OrdinalIgnoreCase) { "shaman_chain_lightning" };
+
+    /// <summary>1.3.6: a single target hit that spreads to every foe on a kill.</summary>
+    private static readonly HashSet<string> SpreadAbilityEffects = new(StringComparer.OrdinalIgnoreCase) { "overflow_aoe" };
+
+    /// <summary>1.3.6: the finishing blows (Execute, Assassinate's instant kill, Reap).</summary>
+    private static readonly HashSet<string> ExecuteAbilityEffects = new(StringComparer.OrdinalIgnoreCase) { "execute", "instant_kill", "execute_reap" };
+
+    /// <summary>The effects that work on the mind (the distract, psychic, magic, charm, fear and confusion effects).</summary>
+    private static readonly HashSet<string> MindAbilityEffects = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "distract", "psychic", "magic", "charm", "fear", "confusion", "aoe_confusion",
+    };
+
+    /// <summary>1.3.6 (Q9): the Alchemist's thrown bombs and the Bard's Cutting Words, keyed by ability (an effect id
+    /// such as "aoe" is shared with melee abilities).</summary>
+    private static readonly HashSet<string> NotMeleeAbilityIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "acid_splash", "frost_bomb", "explosive_flask", "philosophers_bomb", "cataclysm_bomb", "cutting_words",
+        "throw_bomb",
+    };
+
+    /// <summary>1.3.6: the one source for an ability's kinds, read by the base block, the hit roll, the off-hand
+    /// swing, the quickbar target prompt and the teammate picks.</summary>
+    internal static AbilityKind AbilityKinds(string? abilityId, string? effect)
+    {
+        var kinds = AbilityKind.None;
+        if (!string.IsNullOrEmpty(effect))
+        {
+            if (AreaAbilityEffects.Contains(effect)) kinds |= AbilityKind.Area;
+            if (PrimaryAbilityEffects.Contains(effect)) kinds |= AbilityKind.Primary;
+            if (SpreadAbilityEffects.Contains(effect)) kinds |= AbilityKind.Spread;
+            // The own-damage list: each handler applies its own damage loop or hit, so the generic base damage block
+            // skips these (it would hit a second time). The "aoe" and "aoe_confusion" handler is INSIDE the base block,
+            // so it is not here. v0.61.5: "fire" (Throw Bomb) is a single-target bonus on top of the base block, so it
+            // is not here either. Audit sweep: every single-target handler here applies its own damage (verified per
+            // case); the base block too dealt about 2x and, when it killed first, skipped the handler's on-kill riders.
+            // v1.0.4: those handlers route through ApplyHandlerAbilityDamage for the crit, Marked and enchant pipeline.
+            bool isAoEAbility = effect is "crescendo_aoe"
+                or "aoe_holy" or "void_rupture"
+                or "dissonant_wave" or "aoe_taunt" or "grand_finale_jester" or "execute_all"
+                or "shaman_chain_lightning"
+                or "echo_25" or "cycles_end" or "overflow_aoe" or "soul_leech"
+                or "consume_soul" or "execute_reap" or "devour" or "entropic_blade"
+                or "annihilation" or "wrath_deep" or "shaman_lightning_bolt"
+                or "sanctified_torrent" or "maelstrom_faithful" or "aoe_corrode"
+                or "entropy_aoe" or "singularity" or "abyssal_eruption"
+                or "abyss_unchained"
+                // 1.3.6: the handler hits every foe once; the base block also hit (and rolled for) the first one
+                or "resonance_cascade" or "grand_finale";
+            if (isAoEAbility) kinds |= AbilityKind.OwnDamage;
+            if (ExecuteAbilityEffects.Contains(effect)) kinds |= AbilityKind.Execute;
+            if (MindAbilityEffects.Contains(effect)) kinds |= AbilityKind.Mind;
+        }
+        if (!string.IsNullOrEmpty(abilityId) && NotMeleeAbilityIds.Contains(abilityId)) kinds |= AbilityKind.NotMelee;
+        return kinds;
+    }
+
+    internal static AbilityKind AbilityKinds(ClassAbilitySystem.ClassAbility? ability) => AbilityKinds(ability?.Id, ability?.SpecialEffect);
+
+    internal static AbilityKind AbilityKinds(ClassAbilityResult? abilityResult) =>
+        AbilityKinds(abilityResult?.AbilityUsed?.Id, abilityResult?.SpecialEffect);
+
+    /// <summary>1.3.6 (Q19, Q9): an Attack ability with damage gives a dual wielder an off-hand swing unless it is an
+    /// area hit, spreads to every foe, works on the mind or is thrown or spoken.</summary>
+    internal static bool AbilityGivesOffHandSwing(AbilityKind kinds) =>
+        (kinds & (AbilityKind.Area | AbilityKind.Spread | AbilityKind.Mind | AbilityKind.NotMelee)) == 0;
+
+    /// <summary>1.3.6: the quickbar asks for a target for an Attack or Debuff ability that is not an area one, or that
+    /// is an area one whose handler treats the chosen target differently (Primary).</summary>
+    internal static bool QuickbarAbilityAsksForTarget(ClassAbilitySystem.ClassAbility ability) =>
+        (ability.Type == ClassAbilitySystem.AbilityType.Attack || ability.Type == ClassAbilitySystem.AbilityType.Debuff)
+        && ((AbilityKinds(ability) & AbilityKind.Area) == 0 || (AbilityKinds(ability) & AbilityKind.Primary) != 0);
+
+    /// <summary>1.3.6: the teammate's pick at 3 or more foes: its first area ability.</summary>
+    internal static ClassAbilitySystem.ClassAbility? TeammateAreaPick(IEnumerable<ClassAbilitySystem.ClassAbility> attackAbilities) =>
+        attackAbilities.FirstOrDefault(a => (AbilityKinds(a) & AbilityKind.Area) != 0);
+
+    /// <summary>1.3.6: a finishing blow for the teammate's execute pick, its low HP check and its target.</summary>
+    internal static bool IsTeammateExecutePick(ClassAbilitySystem.ClassAbility? ability) =>
+        ability != null && (AbilityKinds(ability) & AbilityKind.Execute) != 0;
+
     // 1.3.5: the targets whose immunity message this ability action has printed (one line per target per action)
     private readonly HashSet<Monster> _abilityImmunityAnnounced = new();
 
@@ -13934,7 +14048,11 @@ public partial class CombatEngine
         => ApplyAoEDamageCore(monsters, totalDamage, result, damageSource, isSpellDamage, attacker, spellCaster, notMelee: false);
 
     // notMelee: a ranged hit (Volley, Arrow Storm), so the Gnoll bite stays off it
-    private async Task ApplyAoEDamageCore(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource, bool isSpellDamage, Character? attacker, Character? spellCaster, bool notMelee)
+    private Task ApplyAoEDamageCore(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource, bool isSpellDamage, Character? attacker, Character? spellCaster, bool notMelee)
+        => ApplyAoEDamageHits(monsters, totalDamage, result, damageSource, isSpellDamage, attacker, spellCaster, notMelee, noWeaponProcs: false);
+
+    // noWeaponProcs (1.3.6, Q9): a thrown bomb, no weapon procs and no Thorns; its immunity kind stays physical
+    private async Task ApplyAoEDamageHits(List<Monster> monsters, long totalDamage, CombatResult result, string? damageSource, bool isSpellDamage, Character? attacker, Character? spellCaster, bool notMelee, bool noWeaponProcs)
     {
         var livingMonsters = monsters.Where(m => m.IsAlive).ToList();
         if (livingMonsters.Count == 0) return;
@@ -14044,9 +14162,9 @@ public partial class CombatEngine
             // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
             var enchantAttacker = attacker ?? result.Player;
             if (enchantAttacker != null)
-                ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage, notMelee: notMelee);
+                ApplyPostHitEnchantments(enchantAttacker, monster, actualDamage, result, isSpellDamage || noWeaponProcs, notMelee: notMelee);
 
-            if (!isSpellDamage && !notMelee)
+            if (!isSpellDamage && !notMelee && !noWeaponProcs)
                 ReflectMonsterThorns(attacker, monster, actualDamage);   // 1.3.2: a melee area hit on Thorns
 
             if (monster.HP <= 0)
@@ -14472,16 +14590,16 @@ public partial class CombatEngine
 
     /// <summary>
     /// 1.2.8: a class ability rolls to hit when it is a physical single-target attack: an Attack ability with
-    /// damage whose effect is not area, magical or mental (the test of the off-hand follow-up below, and
-    /// MagicalAbilityEffects), that deals its damage in the base block (the effects with their own damage
+    /// damage that is not area, mental, thrown or spoken (AbilityKinds) nor magical (IsMagicalAbility),
+    /// that deals its damage in the base block (the effects with their own damage
     /// handler are area or prestige magic), and that does not promise a certain hit (Precise Shot).
     /// </summary>
     internal static bool AbilityRollsToHit(ClassAbilitySystem.ClassAbility ability, ClassAbilityResult abilityResult, bool hasOwnDamageHandler)
     {
         if (ability.Type != ClassAbilitySystem.AbilityType.Attack || abilityResult.Damage <= 0 || hasOwnDamageHandler) return false;
         string effect = abilityResult.SpecialEffect ?? "";
-        if (effect.Contains("aoe") || effect.Contains("distract") || effect.Contains("psychic") || effect.Contains("magic")
-            || effect.Contains("charm") || effect.Contains("fear") || effect.Contains("confus")) return false;
+        // 1.3.6: area, mind, thrown and spoken hits do not roll (the ability's kinds)
+        if ((AbilityKinds(ability.Id, effect) & (AbilityKind.Area | AbilityKind.Mind | AbilityKind.NotMelee)) != 0) return false;
         if (IsMagicalAbility(abilityResult)) return false;   // 1.3.5: the ability's one kind, as for its protections and procs
         return effect != "guaranteed_hit";
     }
@@ -16139,49 +16257,11 @@ public partial class CombatEngine
         bool isPlayer = (player == currentPlayer);
         string actorName = isPlayer ? Loc.Get("combat.actor_you") : player.DisplayName;
 
-        // Skip base single-target damage for AoE abilities — their special effect handlers do all the damage
-        // AoE abilities that have their own damage loops in the special effect handler
-        // These skip the generic single-target base damage to avoid double-dipping
-        // Only include effects that have a dedicated case/handler doing their own damage loop
-        // Effects with NO handler (whirlwind, chain_lightning, corrosive_cloud_aoe, harmonic_crescendo)
-        // rely on the generic base damage and must NOT be listed here
-        // AoE abilities with EXTERNAL damage handlers (outside the base damage block)
-        // These skip the generic single-target base damage to avoid double-dipping
-        // NOTE: "aoe" handler is INSIDE the base damage block so must NOT be skipped
-        //
-        // v0.61.5 (Lv.3 Alchemist player report): "fire" was previously in this list,
-        // but the "fire" handler at line ~13751 is single-target, applies BONUS damage
-        // to Plant/Beast only, and a burn DoT. It does NOT have an AoE damage loop.
-        // Including it here caused Throw Bomb's base damage to be skipped entirely --
-        // the bomb explodes for 0 damage against non-Plant/Beast and HALF damage
-        // against vulnerable targets, neither of which matches the "Hurl an explosive
-        // concoction at enemies" description. Player report: bonus damage killed a
-        // wolf but no death message displayed because the "fire" case had no kill
-        // check (compared to "holy" / "lifesteal" which both check IsAlive post-damage).
-        // Fix: remove "fire" from the AoE list so the base damage block fires for
-        // Throw Bomb. Base block has its own kill check; the "fire" case below also
-        // gets a kill check for the edge case where base damage doesn't kill but
-        // the fire bonus does.
-        // v1.0.4 (PR #114 follow-up): see ApplyHandlerAbilityDamage below. The
-        // single-target entries in this list apply their own damage, so the base
-        // block must not also apply it -- but they still need the crit / Marked /
-        // enchant pipeline, which they now get by routing through that helper.
-        bool isAoEAbility = abilityResult.SpecialEffect is "crescendo_aoe"
-            or "aoe_holy" or "void_rupture"
-            or "dissonant_wave" or "aoe_taunt" or "grand_finale_jester" or "execute_all"
-            or "shaman_chain_lightning"
-            // Audit sweep: every handler below applies its own damage (verified
-            // per-case), so running the base block too dealt ~2x listed damage --
-            // and when the base hit killed first, the handler's IsAlive guard
-            // skipped its on-kill riders (Consume Soul stacks, Reap reset,
-            // lifesteal heals) entirely. Same bug class as the v0.57.2
-            // shadow_harvest and v0.61.2 lifesteal fixes; this is the remainder.
-            or "echo_25" or "cycles_end" or "overflow_aoe" or "soul_leech"
-            or "consume_soul" or "execute_reap" or "devour" or "entropic_blade"
-            or "annihilation" or "wrath_deep" or "shaman_lightning_bolt"
-            or "sanctified_torrent" or "maelstrom_faithful" or "aoe_corrode"
-            or "entropy_aoe" or "singularity" or "abyssal_eruption"
-            or "abyss_unchained";
+        // Abilities whose own handler deals their damage skip the generic single-target base damage (it would hit
+        // twice); the list and its history are in AbilityKinds (1.3.6: one source for an ability's kinds).
+        var abilityKinds = AbilityKinds(abilityResult);
+        bool isAoEAbility = (abilityKinds & AbilityKind.OwnDamage) != 0;
+        bool thrownOrSpoken = (abilityKinds & AbilityKind.NotMelee) != 0;   // 1.3.6 (Q9): no weapon procs, no Thorns
 
         // 1.2.8: a physical single-target ability rolls to hit (AbilityRollsToHit); from hiding it is certain.
         // This path has no evasion check and gets none. A missed ability does nothing: no damage, no healing,
@@ -16276,7 +16356,8 @@ public partial class CombatEngine
                 // AoE abilities hit all monsters
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.ability_aoe_all"));
-                await ApplyAoEDamageCore(monsters, actualDamage, result, ability.DisplayName, false, player, null, notMelee: IsRangedAbility(ability));
+                await ApplyAoEDamageHits(monsters, actualDamage, result, ability.DisplayName, false, player, null, notMelee: IsRangedAbility(ability),
+                    noWeaponProcs: thrownOrSpoken);   // 1.3.6 (Q9): a thrown bomb sets off no weapon proc and no Thorns
                 // AoE confusion: confuse surviving monsters
                 if (abilityResult.SpecialEffect == "aoe_confusion")
                 {
@@ -16369,9 +16450,10 @@ public partial class CombatEngine
                 // Apply all post-hit enchantment effects (lifesteal, elemental procs, sunforged, poison)
                 // Magical abilities (Holy Smite, Lightning Bolt, etc.) don't proc weapon enchants
                 bool magicalAbilityHit = IsMagicalAbility(abilityResult);
-                ApplyPostHitEnchantments(player, target, abilityHpRemoved, result, isSpellDamage: magicalAbilityHit, notMelee: IsRangedAbility(ability));
+                // 1.3.6 (Q9): a thrown bomb or Cutting Words is not a weapon hit: no weapon procs and no Thorns
+                ApplyPostHitEnchantments(player, target, abilityHpRemoved, result, isSpellDamage: magicalAbilityHit || thrownOrSpoken, notMelee: IsRangedAbility(ability));
 
-                if (!magicalAbilityHit && !IsRangedAbility(ability))
+                if (!magicalAbilityHit && !IsRangedAbility(ability) && !thrownOrSpoken)
                     ReflectMonsterThorns(player, target, actualDamage);   // 1.3.2: a melee ability hit on Thorns
 
                 // v0.57.2 Shadow Harvest lifesteal — 25% of damage dealt heals the caster. Applied
@@ -16431,11 +16513,8 @@ public partial class CombatEngine
 
         // Off-hand follow-up for melee attack abilities when dual-wielding
         // Power Strike etc. empower the main hand — the off-hand still gets its normal swing
-        // Non-melee abilities (distract, psychic, magic) don't trigger off-hand physical strikes
-        bool isNonMeleeAbility = abilityResult.SpecialEffect.Contains("aoe") ||
-            abilityResult.SpecialEffect.Contains("distract") || abilityResult.SpecialEffect.Contains("psychic") ||
-            abilityResult.SpecialEffect.Contains("magic") || abilityResult.SpecialEffect.Contains("charm") ||
-            abilityResult.SpecialEffect.Contains("fear") || abilityResult.SpecialEffect.Contains("confus");
+        // 1.3.6: no off-hand swing after an area ability (Q19), a spread, a mind ability or a thrown or spoken hit (Q9)
+        bool isNonMeleeAbility = !AbilityGivesOffHandSwing(abilityKinds);
         if (ability.Type == ClassAbilitySystem.AbilityType.Attack && abilityResult.Damage > 0 && player.IsDualWielding
             && !isNonMeleeAbility)
         {
@@ -21487,10 +21566,7 @@ public partial class CombatEngine
         // Situational priority: AoE when many monsters, execute when low HP target
         if (chosenAbility == null && livingMonsters.Count >= 3)
         {
-            var aoeAbility = attackAbilities.FirstOrDefault(a =>
-                a.SpecialEffect == "aoe" || a.SpecialEffect == "whirlwind" ||
-                a.SpecialEffect == "fire" || a.SpecialEffect == "holy_aoe" ||
-                a.SpecialEffect == "aoe_holy" || a.SpecialEffect == "aoe_taunt");
+            var aoeAbility = TeammateAreaPick(attackAbilities);   // 1.3.6: every area ability (AbilityKinds)
             if (aoeAbility != null && random.Next(100) < 60)
                 chosenAbility = aoeAbility;
         }
@@ -21499,13 +21575,12 @@ public partial class CombatEngine
         var stillAlive = monsters.Where(m => m.IsAlive).ToList();
         if (chosenAbility == null && stillAlive.Any(m => m.HP < m.MaxHP * 0.3))
         {
-            var executeAbility = attackAbilities.FirstOrDefault(a =>
-                a.SpecialEffect == "execute" || a.SpecialEffect == "assassinate");
+            var executeAbility = attackAbilities.FirstOrDefault(IsTeammateExecutePick);   // 1.3.6: Execute, Assassinate, Reap
             if (executeAbility != null && random.Next(100) < 50)
                 chosenAbility = executeAbility;
         }
         // Don't use execute if no living monster is actually low HP
-        if (chosenAbility != null && (chosenAbility.SpecialEffect == "execute" || chosenAbility.SpecialEffect == "assassinate"))
+        if (IsTeammateExecutePick(chosenAbility))
         {
             if (!stillAlive.Any(m => m.HP < m.MaxHP * 0.3))
                 chosenAbility = null; // Cancel — no valid execute target
@@ -21588,7 +21663,7 @@ public partial class CombatEngine
         if (chosenAbility.Type == ClassAbilitySystem.AbilityType.Attack || chosenAbility.Type == ClassAbilitySystem.AbilityType.Debuff)
         {
             // Target low HP monster for execute abilities, otherwise weakest
-            if (chosenAbility.SpecialEffect == "execute" || chosenAbility.SpecialEffect == "assassinate")
+            if (IsTeammateExecutePick(chosenAbility))
             {
                 target = livingMonsters.OrderBy(m => (double)m.HP / m.MaxHP).FirstOrDefault();
             }
@@ -31553,8 +31628,8 @@ public partial class CombatEngine
         var abilityDef = ClassAbilitySystem.GetAbility(matched.slotId);
         if (abilityDef != null && (abilityDef.Type == ClassAbilitySystem.AbilityType.Attack || abilityDef.Type == ClassAbilitySystem.AbilityType.Debuff))
         {
-            bool isAoe = abilityDef.SpecialEffect.Contains("aoe");
-            if (isAoe)
+            // 1.3.6: an area ability takes every foe; a single target one (Seal Fracture too) and Chain Lightning ask (AbilityKinds)
+            if (!QuickbarAbilityAsksForTarget(abilityDef))
             {
                 return (CombatActionType.ClassAbility, null, matched.slotId, 0, null, true);
             }
