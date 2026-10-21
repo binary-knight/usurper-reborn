@@ -1790,15 +1790,13 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("bright_cyan");
                             terminal.WriteLine($"  {Loc.Get("combat.sage_seal_ward", player.DisplayName, sealPercent)}");
                         }
-                        player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, ward);
-                        player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, spellDur);
+                        player.AddSlotBonus(BonusSlot.Defense, CombatEngine.SpellSlotSource(player, result, selectedSpell.Level), ward, spellDur);   // 1.3.6 G4
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"  {Loc.Get("world_boss.protection_increased", ward)}");
                     }
                     if (result.AttackBonus > 0)
                     {
-                        player.TempAttackBonus = Math.Max(player.TempAttackBonus, result.AttackBonus);
-                        player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, spellDur);
+                        player.AddSlotBonus(BonusSlot.Attack, CombatEngine.SpellSlotSource(player, result, selectedSpell.Level), result.AttackBonus, spellDur);   // 1.3.6 G4
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"  {Loc.Get("world_boss.attack_increased", result.AttackBonus)}");
                     }
@@ -2030,16 +2028,14 @@ namespace UsurperRemake.Systems
 
             if (result.AttackBonus > 0)
             {
-                player.TempAttackBonus = Math.Max(player.TempAttackBonus, result.AttackBonus);
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, dur);
+                player.AddSlotBonus(BonusSlot.Attack, CombatEngine.SlotSource(result), result.AttackBonus, dur);   // 1.3.6 G4
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("world_boss.buff_attack_dur", result.AttackBonus, player.TempAttackBonusDuration)}");
             }
 
             if (result.DefenseBonus > 0)
             {
-                player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, result.DefenseBonus);
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, dur);
+                player.AddSlotBonus(BonusSlot.Defense, CombatEngine.SlotSource(result), result.DefenseBonus, dur);   // 1.3.6 G4
                 terminal.SetColor("cyan");
                 terminal.WriteLine($"  {Loc.Get("world_boss.buff_defense_dur", result.DefenseBonus, player.TempDefenseBonusDuration)}");
             }

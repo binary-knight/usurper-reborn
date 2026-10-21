@@ -8522,8 +8522,7 @@ public partial class CombatEngine
             {
                 // Teammates get 60% of the Bard's attack buff
                 int teamAtkBonus = (int)(abilityResult.AttackBonus * 0.6);
-                teammate.TempAttackBonus = Math.Max(teammate.TempAttackBonus, teamAtkBonus);
-                teammate.TempAttackBonusDuration = Math.Max(teammate.TempAttackBonusDuration, abilityResult.Duration);
+                teammate.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), teamAtkBonus, abilityResult.Duration);
             }
 
             // Apply defense buff to teammate (use Math.Max — don't downgrade existing buffs, don't stack)
@@ -8531,8 +8530,7 @@ public partial class CombatEngine
             {
                 // Teammates get 60% of the Bard's defense buff
                 int teamDefBonus = (int)(abilityResult.DefenseBonus * 0.6);
-                teammate.TempDefenseBonus = Math.Max(teammate.TempDefenseBonus, teamDefBonus);
-                teammate.TempDefenseBonusDuration = Math.Max(teammate.TempDefenseBonusDuration, abilityResult.Duration);
+                teammate.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), teamDefBonus, abilityResult.Duration);
             }
         }
 
@@ -8563,8 +8561,7 @@ public partial class CombatEngine
         if (teammates == null || teammates.Count == 0) return;
 
         var target = teammates[random.Next(teammates.Count)];
-        target.TempAttackBonus += GameConfig.BardInspirationAttackBonus;
-        target.TempAttackBonusDuration = Math.Max(target.TempAttackBonusDuration, GameConfig.BardInspirationDuration);
+        target.AddSlotBonus(BonusSlot.Attack, "bardic_inspiration", GameConfig.BardInspirationAttackBonus, GameConfig.BardInspirationDuration);
         terminal.SetColor("bright_yellow");
         terminal.WriteLine(Loc.Get("combat.bardic_inspiration", target.DisplayName, GameConfig.BardInspirationAttackBonus, GameConfig.BardInspirationDuration));
     }
@@ -8690,8 +8687,7 @@ public partial class CombatEngine
             case "party_stimulant":
             {
                 // Self buff
-                alchemist.TempAttackBonus += abilityResult.AttackBonus;
-                alchemist.TempAttackBonusDuration = Math.Max(alchemist.TempAttackBonusDuration, abilityResult.Duration);
+                alchemist.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);
                 terminal.WriteLine(isPlayer
                     ? $"  {Loc.Get("combat.alch_stimulant_self", abilityResult.AttackBonus)}"
                     : $"  {Loc.Get("combat.alch_stimulant_other", alchemist.DisplayName, abilityResult.AttackBonus)}", "bright_yellow");
@@ -8701,8 +8697,7 @@ public partial class CombatEngine
                     int tmBonus = (int)(abilityResult.AttackBonus * 0.75);
                     foreach (var tm in teammates)
                     {
-                        tm.TempAttackBonus += tmBonus;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), tmBonus, abilityResult.Duration);
                         terminal.WriteLine($"  {Loc.Get("combat.tm_energized", tm.DisplayName, tmBonus)}", "yellow");
                     }
                 }
@@ -8711,8 +8706,7 @@ public partial class CombatEngine
             case "party_smoke_screen":
             {
                 // Self defense buff
-                alchemist.TempDefenseBonus += abilityResult.DefenseBonus;
-                alchemist.TempDefenseBonusDuration = Math.Max(alchemist.TempDefenseBonusDuration, abilityResult.Duration);
+                alchemist.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                 terminal.WriteLine(isPlayer
                     ? $"  {Loc.Get("combat.alch_smoke_self", abilityResult.DefenseBonus)}"
                     : $"  {Loc.Get("combat.alch_smoke_other", alchemist.DisplayName, abilityResult.DefenseBonus)}", "gray");
@@ -8721,8 +8715,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in teammates)
                     {
-                        tm.TempDefenseBonus += abilityResult.DefenseBonus;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                         terminal.WriteLine($"  {Loc.Get("combat.tm_obscured", tm.DisplayName, abilityResult.DefenseBonus)}", "gray");
                     }
                 }
@@ -8731,10 +8724,8 @@ public partial class CombatEngine
             case "party_battle_brew":
             {
                 // Self buff
-                alchemist.TempAttackBonus += abilityResult.AttackBonus;
-                alchemist.TempAttackBonusDuration = Math.Max(alchemist.TempAttackBonusDuration, abilityResult.Duration);
-                alchemist.TempDefenseBonus += abilityResult.DefenseBonus;
-                alchemist.TempDefenseBonusDuration = Math.Max(alchemist.TempDefenseBonusDuration, abilityResult.Duration);
+                alchemist.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);
+                alchemist.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                 terminal.WriteLine(isPlayer
                     ? $"  {Loc.Get("combat.alch_brew_self", abilityResult.AttackBonus, abilityResult.DefenseBonus)}"
                     : $"  {Loc.Get("combat.alch_brew_other", alchemist.DisplayName, abilityResult.AttackBonus, abilityResult.DefenseBonus)}", "bright_cyan");
@@ -8745,10 +8736,8 @@ public partial class CombatEngine
                     int tmDef = (int)(abilityResult.DefenseBonus * 0.75);
                     foreach (var tm in teammates)
                     {
-                        tm.TempAttackBonus += tmAtk;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
-                        tm.TempDefenseBonus += tmDef;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), tmAtk, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), tmDef, abilityResult.Duration);
                         terminal.WriteLine($"  {Loc.Get("combat.tm_empowered", tm.DisplayName, tmAtk, tmDef)}", "cyan");
                     }
                 }
@@ -8857,8 +8846,7 @@ public partial class CombatEngine
                     cleric.HP += selfHeal;
                     EvHeal(cleric, cleric, selfHeal);   // 1.2.6
                 }
-                cleric.TempDefenseBonus += abilityResult.DefenseBonus;
-                cleric.TempDefenseBonusDuration = Math.Max(cleric.TempDefenseBonusDuration, abilityResult.Duration);
+                cleric.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                 terminal.WriteLine(isPlayer
                     ? $"  {Loc.Get("combat.cleric_beacon_self", selfHeal, abilityResult.DefenseBonus, abilityResult.Duration)}"
                     : $"  {Loc.Get("combat.cleric_beacon_other", cleric.DisplayName, selfHeal, abilityResult.DefenseBonus, abilityResult.Duration)}", "bright_yellow");
@@ -8869,8 +8857,7 @@ public partial class CombatEngine
                     {
                         long tmHeal = Math.Min((long)(abilityResult.Healing * 0.75), tm.MaxHP - tm.HP);
                         if (tmHeal > 0) { tm.HP += tmHeal; EvHeal(cleric, tm, tmHeal); }
-                        tm.TempDefenseBonus += abilityResult.DefenseBonus;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                         terminal.WriteLine($"  {Loc.Get("combat.tm_shielded_beacon", tm.DisplayName, tmHeal, abilityResult.DefenseBonus)}", "yellow");
                     }
                 }
@@ -9098,6 +9085,15 @@ public partial class CombatEngine
 
     internal static CasterPart HandlerAppliesToCaster(string? effect) =>
         !string.IsNullOrEmpty(effect) && HandlerCasterParts.TryGetValue(effect, out var parts) ? parts : CasterPart.None;
+
+    /// <summary>1.3.6 G4: the source name an ability's attack or defence entry is held under (its id).</summary>
+    internal static string SlotSource(ClassAbilityResult? abilityResult) =>
+        abilityResult?.AbilityUsed?.Id ?? (string.IsNullOrEmpty(abilityResult?.SpecialEffect) ? "ability" : abilityResult!.SpecialEffect);
+
+    /// <summary>1.3.6 G4: the source name a spell's attack or defence entry is held under: its effect, or its class and level.</summary>
+    internal static string SpellSlotSource(Character? caster, SpellSystem.SpellResult? spellResult, int spellLevel) =>
+        !string.IsNullOrEmpty(spellResult?.SpecialEffect) ? "spell_" + spellResult!.SpecialEffect
+            : $"spell_{caster?.Class}_{spellLevel}";
 
     /// <summary>1.3.6 (Q19, Q9): an Attack ability with damage gives a dual wielder an off-hand swing unless it is an
     /// area hit, spreads to every foe, works on the mind or is thrown or spoken.</summary>
@@ -16684,47 +16680,23 @@ public partial class CombatEngine
         // Apply buffs
         if (abilityResult.AttackBonus > 0 && !abilityMissed && (handlerParts & CasterPart.Attack) == 0)
         {
-            // Use the higher of current or new bonus (don't let weaker buff overwrite stronger)
-            if (abilityResult.AttackBonus > player.TempAttackBonus)
-            {
-                player.TempAttackBonus = abilityResult.AttackBonus;
-                player.TempAttackBonusDuration = abilityResult.Duration;
-            }
-            else if (player.TempAttackBonusDuration <= 0)
-            {
-                // No active buff — apply this one
-                player.TempAttackBonus = abilityResult.AttackBonus;
-                player.TempAttackBonusDuration = abilityResult.Duration;
-            }
-            else
-            {
-                // Existing buff is stronger — just refresh duration if this one is longer
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration);
-            }
+            // 1.3.6 G4: this ability's own entry; the highest entry shows, a recast refreshes and does not stack
+            player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_attack_up" : "combat.ability_attack_up_npc", actorName, abilityResult.AttackBonus, abilityResult.Duration));
         }
 
         if (abilityResult.DefenseBonus > 0 && !abilityMissed && (handlerParts & CasterPart.Defense) == 0)
         {
-            // Use the higher of current or new bonus
-            if (abilityResult.DefenseBonus > player.TempDefenseBonus || player.TempDefenseBonusDuration <= 0)
-            {
-                player.TempDefenseBonus = abilityResult.DefenseBonus;
-                player.TempDefenseBonusDuration = abilityResult.Duration;
-            }
-            else
-            {
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
-            }
+            // 1.3.6 G4: this ability's own entry; the highest entry shows, a recast refreshes and does not stack
+            player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
             terminal.SetColor("cyan");
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_defense_up" : "combat.ability_defense_up_npc", actorName, abilityResult.DefenseBonus, abilityResult.Duration));
         }
         else if (abilityResult.DefenseBonus < 0 && !abilityMissed)
         {
-            // Rage reduces defense
-            player.TempDefenseBonus = abilityResult.DefenseBonus;
-            player.TempDefenseBonusDuration = abilityResult.Duration;
+            // Rage reduces defense: 1.3.6 G4, a penalty entry of its own on top of any held bonus
+            player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
             terminal.SetColor("yellow");
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_defense_down" : "combat.ability_defense_down_npc", actorName, -abilityResult.DefenseBonus));
         }
@@ -16889,16 +16861,14 @@ public partial class CombatEngine
                 {
                     foreach (var teammate in result.Teammates.Where(t => t.IsAlive))
                     {
-                        teammate.TempAttackBonus += 15;
-                        teammate.TempAttackBonusDuration = Math.Max(teammate.TempAttackBonusDuration, 3);
+                        teammate.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 3);
                     }
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_inspire_allies" : "combat.ability_inspire_allies_npc", actorName));
                 }
                 else
                 {
-                    player.TempAttackBonus += 10;
-                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 10, 3);
                     terminal.SetColor("bright_yellow");
                     terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_inspire_self" : "combat.ability_inspire_self_npc", actorName));
                 }
@@ -16946,8 +16916,7 @@ public partial class CombatEngine
             // === DAMAGE ENHANCEMENT EFFECTS ===
 
             case "reckless":
-                player.TempDefenseBonus -= 20;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 1);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), -20, 1);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_reckless" : "combat.ability_reckless_npc", actorName));
                 break;
@@ -17305,8 +17274,7 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 int evasionDefBase = abilityResult.DefenseBonus > 0 ? abilityResult.DefenseBonus : 50;
                 int evasionDef = evasionDefBase + (int)(player.Constitution / 5); // CON scaling
-                player.TempDefenseBonus += evasionDef;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 2);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), evasionDef, abilityResult.Duration > 0 ? abilityResult.Duration : 2);
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_evasion" : "combat.ability_evasion_npc", actorName));
                 terminal.SetColor("cyan");
@@ -17390,8 +17358,7 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 int vanishDefBase = abilityResult.DefenseBonus > 0 ? abilityResult.DefenseBonus : 80;
                 int vanishDef = vanishDefBase + (int)(player.Constitution / 4); // CON scaling
-                player.TempDefenseBonus += vanishDef;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 1);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), vanishDef, abilityResult.Duration > 0 ? abilityResult.Duration : 1);
                 // Hidden = 2 (not 1) so the status survives the start-of-next-round
                 // ProcessStatusEffects tick. See Symphony of the Depths fix in SpellSystem
                 // for the full explanation — every "auto-crit on next attack" Hidden grant
@@ -17806,8 +17773,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus += 25;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, abilityResult.Duration);
                     }
                 }
                 terminal.SetColor("bright_cyan");
@@ -17861,18 +17827,14 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe_allies", allyCount, bonusDmg));
                 }
                 // Inspire buff: +25 ATK, +25 DEF for 3 rounds to all allies
-                player.TempAttackBonus += 25;
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
-                player.TempDefenseBonus += 25;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 3);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, 3);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
                 if (result?.Teammates != null)
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus += 25;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, 3);
-                        tm.TempDefenseBonus += 25;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, 3);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, 3);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
                     }
                 }
                 terminal.SetColor("bright_green");
@@ -17908,12 +17870,10 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus = Math.Max(tm.TempAttackBonus, 15);
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, 2);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                     }
                 }
-                player.TempAttackBonus = Math.Max(player.TempAttackBonus, 15);
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 2);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                 terminal.SetColor("bright_green");
                 terminal.WriteLine(Loc.Get("combat.ability_grand_finale_inspire"));
                 break;
@@ -17921,16 +17881,14 @@ public partial class CombatEngine
 
             case "harmonic_shield":
                 // +40 DEF + 15% reflection to entire party (including caster)
-                player.TempDefenseBonus += 40;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, abilityResult.Duration);
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
                     player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
                 if (result?.Teammates != null)
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempDefenseBonus += 40;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, abilityResult.Duration);
                         if (!tm.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
                             tm.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
                     }
@@ -18009,10 +17967,8 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus += 50;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
-                        tm.TempDefenseBonus += 30;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 50, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 30, abilityResult.Duration);
                     }
                 }
                 terminal.SetColor("bright_cyan");
@@ -18071,8 +18027,7 @@ public partial class CombatEngine
             case "temporal_feint":
                 // Auto-hit/crit next attack, dodge this round
                 player.DodgeNextAttack = true;
-                player.TempAttackBonus += 999; // Guarantee hit
-                player.TempAttackBonusDuration = 1;
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1); // Guarantee hit
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2; // Crit bonus from stealth
@@ -18085,10 +18040,8 @@ public partial class CombatEngine
                 // Scale with both cycle count and player level for meaningful buff
                 int cycle = StoryProgressionSystem.Instance?.CurrentCycle ?? 1;
                 int cycleBonus = Math.Min(50, cycle * (player.Level / 10 + 1));
-                player.TempAttackBonus += cycleBonus;
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration);
-                player.TempDefenseBonus += cycleBonus;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), cycleBonus, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), cycleBonus, abilityResult.Duration);
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("combat.ability_borrowed_power", cycleBonus));
                 break;
@@ -18294,8 +18247,7 @@ public partial class CombatEngine
             case "umbral_step":
                 // Guaranteed crit + evade all attacks
                 player.DodgeNextAttack = true;
-                player.TempAttackBonus += 999;
-                player.TempAttackBonusDuration = 1;
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -18453,8 +18405,7 @@ public partial class CombatEngine
                         target.HP = 0;
                         if (!result.DefeatedMonsters.Contains(target))
                             result.DefeatedMonsters.Add(target);
-                        player.TempAttackBonus += 5;
-                        player.TempAttackBonusDuration = 999;
+                        player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Attack, SlotSource(abilityResult)) + 5, 999);   // 1.3.6 G4: its own entry grows by 5 a kill
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_consume_soul_bonus"));
                     }
@@ -18524,8 +18475,7 @@ public partial class CombatEngine
                 bool desperate = player.HP < (int)(player.MaxHP * 0.25);
                 if (desperate)
                 {
-                    player.TempAttackBonus += 60;
-                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Attack, SlotSource(abilityResult)) + 60, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("combat.ability_offer_flesh_desperate", sacrifice));
                 }
@@ -18754,8 +18704,7 @@ public partial class CombatEngine
                 // Flametongue: +15% ATK bonus for the enchant duration (mirrors Rockbiter's +DEF)
                 {
                     int fireAtkBonus = Math.Max(1, (int)(player.Strength * 0.15));
-                    player.TempAttackBonus += fireAtkBonus;
-                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, GameConfig.ShamanEnchantDuration);
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), fireAtkBonus, GameConfig.ShamanEnchantDuration);
                     terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", GameConfig.GetShamanEnchantPower(player.Intelligence), GameConfig.ShamanEnchantDuration), "bright_red");
                     terminal.WriteLine(Loc.Get("combat.attack_power_increased", fireAtkBonus), "bright_red");
                 }
@@ -18772,8 +18721,7 @@ public partial class CombatEngine
                 player.ShamanEnchantType = 3;
                 player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
                 player.ShamanEnchantPower = GameConfig.GetShamanEnchantPower(player.Intelligence);
-                player.TempDefenseBonus += abilityResult.DefenseBonus;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, GameConfig.ShamanEnchantDuration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Defense, SlotSource(abilityResult)) + abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration);   // 1.3.6 G4: Rockbiter still adds per cast (OneApply136 pins it; the supervisor's word changes it)
                 terminal.WriteLine(Loc.Get("combat.shaman_enchant_earth", GameConfig.GetShamanEnchantPower(player.Intelligence), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration), "bright_green");
                 break;
 
@@ -19081,7 +19029,7 @@ public partial class CombatEngine
             }
             void ApplyBuffTo(Character tgt)
             {
-                ApplySpellEffects(tgt, null, spellResult, monsters: monsters, healer: player);
+                ApplySpellEffectsAs(tgt, null, spellResult, SpellSlotSource(player, spellResult, spellInfo.Level), monsters: monsters, healer: player);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name} on {tgt.DisplayName}.");
             }
 
@@ -19094,7 +19042,7 @@ public partial class CombatEngine
                 if (!overrideTgt.IsAlive || overrideTgt == player)
                 {
                     // Dead target or self -> apply to caster (matches the dead-ally fallback).
-                    ApplySpellEffects(player, null, spellResult, monsters: monsters);
+                    ApplySpellEffectsAs(player, null, spellResult, SpellSlotSource(player, spellResult, spellInfo.Level), monsters: monsters);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(overrideTgt);
@@ -19110,7 +19058,7 @@ public partial class CombatEngine
             else if (spellInfo.IsMultiTarget && spellInfo.SpellType == "Buff")
             {
                 // Apply buffs to caster
-                ApplySpellEffects(player, null, spellResult, monsters: monsters);
+                ApplySpellEffectsAs(player, null, spellResult, SpellSlotSource(player, spellResult, spellInfo.Level), monsters: monsters);
 
                 // Apply buffs to all living teammates
                 if (currentTeammates != null)
@@ -19122,8 +19070,7 @@ public partial class CombatEngine
                         if (spellResult.AttackBonus > 0)
                         {
                             int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
-                            tm.TempAttackBonus += spellResult.AttackBonus;
-                            tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, dur);
+                            tm.AddSlotBonus(BonusSlot.Attack, SpellSlotSource(player, spellResult, spellInfo.Level), spellResult.AttackBonus, dur);
                             terminal.WriteLine(Loc.Get("combat.power_surges", tm.DisplayName, spellResult.AttackBonus), "red");
                         }
                         // Symphony of the Depths and any other multi-target buff that
@@ -19155,8 +19102,7 @@ public partial class CombatEngine
                     if (spellResult.AttackBonus > 0)
                     {
                         int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
-                        lead.TempAttackBonus += spellResult.AttackBonus;
-                        lead.TempAttackBonusDuration = Math.Max(lead.TempAttackBonusDuration, dur);
+                        lead.AddSlotBonus(BonusSlot.Attack, SpellSlotSource(player, spellResult, spellInfo.Level), spellResult.AttackBonus, dur);
                         terminal.WriteLine(Loc.Get("combat.power_surges", lead.DisplayName, spellResult.AttackBonus), "red");
                     }
                     if (player.HasStatus(StatusEffect.Hidden) && !lead.HasStatus(StatusEffect.Hidden))
@@ -19237,7 +19183,7 @@ public partial class CombatEngine
                 if (!allyTarget.IsAlive)
                 {
                     // Ally died between selection and execution — fall back to self
-                    ApplySpellEffects(player, null, spellResult, monsters: monsters);
+                    ApplySpellEffectsAs(player, null, spellResult, SpellSlotSource(player, spellResult, spellInfo.Level), monsters: monsters);
                     result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
                 }
                 else if (spellInfo.SpellType == "Heal") ApplyHealTo(allyTarget);
@@ -19246,7 +19192,7 @@ public partial class CombatEngine
             else
             {
                 // Self-targeting (no ally selected, or invalid index)
-                ApplySpellEffects(player, null, spellResult, monsters: monsters);
+                ApplySpellEffectsAs(player, null, spellResult, SpellSlotSource(player, spellResult, spellInfo.Level), monsters: monsters);
                 result.CombatLog.Add($"{player.DisplayName} casts {spellInfo.Name}.");
             }
         }
@@ -25775,48 +25721,21 @@ public partial class CombatEngine
             // Use the higher of current or new bonus (don't let weaker buff overwrite stronger)
             if (abilityResult.AttackBonus > 0)
             {
-                if (abilityResult.AttackBonus > player.TempAttackBonus)
-                {
-                    player.TempAttackBonus = abilityResult.AttackBonus;
-                    player.TempAttackBonusDuration = abilityResult.Duration;
-                }
-                else if (player.TempAttackBonusDuration <= 0)
-                {
-                    player.TempAttackBonus = abilityResult.AttackBonus;
-                    player.TempAttackBonusDuration = abilityResult.Duration;
-                }
-                else
-                {
-                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration);
-                }
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);   // 1.3.6 G4
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("combat.attack_increased", abilityResult.AttackBonus, abilityResult.Duration), "cyan");
             }
 
             if (abilityResult.DefenseBonus > 0)
             {
-                if (abilityResult.DefenseBonus > player.TempDefenseBonus)
-                {
-                    player.TempDefenseBonus = abilityResult.DefenseBonus;
-                    player.TempDefenseBonusDuration = abilityResult.Duration;
-                }
-                else if (player.TempDefenseBonusDuration <= 0)
-                {
-                    player.TempDefenseBonus = abilityResult.DefenseBonus;
-                    player.TempDefenseBonusDuration = abilityResult.Duration;
-                }
-                else
-                {
-                    player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
-                }
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);   // 1.3.6 G4
                 terminal.SetColor("cyan");
                 terminal.WriteLine(Loc.Get("combat.defense_increased", abilityResult.DefenseBonus, abilityResult.Duration), "cyan");
             }
             else if (abilityResult.DefenseBonus < 0)
             {
-                // Rage reduces defense
-                player.TempDefenseBonus = abilityResult.DefenseBonus;
-                player.TempDefenseBonusDuration = abilityResult.Duration;
+                // Rage reduces defense: 1.3.6 G4, a penalty entry of its own on top of any held bonus
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                 terminal.WriteLine(Loc.Get("combat.defense_reduced_rage", -abilityResult.DefenseBonus), "yellow");
             }
         }
@@ -25941,8 +25860,7 @@ public partial class CombatEngine
 
             case "smoke":
                 terminal.WriteLine(Loc.Get("combat.smoke_obscures"), "gray");
-                player.TempDefenseBonus += 40;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 2);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, 2);
                 break;
 
             case "rage":
@@ -25962,8 +25880,7 @@ public partial class CombatEngine
                 break;
 
             case "inspire":
-                player.TempAttackBonus += 10;
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 10, 3);
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("combat.melody_steels"));
                 break;
@@ -25976,8 +25893,7 @@ public partial class CombatEngine
                 break;
 
             case "reckless":
-                player.TempDefenseBonus -= 20;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 1);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), -20, 1);
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.reckless_swing"));
                 break;
@@ -26265,8 +26181,7 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 int evasionDefBaseSM = abilityResult.DefenseBonus > 0 ? abilityResult.DefenseBonus : 50;
                 int evasionDefSM = evasionDefBaseSM + (int)(player.Constitution / 5); // CON scaling
-                player.TempDefenseBonus += evasionDefSM;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 2);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), evasionDefSM, abilityResult.Duration > 0 ? abilityResult.Duration : 2);
                 terminal.SetColor("magenta");
                 terminal.WriteLine(Loc.Get("combat.melt_shadows"));
                 terminal.SetColor("cyan");
@@ -26348,8 +26263,7 @@ public partial class CombatEngine
                 player.DodgeNextAttack = true;
                 int vanishDefBaseSM = abilityResult.DefenseBonus > 0 ? abilityResult.DefenseBonus : 80;
                 int vanishDefSM = vanishDefBaseSM + (int)(player.Constitution / 4); // CON scaling
-                player.TempDefenseBonus += vanishDefSM;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 1);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), vanishDefSM, abilityResult.Duration > 0 ? abilityResult.Duration : 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -26733,8 +26647,7 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus += 25;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, abilityResult.Duration);
                     }
                 }
                 terminal.SetColor("bright_cyan");
@@ -26778,18 +26691,14 @@ public partial class CombatEngine
                     terminal.WriteLine(Loc.Get("combat.ability_crescendo_aoe_allies", caAllyCount, caBonusDmg));
                 }
                 // Inspire buff: +25 ATK, +25 DEF for 3 rounds to all allies
-                player.TempAttackBonus += 25;
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
-                player.TempDefenseBonus += 25;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 3);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, 3);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
                 if (result?.Teammates != null)
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus += 25;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, 3);
-                        tm.TempDefenseBonus += 25;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, 3);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 25, 3);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 25, 3);
                     }
                 }
                 terminal.SetColor("bright_green");
@@ -26799,16 +26708,14 @@ public partial class CombatEngine
 
             case "harmonic_shield":
                 // +40 DEF + 15% reflection to entire party (including caster)
-                player.TempDefenseBonus += 40;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, abilityResult.Duration);
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
                     player.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
                 if (result?.Teammates != null)
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempDefenseBonus += 40;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 40, abilityResult.Duration);
                         if (!tm.ActiveStatuses.ContainsKey(StatusEffect.Reflecting))
                             tm.ActiveStatuses[StatusEffect.Reflecting] = abilityResult.Duration;
                     }
@@ -26847,14 +26754,12 @@ public partial class CombatEngine
                     }
                 }
                 // Inspire buff: +15 ATK for 2 rounds to player and all teammates
-                player.TempAttackBonus = Math.Max(player.TempAttackBonus, 15);
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 2);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                 if (result?.Teammates != null)
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus = Math.Max(tm.TempAttackBonus, 15);
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, 2);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 15, 2);
                     }
                 }
                 terminal.SetColor("bright_green");
@@ -26901,10 +26806,8 @@ public partial class CombatEngine
                 {
                     foreach (var tm in result.Teammates.Where(t => t.IsAlive))
                     {
-                        tm.TempAttackBonus += 50;
-                        tm.TempAttackBonusDuration = Math.Max(tm.TempAttackBonusDuration, abilityResult.Duration);
-                        tm.TempDefenseBonus += 30;
-                        tm.TempDefenseBonusDuration = Math.Max(tm.TempDefenseBonusDuration, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 50, abilityResult.Duration);
+                        tm.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), 30, abilityResult.Duration);
                     }
                 }
                 terminal.SetColor("bright_cyan");
@@ -26957,8 +26860,7 @@ public partial class CombatEngine
             case "temporal_feint":
                 // Auto-hit/crit next attack, dodge this round
                 player.DodgeNextAttack = true;
-                player.TempAttackBonus += 999;
-                player.TempAttackBonusDuration = 1;
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -26971,10 +26873,8 @@ public partial class CombatEngine
                 // Scale with both cycle count and player level for meaningful buff
                 int cbCycle = StoryProgressionSystem.Instance?.CurrentCycle ?? 1;
                 int cbCycleBonus = Math.Min(50, cbCycle * (player.Level / 10 + 1));
-                player.TempAttackBonus += cbCycleBonus;
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration);
-                player.TempDefenseBonus += cbCycleBonus;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), cbCycleBonus, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), cbCycleBonus, abilityResult.Duration);
                 terminal.SetColor("bright_magenta");
                 terminal.WriteLine(Loc.Get("combat.ability_borrowed_power", cbCycleBonus));
                 break;
@@ -27154,8 +27054,7 @@ public partial class CombatEngine
             case "umbral_step":
                 // Guaranteed crit + evade all attacks
                 player.DodgeNextAttack = true;
-                player.TempAttackBonus += 999;
-                player.TempAttackBonusDuration = 1;
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), 999, 1);
                 // Hidden = 2 so it survives the next-round status tick (see Symphony fix).
                 if (!player.ActiveStatuses.ContainsKey(StatusEffect.Hidden))
                     player.ActiveStatuses[StatusEffect.Hidden] = 2;
@@ -27279,8 +27178,7 @@ public partial class CombatEngine
                         monster.HP = 0;
                         if (!result.DefeatedMonsters.Contains(monster))
                             result.DefeatedMonsters.Add(monster);
-                        player.TempAttackBonus += 5;
-                        player.TempAttackBonusDuration = 999;
+                        player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Attack, SlotSource(abilityResult)) + 5, 999);   // 1.3.6 G4: its own entry grows by 5 a kill
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get("combat.ability_consume_soul_bonus"));
                     }
@@ -27339,8 +27237,7 @@ public partial class CombatEngine
                 bool ofDesperate = player.HP < (int)(player.MaxHP * 0.25);
                 if (ofDesperate)
                 {
-                    player.TempAttackBonus += 60;
-                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Attack, SlotSource(abilityResult)) + 60, abilityResult.Duration > 0 ? abilityResult.Duration : 3);
                     terminal.SetColor("bright_red");
                     terminal.WriteLine(Loc.Get("combat.ability_offer_flesh_desperate", ofSacrifice));
                 }
@@ -27533,8 +27430,7 @@ public partial class CombatEngine
                 // Flametongue: +15% ATK bonus for the enchant duration (mirrors Rockbiter's +DEF)
                 {
                     int fireAtkBonus = Math.Max(1, (int)(player.Strength * 0.15));
-                    player.TempAttackBonus += fireAtkBonus;
-                    player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, GameConfig.ShamanEnchantDuration);
+                    player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), fireAtkBonus, GameConfig.ShamanEnchantDuration);
                     terminal.WriteLine(Loc.Get("combat.shaman_enchant_fire", GameConfig.GetShamanEnchantPower(player.Intelligence), GameConfig.ShamanEnchantDuration), "bright_red");
                     terminal.WriteLine(Loc.Get("combat.attack_power_increased", fireAtkBonus), "bright_red");
                 }
@@ -27551,8 +27447,7 @@ public partial class CombatEngine
                 player.ShamanEnchantType = 3;
                 player.ShamanEnchantRounds = GameConfig.ShamanEnchantDuration;
                 player.ShamanEnchantPower = GameConfig.GetShamanEnchantPower(player.Intelligence);
-                player.TempDefenseBonus += abilityResult.DefenseBonus;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, GameConfig.ShamanEnchantDuration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), player.SlotBonusValue(BonusSlot.Defense, SlotSource(abilityResult)) + abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration);   // 1.3.6 G4: Rockbiter still adds per cast (OneApply136 pins it; the supervisor's word changes it)
                 terminal.WriteLine(Loc.Get("combat.shaman_enchant_earth", GameConfig.GetShamanEnchantPower(player.Intelligence), abilityResult.DefenseBonus, GameConfig.ShamanEnchantDuration), "bright_green");
                 break;
 
@@ -28738,15 +28633,13 @@ public partial class CombatEngine
         // Apply temp attack/defense bonuses to attacker
         if (abilityResult.AttackBonus > 0)
         {
-            attacker.TempAttackBonus += abilityResult.AttackBonus;
-            attacker.TempAttackBonusDuration = Math.Max(attacker.TempAttackBonusDuration, abilityResult.Duration);
+            attacker.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);
             terminal.SetColor("bright_yellow");
             terminal.WriteLine(Loc.Get("combat.attack_power_increased", abilityResult.AttackBonus));
         }
         if (abilityResult.DefenseBonus > 0)
         {
-            attacker.TempDefenseBonus += abilityResult.DefenseBonus;
-            attacker.TempDefenseBonusDuration = Math.Max(attacker.TempDefenseBonusDuration, abilityResult.Duration);
+            attacker.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
             terminal.SetColor("bright_cyan");
             terminal.WriteLine(Loc.Get("combat.defense_increased_flat", abilityResult.DefenseBonus));
         }
@@ -28824,7 +28717,7 @@ public partial class CombatEngine
                 // must be applied here directly -- ApplySpellEffects only damages Monster
                 // targets and ApplyPvPSpellEffect only handles special effects, so AI
                 // caster defenders used to deal literally 0 spell damage.
-                ApplySpellEffects(computer, null, spellResult);
+                ApplySpellEffectsAs(computer, null, spellResult, SpellSlotSource(computer, spellResult, chosen.Level));
                 if (spellResult.Success)
                 {
                     if (spellResult.Damage > 0)
@@ -28893,13 +28786,11 @@ public partial class CombatEngine
                 }
                 if (abilityResult.AttackBonus > 0)
                 {
-                    computer.TempAttackBonus += abilityResult.AttackBonus;
-                    computer.TempAttackBonusDuration = Math.Max(computer.TempAttackBonusDuration, abilityResult.Duration);
+                    computer.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);
                 }
                 if (abilityResult.DefenseBonus > 0)
                 {
-                    computer.TempDefenseBonus += abilityResult.DefenseBonus;
-                    computer.TempDefenseBonusDuration = Math.Max(computer.TempDefenseBonusDuration, abilityResult.Duration);
+                    computer.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                 }
                 if (abilityResult.CooldownApplied > 0)
                     pvpDefenderCooldowns[chosen.Id] = abilityResult.CooldownApplied;
@@ -29429,7 +29320,7 @@ public partial class CombatEngine
             }
 
             // Apply spell effects
-            ApplySpellEffects(player, monster, spellResult, result, monster != null ? new[] { monster } : null);
+            ApplySpellEffectsAs(player, monster, spellResult, SpellSlotSource(player, spellResult, selectedSpell.Level), result, monster != null ? new[] { monster } : null);
 
             // Display training improvement message if spell proficiency increased
             if (spellResult.SkillImproved && !string.IsNullOrEmpty(spellResult.NewProficiencyLevel))
@@ -29447,6 +29338,18 @@ public partial class CombatEngine
         }
     }
     
+    /// <summary>1.3.6 G4: ApplySpellEffects with the source name its attack entry is held under (the spell's).</summary>
+    private void ApplySpellEffectsAs(Character caster, Monster target, SpellSystem.SpellResult spellResult, string? slotSource, CombatResult result = null, IEnumerable<Monster>? monsters = null, Character? healer = null)
+    {
+        var held = _spellSlotSource;
+        _spellSlotSource = slotSource;
+        try { ApplySpellEffects(caster, target, spellResult, result, monsters, healer); }
+        finally { _spellSlotSource = held; }
+    }
+
+    /// <summary>1.3.6 G4: the spell source ApplySpellEffectsAs names for the cast being applied (null: worked out from the result).</summary>
+    private string? _spellSlotSource;
+
     /// <summary>
     /// Apply spell effects to combat
     /// </summary>
@@ -29521,8 +29424,7 @@ public partial class CombatEngine
         if (spellResult.AttackBonus > 0)
         {
             int dur = spellResult.Duration > 0 ? spellResult.Duration : 3;
-            caster.TempAttackBonus += spellResult.AttackBonus;
-            caster.TempAttackBonusDuration = Math.Max(caster.TempAttackBonusDuration, dur);
+            caster.AddSlotBonus(BonusSlot.Attack, _spellSlotSource ?? SpellSlotSource(caster, spellResult, 0), spellResult.AttackBonus, dur);   // 1.3.6 G4: the spell's own entry
             string durText = dur >= 999 ? Loc.Get("combat.whole_fight") : Loc.Get("combat.n_rounds", dur);
             terminal.WriteLine(Loc.Get("combat.caster_power_surges", caster.DisplayName, spellResult.AttackBonus, durText), "red");
         }
@@ -29755,8 +29657,8 @@ public partial class CombatEngine
 
             case "wish":
                 // Wish: double all combat stats
-                caster.TempAttackBonus += (int)caster.Strength;
-                caster.TempDefenseBonus += (int)caster.Defense;
+                caster.AddSlotBonus(BonusSlot.Attack, "spell_wish", (int)caster.Strength, 0);   // 1.3.6 G4: Wish's own entries
+                caster.AddSlotBonus(BonusSlot.Defense, "spell_wish", (int)caster.Defense, 0);
                 terminal.WriteLine(Loc.Get("combat.wish_reshapes_reality", caster.DisplayName), "bright_magenta");
                 break;
 
@@ -29784,8 +29686,7 @@ public partial class CombatEngine
                 // Giant Form: grow to massive size — bonus defense + heal to full
                 {
                     int giantDef = 20 + (int)(caster.Level / 3);
-                    caster.TempDefenseBonus += giantDef;
-                    caster.TempDefenseBonusDuration = Math.Max(caster.TempDefenseBonusDuration, 999);
+                    caster.AddSlotBonus(BonusSlot.Defense, "spell_giant", giantDef, 999);
                     long giantHeal = Math.Min(caster.Level * 3, caster.MaxHP - caster.HP);
                     if (giantHeal > 0) { caster.HP += giantHeal; EvHeal(caster, caster, giantHeal); }   // 1.2.6
                     terminal.WriteLine(Loc.Get("combat.grows_enormous", caster.DisplayName, giantDef, giantHeal), "bright_green");
@@ -29960,8 +29861,8 @@ public partial class CombatEngine
                 break;
 
             case "wish":
-                caster.TempAttackBonus += (int)caster.Strength;
-                caster.TempDefenseBonus += (int)caster.Defense;
+                caster.AddSlotBonus(BonusSlot.Attack, "spell_wish", (int)caster.Strength, 0);   // 1.3.6 G4: Wish's own entries
+                caster.AddSlotBonus(BonusSlot.Defense, "spell_wish", (int)caster.Defense, 0);
                 terminal.WriteLine(Loc.Get("combat.wish_reshapes_reality", caster.DisplayName), "bright_magenta");
                 break;
 
@@ -30013,7 +29914,7 @@ public partial class CombatEngine
             case "giant":
                 {
                     int giantDef = 20 + (int)(caster.Level / 3);
-                    caster.TempDefenseBonus += giantDef;
+                    caster.AddSlotBonus(BonusSlot.Defense, "spell_giant", giantDef, 0);   // 1.3.6 G4: no rounds, as before
                     long giantHeal = Math.Min(caster.Level * 3, caster.MaxHP - caster.HP);
                     if (giantHeal > 0) caster.HP += giantHeal;
                     terminal.WriteLine(Loc.Get("combat.grows_enormous", caster.DisplayName, giantDef, giantHeal), "bright_green");
@@ -31781,16 +31682,14 @@ public partial class CombatEngine
             // Apply as temporary buff
             if (abilityResult.AttackBonus > 0)
             {
-                player.TempAttackBonus += abilityResult.AttackBonus;
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Attack, SlotSource(abilityResult), abilityResult.AttackBonus, abilityResult.Duration);
                 terminal.SetColor("bright_yellow");
                 terminal.WriteLine(Loc.Get("combat.attack_increased", abilityResult.AttackBonus, abilityResult.Duration));
             }
 
             if (abilityResult.DefenseBonus != 0)
             {
-                player.TempDefenseBonus += abilityResult.DefenseBonus;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, abilityResult.Duration);
+                player.AddSlotBonus(BonusSlot.Defense, SlotSource(abilityResult), abilityResult.DefenseBonus, abilityResult.Duration);
                 string sign = abilityResult.DefenseBonus >= 0 ? "+" : "";
                 terminal.SetColor(abilityResult.DefenseBonus >= 0 ? "bright_cyan" : "yellow");
                 terminal.WriteLine(Loc.Get("combat.defense_bonus_rounds", sign, abilityResult.DefenseBonus, abilityResult.Duration));

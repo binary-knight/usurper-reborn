@@ -15715,16 +15715,14 @@ public class DungeonLocation : BaseLocation
                     var ghostBuff = dungeonRandom.Next(3);
                     if (ghostBuff == 0)
                     {
-                        player.TempAttackBonus += 15;
-                        player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, 3);
+                        player.AddSlotBonus(BonusSlot.Attack, "ghost_companion", 15, 3);   // 1.3.6 G4 (the fight start clears it, as before)
                         terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_strength")}\"");
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("dungeon.ghost_companion_atk_buff"));
                     }
                     else if (ghostBuff == 1)
                     {
-                        player.TempDefenseBonus += 15;
-                        player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 3);
+                        player.AddSlotBonus(BonusSlot.Defense, "ghost_companion", 15, 3);   // 1.3.6 G4 (the fight start clears it, as before)
                         terminal.WriteLine($"  {ghost.Companion.Name}: \"{Loc.Get("dungeon.ghost_companion_watch_back")}\"");
                         terminal.SetColor("green");
                         terminal.WriteLine(Loc.Get("dungeon.ghost_companion_def_buff"));

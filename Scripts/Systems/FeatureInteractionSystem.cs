@@ -776,8 +776,9 @@ public class FeatureInteractionSystem
             // Apply temporary stat boost based on the stat code
             switch (stat)
             {
-                case "STR": player.TempAttackBonus += boost; break;
-                case "DEX": player.TempDefenseBonus += boost; break;
+                // 1.3.6 G4: entries with no rounds, as before (the fight start clears them)
+                case "STR": player.AddSlotBonus(BonusSlot.Attack, "feature_insight", boost, 0); break;
+                case "DEX": player.AddSlotBonus(BonusSlot.Defense, "feature_insight", boost, 0); break;
                 case "INT": player.Mana = Math.Min(player.MaxMana, player.Mana + boost * 5); break;
             }
         }
@@ -1101,7 +1102,7 @@ public class FeatureInteractionSystem
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("feature.spot_weaknesses"));
                 terminal.WriteLine(Loc.Get("feature.next_battle_easier"));
-                player.TempAttackBonus += 5 + (level / 10);
+                player.AddSlotBonus(BonusSlot.Attack, "feature_weakness", 5 + (level / 10), 0);   // 1.3.6 G4: no rounds, as before
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("feature.attack_power_bonus", 5 + (level / 10)));
                 break;

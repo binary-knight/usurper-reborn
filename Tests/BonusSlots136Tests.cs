@@ -317,4 +317,99 @@ public class BonusSlots136Tests
         tick.Should().BeGreaterThan(clear, "and ticks them at each round end of the fight");
         src.IndexOf("Reset transient combat buffs", StringComparison.Ordinal).Should().BeLessThan(clear);
     }
+
+    // ---------------------------------------------------------------- the writers through the entries
+
+    internal static SpellSystem.SpellResult CastOk(Character caster, int level)
+    {
+        for (int i = 0; i < 200; i++)
+        {
+            caster.Mana = caster.MaxMana;
+            var r = SpellSystem.CastSpell(caster, level, null);
+            if (r.Success) return r;
+        }
+        throw new Exception($"spell {level} never succeeded in 200 casts");
+    }
+
+    internal static Character Caster(CharacterClass cls, int spell, int level = 60)
+    {
+        var c = cls == CharacterClass.Magician || cls == CharacterClass.Sage
+            ? G.Hero(hp: 100_000, level: level, cls: cls, main: 30, mainType: WeaponType.Staff)   // their spells need a staff
+            : G.Hero(hp: 100_000, level: level, cls: cls);
+        c.Intelligence = 40; c.BaseIntelligence = 40; c.Wisdom = 40; c.BaseWisdom = 40;
+        c.MaxMana = 100_000; c.Mana = 100_000;
+        c.Spell = Enumerable.Range(1, 25).Select(slot => new List<bool> { slot == spell }).ToList();
+        c.ClearSlotBonuses();
+        return c;
+    }
+
+    internal static void ApplySpell(G.Rig rig, Character caster, SpellSystem.SpellResult r) =>
+        typeof(CombatEngine).GetMethod("ApplySpellEffects", F)!
+            .Invoke(rig.Engine, new object?[] { caster, null, r, rig.Result, rig.Monsters, null });
+
+    [Fact]
+    public void BonusSlots136_Flametongue_TwiceInARow_DoesNotStack()
+    {
+        var once = OneApply136Tests.Run("flametongue", CharacterClass.MysticShaman);
+        var twice = OneApply136Tests.Run("flametongue", CharacterClass.MysticShaman, casts: 2);
+        once.Attack.Should().BeGreaterThan(0);
+        twice.Attack.Should().Be(once.Attack, "a recast (cooldown 0) refreshes its entry, it does not add again");
+        twice.AttackRounds.Should().Be(once.AttackRounds);
+    }
+
+    [Fact]
+    public void BonusSlots136_Haste_TwiceInARow_DoesNotStack()
+    {
+        var mage = Caster(CharacterClass.Magician, 7);
+        var rig = G.NewRig(mage, new G.RecordingRandom(136));
+        var r = CastOk(mage, 7);
+        r.SpecialEffect.Should().Be("haste");
+        ApplySpell(rig, mage, r);
+        int once = mage.TempAttackBonus;
+        once.Should().Be(r.AttackBonus);
+        ApplySpell(rig, mage, CastOk(mage, 7));
+        mage.TempAttackBonus.Should().BeLessThan(2 * once, "a recast refreshes, it does not add");
+        mage.AttackBonusEntries.Should().ContainSingle(e => e.Source == "spell_haste");
+    }
+
+    [Theory]
+    [InlineData("inspiring_cadence", CharacterClass.Wavecaller)]
+    [InlineData("crescendo", CharacterClass.Wavecaller)]
+    [InlineData("harmonic_shield", CharacterClass.Wavecaller)]
+    [InlineData("oceans_voice", CharacterClass.Wavecaller)]
+    [InlineData("borrowed_power", CharacterClass.Cyclebreaker)]
+    public void BonusSlots136_TheAddingHandlers_TwiceInARow_DoNotStack(string id, CharacterClass cls)
+    {
+        var once = OneApply136Tests.Run(id, cls, mates: 1);
+        var twice = OneApply136Tests.Run(id, cls, mates: 1, casts: 2);
+        (once.Attack + once.Defense + once.MateAttack.Sum() + once.MateDefense.Sum()).Should().BeGreaterThan(0, id);
+        twice.Attack.Should().Be(once.Attack, $"{id}: the caster's attack entry refreshes");
+        twice.Defense.Should().Be(once.Defense, $"{id}: the caster's defence entry refreshes");
+        twice.MateAttack.Should().Equal(once.MateAttack, $"{id}: each teammate's entry refreshes");
+        twice.MateDefense.Should().Equal(once.MateDefense, $"{id}: each teammate's entry refreshes");
+    }
+
+    [Fact]
+    public void BonusSlots136_Rage_OverAHeldDefenceBonus_TakesItsPenaltyOnTop()
+    {
+        var hero = OneApply136Tests.Caster(CharacterClass.Barbarian);
+        hero.ClearSlotBonuses();
+        hero.AddSlotBonus(Def, "shield_wall", 300, 3);
+        var c = OneApply136Tests.Run("rage", CharacterClass.Barbarian, caster: hero);
+        c.Result.DefenseBonus.Should().BeLessThan(0);
+        hero.TempDefenseBonus.Should().Be(300 + c.Result.DefenseBonus, "the held 300 stays and rage's penalty comes off it");
+        hero.DefenseBonusEntries.Should().Contain(e => e.Source == "shield_wall" && e.Value == 300);
+    }
+
+    [Fact]
+    public void BonusSlots136_RecklessAttack_OverAHeldDefenceBonus_TakesItsPenaltyOnTop()
+    {
+        var hero = OneApply136Tests.Caster(CharacterClass.Barbarian);
+        hero.ClearSlotBonuses();
+        hero.AddSlotBonus(Def, "shield_wall", 300, 3);
+        OneApply136Tests.Run("reckless_attack", CharacterClass.Barbarian, caster: hero);
+        hero.TempDefenseBonus.Should().Be(280, "300 held, 20 taken off on top");
+        hero.TickSlotBonuses();
+        hero.TempDefenseBonus.Should().Be(300, "the one round penalty ended; the held bonus is whole again");
+    }
 }
