@@ -400,4 +400,204 @@ public class ControlRules136Tests
             return 0;
         });
     }
+
+    // ---------------------------------------------------------------- rule 1: fear on a boss is a hold
+
+    /// <summary>Next(max) is the given share of max, so a roll of 70 passes and the boss hold resist (50) fails.</summary>
+    private sealed class FixedRandom : Random
+    {
+        private readonly double _share;
+        public FixedRandom(double share) { _share = share; }
+        public override int Next() => (int)(int.MaxValue * _share);
+        public override int Next(int maxValue) => (int)(maxValue * _share);
+        public override int Next(int minValue, int maxValue) => minValue + (int)((maxValue - minValue) * _share);
+        public override double NextDouble() => _share;
+        protected override double Sample() => _share;
+    }
+
+    /// <summary>The four fear sources: the Fear spell, the fear in Soul Rend, Intimidating Roar and Dissonant Whispers.</summary>
+    public static IEnumerable<object[]> FearSources() => new[]
+    {
+        new object[] { "spell:fear", CharacterClass.Magician },
+        new object[] { "spell:soul", CharacterClass.Sage },
+        new object[] { "intimidate", CharacterClass.Barbarian },
+        new object[] { "dissonant_whispers", CharacterClass.Bard },
+    };
+
+    private static void Fear(G.Rig rig, Character hero, Monster m, string source)
+    {
+        if (source.StartsWith("spell:")) Spell(rig, hero, m, source.Substring(6), 8);
+        else Ability(rig, hero, m, source);
+    }
+
+    private static G.Rig FixedRig(Character hero, double share, params Monster[] monsters)
+    {
+        var rig = G.NewRig(hero, new FixedRandom(share), null, monsters);
+        rig.Result.Monsters = rig.Monsters;
+        return rig;
+    }
+
+    private static bool Stun(G.Rig rig, Monster m) =>
+        (bool)typeof(CombatEngine).GetMethod("TryStunMonster", F)!.Invoke(rig.Engine, new object[] { m, 1 })!;
+
+    [Theory]
+    [MemberData(nameof(FearSources))]
+    public void ControlRules136_FearOnABoss_ResistsAboutHalf_AndHoldsOneRound(string source, CharacterClass cls)
+    {
+        var hero = Hero(cls);
+        var rig = Rig(hero, 1373);
+        int landed = 0, trials = 800;
+        for (int i = 0; i < trials; i++)
+        {
+            var boss = Foe(boss: i % 2 == 0, mini: i % 2 == 1);
+            rig.Monsters.Clear(); rig.Monsters.Add(boss);
+            Fear(rig, hero, boss, source);
+            if (boss.IsFeared)
+            {
+                landed++;
+                boss.FearDuration.Should().Be(GameConfig.MaxStunDurationBoss, $"{source} holds a boss at most 1 round");
+                boss.HoldsThisFight.Should().Be(1, "fear on a boss counts in the shared hold budget");
+                boss.RecentStunCount.Should().Be(1, "and toward the stun diminishing returns");
+            }
+            else boss.HoldsThisFight.Should().Be(0);
+        }
+        // the spells: the hold rule's 50 percent; the abilities: their own 70 percent roll, then the 50 percent
+        var (low, high) = source.StartsWith("spell:") ? (0.40, 0.60) : (0.27, 0.43);
+        ((double)landed / trials).Should().BeInRange(low, high, $"{source} on a boss resists as the stun rule says");
+    }
+
+    [Theory]
+    [MemberData(nameof(FearSources))]
+    public void ControlRules136_FearOnABoss_ShareTheHoldBudget_AndWeakenOnReuse(string source, CharacterClass cls)
+    {
+        var hero = Hero(cls);
+        var boss = Foe(boss: true);
+        var rig = FixedRig(hero, 0.6, boss);
+        Stun(rig, boss).Should().BeTrue("past the boss resist");
+        Fear(rig, hero, boss, source);
+        boss.IsFeared.Should().BeFalse($"{source}: no fear lands on a stunned boss");
+        boss.IsStunned = false; boss.StunDuration = 0;
+
+        // three holds in the fight, then the boss is immune to holds for the fight
+        for (int i = 0; i < 2; i++)
+        {
+            Fear(rig, hero, boss, source);
+            boss.IsFeared.Should().BeTrue($"hold {i + 2} lands");
+            Stun(rig, boss).Should().BeFalse("a feared boss is held: no stun on top");
+            rig.Engine.TryHoldMonster(boss, CombatEngine.HoldKind.Freeze, 2).Should().BeFalse("nor a freeze");
+            boss.IsFeared = false; boss.FearDuration = 0;
+        }
+        boss.HoldsThisFight.Should().Be(3);
+        Fear(rig, hero, boss, source);
+        boss.IsFeared.Should().BeFalse($"{source}: a fourth hold in the fight does not land");
+    }
+
+    [Theory]
+    [MemberData(nameof(FearSources))]
+    public void ControlRules136_WhenFearOnABossEnds_ThePostHoldImmunityStarts(string source, CharacterClass cls)
+    {
+        var hero = Hero(cls);
+        var boss = Foe(boss: true);
+        boss.Strength = 0;
+        var rig = FixedRig(hero, 0.6, boss);
+        Fear(rig, hero, boss, source);
+        boss.IsFeared.Should().BeTrue();
+        MonsterRound(rig, boss, 1);
+        boss.IsFeared.Should().BeFalse("one round of fear on a boss, however many actions the round holds");
+        boss.StunImmunityRounds.Should().Be(GameConfig.StunImmunityRoundsAfterRecovery);
+        Fear(rig, hero, boss, source);
+        boss.IsFeared.Should().BeFalse($"{source}: no fear during the post-hold immunity");
+        Stun(rig, boss).Should().BeFalse();
+    }
+
+    [Theory]
+    [MemberData(nameof(FearSources))]
+    public void ControlRules136_FearOnANormalMonster_IsUnchanged(string source, CharacterClass cls)
+    {
+        var hero = Hero(cls);
+        var m = Foe();
+        m.Strength = 0;
+        var rig = FixedRig(hero, 0.6, m);
+        int rounds = source switch { "spell:fear" => 8, "spell:soul" => 8, "intimidate" => 3, _ => 2 };
+        Fear(rig, hero, m, source);
+        m.IsFeared.Should().BeTrue();
+        m.FearDuration.Should().Be(rounds, "a normal monster is feared for the rounds asked, as before");
+        m.HoldsThisFight.Should().Be(0, "outside the hold budget");
+        m.RecentStunCount.Should().Be(0);
+        Stun(rig, m).Should().BeTrue("a feared normal monster can still be stunned, as before");
+        m.IsStunned = false; m.StunDuration = 0; m.StunImmunityRounds = 0; m.HoldsThisFight = 0; m.RecentStunCount = 0;
+        Fear(rig, hero, m, source);
+        m.FearDuration.Should().Be(rounds, "a fear on a feared normal monster lands again");
+        m.FearDuration = 1;
+        MonsterRound(rig, m, 0);
+        m.IsFeared.Should().BeFalse();
+        m.StunImmunityRounds.Should().Be(0, "no post-hold immunity after fear on a normal monster");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public void ControlRules136_TheFearLines_FitTheScreen_AndTheCastLineClaimsNoLanding(string lang)
+    {
+        string saved = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = lang;
+            const string longName = "Ancient Abyssal Wyrm of Thorns";
+            foreach (var key in new[] { "combat.spell_fear_cast", "combat.spell_fear_resist", "combat.spell_fear", "combat.existential_terror" })
+                Plain(Loc.Get(key, longName)).Length.Should().BeLessThanOrEqualTo(79, $"{key} in {lang}");
+            Loc.Get("combat.spell_fear_resist", longName).Should().NotBe(Loc.Get("combat.spell_fear", longName));
+        }
+        finally { GameConfig.Language = saved; }
+        Loc.GetIn("en", "combat.spell_fear_cast").Should().NotContain("overwhelmed", "the cast line comes before the roll");
+    }
+
+    [Fact]
+    public void ControlRules136_TheFearSpell_OnABoss_SaysWhenItIsResisted()
+    {
+        var hero = Hero(CharacterClass.Magician);
+        var boss = Foe(boss: true);
+        var rig = FixedRig(hero, 0.2, boss);   // 20 is under the boss hold resist of 50
+        Spell(rig, hero, boss, "fear", 8);
+        boss.IsFeared.Should().BeFalse();
+        Shown(rig).Should().Contain(Plain(Loc.Get("combat.spell_fear_resist", MonsterNames.Display(boss))));
+        Shown(rig).Should().NotContain(Plain(Loc.Get("combat.spell_fear", MonsterNames.Display(boss))));
+    }
+
+    // ---------------------------------------------------------------- rule 2: the jesters' confusion
+
+    [Theory]
+    [InlineData("deadly_joke")]
+    [InlineData("last_laugh")]
+    public void ControlRules136_TheJestersConfusion_OnABoss_TakesTheSoftControlRuleAfterItsOwnRoll(string id)
+    {
+        var hero = Hero(CharacterClass.Jester);
+        double Rate(bool boss, bool mini, int expect)
+        {
+            var rig = Rig(hero, boss ? 1374 : mini ? 1375 : 1376);
+            int confused = 0, trials = 2000;
+            for (int i = 0; i < trials; i++)
+            {
+                var m = Foe(boss: boss, mini: mini);
+                rig.Monsters.Clear(); rig.Monsters.Add(m);
+                Ability(rig, hero, m, id);
+                if (m.IsConfused) { confused++; m.ConfusedDuration.Should().Be(expect); }
+            }
+            return (double)confused / trials;
+        }
+        Rate(false, false, 2).Should().BeInRange(0.60, 0.70, "a normal monster: the ability's own 65 percent, 2 rounds");
+        Rate(true, false, 1).Should().BeInRange(0.19, 0.26, "a boss: 30 percent, then a quarter shrugged off, 1 round");
+        Rate(false, true, 1).Should().BeInRange(0.44, 0.535, "a mini boss: 65 percent, then a quarter shrugged off, 1 round");
+    }
+
+    [Fact]
+    public void ControlRules136_MindSpikeOnANormalMonster_SetsItsOneRoundAsBefore()
+    {
+        var hero = Hero(CharacterClass.Sage);
+        var m = Foe();
+        var rig = FixedRig(hero, 0.0, m);
+        m.IsConfused = true; m.ConfusedDuration = 3;
+        Spell(rig, hero, m, "psychic", 0);
+        m.ConfusedDuration.Should().Be(1, "the rider sets 1 round on a normal monster, as before");
+    }
 }

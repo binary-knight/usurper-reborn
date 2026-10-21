@@ -5422,6 +5422,9 @@ public partial class CombatEngine
             if (monster.FearDuration <= 0)
             {
                 monster.IsFeared = false;
+                // 1.3.6 (Q2): on a boss fear is a hold; the same post-hold immunity as a stun follows it
+                if (monster.IsBoss || monster.IsMiniBoss)
+                    monster.StunImmunityRounds = GameConfig.StunImmunityRoundsAfterRecovery;
                 terminal.WriteLine(Loc.Get("combat.monster_shakes_fear", MonsterNames.Display(monster)), "yellow");
             }
             await Pacing.Wait(GetCombatDelay(600));
@@ -9684,8 +9687,8 @@ public partial class CombatEngine
 
         // Already stunned in ANY system: refuse. Refresh-stacking was the primary
         // perma-stun path -- spell or proc kept extending an existing stun's clock.
-        // v1.1.15: frozen or asleep counts too; one hold at a time.
-        if (target.IsHeld)
+        // v1.1.15: frozen or asleep counts too; one hold at a time. 1.3.6 (Q2): so does fear on a boss.
+        if (target.IsHeld || FearHoldsBoss(target))
             return false;
 
         // Post-recovery immunity window
@@ -9724,7 +9727,7 @@ public partial class CombatEngine
         return true;
     }
 
-    internal enum HoldKind { Freeze, Sleep, Bind }
+    internal enum HoldKind { Freeze, Sleep, Bind, Fear }
 
     /// <summary>
     /// v1.1.15: freeze and sleep on a monster, under the shared hold budget with stun and web.
@@ -9738,7 +9741,7 @@ public partial class CombatEngine
     internal bool TryHoldMonster(Monster target, HoldKind kind, int requestedRounds)
     {
         if (target == null || !target.IsAlive) return false;
-        if (target.IsHeld) return false;
+        if (target.IsHeld || FearHoldsBoss(target)) return false;
         if (target.StunImmunityRounds > 0) return false;
 
         int percent = target.HoldsThisFight switch { 0 => 100, 1 => 50, 2 => 25, _ => 0 };
@@ -9761,6 +9764,12 @@ public partial class CombatEngine
             target.IsFrozen = true;
             target.FrozenDuration = duration;
         }
+        else if (kind == HoldKind.Fear)
+        {
+            // 1.3.6 (Q2): fear on a boss or mini boss, a hold that takes the monster's turns
+            target.IsFeared = true;
+            target.FearDuration = duration;
+        }
         else if (kind == HoldKind.Bind)
         {
             // 1.2.0 Temple gods piece 5: Judicar's Miracle, a hold that takes the monster's turns as a stun does
@@ -9775,6 +9784,24 @@ public partial class CombatEngine
         target.HoldsThisFight++;
         target.RecentStunCount++;
         target.RoundsSinceLastStun = 0;
+        return true;
+    }
+
+    /// <summary>1.3.6 (Q2): a feared boss or mini boss counts as held: no stun, freeze, sleep or bind lands on top.</summary>
+    private static bool FearHoldsBoss(Monster target) => target.IsFeared && (target.IsBoss || target.IsMiniBoss);
+
+    /// <summary>
+    /// 1.3.6 (Q2, supervisor 2026-10-21T14:10:03Z): fear on a boss or mini boss (an Old God included) follows the hold rule
+    /// through TryHoldMonster (HoldKind.Fear): the resist, the 1 round cap, the shared hold budget, the post-hold immunity
+    /// and the diminishing returns. On any other monster fear stays as before: it lands for the rounds asked, outside the
+    /// hold budget. True when the fear landed.
+    /// </summary>
+    internal bool TryFearMonster(Monster target, int rounds)
+    {
+        if (target == null || !target.IsAlive) return false;
+        if (target.IsBoss || target.IsMiniBoss) return TryHoldMonster(target, HoldKind.Fear, rounds);
+        target.IsFeared = true;
+        target.FearDuration = rounds;
         return true;
     }
 
@@ -17257,11 +17284,10 @@ public partial class CombatEngine
             case "fear":
                 if (target != null && target.IsAlive)
                 {
-                    int fearChance = target.IsBoss ? 35 : 70;
-                    if (random.Next(100) < fearChance)
+                    // 1.3.6 (Q2): the 70 percent roll for every target; on a boss the hold rule's resist follows
+                    // (70 then half: the old 35 percent on a boss)
+                    if (random.Next(100) < 70 && TryFearMonster(target, abilityResult.Duration > 0 ? abilityResult.Duration : 3))
                     {
-                        target.IsFeared = true;
-                        target.FearDuration = abilityResult.Duration > 0 ? abilityResult.Duration : 3;
                         terminal.SetColor("bright_red");
                         terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_fear_success" : "combat.ability_fear_success_npc", MonsterNames.Display(target), actorName));
                     }
@@ -17277,10 +17303,15 @@ public partial class CombatEngine
                 if (target != null && target.IsAlive)
                 {
                     int confuseChance = target.IsBoss ? 30 : 65;
-                    if (random.Next(100) < confuseChance)
+                    // 1.3.6 (Q2): after the ability's own roll, a boss or mini boss takes the soft control rule
+                    bool confuseBoss = target.IsBoss || target.IsMiniBoss;
+                    if (random.Next(100) < confuseChance && (!confuseBoss || TryConfuseMonster(target, 2)))
                     {
-                        target.IsConfused = true;
-                        target.ConfusedDuration = 2;
+                        if (!confuseBoss)
+                        {
+                            target.IsConfused = true;
+                            target.ConfusedDuration = 2;
+                        }
                         terminal.SetColor("magenta");
                         terminal.WriteLine(Loc.Get("combat.ability_confusion_success", MonsterNames.Display(target)));
                     }
@@ -19477,9 +19508,11 @@ public partial class CombatEngine
                 break;
 
             case "fear":
-                target.IsFeared = true;
-                target.FearDuration = duration > 0 ? duration : 3;
-                terminal.WriteLine(Loc.Get("combat.spell_fear", MonsterNames.Display(target)), "yellow");
+                // 1.3.6 (Q2): on a boss the hold rule
+                if (TryFearMonster(target, duration > 0 ? duration : 3))
+                    terminal.WriteLine(Loc.Get("combat.spell_fear", MonsterNames.Display(target)), "yellow");
+                else
+                    terminal.WriteLine(Loc.Get("combat.spell_fear_resist", MonsterNames.Display(target)), "yellow");
                 break;
 
             case "stun":
@@ -19731,10 +19764,13 @@ public partial class CombatEngine
                 break;
 
             case "psychic":
-                // 25% chance to confuse target for 1 round (1.3.6 Q2: through the soft control rule)
+                // 25% chance to confuse target for 1 round (1.3.6 Q2: on a boss through the soft control rule)
                 if (random.Next(100) < 25)
                 {
-                    if (TryConfuseMonster(target, 1))
+                    bool spiked;
+                    if (target.IsBoss || target.IsMiniBoss) spiked = TryConfuseMonster(target, 1);
+                    else { target.IsConfused = true; target.ConfusedDuration = 1; spiked = true; }
+                    if (spiked)
                         terminal.WriteLine(Loc.Get("combat.spell_psychic", MonsterNames.Display(target)), "magenta");
                     else
                         terminal.WriteLine(Loc.Get("combat.sage_control_resist", MonsterNames.Display(target)), "yellow");
@@ -19746,11 +19782,11 @@ public partial class CombatEngine
                 {
                     int soulDefReduce = (int)(target.ArmPow * 0.25);
                     target.ArmPow = Math.Max(0, target.ArmPow - soulDefReduce);
-                    target.IsFeared = true;
-                    target.FearDuration = duration > 0 ? duration : 2;
+                    // 1.3.6 (Q2): the fear on a boss takes the hold rule; the defence cut stays
+                    bool soulFear = TryFearMonster(target, duration > 0 ? duration : 2);
                     if (soulDefReduce > 0)
                         UIHelper.WriteRow(terminal, Loc.Get("combat.soul_shattered", MonsterNames.Display(target), soulDefReduce), "dark_red");
-                    terminal.WriteLine(Loc.Get("combat.existential_terror", MonsterNames.Display(target)), "yellow");
+                    terminal.WriteLine(Loc.Get(soulFear ? "combat.existential_terror" : "combat.spell_fear_resist", MonsterNames.Display(target)), "yellow");
                 }
                 break;
 
