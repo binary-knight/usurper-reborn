@@ -9081,6 +9081,37 @@ public partial class CombatEngine
     internal static AbilityKind AbilityKinds(ClassAbilityResult? abilityResult) =>
         AbilityKinds(abilityResult?.AbilityUsed?.Id, abilityResult?.SpecialEffect);
 
+    /// <summary>1.3.6 G3: a part of one cast that lands on the caster.</summary>
+    [Flags]
+    internal enum CasterPart { None = 0, Heal = 1, Attack = 2, Defense = 4 }
+
+    /// <summary>
+    /// 1.3.6 G3 (one cast, one apply): the effects whose own handler gives the caster these parts, with its own line.
+    /// ApplyAbilityEffectsMultiMonster's generic block skips them, so the caster gets each part of one cast once (it
+    /// still adds the healer spec bonus to the heal, which the handler then uses for the caster and the teammates).
+    /// </summary>
+    private static readonly Dictionary<string, CasterPart> HandlerCasterParts = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["party_heal_mist"] = CasterPart.Heal,                          // Healing Mist, Rejuvenating Brew
+        ["party_remedy"] = CasterPart.Heal,                             // Grand Remedy
+        ["party_stimulant"] = CasterPart.Attack,                        // Stimulant Brew
+        ["party_smoke_screen"] = CasterPart.Defense,                    // Smoke Screen
+        ["party_battle_brew"] = CasterPart.Attack | CasterPart.Defense, // Battle Tincture
+        ["party_heal_divine"] = CasterPart.Heal,                        // Circle of Healing
+        ["party_heal_cleanse"] = CasterPart.Heal,                       // Holy Covenant
+        ["party_beacon"] = CasterPart.Heal | CasterPart.Defense,        // Beacon of Light
+        ["oceans_embrace"] = CasterPart.Heal,                           // Ocean's Embrace
+        ["harmonic_shield"] = CasterPart.Defense,                       // Harmonic Shield: its +40
+        ["shaman_enchant_earth"] = CasterPart.Defense,                  // Rockbiter
+        ["evasion"] = CasterPart.Defense,                               // Shadow Step: its defence plus the CON part
+        ["vanish"] = CasterPart.Defense,                                // Vanish: its defence plus the CON part
+    };
+
+    internal static IReadOnlyCollection<string> HandlerCasterPartEffects => HandlerCasterParts.Keys;
+
+    internal static CasterPart HandlerAppliesToCaster(string? effect) =>
+        !string.IsNullOrEmpty(effect) && HandlerCasterParts.TryGetValue(effect, out var parts) ? parts : CasterPart.None;
+
     /// <summary>1.3.6 (Q19, Q9): an Attack ability with damage gives a dual wielder an off-hand swing unless it is an
     /// area hit, spreads to every foe, works on the mind or is thrown or spoken.</summary>
     internal static bool AbilityGivesOffHandSwing(AbilityKind kinds) =>
@@ -16578,12 +16609,17 @@ public partial class CombatEngine
             }
         }
 
-        // Apply healing (with ally targeting for CanTargetAlly abilities)
+        // 1.3.6 G3: the parts this ability's own handler gives the caster; the generic block below skips them (one cast,
+        // one apply).
+        var handlerParts = HandlerAppliesToCaster(abilityResult.SpecialEffect);
+
+        // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs. The handlers that heal read it too.
         if (abilityResult.Healing > 0 && !abilityMissed)
-        {
-            // Healer spec heal bonus (v0.56.0): +20% for healer-role NPC specs
             abilityResult.Healing = ApplyHealerSpecBonus(player, abilityResult.Healing, monsters);
 
+        // Apply healing (with ally targeting for CanTargetAlly abilities)
+        if (abilityResult.Healing > 0 && !abilityMissed && (handlerParts & CasterPart.Heal) == 0)
+        {
             Character healTarget = player;
             bool healedAlly = false;
 
@@ -16659,7 +16695,7 @@ public partial class CombatEngine
         }
 
         // Apply buffs
-        if (abilityResult.AttackBonus > 0 && !abilityMissed)
+        if (abilityResult.AttackBonus > 0 && !abilityMissed && (handlerParts & CasterPart.Attack) == 0)
         {
             // Use the higher of current or new bonus (don't let weaker buff overwrite stronger)
             if (abilityResult.AttackBonus > player.TempAttackBonus)
@@ -16682,7 +16718,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_attack_up" : "combat.ability_attack_up_npc", actorName, abilityResult.AttackBonus, abilityResult.Duration));
         }
 
-        if (abilityResult.DefenseBonus > 0 && !abilityMissed)
+        if (abilityResult.DefenseBonus > 0 && !abilityMissed && (handlerParts & CasterPart.Defense) == 0)
         {
             // Use the higher of current or new bonus
             if (abilityResult.DefenseBonus > player.TempDefenseBonus || player.TempDefenseBonusDuration <= 0)
@@ -16837,10 +16873,9 @@ public partial class CombatEngine
                 break;
 
             case "smoke":
+                // 1.3.6 G3: the table's defence for its 3 rounds comes from the generic block alone (no flat 40 on top)
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get(isPlayer ? "combat.ability_smoke" : "combat.ability_smoke_npc", actorName));
-                player.TempDefenseBonus += 40;
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, 2);
                 break;
 
             case "rage":
@@ -29754,9 +29789,8 @@ public partial class CombatEngine
                 break;
 
             case "avatar":
-                // Divine Avatar: boost all combat stats
-                caster.TempAttackBonus += 55;
-                caster.TempDefenseBonus += 55;
+                // Divine Avatar (1.3.6 G3, Q8): its one attack and one defence bonus come from the spell result
+                // (ApplySpellEffects above), with no flat +55 on top.
                 terminal.WriteLine(Loc.Get("combat.channels_divine_power", caster.DisplayName), "bright_yellow");
                 break;
 
@@ -29962,8 +29996,7 @@ public partial class CombatEngine
                 break;
 
             case "avatar":
-                caster.TempAttackBonus += 55;
-                caster.TempDefenseBonus += 55;
+                // 1.3.6 G3 (Q8): the duel path applied the spell result's bonuses already; no flat +55 on top
                 terminal.WriteLine(Loc.Get("combat.channels_divine_power", caster.DisplayName), "bright_yellow");
                 break;
 
