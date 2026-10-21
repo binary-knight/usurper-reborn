@@ -173,6 +173,19 @@ public class Monster
     internal int ProbabilityShiftRounds { get; set; } = 0;
     internal bool ProbabilityShiftActive { get; set; } = false;
 
+    // 1.3.6 G11 (rule 4): Prison Warden's Command. While DominatedRounds is above 0 the monster's attack power and every
+    // defence value a hit takes off are cut by DominatedCutPercent (50, or 25 on a boss or a mini boss); no base stat is
+    // edited. It counts down once a round at the round's end, so a cast covers the monster's attacks and the party's
+    // hits of its own round and the next two. A recast sets the rounds and the cut again; it never compounds. In memory
+    // only, not saved; internal, as Probability Shift's.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int DominatedRounds { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int DominatedCutPercent { get; set; } = 0;
+
+    private long DominatedCut(long value) =>
+        DominatedRounds > 0 && DominatedCutPercent > 0 ? value - value * DominatedCutPercent / 100 : value;
+
     // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
     // application increments RecentStunCount and resets RoundsSinceLastStun. The
     // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to
@@ -467,6 +480,8 @@ public class Monster
             attack = (long)(attack * 0.70f);
         }
 
+        attack = DominatedCut(attack);   // 1.3.6 G11 (rule 4): Prison Warden's Command, timed
+
         return Math.Max(1, attack);
     }
 
@@ -496,8 +511,10 @@ public class Monster
     /// <summary>
     /// 1.3.6 G8 (Q4): the Weaken status's defence cut, 20 percent off a defence value while WeakenRounds > 0. Every
     /// live hit path that takes the monster's Defence or ArmPow off a hit applies it once to what it reads.
+    /// 1.3.6 G11 (rule 4): Prison Warden's Command's timed cut is read here too, after Weaken's, so it reaches the same
+    /// hit paths.
     /// </summary>
-    public long WeakenDefenceCut(long defence) => WeakenRounds > 0 ? (long)(defence * 0.80f) : defence;
+    public long WeakenDefenceCut(long defence) => DominatedCut(WeakenRounds > 0 ? (long)(defence * 0.80f) : defence);
     
     /// <summary>
     /// Take damage (Pascal compatible)
