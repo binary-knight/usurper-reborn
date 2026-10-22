@@ -1,8 +1,9 @@
 ---
 title: The Sanctum
 path: /wiki/en/world/sanctum/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/SanctumLocation.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Data/HonorTournamentData.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MonsterGenerator.cs
+history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | A Tournament of Honor champion of level 25 or more has more HP and hits harder, as a dungeon monster of that level does.

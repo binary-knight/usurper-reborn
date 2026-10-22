@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.6 | An NPC ally's party heals, buffs and songs now reach you and give the ally its share only once, its ally heal can pick you, and Death's Embrace now leaves an ally standing at 15 percent of its maximum HP.
 history: 1.3.5 | A living companion now takes the NPC teammate's 75 percent share of the experience from room features and shared rewards.
 history: 1.3.4 | none
 history: 1.3.3 | A companion, NPC ally, spouse, lover or fighting beast at 0 HP is Downed: U rescues it with a healing potion, a Beast, Insectoid, Shadow or Undead monster or a boss can finish it, and it stands up with half its maximum HP when the fight ends.

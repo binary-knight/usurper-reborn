@@ -1,8 +1,9 @@
 ---
 title: Afflictions, addiction and treatment
 path: /wiki/en/characters/afflictions/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/StatusEffect.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/BaseLocation.cs, Scripts/Locations/DungeonLocation.cs
+history: 1.3.6 | Weapon poison now poisons for 4 rounds in place of one hit, a Weakened monster takes more damage from every hit, a Poisoned monster no longer hits harder, a boss's physical immunity and divine armor cut each Poisoned tick, and fear, confusion and frost slows on a boss follow the hold and soft control rules.
 history: 1.3.5 | A slow on a monster counts down once a round even when the monster acts more than once, and a boss or mini boss now resists the Frostbite and Frostbrand slows as it resists other slows.
 history: 1.3.4 | Probability Shift now keeps the monster from scoring critical hits and makes 30 percent of its normal attacks that would hit you or an ally miss, in place of confusing and slowing it.
 history: 1.3.3 | Poison, bleeding or another status that takes a companion or NPC ally to 0 HP leaves it Downed, not dead.
@@ -32,7 +33,7 @@ A status lasts the number of rounds the spell, ability or monster that put it on
 
 ### Poison, bleeding and burning damage per round
 
-Poison does 2 to 5 damage a round plus 1 per 10 levels of the character who has it. Bleeding does 1 to 6 plus 1 per 5 levels, burning 2 to 8 plus 1 per 4 levels, frost 1 to 3 plus 1 per 8 levels, a curse 1 to 2 plus 1 per 10 levels, and disease 1 plus 1 per 15 levels. Your statuses tick at the start of each round, before you act; a teammate's at the start of its own turn. Regenerating heals 1 to 6 HP a round.
+Poison does 2 to 5 damage a round plus 1 per 10 levels of the character who has it. Bleeding does 1 to 6 plus 1 per 5 levels, burning 2 to 8 plus 1 per 4 levels, frost 1 to 3 plus 1 per 8 levels, a curse 1 to 2 plus 1 per 10 levels, and disease 1 plus 1 per 15 levels. Your statuses tick at the start of each round, before you act; a teammate's at the start of its own turn. Regenerating heals 1 to 6 HP a round, or 20 a round in the rounds Living Waters gives it.
 
 ### How long a status lasts and whether it stacks
 
