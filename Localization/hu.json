@@ -1168,6 +1168,7 @@
   "combat.rescue_deaths_door_ready": "A halál kapujában kész",
   "combat.rescue_deaths_door_low": "A halál kapujában: több mint negyed ÉP kell",
   "combat.rescue_deaths_door_spent": "A halál kapujában elhasználva",
+  "combat.rescue_last_stand_spent": "Utolsó vérig elhasználva",
   "combat.round_label": "{0}. kör",
   "combat.buffs_label": "Hatások:",
   "combat.buff_song": "Dal({0})",

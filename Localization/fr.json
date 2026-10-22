@@ -1168,6 +1168,7 @@
   "combat.rescue_deaths_door_ready": "Aux portes de la mort prêt",
   "combat.rescue_deaths_door_low": "Aux portes de la mort exige plus d’un quart des PV",
   "combat.rescue_deaths_door_spent": "Aux portes de la mort épuisé",
+  "combat.rescue_last_stand_spent": "Dernier Rempart épuisé",
   "combat.round_label": "Tour {0}",
   "combat.buffs_label": "Bonus :",
   "combat.buff_song": "Chant({0})",

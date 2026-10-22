@@ -1168,6 +1168,7 @@
   "combat.rescue_deaths_door_ready": "A las puertas de la muerte lista",
   "combat.rescue_deaths_door_low": "A las puertas de la muerte requiere más de un cuarto de PV",
   "combat.rescue_deaths_door_spent": "A las puertas de la muerte gastada",
+  "combat.rescue_last_stand_spent": "Última resistencia gastada",
   "combat.round_label": "Ronda {0}",
   "combat.buffs_label": "Mejoras:",
   "combat.buff_song": "Canción({0})",

@@ -1168,6 +1168,7 @@
   "combat.rescue_deaths_door_ready": "Death's Door ready",
   "combat.rescue_deaths_door_low": "Death's Door needs over a quarter HP",
   "combat.rescue_deaths_door_spent": "Death's Door spent",
+  "combat.rescue_last_stand_spent": "Last Stand spent",
   "combat.round_label": "Round {0}",
   "combat.buffs_label": "Buffs:",
   "combat.buff_song": "Song({0})",

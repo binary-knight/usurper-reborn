@@ -1168,6 +1168,7 @@
   "combat.rescue_deaths_door_ready": "Sulla soglia della morte pronta",
   "combat.rescue_deaths_door_low": "Sulla soglia della morte richiede più di un quarto dei PV",
   "combat.rescue_deaths_door_spent": "Sulla soglia della morte esaurita",
+  "combat.rescue_last_stand_spent": "Ultima Resistenza esaurita",
   "combat.round_label": "Turno {0}",
   "combat.buffs_label": "Potenziamenti:",
   "combat.buff_song": "Canto({0})",

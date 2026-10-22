@@ -178,3 +178,163 @@ public class RescueOnce_LastStandRescue136Tests
             shown.Length.Should().BeLessThanOrEqualTo(79, shown);
     }
 }
+
+/// <summary>
+/// 1.3.6 rule 2: Last Stand keeps the fight going. When the fight's owner would die in the round loop and
+/// Last Stand qualifies, the player is left at 1 HP, the line prints and the fight goes on; HandlePlayerDeath
+/// does not run for that blow. Last Stand fires once per fight; a later killing blow goes to Death's Door if
+/// it qualifies, otherwise to death. Death's Door keeps the fight going too (ruling 1). Fights are real
+/// PlayerVsMonsters fights on a scripted terminal.
+/// </summary>
+[Collection("SharedGameSingletons")]
+public class LastStandLoop_LastStandRescue136Tests
+{
+    private static string Attacks(int n = 30) => string.Concat(Enumerable.Repeat("A\n\n", n)) + string.Concat(Enumerable.Repeat("P\n", 10));
+
+    private static Character Hero(long hp, bool exhibition = false) => new Character
+    {
+        Name1 = "Tester", Name2 = "Tester", AI = CharacterAI.Human,
+        Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 10,
+        HP = hp, MaxHP = 600, BaseMaxHP = 600,
+        Strength = 60, BaseStrength = 60, Defence = 20, BaseDefence = 20,
+        Dexterity = 30, BaseDexterity = 30, Agility = 20, BaseAgility = 20,
+        Constitution = 30, BaseConstitution = 30, Intelligence = 20, BaseIntelligence = 20,
+        Wisdom = 20, BaseWisdom = 20, Stamina = 100, BaseStamina = 100,
+        Mental = 80, Gold = 0, Healing = 0, AutoHeal = false,
+        CombatSpeed = CombatSpeed.Instant, Resurrections = 3, IsExhibitionCombat = exhibition,
+    };
+
+    /// <summary>One blow is held at the per hit cap (510 against this hero, whose MaxHP the fight start makes
+    /// 680): it kills a hero at 400 HP (above half: Last Stand) or at 200 (above a quarter: Death's Door).</summary>
+    private static Monster Crusher(long hp = 5000, int level = 8) => new Monster
+    {
+        Name = "Crusher", Level = level, HP = hp, MaxHP = hp, Strength = 60000, Defence = 5, Experience = 1, Gold = 0,
+        IsActive = true, FamilyName = "Goblinoid",
+    };
+
+    private sealed record Fight(CombatResult? Result, Exception? Error, string Text);
+
+    private static async Task<Fight> Run(Character hero, Monster monster, bool ambush = false, int seed = 136)
+    {
+        var output = new System.IO.MemoryStream();
+        var term = new TerminalEmulator(new ScriptedStream(Attacks()), output);
+        var e = new CombatEngine(term) { DivineFavorChanceOverride = () => 0f };
+        e.SeedRandomForTests(seed);
+        try
+        {
+            var task = e.PlayerVsMonsters(hero, new List<Monster> { monster }, offerMonkEncounter: false, isAmbush: ambush);
+            var done = await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(60)));
+            if (done != task) throw new TimeoutException("the fight did not end");
+            return new Fight(await task, null, System.Text.Encoding.UTF8.GetString(output.ToArray()));
+        }
+        catch (Exception ex) { return new Fight(null, ex, System.Text.Encoding.UTF8.GetString(output.ToArray())); }
+    }
+
+    private static int Count(string text, string line)
+    {
+        int n = 0, i = 0;
+        while ((i = text.IndexOf(line, i, StringComparison.Ordinal)) >= 0) { n++; i += line.Length; }
+        return n;
+    }
+
+    [Fact]
+    public async Task LastStand_KeepsTheFightGoing_AndASecondKillingBlowIsADeath()
+    {
+        // exhibition: the loss ends without the death screens, and Death's Door is off, so the second blow kills
+        var hero = Hero(400, exhibition: true);
+        var f = await Run(hero, Crusher());
+        f.Error.Should().BeNull("{0}", f.Text);
+        Count(f.Text, Loc.Get("combat.last_stand")).Should().Be(1, "Last Stand fires once: {0}", f.Text);
+        hero.LastStandUsedThisCombat.Should().BeTrue();
+        f.Result!.CurrentRound.Should().BeGreaterThanOrEqualTo(2, "the fight went on to a later round: {0}", f.Text);
+        f.Text.Should().Contain(Loc.Get("combat.rescue_last_stand_spent"), "the status line of the later round says it is spent");
+        f.Result.Outcome.Should().Be(CombatOutcome.PlayerDied, "the second killing blow is a death, not an escape: {0}", f.Text);
+        f.Text.Should().NotContain(Loc.Get("combat.deaths_door"));
+    }
+
+    [Fact]
+    public async Task LastStand_InTheAmbush_ThenThePlayerActsAndWins()
+    {
+        // the level 200 monster wins the ambush and its blow kills the hero from 400 HP; the hero then acts
+        // in round 1 and kills it. A flag left from an earlier fight is cleared at the fight's start.
+        var hero = Hero(400);
+        hero.LastStandUsedThisCombat = true;
+        var crusher = Crusher(hp: 1, level: 200);
+        var f = await Run(hero, crusher, ambush: true);
+        f.Error.Should().BeNull("{0}", f.Text);
+        f.Text.Should().Contain(Loc.Get("combat.last_stand"), "{0}", f.Text);
+        crusher.IsAlive.Should().BeFalse("the player acted after Last Stand: {0}", f.Text);
+        f.Result!.Outcome.Should().Be(CombatOutcome.Victory, "the fight went on, so it is won, not an escape: {0}", f.Text);
+        f.Result.CurrentRound.Should().BeGreaterThanOrEqualTo(1);
+        f.Result.PlayerActuallyDied.Should().BeFalse();
+        hero.HP.Should().BeGreaterThan(0);
+        hero.Resurrections.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task DeathsDoor_InTheAmbush_AlsoKeepsTheFightGoing()
+    {
+        var hero = Hero(200);
+        var crusher = Crusher(hp: 1, level: 200);
+        var f = await Run(hero, crusher, ambush: true);
+        f.Error.Should().BeNull("{0}", f.Text);
+        f.Text.Should().Contain(Loc.Get("combat.deaths_door"), "{0}", f.Text);
+        f.Text.Should().NotContain(Loc.Get("combat.last_stand"));
+        crusher.IsAlive.Should().BeFalse("the player acted after Death's Door: {0}", f.Text);
+        f.Result!.Outcome.Should().Be(CombatOutcome.Victory, "{0}", f.Text);
+        hero.DeathsDoorUsedThisCombat.Should().BeTrue();
+        f.Text.Should().Contain(Loc.Get("combat.rescue_deaths_door_spent"), "the round after it shows it spent");
+    }
+
+    [Fact]
+    public void LastStand_FiresOncePerFight_ThenDeathsDoor_ThenDeath()
+    {
+        var p = Hero(600);
+        p.CaptureRoundStartHP();
+        p.HP = 0;
+        p.LastStandCheckAndApply().Should().BeTrue("the first killing blow from above half");
+        p.LastStandFiredThisRound.Should().BeTrue();
+        p.LastStandUsedThisCombat.Should().BeTrue();
+        p.HP.Should().Be(1);
+
+        p.HP = 600; p.CaptureRoundStartHP(); p.HP = 0;
+        p.LastStandCheckAndApply().Should().BeTrue("the second killing blow from above half goes to Death's Door");
+        p.LastStandFiredThisRound.Should().BeFalse("Last Stand did not fire twice");
+        p.DeathsDoorFiredThisRound.Should().BeTrue();
+        p.HP.Should().Be(1);
+
+        p.HP = 600; p.CaptureRoundStartHP(); p.HP = 0;
+        p.LastStandCheckAndApply().Should().BeFalse("both are spent: a death");
+        p.HP.Should().Be(0);
+    }
+
+    [Fact]
+    public void TheStatusLine_SaysLastStandIsSpent()
+    {
+        var p = Hero(600);
+        p.CaptureRoundStartHP();
+        CombatEngine.BuildPlayerStatusEntries(p).Select(e => e.text).Should().Contain(Loc.Get("combat.rescue_last_stand_ready"));
+        p.LastStandUsedThisCombat = true;
+        var shown = CombatEngine.BuildPlayerStatusEntries(p).Select(e => e.text).ToList();
+        shown.Should().Contain(Loc.Get("combat.rescue_last_stand_spent"));
+        shown.Should().NotContain(Loc.Get("combat.rescue_last_stand_ready"));
+        shown.Should().NotContain(Loc.Get("combat.rescue_last_stand_low"));
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("it")]
+    public void TheSpentLine_IsInEveryLanguage_AndNoWiderThanTheLowLine(string lang)
+    {
+        Loc.HasIn(lang, "combat.rescue_last_stand_spent").Should().BeTrue();
+        string spent = Loc.GetIn(lang, "combat.rescue_last_stand_spent");
+        spent.Should().NotBe("combat.rescue_last_stand_spent", "a real line, not the key");
+        if (lang != "en") spent.Should().NotBe(Loc.GetIn("en", "combat.rescue_last_stand_spent"), "translated");
+        spent.Length.Should().BeLessThanOrEqualTo(Loc.GetIn(lang, "combat.rescue_last_stand_low").Length,
+            "the status line takes it where the low line stood, so it fits wherever that fit");
+        ("  " + spent).Length.Should().BeLessThanOrEqualTo(79);
+    }
+}
