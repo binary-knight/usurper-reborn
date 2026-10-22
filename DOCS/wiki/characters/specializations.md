@@ -21,7 +21,7 @@ Each [class page](/wiki/en/characters/classes/) lists its specialization descrip
 
 ## Healer specializations
 
-Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman) are healer specializations. They add 20 percent to the healing of your abilities and spells.
+Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman) are healer specializations. They add 20 percent to the healing of your abilities and spells, though not to the Mystic Shaman's Healing Totem, Spirit Link Totem or Ancestral Guidance.
 
 ## Tank specializations
 

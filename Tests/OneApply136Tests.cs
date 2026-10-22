@@ -107,7 +107,7 @@ public class OneApply136Tests
     [Theory]
     [InlineData("healing_mist", CharacterClass.Alchemist, "Your alchemical mist heals you for ")]
     [InlineData("rejuvenating_brew", CharacterClass.Alchemist, "Your alchemical mist heals you for ")]
-    [InlineData("grand_remedy", CharacterClass.Alchemist, "Your remedy fully restores you!")]
+    [InlineData("grand_remedy", CharacterClass.Alchemist, "Your remedy restores you!")]
     [InlineData("circle_of_healing", CharacterClass.Cleric, "Your divine light heals you for ")]
     [InlineData("holy_covenant", CharacterClass.Cleric, "Covenant of Faith heals you for ")]
     [InlineData("beacon_of_light", CharacterClass.Cleric, "Beacon of Faith heals you for ")]
