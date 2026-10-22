@@ -19871,7 +19871,7 @@ public partial class CombatEngine
 
             case "death":
                 // Instant kill chance if target below 20% HP (never on bosses)
-                if (!target.IsBoss && target.HP < target.MaxHP * 0.20)
+                if (!target.IsBoss && !target.IsMiniBoss && target.HP < target.MaxHP * 0.20)   // 1.3.6 (Q5): minis too
                 {
                     if (random.Next(100) < 30)
                     {
