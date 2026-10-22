@@ -600,7 +600,7 @@ public static class ClassAbilitySystem
         {
             Id = "prayer_of_mending",
             Name = "Prayer of Mending",
-            Description = "A fervent prayer that restores health over time.",
+            Description = "A fervent prayer that heals your wounds at once.",
             LevelRequired = 1,
             StaminaCost = 20,
             Cooldown = 3,
@@ -697,7 +697,7 @@ public static class ClassAbilitySystem
         {
             Id = "beacon_of_light",
             Name = "Beacon of Light",
-            Description = "Become a beacon of divine light, shielding and slowly healing all allies.",
+            Description = "Become a beacon of divine light, shielding all allies and healing them at once.",
             LevelRequired = 52,
             StaminaCost = 55,
             Cooldown = 6,
