@@ -157,17 +157,17 @@ public static class SpellSystem
         {
             // --- EARLY TIER (Levels 1-25) - Apprentice Magic ---
             [1] = new SpellInfo(1, "Magic Missile", "Steel arrows of force strike the target. Damage: 18-28. Duration: 1 turn.", 4, 1, "Exmamarie", false, "Attack"),
-            [2] = new SpellInfo(2, "Arcane Shield", "A shimmering barrier deflects attacks. Protection: +8. Duration: whole fight.", 7, 2, "Exmasumarie", false, "Buff"),
+            [2] = new SpellInfo(2, "Arcane Shield", "A shimmering barrier deflects attacks. Protection: +10, scales with level and INT. Duration: whole fight.", 7, 2, "Exmasumarie", false, "Buff"),
             [3] = new SpellInfo(3, "Spark", "A jolt of electricity damages the target. Damage: 28-40. Duration: 1 turn.", 8, 3, "Sparkarie", false, "Attack"),
             [4] = new SpellInfo(4, "Sleep", "Lull the target into magical slumber. Effect: target cannot act. Duration: varies.", 12, 4, "Exdamarie", false, "Debuff"),
             [5] = new SpellInfo(5, "Frost Touch", "Chill your enemy to the bone. Damage: 40-58. Duration: 1 turn.", 14, 5, "Frostarie", false, "Attack"),
-            [6] = new SpellInfo(6, "Web", "Conjure sticky strands to trap your foe. Effect: cannot move. Duration: varies.", 22, 6, "Exmasesamamarie", false, "Debuff"),
+            [6] = new SpellInfo(6, "Web", "Conjure sticky strands to trap your foe. Effect: cannot act, at most 3 rounds (a boss resists half the time, held 1 round). Duration: varies.", 22, 6, "Exmasesamamarie", false, "Debuff"),
             [7] = new SpellInfo(7, "Haste", "Accelerate time around yourself. Two doubled turns; a recast refreshes them.", 25, 7, "Quicksilvarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Journeyman Sorcery ---
             [8] = new SpellInfo(8, "Power Hat", "Regenerate health and bolster defenses. Effect: 50-75 hp + protection. Duration: whole fight.", 30, 8, "Excadammarie", false, "Heal"),
             [9] = new SpellInfo(9, "Fireball", "A sphere of flame engulfs your enemy. Damage: 55-75. Duration: 1 turn.", 35, 9, "Exammmarie", false, "Attack"),
-            [10] = new SpellInfo(10, "Fear", "Project terror into your enemy's mind. Effect: reduced effectiveness. Duration: varies.", 40, 10, "Examasumarie", false, "Debuff"),
+            [10] = new SpellInfo(10, "Fear", "Project terror into your enemy's mind. Effect: it loses its turns (a boss resists half the time, held 1 round). Duration: varies.", 40, 10, "Examasumarie", false, "Debuff"),
             [11] = new SpellInfo(11, "Lightning Bolt", "A crackling bolt of electricity. Damage: 60-80. Duration: 1 turn.", 45, 11, "Exmasesaexmarie", false, "Attack"),
             [12] = new SpellInfo(12, "Mirror Image", "Create illusory duplicates of yourself. Protection: +35. Duration: whole fight.", 50, 12, "Mirrorimarie", false, "Buff"),
             [13] = new SpellInfo(13, "Ice Storm", "Razor shards of ice assault all enemies. Damage: 50-70 to all. Duration: 1 turn.", 55, 13, "Icestormarie", true, "Attack"),
@@ -177,16 +177,16 @@ public static class SpellSystem
             [15] = new SpellInfo(15, "Chain Lightning", "Lightning arcs between multiple foes. Damage: 80-105 to all. Duration: 1 turn.", 75, 15, "Chainlightarie", true, "Attack"),
             [16] = new SpellInfo(16, "Disintegrate", "Unravel the target's physical form. Damage: 110-150. Duration: 1 turn.", 85, 16, "Disintegrarie", false, "Attack"),
             [17] = new SpellInfo(17, "Pillar of Fire", "A column of flame that penetrates all armor. Damage: 120-160. Duration: 1 turn.", 95, 17, "Exdammasumarie", false, "Attack"),
-            [18] = new SpellInfo(18, "Time Stop", "Briefly halt time itself. Extra turn + protection. Duration: 2 rounds.", 110, 18, "Timestoparie", false, "Buff"),
+            [18] = new SpellInfo(18, "Time Stop", "Time halts 2 rounds: +35 ATK and protection, up with level; dodge next attack.", 110, 18, "Timestoparie", false, "Buff"),
             [19] = new SpellInfo(19, "Meteor Swarm", "Call down flaming rocks from the sky. Damage: 130-180 to all. Duration: 1 turn.", 125, 19, "Meteorarie", true, "Attack"),
-            [20] = new SpellInfo(20, "Arcane Immunity", "Become immune to lesser magics. Protection: +65. Duration: whole fight.", 140, 20, "Immunemagarie", false, "Buff"),
+            [20] = new SpellInfo(20, "Arcane Immunity", "Become immune to status effects. Protection: +65, scales with level and INT. Duration: whole fight.", 140, 20, "Immunemagarie", false, "Buff"),
 
             // --- LEGENDARY TIER (Levels 76-100) - Archmage Powers ---
-            [21] = new SpellInfo(21, "Power Word: Stun", "A single word paralyzes your enemy. Effect: cannot act 3 rounds. Duration: 3 rounds.", 160, 21, "Stunverbum", false, "Debuff"),
+            [21] = new SpellInfo(21, "Power Word: Stun", "A single word paralyzes your enemy. Effect: cannot act 3 rounds (a boss resists half the time, held 1 round). Duration: 3 rounds.", 160, 21, "Stunverbum", false, "Debuff"),
             [22] = new SpellInfo(22, "Manwe's Creation", "Channel the Creator's power to reshape reality. Damage: 200-280. Duration: 1 turn.", 180, 22, "Manwecreatie", false, "Attack"),
-            [23] = new SpellInfo(23, "Summon Demon", "Call a demon from the abyss. Attack: +100. Duration: whole fight.", 200, 23, "Excadexsumarie", false, "Summon"),
+            [23] = new SpellInfo(23, "Summon Demon", "Call a demon from the abyss. Attack: +100, scales with level. Dodge next attack. Duration: whole fight.", 200, 23, "Excadexsumarie", false, "Summon"),
             [24] = new SpellInfo(24, "Power Word: Kill", "The ultimate death magic. Damage: 280-380. Duration: 1 turn.", 230, 24, "Mattravidduzzievh", false, "Attack"),
-            [25] = new SpellInfo(25, "Wish", "Bend reality to your will. All stats doubled. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
+            [25] = new SpellInfo(25, "Wish", "Bend reality to your will. Attack +your Strength and defense +your Defense. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
