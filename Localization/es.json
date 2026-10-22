@@ -12193,6 +12193,7 @@
   "ability.available": "Habilidades Disponibles",
   "ability.locked": "Bloqueada (nivel muy bajo)",
   "ability.requires_lv": "Requiere Nv{0}",
+  "ability.requires_weapon": "Requiere {0}",
   "ability.menu_sr": "E=Equipar, R=Quitar, A=Auto-llenar, C=Borrar todo, Q=Salir",
   "ability.menu_visual": "[E]quipar  [R]emover  [A]uto  [C]lear  [Q]Salir",
   "ability.auto_filled": "Barra rápida auto-llenada con las mejores habilidades.",

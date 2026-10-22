@@ -12433,6 +12433,7 @@
   "ability.available": "Available Abilities",
   "ability.locked": "Locked (level too low)",
   "ability.requires_lv": "Requires Lv{0}",
+  "ability.requires_weapon": "Requires {0}",
   "ability.menu_sr": "1-9. Equip or change slot, C. Clear a slot, A. Auto-fill, X. Exit",
   "ability.menu_visual": "[1-9] Equip/change slot  [C] Clear a slot  [A] Auto-fill  [X] Exit",
   "ability.auto_filled": "Abilities added to quickbar!",

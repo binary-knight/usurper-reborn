@@ -2609,7 +2609,8 @@ public static class ClassAbilitySystem
     }
 
     /// <summary>
-    /// Get a human-readable reason why a weapon requirement isn't met, or null if requirements are satisfied
+    /// Get a human-readable reason why a weapon requirement isn't met, or null if requirements are satisfied.
+    /// 1.3.6 X1: the text is the ability.requires_weapon key with the game's own weapon type names, in the player's language.
     /// </summary>
     public static string? GetWeaponRequirementReason(Character character, ClassAbility ability)
     {
@@ -2621,8 +2622,8 @@ public static class ClassAbilitySystem
                             || (offHand != null && ability.RequiredWeaponTypes.Contains(offHand.WeaponType));
             if (!hasRequired)
             {
-                var names = string.Join("/", ability.RequiredWeaponTypes.Select(w => w.ToString()));
-                return $"Requires {names}";
+                var names = string.Join("/", ability.RequiredWeaponTypes.Select(BaseLocation.WeaponTypeLabel));
+                return Loc.Get("ability.requires_weapon", names);
             }
         }
         if (ability.RequiresShield)
@@ -2630,7 +2631,7 @@ public static class ClassAbilitySystem
             var offHand = character.GetEquipment(EquipmentSlot.OffHand);
             if (offHand == null || (offHand.WeaponType != WeaponType.Shield &&
                 offHand.WeaponType != WeaponType.Buckler && offHand.WeaponType != WeaponType.TowerShield))
-                return "Requires Shield";
+                return Loc.Get("ability.requires_weapon", BaseLocation.WeaponTypeLabel(WeaponType.Shield));
         }
         return null;
     }

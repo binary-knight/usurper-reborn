@@ -16,13 +16,13 @@ Read the combat menu before choosing a target. Healing an ally and attacking a f
 
 {{table:abilities}}
 
-The table also shows each ability's cooldown in rounds and the base values its template holds: damage, healing, attack bonus, defense bonus and duration.
+The table also shows each ability's cooldown in rounds, the base values its template holds (damage, healing, attack bonus and defense bonus) and the rounds its effect lasts. Cutting Words' weaken lasts 4 rounds and Legendary Shot stuns for 1 round, though their templates hold no duration.
 
 ## How to learn abilities
 
 Abilities are not bought or learned one by one. Every ability of your class becomes available at its required level. In a fight you use them from a quickbar of 9 slots that abilities and spells share; arrange it under Abilities at the Level Master.
 
-The listed required level is an availability condition, not a promise that the action is usable without enough stamina or mana. Abilities that need level 50 or more cost 25 percent more stamina than the listed cost, and those that need level 75 or more cost 40 percent more. See [combat basics](/wiki/en/combat/) and the [combat stamina rules](/wiki/en/characters/stats/#combat-stamina).
+The listed required level is an availability condition, not a promise that the action is usable without enough stamina or mana. Abilities that need level 50 or more cost 25 percent more stamina than the listed cost, and those that need level 75 or more cost 40 percent more, rounded down: Iron Fortress lists 80 and costs 112, and Avatar of Destruction lists 90 and costs 125. The combat screens and the Level Master show the cost charged. See [combat basics](/wiki/en/combat/) and the [combat stamina rules](/wiki/en/characters/stats/#combat-stamina).
 
 ## How abilities scale
 

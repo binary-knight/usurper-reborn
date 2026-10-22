@@ -12193,6 +12193,7 @@
   "ability.available": "Aptitudes disponibles",
   "ability.locked": "Verrouillé (niveau trop bas)",
   "ability.requires_lv": "Nécessite Nv{0}",
+  "ability.requires_weapon": "Nécessite {0}",
   "ability.menu_sr": "1-9. Équiper/changer emplacement, C. Effacer un emplacement, A. Auto-remplir, X. Quitter",
   "ability.menu_visual": "[1-9] Équiper/changer  [C] Effacer  [A] Auto-remplir  [X] Quitter",
   "ability.auto_filled": "Barre rapide remplie automatiquement!",
