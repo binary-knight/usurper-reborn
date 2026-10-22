@@ -456,7 +456,12 @@ function renderers(data) {
   const abilityLine = (a) =>
     `${link("characters/abilities", a)} (level ${a.levelRequired}, ${abilityCost(a)}, cooldown ${a.cooldown} rounds${a.requiresShield ? ", needs a shield" : ""})`;
   function classRoles() {
-    return data.classes
+    // 1.3.6 X1: the lines list template costs (as the abilities table does); the tier rule is
+    // ClassAbilitySystem.GetEffectiveStaminaCost, checked by ShownCosts136Tests
+    const tierNote =
+      "<p>Ability costs below are template costs. An ability that needs level 50 or more costs 25 percent more stamina, " +
+      "and one that needs level 75 or more costs 40 percent more, rounded down. The combat screens show the cost charged.</p>";
+    return tierNote + data.classes
       .map((c) => {
         const mine = data.abilities
           .filter((a) => a.classes.includes(c.id))
@@ -793,6 +798,13 @@ function renderers(data) {
         ]),
         "Spell definitions",
       );
+    // 1.3.6 X1: the rounds an ability's effect lasts. Two templates hold 0 while the combat code holds the rounds
+    // (CombatEngine.ApplyAbilityEffectsMultiMonster: case "weaken" lasts the duration or 4 rounds, case "legendary"
+    // stuns for 1 round); ShownCosts136Tests checks these numbers against that path
+    const effectRounds = (e) =>
+      e.specialEffect === "weaken" ? e.duration || 4
+      : e.specialEffect === "legendary" ? 1
+      : e.duration;
     if (id === "abilities")
       return table(
         [
@@ -814,7 +826,7 @@ function renderers(data) {
           e.cooldown,
           `${e.baseDamage} / ${e.baseHealing}`,
           `${e.attackBonus} / ${e.defenseBonus}`,
-          e.duration,
+          effectRounds(e),
           escape(e.description.en),
         ]),
         "Ability definitions",

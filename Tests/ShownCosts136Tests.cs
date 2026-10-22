@@ -316,4 +316,49 @@ public class ShownCosts136Tests
             checkedRows.Should().BeGreaterThan(20);
         }
     }
+
+    // ---------------------------------------------------------------- the wiki tables
+
+    private static string BuildJs() => File.ReadAllText(Path.Combine(RepoRoot(), "tools", "wiki-build", "build.js"));
+
+    [Fact]
+    public void ShownCosts136_WikiClassRoles_StatesTheTierRule()
+    {
+        // the rule the note states is the rule GetEffectiveStaminaCost charges: 25 and 40 percent, rounded down
+        ClassAbilitySystem.GetEffectiveStaminaCost(Made(50, 100)).Should().Be(125);
+        ClassAbilitySystem.GetEffectiveStaminaCost(Made(75, 100)).Should().Be(140);
+        ClassAbilitySystem.GetEffectiveStaminaCost(Made(75, 90)).Should().Be(125, "rounded down from 126");
+        string js = BuildJs();
+        js.Should().Contain("Ability costs below are template costs.")
+            .And.Contain("An ability that needs level 50 or more costs 25 percent more stamina")
+            .And.Contain("level 75 or more costs 40 percent more, rounded down");
+    }
+
+    [Fact]
+    public void ShownCosts136_WikiAbilityTable_Durations_AreTheLiveRounds()
+    {
+        // the live ability path (ApplyAbilityEffectsMultiMonster) with the template's duration of 0
+        var bard = G.Hero(hp: 1_000_000, level: 100, cls: CharacterClass.Bard, name: "Bard");
+        var weakened = G.Dummy();
+        var rig = P.NewRig(bard, new List<Character>(), monsters: weakened);
+        ClassAbilitySystem.GetAbility("cutting_words")!.Duration.Should().Be(0);
+        P.Apply(rig, bard, "cutting_words", duration: 0);
+        int weakenRounds = weakened.WeakenRounds;
+
+        var ranger = G.Hero(hp: 1_000_000, level: 100, cls: CharacterClass.Ranger, name: "Ranger");
+        var stunned = G.Dummy();
+        var rig2 = P.NewRig(ranger, new List<Character>(), monsters: stunned);
+        ClassAbilitySystem.GetAbility("legendary_shot")!.Duration.Should().Be(0);
+        P.Apply(rig2, ranger, "legendary_shot", duration: 0);
+        int stunRounds = stunned.StunDuration;
+
+        weakenRounds.Should().Be(4);
+        stunned.IsStunned.Should().BeTrue();
+        stunRounds.Should().Be(1);
+        string js = BuildJs();
+        Regex.Match(js, "e\\.specialEffect === \"weaken\"\\s*\\?\\s*e\\.duration \\|\\| (\\d+)").Groups[1].Value
+            .Should().Be(weakenRounds.ToString(), "the ability table shows the weaken's rounds");
+        Regex.Match(js, "e\\.specialEffect === \"legendary\"\\s*\\?\\s*(\\d+)").Groups[1].Value
+            .Should().Be(stunRounds.ToString(), "the ability table shows the stun's rounds");
+    }
 }
