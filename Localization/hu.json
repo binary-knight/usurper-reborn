@@ -12201,6 +12201,7 @@
   "ability.available": "Elérhető Képességek",
   "ability.locked": "Lezárva (túl alacsony szint)",
   "ability.requires_lv": "Szükséges szint: {0}",
+  "ability.requires_weapon": "{0} szükséges",
   "ability.menu_sr": "1-9. Felszerelés vagy csere, C. Törlés, A. Automatikus kitöltés, X. Kilépés",
   "ability.menu_visual": "[1-9] Felszerelés/csere  [C] Törlés  [A] Auto-kitöltés  [X] Kilépés",
   "ability.auto_filled": "Harci képességek automatikusan kitöltve!",

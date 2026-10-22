@@ -16531,7 +16531,7 @@ public partial class CombatEngine
             }
             else
             {
-                terminal.WriteLine(Loc.Get("combat.ability_use", player.Name2, ability.DisplayName, ability.StaminaCost));
+                terminal.WriteLine(Loc.Get("combat.ability_use", player.Name2, ability.DisplayName, effectiveStamCost));
                 terminal.SetColor("gray");
                 terminal.WriteLine(Loc.Get("combat.ability_stamina", player.CurrentCombatStamina, player.MaxCombatStamina));
             }
@@ -19284,7 +19284,7 @@ public partial class CombatEngine
             }
             else if (!hasStamina)
             {
-                statusText = Loc.Get("combat.ability_tag_need_stamina", ability.StaminaCost);
+                statusText = Loc.Get("combat.ability_tag_need_stamina", ClassAbilitySystem.GetEffectiveStaminaCost(ability));
                 color = ColorRole.Disabled;
             }
             else if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
@@ -22103,7 +22103,7 @@ public partial class CombatEngine
         if (chosenAbility.ManaCost > 0)
             terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_mana", teammate.DisplayName, chosenAbility.DisplayName, chosenAbility.ManaCost));
         else
-            terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_stamina", teammate.DisplayName, chosenAbility.DisplayName, chosenAbility.StaminaCost));
+            terminal.WriteLine(Loc.Get("combat.teammate_uses_ability_stamina", teammate.DisplayName, chosenAbility.DisplayName, ClassAbilitySystem.GetEffectiveStaminaCost(chosenAbility)));
         await Pacing.Wait(GetCombatDelay(500));
 
         // Get target for the ability
@@ -29071,7 +29071,7 @@ public partial class CombatEngine
                 }
                 else if (!hasStamina)
                 {
-                    statusText = Loc.Get("combat.ability_tag_need_stamina_have", ability.StaminaCost, attacker.CurrentCombatStamina);
+                    statusText = Loc.Get("combat.ability_tag_need_stamina_have", ClassAbilitySystem.GetEffectiveStaminaCost(ability), attacker.CurrentCombatStamina);
                     color = ColorRole.Disabled;
                 }
                 else if (ability.ManaCost > 0 && attacker.Mana < ability.ManaCost)
@@ -31898,9 +31898,9 @@ public partial class CombatEngine
                 else if (CooldownsFor(player).TryGetValue(slotId, out int cd) && cd > 0)
                     displayName = Loc.Get("combat.qb_cooldown", ability.DisplayName, cd);
                 else if (ability.ManaCost > 0)
-                    displayName = Loc.Get("combat.qb_stamina_mana", ability.DisplayName, ability.StaminaCost, ability.ManaCost);
+                    displayName = Loc.Get("combat.qb_stamina_mana", ability.DisplayName, ClassAbilitySystem.GetEffectiveStaminaCost(ability), ability.ManaCost);
                 else
-                    displayName = Loc.Get("combat.qb_stamina", ability.DisplayName, ability.StaminaCost);
+                    displayName = Loc.Get("combat.qb_stamina", ability.DisplayName, ClassAbilitySystem.GetEffectiveStaminaCost(ability));
                 // Check mana availability for shaman abilities
                 if (ability.ManaCost > 0 && player.Mana < ability.ManaCost)
                     canUse = false;
@@ -32068,8 +32068,8 @@ public partial class CombatEngine
                     var weaponReason = ClassAbilitySystem.GetWeaponRequirementReason(player, ability);
                     if (weaponReason != null)
                         terminal.WriteLine(Loc.Get("combat.ability_weapon_reason", ability.DisplayName, weaponReason), "red");
-                    else if (player.CurrentCombatStamina < ability.StaminaCost)
-                        terminal.WriteLine(Loc.Get("combat.not_enough_stamina", ability.StaminaCost, player.CurrentCombatStamina), "red");
+                    else if (player.CurrentCombatStamina < ClassAbilitySystem.GetEffectiveStaminaCost(ability))
+                        terminal.WriteLine(Loc.Get("combat.not_enough_stamina", ClassAbilitySystem.GetEffectiveStaminaCost(ability), player.CurrentCombatStamina), "red");
                     else if (CooldownsFor(player).TryGetValue(matched.slotId, out int cd) && cd > 0)
                         terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.DisplayName, cd), "red");
                 }
@@ -32201,8 +32201,8 @@ public partial class CombatEngine
                     var weaponReason = ClassAbilitySystem.GetWeaponRequirementReason(player, ability);
                     if (weaponReason != null)
                         terminal.WriteLine(Loc.Get("combat.ability_weapon_reason", ability.DisplayName, weaponReason), "red");
-                    else if (player.CurrentCombatStamina < ability.StaminaCost)
-                        terminal.WriteLine(Loc.Get("combat.not_enough_stamina", ability.StaminaCost, player.CurrentCombatStamina), "red");
+                    else if (player.CurrentCombatStamina < ClassAbilitySystem.GetEffectiveStaminaCost(ability))
+                        terminal.WriteLine(Loc.Get("combat.not_enough_stamina", ClassAbilitySystem.GetEffectiveStaminaCost(ability), player.CurrentCombatStamina), "red");
                     else if (CooldownsFor(player).TryGetValue(matched.slotId, out int cd) && cd > 0)
                         terminal.WriteLine(Loc.Get("combat.ability_cooldown", ability.DisplayName, cd), "red");
                 }
@@ -34394,8 +34394,8 @@ public partial class CombatEngine
     /// <summary>v1.2.2: an ability's cost in the ability menus, "10 stamina, 5 mana" in the player's language.</summary>
     internal static string AbilityCostText(ClassAbilitySystem.ClassAbility ability)
         => ability.ManaCost > 0
-            ? Loc.Get("combat.ability_cost_stamina_mana", ability.StaminaCost, ability.ManaCost)
-            : Loc.Get("combat.ability_cost_stamina", ability.StaminaCost);
+            ? Loc.Get("combat.ability_cost_stamina_mana", ClassAbilitySystem.GetEffectiveStaminaCost(ability), ability.ManaCost)
+            : Loc.Get("combat.ability_cost_stamina", ClassAbilitySystem.GetEffectiveStaminaCost(ability));
 
     /// <summary>v1.2.2: StatusWord in a given language, for a line on another player's terminal.</summary>
     internal static string StatusWord(StatusEffect status, string lang)

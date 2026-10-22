@@ -12193,6 +12193,7 @@
   "ability.available": "Abilità Disponibili",
   "ability.locked": "Bloccate (livello troppo basso)",
   "ability.requires_lv": "Richiede Lv{0}",
+  "ability.requires_weapon": "Richiede {0}",
   "ability.menu_sr": "1-9. Equipaggia o cambia slot, C. Svuota slot, A. Riempimento auto, X. Esci",
   "ability.menu_visual": "[1-9] Equipaggia/cambia slot  [C] Svuota slot  [A] Riempimento auto  [X] Esci",
   "ability.auto_filled": "Barra rapida riempita automaticamente!",
