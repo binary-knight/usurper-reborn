@@ -51,7 +51,7 @@ public class Bump136Tests
         Regex.Matches(notes, "(?m)^### (.+)$").Select(m => m.Groups[1].Value).Should().Equal(Groups);
         notes.Should().NotContain("Known issues").And.NotContain("Known Issues");
         string[] bullets = Bullets(notes);
-        bullets.Length.Should().Be(76);
+        bullets.Length.Should().Be(79);
         foreach (string b in bullets) ChangeLine.IsMatch(b.Replace("Power Word: Kill", "Power Word Kill")).Should().BeTrue(b);   // the one spell name with a colon (BUMP-136 ruling a)
         bullets.Distinct().Count().Should().Be(bullets.Length);
         notes.Split('\n').Where(l => l.Length > 0).Skip(2).Should().OnlyContain(l =>
@@ -87,7 +87,7 @@ public class Bump136Tests
         string[] lines = readme.Split('\n');
         int bullet = Array.FindIndex(lines, l => l.StartsWith("- **v1.3.6:**", StringComparison.Ordinal));
         bullet.Should().BeGreaterThan(0);
-        lines[bullet].Should().Be("- **v1.3.6:** 76 changes; the Changelist is in " + NotesPath);
+        lines[bullet].Should().Be("- **v1.3.6:** 79 changes; the Changelist is in " + NotesPath);
         lines[bullet + 1].Should().StartWith("- **v1.3.5:** 46 changes;", "the newest bullet comes first");
     }
 
@@ -123,7 +123,7 @@ public class Bump136Tests
             dict["r1.road_136_t"].Should().StartWith("1.3.6 -- ", lang);
             dict["r1.road_137_t"].Should().StartWith("1.3.7 -- ", lang);
             dict["r1.road_14_t"].Should().StartWith("1.4 -- ", lang);
-            dict["r1.road_136_d"].Should().Contain("76", lang);
+            dict["r1.road_136_d"].Should().Contain("79", lang);
             foreach (string n in next) dict["r1.road_" + n + "_when"].Should().Contain(after[n], $"{lang} {n}");
             foreach (var pair in dict.Where(p => p.Key.StartsWith("r1.road_", StringComparison.Ordinal)))
                 DashOrEmoji.IsMatch(pair.Value).Should().BeFalse($"{lang} {pair.Key}");
@@ -142,6 +142,6 @@ public class Bump136Tests
             + "against every Old God, so each class holds its own deep in the dungeon and against the gods, and gear upgrades come at an even pace.");
         en["r1.road_136_d"].Should().Be("Shipped: five enchant rules (a real magic resistance, poison over several rounds, Titan's Resolve for "
             + "max HP, enchants for companions, abilities, PvP and world bosses, and stronger Phoenix Fire and Frostbite), and an audit of every "
-            + "ability and spell of all seventeen classes, with 76 changes in all so each does what its text says.");
+            + "ability and spell of all seventeen classes, with 79 changes in all so each does what its text says.");
     }
 }

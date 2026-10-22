@@ -34,6 +34,8 @@
 • Fixed Weaken's defense cut doing nothing, so a weakened monster now takes more damage from every hit
 • Fixed monsters hitting harder after they are poisoned
 • Fixed Grand Finale and ten other area abilities' damage missing from the fight's damage totals and from Paradox Collapse's bonus
+• Fixed Last Stand and Death's Door ending the fight, so they now keep you fighting at 1 HP, once per fight
+• Adjusted Rescue to lift each Downed ally once per fight
 
 ### Class abilities
 
@@ -86,6 +88,7 @@
 • Fixed Divine Shield, Avatar of Light, Divine Intervention, Avatar of Grace and Eternal Vigil giving a teammate no invulnerability
 • Fixed Death's Embrace never reviving a teammate
 • Fixed an NPC Mystic Shaman's weapon enchants and Ancestral Guidance doing nothing on its own swings
+• Fixed finishing a Downed ally that was already rescued in the fight counting as leaving it to die
 
 ### Texts and wiki
 
