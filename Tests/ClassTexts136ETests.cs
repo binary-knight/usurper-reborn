@@ -93,7 +93,7 @@ public class ClassTexts136ETests
     [Fact]
     public void ClassTexts136E_Wish_StrengthAndDefenseNotAllStats()
     {
-        Desc(25).Should().Contain("Attack +your Strength and defense +your Defense").And.NotContain("doubled");
+        Desc(25).Should().Contain("Adds your Strength to attack and your Defense to defense").And.NotContain("doubled");
         En("combat.spell_wish_cast").Should().NotContain("doubled");
         Cast(25).SpecialEffect.Should().Be("wish");
     }

@@ -26,6 +26,7 @@ public class ClassTexts136CTests
         "ability.flametongue.desc", "ability.healing_totem.desc", "ability.earthbind_totem.desc",
         "combat.shaman_totem_earthbind_summon", "ability.searing_totem.desc",
         "combat.shaman_enchant_frost", "combat.shaman_enchant_storm", "combat.shaman_enchant_storm_hit",
+        "combat.alch_restored_self", "combat.alch_restored_other",
     };
 
     private static readonly string[] Descs =
@@ -45,6 +46,8 @@ public class ClassTexts136CTests
         Fits79("combat.shaman_totem_earthbind_summon", GameConfig.ShamanTotemBaseDuration);
         Fits79("combat.party_remedy");
         Fits79("combat.tm_fully_restored", "A Long Teammate Name", 99999);
+        Fits79("combat.alch_restored_self", 99999);
+        Fits79("combat.alch_restored_other", "A Long Teammate Name", 99999);
     }
 
     [Fact]
@@ -134,6 +137,14 @@ public class ClassTexts136CTests
             .And.Contain("cures poison, bleeding, burning, curses, weakness and disease").And.NotContain("fully");
         En("combat.party_remedy").Should().NotContain("all wounds");
         En("combat.tm_fully_restored").Should().NotContain("fully");
+        foreach (var k in new[] { "combat.alch_restored_self", "combat.alch_restored_other" })
+        {
+            En(k).Should().Contain("remedy restores").And.NotContain("fully");
+            Loc.GetIn("es", k).Should().NotContain("por completo");
+            Loc.GetIn("fr", k).Should().NotContain("complètement");
+            Loc.GetIn("hu", k).Should().NotContain("teljesen");
+            Loc.GetIn("it", k).Should().NotContain("completamente");
+        }
         var mate = G.Mate("Mate0"); mate.HP = 1;
         mate.ApplyStatus(StatusEffect.Bleeding, 5);
         var hero = Hero(CharacterClass.Alchemist); hero.HP = 1000;

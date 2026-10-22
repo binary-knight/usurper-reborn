@@ -186,7 +186,7 @@ public static class SpellSystem
             [22] = new SpellInfo(22, "Manwe's Creation", "Channel the Creator's power to reshape reality. Damage: 200-280. Duration: 1 turn.", 180, 22, "Manwecreatie", false, "Attack"),
             [23] = new SpellInfo(23, "Summon Demon", "Call a demon from the abyss. Attack: +100, scales with level. Dodge next attack. Duration: whole fight.", 200, 23, "Excadexsumarie", false, "Summon"),
             [24] = new SpellInfo(24, "Power Word: Kill", "The ultimate death magic. Damage: 280-380. Duration: 1 turn.", 230, 24, "Mattravidduzzievh", false, "Attack"),
-            [25] = new SpellInfo(25, "Wish", "Bend reality to your will. Attack +your Strength and defense +your Defense. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
+            [25] = new SpellInfo(25, "Wish", "Bend reality to your will. Adds your Strength to attack and your Defense to defense. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
