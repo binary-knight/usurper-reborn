@@ -82,7 +82,7 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 
 ### Stuns and holds on monsters
 
-A stun, freeze, sleep or bind on a monster lasts at most {{balance:MaxStunDurationNormal}} rounds. While one lasts no other lands, and for {{balance:StunImmunityRoundsAfterRecovery}} rounds after it ends, or after damage wakes a monster that Slumber Mist put to sleep, it cannot be held; damage does not wake a monster held by the Magician's Sleep. The second hold in a fight lasts half as long, the third a quarter, and after three holds a monster cannot be frozen, put to sleep or bound again that fight; stuns recover one step for every {{balance:StunDRWindowRounds}} rounds the monster acts unstunned.
+A stun, freeze, sleep or bind on a monster lasts at most {{balance:MaxStunDurationNormal}} rounds. While one lasts no other lands, and for {{balance:StunImmunityRoundsAfterRecovery}} rounds after it ends, or after damage wakes a monster that Slumber Mist put to sleep, it cannot be held; hits never wake a monster held by the Magician's Sleep. The second hold in a fight lasts half as long, the third a quarter, and after three holds a monster cannot be frozen, put to sleep or bound again that fight; stuns recover one step for every {{balance:StunDRWindowRounds}} rounds the monster acts unstunned.
 
 ### Can bosses be stunned
 
