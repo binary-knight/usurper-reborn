@@ -1,8 +1,9 @@
 ---
 title: Anchor Road challenges
 path: /wiki/en/world/anchor-road/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/AnchorRoadLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Data/GauntletChampionData.cs, Scripts/Systems/QuestSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.6 | Weapon enchants and life steal now work in bounty hunting and gang war fights, and magic resistance cuts a spell's damage there by up to half.
 history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | Gauntlet monsters and champions of level 25 or more have more HP and hit harder, as dungeon monsters of that level do.

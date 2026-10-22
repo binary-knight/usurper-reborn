@@ -1,8 +1,9 @@
 ---
 title: Fear, retreat and fleeing
 path: /wiki/en/combat/fleeing/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.6 | The Jester's Disappearing Act and the Sage's Escape now follow the flee rules: they fail on Nightmare and roll the Old God flee chance in an Old God fight or while a floor boss is alive.
 history: 1.3.5 | none
 history: 1.3.4 | A failed flee now also halves the damage of Manwe's named abilities for the rest of that round.
 history: 1.3.3 | Allies still Downed when you flee stand up with half their maximum HP.

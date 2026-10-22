@@ -1,4 +1,4 @@
-<!-- doc: checked 1.3.5; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
+<!-- doc: checked 1.3.6; sources: tools/wiki-build, Scripts/Systems/WikiDataExporter.cs, web/wiki-bot.js, web/wiki-search.js, web/ssh-proxy.js, scripts-server/wiki-bot.env.example, scripts-server/usurper-web.service, .github/workflows/ci-cd.yml, .github/workflows/wiki-suggestion.yml, .github/workflows/wiki-suggestion-guard.yml -->
 # Wiki build and review
 
 The launch wiki has English prose in `DOCS/wiki/`, generated references and a
