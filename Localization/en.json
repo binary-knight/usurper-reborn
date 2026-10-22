@@ -7205,6 +7205,7 @@
   "combat.rescue_which": "Which ally do you pick up?",
   "combat.rescue_done": "{0} stands again with {1} HP.",
   "combat.rescue_no_potion": "You need a healing potion to rescue a downed ally.",
+  "combat.rescue_already_used": "{0} was already rescued this fight.",
   "combat.ally_recovers": "{0} gets back up ({1}/{2} HP).",
   "combat.party_summary_downs": "downed {0}x, rescued {1}x",
   "combat.party_summary_downs_fell": "downed {0}x, rescued {1}x, fell",

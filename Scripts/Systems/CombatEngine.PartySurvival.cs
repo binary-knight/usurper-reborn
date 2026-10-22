@@ -9,7 +9,7 @@ using UsurperRemake.Utils;
 /// <summary>
 /// 1.3.3 party survival. A story companion or NPC ally that reaches 0 HP in a fight is Downed: it stays
 /// in the party at 0 HP, out of every target, heal and turn list (all of them already skip HP 0). The
-/// combat owner can lift it with Rescue [U] and one healing potion. A predator (Beast, Insectoid, Shadow,
+/// combat owner can lift it with Rescue [U] and one healing potion, once per ally per fight. A predator (Beast, Insectoid, Shadow,
 /// Undead) or a boss spends its action to announce a finish on the earliest Downed ally and, in a later
 /// round, spends its action to finish it: only then do the death handlers run (permadeath, grief, the
 /// left-to-die penalty, the fall in teammates_lost). A taunt, a hold or the finisher's death loses the
@@ -24,6 +24,8 @@ public partial class CombatEngine
     private readonly HashSet<Character> _downedAtTurnStart = new(ReferenceEqualityComparer.Instance);
     private bool _ownerRescuedThisTurn;
     private bool _finishGateReached;
+    // 1.3.6: each Downed ally is lifted once per fight; a second down of the same ally cannot be rescued
+    private readonly HashSet<Character> _rescuedThisFight = new(ReferenceEqualityComparer.Instance);
 
     private void ResetPartySurvival()
     {
@@ -32,6 +34,7 @@ public partial class CombatEngine
         _downedAtTurnStart.Clear();
         _ownerRescuedThisTurn = false;
         _finishGateReached = false;
+        _rescuedThisFight.Clear();
     }
 
     /// <summary>Who can be Downed: a story companion or an NPC ally (spouse, lover, team member, pet: every
@@ -173,16 +176,31 @@ public partial class CombatEngine
         if (ally.IsCompanion) CompanionSystem.Instance.SyncCompanionHP(ally);
     }
 
-    /// <summary>Rescue is offered to the combat owner while an ally is Downed, a healing potion is on the
-    /// belt, and no Old God potion cooldown runs.</summary>
-    internal bool RescueOffered(Character owner) =>
-        DownedAllies().Count > 0 && owner.Healing > 0 && !(BossContext != null && owner.PotionCooldownRounds > 0);
+    /// <summary>1.3.6: the ally was already rescued in this fight, so it cannot be lifted again.</summary>
+    internal bool RescuedThisFight(Character ally) => _rescuedThisFight.Contains(ally);
 
-    /// <summary>The [U] key: the Downed ally to lift (a prompt only when two or more are Downed), or null.</summary>
+    /// <summary>Downed allies that can still be lifted: each ally once per fight (1.3.6).</summary>
+    internal List<Character> RescuableAllies(CombatResult? result = null) =>
+        DownedAllies(result).Where(a => !_rescuedThisFight.Contains(a)).ToList();
+
+    /// <summary>Rescue is offered to the combat owner while an ally not yet rescued in this fight is Downed,
+    /// a healing potion is on the belt, and no Old God potion cooldown runs.</summary>
+    internal bool RescueOffered(Character owner) =>
+        RescuableAllies().Count > 0 && owner.Healing > 0 && !(BossContext != null && owner.PotionCooldownRounds > 0);
+
+    /// <summary>The [U] key: the Downed ally to lift (a prompt only when two or more can be lifted), or null.
+    /// 1.3.6: an ally already rescued in this fight is not offered; with only such allies Downed, one line
+    /// says so.</summary>
     private async Task<CombatAction?> ChooseRescue(Character owner)
     {
-        var downed = DownedAllies();
-        if (downed.Count == 0) return null;
+        if (DownedAllies().Count == 0) return null;
+        var downed = RescuableAllies();
+        if (downed.Count == 0)
+        {
+            UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.rescue_already_used", DownedAllies()[0].DisplayName)}", "yellow");
+            await Pacing.Wait(GetCombatDelay(800));
+            return null;
+        }
         if (!RescueOffered(owner))
         {
             if (owner.Healing > 0)
@@ -218,6 +236,11 @@ public partial class CombatEngine
     private async Task ExecuteRescue(Character owner, Character? ally, CombatResult result)
     {
         if (ally == null || !ally.IsDowned || result.Teammates == null || !result.Teammates.Contains(ally)) return;
+        if (_rescuedThisFight.Contains(ally))
+        {
+            UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.rescue_already_used", ally.DisplayName)}", "yellow");
+            return;
+        }
         if (owner.Healing <= 0 || (BossContext != null && owner.PotionCooldownRounds > 0))
         {
             UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.rescue_no_potion")}", "yellow");
@@ -234,6 +257,7 @@ public partial class CombatEngine
         ally.Lifecycle = AllyLifecycle.Active;
         _pendingFinish.Remove(ally);
         _downOrder.Remove(ally);
+        _rescuedThisFight.Add(ally);
         StatsFor(ally).Rescues++;
         owner.Statistics?.RecordPotionUsed(heal);
         if (BossContext != null)

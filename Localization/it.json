@@ -6959,6 +6959,7 @@
   "combat.rescue_which": "Quale alleato rialzi?",
   "combat.rescue_done": "{0} si rialza con {1} PV.",
   "combat.rescue_no_potion": "Ti serve una pozione curativa per soccorrere un alleato a terra.",
+  "combat.rescue_already_used": "{0} è già stato soccorso in questo combattimento.",
   "combat.ally_recovers": "{0} si rialza ({1}/{2} PV).",
   "combat.party_summary_downs": "a terra {0} volte, soccorso {1} volte",
   "combat.party_summary_downs_fell": "a terra {0} volte, soccorso {1} volte, caduto",

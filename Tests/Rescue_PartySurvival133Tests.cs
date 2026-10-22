@@ -119,7 +119,7 @@ public class Rescue_PartySurvival133Tests
         r.Engine.BossContext = null;
         r.Owner.PotionCooldownRounds = 2;
         await Down(r, ally);
-        r.Engine.RescueOffered(r.Owner).Should().BeTrue("a floor boss has no potion cooldown");
+        r.Engine.RescueOffered(r.Owner).Should().BeFalse("1.3.6: this ally was already rescued in this fight (the floor boss case is in RescueOnce_LastStandRescue136Tests)");
     }
 
     // ---------- 11. a rescued ally stands with the potion heal and can be downed again ----------

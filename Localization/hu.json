@@ -6967,6 +6967,7 @@
   "combat.rescue_which": "Melyik szövetségest segíted fel?",
   "combat.rescue_done": "{0} újra talpon van, {1} ÉP.",
   "combat.rescue_no_potion": "Egy gyógyital kell egy földre került szövetséges megmentéséhez.",
+  "combat.rescue_already_used": "{0} már kapott mentést ebben a harcban.",
   "combat.ally_recovers": "{0} feltápászkodik ({1}/{2} ÉP).",
   "combat.party_summary_downs": "földre került {0}x, megmentve {1}x",
   "combat.party_summary_downs_fell": "földre került {0}x, megmentve {1}x, elesett",
