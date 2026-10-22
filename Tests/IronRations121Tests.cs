@@ -237,7 +237,7 @@ public class IronRations121Tests
     [Fact]
     public async Task Defeat_ClosesTheFight()
     {
-        var (engine, output) = MakeEngine(string.Concat(Enumerable.Repeat("A\n", 6)) + "\n\n\n1\n" + string.Concat(Enumerable.Repeat("\n", 8)));
+        var (engine, output) = MakeEngine(string.Concat(Enumerable.Repeat("A\n", 12)) + "\n\n\n1\n" + string.Concat(Enumerable.Repeat("\n", 8)));
         var p = Fed("IrDie", hp: 5);
         var difficulty = DifficultySystem.CurrentDifficulty;
         DifficultySystem.CurrentDifficulty = DifficultyMode.Normal;
