@@ -76,7 +76,7 @@ public static class ClassAbilitySystem
         {
             Id = "power_strike",
             Name = "Power Strike",
-            Description = "A devastating two-handed blow that deals massive damage.",
+            Description = "A heavy blow with any weapon that deals massive damage. A two-handed grip adds 45%.",
             LevelRequired = 1,
             StaminaCost = 15,
             Cooldown = 0,
@@ -115,7 +115,7 @@ public static class ClassAbilitySystem
         {
             Id = "thundering_roar",
             Name = "Thundering Roar",
-            Description = "A devastating war cry that forces all enemies to attack you for 3 rounds.",
+            Description = "A war cry that draws all enemies to you for 3 rounds. Each round, each enemy keeps to you on a 75% roll.",
             LevelRequired = 20,
             StaminaCost = 40,
             Cooldown = 3,
@@ -339,7 +339,7 @@ public static class ClassAbilitySystem
         {
             Id = "wild_swing",
             Name = "Wild Swing",
-            Description = "A furious wind-up blow. Hits harder than a normal swing at the cost of stamina.",
+            Description = "A furious wind-up blow: 20 damage plus a quarter of your weapon power, scaled by level and Strength.",
             LevelRequired = 1,
             StaminaCost = 12,
             Cooldown = 0,
@@ -421,7 +421,7 @@ public static class ClassAbilitySystem
         {
             Id = "primal_scream",
             Name = "Primal Scream",
-            Description = "A primal roar that damages all enemies and terrifies them. 90 AoE damage + confuses surviving enemies for 2 rounds.",
+            Description = "A primal roar that damages all enemies: 90 base damage to the first, 75%, 50% and 25% to the next. Confuses survivors for 2 rounds; a boss may shrug it off.",
             LevelRequired = 60,
             StaminaCost = 65,
             Cooldown = 5,
@@ -482,7 +482,7 @@ public static class ClassAbilitySystem
         {
             Id = "divine_smite",
             Name = "Divine Smite",
-            Description = "Channel holy energy through your weapon. Extra vs undead.",
+            Description = "Channel holy energy into a magical strike, with no weapon effects. Undead and demons take its damage twice.",
             LevelRequired = 10,
             StaminaCost = 35,
             Cooldown = 2,
@@ -522,7 +522,7 @@ public static class ClassAbilitySystem
         {
             Id = "cleansing_light",
             Name = "Cleansing Light",
-            Description = "Purge corruption and heal wounds with holy light.",
+            Description = "Holy light removes all your harmful statuses and heals 80 HP, scaled by level, Constitution and Wisdom.",
             LevelRequired = 44,
             StaminaCost = 50,
             Cooldown = 5,
@@ -1797,7 +1797,7 @@ public static class ClassAbilitySystem
         {
             Id = "focus",
             Name = "Focus",
-            Description = "Concentrate to increase accuracy.",
+            Description = "Concentrate to raise your attack power: +20, scaled by level and Charisma.",
             LevelRequired = 5,
             StaminaCost = 15,
             Cooldown = 2,
@@ -1817,7 +1817,7 @@ public static class ClassAbilitySystem
         {
             Id = "rally",
             Name = "Rally",
-            Description = "Steel your resolve, recovering health and stamina. Restores 55 HP + 50 stamina.",
+            Description = "Steel your resolve: heals 55 HP, scaled by level, Constitution and Wisdom, and restores 50 stamina.",
             LevelRequired = 30,
             StaminaCost = 40,
             Cooldown = 6,
