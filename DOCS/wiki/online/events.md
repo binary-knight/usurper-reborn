@@ -1,8 +1,9 @@
 ---
 title: Rankings, news and world events
 path: /wiki/en/online/events/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/WorldEventSystem.cs, Scripts/Systems/NewsSystem.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/WorldSimService.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Systems/WeeklyGodSystem.cs
+history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none

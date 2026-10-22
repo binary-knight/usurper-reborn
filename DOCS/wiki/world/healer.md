@@ -1,8 +1,9 @@
 ---
 title: The Healer
 path: /wiki/en/world/healer/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/HealerLocation.cs, Scripts/Systems/MentalSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Systems/CityControlSystem.cs
+history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none

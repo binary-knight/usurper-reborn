@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.6 | Frost Touch and Ice Storm slow a boss at most 1 round, Steal Life and Energy Drain heal half of the damage dealt, Purifying Surge cures an ally's poison and disease, Cycle Rewind and Blood Pact act only on the caster, Summon Angel and Summon Demon ask for no target and give their attack bonus, and Death Kiss and Power Word: Kill no longer kill mini bosses outright.
 history: 1.3.5 | Cycle Rewind heals exactly 30 percent of the caster's maximum HP, as its text says, with no level, Wisdom or proficiency scaling.
 history: 1.3.4 | Probability Shift makes 30 percent of the target's hits miss and stops its critical hits in place of confusing and slowing it, Echo of Tomorrow ignores half the target's armor, and Paradox Collapse's text names its bonus damage.
 history: 1.3.3 | none

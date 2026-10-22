@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.6 | Magic resistance on your gear now cuts a monster's breath and spell damage by up to half, except an Old God's, a weakened monster sets 0.80 times its armor and Defence against your hits, and Boss Slayer gear now adds its 10 percent to Power Attack.
 history: 1.3.5 | Gear HP and mana regeneration restores a share of the maximum each round, at most 10 percent, armor piercing also lowers monster Defence against abilities and area attacks and adds up to at most 50 percent, and gear crit damage adds on top of the 3 times Dexterity cap.
 history: 1.3.4 | A Cyclebreaker's Probability Shift makes 30 percent of a monster's hits on you miss and turns its natural 20 into an ordinary hit, and the difficulty's monster damage now applies to Manwe's named abilities.
 history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
@@ -45,7 +46,7 @@ Spells and martial abilities use their own effect definitions. Read [spells](/wi
 
 ## The hit roll
 
-Your hit chance against a monster at most 5 levels above you is 95 percent: you need {{balance:PlayerHitMinNeeded}} or more on a twenty-sided die, so only a natural 1 misses. Each physical attack you make on a monster rolls: a basic swing (each hand on its own when you dual wield), Power Attack, Precise Strike, Backstab and a physical single-target class ability. The game shows the roll and the number needed, for example "[You roll 14; you need 2 or more]".
+Your hit chance against a monster at most 5 levels above you is 95 percent: you need {{balance:PlayerHitMinNeeded}} or more on a twenty-sided die, so only a natural 1 misses. Each physical attack you make on a monster rolls: a basic swing (each hand on its own when you dual wield), Power Attack, Precise Strike, Backstab and a physical single-target class ability other than the Alchemist's thrown bombs and the Bard's Cutting Words. The game shows the roll and the number needed, for example "[You roll 14; you need 2 or more]".
 
 - Against a monster up to {{balance:AtLevelAccuracyGap}} levels above you, or any level below, you need {{balance:PlayerHitMinNeeded}} or more: only a natural 1 misses.
 - Against a monster more than {{balance:AtLevelAccuracyGap}} levels above you, you need between {{balance:PlayerHitMinNeeded}} and {{balance:PlayerHitMaxNeededAbove}}, so you hit 65 to 95 percent of the time.
