@@ -1882,7 +1882,7 @@ public static class ClassAbilitySystem
         {
             Id = "undertow_stance",
             Name = "Undertow Stance",
-            Description = "Tidal currents pull all enemies toward you: taunt + weaken (-20% damage) for 3 rounds. Self defense +35.",
+            Description = "Tidal currents pull all enemies toward you for 3 rounds: each keeps to you on a 75% roll a round and is weakened (-30% attack, -20% defense). Self defense +35.",
             LevelRequired = 1, StaminaCost = 30, Cooldown = 4,
             Type = AbilityType.Defense, DefenseBonus = 35, Duration = 3,
             SpecialEffect = "undertow",
@@ -1892,7 +1892,7 @@ public static class ClassAbilitySystem
         {
             Id = "riptide_strike",
             Name = "Riptide Strike",
-            Description = "A sweeping blow infused with tidal force. Target's next attack reduced by 25%. Bonus damage vs weakened foes.",
+            Description = "A sweeping blow infused with tidal force. Weakens the target for 2 rounds (-30% attack, -20% defense). +40% damage vs weakened foes.",
             LevelRequired = 5, StaminaCost = 40, Cooldown = 2,
             Type = AbilityType.Attack, BaseDamage = 70,
             SpecialEffect = "riptide",
@@ -1932,7 +1932,7 @@ public static class ClassAbilitySystem
         {
             Id = "abyssal_anchor",
             Name = "Abyssal Anchor",
-            Description = "Root yourself like a reef. All enemies forced to attack you for 3 rounds. +80 defense, enemies deal 20% less damage.",
+            Description = "Root yourself like a reef. For 3 rounds all enemies keep to you on a 75% roll a round and are weakened (-30% attack, -20% defense). +80 defense.",
             LevelRequired = 50, StaminaCost = 65, Cooldown = 4,
             Type = AbilityType.Defense, DefenseBonus = 80, Duration = 3,
             SpecialEffect = "abyssal_anchor",
@@ -2056,7 +2056,7 @@ public static class ClassAbilitySystem
         {
             Id = "dissonant_wave",
             Name = "Dissonant Wave",
-            Description = "Discordant blast. All enemies: -30 ATK, -30 DEF, 25% chance to skip turn for 3 rounds.",
+            Description = "Discordant blast. All enemies for 3 rounds: weakened (-30% attack, -20% defense) and marked (+30% damage taken). Each has a 25% chance to be stunned for 1 round.",
             LevelRequired = 60, StaminaCost = 70, Cooldown = 5,
             Type = AbilityType.Debuff, Duration = 3,
             SpecialEffect = "dissonant_wave",
@@ -2086,7 +2086,7 @@ public static class ClassAbilitySystem
         {
             Id = "oceans_voice",
             Name = "Ocean's Voice",
-            Description = "The Ocean speaks through you. All allies: +50 ATK, +30 DEF, +20% crit for 4 rounds.",
+            Description = "The Ocean speaks through you. All allies: +50 ATK, +30 DEF for 4 rounds. While you hold an attack bonus, your missed crits roll again at 20%.",
             LevelRequired = 90, StaminaCost = 100, Cooldown = 7,
             Type = AbilityType.Buff, AttackBonus = 50, DefenseBonus = 30, Duration = 4,
             SpecialEffect = "oceans_voice",
@@ -2150,7 +2150,7 @@ public static class ClassAbilitySystem
         {
             Id = "entropy_cascade",
             Name = "Entropy Cascade",
-            Description = "Accelerate entropy. 140 AoE damage. Enemies take +15% damage for 4 rounds.",
+            Description = "Accelerate entropy. 140 AoE damage. Enemies are marked for 4 rounds: +30% damage taken.",
             LevelRequired = 40, StaminaCost = 100, Cooldown = 7,
             Type = AbilityType.Attack, BaseDamage = 140, Duration = 4,
             SpecialEffect = "entropy_aoe",
@@ -2160,7 +2160,7 @@ public static class ClassAbilitySystem
         {
             Id = "timeline_split",
             Name = "Timeline Split",
-            Description = "Create a temporal clone that attacks for 50% of your damage for 3 rounds.",
+            Description = "Split your timeline. Your basic attacks are doubled, at full damage, for 3 rounds.",
             LevelRequired = 50, StaminaCost = 65, Cooldown = 6,
             Type = AbilityType.Buff, Duration = 3,
             SpecialEffect = "timeline_split",
@@ -2170,7 +2170,7 @@ public static class ClassAbilitySystem
         {
             Id = "causality_loop",
             Name = "Causality Loop",
-            Description = "Trap the enemy in a loop. They take damage equal to what they dealt last round for 3 rounds.",
+            Description = "Trap the enemy in a loop for 3 rounds: confused and weakened (-30% attack, -20% defense).",
             LevelRequired = 60, StaminaCost = 70, Cooldown = 5,
             Type = AbilityType.Debuff, Duration = 3,
             SpecialEffect = "causality_loop",
@@ -2200,7 +2200,7 @@ public static class ClassAbilitySystem
         {
             Id = "temporal_prison",
             Name = "Temporal Prison",
-            Description = "Freeze the target in time. Cannot act for 2 rounds (boss: 1 round). Takes no damage during.",
+            Description = "Freeze the target in time. Cannot act for 2 rounds (boss: 1 round, resisted half the time).",
             LevelRequired = 90, StaminaCost = 95, Cooldown = 8,
             Type = AbilityType.Debuff, Duration = 2,
             SpecialEffect = "temporal_prison",
@@ -2210,7 +2210,7 @@ public static class ClassAbilitySystem
         {
             Id = "cycles_end",
             Name = "Cycle's End",
-            Description = "Strike with the weight of every cycle. 400 damage + 50 per NG+ cycle (max +250). Ignores 50% defense.",
+            Description = "Strike with the weight of every cycle. 400 damage + 50 per NG+ cycle (max +250). Ignores all defense.",
             LevelRequired = 95, StaminaCost = 120, Cooldown = 8,
             Type = AbilityType.Attack, BaseDamage = 400,
             SpecialEffect = "cycles_end",
@@ -2234,7 +2234,7 @@ public static class ClassAbilitySystem
         {
             Id = "corrupting_touch",
             Name = "Corrupting Touch",
-            Description = "Infect with Old God corruption. 40 damage/round for 5 rounds. Each tick heals you.",
+            Description = "Infect with Old God corruption. Hits for 40 now, then 40 damage/round for 5 rounds. Each tick heals you half its damage.",
             LevelRequired = 5, StaminaCost = 35, Cooldown = 3,
             Type = AbilityType.Debuff, BaseDamage = 40, Duration = 5,
             SpecialEffect = "corrupting_dot",
@@ -2244,7 +2244,7 @@ public static class ClassAbilitySystem
         {
             Id = "umbral_step",
             Name = "Umbral Step",
-            Description = "Vanish into shadow. Next attack guaranteed critical. Evade all attacks this round.",
+            Description = "Vanish into shadow. Your next attack is a guaranteed critical. Dodge the next attack against you.",
             LevelRequired = 15, StaminaCost = 40, Cooldown = 3,
             Type = AbilityType.Utility,
             SpecialEffect = "umbral_step",
@@ -2284,7 +2284,7 @@ public static class ClassAbilitySystem
         {
             Id = "abyssal_eruption",
             Name = "Abyssal Eruption",
-            Description = "Unleash corruption. 150 AoE damage. Leaves 20 damage/round DoT for 3 rounds on all enemies.",
+            Description = "Unleash corruption. 150 AoE damage. Poisons all enemies for 3 rounds (3-5% of their max HP a round).",
             LevelRequired = 60, StaminaCost = 75, Cooldown = 5,
             Type = AbilityType.Attack, BaseDamage = 150,
             SpecialEffect = "abyssal_eruption",
@@ -2368,7 +2368,7 @@ public static class ClassAbilitySystem
         {
             Id = "void_shroud",
             Name = "Void Shroud",
-            Description = "25% of damage taken reflected to attacker. +30 defense for 3 rounds.",
+            Description = "15% of damage taken reflected to attacker. +30 defense for 3 rounds.",
             LevelRequired = 25, StaminaCost = 60, Cooldown = 5,
             Type = AbilityType.Defense, DefenseBonus = 30, Duration = 3,
             SpecialEffect = "damage_reflect_25",
@@ -2388,7 +2388,7 @@ public static class ClassAbilitySystem
         {
             Id = "devour",
             Name = "Devour",
-            Description = "Consume the target. 120 damage. Heals 30% dealt. Below 30% HP: damage x1.5.",
+            Description = "Consume the target. 120 damage. Heals 30% dealt. While your HP is below 30%: damage x1.5.",
             LevelRequired = 50, StaminaCost = 60, Cooldown = 4,
             Type = AbilityType.Attack, BaseDamage = 120, // Reduced from 160; lifesteal 50%→30%, low HP 2x→1.5x
             SpecialEffect = "devour",
@@ -2418,7 +2418,7 @@ public static class ClassAbilitySystem
         {
             Id = "void_rupture",
             Name = "Void Rupture",
-            Description = "Tear the void open. 160 AoE damage. Enemies killed explode for 60 bonus damage to others.",
+            Description = "Tear the void open. 160 AoE damage. Each enemy killed makes the others take 60 or 15% of the damage, whichever is more.",
             LevelRequired = 80, StaminaCost = 90, Cooldown = 6,
             Type = AbilityType.Attack, BaseDamage = 160, // Reduced from 220; explosion 100→60
             SpecialEffect = "void_rupture",

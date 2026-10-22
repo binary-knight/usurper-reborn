@@ -252,7 +252,7 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Tidecall Barrier", "Surround all allies with shimmering wave-light. All allies: +25 protection. Duration: whole fight.", 40, 6, "Tidabarriarie", true, "Buff"),
             [3] = new SpellInfo(3, "Siren's Lament", "Sing the Ocean's grief, sapping enemy will. All enemies: -30% attack, -20% defense. Duration: 4 rounds.", 55, 11, "Sirenlamentarie", true, "Debuff"),
             [4] = new SpellInfo(4, "Alethia's Grace", "Channel the healing light of Aurelion's beloved. Effect: 80-120 hp to all allies. Duration: 1 turn.", 90, 16, "Alethiagratarie", true, "Heal"),
-            [5] = new SpellInfo(5, "Symphony of the Depths", "Channel the Ocean's full harmonic spectrum. All allies: +60 attack, +40 defense, guaranteed crit on next hit. Self: -50% max HP. Duration: whole fight.", 160, 22, "Symphodeptarie", true, "Buff")
+            [5] = new SpellInfo(5, "Symphony of the Depths", "The Ocean's full harmony. All allies: +60 attack and +40 defense (grow with level; defense with CHA too), next hit crits. Costs half your max HP. Duration: whole fight.", 160, 22, "Symphodeptarie", true, "Buff")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -275,7 +275,7 @@ public static class SpellSystem
         [CharacterClass.Abysswarden] = new Dictionary<int, SpellInfo>
         {
             [1] = new SpellInfo(1, "Prison Siphon", "Draw power from the nearest sealed God-prison. Damage: 12-18. Heals self 50% of damage. Duration: 1 turn.", 15, 1, "Prisonsipharie", false, "Attack"),
-            [2] = new SpellInfo(2, "Noctura's Whisper", "Invoke the Shadow Goddess's paranoia. Target: -25% attack, -25% defense. Duration: 3 rounds.", 35, 6, "Nocturwhisparie", false, "Debuff"),
+            [2] = new SpellInfo(2, "Noctura's Whisper", "Invoke the Shadow Goddess's paranoia. Target weakened: -30% attack, -20% defense. Duration: 3 rounds.", 35, 6, "Nocturwhisparie", false, "Debuff"),
             [3] = new SpellInfo(3, "Abyssal Chains", "Bind the target with chains from the Old Gods' prison. Damage: 65-85. Target immobilized 2 rounds. Duration: 1 turn.", 60, 11, "Abysschainarie", false, "Attack"),
             [4] = new SpellInfo(4, "Devour Essence", "Consume the target's life force. Damage: 100-140. Heals 75%. Restores 20 mana. Duration: 1 turn.", 90, 17, "Devouressarie", false, "Attack"),
             [5] = new SpellInfo(5, "Maelketh's Prison Break", "Crack the War God's seal, releasing imprisoned fury. Damage: 220-300. Self takes 10% as backlash. Duration: 1 turn.", 180, 23, "Maelbreakarie", false, "Attack")
