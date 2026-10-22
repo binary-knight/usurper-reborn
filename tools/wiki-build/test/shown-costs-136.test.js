@@ -3,8 +3,10 @@
 // Cutting Words and Legendary Shot hold (their templates hold 0).
 const { test } = require("node:test");
 const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
-const { loadData, renderers, textOf } = require("../build");
+const { build, loadData, renderers, textOf } = require("../build");
 const dataDir =
   process.env.WIKI_DATA_DIR || path.resolve(__dirname, "../../../wiki-data");
 const load = () => loadData(dataDir).data;
@@ -43,4 +45,26 @@ test("abilities table: Cutting Words and Legendary Shot show the rounds their ef
   assert.equal(row(html, byId("legendary_shot").name.en)[6], "1");
   for (const a of data.abilities.filter((x) => !["weaken", "legendary"].includes(x.specialEffect)))
     assert.equal(row(html, a.name.en)[6], String(a.duration), a.id);
+});
+
+test("ability pages: a page whose stamina cost the tier raises carries the tier note once", () => {
+  const data = load();
+  const temp = fs.mkdtempSync(path.join(os.tmpdir(), "usurper-wiki-x1-"));
+  try {
+    const { pages } = build({ dataDir, outDir: path.join(temp, "site") });
+    const page = (id) => pages.find((p) => p.path === `/wiki/en/characters/abilities/${id}/`);
+    const note =
+      "The stamina cost above is the template cost: an ability that needs level 50 or more costs 25 percent more stamina, " +
+      "and one that needs level 75 or more costs 40 percent more, rounded down.";
+    for (const a of data.abilities) {
+      const text = textOf(page(a.id).body);
+      const count = text.split(note).length - 1;
+      assert.equal(count, a.staminaCost > 0 && a.levelRequired >= 50 ? 1 : 0, a.id);
+    }
+    assert.ok(textOf(page("champion_strike").body).includes(note));
+    assert.ok(!textOf(page("savage_charge").body).includes(note), "level 47: the template is the charge");
+    assert.ok(!textOf(page("windfury_totem").body).includes(note), "mana only");
+  } finally {
+    fs.rmSync(temp, { recursive: true, force: true });
+  }
 });

@@ -1908,6 +1908,11 @@ function build(options = {}) {
           ),
           "Ability template and requirements",
         ) +
+        // 1.3.6 X1: the tier note of the class roles table, where the page lists a stamina cost the tier raises
+        (e.staminaCost > 0 && e.levelRequired >= 50
+          ? "<p>The stamina cost above is the template cost: an ability that needs level 50 or more costs 25 percent more stamina, " +
+            "and one that needs level 75 or more costs 40 percent more, rounded down.</p>"
+          : "") +
         '<p><a href="/wiki/en/characters/abilities/">All abilities</a></p>',
       "Scripts/Systems/ClassAbilitySystem.cs",
     );

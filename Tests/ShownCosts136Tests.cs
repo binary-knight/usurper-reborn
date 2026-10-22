@@ -361,4 +361,36 @@ public class ShownCosts136Tests
         Regex.Match(js, "e\\.specialEffect === \"legendary\"\\s*\\?\\s*(\\d+)").Groups[1].Value
             .Should().Be(stunRounds.ToString(), "the ability table shows the stun's rounds");
     }
+
+    // ---------------------------------------------------------------- the GMCP skills list
+
+    [Fact]
+    public void ShownCosts136_GmcpSkillsList_SendsTheCharge()
+    {
+        var hero = G.Hero(hp: 1_000_000, level: 100, cls: CharacterClass.Barbarian, name: "Gmcp");
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        var stream = new MemoryStream();
+        UsurperRemake.Server.SessionContext.Current = new UsurperRemake.Server.SessionContext { OutputStream = stream, GmcpEnabled = true };
+        System.Text.Json.JsonElement frame;
+        try
+        {
+            UsurperRemake.Server.GmcpBridge.EmitSkillsList(hero);
+            string text = Encoding.UTF8.GetString(stream.ToArray());
+            int a = text.IndexOf('{');
+            int b = text.LastIndexOf('}');
+            a.Should().BeGreaterThan(-1, "a Char.Skills.List frame was written");
+            using var doc = System.Text.Json.JsonDocument.Parse(text.Substring(a, b - a + 1));
+            frame = doc.RootElement.Clone();
+        }
+        finally { UsurperRemake.Server.SessionContext.Current = saved; }
+        int Sent(string id) => frame.GetProperty("abilities").EnumerateArray()
+            .Single(e => e.GetProperty("id").GetString() == id).GetProperty("staminaCost").GetInt32();
+        // Unstoppable needs level 75 (70, charged 98); Frenzy needs level 48, below the tier (55, charged 55)
+        ClassAbilitySystem.GetAbility("unstoppable")!.LevelRequired.Should().Be(75);
+        Sent("unstoppable").Should().Be(98, "a level 75 ability sends the cost charged");
+        ClassAbilitySystem.GetAbility("frenzy")!.LevelRequired.Should().BeLessThan(50);
+        Sent("frenzy").Should().Be(55, "below level 50 the template is the charge");
+        foreach (var ability in ClassAbilitySystem.GetAvailableAbilities(hero))
+            Sent(ability.Id).Should().Be(ClassAbilitySystem.GetEffectiveStaminaCost(ability), ability.Id);
+    }
 }
