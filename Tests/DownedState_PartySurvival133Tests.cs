@@ -422,9 +422,11 @@ public class DownedState_PartySurvival133Tests
     public async Task Recovery_RunsAtDeathsDoor()
     {
         var ally = Ally();
-        var (res, err, text) = await FightWithDowned(Hero(hp: 200), new List<Monster> { Mob("Crusher", "Goblinoid", hp: 400, str: 60000) }, ally, Attacks());
+        var hero = Hero(hp: 200);
+        hero.IsExhibitionCombat = true;
+        var (res, err, text) = await FightWithDowned(hero, new List<Monster> { Mob("Crusher", "Goblinoid", hp: 400, str: 60000) }, ally, Attacks());
         err.Should().BeNull("{0}", text);
-        res!.Outcome.Should().Be(CombatOutcome.PlayerEscaped, "Death's Door carries the player out: {0}", text);
+        res!.Outcome.Should().Be(CombatOutcome.PlayerDied, "1.3.6 rule 2: Last Stand keeps the fight going, the next blow kills: {0}", text);
         ally.HP.Should().Be(50); ally.IsDowned.Should().BeFalse();
     }
 

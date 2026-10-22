@@ -1076,6 +1076,8 @@ public class Character
     // (per-round combat state, not serialized).
     [System.Text.Json.Serialization.JsonIgnore] public long RoundStartHP { get; set; } = 0;
     [System.Text.Json.Serialization.JsonIgnore] public bool LastStandFiredThisRound { get; set; } = false;
+    // 1.3.6: Last Stand fires once per fight (reset at the fight's start with DeathsDoorUsedThisCombat)
+    [System.Text.Json.Serialization.JsonIgnore] public bool LastStandUsedThisCombat { get; set; } = false;
 
     // v0.65.6 "Death's Door": once per combat, a burst that would kill the player
     // from above 25% round-start HP leaves them at 1 HP instead. Closes the
@@ -1115,9 +1117,12 @@ public class Character
     /// monster damage has landed and BEFORE the death check runs. If the
     /// player died this round but started above 50% MaxHP, rescue them by
     /// setting HP to 1 and flagging LastStandFiredThisRound so the combat
-    /// loop can render the flavor line. Combat then ends with the player
-    /// alive at 1 HP (the caller rewrites the outcome to Victory or
-    /// PlayerEscaped). End-of-round check (rather than per-
+    /// loop can render the flavor line. 1.3.6: the round loop calls this where
+    /// it finds the player dead, and the fight goes on with the player at 1 HP
+    /// (Last Stand once per fight, LastStandUsedThisCombat; a later killing blow
+    /// goes to Death's Door if it qualifies, otherwise to death). A call from
+    /// HandlePlayerDeath after the loop still rewrites the outcome to Victory or
+    /// PlayerEscaped. End-of-round check (rather than per-
     /// damage clamp) lets us cover all damage sources -- basic attacks,
     /// ability damage, multi-monster pile-on, DoT ticks, boss specials -- in
     /// one place without touching every damage application site.
@@ -1136,18 +1141,18 @@ public class Character
         if (DifficultySystem.IsPermadeath()) return false;
         if (HP > 0) return false;                 // Not dead; nothing to rescue.
 
-        if (RoundStartHP > MaxHP / 2)
+        if (RoundStartHP > MaxHP / 2 && !LastStandUsedThisCombat)
         {
-            // Last Stand: started the round healthy; no single round may kill.
+            // Last Stand: started the round healthy; no single round may kill. 1.3.6: once per fight.
             HP = 1;
+            LastStandUsedThisCombat = true;
             LastStandFiredThisRound = true;
             return true;
         }
 
         // v0.65.6 "Death's Door": once per combat, a killing burst against a
         // player who started the round above 25% MaxHP leaves them at 1 HP;
-        // combat then ends with the player alive (the caller rewrites the
-        // outcome to an escape). A later fight can burst-kill for real if the
+        // 1.3.6: the fight then goes on, as after Last Stand. A later fight can burst-kill for real if the
         // guarantee was already spent. Skipped in exhibition combat (Gauntlet /
         // Tournament of Honor / pit fights) and arrest combat -- exhibition
         // waves are each a fresh combat, so an unguarded Death's Door would
