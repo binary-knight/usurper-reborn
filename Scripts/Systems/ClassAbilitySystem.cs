@@ -1375,7 +1375,7 @@ public static class ClassAbilitySystem
         {
             Id = "smoke_bomb",
             Name = "Smoke Bomb",
-            Description = "Create smoke to confuse enemies.",
+            Description = "Create a cloud of smoke: +45 defense (grows with level) for 3 rounds.",
             LevelRequired = 16,
             StaminaCost = 25,
             Cooldown = 4,
@@ -1455,7 +1455,7 @@ public static class ClassAbilitySystem
         {
             Id = "stimulant_brew",
             Name = "Stimulant Brew",
-            Description = "Distribute stimulant vials to the whole party, boosting attack and stamina.",
+            Description = "Distribute stimulant vials to the whole party: +20 attack (grows with level and CHA) for 4 rounds; teammates get 75%.",
             LevelRequired = 6,
             StaminaCost = 25,
             Cooldown = 4,
@@ -1508,7 +1508,7 @@ public static class ClassAbilitySystem
         {
             Id = "smoke_screen",
             Name = "Smoke Screen",
-            Description = "A billowing smoke screen that grants the whole party evasion.",
+            Description = "A billowing smoke screen: +40 defense (grows with level and CON) for the whole party for 3 rounds.",
             LevelRequired = 40,
             StaminaCost = 35,
             Cooldown = 5,
@@ -1563,7 +1563,7 @@ public static class ClassAbilitySystem
         {
             Id = "grand_remedy",
             Name = "Grand Remedy",
-            Description = "The ultimate curative: fully restores the party and cures all ailments.",
+            Description = "The ultimate curative: heals you 175 HP and each teammate 75% of that, and cures poison, bleeding, burning, curses, weakness and disease.",
             LevelRequired = 80,
             StaminaCost = 65,
             Cooldown = 6,
@@ -1576,7 +1576,7 @@ public static class ClassAbilitySystem
         {
             Id = "transmutation",
             Name = "Transmutation",
-            Description = "The ultimate alchemical transformation. Purges ailments.",
+            Description = "The ultimate alchemical transformation: heals 110 HP, +70 ATK and +55 DEF for 6 rounds, and regeneration. Clears harmful statuses, but not lasting poison or disease.",
             LevelRequired = 88,
             StaminaCost = 75,
             Cooldown = 6,
@@ -1609,7 +1609,7 @@ public static class ClassAbilitySystem
         {
             Id = "flametongue",
             Name = "Flametongue",
-            Description = "Enchant your weapon with fire for 5 rounds. Melee attacks deal bonus fire damage and gain +15% attack power.",
+            Description = "Enchant your weapon with fire for 5 rounds: melee attacks deal bonus fire damage, and you gain attack equal to 15% of your Strength.",
             LevelRequired = 1,
             ManaCost = 15,
             Cooldown = 0,
@@ -1623,7 +1623,7 @@ public static class ClassAbilitySystem
         {
             Id = "healing_totem",
             Name = "Healing Totem",
-            Description = "Summon a healing totem that restores 10% MaxHP to all allies each round for 4 rounds.",
+            Description = "Summon a healing totem for 4 rounds: heals you 10% of max HP each round, or you and each teammate 5% each while a teammate lives.",
             LevelRequired = 5,
             ManaCost = 30,
             Cooldown = 5,
@@ -1651,7 +1651,7 @@ public static class ClassAbilitySystem
         {
             Id = "earthbind_totem",
             Name = "Earthbind Totem",
-            Description = "Summon an earthbind totem that slows enemies, reducing their attack by 20% for 4 rounds.",
+            Description = "Summon an earthbind totem that weighs enemies down, cutting their attack by 20% for 4 rounds.",
             LevelRequired = 15,
             ManaCost = 25,
             Cooldown = 5,
@@ -1692,7 +1692,7 @@ public static class ClassAbilitySystem
         {
             Id = "searing_totem",
             Name = "Searing Totem",
-            Description = "Summon a fire totem that blasts enemies for fire damage each round for 4 rounds.",
+            Description = "Summon a fire totem: a 60 damage fire hit on your target now, then that hit on every enemy each round for 4 rounds, setting them burning.",
             LevelRequired = 30,
             ManaCost = 35,
             Cooldown = 5,
@@ -1720,7 +1720,7 @@ public static class ClassAbilitySystem
         {
             Id = "windfury_totem",
             Name = "Windfury Totem",
-            Description = "Summon a wind totem that grants all allies a chance for an extra attack each round for 4 rounds.",
+            Description = "Summon a wind totem: for 4 rounds, each of your attack turns has a 40% chance of one extra attack.",
             LevelRequired = 50,
             ManaCost = 40,
             Cooldown = 6,

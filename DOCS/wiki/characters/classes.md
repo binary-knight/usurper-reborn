@@ -49,7 +49,7 @@ For an NPC teammate, the classes Warrior, Paladin and Barbarian count as party t
 
 ### Which classes can heal
 
-Six specializations have the Healer role: Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman). Each adds {{percent:HealerSpecHealBonus}} percent to ability and spell healing. The game's role list for prestige classes names Wavecaller as Healer. Four classes heal more with abilities whatever their specialization: see the class passives below.
+Six specializations have the Healer role: Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman). Each adds {{percent:HealerSpecHealBonus}} percent to ability and spell healing, though not to the Mystic Shaman's Healing Totem, Spirit Link Totem or Ancestral Guidance. The game's role list for prestige classes names Wavecaller as Healer. Four classes heal more with abilities whatever their specialization: see the class passives below.
 
 ### Role numbers for each class
 

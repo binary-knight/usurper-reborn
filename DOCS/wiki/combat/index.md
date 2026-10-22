@@ -106,7 +106,7 @@ Armor piercing on your gear takes its percent off the armor or Defence a monster
 
 ### Area damage
 
-An area attack does full damage to the first monster, 75 percent to the second, 50 percent to the third and 25 percent to the fourth and every later one, in the order the monsters stand, not the one you picked first.
+An area attack does full damage to the first monster, 75 percent to the second, 50 percent to the third and 25 percent to the fourth and every later one, in the order the monsters stand, not the one you picked first. Chain Lightning is the exception: it hits the monster you pick in full, then each other monster for half of that, at 100, 75, 50 and 25 percent of the half in the same order.
 
 ## Attacks per round
 
