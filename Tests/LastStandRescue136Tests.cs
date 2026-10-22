@@ -146,6 +146,20 @@ public class RescueOnce_LastStandRescue136Tests
         r.Engine.RescueOffered(r.Owner).Should().BeTrue("a floor boss has no potion cooldown");
     }
 
+    [Fact]
+    public async Task AnAllyAlreadyRescued_IsNotLeftToDie_WhenItCannotBeLiftedAgain()
+    {
+        var a = Ally("Mira"); var b = Ally("Kade");
+        var r = NewRig(owner: Hero(potions: 3), team: new[] { a, b });
+        var attack = new CombatAction { Type = CombatActionType.Attack };
+        await Down(r, a);
+        await CallAsync(r.Engine, "ExecuteRescue", r.Owner, a, r.Result);
+        await Down(r, a); await Down(r, b);
+        r.Engine.NoteOwnerTurn(r.Owner, r.Team, attack);
+        r.Engine.CouldHaveHelped(a, r.Owner).Should().BeFalse("Mira was already rescued in this fight, so U could not lift her");
+        r.Engine.CouldHaveHelped(b, r.Owner).Should().BeTrue("Kade could still be lifted");
+    }
+
     [Theory]
     [InlineData("en")]
     [InlineData("hu")]

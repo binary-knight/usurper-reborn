@@ -90,7 +90,7 @@ Before the quest, each companion has two story scenes, in order, on any floor at
 
 A companion at 0 HP in a fight is Downed, not dead: it stays in the party until you rescue it, a monster finishes it, or the fight ends and it stands up again with half its maximum HP (see [Downed allies](/wiki/en/combat/party/#downed-allies)). A companion that a monster finishes is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
 
-If a companion was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
+If a companion was Downed at the start of your turn, had not already been rescued in that fight, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
 
 ### A companion who dies for you
 

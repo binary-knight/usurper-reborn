@@ -196,8 +196,9 @@ public partial class CombatEngine
         if (owner.IsExhibitionCombat || owner.IsArrestCombat) return false;
         // 1.3.3 party survival: an ally in scope is lost only at a finish, so the question is "did not
         // pick up": Downed at the owner's last turn start, a healing potion held, and no Rescue chosen.
+        // 1.3.6: an ally already rescued in this fight cannot be lifted again, so it was not left to die
         if (IsDownable(ally))
-            return _downedAtTurnStart.Contains(ally) && !_ownerRescuedThisTurn
+            return _downedAtTurnStart.Contains(ally) && !_ownerRescuedThisTurn && !RescuedThisFight(ally)
                 && owner.Healing > 0 && owner.PotionCooldownRounds <= 0;
         if (!_lowAlliesAtTurnStart.Contains(ally) || _ownerAidedThisTurn) return false;
         bool potion = owner.Healing > 0 && owner.PotionCooldownRounds <= 0;
