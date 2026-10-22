@@ -66,7 +66,7 @@ Against a monster up to {{balance:AtLevelAccuracyGap}} levels above you none of 
 
 ### Monster evasion
 
-A monster with an evasion buff makes each of your hits miss with its own chance, 25 to 55 percent for 2 rounds (Ink Cloud: 30 percent for 3 rounds). The check comes before your roll, also applies to spells and area damage, and is not changed by hiding.
+A monster with an evasion buff makes each of your hits miss with its own chance, 25 to 55 percent for 2 rounds (Ink Cloud: 30 percent for 3 rounds). The check comes before your roll, also applies to spells and area damage (but not to Death Blossom or Grand Finale), and is not changed by hiding.
 
 ## Critical hits
 

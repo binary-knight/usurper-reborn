@@ -831,7 +831,7 @@ public static class ClassAbilitySystem
         {
             Id = "death_mark",
             Name = "Death Mark",
-            Description = "Mark target for 4 rounds: all attacks deal +30% damage to marked enemy. Scales with INT.",
+            Description = "Mark target for 4 rounds: all attacks deal +30% damage to it, and you gain +40 attack (grows with level).",
             LevelRequired = 28,
             StaminaCost = 45,
             Cooldown = 5,
@@ -888,7 +888,7 @@ public static class ClassAbilitySystem
         {
             Id = "noctura_embrace",
             Name = "Noctura's Embrace",
-            Description = "+50 ATK, +60 DEF for 4 rounds. Grants Hidden status (next 2 attacks crit from stealth).",
+            Description = "+50 ATK (grows with level and CHA), +60 DEF (grows with level) for 4 rounds. Hidden: your next attack crits from stealth.",
             LevelRequired = 65,
             StaminaCost = 60,
             Cooldown = 6,

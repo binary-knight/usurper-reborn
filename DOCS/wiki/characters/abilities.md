@@ -62,7 +62,7 @@ Bonuses do not stack. Each ability, spell or other source holds its own attack o
 
 ## Song of Rest and other party songs
 
-A Bard song that heals, such as Song of Rest, gives each living teammate 75 percent of the healing the Bard receives, up to the HP that teammate is missing. A song's attack and defense bonuses reach teammates at 60 percent, as in the example above.
+A Bard song that heals, such as Song of Rest, gives each living teammate 75 percent of the song's whole heal, even when the Bard needs less of it, up to the HP that teammate is missing. A song's attack and defense bonuses reach teammates at 60 percent, as in the example above.
 
 ## Calm Waters
 
