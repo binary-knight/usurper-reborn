@@ -43,7 +43,7 @@ internal static class ClassTexts136Support
                 t.Should().NotBeNullOrWhiteSpace($"{key} {lang}");
                 Placeholders(t).Should().Equal(Placeholders(en), $"{key} {lang} has the placeholders of en");
                 Numbers(t).Should().Equal(Numbers(en), $"{key} {lang} states the numbers of en: \"{t}\"");
-                Regex.IsMatch(t, "[–—]").Should().BeFalse($"{key} {lang} has no en or em dash");
+                Regex.IsMatch(t, "[\u2013\u2014]").Should().BeFalse($"{key} {lang} has no en or em dash");
             }
         }
     }
