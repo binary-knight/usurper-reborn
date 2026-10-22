@@ -178,7 +178,7 @@ public class ClassTexts136DTests
         En("spell.sage.23.desc").Should().Contain("stuns for 2 rounds (a boss resists half the time and is held 1 round)");
         Percent(GameConfig.BossStunResistChance).Should().Be(50);
         GameConfig.MaxStunDurationBoss.Should().Be(1);
-        En("spell.sage.25.desc").Should().Contain("under 20% HP that is not a boss dies 30% of the time").And.NotContain("drain");
+        En("spell.sage.25.desc").Should().Contain("under 20% HP that is not a boss or mini boss dies 30% of the time").And.NotContain("drain");
         var heal = Range(En("spell.sage.24.desc"), "heal");
         Cast(CharacterClass.Sage, 24, false).Healing.Should().Be(heal.Lo);
         Cast(CharacterClass.Sage, 24, true).Healing.Should().Be(heal.Hi);

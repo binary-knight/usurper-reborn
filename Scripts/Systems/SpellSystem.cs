@@ -185,7 +185,7 @@ public static class SpellSystem
             [21] = new SpellInfo(21, "Power Word: Stun", "A single word paralyzes your enemy. Effect: cannot act 3 rounds (a boss resists half the time, held 1 round). Duration: 3 rounds.", 160, 21, "Stunverbum", false, "Debuff"),
             [22] = new SpellInfo(22, "Manwe's Creation", "Channel the Creator's power to reshape reality. Damage: 200-280. Duration: 1 turn.", 180, 22, "Manwecreatie", false, "Attack"),
             [23] = new SpellInfo(23, "Summon Demon", "Call a demon from the abyss. Attack: +100, scales with level. Dodge next attack. Duration: whole fight.", 200, 23, "Excadexsumarie", false, "Summon"),
-            [24] = new SpellInfo(24, "Power Word: Kill", "The ultimate death magic. Damage: 280-380. Duration: 1 turn.", 230, 24, "Mattravidduzzievh", false, "Attack"),
+            [24] = new SpellInfo(24, "Power Word: Kill", "The ultimate death magic. Damage: 280-380; a foe under 20% HP that is not a boss or mini boss dies 30% of the time. Duration: 1 turn.", 230, 24, "Mattravidduzzievh", false, "Attack"),
             [25] = new SpellInfo(25, "Wish", "Bend reality to your will. Adds your Strength to attack and your Defense to defense. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
         },
 
@@ -226,7 +226,7 @@ public static class SpellSystem
             [22] = new SpellInfo(22, "Ocean's Memory", "Tap into the infinite wisdom. All allies: spells cost half mana. Duration: whole fight.", 180, 22, "Oceanmemarie", true, "Buff"),
             [23] = new SpellInfo(23, "Temporal Paradox", "Trap the enemy in a time loop. Damage: 200-280; stuns for 2 rounds (a boss resists half the time and is held 1 round). Duration: 1 turn.", 200, 23, "Temporalarie", false, "Attack"),
             [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. All allies: heal 240-320, scales with WIS, and protection +85, scales with level and INT. Duration: whole fight.", 230, 24, "Velouralovearie", true, "Heal"),
-            [25] = new SpellInfo(25, "Death Kiss", "The ultimate death magic. Damage: 300-420; a foe under 20% HP that is not a boss dies 30% of the time. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
+            [25] = new SpellInfo(25, "Death Kiss", "The ultimate death magic. Damage: 300-420; a foe under 20% HP that is not a boss or mini boss dies 30% of the time. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
