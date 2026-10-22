@@ -1,8 +1,9 @@
 ---
 title: Spells
 path: /wiki/en/characters/spells/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/SpellSystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellLearningSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.6 | Frost Touch and Ice Storm slow a boss at most 1 round, Steal Life and Energy Drain heal half of the damage dealt, Purifying Surge cures an ally's poison and disease, Cycle Rewind and Blood Pact act only on the caster, Summon Angel and Summon Demon ask for no target and give their attack bonus, and Death Kiss and Power Word: Kill no longer kill mini bosses outright.
 history: 1.3.5 | Cycle Rewind heals exactly 30 percent of the caster's maximum HP, as its text says, with no level, Wisdom or proficiency scaling.
 history: 1.3.4 | Probability Shift makes 30 percent of the target's hits miss and stops its critical hits in place of confusing and slowing it, Echo of Tomorrow ignores half the target's armor, and Paradox Collapse's text names its bonus damage.
 history: 1.3.3 | none
@@ -52,9 +53,17 @@ Spells do not use the ability scaling, and a spell does not make the [hit roll](
 - Healing: the base healing times 1 plus 2.5 percent per character level, times 1 plus 1.5 percent per point of Wisdom above 10, at most 3 times. Healing varies by up to 5 percent either way. Clerics heal 25 percent more with spells (Divine Grace). Cycle Rewind is the exception: it heals exactly 30 percent of your maximum HP, with no level, Wisdom or proficiency scaling.
 - Protection: the base protection times 1 plus 2 percent per character level, times 1 plus 1.5 percent per point of Intelligence above 10 up to 60, then 0.5 percent per point, at most 2.5 times. Wavecallers use Charisma here too.
 
-Frost Touch slows its target, and Ice Storm every enemy still standing, for 2 rounds; the slow counts down once a round, and a slowed enemy loses its action half the time.
+Frost Touch slows its target, and Ice Storm every enemy still standing, for 2 rounds. A boss or champion shrugs the slow off {{balance:BossSoftControlResistPercent}} percent of the time and is otherwise slowed 1 round. The slow counts down once a round, and a slowed enemy loses its action half the time.
+
+Steal Life and Energy Drain heal you half of the HP the target lost to the hit, after its armor, a boss's protections and its remaining HP.
 
 Drugs, herbs, food and god boons can add to these results. A healer [specialization](/wiki/en/characters/specializations/) adds 20 percent to spell healing.
+
+## Casting on an ally
+
+A single-target heal or buff spell can be aimed at an ally and lands on that ally. A spell that cures, Purify or Purifying Surge, also removes the ally's Poisoned and Diseased statuses and trap poison. Cycle Rewind and Blood Pact act only on the caster: no ally can be chosen for them, and the cast always lands on the one who casts it. Summon Angel and Summon Demon are cast on yourself too: no target is asked for, the attack bonus lasts the whole fight, and each makes you dodge the next attack.
+
+Deluge of Sanctity and Unmaking each have a cooldown in a fight. It counts down once a round for every party member who cast one, a grouped player or an NPC ally as well as you.
 
 ## Spells that move alignment
 

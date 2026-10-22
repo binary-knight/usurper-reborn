@@ -1,8 +1,9 @@
 ---
 title: Monsters and bosses
 path: /wiki/en/monsters/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Data/MonsterFamilies.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/MonsterAbilities.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Systems/EliteAffixes.cs, Scripts/Core/Monster.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Data/GauntletChampionData.cs
+history: 1.3.6 | A monster's breath and spell damage is now magical and cut by your gear's magic resistance, except an Old God's, a monster you poison no longer hits harder, and Thorns no longer reflects the Alchemist's thrown bombs or the Bard's Cutting Words.
 history: 1.3.5 | The Multiattack and Time Stop messages announce the one strike these abilities make.
 history: 1.3.4 | none
 history: 1.3.3 | From level 25 monsters have more HP and hit harder and groups grow a little each level with no jump at level 31 or 61, monsters keep growing past level 50, and Beast, Insectoid, Shadow and Undead monsters can finish a Downed ally.
@@ -77,7 +78,7 @@ On floor {{balance:StragglerMinFloor}} and deeper, {{percent:StragglerEncounterC
 
 A monster with abilities uses one on 30 percent of its turns plus 1 percent per 5 levels: a level 50 monster 40 percent of the time. It picks evenly among its abilities that would not be wasted; the full rule and how ability damage meets your defence are on [combat](/wiki/en/combat/#monster-special-abilities).
 
-An ability that hits, drains or ends the monster's turn replaces its normal attack; one that does none of these (an evasion buff, a heal over time) is followed by the normal attack. A hit multiplies the monster's attack power (Strength + weapon power + punch, 1.3 times for a boss); a multiplier of 1 is a normal strength hit, so a status ability with x1 also hits. A fixed direct damage replaces the hit. Most direct damage is (the monster's level x 3 + its Strength / 2) times the ability's own factor, plus 5 to 14. A status lands at the chance shown unless you resist it. Summoned minions join the fight only up to 5 living monsters in all; a minion has 40 + 3 x the summoner's level HP and is 8 levels lower.
+An ability that hits, drains or ends the monster's turn replaces its normal attack; one that does none of these (an evasion buff, a heal over time) is followed by the normal attack. A hit multiplies the monster's attack power (Strength + weapon power + punch, 1.3 times for a boss); a multiplier of 1 is a normal strength hit, so a status ability with x1 also hits. A fixed direct damage replaces the hit. Most direct damage is (the monster's level x 3 + its Strength / 2) times the ability's own factor, plus 5 to 14; that damage is magical, so your gear's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) cuts it, except an Old God's. A status lands at the chance shown unless you resist it. Summoned minions join the fight only up to 5 living monsters in all; a minion has 40 + 3 x the summoner's level HP and is 8 levels lower.
 
 The table shows what one use does for a level {{balance:AbilityProbeLevel}} monster at half its HP with 166 Strength, against a target with {{balance:AbilityProbeTargetHP}} HP and {{balance:AbilityProbeTargetStrength}} Strength. A range means the number is rolled each use. "Changes when" marks an ability whose effect differs when the monster or the target is badly hurt, or when it is used again in the same fight.
 
@@ -86,7 +87,7 @@ The table shows what one use does for a level {{balance:AbilityProbeLevel}} mons
 ### Monster abilities that depend on the situation
 
 - **Multiattack, Frenzy, Swarm and Time Stop** strike once; the table shows that one hit.
-- **Thorns** covers the monster in thorns for 3 rounds, and the monster then makes its normal attack. While they last, each melee hit on it (a weapon swing or a melee ability, yours, a teammate's or a companion's) costs the attacker 25 percent of the damage it dealt, at least 1, but never below 1 HP. Spells, bow shots and the Ranged Attack are not reflected. Only the Gauntlet champion Korr Stonewarden has Thorns.
+- **Thorns** covers the monster in thorns for 3 rounds, and the monster then makes its normal attack. While they last, each melee hit on it (a weapon swing or a melee ability, yours, a teammate's or a companion's) costs the attacker 25 percent of the damage it dealt, at least 1, but never below 1 HP. Spells, bow shots, the Ranged Attack, the Alchemist's thrown bombs and the Bard's Cutting Words are not reflected. Only the Gauntlet champion Korr Stonewarden has Thorns.
 - **Possess** deals direct damage equal to half your Strength.
 - **Devour** deals damage equal to your current HP when you are below a fifth of your maximum HP; **Devour Soul** does so 5 percent of the time. The most damage one hit can do still applies.
 - **Phylactery** heals a third of the monster's HP once it is below a quarter, and **Rebirth** restores it fully once below a fifth, once per fight; otherwise both hit.

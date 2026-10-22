@@ -822,7 +822,7 @@ public class Equipment
 
     // World boss exclusive loot effects (v0.54.0)
     public bool HasBossSlayer { get; set; }        // +10% damage vs bosses
-    public bool HasTitanResolve { get; set; }      // +5% defense
+    public bool HasTitanResolve { get; set; }      // +5% max HP, once however many items carry it
 
     /// <summary>
     /// Create a new equipment item

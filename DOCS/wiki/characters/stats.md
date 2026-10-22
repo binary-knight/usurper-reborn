@@ -1,8 +1,9 @@
 ---
 title: Stats and the character sheet
 path: /wiki/en/characters/stats/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/StatEffectsSystem.cs, Scripts/Core/Character.cs, Scripts/Systems/CharacterCreationSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/AwakeningBonus.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/AlignmentSystem.cs
+history: 1.3.6 | Magic resistance on your gear now cuts a monster's breaths and spells by up to half, except an Old God's, and the Mystic Shaman's Lightning Bolt, Chain Lightning and Searing Totem now scale with Intelligence.
 history: 1.3.5 | Critical damage from gear adds on top of the 3 times cap, which now holds only for the Dexterity part.
 history: 1.3.4 | none
 history: 1.3.3 | none
@@ -45,7 +46,7 @@ Agility does not decide who acts first.
 
 ## Defence
 
-When a monster hits you, your Defence, magic armor bonus and most of your armor power are taken off the damage. A hit always does at least a small minimum, and an ordinary single hit cannot take more than 75 percent of your maximum HP (85 percent from a boss). Defence and armor reduce damage; neither makes you immune.
+When a monster hits you, your Defence, magic armor bonus and most of your armor power are taken off the damage. A hit always does at least a small minimum, and an ordinary single hit cannot take more than 75 percent of your maximum HP (85 percent from a boss). Defence and armor reduce damage; neither makes you immune. [Magic resistance](/wiki/en/items/enchanting/#magic-resistance) on your gear also cuts a monster's breaths and spells, at most by half, except an Old God's.
 
 ## Constitution, Intelligence and Wisdom
 
@@ -61,7 +62,7 @@ Intelligence:
 
 - Maximum mana for spellcasting classes: 5 per point above 10, plus your level times an eighth of your Intelligence.
 - Spell damage, spell critical chance and protection spells (see [spells](/wiki/en/characters/spells/)).
-- Alchemist attack abilities and Debuff abilities scale with it.
+- Alchemist attack abilities, the Mystic Shaman's Lightning Bolt, Chain Lightning and Searing Totem, and Debuff abilities scale with it.
 - [Training points](/wiki/en/characters/leveling/#training-points-per-level) at each level: one more for every 40 points of Intelligence and Wisdom combined.
 
 Wisdom:

@@ -221,7 +221,7 @@ public static class GmcpBridge
                 name = ability.Name,
                 type = ability.Type.ToString(),
                 cooldown = ability.Cooldown,
-                staminaCost = ability.StaminaCost,
+                staminaCost = ClassAbilitySystem.GetEffectiveStaminaCost(ability),
                 manaCost = ability.ManaCost,
                 requiresLevel = ability.LevelRequired
             });

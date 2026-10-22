@@ -1,8 +1,9 @@
 ---
 title: Companions and beasts
 path: /wiki/en/combat/companions/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Data/BeastData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/TempleLocation.cs, Scripts/Locations/PrisonLocation.cs, Scripts/Locations/MusicShopLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/MainStreetLocation.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Data/WildernessData.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/Items.cs, Scripts/Core/Character.cs, Scripts/Systems/BetrayalSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Systems/MiracleSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/GameConfig.cs
+history: 1.3.6 | A companion's own thorns gear now hurts a monster whose normal attack strikes it, Titan's Resolve on its gear raises its maximum HP by 5 percent, and a companion finished after you rescued it in that fight no longer counts as left to die.
 history: 1.3.5 | A living companion takes the NPC teammate's 75 percent share of the experience from room features and shared rewards, the experience line after a fight shows how close it is to its next level, and its own regeneration gear restores a share of its HP and mana each round.
 history: 1.3.4 | none
 history: 1.3.3 | A companion at 0 HP in a fight is Downed and dies only when a monster finishes it or when, still standing, it takes a killing blow in your place; leaving it to die now means holding a healing potion and not rescuing it while it is Downed.
@@ -58,6 +59,10 @@ A living companion and a living NPC teammate in your dungeon party each take 75 
 
 A companion can train a skill up to Superb; an NPC ally stops at Expert. At the Level Master, H (help a team member) gives an active companion, an NPC on your team or your spouse up to half of your own experience, which leaves your total.
 
+## Companion gear in a fight
+
+A companion fights with its own gear. Thorns on it return their summed percent of the damage a monster's normal attack did to the companion, at least 1, as yours do, and a monster the thorns kill counts as killed. Its own HP and mana regeneration gear restores a share each round (see [regeneration in combat](/wiki/en/combat/#regeneration-in-combat)), and Titan's Resolve raises its maximum HP as it does yours.
+
 ## Companion loyalty
 
 Loyalty runs from 0 to 100 and starts at 50. Each level a companion gains adds 1. At the Inn, P (manage party), the companion's number, then G gives a gift: 50 gold for 3 loyalty, 200 gold for 8, 500 gold for 15. There is no daily limit on gifts.
@@ -86,7 +91,7 @@ Before the quest, each companion has two story scenes, in order, on any floor at
 
 A companion at 0 HP in a fight is Downed, not dead: it stays in the party until you rescue it, a monster finishes it, or the fight ends and it stands up again with half its maximum HP (see [Downed allies](/wiki/en/combat/party/#downed-allies)). A companion that a monster finishes is dead for good. Its equipment and its bag go into your inventory until your inventory is full; the rest is lost. The death costs you {{balance:MentalCompanionGriefLoss}} Mental before any god's ward and starts grief: see [Mental](/wiki/en/characters/mental/).
 
-If a companion was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
+If a companion was Downed at the start of your turn, had not already been rescued in that fight, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
 
 ### A companion who dies for you
 

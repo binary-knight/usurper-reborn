@@ -1,7 +1,7 @@
-<!-- doc: checked 1.3.5; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
+<!-- doc: checked 1.3.6; sources: Scripts, Console/Bootstrap, web, scripts-server, Localization, launchers, electron-client, tools/wiki-build, .github/workflows/ci-cd.yml, usurper-reloaded.csproj, runtimeconfig.template.json, wezterm.lua -->
 # Usurper Reborn -- Architecture Document
 
-> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.5. Section
+> A comprehensive technical reference for the Usurper Reborn codebase, checked against v1.3.6. Section
 > version tags below (e.g. "v0.60.7") mark when a subsystem was introduced or last substantially
 > revised, not the document date.
 
@@ -159,7 +159,7 @@ Character (base)
 ```
 
 ### Character (base)
-**File**: `Scripts/Core/Character.cs` (~3800 lines)
+**File**: `Scripts/Core/Character.cs` (~4000 lines)
 
 Stats follow Pascal `UserRec` layout for source-game compatibility. Modern fields layered on top:
 
@@ -391,7 +391,7 @@ NPC-built community in the Outskirts, a town location beyond the city gates. 7 b
 
 ## 8. Combat Engine
 
-**File**: `Scripts/Systems/CombatEngine.cs` (~34,000 lines, the largest single system)
+**File**: `Scripts/Systems/CombatEngine.cs` (~35,000 lines, the largest single system)
 
 ### Combat Modes
 - `PlayerVsMonsters()` -- single & multi-monster
@@ -445,7 +445,7 @@ MinIncomingDamage = max(1, rawAttack/20, MaxHP * 0.25%)  // tank-floor scaling
 | Daily drinking games | 5/day | Anti-grind |
 
 ### Status Effects on Player Path
-`ProcessStatusEffects()` ticks at the start of every player turn. `CanAct()` short-circuits stunned / frozen / paralyzed / asleep with the matching message. Same logic mirrored on NPC teammates after the v0.57.4 fix (was previously enemy-only).
+`ProcessStatusEffects()` ticks at the start of every player turn. `CanAct()` short-circuits stunned / frozen / paralyzed / asleep with the matching message. Same logic mirrored on NPC teammates after the v0.57.4 fix (was previously enemy-only). Since 1.3.6 the temporary attack and defense bonuses from different abilities do not add: each slot holds its highest live bonus and the next returns when it ends (`Character.AddSlotBonus`, `Character.TickSlotBonuses`).
 
 ### Victory Rewards
 Base XP / Gold from monster -> world event modifiers (Blood Moon 2x XP / 3x gold) -> difficulty modifiers -> NG+ cycle multipliers (`CycleExpMultiplier`) -> spec multipliers -> party split (auto-redistribution on teammate death; equal-or-percentage configurable by player). Companions get 50%, NPC teammates split a configurable allotment.
@@ -1086,7 +1086,7 @@ Bundled into the existing TTYPE probe at session connect. Initial telnet packet 
 Strict opt-in: SSH-relayed, web terminal, BBS, and Electron sessions skip GMCP entirely via early-return on `!ctx.GmcpEnabled`. Synchronous per-stream lock prevents interleaved frames.
 
 ### Shipped Since
-The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). Each spell in `Char.Skills.List` carries the mana a cast costs that player (`SpellSystem.CalculateManaCost`) and the level at which the spell opens for the class (`SpellSystem.GetLevelRequired`), since 1.3.5. `Core.Supports.Set` is recorded per session but changes nothing yet.
+The server now also emits `Char.StatusVars`, `Char.Items.List`, `Char.Skills.List` and the combat packages `Char.Combat.Party`, `Char.Combat.Enemies`, `Char.Combat.Start`, `Char.Combat.End` and `Char.Combat.Killed` (`GmcpBridge.cs`, `CombatEngine.cs`). Each spell in `Char.Skills.List` carries the mana a cast costs that player (`SpellSystem.CalculateManaCost`) and the level at which the spell opens for the class (`SpellSystem.GetLevelRequired`), since 1.3.5. Each ability in `Char.Skills.List` carries the stamina cost charged, tier increase included (`ClassAbilitySystem.GetEffectiveStaminaCost`, 1.3.6). `Core.Supports.Set` is recorded per session but changes nothing yet.
 
 ---
 
@@ -1146,7 +1146,7 @@ Server-wide raid bosses. Since v1.1.4 a boss spawns daily at 8 PM Eastern (`Worl
 Each with 3 phases, escalating abilities, themed loot. Spawned with `boss_data_json` snapshot for full data preservation across restarts.
 
 ### Combat
-Each player runs their own combat loop against a **shared HP pool** atomically tracked via `SqlSaveBackend.RecordWorldBossDamage`. Returns `(remainingHp, wasKillingBlow)` -- exactly one player wins the kill credit via the conditional UPDATE described in Section 16. World-boss-exclusive loot affixes: `BossSlayer` (+10% damage vs bosses) and `TitanResolve` (+5% defense). Both work in regular combat too.
+Each player runs their own combat loop against a **shared HP pool** atomically tracked via `SqlSaveBackend.RecordWorldBossDamage`. Returns `(remainingHp, wasKillingBlow)` -- exactly one player wins the kill credit via the conditional UPDATE described in Section 16. World-boss-exclusive loot affixes: `BossSlayer` (+10% damage vs bosses) and `TitanResolve` (+5% max HP). Both work in regular combat too.
 
 ### Reward Tiers
 By contribution share: MVP 3.0x, Top 3 2.5x, Top 25% 2.0x, Top 50% 1.5x, Any 1.0x. Plus +25 Fame for kill credit, +15 Fame for any contribution. Achievements: World Slayer, Boss Hunter, Legend Killer, MVP.
@@ -1696,7 +1696,7 @@ Self-contained is mandatory; without it the binary won't run on machines without
 
 ### Version
 ```csharp
-Version = "1.3.5"
+Version = "1.3.6"
 VersionName = "Reckoning"
 ```
 
@@ -1827,7 +1827,7 @@ Scripts/
 ├── Core/
 │   ├── GameEngine.cs               Singleton, main game loop, init, save load
 │   ├── GameConfig.cs               Constants, class/race attrs, version, admin tunables
-│   ├── Character.cs                Base class (~3800 lines) + all enums
+│   ├── Character.cs                Base class (~4000 lines) + all enums
 │   ├── Player.cs                   Player-specific state
 │   ├── NPC.cs                      NPC with AI brain, lifecycle
 │   ├── Monster.cs                  Combat entity (standalone)
@@ -1863,7 +1863,7 @@ Scripts/
 │   ├── WikiDataExporter.cs         --export-wiki data for the player wiki
 │   ├── ServerSettingsRegistry.cs   v0.60.7 admin-tunable framework
 │   ├── PermadeathHelper.cs         Online death + permadeath
-│   ├── CombatEngine.cs             Turn-based combat (~34000 lines, plus CombatEngine.PartySurvival.cs)
+│   ├── CombatEngine.cs             Turn-based combat (~35000 lines, plus CombatEngine.PartySurvival.cs)
 │   ├── DailySystemManager.cs       Daily resets, time-of-day, maintenance
 │   ├── WorldSimulator.cs           Background NPC simulation
 │   ├── WorldSimService.cs          World sim host (MUD server and --worldsim)

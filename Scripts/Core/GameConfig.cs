@@ -10,7 +10,7 @@ using System.Collections.Generic;
 public static partial class GameConfig
 {
     // Version information
-    public const string Version = "1.3.5";
+    public const string Version = "1.3.6";
     public const string VersionName = "Reckoning"; // 1.3 line: the dungeon difficulty rework and betrayal
 
     // v0.57.12: Alignment scale cap. Character.Chivalry and Character.Darkness setters clamp to [0, AlignmentCap]
@@ -2228,6 +2228,16 @@ public static partial class GameConfig
     public const float FireEnchantDamageMultiplier = 0.15f;   // Fire damage = weapon damage * 15%
     public const float FrostEnchantProcChance = 0.15f;        // 15% chance for frost slow per attack
     public const int FrostEnchantDuration = 2;                // Frost slow lasts 2 turns (v0.60.10: was paired with FrostEnchantAgiReduction which mutated Defence -- removed when slow was correctly implemented via IsSlowed)
+    // 1.3.6: the shop's Phoenix Fire and Frostbite. A weapon whose enchant kinds hold "fire" or "phoenix" (Phoenix Fire)
+    // procs fire at PhoenixFireProcChance for PhoenixFireDamageMultiplier of the hit; one holding "frost" or "frostbite"
+    // (Frostbite) slows at FrostbiteProcChance. A loot fire or frost weapon keeps the three numbers above. The shop writes
+    // ElementEnchantWeaponPower for an enchant from 1.3.6 (kind "phoenix" or "frostbite"); one from before carries
+    // LegacyElementEnchantWeaponPower (kind "fire" or "frost").
+    public const float PhoenixFireProcChance = 0.30f;
+    public const float PhoenixFireDamageMultiplier = 0.25f;
+    public const float FrostbiteProcChance = 0.25f;
+    public const int ElementEnchantWeaponPower = 30;
+    public const int LegacyElementEnchantWeaponPower = 20;
     public const float LightningEnchantProcChance = 0.15f;    // 15% chance to stun per attack
     public const float LightningEnchantDamageMultiplier = 0.12f; // Lightning damage = weapon damage * 12%
 

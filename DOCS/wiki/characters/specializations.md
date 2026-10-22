@@ -1,8 +1,9 @@
 ---
 title: Specializations
 path: /wiki/en/characters/specializations/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/LevelMasterLocation.cs, Scripts/Data/SpecializationData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | Shield Wall Formation and Divine Mandate, with their Protection and Guardian bonuses, now also work against Manwe's named abilities.
 history: 1.3.3 | none
@@ -21,7 +22,7 @@ Each [class page](/wiki/en/characters/classes/) lists its specialization descrip
 
 ## Healer specializations
 
-Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman) are healer specializations. They add 20 percent to the healing of your abilities and spells.
+Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman) are healer specializations. They add 20 percent to the healing of your abilities and spells, though not to the Mystic Shaman's Healing Totem, Spirit Link Totem or Ancestral Guidance.
 
 ## Tank specializations
 

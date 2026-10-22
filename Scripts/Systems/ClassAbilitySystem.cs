@@ -76,7 +76,7 @@ public static class ClassAbilitySystem
         {
             Id = "power_strike",
             Name = "Power Strike",
-            Description = "A devastating two-handed blow that deals massive damage.",
+            Description = "A heavy blow with any weapon that deals massive damage. A two-handed grip adds 45%.",
             LevelRequired = 1,
             StaminaCost = 15,
             Cooldown = 0,
@@ -115,7 +115,7 @@ public static class ClassAbilitySystem
         {
             Id = "thundering_roar",
             Name = "Thundering Roar",
-            Description = "A devastating war cry that forces all enemies to attack you for 3 rounds.",
+            Description = "A war cry that draws all enemies to you for 3 rounds. Each round, each enemy keeps to you on a 75% roll.",
             LevelRequired = 20,
             StaminaCost = 40,
             Cooldown = 3,
@@ -339,7 +339,7 @@ public static class ClassAbilitySystem
         {
             Id = "wild_swing",
             Name = "Wild Swing",
-            Description = "A furious wind-up blow. Hits harder than a normal swing at the cost of stamina.",
+            Description = "A furious wind-up blow: 20 damage plus a quarter of your weapon power, scaled by level and Strength.",
             LevelRequired = 1,
             StaminaCost = 12,
             Cooldown = 0,
@@ -421,7 +421,7 @@ public static class ClassAbilitySystem
         {
             Id = "primal_scream",
             Name = "Primal Scream",
-            Description = "A primal roar that damages all enemies and terrifies them. 90 AoE damage + confuses surviving enemies for 2 rounds.",
+            Description = "A primal roar that damages all enemies: 90 base damage to the first, 75%, 50% and 25% to the next. Confuses survivors for 2 rounds; a boss may shrug it off.",
             LevelRequired = 60,
             StaminaCost = 65,
             Cooldown = 5,
@@ -482,7 +482,7 @@ public static class ClassAbilitySystem
         {
             Id = "divine_smite",
             Name = "Divine Smite",
-            Description = "Channel holy energy through your weapon. Extra vs undead.",
+            Description = "Channel holy energy into a magical strike, with no weapon effects. Undead and demons take its damage twice.",
             LevelRequired = 10,
             StaminaCost = 35,
             Cooldown = 2,
@@ -522,7 +522,7 @@ public static class ClassAbilitySystem
         {
             Id = "cleansing_light",
             Name = "Cleansing Light",
-            Description = "Purge corruption and heal wounds with holy light.",
+            Description = "Holy light removes all your harmful statuses and heals 80 HP, scaled by level, Constitution and Wisdom.",
             LevelRequired = 44,
             StaminaCost = 50,
             Cooldown = 5,
@@ -600,7 +600,7 @@ public static class ClassAbilitySystem
         {
             Id = "prayer_of_mending",
             Name = "Prayer of Mending",
-            Description = "A fervent prayer that restores health over time.",
+            Description = "A fervent prayer that heals your wounds at once.",
             LevelRequired = 1,
             StaminaCost = 20,
             Cooldown = 3,
@@ -697,7 +697,7 @@ public static class ClassAbilitySystem
         {
             Id = "beacon_of_light",
             Name = "Beacon of Light",
-            Description = "Become a beacon of divine light, shielding and slowly healing all allies.",
+            Description = "Become a beacon of divine light, shielding all allies and healing them at once.",
             LevelRequired = 52,
             StaminaCost = 55,
             Cooldown = 6,
@@ -831,7 +831,7 @@ public static class ClassAbilitySystem
         {
             Id = "death_mark",
             Name = "Death Mark",
-            Description = "Mark target for 4 rounds: all attacks deal +30% damage to marked enemy. Scales with INT.",
+            Description = "Mark target for 4 rounds: all attacks deal +30% damage to it, and you gain +40 attack (grows with level).",
             LevelRequired = 28,
             StaminaCost = 45,
             Cooldown = 5,
@@ -888,7 +888,7 @@ public static class ClassAbilitySystem
         {
             Id = "noctura_embrace",
             Name = "Noctura's Embrace",
-            Description = "+50 ATK, +60 DEF for 4 rounds. Grants Hidden status (next 2 attacks crit from stealth).",
+            Description = "+50 ATK (grows with level and CHA), +60 DEF (grows with level) for 4 rounds. Hidden: your next attack crits from stealth.",
             LevelRequired = 65,
             StaminaCost = 60,
             Cooldown = 6,
@@ -1375,7 +1375,7 @@ public static class ClassAbilitySystem
         {
             Id = "smoke_bomb",
             Name = "Smoke Bomb",
-            Description = "Create smoke to confuse enemies.",
+            Description = "Create a cloud of smoke: +45 defense (grows with level) for 3 rounds.",
             LevelRequired = 16,
             StaminaCost = 25,
             Cooldown = 4,
@@ -1455,7 +1455,7 @@ public static class ClassAbilitySystem
         {
             Id = "stimulant_brew",
             Name = "Stimulant Brew",
-            Description = "Distribute stimulant vials to the whole party, boosting attack and stamina.",
+            Description = "Distribute stimulant vials to the whole party: +20 attack (grows with level and CHA) for 4 rounds; teammates get 75%.",
             LevelRequired = 6,
             StaminaCost = 25,
             Cooldown = 4,
@@ -1508,7 +1508,7 @@ public static class ClassAbilitySystem
         {
             Id = "smoke_screen",
             Name = "Smoke Screen",
-            Description = "A billowing smoke screen that grants the whole party evasion.",
+            Description = "A billowing smoke screen: +40 defense (grows with level and CON) for the whole party for 3 rounds.",
             LevelRequired = 40,
             StaminaCost = 35,
             Cooldown = 5,
@@ -1563,7 +1563,7 @@ public static class ClassAbilitySystem
         {
             Id = "grand_remedy",
             Name = "Grand Remedy",
-            Description = "The ultimate curative: fully restores the party and cures all ailments.",
+            Description = "The ultimate curative: heals you 175 HP and each teammate 75% of that, and cures poison, bleeding, burning, curses, weakness and disease.",
             LevelRequired = 80,
             StaminaCost = 65,
             Cooldown = 6,
@@ -1576,7 +1576,7 @@ public static class ClassAbilitySystem
         {
             Id = "transmutation",
             Name = "Transmutation",
-            Description = "The ultimate alchemical transformation. Purges ailments.",
+            Description = "The ultimate alchemical transformation: heals 110 HP, +70 ATK and +55 DEF for 6 rounds, and regeneration. Clears harmful statuses, but not lasting poison or disease.",
             LevelRequired = 88,
             StaminaCost = 75,
             Cooldown = 6,
@@ -1609,7 +1609,7 @@ public static class ClassAbilitySystem
         {
             Id = "flametongue",
             Name = "Flametongue",
-            Description = "Enchant your weapon with fire for 5 rounds. Melee attacks deal bonus fire damage and gain +15% attack power.",
+            Description = "Enchant your weapon with fire for 5 rounds: melee attacks deal bonus fire damage, and you gain attack equal to 15% of your Strength.",
             LevelRequired = 1,
             ManaCost = 15,
             Cooldown = 0,
@@ -1623,7 +1623,7 @@ public static class ClassAbilitySystem
         {
             Id = "healing_totem",
             Name = "Healing Totem",
-            Description = "Summon a healing totem that restores 10% MaxHP to all allies each round for 4 rounds.",
+            Description = "Summon a healing totem for 4 rounds: heals you 10% of max HP each round, or you and each teammate 5% each while a teammate lives.",
             LevelRequired = 5,
             ManaCost = 30,
             Cooldown = 5,
@@ -1651,7 +1651,7 @@ public static class ClassAbilitySystem
         {
             Id = "earthbind_totem",
             Name = "Earthbind Totem",
-            Description = "Summon an earthbind totem that slows enemies, reducing their attack by 20% for 4 rounds.",
+            Description = "Summon an earthbind totem that weighs enemies down, cutting their attack by 20% for 4 rounds.",
             LevelRequired = 15,
             ManaCost = 25,
             Cooldown = 5,
@@ -1692,7 +1692,7 @@ public static class ClassAbilitySystem
         {
             Id = "searing_totem",
             Name = "Searing Totem",
-            Description = "Summon a fire totem that blasts enemies for fire damage each round for 4 rounds.",
+            Description = "Summon a fire totem: a 60 damage fire hit on your target now, then that hit on every enemy each round for 4 rounds, setting them burning.",
             LevelRequired = 30,
             ManaCost = 35,
             Cooldown = 5,
@@ -1720,7 +1720,7 @@ public static class ClassAbilitySystem
         {
             Id = "windfury_totem",
             Name = "Windfury Totem",
-            Description = "Summon a wind totem that grants all allies a chance for an extra attack each round for 4 rounds.",
+            Description = "Summon a wind totem: for 4 rounds, each of your attack turns has a 40% chance of one extra attack.",
             LevelRequired = 50,
             ManaCost = 40,
             Cooldown = 6,
@@ -1797,13 +1797,13 @@ public static class ClassAbilitySystem
         {
             Id = "focus",
             Name = "Focus",
-            Description = "Concentrate to increase accuracy.",
+            Description = "Concentrate to raise your attack power: +20, scaled by level and Charisma.",
             LevelRequired = 5,
             StaminaCost = 15,
             Cooldown = 2,
             Type = AbilityType.Buff,
             AttackBonus = 20,  // Buff - scales with CHA
-            Duration = 1,
+            Duration = 2,      // 1.3.6 G4: 1 ended at the round end it was cast in, before any swing
             AvailableToClasses = new[] {
                 CharacterClass.Warrior, CharacterClass.Barbarian, CharacterClass.Paladin,
                 CharacterClass.Assassin, CharacterClass.Ranger, CharacterClass.Jester,
@@ -1817,7 +1817,7 @@ public static class ClassAbilitySystem
         {
             Id = "rally",
             Name = "Rally",
-            Description = "Steel your resolve, recovering health and stamina. Restores 55 HP + 50 stamina.",
+            Description = "Steel your resolve: heals 55 HP, scaled by level, Constitution and Wisdom, and restores 50 stamina.",
             LevelRequired = 30,
             StaminaCost = 40,
             Cooldown = 6,
@@ -1882,7 +1882,7 @@ public static class ClassAbilitySystem
         {
             Id = "undertow_stance",
             Name = "Undertow Stance",
-            Description = "Tidal currents pull all enemies toward you: taunt + weaken (-20% damage) for 3 rounds. Self defense +35.",
+            Description = "Tidal currents pull all enemies toward you for 3 rounds: each keeps to you on a 75% roll a round and is weakened (-30% attack, -20% defense). Self defense +35.",
             LevelRequired = 1, StaminaCost = 30, Cooldown = 4,
             Type = AbilityType.Defense, DefenseBonus = 35, Duration = 3,
             SpecialEffect = "undertow",
@@ -1892,7 +1892,7 @@ public static class ClassAbilitySystem
         {
             Id = "riptide_strike",
             Name = "Riptide Strike",
-            Description = "A sweeping blow infused with tidal force. Target's next attack reduced by 25%. Bonus damage vs weakened foes.",
+            Description = "A sweeping blow infused with tidal force. Weakens the target for 2 rounds (-30% attack, -20% defense). +40% damage vs weakened foes.",
             LevelRequired = 5, StaminaCost = 40, Cooldown = 2,
             Type = AbilityType.Attack, BaseDamage = 70,
             SpecialEffect = "riptide",
@@ -1932,7 +1932,7 @@ public static class ClassAbilitySystem
         {
             Id = "abyssal_anchor",
             Name = "Abyssal Anchor",
-            Description = "Root yourself like a reef. All enemies forced to attack you for 3 rounds. +80 defense, enemies deal 20% less damage.",
+            Description = "Root yourself like a reef. For 3 rounds all enemies keep to you on a 75% roll a round and are weakened (-30% attack, -20% defense). +80 defense.",
             LevelRequired = 50, StaminaCost = 65, Cooldown = 4,
             Type = AbilityType.Defense, DefenseBonus = 80, Duration = 3,
             SpecialEffect = "abyssal_anchor",
@@ -2056,7 +2056,7 @@ public static class ClassAbilitySystem
         {
             Id = "dissonant_wave",
             Name = "Dissonant Wave",
-            Description = "Discordant blast. All enemies: -30 ATK, -30 DEF, 25% chance to skip turn for 3 rounds.",
+            Description = "Discordant blast. All enemies for 3 rounds: weakened (-30% attack, -20% defense) and marked (+30% damage taken). Each has a 25% chance to be stunned for 1 round.",
             LevelRequired = 60, StaminaCost = 70, Cooldown = 5,
             Type = AbilityType.Debuff, Duration = 3,
             SpecialEffect = "dissonant_wave",
@@ -2086,7 +2086,7 @@ public static class ClassAbilitySystem
         {
             Id = "oceans_voice",
             Name = "Ocean's Voice",
-            Description = "The Ocean speaks through you. All allies: +50 ATK, +30 DEF, +20% crit for 4 rounds.",
+            Description = "The Ocean speaks through you. All allies: +50 ATK, +30 DEF for 4 rounds. While you hold an attack bonus, your missed crits roll again at 20%.",
             LevelRequired = 90, StaminaCost = 100, Cooldown = 7,
             Type = AbilityType.Buff, AttackBonus = 50, DefenseBonus = 30, Duration = 4,
             SpecialEffect = "oceans_voice",
@@ -2150,7 +2150,7 @@ public static class ClassAbilitySystem
         {
             Id = "entropy_cascade",
             Name = "Entropy Cascade",
-            Description = "Accelerate entropy. 140 AoE damage. Enemies take +15% damage for 4 rounds.",
+            Description = "Accelerate entropy. 140 AoE damage. Enemies are marked for 4 rounds: +30% damage taken.",
             LevelRequired = 40, StaminaCost = 100, Cooldown = 7,
             Type = AbilityType.Attack, BaseDamage = 140, Duration = 4,
             SpecialEffect = "entropy_aoe",
@@ -2160,7 +2160,7 @@ public static class ClassAbilitySystem
         {
             Id = "timeline_split",
             Name = "Timeline Split",
-            Description = "Create a temporal clone that attacks for 50% of your damage for 3 rounds.",
+            Description = "Split your timeline. Your basic attacks are doubled, at full damage, for 3 rounds.",
             LevelRequired = 50, StaminaCost = 65, Cooldown = 6,
             Type = AbilityType.Buff, Duration = 3,
             SpecialEffect = "timeline_split",
@@ -2170,7 +2170,7 @@ public static class ClassAbilitySystem
         {
             Id = "causality_loop",
             Name = "Causality Loop",
-            Description = "Trap the enemy in a loop. They take damage equal to what they dealt last round for 3 rounds.",
+            Description = "Trap the enemy in a loop for 3 rounds: confused and weakened (-30% attack, -20% defense).",
             LevelRequired = 60, StaminaCost = 70, Cooldown = 5,
             Type = AbilityType.Debuff, Duration = 3,
             SpecialEffect = "causality_loop",
@@ -2200,7 +2200,7 @@ public static class ClassAbilitySystem
         {
             Id = "temporal_prison",
             Name = "Temporal Prison",
-            Description = "Freeze the target in time. Cannot act for 2 rounds (boss: 1 round). Takes no damage during.",
+            Description = "Freeze the target in time. Cannot act for 2 rounds (boss: 1 round, resisted half the time).",
             LevelRequired = 90, StaminaCost = 95, Cooldown = 8,
             Type = AbilityType.Debuff, Duration = 2,
             SpecialEffect = "temporal_prison",
@@ -2210,7 +2210,7 @@ public static class ClassAbilitySystem
         {
             Id = "cycles_end",
             Name = "Cycle's End",
-            Description = "Strike with the weight of every cycle. 400 damage + 50 per NG+ cycle (max +250). Ignores 50% defense.",
+            Description = "Strike with the weight of every cycle. 400 damage + 50 per NG+ cycle (max +250). Ignores all defense.",
             LevelRequired = 95, StaminaCost = 120, Cooldown = 8,
             Type = AbilityType.Attack, BaseDamage = 400,
             SpecialEffect = "cycles_end",
@@ -2234,7 +2234,7 @@ public static class ClassAbilitySystem
         {
             Id = "corrupting_touch",
             Name = "Corrupting Touch",
-            Description = "Infect with Old God corruption. 40 damage/round for 5 rounds. Each tick heals you.",
+            Description = "Infect with Old God corruption. Hits for 40 now, then 40 damage/round for 5 rounds. Each tick heals you half its damage.",
             LevelRequired = 5, StaminaCost = 35, Cooldown = 3,
             Type = AbilityType.Debuff, BaseDamage = 40, Duration = 5,
             SpecialEffect = "corrupting_dot",
@@ -2244,7 +2244,7 @@ public static class ClassAbilitySystem
         {
             Id = "umbral_step",
             Name = "Umbral Step",
-            Description = "Vanish into shadow. Next attack guaranteed critical. Evade all attacks this round.",
+            Description = "Vanish into shadow. Your next attack is a guaranteed critical. Dodge the next attack against you.",
             LevelRequired = 15, StaminaCost = 40, Cooldown = 3,
             Type = AbilityType.Utility,
             SpecialEffect = "umbral_step",
@@ -2284,7 +2284,7 @@ public static class ClassAbilitySystem
         {
             Id = "abyssal_eruption",
             Name = "Abyssal Eruption",
-            Description = "Unleash corruption. 150 AoE damage. Leaves 20 damage/round DoT for 3 rounds on all enemies.",
+            Description = "Unleash corruption. 150 AoE damage. Poisons all enemies for 3 rounds (3-5% of their max HP a round).",
             LevelRequired = 60, StaminaCost = 75, Cooldown = 5,
             Type = AbilityType.Attack, BaseDamage = 150,
             SpecialEffect = "abyssal_eruption",
@@ -2368,7 +2368,7 @@ public static class ClassAbilitySystem
         {
             Id = "void_shroud",
             Name = "Void Shroud",
-            Description = "25% of damage taken reflected to attacker. +30 defense for 3 rounds.",
+            Description = "15% of damage taken reflected to attacker. +30 defense for 3 rounds.",
             LevelRequired = 25, StaminaCost = 60, Cooldown = 5,
             Type = AbilityType.Defense, DefenseBonus = 30, Duration = 3,
             SpecialEffect = "damage_reflect_25",
@@ -2388,7 +2388,7 @@ public static class ClassAbilitySystem
         {
             Id = "devour",
             Name = "Devour",
-            Description = "Consume the target. 120 damage. Heals 30% dealt. Below 30% HP: damage x1.5.",
+            Description = "Consume the target. 120 damage. Heals 30% dealt. While your HP is below 30%: damage x1.5.",
             LevelRequired = 50, StaminaCost = 60, Cooldown = 4,
             Type = AbilityType.Attack, BaseDamage = 120, // Reduced from 160; lifesteal 50%→30%, low HP 2x→1.5x
             SpecialEffect = "devour",
@@ -2418,7 +2418,7 @@ public static class ClassAbilitySystem
         {
             Id = "void_rupture",
             Name = "Void Rupture",
-            Description = "Tear the void open. 160 AoE damage. Enemies killed explode for 60 bonus damage to others.",
+            Description = "Tear the void open. 160 AoE damage. Each enemy killed makes the others take 60 or 15% of the damage, whichever is more.",
             LevelRequired = 80, StaminaCost = 90, Cooldown = 6,
             Type = AbilityType.Attack, BaseDamage = 160, // Reduced from 220; explosion 100→60
             SpecialEffect = "void_rupture",
@@ -2609,7 +2609,8 @@ public static class ClassAbilitySystem
     }
 
     /// <summary>
-    /// Get a human-readable reason why a weapon requirement isn't met, or null if requirements are satisfied
+    /// Get a human-readable reason why a weapon requirement isn't met, or null if requirements are satisfied.
+    /// 1.3.6 X1: the text is the ability.requires_weapon key with the game's own weapon type names, in the player's language.
     /// </summary>
     public static string? GetWeaponRequirementReason(Character character, ClassAbility ability)
     {
@@ -2621,8 +2622,8 @@ public static class ClassAbilitySystem
                             || (offHand != null && ability.RequiredWeaponTypes.Contains(offHand.WeaponType));
             if (!hasRequired)
             {
-                var names = string.Join("/", ability.RequiredWeaponTypes.Select(w => w.ToString()));
-                return $"Requires {names}";
+                var names = string.Join("/", ability.RequiredWeaponTypes.Select(BaseLocation.WeaponTypeLabel));
+                return Loc.Get("ability.requires_weapon", names);
             }
         }
         if (ability.RequiresShield)
@@ -2630,7 +2631,7 @@ public static class ClassAbilitySystem
             var offHand = character.GetEquipment(EquipmentSlot.OffHand);
             if (offHand == null || (offHand.WeaponType != WeaponType.Shield &&
                 offHand.WeaponType != WeaponType.Buckler && offHand.WeaponType != WeaponType.TowerShield))
-                return "Requires Shield";
+                return Loc.Get("ability.requires_weapon", BaseLocation.WeaponTypeLabel(WeaponType.Shield));
         }
         return null;
     }
@@ -2638,6 +2639,14 @@ public static class ClassAbilitySystem
     /// <summary>v1.2.2: an ability's cost tag, "(12 MP)" or "(15 ST)", in the player's language.</summary>
     internal static string CostTag(ClassAbility ability) =>
         ability.ManaCost > 0 ? Loc.Get("ability.cost_mp", ability.ManaCost) : Loc.Get("ability.cost_st", GetEffectiveStaminaCost(ability));
+
+    /// <summary>
+    /// 1.3.6 G10 (Q10): the Mystic Shaman's own Attack abilities, whose effect names start "shaman_" (Lightning Bolt,
+    /// Chain Lightning, Searing Totem), scale with Intelligence. Desperate Strike, the shared melee strike a Shaman can
+    /// also use, keeps Strength.
+    /// </summary>
+    internal static bool ScalesWithShamanIntelligence(ClassAbility ability) =>
+        ability.Type == AbilityType.Attack && (ability.SpecialEffect ?? "").StartsWith("shaman_", StringComparison.Ordinal);
 
     /// <summary>
     /// Use an ability and return the result
@@ -2685,6 +2694,14 @@ public static class ClassAbilitySystem
                 statScale += Math.Max(0, (user.Intelligence - 10) * 0.04);
                 // Dexterity adds accuracy bonus for throwing
                 statScale += Math.Max(0, (user.Dexterity - 10) * 0.02);
+            }
+            else if (user.Class == CharacterClass.MysticShaman && ScalesWithShamanIntelligence(ability))
+            {
+                // 1.3.6 G10 (Q10): a Mystic Shaman's own attacks (Lightning Bolt, Chain Lightning, Searing Totem) scale
+                // with Intelligence, as their text says, in place of Strength
+                statScale += Math.Max(0, (user.Intelligence - 10) * 0.04);
+                // the default Attack branch's Dexterity term, kept
+                statScale += Math.Max(0, (user.Dexterity - 10) * 0.015);
             }
             else if (user.Class == CharacterClass.Bard || user.Class == CharacterClass.Jester)
             {
@@ -2745,7 +2762,12 @@ public static class ClassAbilitySystem
             // BALANCE: Add weapon power contribution to ability damage
             // This ensures abilities scale with gear and always beat basic attacks
             double weaponBonus = user.AbilityWeapPow * 0.25; // 25% of weapon power added (1.2.8: dual-wield reads main hand plus half the off hand)
-            double scaledDamage = (ability.BaseDamage + weaponBonus) * totalScale;
+            // 1.3.6 G4 (Q11): a Buff ability's own hit (Avatar of Destruction's activation) grows with Strength, not
+            // with the Charisma its bonus uses
+            double damageScale = ability.Type == AbilityType.Buff
+                ? levelScale * Math.Min(4.5, 1.0 + Math.Max(0, (user.Strength - 10) * 0.04))
+                : totalScale;
+            double scaledDamage = (ability.BaseDamage + weaponBonus) * damageScale;
 
             // v0.57.0 shield-scaling damage — Shield Bash / Holy Shield Slam use the equipped shield's
             // BlockChance and half the armor power, so investment in a higher-tier shield directly

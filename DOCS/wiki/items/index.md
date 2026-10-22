@@ -1,8 +1,9 @@
 ---
 title: Equipment and economy
 path: /wiki/en/items/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Data/EquipmentData.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs
+history: 1.3.6 | Titan's Resolve on world boss armor gives 5 percent more maximum HP in place of 5 percent more defense, once however many worn items carry it.
 history: 1.3.5 | Shadowfang, Venomstrike and Serpent's Fang can now deal their poison damage on a hit, the Max HP, Max Mana and all stats loot effects count as shown, and gear regeneration is shown as a percent of the pool.
 history: 1.3.4 | none
 history: 1.3.3 | none
@@ -29,6 +30,8 @@ A monster whose name holds Boss, Chief, Lord or King has a fixed 35 percent chan
 ## What bosses and mini-bosses drop
 
 A mini-boss (a champion) always drops 2 items. Each is at least Uncommon, with its rarity rolled as if the monster were 10 levels higher. A floor boss always drops 1 item of at least Epic rarity, rolled as if 25 levels higher.
+
+A [world boss](/wiki/en/online/world-boss/) armor item (not a weapon) of Epic rarity or better carries Titan's Resolve: 5 percent more maximum HP for whoever wears it, a companion or ally included, once however many worn items carry it.
 
 ## Weapon or armor, and which slot
 

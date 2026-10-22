@@ -1,8 +1,9 @@
 ---
 title: Combat basics
 path: /wiki/en/combat/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
+history: 1.3.6 | Magic resistance on your gear now cuts a monster's breath and spell damage by up to half, except an Old God's, a weakened monster sets 0.80 times its armor and Defence against your hits, Boss Slayer gear now adds its 10 percent to Power Attack, and U rescues each Downed ally once per fight.
 history: 1.3.5 | Gear HP and mana regeneration restores a share of the maximum each round, at most 10 percent, armor piercing also lowers monster Defence against abilities and area attacks and adds up to at most 50 percent, and gear crit damage adds on top of the 3 times Dexterity cap.
 history: 1.3.4 | A Cyclebreaker's Probability Shift makes 30 percent of a monster's hits on you miss and turns its natural 20 into an ordinary hit, and the difficulty's monster damage now applies to Manwe's named abilities.
 history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
@@ -45,7 +46,7 @@ Spells and martial abilities use their own effect definitions. Read [spells](/wi
 
 ## The hit roll
 
-Your hit chance against a monster at most 5 levels above you is 95 percent: you need {{balance:PlayerHitMinNeeded}} or more on a twenty-sided die, so only a natural 1 misses. Each physical attack you make on a monster rolls: a basic swing (each hand on its own when you dual wield), Power Attack, Precise Strike, Backstab and a physical single-target class ability. The game shows the roll and the number needed, for example "[You roll 14; you need 2 or more]".
+Your hit chance against a monster at most 5 levels above you is 95 percent: you need {{balance:PlayerHitMinNeeded}} or more on a twenty-sided die, so only a natural 1 misses. Each physical attack you make on a monster rolls: a basic swing (each hand on its own when you dual wield), Power Attack, Precise Strike, Backstab and a physical single-target class ability other than the Alchemist's thrown bombs and the Bard's Cutting Words. The game shows the roll and the number needed, for example "[You roll 14; you need 2 or more]".
 
 - Against a monster up to {{balance:AtLevelAccuracyGap}} levels above you, or any level below, you need {{balance:PlayerHitMinNeeded}} or more: only a natural 1 misses.
 - Against a monster more than {{balance:AtLevelAccuracyGap}} levels above you, you need between {{balance:PlayerHitMinNeeded}} and {{balance:PlayerHitMaxNeededAbove}}, so you hit 65 to 95 percent of the time.
@@ -66,7 +67,7 @@ Against a monster up to {{balance:AtLevelAccuracyGap}} levels above you none of 
 
 ### Monster evasion
 
-A monster with an evasion buff makes each of your hits miss with its own chance, 25 to 55 percent for 2 rounds (Ink Cloud: 30 percent for 3 rounds). The check comes before your roll, also applies to spells and area damage, and is not changed by hiding.
+A monster with an evasion buff makes each of your hits miss with its own chance, 25 to 55 percent for 2 rounds (Ink Cloud: 30 percent for 3 rounds). The check comes before your roll, also applies to spells and area damage (but not to Death Blossom or Grand Finale), and is not changed by hiding.
 
 ## Critical hits
 
@@ -100,13 +101,13 @@ Weapon power above 800 counts at half in a swing's damage: 1,000 counts as 900. 
 
 ### Monster armor and Defence
 
-A monster takes your damage minus its armor power, at least 1. A basic swing and Backstab ignore its Defence; Power Attack and Precise Strike first take off its Defence plus a random 0 to Defence / 8. A sleeping monster then takes 50 percent more.
+A monster takes your damage minus its armor power, at least 1. A basic swing and Backstab ignore its Defence; Power Attack and Precise Strike first take off its Defence plus a random 0 to Defence / 8. A weakened monster sets 0.80 times its armor and Defence against every hit. A sleeping monster then takes 50 percent more.
 
 Armor piercing on your gear takes its percent off the armor or Defence a monster sets against your basic attacks, abilities and area attacks; the sum over all your gear is at most 50 percent.
 
 ### Area damage
 
-An area attack does full damage to the first monster, 75 percent to the second, 50 percent to the third and 25 percent to the fourth and every later one, in the order the monsters stand, not the one you picked first.
+An area attack does full damage to the first monster, 75 percent to the second, 50 percent to the third and 25 percent to the fourth and every later one, in the order the monsters stand, not the one you picked first. Chain Lightning is the exception: it hits the monster you pick in full, then each other monster for half of that, at 100, 75, 50 and 25 percent of the half in the same order. A teammate's area spell is split another way: each monster takes the spell's damage divided by the number of monsters, at least a third of it, with no armor taken off.
 
 ## Attacks per round
 
@@ -133,7 +134,7 @@ These actions work for any class unless stated, and each one ends your turn, eve
 
 ### Power Attack (P)
 
-Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
+Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, a Boss Slayer item's +10 percent against a boss or mini-boss, and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
 
 ### Precise Strike (E)
 
@@ -169,7 +170,7 @@ Defend halves every monster basic attack on you for the rest of the round, round
 
 ### Rescue (U)
 
-An ally at 0 HP in a fight (a companion, NPC ally, spouse, lover or fighting beast) is Downed, not dead. U spends one healing potion from your belt to lift a Downed ally: it stands again with the HP your healing potion would give it, and a finish a monster announced on it is called off. With two or more allies Downed you pick which one. U is in the menu only while an ally is Downed and you hold a healing potion, and only for the player leading the fight. In an Old God fight a rescue waits for the potion cooldown and starts it, as a potion does. A rescue counts as healing an ally for a god's deeds.
+An ally at 0 HP in a fight (a companion, NPC ally, spouse, lover or fighting beast) is Downed, not dead. U spends one healing potion from your belt to lift a Downed ally: it stands again with the HP your healing potion would give it, and a finish a monster announced on it is called off. Each ally can be rescued once per fight; an ally that goes down again after its rescue stays Downed until the fight ends or a monster finishes it. With two or more allies you can lift you pick which one. U is in the menu only while an ally not yet rescued in this fight is Downed and you hold a healing potion, and only for the player leading the fight. In an Old God fight a rescue waits for the potion cooldown and starts it, as a potion does. A rescue counts as healing an ally for a god's deeds.
 
 ## When a monster attacks you
 
@@ -210,12 +211,12 @@ An ordinary monster's hit can take at most 75 percent of your maximum HP and a b
 
 A monster with abilities uses one on 30 percent of its turns plus 1 percent per 5 levels: a level 50 monster 40 percent of the time. An Old God uses one 70 percent of the time. When every ability would be wasted it makes its normal attack instead ([how monsters choose](/wiki/en/monsters/#how-monsters-fight)).
 
-An ability's direct damage is reduced by your Defence + half your armor power + a ward spell's bonus, with the same minimum and caps as a normal hit. Defend, dodge, Blur and a shield do not help against it.
+An ability's direct damage is reduced by your Defence + half your armor power + a ward spell's bonus, with the same minimum and caps as a normal hit. Defend, dodge, Blur and a shield do not help against it. Last, a monster breath or spell loses the share your gear's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) takes, at most half and even below the minimum; an Old God's never does.
 
 ## Life steal and thorns
 
 - **Life steal:** life steal from gear counts at most {{balance:MaxEquipmentLifeStealPercent}} percent of a hit, and all life steal together never heals more than {{balance:MaxTotalLifestealPercent}} percent of the damage dealt.
-- **Thorns:** thorns on your gear return their summed percent of the damage a monster's normal attack did to you, at least 1. The Reflecting status and the Scales of Law artifact (15 percent) work the same way.
+- **Thorns:** thorns on your gear return their summed percent of the damage a monster's normal attack did to you, at least 1. The Reflecting status and the Scales of Law artifact (15 percent) work the same way. A companion's or an ally's own thorns gear does the same for a monster's normal attack on it.
 
 ## Regeneration in combat
 
@@ -236,7 +237,7 @@ Only you, the fight's leader, also get these:
 - **Alignment:** Good 2 percent and Holy 4 percent of maximum HP a round.
 - **Tidesworn:** 3 percent of maximum HP a round, 5 percent below half HP.
 
-The Regenerating status heals 1 to 6 HP a round for whoever has it. There is no other HP regeneration in a fight.
+The Regenerating status heals 1 to 6 HP a round for whoever has it; the Tidesworn's Living Waters makes it heal 20 a round for its 3 rounds. There is no other HP regeneration in a fight.
 
 ### Mana outside a fight
 

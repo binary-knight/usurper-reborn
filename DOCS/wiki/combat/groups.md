@@ -1,8 +1,9 @@
 ---
 title: Groups, followers and support
 path: /wiki/en/combat/groups/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/MonsterTactics.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.6 | An invulnerable teammate, companion or grouped player now takes no damage from a monster's attack, and Death's Embrace now leaves an ally at 15 percent of its maximum HP after a killing hit.
 history: 1.3.5 | Each party member's own HP and mana regeneration gear restores a share of its maximum HP and mana each round, at most 10 percent.
 history: 1.3.4 | A monster under a Cyclebreaker's Probability Shift misses a teammate or companion with 30 percent of its normal attacks.
 history: 1.3.3 | An NPC of your team at 0 HP in your fight is Downed, and the oath-mark speaks only when a monster finishes it.
@@ -42,7 +43,9 @@ Then it changes:
 
 ## Monster hits on allies
 
-A monster's normal attack on a teammate or companion makes no hit roll and cannot be dodged: it lands unless the monster is distracted (25 percent miss for an ordinary distraction, at most 60), the ally has Blur (20 percent miss) or the monster is under Probability Shift (30 percent miss).
+A monster's normal attack on a teammate or companion makes no hit roll: it lands unless the ally holds a dodge of the next attack (Death's Embrace gives one), the monster is distracted (25 percent miss for an ordinary distraction, at most 60), the ally has Blur (20 percent miss) or the monster is under Probability Shift (30 percent miss).
+
+An invulnerable teammate, companion or grouped player (Divine Shield, Avatar of Light, Divine Intervention, Avatar of Grace or Eternal Vigil) takes no damage from a monster's normal attack or from its ability, as you do; a status or mana drain from the ability still lands. A boss's party-wide blast and channelled attack are not blocked, for you or an ally. Death's Embrace on an ally works as on you: the first monster hit that would bring it to 0 HP leaves it at 15 percent of its maximum HP instead, and it dodges the next attack.
 
 - **Ally defence:** the ally's Defence + a random 0 to Defence / 8 + a random 0 to 5 x the square root of its armor power, plus a ward, any temporary defence and 2 while a living Paladin is in the party. Armor power 400 absorbs 0 to 100. A Barbarian or Mystic Shaman ally then takes 2 less, never below the minimum.
 - **Several hits in one round:** the second hit on the same ally that round does 25 percent less and every later one 50 percent less.

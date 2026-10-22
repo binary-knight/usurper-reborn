@@ -1,8 +1,9 @@
 ---
 title: Player combat and duels
 path: /wiki/en/combat/pvp/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Core/GameConfig.cs, Scripts/Locations/ArenaLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/DormitoryLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.6 | Weapon enchants and life steal now work in a player fight, and the target's magic resistance cuts a spell's damage there by up to half.
 history: 1.3.5 | An item you take from a sleeper you beat in the Dormitory keeps its enchantments, effects and curse.
 history: 1.3.4 | none
 history: 1.3.3 | none
@@ -30,7 +31,16 @@ Your swing in a player fight does Strength + the weapon power of that hand + a r
 - **Shield:** the defender blocks 20 percent of the time and adds its shield's bonus to Defence for that hit.
 - **Blinded:** a blinded fighter misses {{balance:PvPBlindedMissPercent}} percent of weapon swings.
 
+A spell that hits for damage in a player fight, yours or your opponent's, is cut by the target's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) last, after the Team HQ Barracks: MR / (MR + 100) of the hit, at most half, at least 1 left. Weapon swings are not cut by it.
+
 Your opponent's swing at you, when the game fights for it (an NPC, or the Arena's copy of a player), is one swing a turn with no crit, and it does half damage while you defend.
+
+Weapon enchants work in a player fight. Each of your weapon hits can set off the fire, frost, lightning, poison, holy and shadow effects of the weapon in the hand that struck, with the same chance and share of the hit as against a monster, taken from the hit after the Team HQ Armory and Barracks. Your opponent's strike sets off those of its main hand weapon and heals it by its gear's life steal, as your life steal heals you.
+
+- **Holy:** not the double damage it does to undead monsters; Aurelion's attunement still adds its bonus.
+- **Lightning:** its stun follows the hold rules of a player fight: no new hold on a fighter who already cannot act or has just shaken a hold off, and each hold soon after another is shorter.
+- **Frost:** slows for {{balance:FrostEnchantDuration}} rounds. A slowed fighter's basic attack makes half its swings, at least one; your opponent's strike is one swing a turn anyway, so frost does not change it.
+- **Poison:** one hit of 10 percent of the hit, or the weapon's poison value raised by the Armory, not 4 rounds of poison.
 
 ## PvP rewards
 

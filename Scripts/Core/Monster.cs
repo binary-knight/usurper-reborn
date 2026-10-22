@@ -29,6 +29,9 @@ public class Monster
     public long HP { get; set; }                        // hitpoints
     public long Punch { get; set; }                     // punch, temporary battle var
     public bool Poisoned { get; set; }                  // poisoned?, temporary battle var
+    // 1.3.6 G8 (X5): poisonous by its own data (CreateMonster's poisoned argument), the one source of the +5 attack;
+    // the Poisoned status a hit puts on it adds nothing. Not public: not saved and not in the state dumps.
+    internal bool PoisonousByData { get; set; }
     public bool IsBurning { get; set; }                  // burning (fire DoT), temporary battle var
     public int BurnRounds { get; set; } = 0;             // remaining rounds of fire DoT (independent of PoisonRounds)
     public bool Stunned { get; set; }                   // stunned?, temporary battle var
@@ -170,6 +173,19 @@ public class Monster
     internal int ProbabilityShiftRounds { get; set; } = 0;
     internal bool ProbabilityShiftActive { get; set; } = false;
 
+    // 1.3.6 G11 (rule 4): Prison Warden's Command. While DominatedRounds is above 0 the monster's attack power and every
+    // defence value a hit takes off are cut by DominatedCutPercent (50, or 25 on a boss or a mini boss); no base stat is
+    // edited. It counts down once a round at the round's end, so a cast covers the monster's attacks and the party's
+    // hits of its own round and the next two. A recast sets the rounds and the cut again; it never compounds. In memory
+    // only, not saved; internal, as Probability Shift's.
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int DominatedRounds { get; set; } = 0;
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int DominatedCutPercent { get; set; } = 0;
+
+    private long DominatedCut(long value) =>
+        DominatedRounds > 0 && DominatedCutPercent > 0 ? value - value * DominatedCutPercent / 100 : value;
+
     // v0.60.0 stun-lock audit: diminishing-returns tracking. Each successful stun
     // application increments RecentStunCount and resets RoundsSinceLastStun. The
     // DR window in GameConfig.StunDRWindowRounds gradually decays the count back to
@@ -221,6 +237,12 @@ public class Monster
     // ATTACKS — so the player saw healing only when they hit the target, not when the DoT ticked.
     public int CorruptingDotRounds { get; set; } = 0;
     public long CorruptingDotTickDamage { get; set; } = 0;
+
+    // 1.3.6: weapon poison over time, set by a poison weapon's proc: the rounds left and the damage of each tick. A
+    // state of its own, never the 3 to 5 percent max-HP Poisoned status (PoisonRounds); both can tick on one monster.
+    // Internal: the fixture tests list every public Monster property by reflection.
+    internal int EnchantPoisonRounds { get; set; } = 0;
+    internal long EnchantPoisonTick { get; set; } = 0;
 
     // Boss end-game party mechanics (v0.52.1)
     public bool IsChanneling { get; set; } = false;        // Boss is charging a devastating ability
@@ -308,6 +330,7 @@ public class Monster
             Weapon = weapon,
             Armor = armor,
             Poisoned = poisoned,
+            PoisonousByData = poisoned,
             Disease = disease,
             Punch = punch,
             ArmPow = armpow,
@@ -443,8 +466,8 @@ public class Monster
             attack = (long)(attack * 1.3f);
         }
 
-        // Add poison damage if poisoned
-        if (Poisoned)
+        // Add poison damage if poisonous by its own data (1.3.6 G8: never from the Poisoned status a hit puts on it)
+        if (PoisonousByData)
         {
             attack += 5;
         }
@@ -456,6 +479,8 @@ public class Monster
         {
             attack = (long)(attack * 0.70f);
         }
+
+        attack = DominatedCut(attack);   // 1.3.6 G11 (rule 4): Prison Warden's Command, timed
 
         return Math.Max(1, attack);
     }
@@ -478,13 +503,18 @@ public class Monster
         }
 
         // v0.57.1 — Weaken debuff reduces effective defense by 20% for the duration.
-        if (WeakenRounds > 0)
-        {
-            defense = (long)(defense * 0.80f);
-        }
+        defense = WeakenDefenceCut(defense);
 
         return Math.Max(0, defense);
     }
+
+    /// <summary>
+    /// 1.3.6 G8 (Q4): the Weaken status's defence cut, 20 percent off a defence value while WeakenRounds > 0. Every
+    /// live hit path that takes the monster's Defence or ArmPow off a hit applies it once to what it reads.
+    /// 1.3.6 G11 (rule 4): Prison Warden's Command's timed cut is read here too, after Weaken's, so it reaches the same
+    /// hit paths.
+    /// </summary>
+    public long WeakenDefenceCut(long defence) => DominatedCut(WeakenRounds > 0 ? (long)(defence * 0.80f) : defence);
     
     /// <summary>
     /// Take damage (Pascal compatible)

@@ -1401,8 +1401,9 @@ public partial class MagicShopLocation : BaseLocation
         ("magic_shop.tier_mythic",          24, 180000L, 2000, 55, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_legendary",       30, 300000L, 3000, 65, "magic_shop.tier_desc_one_stat"),
         ("magic_shop.tier_godforged",       38, 500000L, 5000, 75, "magic_shop.tier_desc_one_stat"),
-        ("magic_shop.tier_phoenix_fire",    20, 400000L, 4000, 60, "magic_shop.tier_desc_phoenix"),
-        ("magic_shop.tier_frostbite",       20, 400000L, 4000, 60, "magic_shop.tier_desc_frostbite"),
+        // 1.3.6: the weapon power an enchant from 1.3.6 adds (one from before carries 20, kind "fire" or "frost")
+        ("magic_shop.tier_phoenix_fire",    GameConfig.ElementEnchantWeaponPower, 400000L, 4000, 60, "magic_shop.tier_desc_phoenix"),
+        ("magic_shop.tier_frostbite",       GameConfig.ElementEnchantWeaponPower, 400000L, 4000, 60, "magic_shop.tier_desc_frostbite"),
         // 1.3.5: the god counters (CounterKindCodes), weapon only and one per weapon; they change no stat.
         ("magic_shop.tier_sunbane",         0,  300000L, 3000, 80, "magic_shop.tier_desc_sunbane"),     // Aurelion
         ("magic_shop.tier_stonebane",       0,  400000L, 4000, 88, "magic_shop.tier_desc_stonebane"),   // Terravok
@@ -1427,7 +1428,45 @@ public partial class MagicShopLocation : BaseLocation
 
     /// <summary>v1.2.5: a tier's name and description in the player's language.</summary>
     internal static string TierName(int index) => Loc.Get(EnchantTiers[index].name);
-    internal static string TierDescription(int index) => Loc.Get(EnchantTiers[index].description, EnchantTiers[index].bonus);
+    internal static string TierDescription(int index) => EnchantTiers[index].description switch
+    {
+        // 1.3.6: Phoenix Fire and Frostbite also name their chance (and Phoenix Fire its share of the hit)
+        "magic_shop.tier_desc_phoenix" => Loc.Get(EnchantTiers[index].description, EnchantTiers[index].bonus,
+            Pct(GameConfig.PhoenixFireProcChance), Pct(GameConfig.PhoenixFireDamageMultiplier)),
+        "magic_shop.tier_desc_frostbite" => Loc.Get(EnchantTiers[index].description, EnchantTiers[index].bonus,
+            Pct(GameConfig.FrostbiteProcChance)),
+        _ => Loc.Get(EnchantTiers[index].description, EnchantTiers[index].bonus),
+    };
+
+    private static int Pct(float share) => (int)Math.Round(share * 100);
+
+    /// <summary>1.3.6: Phoenix Fire (13) and Frostbite (14), the element tiers: a main or off hand weapon only, never a
+    /// shield, and one of each element per item.</summary>
+    internal static bool IsElementTier(int tierChoice) => tierChoice == 13 || tierChoice == 14;
+
+    /// <summary>1.3.6: the kind codes of Phoenix Fire and Frostbite. An enchant from 1.3.6 writes "phoenix" or
+    /// "frostbite" and adds GameConfig.ElementEnchantWeaponPower; one from before carries "fire" or "frost" and
+    /// GameConfig.LegacyElementEnchantWeaponPower. Both codes of an element are the same tier and the same enchant.</summary>
+    internal const string LegacyFireKind = "fire", PhoenixKind = "phoenix", LegacyFrostKind = "frost", FrostbiteKind = "frostbite";
+
+    /// <summary>1.3.6: a Phoenix Fire kind code, old or new (the proc rule reads it).</summary>
+    internal static bool IsPhoenixKind(string kind) => kind == LegacyFireKind || kind == PhoenixKind;
+
+    /// <summary>1.3.6: a Frostbite kind code, old or new (the proc rule reads it).</summary>
+    internal static bool IsFrostbiteKind(string kind) => kind == LegacyFrostKind || kind == FrostbiteKind;
+
+    /// <summary>1.3.6: the weapon power the Phoenix Fire or Frostbite of this kind code added: 20 for "fire" and
+    /// "frost", 30 for "phoenix" and "frostbite", 0 for any other code.</summary>
+    internal static int ElementKindWeaponPower(string kind) => kind switch
+    {
+        LegacyFireKind or LegacyFrostKind => GameConfig.LegacyElementEnchantWeaponPower,
+        PhoenixKind or FrostbiteKind => GameConfig.ElementEnchantWeaponPower,
+        _ => 0,
+    };
+
+    /// <summary>1.3.6: two kind codes are the same enchant: equal, or the two codes of one named tier.</summary>
+    internal static bool SameEnchantKind(string a, string b) =>
+        a == b || (NamedTierOf(a) > 0 && NamedTierOf(a) == NamedTierOf(b));
 
     // Material requirements for high-tier enchantments (0-indexed tier → required materials)
     private static readonly Dictionary<int, (string materialId, int count)[]> EnchantMaterialRequirements = new()
@@ -1959,6 +1998,15 @@ public partial class MagicShopLocation : BaseLocation
             }
         }
 
+        // 1.3.6: Phoenix Fire and Frostbite go on a main or off hand weapon only (never a shield), as the counters.
+        if (IsElementTier(tierChoice) && (!selectedEquip.Slot.IsWeaponSlot() || IsShieldForCounter(selectedEquip)))
+        {
+            DisplayMessage("");
+            WrappedLine(Loc.Get("magic_shop.element_weapon_only"), "red");
+            await terminal.WaitForKey();
+            return;
+        }
+
         if (tierChoice == 6 && (OceanPhilosophySystem.Instance?.AwakeningLevel ?? 0) < 2)
         {
             DisplayMessage(Loc.Get("magic_shop.ocean_requires_awakening"), "cyan");
@@ -2026,7 +2074,7 @@ public partial class MagicShopLocation : BaseLocation
         string enchantKindCode = GetEnchantKindCode(tierChoice, statChoice);
         int? upgradeFrom = null;
         if (!string.IsNullOrEmpty(enchantKindCode) &&
-            selectedEquip.GetEnchantedKinds().Contains(enchantKindCode))
+            selectedEquip.GetEnchantedKinds().Any(k => SameEnchantKind(k, enchantKindCode)))   // 1.3.6: both codes of an element
         {
             int? carried = statChoice > 0 ? CarriedStatBonus(selectedEquip, statChoice) : null;
             if (carried == null || selectedTier.bonus <= carried.Value)
@@ -2038,6 +2086,15 @@ public partial class MagicShopLocation : BaseLocation
                 return;
             }
             upgradeFrom = carried.Value;
+        }
+        // 1.3.6: one element per item: Phoenix Fire is refused on an item with a fire enchant from any source (a loot
+        // fire weapon carries no kind code), Frostbite on one with frost. Before any gold is taken.
+        if ((tierChoice == 13 && selectedEquip.HasFireEnchant) || (tierChoice == 14 && selectedEquip.HasFrostEnchant))
+        {
+            DisplayMessage("");
+            WrappedLine(Loc.Get("magic_shop.element_one_per_item"), "red");
+            await terminal.WaitForKey();
+            return;
         }
         if (upgradeFrom == null && selectedEquip.GetEnchantmentCount() >= GameConfig.MaxEnchantments)
         {
@@ -2167,8 +2224,8 @@ public partial class MagicShopLocation : BaseLocation
                 ApplyEquipmentStatBonus(enchanted, statChoice, selectedTier.bonus);
                 suffix = StatSuffix(selectedTier.bonus, statChoice);
                 break;
-            case 13: case 14: // Phoenix Fire, Frostbite
-                ApplyNamedEnchant(enchanted, tierChoice);
+            case 13: case 14: // Phoenix Fire, Frostbite (1.3.6: kind "phoenix" or "frostbite", +30 weapon power)
+                ApplyNamedKind(enchanted, enchantKindCode);
                 suffix = NamedEnchantTag(tierChoice);
                 break;
             case 15: case 16: case 17: // 1.3.5: Sunbane, Stonebane, Godbane: no stat and no name tag, the kind code is the whole effect
@@ -2250,8 +2307,8 @@ public partial class MagicShopLocation : BaseLocation
             7  => "ward",   // Ward
             8  => "pred",   // Predator
             9  => "life",   // Lifedrinker
-            13 => "fire",   // Phoenix Fire
-            14 => "frost",  // Frostbite
+            13 => PhoenixKind,     // Phoenix Fire (1.3.6; "fire" before)
+            14 => FrostbiteKind,   // Frostbite (1.3.6; "frost" before)
             15 => "sunbane",    // 1.3.5: the god counters (CounterKindCodes)
             16 => "stonebane",
             17 => "godbane",
@@ -2259,9 +2316,25 @@ public partial class MagicShopLocation : BaseLocation
         };
     }
 
-    /// <summary>v1.2.5: what a named enchant tier adds to an item (the enchant applies it; removal of an item
-    /// enchanted before 1.2.5 reads it to check the item against its template).</summary>
-    internal static void ApplyNamedEnchant(Equipment e, int tierChoice)
+    /// <summary>v1.2.5: what a named enchant tier adds to an item. 1.3.6: this is the form before 1.3.6, Phoenix Fire
+    /// and Frostbite at GameConfig.LegacyElementEnchantWeaponPower (kind "fire" or "frost"); the enchant and the four
+    /// sites that read what an enchant on an item added go through ApplyNamedKind, which reads the item's kind code.</summary>
+    internal static void ApplyNamedEnchant(Equipment e, int tierChoice) =>
+        ApplyNamedEnchant(e, tierChoice, GameConfig.LegacyElementEnchantWeaponPower);
+
+    /// <summary>1.3.6: what the named enchant of this kind code adds: Phoenix Fire and Frostbite the weapon power of
+    /// their code (ElementKindWeaponPower), every other named kind as its tier. A code of no named tier adds nothing.</summary>
+    internal static void ApplyNamedKind(Equipment e, string kind)
+    {
+        int tier = NamedTierOf(kind);
+        if (tier > 0) ApplyNamedEnchant(e, tier, ElementKindWeaponPower(kind));
+    }
+
+    /// <summary>1.3.6: what a named enchant tier writes now, as the shop does (its kind code from 1.3.6: Phoenix Fire
+    /// and Frostbite "phoenix" and "frostbite", +30 weapon power). The wiki export reads it.</summary>
+    internal static void ApplyNamedTier(Equipment e, int tier) => ApplyNamedKind(e, GetEnchantKindCode(tier, 0));
+
+    private static void ApplyNamedEnchant(Equipment e, int tierChoice, int elementPower)
     {
         switch (tierChoice)
         {
@@ -2273,8 +2346,8 @@ public partial class MagicShopLocation : BaseLocation
             case 7: e.MagicResistance += 20; e.DefenceBonus += 2; break;      // Ward
             case 8: e.CriticalChanceBonus += 5; e.CriticalDamageBonus += 10; break;   // Predator
             case 9: e.LifeSteal += EnchantTiers[8].bonus; break;              // Lifedrinker (1.3.5: the table's bonus, as its description shows)
-            case 13: e.WeaponPower += 20; e.HasFireEnchant = true; break;     // Phoenix Fire
-            case 14: e.WeaponPower += 20; e.HasFrostEnchant = true; break;    // Frostbite
+            case 13: e.WeaponPower += elementPower; e.HasFireEnchant = true; break;     // Phoenix Fire
+            case 14: e.WeaponPower += elementPower; e.HasFrostEnchant = true; break;    // Frostbite
         }
     }
 
@@ -2331,8 +2404,8 @@ public partial class MagicShopLocation : BaseLocation
         var statFields = new List<int>();
         foreach (var kind in kinds)
         {
-            int named = NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
-            if (named > 0) { ApplyNamedEnchant(expected, named); continue; }
+            int named = NamedTierOf(kind);
+            if (named > 0) { ApplyNamedKind(expected, kind); continue; }   // 1.3.6: the delta of the item's own kind code
             if (Array.IndexOf(CounterKindCodes, kind) >= 0) continue;   // 1.3.5: a god counter adds no stat and no tag
             int stat = Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
             if (stat == 0) return false;
@@ -2355,8 +2428,10 @@ public partial class MagicShopLocation : BaseLocation
     /// destroys. A test sets its own and puts this back.</summary>
     internal static Random EnchantRandom = Random.Shared;
 
+    // 1.3.6: both codes of an element are its tier: "fire" and "phoenix" 13, "frost" and "frostbite" 14.
     private static int NamedTierOf(string kind) =>
-        NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
+        kind == LegacyFireKind ? 13 : kind == LegacyFrostKind ? 14
+        : NamedEnchantTags.Select(n => n.Tier).FirstOrDefault(tier => GetEnchantKindCode(tier, 0) == kind);
 
     private static int StatOf(string kind) =>
         Enumerable.Range(1, StatNames.Length).FirstOrDefault(st => GetEnchantKindCode(1, st) == kind);
@@ -2419,7 +2494,7 @@ public partial class MagicShopLocation : BaseLocation
         if (named > 0)
         {
             var delta = new Equipment();
-            ApplyNamedEnchant(delta, named);
+            ApplyNamedKind(delta, kind);   // 1.3.6: the delta of the destroyed kind code (fire or frost 20, phoenix or frostbite 30)
             var now = damaged.ToEnchantBaseRecord();
             var off = delta.ToEnchantBaseRecord();
             foreach (var prop in typeof(Equipment.EnchantBaseRecord).GetProperties().Where(p => p.PropertyType == typeof(int)))
@@ -2462,8 +2537,8 @@ public partial class MagicShopLocation : BaseLocation
     {
         var baseItem = new Equipment();
         baseItem.ApplyEnchantBaseRecord(baseForm);
-        int namedOnStat = item.GetEnchantedKinds().Select(NamedTierOf).Where(t => t > 0)
-            .Sum(t => { var d = new Equipment(); ApplyNamedEnchant(d, t); return GetEquipmentStat(d, stat); });
+        int namedOnStat = item.GetEnchantedKinds().Where(k => NamedTierOf(k) > 0)
+            .Sum(k => { var d = new Equipment(); ApplyNamedKind(d, k); return GetEquipmentStat(d, stat); });   // 1.3.6: by kind code
         return Math.Max(0, GetEquipmentStat(item, stat) - GetEquipmentStat(baseItem, stat) - namedOnStat);
     }
 

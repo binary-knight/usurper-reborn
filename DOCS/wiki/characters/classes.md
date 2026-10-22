@@ -1,8 +1,9 @@
 ---
 title: Classes
 path: /wiki/en/characters/classes/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Core/GameConfig.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Core/Character.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs, Scripts/Data/SpecializationData.cs, Scripts/Data/EquipmentData.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/PotionBonus.cs, Scripts/Systems/LootGenerator.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/TeamCornerLocation.cs
+history: 1.3.6 | An NPC Bard teammate now gives Bardic Inspiration and can inspire you, never itself, and class ability and spell descriptions now say what each one does.
 history: 1.3.5 | The Cyclebreaker's evade stops only monster attacks aimed at the Cyclebreaker, not those aimed at companions, Cycle Rewind heals exactly 30 percent of maximum HP, and the Rockbiter and Death's Embrace descriptions say what they do.
 history: 1.3.4 | none
 history: 1.3.3 | none
@@ -49,7 +50,7 @@ For an NPC teammate, the classes Warrior, Paladin and Barbarian count as party t
 
 ### Which classes can heal
 
-Six specializations have the Healer role: Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman). Each adds {{percent:HealerSpecHealBonus}} percent to ability and spell healing. The game's role list for prestige classes names Wavecaller as Healer. Four classes heal more with abilities whatever their specialization: see the class passives below.
+Six specializations have the Healer role: Holy (Paladin), Restoration (Cleric), Mystic (Sage), Minstrel (Bard), Apothecary (Alchemist) and Spiritwalker (Mystic Shaman). Each adds {{percent:HealerSpecHealBonus}} percent to ability and spell healing, though not to the Mystic Shaman's Healing Totem, Spirit Link Totem or Ancestral Guidance. The game's role list for prestige classes names Wavecaller as Healer. Four classes heal more with abilities whatever their specialization: see the class passives below.
 
 ### Role numbers for each class
 
@@ -81,7 +82,7 @@ Divine Resolve gives a Paladin {{percent:PaladinDivineResolveDamageBonus}} perce
 
 ### Bardic Inspiration (Bard)
 
-After each ability a Bard uses there is a {{balance:BardInspirationChance}} percent chance of Bardic Inspiration: one random living companion or NPC teammate gains {{balance:BardInspirationAttackBonus}} attack for at least {{balance:BardInspirationDuration}} rounds. With no such teammate it does nothing.
+After each ability a Bard uses there is a {{balance:BardInspirationChance}} percent chance of Bardic Inspiration: one random living companion or NPC teammate gains {{balance:BardInspirationAttackBonus}} attack for at least {{balance:BardInspirationDuration}} rounds. With no such teammate it does nothing. A Bard ally's abilities have the same chance, and a Bard ally can inspire you or another ally, never itself.
 
 ### Trickster's Luck (Jester)
 
@@ -89,7 +90,7 @@ Each basic attack a Jester makes has a {{balance:JesterTrickstersLuckChance}} pe
 
 ### Lethal Precision (Assassin)
 
-Lethal Precision works on an Assassin's basic attacks. A critical hit with a dagger in the main hand adds {{percent:AssassinLethalPrecisionCritBonus}} percent of the swing's attack power, and a swing at a poisoned monster adds {{percent:AssassinLethalPrecisionPoisonBonus}} percent.
+Lethal Precision works on an Assassin's basic attacks. A critical hit with a dagger in the main hand adds {{percent:AssassinLethalPrecisionCritBonus}} percent of the swing's attack power, and a swing at a monster with the Poisoned status adds {{percent:AssassinLethalPrecisionPoisonBonus}} percent (weapon poison alone does not count).
 
 ### Elemental Mastery (Mystic Shaman)
 

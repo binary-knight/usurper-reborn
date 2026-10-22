@@ -395,10 +395,9 @@ public class BossProtect135Tests
     {
         for (int seed = 0; seed < 10; seed++)
         {
-            long full = Act(id, seed, null, Hero(), God())[0];
-            long baseHit = full - D;   // one god: the loop hits it again for the ability's damage
-            baseHit.Should().BeGreaterOrEqualTo(D, "the base block hit lands first");
-            Act(id, seed, null, Hero(), God(physical: true))[0].Should().Be(Cut(baseHit) + Cut(D), "both hits are cut");
+            // 1.3.6 (G2, supervisor ruling 2026-10-21T06:06:40Z): the base block no longer hits first; the loop hits once
+            Act(id, seed, null, Hero(), God())[0].Should().Be(D, "one god: the loop hits it once for the ability's damage");
+            Act(id, seed, null, Hero(), God(physical: true))[0].Should().Be(Cut(D), "the one hit is cut");
         }
     }
 

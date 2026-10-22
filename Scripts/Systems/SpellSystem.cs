@@ -117,36 +117,36 @@ public static class SpellSystem
         {
             // --- EARLY TIER (Levels 1-25) - Basic Divine Magic ---
             [1] = new SpellInfo(1, "Cure Light", "A gentle prayer heals minor wounds. Effect: 12-22 hp, scales with WIS. Duration: 1 turn.", 5, 1, "Sularahamasturie", false, "Heal"),
-            [2] = new SpellInfo(2, "Divine Shield", "Call upon the gods for protection. Protection: +8, scales with level and WIS. Duration: whole fight.", 8, 2, "Exmaddurie", false, "Buff"),
+            [2] = new SpellInfo(2, "Divine Shield", "Call upon the gods for protection. Protection: +8, scales with level and INT. Duration: whole fight.", 8, 2, "Exmaddurie", false, "Buff"),
             [3] = new SpellInfo(3, "Purify", "Cleanse disease and minor poisons from the body. Cures minor afflictions.", 12, 3, "Purimasarie", false, "Heal"),
             [4] = new SpellInfo(4, "Bless Weapon", "Imbue your weapon with holy power. Attack: +12, scales with level. Duration: whole fight.", 15, 4, "Sanctiweaparie", false, "Buff"),
             [5] = new SpellInfo(5, "Cure Wounds", "A stronger healing prayer. Effect: 25-40 hp, scales with WIS. Duration: 1 turn.", 18, 5, "Aduexusmarie", false, "Heal"),
-            [6] = new SpellInfo(6, "Turn Undead", "Holy light sears the walking dead. Damage: 35-50, scales with WIS. Affects ONLY undead and demons; living enemies are unaffected.", 22, 6, "Exorcismarie", false, "Attack"),
-            [7] = new SpellInfo(7, "Sanctuary", "Create a holy ward that makes enemies hesitate. Protection: +18, scales with level and WIS. Duration: 3 rounds.", 25, 7, "Sanctuarie", false, "Buff"),
+            [6] = new SpellInfo(6, "Turn Undead", "Holy light sears the walking dead. Damage: 35-50, scales with level, INT and WIS. Affects ONLY undead and demons; living enemies are unaffected.", 22, 6, "Exorcismarie", false, "Attack"),
+            [7] = new SpellInfo(7, "Sanctuary", "Create a holy ward that makes enemies hesitate. Protection: +18, scales with level and INT. Duration: 3 rounds.", 25, 7, "Sanctuarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Advanced Divine Arts ---
             [8] = new SpellInfo(8, "Cure Critical", "Powerful divine healing with chivalry blessing. Effect: 50-75 hp, scales with WIS. Removes up to 10 Darkness; with no Darkness, +10 Chivalry.", 30, 8, "Majorhealarie", false, "Heal"),
-            [9] = new SpellInfo(9, "Holy Smite", "Call down righteous fury. Damage: 45-65, scales with WIS. Double damage vs undead and demons.", 35, 9, "Adrealitarieum", false, "Attack"),
-            [10] = new SpellInfo(10, "Armor of Faith", "Divine armor surrounds the faithful. Protection: +28, scales with level and WIS. Duration: whole fight.", 40, 10, "Faitharmarie", false, "Buff"),
+            [9] = new SpellInfo(9, "Holy Smite", "Call down righteous fury. Damage: 45-65, scales with level, INT and WIS. +50% damage vs undead and demons.", 35, 9, "Adrealitarieum", false, "Attack"),
+            [10] = new SpellInfo(10, "Armor of Faith", "Divine armor surrounds the faithful. Protection: +28, scales with level and INT. Duration: whole fight.", 40, 10, "Faitharmarie", false, "Buff"),
             [11] = new SpellInfo(11, "Dispel Evil", "Banish dark enchantments and weaken evil creatures. Removes enemy buffs.", 45, 11, "Dispeldarkie", false, "Debuff"),
             [12] = new SpellInfo(12, "Mass Cure", "Heal yourself and allies. Effect: 35-55 hp to all, scales with WIS. Duration: 1 turn.", 50, 12, "Masshealarie", true, "Heal"),
-            [13] = new SpellInfo(13, "Holy Explosion", "A burst of holy energy strikes all foes. Damage: 55-80 to all, scales with WIS. Duration: 1 turn.", 55, 13, "Holyburstarie", true, "Attack"),
-            [14] = new SpellInfo(14, "Prayer of Fortitude", "Strengthen body and spirit. Protection: +25, scales with level and WIS. Duration: whole fight.", 60, 14, "Fortitudarie", false, "Buff"),
+            [13] = new SpellInfo(13, "Holy Explosion", "A burst of holy energy strikes all foes. Damage: 55-80 to the first foe, then 75%, 50% and 25% to the next; scales with level, INT and WIS.", 55, 13, "Holyburstarie", true, "Attack"),
+            [14] = new SpellInfo(14, "Prayer of Fortitude", "Strengthen body and spirit. Protection: +25, scales with level and INT. Duration: whole fight.", 60, 14, "Fortitudarie", false, "Buff"),
 
             // --- HIGH TIER (Levels 51-75) - Greater Divine Powers ---
-            [15] = new SpellInfo(15, "Invisibility", "Cloak yourself in divine light, unseen by mortal eyes. Protection: +45, scales with level and WIS. Duration: whole fight.", 70, 15, "Exsuamarie", false, "Buff"),
+            [15] = new SpellInfo(15, "Invisibility", "Cloak yourself in divine light, unseen by mortal eyes. Protection: +45, scales with level and INT. Duration: whole fight.", 70, 15, "Exsuamarie", false, "Buff"),
             [16] = new SpellInfo(16, "Summon Angel", "Call a celestial warrior to your aid. Attack: +55, scales with level. Dodge next attack. Duration: whole fight.", 80, 16, "Admoriasumumarie", false, "Summon"),
-            [17] = new SpellInfo(17, "Divine Lightning", "Channel Aurelion's wrath as lightning. Damage: 90-120, scales with WIS. Duration: 1 turn.", 90, 17, "Exdahabarie", false, "Attack"),
+            [17] = new SpellInfo(17, "Divine Lightning", "Channel Aurelion's wrath as lightning. Damage: 90-120, scales with level, INT and WIS. Duration: 1 turn.", 90, 17, "Exdahabarie", false, "Attack"),
             [18] = new SpellInfo(18, "Restoration", "Full divine healing restores body and soul. Effect: 160-220 hp, scales with WIS. Duration: 1 turn.", 100, 18, "Exmasumarie", false, "Heal"),
-            [19] = new SpellInfo(19, "Holy Word", "Speak a word of power that wounds the unholy. Damage: 110-145, scales with WIS. Double damage vs undead and demons.", 110, 19, "Sanctuverbum", false, "Attack"),
-            [20] = new SpellInfo(20, "Divine Intervention", "The gods themselves protect you. Protection: +85, scales with level and WIS. Duration: 5 rounds.", 120, 20, "Divineprotarie", false, "Buff"),
+            [19] = new SpellInfo(19, "Holy Word", "Speak a word of power that wounds the unholy. Damage: 110-145, scales with level, INT and WIS. +50% damage vs undead and demons.", 110, 19, "Sanctuverbum", false, "Attack"),
+            [20] = new SpellInfo(20, "Divine Intervention", "The gods themselves protect you. Protection: +85, scales with level and INT. Duration: 5 rounds.", 120, 20, "Divineprotarie", false, "Buff"),
 
             // --- LEGENDARY TIER (Levels 76-100) - Godlike Powers ---
-            [21] = new SpellInfo(21, "Aurelion's Radiance", "Channel the Sun God's blinding light. Damage: 160-220 to all, scales with WIS. Double damage vs undead and demons.", 140, 21, "Aurelionluxarie", true, "Attack"),
+            [21] = new SpellInfo(21, "Aurelion's Radiance", "Channel the Sun God's blinding light. Damage: 160-220 to the first, then 75%, 50%, 25%; scales with level, INT and WIS. Undead and demons also take half the full roll.", 140, 21, "Aurelionluxarie", true, "Attack"),
             [22] = new SpellInfo(22, "Resurrection Prayer", "Call back the nearly dead. Effect: 320-450 hp, scales with WIS. Duration: 1 turn.", 160, 22, "Resurrectarie", false, "Heal"),
-            [23] = new SpellInfo(23, "Divine Avatar", "Become a vessel of divine power. ATK and DEF +55, scales with level. Duration: whole fight.", 180, 23, "Avatardivinarie", false, "Buff"),
-            [24] = new SpellInfo(24, "Judgment", "Pass divine judgment on the wicked. Damage: 220-320, scales with WIS. Double vs undead/demons. Removes up to 30 Darkness; with no Darkness, +30 Chivalry.", 200, 24, "Judiciumarie", false, "Attack"),
-            [25] = new SpellInfo(25, "God's Finger", "The ultimate divine strike from the heavens. Damage: 320-450 to all, scales with WIS. Double vs undead and demons.", 250, 25, "Umbarakahstahx", true, "Attack")
+            [23] = new SpellInfo(23, "Divine Avatar", "Become a vessel of divine power. ATK and DEF +55, scales with level; DEF also with INT. Duration: whole fight.", 180, 23, "Avatardivinarie", false, "Buff"),
+            [24] = new SpellInfo(24, "Judgment", "Divine judgment on the wicked. Damage: 220-320, scales with level, INT and WIS. Undead and demons take half again. Removes up to 30 Darkness; with no Darkness, +30 Chivalry.", 200, 24, "Judiciumarie", false, "Attack"),
+            [25] = new SpellInfo(25, "God's Finger", "The ultimate strike from the heavens. Damage: 320-450 to the first, then 75%, 50%, 25%; scales with level, INT and WIS. Undead and demons also take half the full roll.", 250, 25, "Umbarakahstahx", true, "Attack")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -157,17 +157,17 @@ public static class SpellSystem
         {
             // --- EARLY TIER (Levels 1-25) - Apprentice Magic ---
             [1] = new SpellInfo(1, "Magic Missile", "Steel arrows of force strike the target. Damage: 18-28. Duration: 1 turn.", 4, 1, "Exmamarie", false, "Attack"),
-            [2] = new SpellInfo(2, "Arcane Shield", "A shimmering barrier deflects attacks. Protection: +8. Duration: whole fight.", 7, 2, "Exmasumarie", false, "Buff"),
+            [2] = new SpellInfo(2, "Arcane Shield", "A shimmering barrier deflects attacks. Protection: +10, scales with level and INT. Duration: whole fight.", 7, 2, "Exmasumarie", false, "Buff"),
             [3] = new SpellInfo(3, "Spark", "A jolt of electricity damages the target. Damage: 28-40. Duration: 1 turn.", 8, 3, "Sparkarie", false, "Attack"),
             [4] = new SpellInfo(4, "Sleep", "Lull the target into magical slumber. Effect: target cannot act. Duration: varies.", 12, 4, "Exdamarie", false, "Debuff"),
             [5] = new SpellInfo(5, "Frost Touch", "Chill your enemy to the bone. Damage: 40-58. Duration: 1 turn.", 14, 5, "Frostarie", false, "Attack"),
-            [6] = new SpellInfo(6, "Web", "Conjure sticky strands to trap your foe. Effect: cannot move. Duration: varies.", 22, 6, "Exmasesamamarie", false, "Debuff"),
-            [7] = new SpellInfo(7, "Haste", "Accelerate time around yourself. Extra attacks per round. Duration: whole fight.", 25, 7, "Quicksilvarie", false, "Buff"),
+            [6] = new SpellInfo(6, "Web", "Conjure sticky strands to trap your foe. Effect: cannot act, at most 3 rounds (a boss resists half the time, held 1 round). Duration: varies.", 22, 6, "Exmasesamamarie", false, "Debuff"),
+            [7] = new SpellInfo(7, "Haste", "Accelerate time around yourself. Two doubled turns; a recast refreshes them.", 25, 7, "Quicksilvarie", false, "Buff"),
 
             // --- MID TIER (Levels 26-50) - Journeyman Sorcery ---
             [8] = new SpellInfo(8, "Power Hat", "Regenerate health and bolster defenses. Effect: 50-75 hp + protection. Duration: whole fight.", 30, 8, "Excadammarie", false, "Heal"),
             [9] = new SpellInfo(9, "Fireball", "A sphere of flame engulfs your enemy. Damage: 55-75. Duration: 1 turn.", 35, 9, "Exammmarie", false, "Attack"),
-            [10] = new SpellInfo(10, "Fear", "Project terror into your enemy's mind. Effect: reduced effectiveness. Duration: varies.", 40, 10, "Examasumarie", false, "Debuff"),
+            [10] = new SpellInfo(10, "Fear", "Project terror into your enemy's mind. Effect: it loses its turns (a boss resists half the time, held 1 round). Duration: varies.", 40, 10, "Examasumarie", false, "Debuff"),
             [11] = new SpellInfo(11, "Lightning Bolt", "A crackling bolt of electricity. Damage: 60-80. Duration: 1 turn.", 45, 11, "Exmasesaexmarie", false, "Attack"),
             [12] = new SpellInfo(12, "Mirror Image", "Create illusory duplicates of yourself. Protection: +35. Duration: whole fight.", 50, 12, "Mirrorimarie", false, "Buff"),
             [13] = new SpellInfo(13, "Ice Storm", "Razor shards of ice assault all enemies. Damage: 50-70 to all. Duration: 1 turn.", 55, 13, "Icestormarie", true, "Attack"),
@@ -177,16 +177,16 @@ public static class SpellSystem
             [15] = new SpellInfo(15, "Chain Lightning", "Lightning arcs between multiple foes. Damage: 80-105 to all. Duration: 1 turn.", 75, 15, "Chainlightarie", true, "Attack"),
             [16] = new SpellInfo(16, "Disintegrate", "Unravel the target's physical form. Damage: 110-150. Duration: 1 turn.", 85, 16, "Disintegrarie", false, "Attack"),
             [17] = new SpellInfo(17, "Pillar of Fire", "A column of flame that penetrates all armor. Damage: 120-160. Duration: 1 turn.", 95, 17, "Exdammasumarie", false, "Attack"),
-            [18] = new SpellInfo(18, "Time Stop", "Briefly halt time itself. Extra turn + protection. Duration: 1 round.", 110, 18, "Timestoparie", false, "Buff"),
+            [18] = new SpellInfo(18, "Time Stop", "Time halts 2 rounds: +35 ATK and protection, up with level; dodge next attack.", 110, 18, "Timestoparie", false, "Buff"),
             [19] = new SpellInfo(19, "Meteor Swarm", "Call down flaming rocks from the sky. Damage: 130-180 to all. Duration: 1 turn.", 125, 19, "Meteorarie", true, "Attack"),
-            [20] = new SpellInfo(20, "Arcane Immunity", "Become immune to lesser magics. Protection: +65. Duration: whole fight.", 140, 20, "Immunemagarie", false, "Buff"),
+            [20] = new SpellInfo(20, "Arcane Immunity", "Become immune to status effects. Protection: +65, scales with level and INT. Duration: whole fight.", 140, 20, "Immunemagarie", false, "Buff"),
 
             // --- LEGENDARY TIER (Levels 76-100) - Archmage Powers ---
-            [21] = new SpellInfo(21, "Power Word: Stun", "A single word paralyzes your enemy. Effect: cannot act 3 rounds. Duration: 3 rounds.", 160, 21, "Stunverbum", false, "Debuff"),
+            [21] = new SpellInfo(21, "Power Word: Stun", "A single word paralyzes your enemy. Effect: cannot act 3 rounds (a boss resists half the time, held 1 round). Duration: 3 rounds.", 160, 21, "Stunverbum", false, "Debuff"),
             [22] = new SpellInfo(22, "Manwe's Creation", "Channel the Creator's power to reshape reality. Damage: 200-280. Duration: 1 turn.", 180, 22, "Manwecreatie", false, "Attack"),
-            [23] = new SpellInfo(23, "Summon Demon", "Call a demon from the abyss. Attack: +100. Duration: whole fight.", 200, 23, "Excadexsumarie", false, "Summon"),
-            [24] = new SpellInfo(24, "Power Word: Kill", "The ultimate death magic. Damage: 280-380. Duration: 1 turn.", 230, 24, "Mattravidduzzievh", false, "Attack"),
-            [25] = new SpellInfo(25, "Wish", "Bend reality to your will. All stats doubled. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
+            [23] = new SpellInfo(23, "Summon Demon", "Call a demon from the abyss. Attack: +100, scales with level. Dodge next attack. Duration: whole fight.", 200, 23, "Excadexsumarie", false, "Summon"),
+            [24] = new SpellInfo(24, "Power Word: Kill", "The ultimate death magic. Damage: 280-380; a foe under 20% HP that is not a boss or mini boss dies 30% of the time. Duration: 1 turn.", 230, 24, "Mattravidduzzievh", false, "Attack"),
+            [25] = new SpellInfo(25, "Wish", "Bend reality to your will. Adds your Strength to attack and your Defense to defense. Duration: whole fight.", 300, 25, "Ultimawisharie", false, "Buff")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -198,35 +198,35 @@ public static class SpellSystem
             // --- EARLY TIER (Levels 1-25) - First Awakening (Shore Walker) ---
             [1] = new SpellInfo(1, "Fog of War", "Mist hides the whole party from the enemy. All allies: protection +5, scales with level. Duration: whole fight.", 5, 1, "Exadmasaxmarie", true, "Buff"),
             [2] = new SpellInfo(2, "Poison Touch", "Inflict magical toxins on your enemy. Damage over time. Duration: varies.", 8, 2, "Exadlimmarie", false, "Debuff"),
-            [3] = new SpellInfo(3, "Mind Spike", "A psychic attack that damages and disorients. Damage: 8-14. Duration: 1 turn.", 10, 3, "Mindspikearie", false, "Attack"),
+            [3] = new SpellInfo(3, "Mind Spike", "A psychic attack that damages and disorients. Damage: 12-22. Duration: 1 turn.", 10, 3, "Mindspikearie", false, "Attack"),
             [4] = new SpellInfo(4, "Freeze", "Encase the target in ice. Effect: cannot move. Duration: varies.", 15, 4, "Excadaliemarie", false, "Debuff"),
             [5] = new SpellInfo(5, "Dulling Mist", "A grey mist dulls every enemy. Effect: all enemies slowed. Duration: 2 rounds.", 18, 5, "Exmassesumarie", true, "Debuff"),
-            [6] = new SpellInfo(6, "Scholar's Mark", "Reveal one foe's weak points. Effect: it takes +30% damage from every ally. Duration: 3 rounds.", 22, 6, "Exdamseaxmarie", false, "Debuff"),
+            [6] = new SpellInfo(6, "Scholar's Mark", "Reveal one foe's weak points. Effect: it takes +30% damage from every ally, or +45% while Library study sharpens the mark. Duration: 3 rounds.", 22, 6, "Exdamseaxmarie", false, "Debuff"),
             [7] = new SpellInfo(7, "Confusion", "Muddle your enemy's thoughts. Effect: may attack self. Duration: varies.", 25, 7, "Confusarie", false, "Debuff"),
 
             // --- MID TIER (Levels 26-50) - Second Awakening (Tide Reader) ---
-            [8] = new SpellInfo(8, "Hit Self", "Force the target to strike itself. Damage: 40-55. Duration: 1 turn.", 30, 8, "Exadliemasumarie", false, "Attack"),
-            [9] = new SpellInfo(9, "Escape", "Vanish from battle instantly. Success based on level. Effect: ends combat.", 35, 9, "Exemarie", false, "Escape"),
+            [8] = new SpellInfo(8, "Hit Self", "Force the target to strike itself. Damage: 45-65. Duration: 1 turn.", 30, 8, "Exadliemasumarie", false, "Attack"),
+            [9] = new SpellInfo(9, "Escape", "Vanish from battle. Certain against most foes; against a boss or Old God it rolls the flee chance, and on Nightmare there is no escape. Effect: ends combat.", 35, 9, "Exemarie", false, "Escape"),
             [10] = new SpellInfo(10, "Slumber Mist", "A drowsy mist settles on the enemy. Effect: all enemies asleep, any damage wakes them, bosses immune. Duration: 2 rounds.", 40, 10, "Excadmassumarie", true, "Debuff"),
-            [11] = new SpellInfo(11, "Steal Life", "Drain the enemy's vitality. Damage: 35-50, heals half. Duration: 1 turn.", 45, 11, "Steallifearie", false, "Attack"),
-            [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 40-55 to all, and their accuracy drops. Duration: 2 rounds.", 50, 12, "Psychscrearie", true, "Attack"),
-            [13] = new SpellInfo(13, "Shadow Cloak", "Wrap the whole party in living shadow. All allies: protection +35 and Blur. Duration: whole fight.", 55, 13, "Shadowcloakarie", true, "Buff"),
+            [11] = new SpellInfo(11, "Steal Life", "Drain the enemy's vitality. Damage: 40-60, heals half. Duration: 1 turn.", 45, 11, "Steallifearie", false, "Attack"),
+            [12] = new SpellInfo(12, "Psychic Scream", "A mental blast assaults all enemies. Damage: 45-65 to the first, then 75%, 50%, 25%, and their accuracy drops. Duration: 2 rounds.", 50, 12, "Psychscrearie", true, "Attack"),
+            [13] = new SpellInfo(13, "Shadow Cloak", "Wrap the whole party in living shadow. All allies: protection +38, scales with level and INT, and Blur. Duration: whole fight.", 55, 13, "Shadowcloakarie", true, "Buff"),
             [14] = new SpellInfo(14, "Compel", "Bend every enemy's will toward your tank. Effect: all enemies taunted and weakened; Old Gods resist. Duration: 2 rounds.", 60, 14, "Dominatarie", true, "Debuff"),
 
             // --- HIGH TIER (Levels 51-75) - Third Awakening (Wave Dancer) ---
-            [15] = new SpellInfo(15, "Energy Drain", "Force victim to channel energy into their own destruction. Damage: 90-120. Duration: 1 turn.", 75, 15, "Examdammasaxmarie", false, "Attack"),
-            [16] = new SpellInfo(16, "Mind Blank", "Seal every ally's mind. All allies: protection +50 and immune to status effects. Duration: whole fight.", 85, 16, "Mindblankarie", true, "Buff"),
-            [17] = new SpellInfo(17, "Shadow Step", "Teleport through shadows to strike. Damage: 80-100, ignores defense. Duration: 1 turn.", 95, 17, "Shadowsteparie", false, "Attack"),
-            [18] = new SpellInfo(18, "Unveil the Pattern", "Lay bare the weak points of the whole enemy line. Effect: all enemies marked, +30% damage from every ally. Duration: 2 rounds.", 110, 18, "Edujnomed", true, "Debuff"),
+            [15] = new SpellInfo(15, "Energy Drain", "Force victim to channel energy into their own destruction. Damage: 95-130, heals half. Duration: 1 turn.", 75, 15, "Examdammasaxmarie", false, "Attack"),
+            [16] = new SpellInfo(16, "Mind Blank", "Seal every ally's mind. All allies: protection +55, scales with level and INT, and immune to status effects. Duration: whole fight.", 85, 16, "Mindblankarie", true, "Buff"),
+            [17] = new SpellInfo(17, "Shadow Step", "Teleport through shadows to strike. Damage: 85-115, ignores defense. Duration: 1 turn.", 95, 17, "Shadowsteparie", false, "Attack"),
+            [18] = new SpellInfo(18, "Unveil the Pattern", "Lay bare the weak points of the whole enemy line. Effect: all enemies marked, +30% damage from every ally, or +45% while Library study sharpens the mark. Duration: 2 rounds.", 110, 18, "Edujnomed", true, "Debuff"),
             [19] = new SpellInfo(19, "Mass Confusion", "Drive all enemies mad with visions. Effect: all enemies confused. Duration: varies.", 125, 19, "Massconfusarie", true, "Debuff"),
-            [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess shelters your party. All allies: protection +70 and Blur. Duration: whole fight.", 140, 20, "Nocturaveilarie", true, "Buff"),
+            [20] = new SpellInfo(20, "Noctura's Veil", "The Shadow Goddess shelters your party. All allies: protection +75, scales with level and INT, and Blur. Duration: whole fight.", 140, 20, "Nocturaveilarie", true, "Buff"),
 
             // --- LEGENDARY TIER (Levels 76-100) - Deep Awakening (Abyss Gazer) ---
-            [21] = new SpellInfo(21, "Soul Rend", "Tear the very soul from your enemy. Damage: 150-200. Duration: 1 turn.", 160, 21, "Soulrendarie", false, "Attack"),
+            [21] = new SpellInfo(21, "Soul Rend", "Tear the very soul from your enemy. Damage: 170-240; the target is feared for 2 rounds and loses 25% of its armor. Duration: 1 turn.", 160, 21, "Soulrendarie", false, "Attack"),
             [22] = new SpellInfo(22, "Ocean's Memory", "Tap into the infinite wisdom. All allies: spells cost half mana. Duration: whole fight.", 180, 22, "Oceanmemarie", true, "Buff"),
-            [23] = new SpellInfo(23, "Temporal Paradox", "Trap the enemy in a time loop. Damage: 180-220. Duration: 1 turn.", 200, 23, "Temporalarie", false, "Attack"),
-            [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. All allies: heal 250 and protection +80. Duration: whole fight.", 230, 24, "Velouralovearie", true, "Heal"),
-            [25] = new SpellInfo(25, "Death Kiss", "The ultimate draining of life force. Damage: 280-380. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
+            [23] = new SpellInfo(23, "Temporal Paradox", "Trap the enemy in a time loop. Damage: 200-280; stuns for 2 rounds (a boss resists half the time and is held 1 round). Duration: 1 turn.", 200, 23, "Temporalarie", false, "Attack"),
+            [24] = new SpellInfo(24, "Veloura's Embrace", "Channel the lost Goddess of Love. All allies: heal 240-320, scales with WIS, and protection +85, scales with level and INT. Duration: whole fight.", 230, 24, "Velouralovearie", true, "Heal"),
+            [25] = new SpellInfo(25, "Death Kiss", "The ultimate death magic. Damage: 300-420; a foe under 20% HP that is not a boss or mini boss dies 30% of the time. Duration: 1 turn.", 300, 25, "Exmasdamliemasumarie", false, "Attack")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -235,7 +235,7 @@ public static class SpellSystem
         // ═══════════════════════════════════════════════════════════════════════════════
         [CharacterClass.Tidesworn] = new Dictionary<int, SpellInfo>
         {
-            [1] = new SpellInfo(1, "Alethia's Ward", "Invoke the grace of Aurelion's lost beloved. Protection: +20, reflects 10% melee damage. Duration: whole fight.", 20, 1, "Alethiavardarie", false, "Buff"),
+            [1] = new SpellInfo(1, "Alethia's Ward", "Invoke the grace of Aurelion's lost beloved. Protection: +15 + 2 per level, reflects 15% melee damage. Duration: whole fight.", 20, 1, "Alethiavardarie", false, "Buff"),
             [2] = new SpellInfo(2, "Purifying Surge", "A wave of sacred water cleanses and mends. Effect: 40-60 hp + removes poison/disease. Duration: 1 turn.", 35, 5, "Surgiapurarie", false, "Heal"),
             [3] = new SpellInfo(3, "Ocean's Rebuke", "Call forth a crashing wave of consecrated water. Damage: 70-95. Extra vs undead/evil. Duration: 1 turn.", 60, 10, "Oceanrebuquarie", false, "Attack"),
             [4] = new SpellInfo(4, "Covenant of the Deep", "The Ocean itself shields the faithful. All allies: +40 protection, +20 attack. Duration: whole fight.", 100, 17, "Covendeepmarie", true, "Buff"),
@@ -252,7 +252,7 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Tidecall Barrier", "Surround all allies with shimmering wave-light. All allies: +25 protection. Duration: whole fight.", 40, 6, "Tidabarriarie", true, "Buff"),
             [3] = new SpellInfo(3, "Siren's Lament", "Sing the Ocean's grief, sapping enemy will. All enemies: -30% attack, -20% defense. Duration: 4 rounds.", 55, 11, "Sirenlamentarie", true, "Debuff"),
             [4] = new SpellInfo(4, "Alethia's Grace", "Channel the healing light of Aurelion's beloved. Effect: 80-120 hp to all allies. Duration: 1 turn.", 90, 16, "Alethiagratarie", true, "Heal"),
-            [5] = new SpellInfo(5, "Symphony of the Depths", "Channel the Ocean's full harmonic spectrum. All allies: +60 attack, +40 defense, guaranteed crit on next hit. Self: -50% max HP. Duration: whole fight.", 160, 22, "Symphodeptarie", true, "Buff")
+            [5] = new SpellInfo(5, "Symphony of the Depths", "The Ocean's full harmony. All allies: +60 attack and +40 defense (grow with level; defense with CHA too), next hit crits. Costs half your max HP. Duration: whole fight.", 160, 22, "Symphodeptarie", true, "Buff")
         },
 
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -275,7 +275,7 @@ public static class SpellSystem
         [CharacterClass.Abysswarden] = new Dictionary<int, SpellInfo>
         {
             [1] = new SpellInfo(1, "Prison Siphon", "Draw power from the nearest sealed God-prison. Damage: 12-18. Heals self 50% of damage. Duration: 1 turn.", 15, 1, "Prisonsipharie", false, "Attack"),
-            [2] = new SpellInfo(2, "Noctura's Whisper", "Invoke the Shadow Goddess's paranoia. Target: -25% attack, -25% defense. Duration: 3 rounds.", 35, 6, "Nocturwhisparie", false, "Debuff"),
+            [2] = new SpellInfo(2, "Noctura's Whisper", "Invoke the Shadow Goddess's paranoia. Target weakened: -30% attack, -20% defense. Duration: 3 rounds.", 35, 6, "Nocturwhisparie", false, "Debuff"),
             [3] = new SpellInfo(3, "Abyssal Chains", "Bind the target with chains from the Old Gods' prison. Damage: 65-85. Target immobilized 2 rounds. Duration: 1 turn.", 60, 11, "Abysschainarie", false, "Attack"),
             [4] = new SpellInfo(4, "Devour Essence", "Consume the target's life force. Damage: 100-140. Heals 75%. Restores 20 mana. Duration: 1 turn.", 90, 17, "Devouressarie", false, "Attack"),
             [5] = new SpellInfo(5, "Maelketh's Prison Break", "Crack the War God's seal, releasing imprisoned fury. Damage: 220-300. Self takes 10% as backlash. Duration: 1 turn.", 180, 23, "Maelbreakarie", false, "Attack")
@@ -604,6 +604,13 @@ public static class SpellSystem
     /// <summary>1.3.2: the Cleric's Purify (slot 3), by class and slot so a server rename cannot hide it.</summary>
     public static bool IsPurify(CharacterClass characterClass, SpellInfo? spell) =>
         spell != null && characterClass == CharacterClass.Cleric && spell.Level == 3;
+
+    /// <summary>1.3.6 G6 (CP10): a spell that acts on the caster alone, as its text says: the Cyclebreaker's Cycle
+    /// Rewind (slot 4, "your body") and the Voidreaver's Blood Pact (slot 2, the caster's own HP for the caster's
+    /// attack). By class and slot, as IsPurify. No prompt offers an ally for it and no cast lands on one.</summary>
+    public static bool IsCasterOnly(CharacterClass characterClass, SpellInfo? spell) =>
+        spell != null && ((characterClass == CharacterClass.Cyclebreaker && spell.Level == 4)
+                          || (characterClass == CharacterClass.Voidreaver && spell.Level == 2));
 
     /// <summary>
     /// Check if character can cast specific spell
@@ -1199,7 +1206,7 @@ public static class SpellSystem
             case 7: // Haste - Attack bonus
                 int baseAttack7 = (int)((18 + (caster.Level / 5)) * profMult);
                 result.AttackBonus = baseAttack7;
-                result.Duration = 999;
+                result.Duration = 3;   // 1.3.6 G4 (Q12): the bonus lasts the Haste status's 2 doubled turns
                 result.SpecialEffect = "haste";
                 result.Message += $" {Loc.Get("combat.spell_haste_cast", caster.Name2, result.AttackBonus)}";
                 break;
@@ -1279,7 +1286,7 @@ public static class SpellSystem
                 int baseBonus18 = (int)((35 + (caster.Level / 3)) * profMult);
                 result.AttackBonus = baseBonus18;
                 result.ProtectionBonus = ScaleProtectionEffect(35 + (caster.Level / 3), caster, profMult);
-                result.Duration = 1;
+                result.Duration = 2;   // 1.3.6 G4: 1 ended at the round end it was cast in, before any swing
                 result.SpecialEffect = "timestop";
                 result.Message += $" {Loc.Get("combat.spell_time_stop_cast", result.AttackBonus, result.ProtectionBonus)}";
                 break;
@@ -1577,19 +1584,22 @@ public static class SpellSystem
     // PRESTIGE CLASS SPELL IMPLEMENTATIONS
     // ═══════════════════════════════════════════════════════════════════════════════
 
+    /// <summary>1.3.6 G11 (Q20): Alethia's Ward's one reflect, the Reflecting status's 15 percent of a melee hit
+    /// (CombatEngine's Reflecting read in ProcessMonsterAction), as its cast line states it.</summary>
+    internal const int AlethiasWardReflectPercent = 15;
+
     private static void ExecuteTideswornSpell(Character caster, int spellLevel, Character target, List<Character> allTargets, SpellResult result, Random random, float profMult = 1.0f)
     {
         switch (spellLevel)
         {
-            case 1: // Alethia's Ward - Protection (scales with level) + thorn reflect (scales with INT)
-                // v0.56.0 rework: scaling protection (was +20 flat, now +15 + Level*2) and scaling reflect (was flat 10%, now 10% + INT*0.1%)
+            case 1: // Alethia's Ward - Protection (scales with level) + the Reflecting status's reflect
+                // v0.56.0 rework: scaling protection (was +20 flat, now +15 + Level*2).
+                // 1.3.6 G11 (Q20, "One reflect"): the one reflect is the Reflecting status that tidal_reflect gives, 15
+                // percent of a melee hit; the thorn reflect (10 percent + INT/10) this case also set is gone.
                 result.ProtectionBonus = ScaleProtectionEffect(15 + (caster.Level * 2), caster, profMult);
-                int reflectPct = 10 + (int)(caster.Intelligence * 0.1);
-                caster.TempThornReflectPercent = Math.Max(caster.TempThornReflectPercent, reflectPct);
-                caster.TempThornReflectDuration = 999;
                 result.Duration = 999;
                 result.SpecialEffect = "tidal_reflect";
-                result.Message += $" {Loc.Get("combat.spell_alethias_ward_cast", caster.Name2, result.ProtectionBonus, reflectPct)}";
+                result.Message += $" {Loc.Get("combat.spell_alethias_ward_cast", caster.Name2, result.ProtectionBonus, AlethiasWardReflectPercent)}";
                 break;
             case 2: // Purifying Surge - 40-60 heal + cure disease/poison
                 int tideHeal2 = 40 + random.Next(21);
@@ -1781,8 +1791,9 @@ public static class SpellSystem
                 result.Message += $" {Loc.Get("combat.spell_void_bolt_cast", result.Damage)}";
                 break;
             case 4: // Consume the Fallen - Heal 100+ HP (simplified from "50% of last killed")
-                int consumeHeal = Math.Max(100, (int)(caster.MaxHP * 0.25));
-                result.Healing = ScaleHealingEffect(consumeHeal, caster, random, profMult);
+                // 1.3.6 G11 (Q14, "Flat 25 percent"): exactly 25 percent of max HP, at least 100, with no level, Wisdom
+                // or variance scaling, as Cycle Rewind
+                result.Healing = Math.Max(100, (int)(caster.MaxHP * 0.25));
                 result.Message += $" {Loc.Get("combat.spell_consume_fallen_cast", caster.Name2, result.Healing)}";
                 break;
             case 5: // Unmaking - 200-280 damage, costs 25% current HP (reduced from 350-450)

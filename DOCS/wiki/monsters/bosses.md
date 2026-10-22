@@ -1,8 +1,9 @@
 ---
 title: Boss reference
 path: /wiki/en/monsters/bosses/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Data/WorldBossData.cs, Scripts/Systems/SpellSystem.cs, Scripts/Data/OldGodsData.cs, Scripts/Data/SecretBosses.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Core/Monster.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/MiracleSystem.cs
+history: 1.3.6 | An Old God's divine armor and phase immunity now cut weapon poison, Poisoned, Corrupting Touch and Searing Totem ticks as a hit, fear and confusion on a boss follow the hold and soft control rules, and gear's magic resistance does not reduce any Old God attack.
 history: 1.3.5 | Only an Old God's own counter enchant, Sunbane, Stonebane or Godbane, removes its divine armor and it also holds back two of the god's abilities, Maelketh has less health with two to four fighters, and Manwe has 40 percent less HP.
 history: 1.3.4 | Doom starts at Aurelion, Shadow Incarnate's message says Manwe heals, and Manwe's named abilities follow the difficulty, Shield Wall Formation, a failed flee, Divine Mandate and Death's Embrace.
 history: 1.3.3 | From floor 25 floor bosses have more HP and hit harder and bring more escorts as the floor's groups grow, and every boss can finish a Downed ally.
@@ -32,7 +33,7 @@ Some floors have a guardian that must be dealt with before you can go deeper; se
 
 ### Old God fights: enrage, channels and marks
 
-Old Gods enrage after a set number of rounds, channel attacks that hit the whole party and mark party members with lasting harm, so a healer teammate and a fast teammate who can interrupt matter. The numbers for each are in the spoilers below.
+Old Gods enrage after a set number of rounds, channel attacks that hit the whole party and mark party members with lasting harm, so a healer teammate and a fast teammate who can interrupt matter. The numbers for each are in the spoilers below. [Magic resistance](/wiki/en/items/enchanting/#magic-resistance) from gear does not reduce any Old God attack.
 
 ## World bosses
 
@@ -53,7 +54,7 @@ The floor 50 boss asks you a question first. The right answer is the fourth; any
 :::spoiler Spoiler: Old God fights
 An Old God's HP, Strength and Defence in the table below are multiplied by {{balance:BaseMonsterDifficultyScale}} in the fight; its Strength is then split evenly into Strength and weapon power, and its Defence into Defence and armor. Each artifact you hold adds 10 percent to its HP (at most 40 percent) and 5 percent to its damage (at most 20 percent).
 
-Aurelion, Terravok and Manwe wear divine armor: every hit you deal them, spells and abilities included, does 25, 35 and 50 percent less damage. Burn, poison and Corrupting Touch ticks, reflected damage and the added damage of a Mystic Shaman's weapon enchant are not cut. Only that god's own counter enchant on your main hand or off hand weapon (Sunbane for Aurelion, Stonebane for Terravok, Godbane for Manwe) removes it; any other enchant, or a weapon's name, does not change it. The counter also holds back two of the god's abilities, Aurelion's Light's Embrace and Sacrifice, Terravok's Stone Skin and Entomb, and Manwe's Word of Creation and Time Stop: on a turn it draws one, the god strikes instead.
+Aurelion, Terravok and Manwe wear divine armor: every hit you deal them, spells and abilities included, does 25, 35 and 50 percent less damage. Burn ticks, reflected damage and the added damage of a Mystic Shaman's weapon enchant are not cut; a weapon poison tick, a Poisoned tick, a Corrupting Touch tick and a Searing Totem pulse are cut, as a hit is. Only that god's own counter enchant on your main hand or off hand weapon (Sunbane for Aurelion, Stonebane for Terravok, Godbane for Manwe) removes it; any other enchant, or a weapon's name, does not change it. The counter also holds back two of the god's abilities, Aurelion's Light's Embrace and Sacrifice, Terravok's Stone Skin and Entomb, and Manwe's Word of Creation and Time Stop: on a turn it draws one, the god strikes instead.
 
 **Phases.** An Old God enters phase 2 at half its HP and phase 3 at a fifth (Manwe at a tenth). Each phase adds its abilities to those it draws from; it uses one on 70 percent of its turns. Potions in an Old God fight have a cooldown of 1 round.
 
@@ -63,7 +64,7 @@ Aurelion, Terravok and Manwe wear divine armor: every hit you deal them, spells 
 
 **Corruption and Doom.** From phase 2 a god with corruption has a 30 percent chance each round to put a stack on a random party member, 2 stacks in phase 3, up to {{balance:BossCorruptionMaxStacks}}; each stack deals its damage every round. Doom starts at Aurelion: in phase 3 Aurelion, Terravok and Manwe have a 15 percent chance each round to mark a member without Doom, who dies outright when the count reaches 0 (3 rounds for Aurelion and Terravok, 2 for Manwe). Maelketh, Veloura, Thorgrim and Noctura, her betrayal fight included, do not use Doom. Only a healer teammate (Cleric, Paladin, Bard, Wavecaller, Abysswarden or a healer specialization) clears them: first the Doom closest to landing, otherwise 3 + its level / 20 stacks from a member holding 3 or more. You cannot clear them yourself.
 
-**Immunity.** At phase 2 Noctura, Terravok and Manwe become immune to physical damage for 4 rounds and Aurelion to magical damage; Manwe adds magical immunity for 4 rounds at phase 3. Damage of the blocked kind is cut to {{percent:BossPhaseImmunityResidual}} percent.
+**Immunity.** At phase 2 Noctura, Terravok and Manwe become immune to physical damage for 4 rounds and Aurelion to magical damage; Manwe adds magical immunity for 4 rounds at phase 3. Damage of the blocked kind is cut to {{percent:BossPhaseImmunityResidual}} percent; a weapon poison tick and a Poisoned tick count as physical, a Corrupting Touch tick and a Searing Totem pulse as magical.
 
 **Fighting alone.** With no living NPC teammate or companion, an Old God's named abilities deal {{percent:OldGodSoloDamageBonus}} percent more damage and you then take {{percent:OldGodSoloPlayerDamageReduction}} percent less, 0.92 times in all. Manwe's own abilities skip this.
 

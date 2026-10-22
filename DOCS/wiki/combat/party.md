@@ -1,8 +1,9 @@
 ---
 title: Party and allies
 path: /wiki/en/combat/party/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/TeamBalanceSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/TeammatePolicy.cs, Scripts/Systems/TeamSystem.cs, Scripts/Systems/MaintenanceSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/CompanionSystem.cs, Scripts/Locations/CastleLocation.cs, Scripts/Locations/LevelMasterLocation.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Core/GameConfig.cs
+history: 1.3.6 | An NPC ally's party heals, buffs and songs now reach you and give the ally its share only once, its ally heal can pick you, Death's Embrace now leaves an ally standing at 15 percent of its maximum HP, and Rescue lifts each Downed ally once per fight, so an ally finished after its rescue no longer counts as left to die.
 history: 1.3.5 | A living companion now takes the NPC teammate's 75 percent share of the experience from room features and shared rewards.
 history: 1.3.4 | none
 history: 1.3.3 | A companion, NPC ally, spouse, lover or fighting beast at 0 HP is Downed: U rescues it with a healing potion, a Beast, Insectoid, Shadow or Undead monster or a boss can finish it, and it stands up with half its maximum HP when the fight ends.
@@ -60,6 +61,10 @@ An ally that is about to die drinks its own potion before helping anyone. An all
 
 When nobody in the party needs a heal, a Cleric ally who can cast Purify cures a member who is poisoned or diseased: you first, then the member with the lowest share of HP.
 
+An ally's party ability, such as a Bard's song, a Cleric's party prayer, an Alchemist's brew, a Wavecaller's or Tidesworn's party ability or a Shaman's totem, reaches you and every other living member once at the share it gives teammates, and the ally once at its own share. An ally's healing ability, such as Lay on Hands, heals the member with the lowest share of HP, you included, when that share is below the ally's own. An ally's Earthbind Totem cuts the monsters' attack as yours does, and an ally holding Bloodlust heals on its own kills. An ally casts Turn Undead only on an undead or demon foe and never uses Disappearing Act.
+
+A Wavecaller's Empathic Link links one ally for 4 rounds: you pick the ally from the target list (Enter takes the most hurt ally), and an ally casting it links the most hurt living member, you included. While the link holds, half of each monster hit on the linked member goes to the Wavecaller instead, never taking the Wavecaller below 1 HP, and the linked member has 30 more defense; the Wavecaller gets no defense from it. With no living ally the ability is refused before it costs anything.
+
 ## Potions and rest for allies
 
 A rest at Home, a night at the Inn and the daily reset refill the potions of your active companions and of every NPC on your team or in your dungeon party, and the rest at Home and the night at the Inn also heal all of them to full. An NPC ally that casts spells is filled to 2 healing potions plus half its level, any other to 5 plus half its level, never above 5 plus its level; a caster also gets 3 mana potions plus a third of its level, never above 3 plus half its level. A refill never lowers what an NPC ally already carries. Companion potions are on [companions and beasts](/wiki/en/combat/companions/#companion-potions-and-rest).
@@ -99,15 +104,17 @@ Only the ruler can hire royal mercenaries, at the Castle with B (bodyguards). Yo
 
 ## When an ally falls
 
+An ally under Death's Embrace that a monster's hit brings to 0 HP rises at once with 15 percent of its maximum HP and dodges the next attack, as you do. It is not Downed and does not fall; the next hit that brings it to 0 HP is handled as below.
+
 ### Downed allies
 
 A story companion, an NPC ally, your spouse or lover, or a fighting beast at 0 HP in a fight is Downed: it stays in the party at 0 HP, takes no turn, and no monster attack, heal or spell reaches it. The allies box of the combat screen shows a Downed ally as DOWN in place of its HP. A royal mercenary, a player echo and a grouped player are never Downed; they fall as below.
 
-- **Rescue (U):** on your turn, while an ally is Downed and you hold a healing potion, U spends your turn and one from your belt to lift it with the heal it gives an ally (at least 20 percent of its maximum HP). With two or more Downed you choose which. The Old God rule on drinks applies (see [consumables](/wiki/en/items/consumables/#potion-cooldown-in-old-god-fights)). Only the leader of the fight can rescue; a group follower cannot.
+- **Rescue (U):** on your turn, while an ally is Downed and you hold a healing potion, U spends your turn and one from your belt to lift it with the heal it gives an ally (at least 20 percent of its maximum HP). Each ally can be rescued once per fight: if the same ally goes down again in that fight, U cannot lift it, and pressing U with only such allies Downed tells you so and spends nothing. With two or more you can still lift, you choose which. The Old God rule on drinks applies (see [consumables](/wiki/en/items/consumables/#potion-cooldown-in-old-god-fights)). Only the leader of the fight can rescue; a group follower cannot.
 - **The finish:** a Beast, Insectoid, Shadow or Undead monster, or any boss, spends its action to announce that it closes on the earliest Downed ally, and on its first action of a later round spends it again to finish that ally. Other monsters, champions and elites of other families never finish anyone. A taunt on the monster or a hold that costs it its turn loses the finish, and a rescue ends it; the monster may announce again later.
 - **The end of the fight:** every ally still Downed when the fight ends, won, fled or lost, stands up again with half its maximum HP. The end of a fight never finishes anyone.
 
-Grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you could have rescued it and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
+Grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you could have rescued it (it had not already been rescued in that fight) and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
 
 ### Story companion
 
@@ -115,7 +122,7 @@ A companion that a monster finishes is dead for good: see [when a companion dies
 
 ### NPC ally
 
-An NPC ally, spouse or lover that a monster finishes in your fight dies for good with a chance of {{percent:PermadeathChanceDungeonTeam}} percent times 1 minus {{balance:PermadeathLevelReduction}} per level of the NPC, never under 1 percent: 1.4 percent at level 20. No NPC death is permanent while fewer than {{balance:PermadeathPopulationFloor}} NPCs are alive or {{balance:PermadeathRaceFloor}} or fewer of its race are alive, and story NPCs are exempt. An ally who does not die for good comes back to life after a short while; if a saved party member is dead when you enter the dungeon, a line tells you, and it rejoins on a later entry once it is alive again; Team Corner can raise a fallen member of your team for 1,000 gold per level. If it was Downed at the start of your turn, you held a usable healing potion and you did not choose Rescue, its opinion of you worsens when it is finished. A permanent death of your spouse, a lover or a friend starts grief: see [Mental](/wiki/en/characters/mental/). The oath-mark is on [groups](/wiki/en/combat/groups/#the-oath-mark).
+An NPC ally, spouse or lover that a monster finishes in your fight dies for good with a chance of {{percent:PermadeathChanceDungeonTeam}} percent times 1 minus {{balance:PermadeathLevelReduction}} per level of the NPC, never under 1 percent: 1.4 percent at level 20. No NPC death is permanent while fewer than {{balance:PermadeathPopulationFloor}} NPCs are alive or {{balance:PermadeathRaceFloor}} or fewer of its race are alive, and story NPCs are exempt. An ally who does not die for good comes back to life after a short while; if a saved party member is dead when you enter the dungeon, a line tells you, and it rejoins on a later entry once it is alive again; Team Corner can raise a fallen member of your team for 1,000 gold per level. If it was Downed at the start of your turn, had not already been rescued in that fight, you held a usable healing potion and you did not choose Rescue, its opinion of you worsens when it is finished. A permanent death of your spouse, a lover or a friend starts grief: see [Mental](/wiki/en/characters/mental/). The oath-mark is on [groups](/wiki/en/combat/groups/#the-oath-mark).
 
 ### Royal mercenary
 

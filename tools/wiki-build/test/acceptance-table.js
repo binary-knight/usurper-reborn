@@ -15,7 +15,7 @@ module.exports = [
   ["S7","which class is the best tank","/wiki/en/characters/classes/","a Warrior, Paladin, Barbarian or Tidesworn player still counts as the tank","first"],
   ["S8","how long does an npc of each race live","/wiki/en/online/npcs/","a Human lives 75 game years, about 30 real days from birth","miss: characters/races/ ranks first"],
   ["S9","how do i get each ending","/wiki/en/world/story/","Spoiler: ending conditions","fold"],
-  ["S10a","does the wiki have a changelog","/wiki/en/reference/changelog/","Version 1.3.1 fixed a load that could treat a current character","first"],
+  ["S10a","does the wiki have a changelog","/wiki/en/reference/changelog/","Version 1.3.6 brought 79 changes","first"],
   ["S10b","what info do you have on immortals","/wiki/en/gods/player-gods/","An immortal is a player who finished the main story","miss: fact outside the excerpt"],
   ["A99","what is the crit multiplier","/wiki/en/combat/","a Dexterity crit multiplies the swing by 1.5, plus 0.02 per point of Dexterity above 10","first"],
   ["A100","can a server change backstab damage","/wiki/en/reference/balance/","Backstab's triple damage is fixed in the game and a server cannot change it","miss: monsters/ ranks first"],
@@ -255,7 +255,7 @@ module.exports = [
   ["C15","what does godforged enchant give","/wiki/en/items/enchanting/","Godforged +38 to one stat you choose 500,000 + 5,000 per level","miss: items/ ranks first"],
   ["C16","what does predator enchant do","/wiki/en/items/enchanting/","Predator adds +5 percent critical hit chance and +10 percent critical damage.","miss: fact outside the excerpt"],
   ["C17","what does oceans touch enchant do","/wiki/en/items/enchanting/","Ocean's Touch adds +6 Intelligence and +4 Wisdom","miss: fact outside the excerpt"],
-  ["C18","what does phoenix fire do","/wiki/en/items/enchanting/","each hit with that weapon has a 20 percent chance of extra fire damage","first"],
+  ["C18","what does phoenix fire do","/wiki/en/items/enchanting/","each hit with that weapon has a 30 percent chance of extra fire damage","first"],   // 1.3.6: Phoenix Fire's chance is 30 percent
   ["C19","how many enchants can an item have","/wiki/en/items/enchanting/","An item holds at most 5 enchants, and never the same kind twice.","first"],
   ["C20","can enchanting fail","/wiki/en/items/enchanting/","The 4th enchant on an item fails 25 percent of the time","first"],
   ["C21","how much to remove an enchant","/wiki/en/items/enchanting/","Enchant removal (W) costs 5,000 + level x 200 gold before the price modifiers","first"],

@@ -991,10 +991,7 @@ namespace UsurperRemake.Systems
 
             // Reset transient combat buffs so leftover buffs from a previous fight (dungeon, etc.)
             // don't carry into the world boss, and so ability/spell buffs applied this fight start clean.
-            player.TempAttackBonus = 0;
-            player.TempAttackBonusDuration = 0;
-            player.TempDefenseBonus = 0;
-            player.TempDefenseBonusDuration = 0;
+            player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
             player.TempDamageReductionPercent = 0;
             player.TempDamageReductionDuration = 0;
             player.HasStatusImmunity = false;
@@ -1220,10 +1217,7 @@ namespace UsurperRemake.Systems
 
                 // Tick buff durations (attack/defense/damage-reduction/status-immunity) so ability
                 // and spell buffs expire on schedule, mirroring the main combat engine.
-                if (player.TempAttackBonusDuration > 0 && --player.TempAttackBonusDuration <= 0)
-                    player.TempAttackBonus = 0;
-                if (player.TempDefenseBonusDuration > 0 && --player.TempDefenseBonusDuration <= 0)
-                    player.TempDefenseBonus = 0;
+                player.TickSlotBonuses();   // 1.3.6 G4: the attack and defence entries
                 if (player.TempDamageReductionDuration > 0 && --player.TempDamageReductionDuration <= 0)
                     player.TempDamageReductionPercent = 0;
                 if (player.StatusImmunityDuration > 0 && --player.StatusImmunityDuration <= 0)
@@ -1521,6 +1515,7 @@ namespace UsurperRemake.Systems
                     damage = CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
 
                 case "C": // Cast spell
@@ -1539,10 +1534,12 @@ namespace UsurperRemake.Systems
 
                 case "P": // Power attack (high damage, lower accuracy)
                     damage = CalculatePowerAttackDamage(player, bossDef, bossData, rng, terminal);
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
 
                 case "E": // Precise strike (higher crit chance)
                     damage = CalculatePreciseStrikeDamage(player, bossDef, bossData, rng, terminal);
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
 
                 case "L": // Class ability
@@ -1565,10 +1562,72 @@ namespace UsurperRemake.Systems
                     damage = CalculatePlayerDamage(player, bossDef, bossData, rng, terminal: terminal);
                     terminal.SetColor("bright_green");
                     terminal.WriteLine($"  {Loc.Get("world_boss.you_strike", bossDef.Name, $"{damage:N0}")}");
+                    damage += WeaponHitRiders(player, damage, bossDef.Name, rng, terminal);   // 1.3.6: the weapon's procs and lifesteal
                     break;
             }
 
             return damage;
+        }
+
+        /// <summary>
+        /// 1.3.6: the main hand's weapon procs and the gear lifesteal on a world boss weapon hit of
+        /// <paramref name="damage"/>, with the dungeon chances and shares. Fire, lightning (no stun), holy
+        /// (the Aurelion attunement bonus, no undead double), shadow, and poison as one hit (10 percent of
+        /// the hit, or the weapon's fixed poison; the 4 round poison is a monster's only); frost has no
+        /// slow here. Returns the damage the procs add to the pooled hit, which takes the Team HQ Armory
+        /// after; lifesteal heals its percent of the hit. A miss draws nothing, and a weapon without an
+        /// enchant draws nothing for it.
+        /// </summary>
+        internal static long WeaponHitRiders(Character player, long damage, string bossName, Random rng, TerminalEmulator? terminal)
+        {
+            if (player == null || damage <= 0) return 0;
+            long extra = 0;
+            var weapon = player.GetEquipment(EquipmentSlot.MainHand);
+            if (weapon != null)
+            {
+                if (weapon.HasFireEnchant && rng.NextDouble() < global::CombatEngine.WeaponFireChance(weapon))   // 1.3.6: Phoenix Fire or loot fire
+                {
+                    long d = Math.Max(1, (long)(damage * global::CombatEngine.WeaponFireShare(weapon)));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_fire", d)}", "bright_red");
+                }
+                if (weapon.HasLightningEnchant && rng.NextDouble() < GameConfig.LightningEnchantProcChance)
+                {
+                    long d = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_lightning_resist", d, bossName)}", "bright_yellow");
+                }
+                if (weapon.HasPoisonEnchant && rng.NextDouble() < GameConfig.PoisonEnchantProcChance)
+                {
+                    long d = weapon.PoisonDamage > 0 ? weapon.PoisonDamage : Math.Max(1, (int)(damage * 0.10));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_venom_hit", d)}", "green");
+                }
+                if (weapon.HasHolyEnchant && rng.NextDouble() < GameConfig.HolyEnchantProcChance)
+                {
+                    float holyMult = GameConfig.HolyEnchantDamageMultiplier;
+                    if (player.IsAttunedTo("aurelion"))
+                        holyMult *= (1f + GameConfig.ShrineAurelionHolyProcBonus);
+                    long d = Math.Max(1, (long)(damage * holyMult));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_holy", d)}", "bright_white");
+                }
+                if (weapon.HasShadowEnchant && rng.NextDouble() < GameConfig.ShadowEnchantProcChance)
+                {
+                    long d = Math.Max(1, (long)(damage * GameConfig.ShadowEnchantDamageMultiplier));
+                    extra += d;
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.enchant_shadow", d)}", "dark_magenta");
+                }
+            }
+            int pct = player.GetEffectiveLifeStealPercent(EquipmentSlot.MainHand);
+            if (pct > 0 && player.HP < player.MaxHP)
+            {
+                long before = player.HP;
+                player.HP = Math.Min(player.MaxHP, player.HP + Math.Max(1, damage * pct / 100));
+                if (player.HP > before)
+                    UIHelper.WriteRow(terminal, $"  {Loc.Get("combat.lifedrinker", player.HP - before)}", "dark_green");
+            }
+            return extra;
         }
 
         private long CalculatePlayerDamage(Character player, WorldBossDefinition bossDef,
@@ -1731,15 +1790,13 @@ namespace UsurperRemake.Systems
                             terminal.SetColor("bright_cyan");
                             terminal.WriteLine($"  {Loc.Get("combat.sage_seal_ward", player.DisplayName, sealPercent)}");
                         }
-                        player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, ward);
-                        player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, spellDur);
+                        player.AddSlotBonus(BonusSlot.Defense, CombatEngine.SpellSlotSource(player, result, selectedSpell.Level), ward, spellDur);   // 1.3.6 G4
                         terminal.SetColor("cyan");
                         terminal.WriteLine($"  {Loc.Get("world_boss.protection_increased", ward)}");
                     }
                     if (result.AttackBonus > 0)
                     {
-                        player.TempAttackBonus = Math.Max(player.TempAttackBonus, result.AttackBonus);
-                        player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, spellDur);
+                        player.AddSlotBonus(BonusSlot.Attack, CombatEngine.SpellSlotSource(player, result, selectedSpell.Level), result.AttackBonus, spellDur);   // 1.3.6 G4
                         terminal.SetColor("yellow");
                         terminal.WriteLine($"  {Loc.Get("world_boss.attack_increased", result.AttackBonus)}");
                     }
@@ -1971,16 +2028,14 @@ namespace UsurperRemake.Systems
 
             if (result.AttackBonus > 0)
             {
-                player.TempAttackBonus = Math.Max(player.TempAttackBonus, result.AttackBonus);
-                player.TempAttackBonusDuration = Math.Max(player.TempAttackBonusDuration, dur);
+                player.AddSlotBonus(BonusSlot.Attack, CombatEngine.SlotSource(result), result.AttackBonus, dur);   // 1.3.6 G4
                 terminal.SetColor("yellow");
                 terminal.WriteLine($"  {Loc.Get("world_boss.buff_attack_dur", result.AttackBonus, player.TempAttackBonusDuration)}");
             }
 
             if (result.DefenseBonus > 0)
             {
-                player.TempDefenseBonus = Math.Max(player.TempDefenseBonus, result.DefenseBonus);
-                player.TempDefenseBonusDuration = Math.Max(player.TempDefenseBonusDuration, dur);
+                player.AddSlotBonus(BonusSlot.Defense, CombatEngine.SlotSource(result), result.DefenseBonus, dur);   // 1.3.6 G4
                 terminal.SetColor("cyan");
                 terminal.WriteLine($"  {Loc.Get("world_boss.buff_defense_dur", result.DefenseBonus, player.TempDefenseBonusDuration)}");
             }
@@ -2060,9 +2115,7 @@ namespace UsurperRemake.Systems
             if (defendingRounds > 0)
                 playerDef *= 2;
 
-            // TitanResolve: +5% max HP effective defense
-            if (HasSpecialEffect(player, LootGenerator.SpecialEffect.TitanResolve))
-                playerDef += (long)(player.MaxHP * 0.05);
+            // 1.3.6: Titan's Resolve is +5 percent max HP (Character.RecalculateStats), no defence add here
 
             // Defense can reduce damage but never below 20% of boss strength
             // World bosses are meant to be dangerous — pure defense stacking shouldn't trivialize them

@@ -1,14 +1,15 @@
 ---
 title: Enchanting
 path: /wiki/en/items/enchanting/
-checked: 1.3.5
+checked: 1.3.6
 sources: Scripts/Locations/MagicShopLocation.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/StatisticsSystem.cs
+history: 1.3.6 | Magic resistance now cuts monster breaths and spells, and spells in player fights, by up to half, except Old God attacks, Phoenix Fire and Frostbite add 30 weapon power with new chances and go on weapons only, one of each element, weapon effects and life steal work in player fights and on the world boss, and Boss Slayer adds to Power Attack and class abilities.
 history: 1.3.5 | Sunbane, Stonebane and Godbane are new counter enchants for weapons, Lifedrinker gives 6 percent life steal, a higher stat tier replaces the lower one on the same stat, and a failed 4th or 5th enchant destroys one random enchant whole.
 history: 1.3.4 | none
 history: 1.3.3 | none
 history: 1.3.2 | Enchant removal refuses a cursed item without charging, and enchanting a worn item or removing its enchant leaves it worn.
 ---
-The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; the last three, the counters, go on a weapon only.
+The Magic Shop enchants equipment. Open it from Main Street with M for Merchant Row, then M, and press E. You can enchant anything you wear and any weapon, armor, shield or accessory in your backpack. There are 17 enchants; Phoenix Fire, Frostbite and the last three, the counters, go on a weapon only.
 
 ## Enchant list and costs
 
@@ -24,9 +25,26 @@ Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add the
 
 Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
 
+### Magic resistance
+
+Magic resistance on your gear (Ward gives 20, and found gear may carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defence and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
+
+The magical attacks are the monster breaths and spells: Fire Breath, Frost Breath, Poison Cloud, Poison Gas, Spellcasting, Ancient Magic, Hellfire, Immolate, Fireball, Inferno, Lightning, Holy Smite, Divine Judgment, Madness, Terror, Nightmare, Reality Break, Overload, Whirlpool and Tidal Wave, and also Boulder, Earthquake and Root Entangle. A monster's normal blows and its other abilities, Crushing Blow and Life Drain among them, are not magical. Old God attacks are excluded: magic resistance does nothing against an Old God, whatever the attack. A world boss's attacks are not magical either. In a fight between players, magic resistance cuts the damage of every spell that hits you the same way, after the Team HQ Barracks.
+
 ### Phoenix Fire and Frostbite
 
-Phoenix Fire and Frostbite each add +20 weapon power and need level 60 and crafting materials. With Phoenix Fire, each hit with that weapon has a {{percent:FireEnchantProcChance}} percent chance of extra fire damage equal to {{percent:FireEnchantDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostEnchantProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them.
+Phoenix Fire and Frostbite go on a weapon in the main or off hand only, never on a shield, and need level 60 and crafting materials. Each adds +{{balance:ElementEnchantWeaponPower}} weapon power. A weapon enchanted with one before version 1.3.6 keeps the +{{balance:LegacyElementEnchantWeaponPower}} it got then, and takes the chances below like a new one. A weapon holds one fire and one frost effect at most: Phoenix Fire is refused on a weapon that already has fire, from the shop or found with it, and Frostbite on one that already has frost, before any gold is taken. With Phoenix Fire, each hit with that weapon has a {{percent:PhoenixFireProcChance}} percent chance of extra fire damage equal to {{percent:PhoenixFireDamageMultiplier}} percent of the hit. With Frostbite, each hit has a {{percent:FrostbiteProcChance}} percent chance to slow the monster for {{balance:FrostEnchantDuration}} rounds; a boss or mini boss resists that slow {{balance:BossSoftControlResistPercent}} percent of the time, and on one the slow lasts half as long, at least 1 round. Both work on weapon hits, not on spells, and only from the weapon in the hand that struck; a hit that kills the monster does not trigger them. A found weapon with fire or frost keeps its own chances: fire {{percent:FireEnchantProcChance}} percent for {{percent:FireEnchantDamageMultiplier}} percent of the hit, frost {{percent:FrostEnchantProcChance}} percent to slow.
+
+### Weapon effects in player fights and on the world boss
+
+The fire, frost, lightning, poison, holy and shadow effects of a weapon and the life steal on your gear also work outside a monster fight:
+
+- **Player fights:** each of your weapon hits may set off the effects of the weapon in the hand that struck, at the same chance and share of the hit as against a monster. Your opponent's strike sets off those of its main hand weapon and heals it by its gear's life steal. See [PvP damage](/wiki/en/combat/pvp/#pvp-damage) for what each one does there.
+- **World boss:** your attack, Power Attack and Precise Strike set off the effects of your main hand weapon and your gear's life steal, and the effects' damage is added to that round's damage. Frost does nothing there and lightning does not stun. See [world boss damage](/wiki/en/online/world-boss/#world-boss-damage-cap).
+- **Weapon poison** is one hit in both: 10 percent of the hit, or the weapon's poison value raised by your team's Armory, not 4 rounds of poison.
+- **Holy** does not do the double damage it does to undead monsters there, and Aurelion's attunement still adds its bonus.
+
+Thorns on a companion's or an ally's own gear return their percent of a monster's normal attack on it, as yours do. Boss Slayer gear (world boss loot) adds 10 percent against a boss or mini boss to your swings, Power Attack and class abilities, never to spells.
 
 ## Sunbane, Stonebane and Godbane
 

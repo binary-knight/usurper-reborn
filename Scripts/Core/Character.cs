@@ -336,11 +336,139 @@ public class Character
     public bool HasOceanMemory { get; set; } = false;  // Ocean's Memory spell - half mana cost
     public int SmiteChargesRemaining { get; set; } = 0; // Paladin daily smite uses left
 
-    // Temporary combat bonuses from abilities
+    // Temporary combat bonuses from abilities. 1.3.6 G4: every write goes through AddSlotBonus, ClearSlotBonus,
+    // ClearSlotBonuses or TickSlotBonuses below, which keep each slot equal to its highest live positive entry plus
+    // the sum of its live penalties; the Duration is the rounds left on the entry shown. Readers read these four.
     public int TempAttackBonus { get; set; } = 0;
     public int TempAttackBonusDuration { get; set; } = 0;
     public int TempDefenseBonus { get; set; } = 0;
     public int TempDefenseBonusDuration { get; set; } = 0;
+
+    /// <summary>1.3.6 G4: the timed entries behind the attack slot (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<SlotBonusEntry> AttackBonusEntries { get; } = new();
+    /// <summary>1.3.6 G4: the timed entries behind the defence slot (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public List<SlotBonusEntry> DefenseBonusEntries { get; } = new();
+
+    /// <summary>The source name a value set on the slot fields directly (a test, an older caller) is held under.</summary>
+    public const string RawSlotSource = "slot";
+
+    private List<SlotBonusEntry> SlotEntries(BonusSlot slot) => slot == BonusSlot.Attack ? AttackBonusEntries : DefenseBonusEntries;
+
+    /// <summary>
+    /// 1.3.6 G4: one bonus or penalty on a slot from one source for <paramref name="rounds"/> round ends (0: until the
+    /// next clear, as a slot write with no duration was). The same source again takes the new value only if it is
+    /// higher and keeps the longer rounds, so a recast does not stack. A new source is its own entry; the slot shows
+    /// the highest positive entry plus every penalty, so a penalty never wipes a bonus.
+    /// </summary>
+    public void AddSlotBonus(BonusSlot slot, string source, int value, int rounds)
+    {
+        if (value == 0 || string.IsNullOrEmpty(source)) return;
+        AdoptRawSlot(slot);
+        var list = SlotEntries(slot);
+        rounds = Math.Max(0, rounds);
+        var held = list.Find(e => e.Source == source);
+        if (held == null)
+            list.Add(new SlotBonusEntry { Source = source, Value = value, Rounds = rounds });
+        else
+        {
+            if (value > held.Value) held.Value = value;
+            held.Rounds = held.Rounds == 0 || rounds == 0 ? 0 : Math.Max(held.Rounds, rounds);
+        }
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>1.3.6 G4: the value one source holds on a slot now (0 when it holds none).</summary>
+    public int SlotBonusValue(BonusSlot slot, string source)
+    {
+        AdoptRawSlot(slot);
+        return SlotEntries(slot).Find(e => e.Source == source)?.Value ?? 0;
+    }
+
+    /// <summary>1.3.6 G4: empties a slot: every entry and the shown value and rounds.</summary>
+    public void ClearSlotBonus(BonusSlot slot)
+    {
+        SlotEntries(slot).Clear();
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>1.3.6 G4: drops one source's entry from a slot; the next highest shows.</summary>
+    public void ClearSlotBonus(BonusSlot slot, string source)
+    {
+        AdoptRawSlot(slot);
+        SlotEntries(slot).RemoveAll(e => e.Source == source);
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>1.3.6 G4: empties both slots (fight start, fight end, a boss fight's reset).</summary>
+    public void ClearSlotBonuses()
+    {
+        ClearSlotBonus(BonusSlot.Attack);
+        ClearSlotBonus(BonusSlot.Defense);
+    }
+
+    /// <summary>
+    /// 1.3.6 G4: the round-end tick. Each timed entry loses a round and the ones that reach 0 end; untimed entries stay.
+    /// The slot then shows the highest live entry again, so an ending short bonus no longer zeroes a longer one.
+    /// </summary>
+    public void TickSlotBonuses()
+    {
+        TickSlot(BonusSlot.Attack);
+        TickSlot(BonusSlot.Defense);
+    }
+
+    private void TickSlot(BonusSlot slot)
+    {
+        AdoptRawSlot(slot);
+        var list = SlotEntries(slot);
+        if (list.Count == 0) return;
+        list.RemoveAll(e =>
+        {
+            if (e.Rounds <= 0) return false;   // untimed: until the next clear
+            e.Rounds--;
+            return e.Rounds == 0;
+        });
+        RecomputeSlot(slot);
+    }
+
+    /// <summary>
+    /// A value written on the slot fields directly, with no entry behind it, becomes one entry first, so it ticks and
+    /// shows as it always did.
+    /// </summary>
+    private void AdoptRawSlot(BonusSlot slot)
+    {
+        var list = SlotEntries(slot);
+        if (list.Count > 0) return;
+        int value = slot == BonusSlot.Attack ? TempAttackBonus : TempDefenseBonus;
+        int rounds = slot == BonusSlot.Attack ? TempAttackBonusDuration : TempDefenseBonusDuration;
+        if (value != 0)
+            list.Add(new SlotBonusEntry { Source = RawSlotSource, Value = value, Rounds = Math.Max(0, rounds) });
+    }
+
+    private void RecomputeSlot(BonusSlot slot)
+    {
+        var list = SlotEntries(slot);
+        SlotBonusEntry? shown = null;
+        int penalty = 0, penaltyRounds = 0;
+        foreach (var e in list)
+        {
+            if (e.Value > 0)
+            {
+                if (shown == null || e.Value > shown.Value || (e.Value == shown.Value && e.Rounds > shown.Rounds))
+                    shown = e;
+            }
+            else
+            {
+                penalty += e.Value;
+                penaltyRounds = Math.Max(penaltyRounds, e.Rounds);
+            }
+        }
+        int value = (shown?.Value ?? 0) + penalty;
+        int rounds = shown != null ? shown.Rounds : penaltyRounds;
+        if (slot == BonusSlot.Attack) { TempAttackBonus = value; TempAttackBonusDuration = rounds; }
+        else { TempDefenseBonus = value; TempDefenseBonusDuration = rounds; }
+    }
     public int TempCritChanceBonus { get; set; } = 0;        // v1.1.10: percentage points for this fight (an Old God's dialogue); not saved
     public bool DodgeNextAttack { get; set; } = false;
 
@@ -358,6 +486,43 @@ public class Character
     public bool HasBloodlust { get; set; } = false;      // Barbarian: heal on kill
     public bool HasStatusImmunity { get; set; } = false;  // Immune to debuffs
     public int StatusLifestealPercent { get; set; } = 0;  // Lifesteal % from abilities (e.g. 10, 25)
+
+    /// <summary>1.3.6 G11 (rule 1): Living Waters' heal a Regenerating tick gives while FlatRegenRounds last, in place
+    /// of the status's 1d6 (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int FlatRegenAmount { get; set; }
+    /// <summary>1.3.6 G11 (rule 1): the Regenerating ticks left that heal FlatRegenAmount (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int FlatRegenRounds { get; set; }
+
+    /// <summary>1.3.6 G11: clears the combat only state of the prestige singles (Living Waters' flat regen, Apotheosis
+    /// of Ruin's area swings, Empathic Link), at a fight's start and end with the other transient buffs.</summary>
+    internal void ClearPrestigeCombatState()
+    {
+        FlatRegenAmount = 0; FlatRegenRounds = 0;
+        AreaSwingRounds = 0;
+        EmpathicLinkCaster = null; EmpathicLinkRounds = 0;
+    }
+
+    /// <summary>1.3.6 G11 (rule 2): the Wavecaller whose Empathic Link holds this ally; while EmpathicLinkRounds last,
+    /// half of a monster's hit on this ally goes to the caster (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal Character? EmpathicLinkCaster { get; set; }
+    /// <summary>1.3.6 G11 (rule 2): the rounds left on the link (combat only, not saved).</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int EmpathicLinkRounds { get; set; }
+
+    /// <summary>1.3.6 G11 (rule 6): Apotheosis of Ruin's rounds in which this character's basic swings hit every living
+    /// enemy (combat only, not saved). Counts down at round end with the attack and defence entries.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    internal int AreaSwingRounds { get; set; }
+
+    /// <summary>1.3.6 G11: the round end tick of the prestige singles' rounds, beside TickSlotBonuses.</summary>
+    internal void TickPrestigeRounds()
+    {
+        if (AreaSwingRounds > 0) AreaSwingRounds--;
+        if (EmpathicLinkRounds > 0 && --EmpathicLinkRounds == 0) EmpathicLinkCaster = null;
+    }
     public bool DeathsEmbraceActive { get; set; } = false; // Voidreaver: revive on death once (combat-transient)
     public int StatusImmunityDuration { get; set; } = 0;
 
@@ -911,6 +1076,8 @@ public class Character
     // (per-round combat state, not serialized).
     [System.Text.Json.Serialization.JsonIgnore] public long RoundStartHP { get; set; } = 0;
     [System.Text.Json.Serialization.JsonIgnore] public bool LastStandFiredThisRound { get; set; } = false;
+    // 1.3.6: Last Stand fires once per fight (reset at the fight's start with DeathsDoorUsedThisCombat)
+    [System.Text.Json.Serialization.JsonIgnore] public bool LastStandUsedThisCombat { get; set; } = false;
 
     // v0.65.6 "Death's Door": once per combat, a burst that would kill the player
     // from above 25% round-start HP leaves them at 1 HP instead. Closes the
@@ -950,9 +1117,12 @@ public class Character
     /// monster damage has landed and BEFORE the death check runs. If the
     /// player died this round but started above 50% MaxHP, rescue them by
     /// setting HP to 1 and flagging LastStandFiredThisRound so the combat
-    /// loop can render the flavor line. Combat then ends with the player
-    /// alive at 1 HP (the caller rewrites the outcome to Victory or
-    /// PlayerEscaped). End-of-round check (rather than per-
+    /// loop can render the flavor line. 1.3.6: the round loop calls this where
+    /// it finds the player dead, and the fight goes on with the player at 1 HP
+    /// (Last Stand once per fight, LastStandUsedThisCombat; a later killing blow
+    /// goes to Death's Door if it qualifies, otherwise to death). A call from
+    /// HandlePlayerDeath after the loop still rewrites the outcome to Victory or
+    /// PlayerEscaped. End-of-round check (rather than per-
     /// damage clamp) lets us cover all damage sources -- basic attacks,
     /// ability damage, multi-monster pile-on, DoT ticks, boss specials -- in
     /// one place without touching every damage application site.
@@ -971,18 +1141,18 @@ public class Character
         if (DifficultySystem.IsPermadeath()) return false;
         if (HP > 0) return false;                 // Not dead; nothing to rescue.
 
-        if (RoundStartHP > MaxHP / 2)
+        if (RoundStartHP > MaxHP / 2 && !LastStandUsedThisCombat)
         {
-            // Last Stand: started the round healthy; no single round may kill.
+            // Last Stand: started the round healthy; no single round may kill. 1.3.6: once per fight.
             HP = 1;
+            LastStandUsedThisCombat = true;
             LastStandFiredThisRound = true;
             return true;
         }
 
         // v0.65.6 "Death's Door": once per combat, a killing burst against a
         // player who started the round above 25% MaxHP leaves them at 1 HP;
-        // combat then ends with the player alive (the caller rewrites the
-        // outcome to an escape). A later fight can burst-kill for real if the
+        // 1.3.6: the fight then goes on, as after Last Stand. A later fight can burst-kill for real if the
         // guarantee was already spent. Skipped in exhibition combat (Gauntlet /
         // Tournament of Honor / pit fights) and arrest combat -- exhibition
         // waves are each a fresh combat, so an unguarded Death's Door would
@@ -1901,11 +2071,11 @@ public class Character
         _boonOutMaxMana = MaxMana;
         _boonRecorded = true;
 
-        // Apply Fountain of Vitality bonus HP
-        if (BonusMaxHP > 0)
-        {
-            MaxHP += BonusMaxHP;
-        }
+        // Apply Fountain of Vitality bonus HP, then (1.3.6) Titan's Resolve. The inputs are recorded
+        // so RecalculateBoonShare carries a boon change through the same steps.
+        _boonTailBonusMaxHP = BonusMaxHP;
+        _boonTailTitanItems = EquippedTitanResolveCount();
+        MaxHP = AfterBoonSegmentMaxHP(MaxHP, _boonTailBonusMaxHP, _boonTailTitanItems);
 
         // Apply permanent weapon/armor power bonuses (Infernal Forge, artifacts, etc.)
         if (BonusWeapPow > 0)
@@ -1949,6 +2119,25 @@ public class Character
     private long _boonPreMaxHP, _boonPreMaxMana, _boonOutMaxHP, _boonOutMaxMana;
     private double _boonAwakeningHP, _boonAwakeningMana;
     private bool _boonRecorded;
+    // 1.3.6: the inputs of the steps after the boon segment (Fountain bonus, Titan's Resolve items)
+    private long _boonTailBonusMaxHP;
+    private int _boonTailTitanItems;
+
+    /// <summary>1.3.6: Titan's Resolve gives 5 percent more max HP, once however many equipped items carry it.</summary>
+    public const double TitanResolveMaxHPMultiplier = 1.05;
+
+    /// <summary>1.3.6: how many equipped items carry Titan's Resolve (the bonus applies once when any does).</summary>
+    internal int EquippedTitanResolveCount() =>
+        EquippedItems.Values.Count(id => id > 0 && EquipmentDatabase.GetById(id)?.HasTitanResolve == true);
+
+    /// <summary>1.3.6: max HP after the boon segment, before the floor of 1: the Fountain bonus, then Titan's Resolve.</summary>
+    private static long AfterBoonSegmentMaxHP(long boonOut, long bonusMaxHP, int titanItems)
+    {
+        long hp = boonOut;
+        if (bonusMaxHP > 0) hp += bonusMaxHP;
+        if (titanItems > 0) hp = (long)(hp * TitanResolveMaxHPMultiplier);
+        return hp;
+    }
 
     /// <summary>1.2.0: max HP after the configured boon, the awakening and Terran, from the pre-boon max HP.</summary>
     private long BoonSegmentMaxHP(long pre, double awakeningHP)
@@ -1989,7 +2178,8 @@ public class Character
         }
         long hp = BoonSegmentMaxHP(_boonPreMaxHP, _boonAwakeningHP);
         long mana = BoonSegmentMaxMana(_boonPreMaxMana, _boonAwakeningMana);
-        MaxHP = Math.Max(1, MaxHP + hp - _boonOutMaxHP);
+        // 1.3.6: the difference is taken after the Fountain bonus and Titan's Resolve, as a full recalculation applies them
+        MaxHP = Math.Max(1, MaxHP + AfterBoonSegmentMaxHP(hp, _boonTailBonusMaxHP, _boonTailTitanItems) - AfterBoonSegmentMaxHP(_boonOutMaxHP, _boonTailBonusMaxHP, _boonTailTitanItems));
         MaxMana = Math.Max(0, MaxMana + mana - _boonOutMaxMana);
         _boonOutMaxHP = hp;
         _boonOutMaxMana = mana;
@@ -2723,7 +2913,9 @@ public class Character
                     break;
 
                 case StatusEffect.Regenerating:
-                    var heal = rnd.Next(1, 7); // 1d6
+                    // 1.3.6 G11 (rule 1): Living Waters' flat amount for its own rounds; any other source keeps its 1d6
+                    var heal = FlatRegenRounds > 0 ? FlatRegenAmount : rnd.Next(1, 7); // 1d6
+                    if (FlatRegenRounds > 0 && --FlatRegenRounds == 0) FlatRegenAmount = 0;
                     HP = Math.Min(HP + heal, MaxHP);
                     messages.Add((Loc.Get("status.tick_regen", DisplayName, heal), "bright_green"));
                     break;
@@ -2797,6 +2989,10 @@ public class Character
                 case StatusEffect.Lifesteal:
                     StatusLifestealPercent = 0;
                     messages.Add((Loc.Get("status.end_lifesteal", DisplayName), ColorRole.Notice));
+                    break;
+                case StatusEffect.Regenerating:
+                    FlatRegenAmount = 0; FlatRegenRounds = 0;   // 1.3.6 G11: the flat regen ends with the status
+                    messages.Add((Loc.Get("status.end_wears_off", DisplayName, effectName), ColorRole.Notice));
                     break;
                 default:
                     messages.Add((Loc.Get("status.end_wears_off", DisplayName, effectName), ColorRole.Notice));
@@ -3779,4 +3975,16 @@ public static class PoisonData
         PoisonType.Deathbane => GameConfig.DeathbaneDamageBonus,
         _ => 0f
     };
+}
+
+/// <summary>1.3.6 G4: the two bonus slots of a character in a fight.</summary>
+public enum BonusSlot { Attack, Defense }
+
+/// <summary>1.3.6 G4: one timed bonus or penalty on a slot (combat only, not saved).</summary>
+public sealed class SlotBonusEntry
+{
+    public string Source { get; set; } = "";
+    public int Value { get; set; }
+    /// <summary>Round ends left; 0 means until the next clear.</summary>
+    public int Rounds { get; set; }
 }
