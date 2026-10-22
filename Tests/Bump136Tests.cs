@@ -90,4 +90,58 @@ public class Bump136Tests
         lines[bullet].Should().Be("- **v1.3.6:** 76 changes; the Changelist is in " + NotesPath);
         lines[bullet + 1].Should().StartWith("- **v1.3.5:** 46 changes;", "the newest bullet comes first");
     }
+
+    [Fact]
+    public void Roadmap_136Site_NowThenNextThenRecentlyShipped_InEveryLanguage()
+    {
+        string html = Bump130Tests.RoadmapHtml();
+        var keys = Regex.Matches(html, "data-i18n=\"(r1\\.road_[a-z0-9_]+)\"").Select(m => m.Groups[1].Value).ToList();
+        var numbered = keys.Where(k => k.EndsWith("_t", StringComparison.Ordinal) && k != "r1.road_now_t" && k != "r1.road_title").ToList();
+        string[] next = { "137", "14", "20", "beyond" };
+        string[] shipped = { "136", "135", "134", "133", "132", "130" };
+        numbered.Should().Equal(next.Concat(shipped).Select(n => "r1.road_" + n + "_t"));
+        foreach (string t in numbered) keys.Should().Contain(t.Substring(0, t.Length - 1) + "d");
+        int At(string k) { int i = keys.IndexOf(k); i.Should().BeGreaterThan(-1, k); return i; }
+        At("r1.road_now_t").Should().BeLessThan(At("r1.road_next_h"), "NOW comes first");
+        At("r1.road_next_h").Should().BeLessThan(At("r1.road_137_t"));
+        At("r1.road_beyond_d").Should().BeLessThan(At("r1.road_shipped_h"));
+        At("r1.road_shipped_h").Should().BeLessThan(At("r1.road_136_t"));
+        var after = new Dictionary<string, string> { ["137"] = "1.3.6", ["14"] = "1.3.7", ["20"] = "1.4", ["beyond"] = "2.0" };
+        foreach (string n in next) At("r1.road_" + n + "_when").Should().Be(At("r1.road_" + n + "_d") + 1, n + " has its place in the order");
+        foreach (string n in shipped) keys.Should().NotContain("r1.road_" + n + "_when", n + " is shipped");
+        var en = WebLang("en");
+        string[] changed = { "r1.road_now_t", "r1.road_now_d", "r1.road_137_d", "r1.road_136_d" };
+        foreach (string lang in Languages)
+        {
+            var dict = WebLang(lang);
+            foreach (string key in keys) dict[key].Should().NotBeNullOrWhiteSpace($"{lang} {key}");
+            dict.Keys.Where(k => k.StartsWith("r1.road_", StringComparison.Ordinal)).Should().BeSubsetOf(keys, lang);
+            foreach (string gone in new[] { "r1.road_136_when", "r1.road_127_t", "r1.road_127_d" })
+                dict.ContainsKey(gone).Should().BeFalse($"{lang} {gone}");
+            dict["r1.road_now_t"].Should().Contain("1.3.6", lang);
+            dict["r1.road_now_d"].Should().Contain("1.3.6", lang).And.NotContain("TODO", lang);
+            dict["r1.road_136_t"].Should().StartWith("1.3.6 -- ", lang);
+            dict["r1.road_137_t"].Should().StartWith("1.3.7 -- ", lang);
+            dict["r1.road_14_t"].Should().StartWith("1.4 -- ", lang);
+            dict["r1.road_136_d"].Should().Contain("76", lang);
+            foreach (string n in next) dict["r1.road_" + n + "_when"].Should().Contain(after[n], $"{lang} {n}");
+            foreach (var pair in dict.Where(p => p.Key.StartsWith("r1.road_", StringComparison.Ordinal)))
+                DashOrEmoji.IsMatch(pair.Value).Should().BeFalse($"{lang} {pair.Key}");
+            if (lang != "en") foreach (string key in changed)
+                dict[key].Should().NotBe(en[key], $"{lang} {key} is translated");
+        }
+        foreach (string key in keys)
+            html.Should().Contain($"data-i18n=\"{key}\">{en[key]}<", "the page's own English matches en.json");
+        en["r1.road_now_d"].Should().Be("1.3.6 is out: magic resistance is a real defense against magical attacks, poison deals damage over "
+            + "several rounds, Titan's Resolve adds 5% max HP, more enchant and loot effects work for companions, on abilities, in PvP and "
+            + "against world bosses, and Phoenix Fire and Frostbite grew stronger. Every ability and spell of all seventeen classes was checked "
+            + "against what it really does: abilities that applied twice, bonuses that wiped each other out, crowd control that held bosses "
+            + "round after round and NPC teammates who left the player out were fixed, and the class texts now say what the classes do, in "
+            + "every language. The roadmap below says what comes next.");
+        en["r1.road_137_d"].Should().Be("The classes and the gear steps are tuned from the measurements of every class at every depth and "
+            + "against every Old God, so each class holds its own deep in the dungeon and against the gods, and gear upgrades come at an even pace.");
+        en["r1.road_136_d"].Should().Be("Shipped: five enchant rules (a real magic resistance, poison over several rounds, Titan's Resolve for "
+            + "max HP, enchants for companions, abilities, PvP and world bosses, and stronger Phoenix Fire and Frostbite), and an audit of every "
+            + "ability and spell of all seventeen classes, with 76 changes in all so each does what its text says.");
+    }
 }
