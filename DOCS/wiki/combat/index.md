@@ -170,7 +170,7 @@ Defend halves every monster basic attack on you for the rest of the round, round
 
 ### Rescue (U)
 
-An ally at 0 HP in a fight (a companion, NPC ally, spouse, lover or fighting beast) is Downed, not dead. U spends one healing potion from your belt to lift a Downed ally: it stands again with the HP your healing potion would give it, and a finish a monster announced on it is called off. With two or more allies Downed you pick which one. U is in the menu only while an ally is Downed and you hold a healing potion, and only for the player leading the fight. In an Old God fight a rescue waits for the potion cooldown and starts it, as a potion does. A rescue counts as healing an ally for a god's deeds.
+An ally at 0 HP in a fight (a companion, NPC ally, spouse, lover or fighting beast) is Downed, not dead. U spends one healing potion from your belt to lift a Downed ally: it stands again with the HP your healing potion would give it, and a finish a monster announced on it is called off. Each ally can be rescued once per fight; an ally that goes down again after its rescue stays Downed until the fight ends or a monster finishes it. With two or more allies you can lift you pick which one. U is in the menu only while an ally not yet rescued in this fight is Downed and you hold a healing potion, and only for the player leading the fight. In an Old God fight a rescue waits for the potion cooldown and starts it, as a potion does. A rescue counts as healing an ally for a god's deeds.
 
 ## When a monster attacks you
 

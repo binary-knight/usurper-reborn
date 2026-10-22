@@ -323,10 +323,10 @@ public class DeathRows128Tests : IDisposable
         var f = await LastStand();
         f.Transcript.Should().Contain(Loc.Get("combat.last_stand"));
         f.Result!.Outcome.Should().Be(CombatOutcome.PlayerEscaped);
-        var row = await OneRow(f, "fled");
-        row["player_hp_end"].Should().Be(1L);
-        f.Hero.HP.Should().Be(1);
-        f.Hero.Resurrections.Should().Be(3);
+        var row = await OneRow(f, "death");
+        row["player_hp_end"].Should().Be(0L);
+        f.Hero.HP.Should().Be(340, "1.3.6: Last Stand keeps the fight going, the next blow kills and a resurrection raises the hero");
+        f.Hero.Resurrections.Should().Be(2);
     }
 
     [Fact]
@@ -336,9 +336,9 @@ public class DeathRows128Tests : IDisposable
         f.Transcript.Should().Contain(Loc.Get("combat.deaths_door"));
         f.Transcript.Should().NotContain(Loc.Get("combat.last_stand"));
         f.Result!.Outcome.Should().Be(CombatOutcome.PlayerEscaped);
-        var row = await OneRow(f, "fled");
-        row["player_hp_end"].Should().Be(1L);
-        f.Hero.Resurrections.Should().Be(3);
+        var row = await OneRow(f, "death");
+        row["player_hp_end"].Should().Be(0L);
+        f.Hero.Resurrections.Should().Be(2, "1.3.6: Death's Door keeps the fight going and the next blow is a death");
     }
 
     [Fact]
@@ -403,8 +403,8 @@ public class DeathRows128Tests : IDisposable
         {
             ("arrest", Arrest, "death"),
             ("exhibition", Exhibition, "death"),
-            ("last stand", LastStand, "fled"),
-            ("death's door", DeathsDoor, "fled"),
+            ("last stand", LastStand, "death"),
+            ("death's door", DeathsDoor, "death"),
             ("mortis", Mortis, "fled"),
             ("divine favor", DivineFavor, "fled"),
             ("permadeath", () => Permadeath(), "death"),   // last: it removes the answer

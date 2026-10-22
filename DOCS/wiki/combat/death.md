@@ -13,22 +13,22 @@ This page is about dying in a monster fight. Player fights have their own rules:
 
 ## What happens when you die
 
-When your HP reaches 0 in a monster fight, the game first tries to save you, in this order. The first that works ends the fight with you alive.
+When your HP reaches 0 in a monster fight, the game first tries to save you, in this order.
 
 1. A companion may take the killing blow and die in your place: see [a companion who dies for you](/wiki/en/combat/companions/#a-companion-who-dies-for-you).
-2. Divine Favor, for members of the Faith (see below).
-3. Last Stand, then Death's Door (see below).
-4. Mortis's Miracle: see [Mortis and death protection](/wiki/en/gods/miracles/#mortis-and-death-protection).
+2. Last Stand, then Death's Door (see below). Either leaves you at 1 HP and the fight goes on.
+3. Divine Favor, for members of the Faith (see below). It ends the fight with you alive.
+4. Mortis's Miracle: see [Mortis and death protection](/wiki/en/gods/miracles/#mortis-and-death-protection). It ends the fight with you alive.
 
 If none of these saves you, you die. In an arrest fight or an exhibition fight (the Gauntlet, pit fights) you are left at 1 HP instead and nothing is spent.
 
 ## Last Stand: why you survived at 1 HP
 
-Last Stand leaves you at 1 HP when a killing blow lands in a round you began above half your maximum HP. It works every round and every fight, and the fight then ends with you alive: as a win if every monster is dead, otherwise as an escape.
+Last Stand leaves you at 1 HP when a killing blow lands in a round you began above half your maximum HP. It works once per fight, and the fight goes on: you keep fighting at 1 HP. If the same blow also killed the last monster, the fight ends as a win. Once it has fired, the status line in combat shows it spent until the fight ends.
 
 ### Death's Door
 
-Death's Door does the same once per fight when you began the round above a quarter of your maximum HP. It does not work in arrest or exhibition fights.
+Death's Door does the same once per fight when you began the round above a quarter of your maximum HP, and the fight goes on too. A later killing blow in a fight where Last Stand is spent goes to Death's Door if it can still fire. It does not work in arrest or exhibition fights.
 
 Neither works on Nightmare difficulty, in a player fight, or when the death comes from a Mental collapse. If you began the round at a quarter of your HP or less, nothing guards that round.
 

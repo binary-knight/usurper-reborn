@@ -196,8 +196,9 @@ public partial class CombatEngine
         if (owner.IsExhibitionCombat || owner.IsArrestCombat) return false;
         // 1.3.3 party survival: an ally in scope is lost only at a finish, so the question is "did not
         // pick up": Downed at the owner's last turn start, a healing potion held, and no Rescue chosen.
+        // 1.3.6: an ally already rescued in this fight cannot be lifted again, so it was not left to die
         if (IsDownable(ally))
-            return _downedAtTurnStart.Contains(ally) && !_ownerRescuedThisTurn
+            return _downedAtTurnStart.Contains(ally) && !_ownerRescuedThisTurn && !RescuedThisFight(ally)
                 && owner.Healing > 0 && owner.PotionCooldownRounds <= 0;
         if (!_lowAlliesAtTurnStart.Contains(ally) || _ownerAidedThisTurn) return false;
         bool potion = owner.Healing > 0 && owner.PotionCooldownRounds <= 0;
@@ -1119,6 +1120,7 @@ public partial class CombatEngine
         // v0.65.6 Death's Door: once-per-combat burst rescue resets at combat start.
         player.DeathsDoorUsedThisCombat = false;
         player.DeathsDoorFiredThisRound = false;
+        player.LastStandUsedThisCombat = false;   // 1.3.6: Last Stand is once per fight too
         // v1.1.13: the player's hold state (the duel control rules) is per fight
         _pvpControl.Clear();
         _pvpTurnTakenThisRound.Clear();
@@ -1562,7 +1564,7 @@ public partial class CombatEngine
                 }
             }
 
-            if (!player.IsAlive)
+            if (!player.IsAlive && !await KeepsFightingAtOneHp(player, result, isGodMode))   // 1.3.6: Last Stand or Death's Door, then the fight goes on
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.slain_ambush"));
@@ -1681,7 +1683,7 @@ public partial class CombatEngine
             }
 
             // Check if player died from boss mechanics (corruption/doom)
-            if (BossContext != null && !player.IsAlive)
+            if (BossContext != null && !player.IsAlive && !await KeepsFightingAtOneHp(player, result, isGodMode))   // 1.3.6
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.succumb_wounds"));
@@ -1826,7 +1828,7 @@ public partial class CombatEngine
             }
 
             // Check if player died from status effects or plague
-            if (!player.IsAlive)
+            if (!player.IsAlive && !await KeepsFightingAtOneHp(player, result, isGodMode))   // 1.3.6
             {
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("combat.succumb_wounds"));
@@ -1944,7 +1946,7 @@ public partial class CombatEngine
                 break;
 
             // Check if player died during their own action (e.g., spell backfired)
-            if (!player.IsAlive)
+            if (!player.IsAlive && !await KeepsFightingAtOneHp(player, result, isGodMode))   // 1.3.6
                 break;
 
             // === TEAMMATES' TURNS ===
@@ -2088,7 +2090,7 @@ public partial class CombatEngine
             }
 
             // Check for player death — only end combat if no grouped players survive
-            if (!player.IsAlive)
+            if (!player.IsAlive && !await KeepsFightingAtOneHp(player, result, isGodMode))   // 1.3.6
             {
                 if (!anyGroupedAlive())
                 {
@@ -14250,9 +14252,12 @@ public partial class CombatEngine
         // the rescues belong to the fight's owner in PvE; a grouped follower's screen leaves them out
         if (!p.IsGroupedPlayer && !DifficultySystem.IsPermadeath())
         {
-            entries.Add(p.RoundStartHP > p.MaxHP / 2
-                ? (Loc.Get("combat.rescue_last_stand_ready"), "bright_green")
-                : (Loc.Get("combat.rescue_last_stand_low"), "gray"));
+            if (p.LastStandUsedThisCombat)   // 1.3.6: once per fight
+                entries.Add((Loc.Get("combat.rescue_last_stand_spent"), "gray"));
+            else
+                entries.Add(p.RoundStartHP > p.MaxHP / 2
+                    ? (Loc.Get("combat.rescue_last_stand_ready"), "bright_green")
+                    : (Loc.Get("combat.rescue_last_stand_low"), "gray"));
             if (!p.IsExhibitionCombat && !p.IsArrestCombat)
             {
                 if (p.DeathsDoorUsedThisCombat)
@@ -24738,6 +24743,41 @@ public partial class CombatEngine
         return true;
     }
 
+    /// <summary>
+    /// 1.3.6: the round loop calls this where it finds the fight's owner dead, before it decides to end.
+    /// Last Stand (round start above half max HP, once per fight) or Death's Door (above a quarter, once per
+    /// fight, not in arrest or exhibition fights) leaves the player at 1 HP and the fight goes on: the loop
+    /// does not end and HandlePlayerDeath does not run for that blow. True when the player is alive after it.
+    /// A Mental collapse death and the wizard god mode keep their own endings.
+    /// </summary>
+    private async Task<bool> KeepsFightingAtOneHp(Character player, CombatResult result, bool isGodMode)
+    {
+        if (player.IsAlive) return true;
+        if (isGodMode || result.MentalCollapseDeath) return false;
+        if (!player.LastStandCheckAndApply(isPvP: false)) return false;
+        await WriteLastStandLines(result);
+        return true;
+    }
+
+    /// <summary>The Last Stand or Death's Door line for the player and, in a group, for the followers.</summary>
+    private async Task WriteLastStandLines(CombatResult result)
+    {
+        bool wasDeathsDoor = result.Player.DeathsDoorFiredThisRound;
+        terminal.SetColor(wasDeathsDoor ? "bright_red" : "bright_yellow");
+        terminal.WriteLine("");
+        terminal.WriteLine($"  {Loc.Get(wasDeathsDoor ? "combat.deaths_door" : "combat.last_stand")}");
+        terminal.WriteLine("");
+        await Pacing.Wait(GetCombatDelay(1500));
+
+        // For grouped sessions, broadcast a third-person version so the
+        // rest of the party sees what happened.
+        if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
+        {
+            BroadcastGroupLocalized(result, lang => GroupLineWrapped(lang, wasDeathsDoor ? "\u001b[1;31m" : "\u001b[1;33m",
+                wasDeathsDoor ? "combat.deaths_door_broadcast" : "combat.last_stand_broadcast", result.Player.DisplayName));
+        }
+    }
+
     private async Task HandlePlayerDeath(CombatResult result)
     {
         // v0.61.2 Last-Stand cap: every monster / boss / environmental damage
@@ -24755,23 +24795,10 @@ public partial class CombatEngine
             // Render the flavor line in the player's local terminal. Group
             // followers see the broadcast version a few lines below.
             // v0.65.6: two rescue tiers share this branch -- Last Stand
-            // (round-start > 50% MaxHP, every round) and Death's Door
+            // (round-start > 50% MaxHP, once per fight from 1.3.6) and Death's Door
             // (round-start > 25%, once per combat). Branch the flavor so the
             // player knows which guarantee fired and that Death's Door is spent.
-            bool wasDeathsDoor = result.Player.DeathsDoorFiredThisRound;
-            terminal.SetColor(wasDeathsDoor ? "bright_red" : "bright_yellow");
-            terminal.WriteLine("");
-            terminal.WriteLine($"  {Loc.Get(wasDeathsDoor ? "combat.deaths_door" : "combat.last_stand")}");
-            terminal.WriteLine("");
-            await Pacing.Wait(GetCombatDelay(1500));
-
-            // For grouped sessions, broadcast a third-person version so the
-            // rest of the party sees what happened.
-            if (result.Teammates?.Any(t => t.IsGroupedPlayer) == true)
-            {
-                BroadcastGroupLocalized(result, lang => GroupLineWrapped(lang, wasDeathsDoor ? "\u001b[1;31m" : "\u001b[1;33m",
-                    wasDeathsDoor ? "combat.deaths_door_broadcast" : "combat.last_stand_broadcast", result.Player.DisplayName));
-            }
+            await WriteLastStandLines(result);   // 1.3.6: shared with the round loop (KeepsFightingAtOneHp)
 
             // The caller set Outcome=PlayerDied before invoking HandlePlayerDeath
             // (e.g., PlayerVsMonsters line 1602). Now that Last-Stand rescued the
