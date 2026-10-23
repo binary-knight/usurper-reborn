@@ -275,7 +275,7 @@ module.exports = [
   ["C35","why was i thrown out of the shop","/wiki/en/items/shops/","You are thrown out only when you ask to haggle with no tries left and then insist.","first"],
   ["C36","can trolls haggle","/wiki/en/items/shops/","the Weapon Shop does not haggle with a Troll","first"],
   ["C37","what gear sets are there","/wiki/en/items/armor/","There are 8 gear sets: Leather, Chain, Silk, Shadow, Steel, Reinforced, Forged and Mithril.","first"],
-  ["C38","leather set bonus","/wiki/en/items/armor/","2 pieces: +10 Max HP; 4 pieces: +2 Dexterity, +2 Agility; 6 pieces: +4 Defense, +25 Max HP","miss: fact outside the excerpt"],
+  ["C38","leather set bonus","/wiki/en/items/armor/","2 pieces: +10 Max HP; 4 pieces: +2 Dexterity, +2 Agility; 6 pieces: +4 Defence, +25 Max HP","miss: fact outside the excerpt"],
   ["C39","do two rings count for a set","/wiki/en/items/armor/","Pieces are counted by the slot they fill, so two rings of one set count as 2.","first"],
   ["C40","what is the loot drop chance","/wiki/en/items/","20 percent, plus 0.5 percent per monster level, plus 5 percent for each living ally","first"],
   ["C41","do lords and chiefs drop more loot","/wiki/en/items/","A monster whose name holds Boss, Chief, Lord or King has a fixed 35 percent chance","first"],
