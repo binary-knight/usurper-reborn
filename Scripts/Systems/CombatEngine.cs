@@ -2792,10 +2792,9 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.menu_quickbar"));
             foreach (var (qKey, slotId, displayName, available) in quickbarActions)
             {
-                if (available)
-                    terminal.WriteLine($"  {qKey} - {displayName}");
-                else
-                    terminal.WriteLine($"  {qKey} - {displayName} {Loc.Get("combat.menu_unavailable")}");
+                // 1.3.7: a long row (a requirement, the not-available note) continues on an indented row
+                foreach (var row in QuickbarScreenReaderRows(qKey, displayName, available ? null : Loc.Get("combat.menu_unavailable")))
+                    terminal.WriteLine(row);
             }
             terminal.SetColor("darkgray");
             terminal.WriteLine($"  {Loc.Get("combat.quickbar_info_hint")}");
@@ -3129,22 +3128,7 @@ public partial class CombatEngine
             terminal.SetColor("green");
             terminal.WriteLine("╠═══════════════════════════════════════╣");
             foreach (var (qKey, slotId, displayName, available) in quickbarActions)
-            {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write($"[{qKey}] ");
-                if (available)
-                {
-                    terminal.SetColor("yellow");
-                }
-                else
-                {
-                    terminal.SetColor("darkgray");
-                }
-                terminal.Write($"{displayName,-34}");
-                terminal.SetColor("green");
-                terminal.WriteLine("║");
-            }
+                WriteQuickbarBoxRows(qKey, displayName, available);
         }
 
         // === HEALING OPTIONS ===
@@ -3378,10 +3362,8 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.menu_quickbar"));
             foreach (var (key, name, available) in classInfo)
             {
-                if (available)
-                    terminal.WriteLine($"  {key} - {name}");
-                else
-                    terminal.WriteLine($"  {key} - {name} ({Loc.Get("combat.menu_unavailable")})");
+                foreach (var row in QuickbarScreenReaderRows(key, name, available ? null : Loc.Get("combat.menu_unavailable")))
+                    terminal.WriteLine(row);
             }
         }
 
@@ -3520,22 +3502,7 @@ public partial class CombatEngine
             terminal.SetColor("green");
             terminal.WriteLine("╠═══════════════════════════════════════╣");
             foreach (var (key, name, available) in classInfo)
-            {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write($"[{key}] ");
-                if (available)
-                {
-                    terminal.SetColor("yellow");
-                }
-                else
-                {
-                    terminal.SetColor("darkgray");
-                }
-                terminal.Write($"{name,-34}");
-                terminal.SetColor("green");
-                terminal.WriteLine("║");
-            }
+                WriteQuickbarBoxRows(key, name, available);
         }
 
         // Coat Blade (poison vials)
@@ -31870,6 +31837,64 @@ public partial class CombatEngine
         terminal.WriteLine($"  {desc}");
         terminal.SetColor("white");
         return true;
+    }
+
+    /// <summary>1.3.7: word-wrap quickbar text to width columns; a word wider than that is cut.</summary>
+    internal static List<string> WrapQuickbarText(string text, int width)
+    {
+        var result = new List<string>();
+        foreach (var line in UIHelper.WordWrap(text, width))
+        {
+            var l = line;
+            while (UIHelper.VisibleLength(l) > width) { result.Add(l.Substring(0, width)); l = l.Substring(width); }
+            result.Add(l);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 1.3.7: the screen reader rows of one quickbar slot, each at most 79 columns. The name carries its requirement;
+    /// the note (not available) joins the last row when it fits and takes its own row when it does not. A row that
+    /// continues is indented under the name.
+    /// </summary>
+    internal static List<string> QuickbarScreenReaderRows(string key, string name, string? note)
+    {
+        string first = $"  {key} - ";
+        string pad = new string(' ', first.Length);
+        int width = UIHelper.WrapWidth - first.Length;
+        var parts = WrapQuickbarText(name, width);
+        if (!string.IsNullOrEmpty(note))
+        {
+            if (UIHelper.VisibleLength(parts[^1]) + 1 + UIHelper.VisibleLength(note) <= width)
+                parts[^1] = parts[^1] + " " + note;
+            else
+                parts.AddRange(WrapQuickbarText(note, width));
+        }
+        return parts.Select((p, i) => (i == 0 ? first : pad) + p).ToList();
+    }
+
+    /// <summary>1.3.7: one quickbar slot inside the 41 column combat box; a long name continues on rows inside the box.</summary>
+    private void WriteQuickbarBoxRows(string key, string name, bool available)
+    {
+        var parts = WrapQuickbarText(name, 34);
+        for (int i = 0; i < parts.Count; i++)
+        {
+            terminal.SetColor("green");
+            terminal.Write("║ ");
+            if (i == 0)
+            {
+                terminal.SetColor("bright_yellow");
+                terminal.Write($"[{key}] ");
+            }
+            else
+            {
+                terminal.Write("    ");
+            }
+            terminal.SetColor(available ? "yellow" : "darkgray");
+            terminal.Write($"{parts[i],-34}");
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
     }
 
     private List<(string key, string slotId, string displayName, bool available)> GetQuickbarActions(Character player)
