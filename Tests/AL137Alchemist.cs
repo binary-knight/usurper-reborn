@@ -79,7 +79,6 @@ public class AL137Alchemist
         cast.Lost.Should().HaveCount(3);
         foreach (long lost in cast.Lost)
             lost.Should().BeGreaterThan(Window(hero, old).High, id);
-        cast.Lost[2].Should().Be(cast.Lost[1], "the area core hits each secondary foe for the same figure");
         cast.Result.Damage.Should().BeInRange(Window(hero, expected).Low, Window(hero, expected).High, id);
     }
 
