@@ -1317,6 +1317,25 @@ public class Equipment
     /// </summary>
     private static readonly System.Text.RegularExpressions.Regex EnchantMarkerRegex = new(@"\[E:\d+\]|\[ES:[a-z,]+\]");
 
+    private static readonly System.Text.RegularExpressions.Regex EffectLineRegex = new(@"\s*\[EL:([^\]]*)\]");
+
+    /// <summary>1.3.7: the effect line a loot item shows ("Fire Damage +5, Life Steal +3", stored in English), carried in
+    /// Description as an [EL:...] marker so it needs no new save field. Empty when none.</summary>
+    public string GetEffectLine()
+    {
+        if (string.IsNullOrEmpty(Description)) return "";
+        var m = EffectLineRegex.Match(Description);
+        return m.Success ? m.Groups[1].Value : "";
+    }
+
+    /// <summary>1.3.7: set (or with an empty line, clear) the carried effect line; every other part of Description stays.</summary>
+    public void SetEffectLine(string? line)
+    {
+        string clean = EffectLineRegex.Replace(Description ?? "", "").Trim();
+        if (string.IsNullOrEmpty(line) || line.Contains(']')) { Description = clean; return; }
+        Description = (clean + " [EL:" + line + "]").Trim();
+    }
+
     /// <summary>v1.1.7: just the enchant markers of this equipment, for carrying through an Item.</summary>
     public string ExtractEnchantMarkers() =>
         string.IsNullOrEmpty(Description) ? "" : string.Join(" ", EnchantMarkerRegex.Matches(Description).Select(m => m.Value));

@@ -146,4 +146,27 @@ public class LE137Fixes : IDisposable
         if (lang != "en") text.Should().NotBe(Loc.GetIn("en", key), "a real translation");
         text.Length.Should().BeLessThanOrEqualTo(79);
     }
+
+    [Fact]
+    public void LE137_LootEffectLine_SurvivesBothConversions()
+    {
+        var loot = new Item { Name = "Flaming Test Blade", Type = ObjType.Weapon, Attack = 20, MinLevel = 1 };
+        loot.Description[0] = "Fire Damage +5, Life Steal +3";
+        loot.LootEffects.Add(((int)LootGenerator.SpecialEffect.FireDamage, 5));
+        var hero = G.Hero(5003, 100, 20);
+
+        var eq = Character.BuildEquipmentFromItem(loot, EquipmentSlot.MainHand, WeaponHandedness.OneHanded, WeaponType.Sword);
+        var back = hero.ConvertEquipmentToLegacyItem(eq);
+
+        back.Description[0].Should().Be("Fire Damage +5, Life Steal +3");
+        back.GetFullDescription().Should().Contain("Fire Damage +5, Life Steal +3");
+        // enchant markers and the line live together
+        eq.IncrementEnchantmentCount();
+        eq.GetEnchantmentCount().Should().Be(1);
+        hero.ConvertEquipmentToLegacyItem(eq).Description[0].Should().Be("Fire Damage +5, Life Steal +3");
+        // a save written before the fix: no line on the equipment, nothing is invented
+        var old = new Equipment { Name = "Old Blade", Slot = EquipmentSlot.MainHand, Description = "[E:1]" };
+        hero.ConvertEquipmentToLegacyItem(old).Description[0].Should().BeNullOrEmpty();
+        old.GetEnchantmentCount().Should().Be(1);
+    }
 }

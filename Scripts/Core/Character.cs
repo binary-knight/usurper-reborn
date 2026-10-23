@@ -1760,6 +1760,10 @@ public class Character
             EnchantBase = equipment.EnchantBase ?? ""   // v1.2.5: the pre-enchant form, for full removal
         };
 
+        // 1.3.7: the loot effect line (Description[0], the line GetFullDescription shows) goes with the item
+        var effectLine = equipment.GetEffectLine();
+        if (effectLine.Length > 0 && item.Description.Count > 0) item.Description[0] = effectLine;
+
         // Preserve CON/INT as LootEffects for re-equip
         if (equipment.ConstitutionBonus != 0)
             item.LootEffects.Add(((int)LootGenerator.SpecialEffect.Constitution, equipment.ConstitutionBonus));
@@ -1871,6 +1875,9 @@ public class Character
     /// </summary>
     public static void ApplyItemLootEffectsToEquipment(global::Item item, Equipment equipment)
     {
+        // 1.3.7: the item's effect line (Description[0]) rides on the equipment, so converting back keeps it
+        if (item.Description != null && item.Description.Count > 0 && !string.IsNullOrEmpty(item.Description[0]))
+            equipment.SetEffectLine(item.Description[0]);
         if (item.LootEffects == null) return;
         foreach (var (effectType, value) in item.LootEffects)
         {
