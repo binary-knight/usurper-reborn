@@ -35,8 +35,8 @@ public class DeepRamp133Tests
     [InlineData(42, 1.517, 1.517)]
     [InlineData(50, 1.605, 1.605)]
     [InlineData(75, 1.6325, 1.715)]
-    [InlineData(87, 1.6457, 1.8998)]
-    [InlineData(100, 1.66, 2.1)]
+    [InlineData(87, 1.6457, 2.089)]   // 1.3.7: damage was 1.8998
+    [InlineData(100, 1.66, 2.31)]     // 1.3.7: damage was 2.1
     public void Ramps_FollowTheirWaypoints(int level, double hp, double damage)
     {
         MonsterGenerator.DeepMonsterHpFactor(level).Should().BeApproximately(hp, 1e-9);
@@ -55,8 +55,8 @@ public class DeepRamp133Tests
     [InlineData(30, 6554, 308, 103, 126, 218, 36)]
     [InlineData(42, 11706, 542, 144, 218, 384, 51)]
     [InlineData(60, 18328, 852, 207, 339, 603, 76)]
-    [InlineData(80, 25362, 1244, 276, 495, 882, 103)]
-    [InlineData(100, 32744, 1831, 346, 726, 1298, 128)]
+    [InlineData(80, 25362, 1368, 276, 544, 969, 103)]    // 1.3.7: was str 1244, punch 495, weapon 882
+    [InlineData(100, 32744, 2016, 346, 798, 1428, 128)]  // 1.3.7: was str 1831, punch 726, weapon 1298
     public void MonsterStats_FromLevel26_FollowTheRamps_DefenceAndArmourUnchanged(int level, long hp, long str, long def, long punch, long wp, long ap)
         => MonsterGenerator.GetWikiStats(level, 1.0f).Should().Be((hp, str, def, punch, wp, ap));
 

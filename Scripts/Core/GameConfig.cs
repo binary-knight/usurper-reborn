@@ -2307,8 +2307,9 @@ public static partial class GameConfig
     public static readonly (int Level, double Factor)[] DeepMonsterHpRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (100, 1.66) };
 
     /// <summary>1.3.3: deep monster Strength, punch and weapon power by level, waypoints as DeepMonsterHpRamp;
-    /// it climbs further than HP so the risk of dying grows with depth.</summary>
-    public static readonly (int Level, double Factor)[] DeepMonsterDamageRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (75, 1.715), (100, 2.1) };
+    /// it climbs further than HP so the risk of dying grows with depth. 1.3.7: after level 75 it rises faster,
+    /// to 10 percent more damage than the old line by level 80 (1.97) and 2.31 at level 100.</summary>
+    public static readonly (int Level, double Factor)[] DeepMonsterDamageRamp = { (25, 1.0), (35, 1.44), (50, 1.605), (75, 1.715), (80, 1.97), (100, 2.31) };
     public const int StunDRWindowRounds = 5;                  // Rounds of "no stun" before DR resets to 0
     public const int MaxStunDurationNormal = 3;               // Hard cap on stun duration vs normal monsters
     public const int MaxStunDurationBoss = 1;                 // Hard cap on stun duration vs bosses
