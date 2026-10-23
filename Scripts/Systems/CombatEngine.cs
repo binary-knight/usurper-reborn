@@ -7993,7 +7993,8 @@ public partial class CombatEngine
         }
 
         // Void Hunger and Soul Eater (GameConfig.VoidreaverVoidHungerPercent, VoidreaverSoulEaterManaPercent): a single monster fight
-        // ends at its one kill, so this point is the kill; the same helper as the group fight keeps one rule
+        // ends at its one kill, so this point is the kill; the same helper as the group fight keeps one rule. This method is
+        // dead code (DetermineCombatOutcome has no callers; PlayerVsMonster delegates to the multi monster path), so no double heal
         FeedVoidHunger(result.Player, new List<Monster> { result.Monster }, new HashSet<Monster>());
 
         // MUD mode: broadcast boss kills only (regular kills too spammy).
