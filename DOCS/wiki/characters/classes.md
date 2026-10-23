@@ -28,6 +28,8 @@ Creation values are the class contribution before race bonuses and other charact
 
 The table's HP, Defence and mana per level are what one level adds to the base value for that class. They include the 5 maximum HP, 1 Defence and 1 Stamina that every class gains each level.
 
+A Voidreaver's Constitution growth alternates: 2 on reaching an even level and 1 on reaching an odd one, 1.5 a level on average. Its table shows the 1 of an odd level.
+
 See [abilities](/wiki/en/characters/abilities/) and [spells](/wiki/en/characters/spells/) for actual resource costs and effects.
 
 ## Mana classes

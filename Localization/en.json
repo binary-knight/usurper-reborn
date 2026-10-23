@@ -11191,7 +11191,7 @@
   "spell.voidreaver.4.name": "Consume the Fallen",
   "spell.voidreaver.4.desc": "Devour residual energy from the fallen. Heals 25% of max HP (min 100). Duration: 1 turn.",
   "spell.voidreaver.5.name": "Unmaking",
-  "spell.voidreaver.5.desc": "Erase the target from reality. Damage: 200-280. Costs 25% current HP. If kills: restore all HP and mana. Duration: 1 turn.",
+  "spell.voidreaver.5.desc": "Erase the target from reality. Damage: 200-280. Costs 10% current HP. If kills: restore all HP and mana. Duration: 1 turn.",
   "_comment_music_shop_extra": "=== Music Shop -- additional keys ===",
   "music_shop.bbs_buy_instruments": "uy Instruments",
   "music_shop.bbs_performance": "erformance",

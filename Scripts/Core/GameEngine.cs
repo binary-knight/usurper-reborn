@@ -5424,6 +5424,14 @@ public partial class GameEngine
                 DebugLogger.Instance.LogInfo("MIGRATION", $"Shadow Crown granted for the Noctura alliance: {player.Name2}");
         }
         catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Noctura alliance Crown grant failed: {ex.Message}"); }
+        try
+        {
+            // 1.3.7: the Voidreaver Constitution lift for the levels gained before it, once (saved marker)
+            long con = LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(player);
+            if (con > 0)
+                DebugLogger.Instance.LogInfo("MIGRATION", $"Voidreaver Constitution topped up for {player.Name2}: +{con} at level {player.Level}");
+        }
+        catch (Exception ex) { DebugLogger.Instance.LogWarning("MIGRATION", $"Voidreaver Constitution top-up failed: {ex.Message}"); }
     }
 
     private Character RestorePlayerFromSaveData(PlayerData playerData)
@@ -6253,6 +6261,7 @@ public partial class GameEngine
         player.TimedStatBuffs = TimedStatBuffData.ToBuffs(playerData.TimedStatBuffs);   // 1.2.0: before the load recalc
         player.ArtifactStatsApplied = playerData.ArtifactStatsApplied;   // 1.2.0: false in older saves
         player.CycleStatBonusApplied = playerData.CycleStatBonusApplied;   // 1.2.0: false in older saves
+        player.VoidreaverConstitutionApplied = playerData.VoidreaverConstitutionApplied;   // 1.3.7: false in older saves
         player.SteroidShopPurchases = playerData.SteroidShopPurchases;
         player.AlchemistINTBoosts = playerData.AlchemistINTBoosts;
         player.GamblingRoundsToday = playerData.GamblingRoundsToday;
@@ -6805,6 +6814,7 @@ public partial class GameEngine
                 OriginalFatherName = data.OriginalFatherName ?? "",
                 SoulAtGraduation = data.SoulAtGraduation,
                 WasRaisedByPlayer = data.WasRaisedByPlayer,
+                VoidreaverConstitutionApplied = data.VoidreaverConstitutionApplied,   // 1.3.7: false in older saves
 
                 // v0.64.0 Brain v2 Slice 1 cohort flag (default false on legacy saves).
                 // v0.65.6: whole-population Brain v2. Forced true at restore (not read from
@@ -7213,6 +7223,9 @@ public partial class GameEngine
             // Old saves or corrupted NPCs may have 0 base stats, which causes
             // RecalculateStats to zero out all stats (STR: 0, DEF: -18 issues)
             ValidateAndFixNPCBaseStats(npc);
+
+            // 1.3.7: the one-time Voidreaver Constitution top-up (guarded by the saved marker)
+            LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(npc);
 
             // Now recalculate stats with valid base stats
             npc.RecalculateStats();

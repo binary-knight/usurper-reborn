@@ -1427,6 +1427,7 @@ namespace UsurperRemake.Systems
                     OriginalFatherName = data.OriginalFatherName ?? "",
                     SoulAtGraduation = data.SoulAtGraduation,
                     WasRaisedByPlayer = data.WasRaisedByPlayer,
+                    VoidreaverConstitutionApplied = data.VoidreaverConstitutionApplied,   // 1.3.7: false in older saves
 
                     // v0.64.0 Brain v2 Slice 1 cohort flag (default false on legacy saves).
                     // v0.65.6: whole-population Brain v2 -- forced true at restore (see
@@ -1821,6 +1822,9 @@ namespace UsurperRemake.Systems
                         npc.EquippedItems[(EquipmentSlot)kvp.Key] = kvp.Value;
                     }
                 }
+
+                // 1.3.7: the one-time Voidreaver Constitution top-up (guarded by the saved marker)
+                UsurperRemake.Locations.LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(npc);
 
                 // Recalculate stats with equipment bonuses
                 npc.RecalculateStats();
