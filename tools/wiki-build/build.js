@@ -30,9 +30,10 @@ const escape = (value) =>
         })[c],
     );
 const name = (e) => e.name?.en || e.id;
-const label = (value) =>
+const label = (value, keepIdentifier) =>
   String(value)
     .replace(/([a-z\d])([A-Z])/g, "$1 $2")
+    .replace(/\b([Dd])efence\b/g, (m, c) => (keepIdentifier ? m : `${c}efense`))
     .replace(/_/g, " ")
     .replace(/\bhp\b/gi, "HP")
     .replace(/^./, (c) => c.toUpperCase());
@@ -80,11 +81,11 @@ const textOf = (html) =>
 function table(headers, rows, caption) {
   return `<div class="table-wrap" role="region" aria-label="${escape(caption)}" tabindex="0"><table><caption>${escape(caption)}</caption><thead><tr>${headers.map((h) => `<th scope="col">${escape(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((row) => `<tr>${row.map((c, i) => (i === 0 ? `<th scope="row">${c}</th>` : `<td>${c}</td>`)).join("")}</tr>`).join("")}</tbody></table></div>`;
 }
-function values(obj, caption) {
+function values(obj, caption, keepIdentifier) {
   return table(
     ["Rule", "Value"],
     Object.entries(obj).map(([k, v]) => [
-      escape(label(k)),
+      escape(label(k, keepIdentifier)),
       escape(Array.isArray(v) ? v.join(", ") : v),
     ]),
     caption,
@@ -333,7 +334,7 @@ function renderers(data) {
   const enchantFields = {
     StrengthBonus: "Strength",
     DexterityBonus: "Dexterity",
-    DefenceBonus: "Defence",
+    DefenceBonus: "Defense",
     WisdomBonus: "Wisdom",
     IntelligenceBonus: "Intelligence",
     WeaponPower: "weapon power",
@@ -479,7 +480,7 @@ function renderers(data) {
           // level four: the search index weighs h2 and h3 words, and a class name in seventeen
           // headings would pull every question that names a class to this page
           `<h4 id="${slug(name(c))}-role-numbers">${escape(name(c))} role numbers</h4>` +
-          `<p>${escape(name(c))} gains ${g.maxHP} maximum HP, ${g.defence} Defence and ${g.maxMana} maximum mana per level, before specialization. ` +
+          `<p>${escape(name(c))} gains ${g.maxHP} maximum HP, ${g.defence} Defense and ${g.maxMana} maximum mana per level, before specialization. ` +
           `${c.usesMana ? "It has mana." : "It has no mana and pays for abilities with combat stamina."} ` +
           `${heldEquipmentClasses.has(c.id) ? "" : `Armor weights it can wear: ${escape(c.equipment.armorWeights.join(", "))}. `}${roles}${heal}</p>` +
           `<p>Taunt abilities: ${list(mine.filter((a) => tauntEffects.has(a.specialEffect)))}.</p>` +
@@ -542,7 +543,7 @@ function renderers(data) {
           "Level range",
           "HP at min / max",
           "Strength at min / max",
-          "Defence at min / max",
+          "Defense at min / max",
           "Abilities",
         ],
         e.tiers.map((t) => [
@@ -632,7 +633,7 @@ function renderers(data) {
           "Class",
           "Type",
           "HP per level",
-          "Defence per level",
+          "Defense per level",
           "Mana per level",
           "Roles the game lists",
           "Specializations",
@@ -732,7 +733,7 @@ function renderers(data) {
           "Race",
           "HP bonus",
           "Strength bonus",
-          "Defence bonus",
+          "Defense bonus",
           "Stamina bonus",
           "NPC lifespan (game years)",
           "NPC lifespan (real days)",
@@ -883,7 +884,7 @@ function renderers(data) {
           "Region",
           "Level to meet it",
           "Taming difficulty",
-          "Base HP / attack / defence",
+          "Base HP / attack / defense",
         ],
         data.party.beasts.map((b) => [
           escape(name(b)),
@@ -925,7 +926,7 @@ function renderers(data) {
           "Story companions",
         ) +
         table(
-          ["Companion", "HP", "Attack", "Defence", "Magic", "Speed", "Healing"],
+          ["Companion", "HP", "Attack", "Defense", "Magic", "Speed", "Healing"],
           data.party.companions.map((c) => [
             escape(name(c)),
             ...["hp", "attack", "defence", "magic", "speed", "healing"].map(
@@ -1324,7 +1325,7 @@ function renderers(data) {
       );
     if (id === "gauntlet-champions")
       return table(
-        ["Wave", "Champion", "Role", "Level", "HP", "Strength", "Defence", "Abilities", "Drop"],
+        ["Wave", "Champion", "Role", "Level", "HP", "Strength", "Defense", "Abilities", "Drop"],
         data.world.gauntletChampions.map((c) => [
           c.wave,
           escape(`${name(c)}, ${c.title}`),
@@ -1393,7 +1394,7 @@ function renderers(data) {
       // the words for each effect field of a divine boon (DivineBoonRegistry.BoonDefinition); a new field fails the build
       const boonWords = {
         DamagePercent: (v) => `+${Math.round(v * 100)} percent damage`,
-        DefensePercent: (v) => `+${Math.round(v * 100)} percent defence`,
+        DefensePercent: (v) => `+${Math.round(v * 100)} percent defense`,
         CritPercent: (v) => `+${Math.round(v * 100)} critical hit chance`,
         LifestealPercent: (v) => `heals ${Math.round(v * 100)} percent of damage dealt`,
         XPPercent: (v) => `+${Math.round(v * 100)} percent combat experience`,
@@ -1404,7 +1405,7 @@ function renderers(data) {
         FleePercent: (v) => `+${Math.round(v * 100)} flee chance`,
         LuckPercent: (v) => `+${Math.round(v * 100)} to a monster's equipment drop chance`,
         FlatAttack: (v) => `+${v} attack`,
-        FlatDefense: (v) => `+${v} defence`,
+        FlatDefense: (v) => `+${v} defense`,
       };
       const tierText = (t) =>
         Object.entries(t.effects)
@@ -1430,7 +1431,7 @@ function renderers(data) {
         [
           "Alignment",
           "Attack",
-          "Defence",
+          "Defense",
           "Critical hit chance",
           "Melee heals you (% of damage)",
           "Fear on a hit (%)",
@@ -1544,7 +1545,7 @@ function renderers(data) {
     }
     if (id === "monster-guards")
       return table(
-        ["Monster guard", "Level", "Price", "HP", "Strength", "Defence", "Feeding a day"],
+        ["Monster guard", "Level", "Price", "HP", "Strength", "Defense", "Feeding a day"],
         data.realm.monsterGuards.map((m) => [
           escape(name(m)),
           m.level,
@@ -1578,12 +1579,12 @@ function renderers(data) {
       );
     if (id === "balance")
       return (
-        values(data.balance.moddableDefaults, "Moddable balance defaults") +
+        values(data.balance.moddableDefaults, "Moddable balance defaults", true) +
         spoiler(
           "Spoiler: exact combat and hidden-effect rules",
-          values(data.balance.combatConstants, "Combat constants") +
-            values(data.balance.godConstants, "Faith constants") +
-            values(data.mental.constants, "Mental constants"),
+          values(data.balance.combatConstants, "Combat constants", true) +
+            values(data.balance.godConstants, "Faith constants", true) +
+            values(data.mental.constants, "Mental constants", true),
         )
       );
     throw Error(`Unknown table: ${id}`);
