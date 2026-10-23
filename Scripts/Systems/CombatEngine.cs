@@ -3106,20 +3106,9 @@ public partial class CombatEngine
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // === BASIC ACTIONS ===
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[A] ");
-        terminal.SetColor("green");
-        terminal.Write($"{Loc.Get("combat.attack"),-34}");
-        terminal.WriteLine("║");
+        WriteBoxRow("[A] ", "green", Loc.Get("combat.attack"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[D] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.defend"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[D] ", "cyan", Loc.Get("combat.defend"));
 
         // === QUICKBAR SLOTS [1]-[9] ===
         var quickbarActions = GetQuickbarActions(player);
@@ -3134,168 +3123,77 @@ public partial class CombatEngine
         // === HEALING OPTIONS ===
         if (player.Healing > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[H] ");
-            terminal.SetColor("magenta");
             string healDesc = Loc.Get("combat.heal_potions_short", player.Healing, player.MaxPotions);
-            terminal.Write($"{healDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string healDesc = Loc.Get("combat.heal_potions_short", player.Healing, player.MaxPotions);
+            WriteBoxRow("[H] ", "magenta", healDesc);
         }
         else
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[H] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.heal_none_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[H] ", "darkgray", Loc.Get("combat.heal_none_short"));
         }
 
         // Herb Pouch
         if (player.TotalHerbCount > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[J] ");
-            terminal.SetColor("bright_green");
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
-            terminal.Write($"{herbDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
+            WriteBoxRow("[J] ", "bright_green", herbDesc);
         }
 
         // === CLASS-SPECIFIC ABILITIES ===
         if (player.Class == CharacterClass.Barbarian && !player.IsRaging)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[G] ");
-            terminal.SetColor("red");
-            terminal.Write($"{Loc.Get("combat.rage_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[G] ", "red", Loc.Get("combat.rage_short"));
         }
 
         if (player.Class == CharacterClass.Ranger)
         {
             var bowEquipped = player.GetEquipment(EquipmentSlot.MainHand)?.WeaponType == WeaponType.Bow;
-            terminal.Write("║ ");
-            terminal.SetColor(bowEquipped ? "bright_yellow" : "darkgray");
-            terminal.Write("[V] ");
-            terminal.SetColor(bowEquipped ? "yellow" : "darkgray");
-            terminal.Write(bowEquipped ? $"{Loc.Get("combat.ranged_short"),-34}" : $"{Loc.Get("combat.ranged_need_bow_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[V] ", bowEquipped ? "yellow" : "darkgray",
+                bowEquipped ? Loc.Get("combat.ranged_short") : Loc.Get("combat.ranged_need_bow_short"),
+                bowEquipped ? "bright_yellow" : "darkgray");
         }
 
         // === TACTICAL OPTIONS (monster combat only) ===
         if (monster != null)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[P] ");
-            terminal.SetColor("yellow");
-            terminal.Write($"{Loc.Get("combat.power_attack"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[P] ", "yellow", Loc.Get("combat.power_attack"));
 
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[E] ");
-            terminal.SetColor("yellow");
-            terminal.Write($"{Loc.Get("combat.precise_strike"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[E] ", "yellow", Loc.Get("combat.precise_strike"));
         }
 
         // Tactical options for both combat types
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[I] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.disarm"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[I] ", "cyan", Loc.Get("combat.disarm"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[T] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.taunt"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[T] ", "cyan", Loc.Get("combat.taunt"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[L] ");
-        terminal.SetColor("darkgray");
-        terminal.Write($"{Loc.Get("combat.hide"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[L] ", "darkgray", Loc.Get("combat.hide"));
 
         // === COAT BLADE (poison vials) ===
         if (player.PoisonVials > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[B] ");
-            terminal.SetColor("dark_green");
             string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
-            terminal.Write($"{coatDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
+            WriteBoxRow("[B] ", "dark_green", coatDesc);
         }
 
         // === RETREAT/FLEE OPTIONS ===
         if (monster != null)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[R] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("combat.flee"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[R] ", "white", Loc.Get("combat.flee"));
 
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[M] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.mercy_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[M] ", "darkgray", Loc.Get("combat.mercy_short"));
 
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[F] ");
-            terminal.SetColor("red");
-            terminal.Write($"{Loc.Get("combat.fight_death_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[F] ", "red", Loc.Get("combat.fight_death_short"));
         }
         else if (isPvP)
         {
             // PvP-specific: Flee instead of retreat
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[R] ");
-            terminal.SetColor("white");
-            terminal.Write($"{Loc.Get("combat.flee_pvp_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[R] ", "white", Loc.Get("combat.flee_pvp_short"));
         }
 
         // === UTILITY ===
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[S] ");
-        terminal.SetColor("darkgray");
-        terminal.Write($"{Loc.Get("combat.view_status_short"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[S] ", "darkgray", Loc.Get("combat.view_status_short"));
 
         // Combat speed option
         string speedLabel = player.CombatSpeed switch
@@ -3304,14 +3202,9 @@ public partial class CombatEngine
             CombatSpeed.Fast => Loc.Get("combat.speed_fast"),
             _ => Loc.Get("combat.speed_normal")
         };
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write(Loc.Get("combat.bbs_speed_key") + "  ");
-        terminal.SetColor("darkgray");
         string spdDesc = Loc.Get("combat.speed_label", speedLabel);
-        terminal.Write($"{spdDesc,-31}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        string spdDesc = Loc.Get("combat.speed_label", speedLabel);
+        WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc);
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
         terminal.WriteLine("");
@@ -3422,54 +3315,26 @@ public partial class CombatEngine
         terminal.WriteLine("╠═══════════════════════════════════════╣");
 
         // Basic actions
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[A] ");
-        terminal.SetColor("green");
-        terminal.Write($"{Loc.Get("combat.attack"),-34}");
-        terminal.WriteLine("║");
+        WriteBoxRow("[A] ", "green", Loc.Get("combat.attack"));
 
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[D] ");
-        terminal.SetColor("cyan");
-        terminal.Write($"{Loc.Get("combat.defend"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[D] ", "cyan", Loc.Get("combat.defend"));
 
         // Item option (show potion count)
         if (player.Healing > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[I] ");
-            terminal.SetColor("magenta");
             string itemDesc = Loc.Get("combat.use_item_potions_short", player.Healing, player.MaxPotions);
-            terminal.Write($"{itemDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string itemDesc = Loc.Get("combat.use_item_potions_short", player.Healing, player.MaxPotions);
+            WriteBoxRow("[I] ", "magenta", itemDesc);
         }
         else
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[I] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.use_item_none_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[I] ", "darkgray", Loc.Get("combat.use_item_none_short"));
         }
 
         // 1.3.3 party survival: Rescue a Downed ally
         if (!isFollower && RescueOffered(player))
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[U] ");
-            terminal.SetColor("bright_red");
-            terminal.Write($"{Loc.Get("combat.rescue_menu"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[U] ", "bright_red", Loc.Get("combat.rescue_menu"));
         }
 
         // Aid Ally option
@@ -3477,22 +3342,11 @@ public partial class CombatEngine
         {
             if (canHealAlly)
             {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("[H] ");
-                terminal.SetColor("green");
-                terminal.Write($"{Loc.Get("combat.aid_ally_short"),-34}");
-                terminal.WriteLine("║");
+                WriteBoxRow("[H] ", "green", Loc.Get("combat.aid_ally_short"));
             }
             else
             {
-                terminal.Write("║ ");
-                terminal.SetColor("bright_yellow");
-                terminal.Write("[H] ");
-                terminal.SetColor("darkgray");
-                terminal.Write($"{Loc.Get("combat.aid_ally_none_short"),-34}");
-                terminal.SetColor("green");
-                terminal.WriteLine("║");
+                WriteBoxRow("[H] ", "darkgray", Loc.Get("combat.aid_ally_none_short"));
             }
         }
 
@@ -3508,93 +3362,47 @@ public partial class CombatEngine
         // Coat Blade (poison vials)
         if (player.PoisonVials > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[B] ");
-            terminal.SetColor("dark_green");
             string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
-            terminal.Write($"{coatDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
+            WriteBoxRow("[B] ", "dark_green", coatDesc);
         }
 
         // Herb Pouch
         if (player.TotalHerbCount > 0)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[J] ");
-            terminal.SetColor("bright_green");
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
-            terminal.Write($"{herbDesc,-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
+            WriteBoxRow("[J] ", "bright_green", herbDesc);
         }
 
         // 1.3.2: the class keys (a group follower's input has neither)
         if (!isFollower && CanBackstab(player))
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[K] ");
-            terminal.SetColor("darkgray");
-            terminal.Write($"{Loc.Get("combat.backstab_label"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[K] ", "darkgray", Loc.Get("combat.backstab_label"));
         }
         if (!isFollower && CanSmite(player))
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[Z] ");
-            terminal.SetColor("bright_white");
-            terminal.Write($"{Loc.Get("combat.smite_label", player.SmiteChargesRemaining),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[Z] ", "bright_white", Loc.Get("combat.smite_label", player.SmiteChargesRemaining));
         }
 
         // 1.2.0 Temple gods piece 5: the day's Miracle, only while it can be called
         if (miracle != GodDomain.None)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[M] ");
-            terminal.SetColor("bright_magenta");
-            terminal.Write($"{MiracleSystem.MenuLabel(miracle),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[M] ", "bright_magenta", MiracleSystem.MenuLabel(miracle));
         }
 
         // Boss Save option (only when fighting saveable Old God with artifact)
         if (BossContext?.CanSave == true)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write("[V] ");
-            terminal.SetColor("magenta");
-            terminal.Write($"{Loc.Get("combat.save_boss_short"),-34}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow("[V] ", "magenta", Loc.Get("combat.save_boss_short"));
         }
 
         // Retreat and auto
-        terminal.Write("║ ");
-        terminal.SetColor("bright_yellow");
-        terminal.Write("[R] ");
-        terminal.SetColor("white");
-        terminal.Write($"{Loc.Get("combat.flee"),-34}");
-        terminal.SetColor("green");
-        terminal.WriteLine("║");
+        WriteBoxRow("[R] ", "white", Loc.Get("combat.flee"));
 
         if (!isFollower)
         {
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write(Loc.Get("combat.bbs_auto_key") + " ");
-            terminal.SetColor("cyan");
-            terminal.Write($"{Loc.Get("combat.auto_short"),-31}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            WriteBoxRow(Loc.Get("combat.bbs_auto_key") + " ", "cyan", Loc.Get("combat.auto_short"));
 
             // Combat speed option
             string speedLabel = player.CombatSpeed switch
@@ -3603,14 +3411,9 @@ public partial class CombatEngine
                 CombatSpeed.Fast => Loc.Get("combat.speed_fast"),
                 _ => Loc.Get("combat.speed_normal")
             };
-            terminal.Write("║ ");
-            terminal.SetColor("bright_yellow");
-            terminal.Write(Loc.Get("combat.bbs_speed_key") + "  ");
-            terminal.SetColor("darkgray");
             string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
-            terminal.Write($"{spdDesc2,-31}");
-            terminal.SetColor("green");
-            terminal.WriteLine("║");
+            string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
+            WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc2);
         }
 
         terminal.WriteLine("╚═══════════════════════════════════════╝");
@@ -16486,7 +16289,7 @@ public partial class CombatEngine
             // Execute the ability
             var abilityResult = ClassAbilitySystem.UseAbility(player, action.AbilityId, random);
 
-            // Voidreaver Pain Threshold: +20% ability damage when below 50% HP
+            // Voidreaver Pain Threshold: GameConfig.VoidreaverPainThresholdBonus more ability damage when below 50% HP
             if (player.Class == CharacterClass.Voidreaver && player.HP < player.MaxHP / 2 && abilityResult.Damage > 0)
             {
                 abilityResult.Damage = (int)(abilityResult.Damage * (1.0 + GameConfig.VoidreaverPainThresholdBonus));
@@ -16796,7 +16599,7 @@ public partial class CombatEngine
                 // the heal on `target.IsAlive`. At Lv.66 the base hit usually killed orcs/goblins
                 // in one shot, so neither the redundant damage nor the heal fired — heal-on-kill
                 // skipped, heal-on-survive worked, which read to the player as a "flip flop."
-                // Inlined here so the heal scales with actualDamage (after Pain Threshold +20%,
+                // Inlined here so the heal scales with actualDamage (after the Pain Threshold bonus, GameConfig.VoidreaverPainThresholdBonus,
                 // crits, marked +30%) and fires regardless of whether the base hit killed.
                 // Always emit feedback (even when MaxHP clamp swallows the heal) so the player
                 // sees consistent visible confirmation that the ability fired.
@@ -25997,7 +25800,7 @@ public partial class CombatEngine
         // Execute the ability
         var abilityResult = ClassAbilitySystem.UseAbility(player, selectedAbility.Id, random);
 
-        // Voidreaver Pain Threshold: +20% ability damage when below 50% HP
+        // Voidreaver Pain Threshold: GameConfig.VoidreaverPainThresholdBonus more ability damage when below 50% HP
         if (player.Class == CharacterClass.Voidreaver && player.HP < player.MaxHP / 2 && abilityResult.Damage > 0)
         {
             abilityResult.Damage = (int)(abilityResult.Damage * (1.0 + GameConfig.VoidreaverPainThresholdBonus));
@@ -31871,6 +31674,32 @@ public partial class CombatEngine
                 parts.AddRange(WrapQuickbarText(note, width));
         }
         return parts.Select((p, i) => (i == 0 ? first : pad) + p).ToList();
+    }
+
+    /// <summary>1.3.7: one fixed row of a 41 column combat box; a text wider than the box continues on rows inside it.</summary>
+    private void WriteBoxRow(string keyText, string color, string text, string keyColor = "bright_yellow")
+    {
+        int width = 38 - keyText.Length;
+        var parts = WrapQuickbarText(text, width);
+        if (parts.Count == 0) parts.Add("");
+        for (int i = 0; i < parts.Count; i++)
+        {
+            terminal.SetColor("green");
+            terminal.Write("║ ");
+            if (i == 0)
+            {
+                terminal.SetColor(keyColor);
+                terminal.Write(keyText);
+            }
+            else
+            {
+                terminal.Write(new string(' ', keyText.Length));
+            }
+            terminal.SetColor(color);
+            terminal.Write(parts[i].PadRight(width));
+            terminal.SetColor("green");
+            terminal.WriteLine("║");
+        }
     }
 
     /// <summary>1.3.7: one quickbar slot inside the 41 column combat box; a long name continues on rows inside the box.</summary>
