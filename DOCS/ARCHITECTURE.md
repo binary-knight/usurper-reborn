@@ -485,14 +485,14 @@ Per-class threat weight (Paladin=180, Barbarian=170, Warrior=160 ... Magician=60
 ~10 abilities per class spread levels 1-100, costing Combat Stamina. Each carries `RequiredWeaponTypes`, `RequiresShield`, cooldown, mana / stamina cost, target type, and tier-scaled stamina cost (L50+ +25%, L75+ +40%).
 
 **Notable kits:**
-- **Warrior**: Power Strike -> Shield Wall -> Battle Cry -> Shield Wall Formation (level 40 AoE taunt) -> Shield Bash (L16) -> Iron Fortress -> Champion's Strike
+- **Warrior**: Power Strike -> Shield Wall -> Battle Cry -> Shield Bash (L16) -> Shield Wall Formation (level 40 AoE taunt) -> Iron Fortress -> Champion's Strike
 - **Paladin**: Lay on Hands -> Divine Smite -> Aura of Protection -> Holy Shield Slam (L28) -> Divine Mandate (L40 AoE thorn taunt) -> Avatar of Light
-- **Barbarian**: Berserker Rage -> Reckless Attack -> Intimidating Roar -> Rage Challenge (L40 AoE taunt + regen) -> Bloodlust -> Avatar of Destruction
+- **Barbarian**: Berserker Rage -> Reckless Attack -> Intimidating Roar -> Bloodlust -> Rage Challenge (L40 AoE taunt + regen) -> Avatar of Destruction
 - **Assassin**: Backstab -> Poison Blade -> Biaxin (L35 poison + corrosion) -> Assassinate -> Blade Dance -> Death Blossom (passive: Lethal Precision)
 - **Tidesworn**: Undertow Stance -> Breakwater -> Abyssal Anchor (AoE taunt) -> Eternal Vigil (invuln-with-forced-aggro)
 - **Mystic Shaman**: 4 enchantments (fire/frost/earth/storm) + 5 totems (healing/earthbind/searing/windfury/spirit link) + Lightning Bolt + Chain Lightning + Ancestral Guidance
 
-Universal abilities (available to most classes): Second Wind, Focus, Rally. Spellcasters can equip these too (v0.50.5).
+Universal abilities (all 17 classes, spellcasters included): Second Wind, Focus, Rally, Desperate Strike, Iron Will.
 
 ### Class Passives (selection)
 - Bard Bardic Inspiration: 15% proc +20 ATK to teammate
