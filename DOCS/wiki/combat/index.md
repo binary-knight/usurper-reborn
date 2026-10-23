@@ -93,7 +93,7 @@ A basic swing's power is Strength + Strength / 4 + your level, plus the weapon t
 
 - **Weapon term:** with W = the weapon power of that hand + your level / 10, the swing adds W plus a random 0 to W. A weapon of 100 at level 20 adds 102 to 204.
 - **Statuses** change only the Strength and level part: Rage and Power Attack's stance x1.5, Blessed + level / 5 + 2, the King's blessing x1.10, Weakened - (4 + level / 10).
-- Then the swing is multiplied, in order, by your [weapon setup](#weapon-setup-two-handed-dual-wield-and-shields), your basic attack proficiency (0.50 at Untrained, 1.00 at Average, 2.00 at Legendary: see the [proficiency table](/wiki/en/characters/leveling/)), the crit, difficulty, and the Grief, Mental and Fatigue penalty, then by the King's +10 percent, your god's damage boons and a Temple blessing's damage bonus, your buffs (well-rested, herbs, food, songs, blessings, poison coating, Knight +5 percent, Grand Champion +3 percent and others), a Blood Price or divine wrath cut, a boss slayer item's +10 percent against a boss or mini-boss, and your god's boon.
+- Then the swing is multiplied, in order, by your [weapon setup](#weapon-setup-two-handed-dual-wield-and-shields), your basic attack proficiency (0.50 at Untrained, 1.00 at Average, 2.00 at Legendary: see the [proficiency table](/wiki/en/characters/leveling/)), the crit, difficulty, and the Grief, Mental and Fatigue penalty, then by the King's +10 percent, your god's damage boons and a Temple blessing's damage bonus, your buffs (well-rested, herbs, food, songs, blessings, poison coating, Knight +5 percent, Grand Champion +3 percent and others), a Blood Price or divine wrath cut, a boss slayer item's +10 percent against a boss or mini-boss (+4.5 percent against Manwe), and your god's boon.
 
 ### Weapon power cap
 
@@ -134,7 +134,7 @@ These actions work for any class unless stated, and each one ends your turn, eve
 
 ### Power Attack (P)
 
-Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, a Boss Slayer item's +10 percent against a boss or mini-boss, and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
+Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, a Boss Slayer item's +10 percent against a boss or mini-boss (+4.5 percent against Manwe), and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
 
 ### Precise Strike (E)
 
@@ -217,6 +217,7 @@ An ability's direct damage is reduced by your Defence + half your armor power + 
 
 - **Life steal:** life steal from gear counts at most {{balance:MaxEquipmentLifeStealPercent}} percent of a hit, and all life steal together never heals more than {{balance:MaxTotalLifestealPercent}} percent of the damage dealt.
 - **Thorns:** thorns on your gear return their summed percent of the damage a monster's normal attack did to you, at least 1. The Reflecting status and the Scales of Law artifact (15 percent) work the same way. A companion's or an ally's own thorns gear does the same for a monster's normal attack on it.
+- **Against Manwe:** the Creator's Ward stops 55 percent of what gear enchantments add after a hit, his counter held or not: gear life steal and Siphon give 45 percent of their amount, gear thorns return 45 percent of theirs and each weapon proc has 45 percent of its chance. See [Old God fights](/wiki/en/monsters/bosses/).
 
 ## Regeneration in combat
 

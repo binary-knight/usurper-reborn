@@ -3959,7 +3959,7 @@ public partial class CombatEngine
         {
             if (WorldBossSystem.HasSpecialEffect(attacker, LootGenerator.SpecialEffect.BossSlayer))
             {
-                attackPower += (long)(attackPower * 0.10);
+                attackPower += (long)(attackPower * 0.10 * OldGodBossSystem.ManweRiderShare(monsterTarget));   // 1.3.7: the Creator's Ward stops a share on Manwe
             }
         }
 
@@ -5936,7 +5936,10 @@ public partial class CombatEngine
         int thornsPct = player.GetEquipmentThorns();
         if (thornsPct > 0 && actualDamage > 0 && monster.IsAlive)
         {
-            long thornsDamage = Math.Max(1, actualDamage * thornsPct / 100);
+            long thornsDamage = actualDamage * thornsPct / 100;
+            double thornsShare = OldGodBossSystem.ManweRiderShare(monster);   // 1.3.7: the Creator's Ward stops a share on Manwe
+            if (thornsShare != 1.0) thornsDamage = (long)(thornsDamage * thornsShare);
+            thornsDamage = Math.Max(1, thornsDamage);
             monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
             EvHit(player, thornsDamage, CombatEventKind.Basic);   // 1.2.6
             terminal.SetColor("yellow");
@@ -9097,7 +9100,7 @@ public partial class CombatEngine
     {
         if (attacker == null || target == null || damage <= 0 || !(target.IsBoss || target.IsMiniBoss)) return damage;
         if (!WorldBossSystem.HasSpecialEffect(attacker, LootGenerator.SpecialEffect.BossSlayer)) return damage;
-        return damage + (long)(damage * 0.10);
+        return damage + (long)(damage * 0.10 * OldGodBossSystem.ManweRiderShare(target));   // 1.3.7: the Creator's Ward stops a share on Manwe
     }
 
     /// <summary>
@@ -9342,6 +9345,8 @@ public partial class CombatEngine
             if (equipLifeSteal > 0)
             {
                 long requested = Math.Max(1, damage * equipLifeSteal / 100);
+                double riderShare = OldGodBossSystem.ManweRiderShare(target);   // 1.3.7: the Creator's Ward stops a share on Manwe
+                if (riderShare != 1.0) requested = (long)(requested * riderShare);
                 long applied = ApplyLifestealSlice(requested);
                 if (applied > 0)
                 {
@@ -10185,7 +10190,7 @@ public partial class CombatEngine
         // attacker-side resource gain that's still useful when the target dies.
         bool targetAlive = target.HP > 0 && target.IsAlive;
 
-        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < WeaponFireChance(weapon))   // 1.3.6: Phoenix Fire or loot fire
+        if (targetAlive && weapon.HasFireEnchant && random.NextDouble() < WeaponFireChance(weapon) * OldGodBossSystem.ManweRiderShare(target))   // 1.3.6: Phoenix Fire or loot fire; 1.3.7: a share on Manwe
         {
             long fireDamage = Math.Max(1, (long)(damage * WeaponFireShare(weapon)));
             target.HP = Math.Max(0, target.HP - fireDamage); // hq-armory: out (post-hit rider)
@@ -10198,7 +10203,7 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(fireDamage, false);
         }
 
-        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < WeaponFrostChance(weapon))   // 1.3.6: Frostbite or loot frost
+        if (targetAlive && weapon.HasFrostEnchant && random.NextDouble() < WeaponFrostChance(weapon) * OldGodBossSystem.ManweRiderShare(target))   // 1.3.6: Frostbite or loot frost; 1.3.7: a share on Manwe
         {
             // v0.60.10 (Coosh Lv.83 Warrior report): "Frostbite says chance to apply slow
             // but instead it just decreases defences, and by a small amount." Pre-fix this
@@ -10226,7 +10231,7 @@ public partial class CombatEngine
             }
         }
 
-        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance)
+        if (targetAlive && weapon.HasLightningEnchant && random.NextDouble() < GameConfig.LightningEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             long lightningDamage = Math.Max(1, (long)(damage * GameConfig.LightningEnchantDamageMultiplier));
             target.HP = Math.Max(0, target.HP - lightningDamage); // hq-armory: out (post-hit rider)
@@ -10252,7 +10257,7 @@ public partial class CombatEngine
             attacker.Statistics?.RecordDamageDealt(lightningDamage, false);
         }
 
-        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance)
+        if (targetAlive && weapon.HasPoisonEnchant && random.NextDouble() < GameConfig.PoisonEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             // 1.3.6: the proc poisons over time and deals nothing now; the monster's status step takes each tick.
             long poisonTick = ApplyEnchantPoison(attacker, target, weapon, damage);
@@ -10263,7 +10268,7 @@ public partial class CombatEngine
                 : Loc.Get("combat.enchant_venom_tm", name, EnchantPoisonDotRounds, poisonTick), "green");
         }
 
-        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance)
+        if (targetAlive && weapon.HasHolyEnchant && random.NextDouble() < GameConfig.HolyEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             // v0.60.0, issue #91: angels are immune to holy damage. The proc rolls
             // and the player is told the attempt was made and absorbed.
@@ -10299,7 +10304,7 @@ public partial class CombatEngine
             }
         }
 
-        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance)
+        if (targetAlive && weapon.HasShadowEnchant && random.NextDouble() < GameConfig.ShadowEnchantProcChance * OldGodBossSystem.ManweRiderShare(target))   // 1.3.7: a share on Manwe
         {
             // v0.60.0, issue #91: demons are immune to shadow damage. They are creatures
             // of darkness; shadow magic slides off them.
@@ -10353,11 +10358,16 @@ public partial class CombatEngine
             if (!IsAngelMonster(target))
             {
                 long manaRestored = Math.Max(1, damage * manaStealPct / 100);
-                attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
-                terminal.SetColor("blue");
-                terminal.WriteLine(isPlayer
-                    ? Loc.Get("combat.enchant_siphon", manaRestored)
-                    : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
+                double siphonShare = OldGodBossSystem.ManweRiderShare(target);   // 1.3.7: the Creator's Ward stops a share on Manwe
+                if (siphonShare != 1.0) manaRestored = (long)(manaRestored * siphonShare);
+                if (manaRestored > 0)
+                {
+                    attacker.Mana = Math.Min(attacker.MaxMana, attacker.Mana + (int)manaRestored);
+                    terminal.SetColor("blue");
+                    terminal.WriteLine(isPlayer
+                        ? Loc.Get("combat.enchant_siphon", manaRestored)
+                        : Loc.Get("combat.tm_enchant_siphon", name, manaRestored));
+                }
             }
         }
     }
@@ -14975,7 +14985,7 @@ public partial class CombatEngine
                         // 1.3.2: BossSlayer (world boss loot) +10 percent against a boss or mini-boss, as on the old path
                         if ((target.IsBoss || target.IsMiniBoss)
                             && WorldBossSystem.HasSpecialEffect(player, LootGenerator.SpecialEffect.BossSlayer))
-                            attackPower += (long)(attackPower * 0.10);
+                            attackPower += (long)(attackPower * 0.10 * OldGodBossSystem.ManweRiderShare(target));   // 1.3.7: the Creator's Ward stops a share on Manwe
 
                         // Divine boon damage bonus (multi-monster path)
                         var mmBoons = player.CachedBoonEffects;
@@ -22333,7 +22343,10 @@ public partial class CombatEngine
     {
         int thornsPct = companion.GetEquipmentThorns();
         if (thornsPct <= 0 || damage <= 0 || !monster.IsAlive) return;
-        long thornsDamage = Math.Max(1, damage * thornsPct / 100);
+        long thornsDamage = damage * thornsPct / 100;
+        double thornsShare = OldGodBossSystem.ManweRiderShare(monster);   // 1.3.7: the Creator's Ward stops a share on Manwe
+        if (thornsShare != 1.0) thornsDamage = (long)(thornsDamage * thornsShare);
+        thornsDamage = Math.Max(1, thornsDamage);
         monster.HP = Math.Max(0, monster.HP - thornsDamage); // hq-armory: out (equipment thorns)
         EvHit(companion, thornsDamage, CombatEventKind.Basic);
         UIHelper.WriteRow(terminal, Loc.Get("combat.thorns_reflect", thornsDamage, MonsterNames.Display(monster)), "yellow");

@@ -13137,6 +13137,7 @@
   "old_god.warning_less_damage": "  Ogni colpo che infliggi, incantesimi compresi, fa il {0}% di danni in meno.",
   "old_god.warning_enchant": "  Solo un incantamento {0} su una delle due mani, fatto alla Bottega Magica, la rimuove.",
   "old_god.counter_breaks_armour": "  Il tuo incantamento {0} spezza l'armatura divina del dio!",
+  "old_god.ward_on_riders": "  La Protezione del Creatore ferma comunque il {0}% di ciò che aggiungono gli incantamenti del tuo equipaggiamento.",
   "old_god.press_enter_face": "Premi Invio per affrontare l'Antico Dio...",
   "old_god.enters_with_hp": "{0} entra in combattimento con {1} PV.",
   "old_god.mod_fury_bright": "La tua furia arde luminosa! +25% danni, -15% difesa, +15% critico",
