@@ -112,7 +112,7 @@ Probability Manipulation gives a Cyclebreaker a chance of {{balance:Cyclebreaker
 
 ### Abyssal Siphon, Prison Warden's Resilience and Corruption Harvest (Abysswarden)
 
-Abyssal Siphon heals an Abysswarden for {{percent:AbysswardenAbyssalSiphonPercent}} percent of the damage of each hit, at least 1 HP, inside the game's limit on life steal. With Prison Warden's Resilience a monster's hit does {{percent:AbysswardenPrisonWardResist}} percent less damage. Corruption Harvest heals {{percent:AbysswardenCorruptionHealPercent}} percent of maximum HP for each monster that was poisoned when it died, paid when the fight is won.
+Abyssal Siphon heals an Abysswarden for {{percent:AbysswardenAbyssalSiphonPercent}} percent of the damage of each hit, at least 1 HP, inside the game's limit on life steal. With Prison Warden's Resilience a monster's hit does {{percent:AbysswardenPrisonWardResist}} percent less damage. Corruption Harvest heals {{percent:AbysswardenCorruptionHealPercent}} percent of maximum HP for each monster that was poisoned when it died, paid as each poisoned monster falls, inside the fight.
 
 ### Void Hunger, Soul Eater and Pain Threshold (Voidreaver)
 

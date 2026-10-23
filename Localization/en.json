@@ -18376,7 +18376,7 @@
   "base.buff_corruption_harvest": "  - Corruption Harvest: Heal {0}% max HP on killing a poisoned enemy",
   "base.buff_void_hunger": "  - Void Hunger: Heal {0}% max HP on every kill",
   "base.buff_pain_threshold": "  - Pain Threshold: +{0}% ability damage when below 50% HP",
-  "base.buff_soul_eater": "  - Soul Eater: Restore {0}% max mana on killing blow",
+  "base.buff_soul_eater": "  - Soul Eater: Restore {0}% max mana on every kill",
   "base.buff_god_slayer": "  - God Slayer: +{0}% dmg, +{1}% def ({2} combats)",
   "base.buff_dark_pact": "  - Dark Pact: +{0}% dmg ({1} combats)",
   "base.buff_settlement": "  - {0}: +{1}% ({2} combats)",
