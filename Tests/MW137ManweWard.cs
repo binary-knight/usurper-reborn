@@ -537,7 +537,7 @@ public class MW137ManweWard : IDisposable
             files[lang].Should().ContainKey("old_god.ward_on_riders", lang);
             string text = files[lang]["old_god.ward_on_riders"].GetString()!;
             text.Should().Contain("{0}", lang);
-            text.Should().NotMatchRegex("[–—]", $"{lang}: no dash");
+            text.Should().NotMatchRegex("[\u2013\u2014]", $"{lang}: no dash");
             if (lang != "en") text.Should().NotBe(en, $"{lang} is translated");
             string row = string.Format(text, "55");
             if (lang == "en" || lang == "hu")
