@@ -76,12 +76,11 @@ public class AL137Alchemist
         var hero = Alchemist();
         var foes = new List<Monster> { G.Dummy(), G.Dummy(), G.Dummy() };
         var cast = S.Run(id, hero, foes);
-        var (low, _) = Window(hero, expected);
         cast.Lost.Should().HaveCount(3);
         foreach (long lost in cast.Lost)
             lost.Should().BeGreaterThan(Window(hero, old).High, id);
-        cast.Lost.Should().OnlyContain(l => l == cast.Lost[0], "the area core hits each foe for the same figure");
-        cast.Lost[0].Should().BeGreaterOrEqualTo(low - 1, id);
+        cast.Lost[2].Should().Be(cast.Lost[1], "the area core hits each secondary foe for the same figure");
+        cast.Result.Damage.Should().BeInRange(Window(hero, expected).Low, Window(hero, expected).High, id);
     }
 
     [Theory]
