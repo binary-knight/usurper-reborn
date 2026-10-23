@@ -68,6 +68,8 @@ public static partial class GameConfig
     public const int TurnsPerDay = 325;          // turns_per_day
     public const int MaxChildren = 8;            // maxchildren
     public const int MaxKingEdicts = 5;          // max_kingedicts
+    public const double PowerHatMinHealFraction = 0.20;       // Magician Power Hat: heal floor as a fraction of max HP
+    public const double PowerHatHealPerLevelAbove75 = 0.012;  // added to that floor for each caster level above 75 (0.50 at L100)
     public const int MaxHeals = 15;              // max healing potions
     
     // Combat constants

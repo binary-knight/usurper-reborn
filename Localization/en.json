@@ -11107,7 +11107,7 @@
   "spell.magician.7.name": "Haste",
   "spell.magician.7.desc": "Accelerate time around yourself. Two doubled turns; a recast refreshes them.",
   "spell.magician.8.name": "Power Hat",
-  "spell.magician.8.desc": "Regenerate health and bolster defenses. Effect: 50-75 hp + protection. Duration: whole fight.",
+  "spell.magician.8.desc": "Regenerate health and bolster defenses. Effect: 50-75 hp, at least 20% of max HP (+1.2% a level above 75, 50% at L100) + protection. Duration: whole fight.",
   "spell.magician.9.name": "Fireball",
   "spell.magician.9.desc": "A sphere of flame engulfs your enemy. Damage: 55-75. Duration: 1 turn.",
   "spell.magician.10.name": "Fear",
