@@ -3124,7 +3124,6 @@ public partial class CombatEngine
         if (player.Healing > 0)
         {
             string healDesc = Loc.Get("combat.heal_potions_short", player.Healing, player.MaxPotions);
-            string healDesc = Loc.Get("combat.heal_potions_short", player.Healing, player.MaxPotions);
             WriteBoxRow("[H] ", "magenta", healDesc);
         }
         else
@@ -3135,7 +3134,6 @@ public partial class CombatEngine
         // Herb Pouch
         if (player.TotalHerbCount > 0)
         {
-            string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
             WriteBoxRow("[J] ", "bright_green", herbDesc);
         }
@@ -3173,7 +3171,6 @@ public partial class CombatEngine
         if (player.PoisonVials > 0)
         {
             string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
-            string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
             WriteBoxRow("[B] ", "dark_green", coatDesc);
         }
 
@@ -3202,7 +3199,6 @@ public partial class CombatEngine
             CombatSpeed.Fast => Loc.Get("combat.speed_fast"),
             _ => Loc.Get("combat.speed_normal")
         };
-        string spdDesc = Loc.Get("combat.speed_label", speedLabel);
         string spdDesc = Loc.Get("combat.speed_label", speedLabel);
         WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc);
 
@@ -3323,7 +3319,6 @@ public partial class CombatEngine
         if (player.Healing > 0)
         {
             string itemDesc = Loc.Get("combat.use_item_potions_short", player.Healing, player.MaxPotions);
-            string itemDesc = Loc.Get("combat.use_item_potions_short", player.Healing, player.MaxPotions);
             WriteBoxRow("[I] ", "magenta", itemDesc);
         }
         else
@@ -3363,14 +3358,12 @@ public partial class CombatEngine
         if (player.PoisonVials > 0)
         {
             string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
-            string coatDesc = Loc.Get("combat.coat_blade_short", player.PoisonVials);
             WriteBoxRow("[B] ", "dark_green", coatDesc);
         }
 
         // Herb Pouch
         if (player.TotalHerbCount > 0)
         {
-            string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
             string herbDesc = Loc.Get("combat.herb_pouch_short", player.TotalHerbCount);
             WriteBoxRow("[J] ", "bright_green", herbDesc);
         }
@@ -3411,7 +3404,6 @@ public partial class CombatEngine
                 CombatSpeed.Fast => Loc.Get("combat.speed_fast"),
                 _ => Loc.Get("combat.speed_normal")
             };
-            string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
             string spdDesc2 = Loc.Get("combat.speed_label", speedLabel);
             WriteBoxRow(Loc.Get("combat.bbs_speed_key") + "  ", "darkgray", spdDesc2);
         }
