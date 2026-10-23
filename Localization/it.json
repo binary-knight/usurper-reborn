@@ -10867,7 +10867,7 @@
   "spell.magician.7.name": "Fretta",
   "spell.magician.7.desc": "Acceleri il tempo intorno a te. Due turni raddoppiati; un nuovo lancio li rinnova.",
   "spell.magician.8.name": "Cappello del Potere",
-  "spell.magician.8.desc": "Rigenera la salute e rafforza le difese. Effetto: 50-75 hp + protezione. Durata: tutto lo scontro.",
+  "spell.magician.8.desc": "Rigenera la salute e rafforza le difese. Effetto: 50-75 hp, almeno il 20% degli hp max (+1,2% per livello oltre il 75, 50% al liv. 100) + protezione. Durata: tutto lo scontro.",
   "spell.magician.9.name": "Palla di Fuoco",
   "spell.magician.9.desc": "Una sfera di fiamme avvolge il tuo nemico. Danni: 55-75. Durata: 1 turno.",
   "spell.magician.10.name": "Paura",

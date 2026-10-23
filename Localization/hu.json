@@ -10875,7 +10875,7 @@
   "spell.magician.7.name": "Sietség",
   "spell.magician.7.desc": "Felgyorsítod az időt magad körül. Két duplázott kör; újabb varázslás megújítja.",
   "spell.magician.8.name": "Hatalom Kalapja",
-  "spell.magician.8.desc": "Regenerálja az életerőt és megerősíti a védelmet. Hatás: 50-75 ép + védelem. Időtartam: az egész harc.",
+  "spell.magician.8.desc": "Regenerálja az életerőt és megerősíti a védelmet. Hatás: 50-75 ép, legalább a max. ép 20%-a (+1,2% minden 75 feletti szintért, 50% a 100. szinten) + védelem. Időtartam: az egész harc.",
   "spell.magician.9.name": "Tűzgolyó",
   "spell.magician.9.desc": "Egy lánggömb nyeli el ellenfeledet. Sebzés: 55-75. Időtartam: 1 kör.",
   "spell.magician.10.name": "Félelem",

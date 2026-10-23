@@ -10867,7 +10867,7 @@
   "spell.magician.7.name": "Hâte",
   "spell.magician.7.desc": "Accélère le temps autour de vous. Deux tours doublés ; un nouveau lancer les renouvelle.",
   "spell.magician.8.name": "Chapeau de Pouvoir",
-  "spell.magician.8.desc": "Régénère la santé et renforce les défenses. Effet : 50-75 pv + protection. Durée : tout le combat.",
+  "spell.magician.8.desc": "Régénère la santé et renforce les défenses. Effet : 50-75 pv, au moins 20 % des pv max (+1,2 % par niveau au-delà de 75, 50 % au niv. 100) + protection. Durée : tout le combat.",
   "spell.magician.9.name": "Boule de Feu",
   "spell.magician.9.desc": "Une sphère de flammes engloutit votre ennemi. Dégâts : 55-75. Durée : 1 tour.",
   "spell.magician.10.name": "Peur",
