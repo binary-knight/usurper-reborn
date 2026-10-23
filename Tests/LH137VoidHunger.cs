@@ -34,7 +34,7 @@ public class LH137VoidHunger
 
     private static async Task<(string Text, G.Run Run)> Go(Character hero, List<Monster> foes, List<Character>? team, string script)
     {
-        var run = await G.Fight(hero, foes, team, 137, script);
+        var run = await G.Fight(hero, foes, team, 1, script);
         run.Error.Should().BeNull();
         return (Ansi.Replace(run.Transcript, ""), run);
     }
@@ -43,7 +43,7 @@ public class LH137VoidHunger
     private const string HungerLine = "Void Hunger: Consumed";
     private const string EaterLine = "Soul Eater: Devoured";
 
-    private static string Rats(int n) => string.Concat(Enumerable.Repeat("A\n\n", n)) + string.Concat(Enumerable.Repeat("P\n", 10));
+    private static string Rats(int n, string target = "1") => string.Concat(Enumerable.Repeat("A\n" + target + "\n", n)) + string.Concat(Enumerable.Repeat("P\n", 10));
 
     [Fact]
     public async Task LH137_AGroupFight_HealsAtTheFirstKill_WhileFoesRemain()
@@ -63,7 +63,7 @@ public class LH137VoidHunger
         var hero = Reaver();
         long start = hero.HP;
         var foes = new List<Monster> { G.Foe("Rat", 1, 1), G.Foe("Rat", 1, 1), G.Foe("Rat", 1, 1) };
-        var (text, run) = await Go(hero, foes, null, Rats(40));
+        var (text, run) = await Go(hero, foes, null, Rats(40, ""));
         run.Result!.Outcome.Should().Be(CombatOutcome.Victory);
         Count(text, HungerLine).Should().Be(3, "one feed per fallen foe, none repeated by the victory block");
         Count(text, EaterLine).Should().Be(3);
