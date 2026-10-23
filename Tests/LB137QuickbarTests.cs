@@ -103,6 +103,21 @@ public class LB137Quickbar
         return rows;
     }
 
+    /// <summary>The quickbar rows of a boxed menu: the section after a rule whose first row is a [digit] slot, up to the next rule.</summary>
+    private static List<string> BoxQuickbarRows(string text)
+    {
+        var rows = new List<string>();
+        var lines = text.Replace("\r", "").Split('\n');
+        bool inBar = false;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            var l = lines[i];
+            if (l.StartsWith("╠") || l.StartsWith("╚")) { inBar = false; if (i + 1 < lines.Length && Regex.IsMatch(lines[i + 1], "^║ \\[[1-9]\\] ")) inBar = true; continue; }
+            if (inBar && l.StartsWith("║")) rows.Add(l);
+        }
+        return rows;
+    }
+
     private static async Task<List<string>> AllRows(string lang, Menu menu, bool box)
     {
         var all = new List<string>();
@@ -116,7 +131,7 @@ public class LB137Quickbar
                     {
                         string text = Render(menu, cls, bar, spent);
                         if (box)
-                            all.AddRange(text.Replace("\r", "").Split('\n').Where(l => l.StartsWith("║") || l.StartsWith("╠") || l.StartsWith("╔") || l.StartsWith("╚")));
+                            all.AddRange(BoxQuickbarRows(text));
                         else
                             all.AddRange(SrQuickbarRows(text));
                     }
