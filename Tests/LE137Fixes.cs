@@ -83,4 +83,46 @@ public class LE137Fixes : IDisposable
         hero.EquipItem(plain2, out _).Should().BeTrue();
         hero.MaxHP.Should().Be(plain, "swapping the Titan piece for a plain one in the same slot drops the bonus");
     }
+
+    private static async Task<string> Run(Character hero, string method, params string[] lines)
+    {
+        var shop = new MagicShopLocation();
+        using var output = new MemoryStream();
+        var term = new TerminalEmulator(new LineStream(lines.Concat(Enumerable.Repeat("", 12))), output);
+        typeof(BaseLocation).GetField("terminal", F)!.SetValue(shop, term);
+        typeof(BaseLocation).GetField("currentPlayer", F)!.SetValue(shop, hero);
+        var r = typeof(MagicShopLocation).GetMethod(method, F)!.Invoke(shop, new object[] { hero });
+        if (r is Task t) await t;
+        term.StreamWriterInternal?.Flush();
+        return Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
+    }
+
+    [Fact]
+    public async Task LE137_EnchantSuffix_IsAddedWhenTheNameReaches40()
+    {
+        var hero = new Character
+        {
+            Name1 = "tester", Name2 = "Tester", Class = CharacterClass.Warrior, Race = CharacterRace.Human, Level = 100,
+            HP = 5000, MaxHP = 5000, BaseMaxHP = 5000, BaseStrength = 100, Strength = 100,
+            AI = CharacterAI.Human, Gold = 9_000_000_000, AutoEquipDisabled = true,
+        };
+        hero.Achievements.Unlock("first_enchant");
+        var blade = new Equipment
+        {
+            Name = "Exceedingly Long Named Leech Blade", Slot = EquipmentSlot.MainHand, WeaponPower = 10, MinLevel = 1, Value = 100,
+        };
+        blade.Name.Length.Should().BeInRange(30, 39);
+        hero.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(blade);
+        hero.RecalculateStats();
+        long strBefore = hero.Strength;
+
+        await Run(hero, "EnchantEquipment", "1", "1", "2", "Y");
+
+        var worn = hero.GetEquipment(EquipmentSlot.MainHand)!;
+        worn.GetEnchantmentCount().Should().Be(1, "the enchant is applied");
+        worn.StrengthBonus.Should().BeGreaterThan(0);
+        worn.Name.Length.Should().BeGreaterThanOrEqualTo(40, "the test name plus the suffix reaches 40");
+        worn.Name.Should().MatchRegex(@" \+\d+ Str$", "the suffix is on the name whatever its length");
+        MagicShopLocation.StripEnchantTags(worn.Name).Should().Be("Exceedingly Long Named Leech Blade");
+    }
 }

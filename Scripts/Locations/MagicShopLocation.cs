@@ -2236,9 +2236,9 @@ public partial class MagicShopLocation : BaseLocation
                 break;
         }
 
-        // Update name
-        if (enchanted.Name.Length + suffix.Length < 40)
-            enchanted.Name += suffix;
+        // Update name. 1.3.7: the tag is always added (it used to be skipped when the name would reach 40, which left the
+        // item looking unenchanted and let the enchant strip and the gear set resolver miss it); a long name just wraps.
+        enchanted.Name += suffix;
 
         // v1.1.7: the item gains the gold actually charged (after discounts, before tax), not half
         // again its own worth. The x1.5 compounded, and the enchant count that was meant to stop it
