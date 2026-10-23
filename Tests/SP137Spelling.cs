@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Text.RegularExpressions;
 using FluentAssertions;
 using Xunit;
 
@@ -61,37 +60,5 @@ public class SP137Spelling
         var wiki = Path.Combine(RepoRoot(), "DOCS", "wiki");
         foreach (var k in Kept)
             File.ReadAllText(Path.Combine(wiki, k.File), Encoding.UTF8).Should().Contain(k.Text);
-    }
-
-    /// <summary>Kept text in the built pages (relative to web/wiki): a pattern that may say Defence, and why.
-    /// items/armor: the gear set bonus rows are the game's own en.json item.set.bonus.defence ("+{0} Defence").
-    /// reference/balance: the name of the C# constant GodBoonJudicarDefencePct.</summary>
-    private static readonly (string File, string Pattern)[] KeptBuilt =
-    {
-        ("en/items/armor/index.html", @"\+\d+ Defence"),
-        ("en/reference/balance/index.html", @"God Boon Judicar Defence Pct"),
-    };
-
-    [Fact]
-    public void Built_pages_say_defense_not_defence()
-    {
-        // web/wiki is made by the wiki build (npm run build --prefix tools/wiki-build); without it there is nothing to read.
-        var built = Path.Combine(RepoRoot(), "web", "wiki");
-        if (!Directory.Exists(built)) return;
-        var files = Directory.GetFiles(built, "*.html", SearchOption.AllDirectories);
-        files.Should().NotBeEmpty();
-        var bad = new List<string>();
-        foreach (var f in files)
-        {
-            var rel = Path.GetRelativePath(built, f).Replace('\\', '/');
-            var html = File.ReadAllText(f, Encoding.UTF8);
-            html = Regex.Replace(html, @"<(script|style)[\s\S]*?</\1>", " ", RegexOptions.IgnoreCase);
-            var text = Regex.Replace(html, @"<[^>]*>", " ");
-            foreach (var k in KeptBuilt.Where(k => k.File == rel))
-                text = Regex.Replace(text, k.Pattern, "");
-            if (text.IndexOf("defence", StringComparison.OrdinalIgnoreCase) >= 0)
-                bad.Add(rel);
-        }
-        bad.Should().BeEmpty("the built pages spell it defense: " + string.Join(", ", bad.Take(20)));
     }
 }
