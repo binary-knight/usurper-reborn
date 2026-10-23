@@ -5427,7 +5427,7 @@ public partial class GameEngine
         try
         {
             // 1.3.7: the Voidreaver Constitution lift for the levels gained before it, once (saved marker)
-            long con = LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(player);
+            long con = LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(player, isNpc: false);
             if (con > 0)
                 DebugLogger.Instance.LogInfo("MIGRATION", $"Voidreaver Constitution topped up for {player.Name2}: +{con} at level {player.Level}");
         }
@@ -7225,7 +7225,7 @@ public partial class GameEngine
             ValidateAndFixNPCBaseStats(npc);
 
             // 1.3.7: the one-time Voidreaver Constitution top-up (guarded by the saved marker)
-            LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(npc);
+            LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(npc, isNpc: true);
 
             // Now recalculate stats with valid base stats
             npc.RecalculateStats();

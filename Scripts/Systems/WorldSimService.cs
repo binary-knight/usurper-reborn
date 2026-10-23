@@ -1824,7 +1824,7 @@ namespace UsurperRemake.Systems
                 }
 
                 // 1.3.7: the one-time Voidreaver Constitution top-up (guarded by the saved marker)
-                UsurperRemake.Locations.LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(npc);
+                UsurperRemake.Locations.LevelMasterLocation.ApplyVoidreaverConstitutionTopUp(npc, isNpc: true);
 
                 // Recalculate stats with equipment bonuses
                 npc.RecalculateStats();

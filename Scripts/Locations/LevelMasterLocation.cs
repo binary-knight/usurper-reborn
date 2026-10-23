@@ -1277,15 +1277,18 @@ public class LevelMasterLocation : BaseLocation
     /// <summary>
     /// 1.3.7: once per character, on load: a Voidreaver gets the Constitution its levels so far would
     /// have given under the lift (VoidreaverConstitutionThrough), into BaseConstitution, then the game's
-    /// own recalculation. The saved marker VoidreaverConstitutionApplied guards it: false only in a save
+    /// own recalculation. A player gets it added. An NPC gets it as a floor, 10 + the total (the floor
+    /// EnsureClassStatsForLevel uses), as NPCSpawnSystem gave every NPC about 10 + 2 Constitution a level
+    /// whatever its class. The saved marker VoidreaverConstitutionApplied guards it: false only in a save
     /// from before 1.3.7, set here for every class, so a second load adds none. Returns the amount.
     /// </summary>
-    public static long ApplyVoidreaverConstitutionTopUp(Character character)
+    public static long ApplyVoidreaverConstitutionTopUp(Character character, bool isNpc)
     {
         if (character == null || character.VoidreaverConstitutionApplied) return 0;
         character.VoidreaverConstitutionApplied = true;
         if (character.Class != CharacterClass.Voidreaver) return 0;
         long amount = VoidreaverConstitutionThrough(character.Level);
+        if (isNpc) amount = Math.Max(0, 10 + amount - character.BaseConstitution);
         if (amount > 0) character.GrantPermanentStats((StatKind.Constitution, amount));
         return amount;
     }
@@ -1302,7 +1305,7 @@ public class LevelMasterLocation : BaseLocation
 
         // 1.3.7: the guarded one-time top-up first (a no-op once the marker is set), so this floor,
         // a Max, never adds the lifted Voidreaver Constitution a second time on top of it
-        ApplyVoidreaverConstitutionTopUp(npc);
+        ApplyVoidreaverConstitutionTopUp(npc, isNpc: true);
 
         int levelsGained = npc.Level - 1; // number of level-up applications
 

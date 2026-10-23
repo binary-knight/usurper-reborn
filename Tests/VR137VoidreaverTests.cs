@@ -354,15 +354,15 @@ public class VR137VoidreaverTests
         GetMarker(old.Single(d => d.Name == name)).Should().BeFalse();
 
         GameEngine.Instance.RestoreNPCs(old).GetAwaiter().GetResult();
-        Find(name).BaseConstitution.Should().Be(50 + 119, "the single-player NPC loader tops up once");
-        Find(name).Constitution.Should().Be(50 + 119);
+        Find(name).BaseConstitution.Should().Be(10 + 119, "the single-player NPC loader raises an NPC below the floor to it, once");
+        Find(name).Constitution.Should().Be(10 + 119);
         Find(other).BaseConstitution.Should().Be(50, "a non Voidreaver NPC gets nothing");
 
         var task2 = (Task<List<NPCData>>)typeof(SaveSystem).GetMethod("SerializeNPCs", F)!.Invoke(SaveSystem.Instance, null)!;
         var after = task2.GetAwaiter().GetResult();
         GetMarker(after.Single(d => d.Name == name)).Should().BeTrue("the single-player NPC save writes the marker");
         GameEngine.Instance.RestoreNPCs(NpcJson(after, old: false)).GetAwaiter().GetResult();
-        Find(name).BaseConstitution.Should().Be(169, "a save after the top-up loads with none");
+        Find(name).BaseConstitution.Should().Be(129, "a save after the top-up loads with none");
     }
 
     [Fact]
@@ -379,18 +379,18 @@ public class VR137VoidreaverTests
 
             var service = new WorldSimService(new SqlSaveBackend(path));
             typeof(WorldSimService).GetMethod("RestoreNPCsFromData", F)!.Invoke(service, new object[] { old });   // the world simulator's loader
-            Find(name).BaseConstitution.Should().Be(169, "the world simulator's NPC loader tops up once");
-            Find(name).Constitution.Should().Be(169);
+            Find(name).BaseConstitution.Should().Be(129, "the world simulator's NPC loader raises it to the floor once");
+            Find(name).Constitution.Should().Be(129);
 
             var written = OnlineStateManager.SerializeCurrentNPCs();
             GetMarker(written.Single(d => d.Name == name)).Should().BeTrue("the online NPC save writes the marker");
             typeof(WorldSimService).GetMethod("RestoreNPCsFromData", F)!.Invoke(service, new object[] { NpcJson(written, old: false) });
-            Find(name).BaseConstitution.Should().Be(169, "the world simulator loads a topped-up NPC with none");
+            Find(name).BaseConstitution.Should().Be(129, "the world simulator loads a topped-up NPC with none");
 
             GameEngine.Instance.RestoreNPCs(NpcJson(old, old: true)).GetAwaiter().GetResult();   // a player session's loader, old record
-            Find(name).BaseConstitution.Should().Be(169, "a session loading the old record tops up once, from the same saved value");
+            Find(name).BaseConstitution.Should().Be(129, "a session loading the old record tops up once, from the same saved value");
             GameEngine.Instance.RestoreNPCs(NpcJson(written, old: false)).GetAwaiter().GetResult();
-            Find(name).BaseConstitution.Should().Be(169, "and none from the topped-up record");
+            Find(name).BaseConstitution.Should().Be(129, "and none from the topped-up record");
         }
         finally
         {
@@ -412,10 +412,11 @@ public class VR137VoidreaverTests
         // an old NPC topped up on load, then floored: the floor adds none on top
         var topped = Npc("Vr137 Floor Topped", CharacterClass.Voidreaver, 80, 50);
         SetMarker(topped, false);
-        typeof(LevelMasterLocation).GetMethod("ApplyVoidreaverConstitutionTopUp", SP)!.Invoke(null, new object[] { topped });
-        topped.BaseConstitution.Should().Be(169);
+        NpcTopUp(topped);
+        topped.BaseConstitution.Should().Be(129, "an NPC top-up is the floor");
+        topped.BaseConstitution = 140;   // trained above the floor after the top-up
         LevelMasterLocation.EnsureClassStatsForLevel(topped);
-        topped.BaseConstitution.Should().Be(169, "the floor is a Max, under the topped-up value");
+        topped.BaseConstitution.Should().Be(140, "the floor is a Max, under the value");
 
         // an old NPC floored before any top-up: the floor runs the guarded top-up first, so a later top-up adds none
         var floored = Npc("Vr137 Floor First", CharacterClass.Voidreaver, 80, 10);
@@ -423,8 +424,59 @@ public class VR137VoidreaverTests
         LevelMasterLocation.EnsureClassStatsForLevel(floored);
         floored.BaseConstitution.Should().Be(10 + Total(80));
         GetMarker(floored).Should().BeTrue();
-        typeof(LevelMasterLocation).GetMethod("ApplyVoidreaverConstitutionTopUp", SP)!.Invoke(null, new object[] { floored });
+        NpcTopUp(floored);
         floored.BaseConstitution.Should().Be(10 + Total(80), "never twice");
+    }
+
+    private static long NpcTopUp(Character c)
+    {
+        var m = typeof(LevelMasterLocation).GetMethod("ApplyVoidreaverConstitutionTopUp", SP)!;
+        m.GetParameters().Length.Should().Be(2, "the top-up is told whether it serves an NPC");
+        return (long)m.Invoke(null, new object[] { c, true })!;
+    }
+
+    [Fact]
+    public void VR137Voidreaver_AnOldSpawnShapedNpc_AboveTheFloor_StaysUnchanged_AndOneBelowIsRaisedOnce()
+    {
+        // NPCSpawnSystem gave every NPC 10 + 2 x level Constitution (plus or minus 3), whatever its class:
+        // at L 80 about 170, above the floor 10 + 119, so the old NPC keeps what it has
+        using var roster = new Roster(online: false);
+        string spawned = "Vr137 Spawned " + Guid.NewGuid().ToString("N")[..6];
+        string low = "Vr137 Low " + Guid.NewGuid().ToString("N")[..6];
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(Npc(spawned, CharacterClass.Voidreaver, 80, 10 + 80 * 2 - 3));
+        NPCSpawnSystem.Instance.ActiveNPCs.Add(Npc(low, CharacterClass.Voidreaver, 80, 100));
+        var task = (Task<List<NPCData>>)typeof(SaveSystem).GetMethod("SerializeNPCs", F)!.Invoke(SaveSystem.Instance, null)!;
+        var old = NpcJson(task.GetAwaiter().GetResult(), old: true);
+        GameEngine.Instance.RestoreNPCs(old).GetAwaiter().GetResult();
+        Find(spawned).BaseConstitution.Should().Be(167, "above the floor: no top-up added on top of the spawn Constitution");
+        GetMarker(Find(spawned)).Should().BeTrue();
+        Find(low).BaseConstitution.Should().Be(129, "below the floor: raised to 10 + 119");
+        NpcTopUp(Find(low)).Should().Be(0, "once only");
+        Find(low).BaseConstitution.Should().Be(129);
+
+        // a player is not floored: the top-up adds (his answer), even above 10 + 119
+        var hero = Hero("Vr137 Strong Elder", CharacterClass.Voidreaver, 80, con: 170);
+        Load(ThroughJson(Serialize(hero), old: true)).BaseConstitution.Should().Be(170 + 119);
+    }
+
+    // ---------------- the wiki export ----------------
+
+    [Fact]
+    public void VR137Voidreaver_TheWikiExport_ShowsTheVoidreaversConstitutionGrowthAs1Point5()
+    {
+        string dir = Path.Combine(Path.GetTempPath(), $"usurper-vr137-wiki-{Guid.NewGuid():N}");
+        try
+        {
+            WikiDataExporter.Export(dir);
+            using var doc = JsonDocument.Parse(File.ReadAllText(Path.Combine(dir, "classes.json")));
+            JsonElement Growth(string id) => doc.RootElement.GetProperty("data").EnumerateArray()
+                .Single(c => c.GetProperty("id").GetString() == id).GetProperty("growthPerLevel");
+            Growth("Voidreaver").GetProperty("constitution").GetDouble().Should().Be(1.5, "2 on an even level, 1 on an odd one");
+            Growth("Voidreaver").GetProperty("strength").GetInt64().Should().Be(4, "a gain that does not alternate stays whole");
+            Growth("Warrior").GetProperty("constitution").GetInt64().Should().Be(3);
+            Growth("Warrior").GetProperty("maxHP").GetInt64().Should().Be(17);
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
     }
 
     // ---------------- the admin level edit ----------------
