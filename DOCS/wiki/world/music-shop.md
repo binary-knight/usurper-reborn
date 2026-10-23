@@ -24,9 +24,9 @@ For a Bard, an instrument can be relevant to the actions you use. It is not inte
 Hiring a performance (P) is a service, not buying an instrument. A performance gives you a song buff for your next {{balance:SongBuffDuration}} fights, and a new song replaces the one you have. A Bard pays 25 percent less. Prices, with no tax added:
 
 - **War March:** 200 + level x 10 gold. +{{percent:SongWarMarchBonus}} percent attack damage.
-- **Lullaby of Iron:** 200 + level x 10 gold. +{{percent:SongIronLullabyBonus}} percent defence.
+- **Lullaby of Iron:** 200 + level x 10 gold. +{{percent:SongIronLullabyBonus}} percent defense.
 - **Fortune's Tune:** 300 + level x 15 gold. +{{percent:SongFortuneBonus}} percent gold from kills.
-- **Battle Hymn:** 400 + level x 20 gold. +{{percent:SongBattleHymnBonus}} percent attack and +{{percent:SongBattleHymnBonus}} percent defence.
+- **Battle Hymn:** 400 + level x 20 gold. +{{percent:SongBattleHymnBonus}} percent attack and +{{percent:SongBattleHymnBonus}} percent defense.
 
 At level 20 War March costs 400 gold, or 300 for a Bard.
 

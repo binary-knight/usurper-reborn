@@ -24,11 +24,11 @@ Do not infer PvP healing or control behavior from a monster fight. Sage duel beh
 
 ## PvP damage
 
-Your swing in a player fight does Strength + the weapon power of that hand + a random 1 to 15, times your weapon setup (two-handed bonus, off hand at half), minus the defender's Defence + a random 0 to Defence / 8, at least 1. Armor power is not taken off in a player fight.
+Your swing in a player fight does Strength + the weapon power of that hand + a random 1 to 15, times your weapon setup (two-handed bonus, off hand at half), minus the defender's Defense + a random 0 to Defense / 8, at least 1. Armor power is not taken off in a player fight.
 
 - **Crit:** 5 percent plus 1 percent per 10 Dexterity, with no ceiling, for 1.5 times the damage.
-- **Defending:** the defender's Defence counts 1.5 times.
-- **Shield:** the defender blocks 20 percent of the time and adds its shield's bonus to Defence for that hit.
+- **Defending:** the defender's Defense counts 1.5 times.
+- **Shield:** the defender blocks 20 percent of the time and adds its shield's bonus to Defense for that hit.
 - **Blinded:** a blinded fighter misses {{balance:PvPBlindedMissPercent}} percent of weapon swings.
 
 A spell that hits for damage in a player fight, yours or your opponent's, is cut by the target's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) last, after the Team HQ Barracks: MR / (MR + 100) of the hit, at most half, at least 1 left. Weapon swings are not cut by it.

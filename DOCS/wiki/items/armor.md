@@ -10,7 +10,7 @@ history: 1.3.3 | none
 history: 1.3.2 | A Mystic Shaman follows its own armor weight limit.
 history: 1.2.5 | Armor names show in your language, and shop and equipment rows mark armor weight as [Lgt], [Med] or [Hvy].
 ---
-Armor class, defence bonuses, resistances and block effects are different fields. More expensive equipment can trade one kind of protection for another. Your class's armor rules still apply.
+Armor class, defense bonuses, resistances and block effects are different fields. More expensive equipment can trade one kind of protection for another. Your class's armor rules still apply.
 
 Use the [full equipment catalog](/wiki/en/items/) to compare slots and open an item for every nonzero stat and restriction.
 

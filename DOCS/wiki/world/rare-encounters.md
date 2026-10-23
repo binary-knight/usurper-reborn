@@ -24,11 +24,11 @@ Changes to Chivalry and Darkness in these encounters are added directly. Some ch
 
 ### Hidden Tavern
 
-A secret tavern. A drink costs 50 gold and heals a third of your maximum HP. Resting in the back room costs 200 gold, heals you fully and cures poison. The card game bets the lower of a quarter of your gold and 500 (at least 10): a higher card than the dealer's pays twice the bet back, a tie returns it. Talking to a stranger works once a day and gives one of five: 3 healing potions, floor x 100 experience, a tip, an offer of Strength +5 and Defence +5 that you can accept, or a drunk with nothing to say.
+A secret tavern. A drink costs 50 gold and heals a third of your maximum HP. Resting in the back room costs 200 gold, heals you fully and cures poison. The card game bets the lower of a quarter of your gold and 500 (at least 10): a higher card than the dealer's pays twice the bet back, a tie returns it. Talking to a stranger works once a day and gives one of five: 3 healing potions, floor x 100 experience, a tip, an offer of Strength +5 and Defense +5 that you can accept, or a drunk with nothing to say.
 
 ### Wandering Minstrel
 
-The minstrel's songs: the first gives Strength +3, the second Defence +3, the third heals half your maximum HP, and the fourth costs 100 gold for 50 Chivalry. Just listening gives floor x 10 experience.
+The minstrel's songs: the first gives Strength +3, the second Defense +3, the third heals half your maximum HP, and the fourth costs 100 gold for 50 Chivalry. Just listening gives floor x 10 experience.
 
 ### Old Hermit
 
@@ -53,11 +53,11 @@ One of four scenes, equally likely:
 
 ### Mysterious Merchant
 
-Four offers. A potion for floor x 50 gold heals you fully. A blessing for floor x 200 gold gives +5 to one random stat of Strength, Intelligence, Wisdom, Dexterity, Constitution or Charisma. A mystery box for floor x 500 gold gives one of five: three times the price back in gold, Strength +10 and Defence +10, nothing, floor x 500 experience, or full potions and mana. Information for 100 gold is only words.
+Four offers. A potion for floor x 50 gold heals you fully. A blessing for floor x 200 gold gives +5 to one random stat of Strength, Intelligence, Wisdom, Dexterity, Constitution or Charisma. A mystery box for floor x 500 gold gives one of five: three times the price back in gold, Strength +10 and Defense +10, nothing, floor x 500 experience, or full potions and mana. Information for 100 gold is only words.
 
 ### Time Warp
 
-No choice; one of five happens: floor x 1,500 gold; floor x 300 experience and Strength +2; the loss of half your current HP and floor x 100 experience; Constitution +3 with full HP and mana; or Defence +5.
+No choice; one of five happens: floor x 1,500 gold; floor x 300 experience and Strength +2; the loss of half your current HP and floor x 100 experience; Constitution +3 with full HP and mana; or Defense +5.
 
 ### Usurper's Ghost
 
@@ -88,7 +88,7 @@ You fight alone against one monster drawn for the floor, as a room's first monst
 
 ### Catacombs encounters
 
-- **Bone Oracle:** asking about your future gives one of floor x 100 experience, Defence +2, 25 Chivalry or Wisdom +2; asking about the dungeon gives Intelligence +1.
+- **Bone Oracle:** asking about your future gives one of floor x 100 experience, Defense +2, 25 Chivalry or Wisdom +2; asking about the dungeon gives Intelligence +1.
 - **Restless Spirits:** helping them find peace gives 50 Chivalry and floor x 150 experience; attacking them costs a quarter of your maximum HP and adds 20 Darkness.
 - **Crypt Keeper:** 150 gold buys 2 healing potions; asking for information gives a hint about the floors ahead and floor x 50 experience.
 - **Ancient Tomb:** opening the sarcophagus is a mummy half the time (a third of your maximum HP, then floor x 1,500 gold) and otherwise floor x 2,400 gold and Strength +2; taking the offerings pays floor x 600 gold.

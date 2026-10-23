@@ -79,7 +79,7 @@ At Team Corner, N hires an NPC who is not on a team onto your own team. You need
 
 ### Hire price
 
-- The per-level part is the lower of {{balance:NpcRecruitmentCostPerLevel}} gold per level and {{balance:NpcRecruitmentCostPerLevelSquared}} gold times the level squared: lower below level 25, the same from level 25 up. The NPC's Strength, Defence and Agility added together, times 20 gold, are added.
+- The per-level part is the lower of {{balance:NpcRecruitmentCostPerLevel}} gold per level and {{balance:NpcRecruitmentCostPerLevelSquared}} gold times the level squared: lower below level 25, the same from level 25 up. The NPC's Strength, Defense and Agility added together, times 20 gold, are added.
 - An NPC above your level costs {{balance:RecruitAboveLevelPercentPerLevel}} percent more for each level above you, up to {{balance:RecruitAboveLevelMaxPercent}} percent of the price at 10 levels above. An NPC more than 5 levels below you costs 30 percent less.
 - Your relationship with the NPC then multiplies the price: Friendship {{percent:RecruitPriceFriendship}} percent, Trust {{percent:RecruitPriceTrust}}, Respect {{percent:RecruitPriceRespect}}, Normal {{percent:RecruitPriceNormal}}, Suspicious {{percent:RecruitPriceSuspicious}}, Anger {{percent:RecruitPriceAnger}}. An NPC at Enemy or Hate is listed but will not join.
 - Your own grown child joins at {{percent:AdultChildRecruitmentDiscount}} percent of the price, whatever your relationship.

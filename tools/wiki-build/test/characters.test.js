@@ -20,14 +20,14 @@ function row(html, header) {
 const headers = (html) =>
   [...html.matchAll(/<th scope="col">(.*?)<\/th>/g)].map((m) => textOf(m[1]));
 
-test("classes table: HP, Defence and mana per level and the roles the game lists", () => {
+test("classes table: HP, Defense and mana per level and the roles the game lists", () => {
   const data = load();
   const html = render("table:classes", data);
   assert.deepEqual(headers(html), [
     "Class",
     "Type",
     "HP per level",
-    "Defence per level",
+    "Defense per level",
     "Mana per level",
     "Roles the game lists",
     "Specializations",
@@ -130,7 +130,7 @@ test("class-roles: one section per class from the class numbers and its abilitie
   const sections = html.split("<h4 ").slice(1);
   assert.equal(sections.length, data.classes.length);
   const section = (cls) => textOf("<h4 " + sections.find((s) => s.includes(`>${cls} role numbers</h4>`)));
-  assert.match(section("Warrior"), /Warrior gains 17 maximum HP, 3 Defence and 0 maximum mana per level/);
+  assert.match(section("Warrior"), /Warrior gains 17 maximum HP, 3 Defense and 0 maximum mana per level/);
   assert.match(section("Warrior"), /It has no mana and pays for abilities with combat stamina\./);
   assert.match(section("Warrior"), /Armor weights it can wear: Light, Medium, Heavy\./);
   assert.match(section("Warrior"), /Arms is DPS, Protection is Tank\./);

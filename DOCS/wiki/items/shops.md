@@ -74,7 +74,7 @@ Enchant costs, limits, failure chances and the materials each enchant needs are 
 ### Magic Shop prices
 
 - Identification (I) costs 100 + level x 50 gold. New dungeon drops are always identified, so this is for older items.
-- Curse removal (C) costs twice the item's value plus 100 gold for every point of negative Strength, Defence, Dexterity and Wisdom, at least 500 gold, plus tax.
+- Curse removal (C) costs twice the item's value plus 100 gold for every point of negative Strength, Defense, Dexterity and Wisdom, at least 500 gold, plus tax.
 - Purifying a worn item, or a weapon or any armor piece in your backpack (body, shield, helm, arms, hands, legs, feet, waist, face or cloak), leaves it 80 percent of the power it had before the curse, which is 64 percent of its cursed power.
 - Scrying (G) costs 1,000 + level x 50 gold before the Magic Shop's modifiers.
 - A dungeon reset scroll (D) costs 1,000 + 5 x level squared gold plus tax: 3,000 at level 20 and 13,500 at level 50, before tax.

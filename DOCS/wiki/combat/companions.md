@@ -53,7 +53,7 @@ At the Music Shop press T. From level 20 Melodia offers to join and Y accepts; b
 
 ## Companion levels and growth
 
-A companion uses the same experience table as you and stops at level 100. Each level gained adds 12 to 24 HP plus 1 for every 10 levels; a Tank gets 8 more, a Healer 2 more and a Bard 1 more. Other gains follow the role: a Tank gains 2 or 3 defence and 1 or 2 attack, a Damage companion 3 or 4 attack, 1 or 2 speed and 1 defence, a Healer 4 or 5 healing, 2 or 3 magic and 1 defence, a Bard 3 or 4 magic, 2 or 3 healing, 1 or 2 speed and 1 attack.
+A companion uses the same experience table as you and stops at level 100. Each level gained adds 12 to 24 HP plus 1 for every 10 levels; a Tank gets 8 more, a Healer 2 more and a Bard 1 more. Other gains follow the role: a Tank gains 2 or 3 defense and 1 or 2 attack, a Damage companion 3 or 4 attack, 1 or 2 speed and 1 defense, a Healer 4 or 5 healing, 2 or 3 magic and 1 defense, a Bard 3 or 4 magic, 2 or 3 healing, 1 or 2 speed and 1 attack.
 
 A living companion and a living NPC teammate in your dungeon party each take 75 percent of the experience you gain from a room feature you examine. In a group with another player they also each take 75 percent of the experience from treasure, a treasure chest, a cleared floor and the floor boss bonus, on top of their part of the fight's experience.
 
@@ -167,7 +167,7 @@ The Tidepool Sprite restores 5 percent of your maximum mana for each game hour t
 
 ### Dire Wolf and Storm Eagle: fighting beasts
 
-An active Dire Wolf or Storm Eagle joins your party each time you enter the dungeon, even when 4 allies are already there. It fights at the higher of its own level and half your level. From its base values in the table it gains, per level above 1, 10 percent of base HP, 8 percent of base attack and 5 percent of base defence. Example: with you at level 60 a Dire Wolf fights at level 30 with 312 HP, 59 attack and 19 defence. It has no mana.
+An active Dire Wolf or Storm Eagle joins your party each time you enter the dungeon, even when 4 allies are already there. It fights at the higher of its own level and half your level. From its base values in the table it gains, per level above 1, 10 percent of base HP, 8 percent of base attack and 5 percent of base defense. Example: with you at level 60 a Dire Wolf fights at level 30 with 312 HP, 59 attack and 19 defense. It has no mana.
 
 Each Storm Eagle hit adds lightning damage of a tenth of the hit and has a 15 percent chance to stun the target for 1 round.
 

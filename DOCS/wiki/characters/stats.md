@@ -39,14 +39,14 @@ Agility:
 
 - Dodging a monster's hit: 5 percent plus one percent per 2 points above 10, at most 35 percent. Light armor adds 10 and medium armor 5, for at most 45 percent.
 - An extra attack per round: 2 percent per point above 15, at most 40 percent, only with a weapon in your main hand.
-- Defence: your sheet adds a third of your Agility above 10, and subtracts it below 10.
+- Defense: your sheet adds a third of your Agility above 10, and subtracts it below 10.
 - Avoiding pit and other traps, and fleeing a player fight.
 
 Agility does not decide who acts first.
 
-## Defence
+## Defense
 
-When a monster hits you, your Defence, magic armor bonus and most of your armor power are taken off the damage. A hit always does at least a small minimum, and an ordinary single hit cannot take more than 75 percent of your maximum HP (85 percent from a boss). Defence and armor reduce damage; neither makes you immune. [Magic resistance](/wiki/en/items/enchanting/#magic-resistance) on your gear also cuts a monster's breaths and spells, at most by half, except an Old God's.
+When a monster hits you, your Defense, magic armor bonus and most of your armor power are taken off the damage. A hit always does at least a small minimum, and an ordinary single hit cannot take more than 75 percent of your maximum HP (85 percent from a boss). Defense and armor reduce damage; neither makes you immune. [Magic resistance](/wiki/en/items/enchanting/#magic-resistance) on your gear also cuts a monster's breaths and spells, at most by half, except an Old God's.
 
 ## Constitution, Intelligence and Wisdom
 
@@ -99,10 +99,10 @@ Stamina, the stat, sets your combat stamina, the pool that pays for martial abil
 
 ## Character creation
 
-Creation rolls three six-sided dice for each of Strength, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution, and adds your class's starting value to each. Your race adds its bonus to Strength, Stamina, Defence and HP only.
+Creation rolls three six-sided dice for each of Strength, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution, and adds your class's starting value to each. Your race adds its bonus to Strength, Stamina, Defense and HP only.
 
 - A 3d6 roll averages 10.5. A 3 or an 18 each comes up once in 216 rolls; results near the middle are far more common.
-- Defence is not rolled: it is your class value plus your race bonus.
+- Defense is not rolled: it is your class value plus your race bonus.
 - HP is two six-sided dice, plus three times your class's HP value, plus your race's HP bonus, plus a third of your Constitution.
 - A spellcasting class starts with its class mana plus a quarter of your Intelligence.
 - Your sheet then adds the usual Constitution, Intelligence and Wisdom bonuses above.

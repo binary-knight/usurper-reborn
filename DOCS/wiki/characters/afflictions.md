@@ -47,7 +47,7 @@ Statuses do not stack. Getting the same status again replaces the rounds left wi
 - **Weakened:** your basic swing and Power Attack lose 4 + level / 10 power.
 - **Cursed:** damage each round only.
 - **Feared:** no effect on what you can do.
-- **Blessed:** + level / 5 + 2 attack power, +2 defence, and 2 less armor class for your hit roll against a monster more than 5 levels above you.
+- **Blessed:** + level / 5 + 2 attack power, +2 defense, and 2 less armor class for your hit roll against a monster more than 5 levels above you.
 - **Vulnerable, Exhausted, Berserk, Empowered, Shielded and Protected** change nothing in a monster fight.
 
 A dungeon monster never puts Paralyzed, Sleeping, Confused, Slow or Diseased on you; those come from world bosses or other players, and Charmed only from other players.
@@ -78,7 +78,7 @@ From dungeon floor {{balance:EliteMinFloor}} an [elite monster](/wiki/en/monster
 - **Confused:** the monster loses its action 50 percent of the time; otherwise it hits itself for a third of its Strength 25 percent of the time.
 - **Slowed:** the monster loses its action 50 percent of the time.
 - **Feared:** the monster loses every action while the fear lasts.
-- **Weakened:** the monster's attack is 0.70 times, and the Defence and armor it sets against every hit you deal it are 0.80 times.
+- **Weakened:** the monster's attack is 0.70 times, and the Defense and armor it sets against every hit you deal it are 0.80 times.
 - **Probability Shift:** a Cyclebreaker spell. For 3 rounds the monster never scores a critical hit, and 30 percent of its normal attacks that would hit you or an ally miss. Its special abilities are not affected.
 
 ### Stuns and holds on monsters
