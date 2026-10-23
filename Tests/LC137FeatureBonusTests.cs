@@ -129,4 +129,46 @@ public class LC137FeatureBonus
         res.Outcome.Should().NotBe(CombatOutcome.Victory, "{0}", Encoding.UTF8.GetString(output.ToArray()));
         hero.SlotBonusValue(BonusSlot.Attack, Src).Should().Be(0, "a lost fight ends it");
     }
+
+    [Fact]
+    public async Task AFledFight_EndsTheBonusToo_AndItIsAbsentInTheFightAfter()
+    {
+        var hero = Hero();
+        await TakeFeature(hero);
+        var (e, watch, output) = Engine(hero, string.Concat(Enumerable.Repeat("R\n\n", 80)) + new string((char)10, 300));
+        var res = await Fight(e, hero, Mob("Ogre", "Giant", hp: 100000, str: 1));
+        res.Outcome.Should().Be(CombatOutcome.PlayerEscaped, "{0}", Encoding.UTF8.GetString(output.ToArray()));
+        watch.Seen[0].Should().Be(7, "the fled fight had the bonus in round 1");
+        hero.SlotBonusValue(BonusSlot.Attack, Src).Should().Be(0, "a fled fight ends it");
+        var (e2, watch2, _) = Engine(hero, Attacks);
+        await Fight(e2, hero, Mob("Rat", "Goblinoid", hp: 1, str: 1));
+        watch2.Seen.Should().NotBeEmpty();
+        watch2.Seen.Should().OnlyContain(v => v == 0, "the fight after starts without it");
+    }
+
+    [Fact]
+    public async Task AnOldGodFight_HasTheBonusInRoundOne_AndGoneAfter()
+    {
+        var hero = OldGodBuild134Support.Hero();
+        hero.CombatSpeed = CombatSpeed.Instant; hero.Mental = 80;
+        await TakeFeature(hero);
+        var before = OldGodBuild134Support.SetArtifacts(0);
+        var watch = new WatchStream(Attacks, () => hero.SlotBonusValue(BonusSlot.Attack, Src));
+        try
+        {
+            OldGodBossSystem.FightSeamForTests = (m, _) => { m.HP = 1; m.MaxHP = 1; m.Strength = 1; };
+            var sys = new OldGodBossSystem();
+            var data = OldGodBuild134Support.Rows().Single(r => r.Row == "Maelketh").Data;
+            try
+            {
+                await (Task<BossEncounterResult>)typeof(OldGodBossSystem).GetMethod("RunBossCombat", BindingFlags.NonPublic | BindingFlags.Instance)!
+                    .Invoke(sys, new object[] { hero, data, new TerminalEmulator(watch, new MemoryStream()) })!;
+            }
+            catch (ConnectionClosedException) { }   // the script ends after the fight
+        }
+        finally { OldGodBossSystem.FightSeamForTests = null; OldGodBuild134Support.RestoreArtifacts(before); }
+        watch.Seen.Should().NotBeEmpty();
+        watch.Seen.Should().Contain(7, "the god fight's rounds ran with the bonus");
+        hero.SlotBonusValue(BonusSlot.Attack, Src).Should().Be(0, "gone after the fight");
+    }
 }
