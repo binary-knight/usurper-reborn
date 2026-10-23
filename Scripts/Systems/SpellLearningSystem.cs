@@ -371,10 +371,6 @@ public static class SpellLearningSystem
         }
     }
 
-    /// <summary>
-    /// Check if a spell is known by the player
-    /// </summary>
-    /// <summary>v1.2.2: a spell's type (Attack, Heal, Buff, ...) in the player's language; an unknown type is shown as is.</summary>
     /// <summary>1.3.7: the widest a spell row may be.</summary>
     internal const int DescriptionRowWidth = 79;
 
@@ -412,6 +408,10 @@ public static class SpellLearningSystem
             terminal.WriteLine(row);
     }
 
+    /// <summary>
+    /// Check if a spell is known by the player
+    /// </summary>
+    /// <summary>v1.2.2: a spell's type (Attack, Heal, Buff, ...) in the player's language; an unknown type is shown as is.</summary>
     internal static string SpellTypeLabel(string spellType)
     {
         string key = "spell_learning.type." + (spellType ?? "").ToLowerInvariant();
