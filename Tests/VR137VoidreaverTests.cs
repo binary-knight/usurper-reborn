@@ -500,7 +500,7 @@ public class VR137VoidreaverTests
         long str = p.BaseStrength;
         AdminRaise(p, from, to);
         p.BaseConstitution.Should().Be(100 + Total(to) - Total(from), "g(l) for each level reached, oldLevel + i + 1");
-        p.BaseStrength.Should().Be(str + 5L * (to - from), "the copy's other rows are unchanged");
+        p.BaseStrength.Should().Be(str + 4L * (to - from), "Str equals the live level up, 4 a level (the admin copy gave 5 before 1.3.7)");
 
         // a save without the marker gains none here: its next load gives every level's Constitution at once
         var old = ThroughJson(Serialize(Hero("Vr137 Admin Old", CharacterClass.Voidreaver, from, con: 100)), old: true);
