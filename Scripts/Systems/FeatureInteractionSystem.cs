@@ -1102,7 +1102,7 @@ public class FeatureInteractionSystem
                 terminal.SetColor("bright_red");
                 terminal.WriteLine(Loc.Get("feature.spot_weaknesses"));
                 terminal.WriteLine(Loc.Get("feature.next_battle_easier"));
-                player.AddSlotBonus(BonusSlot.Attack, "feature_weakness", 5 + (level / 10), 0);   // 1.3.6 G4: no rounds, as before
+                player.AddSlotBonus(BonusSlot.Attack, Character.FeatureWeaknessSource, 5 + (level / 10), 0);   // 1.3.6 G4: no rounds; 1.3.7: the next fight keeps it
                 terminal.SetColor("yellow");
                 terminal.WriteLine(Loc.Get("feature.attack_power_bonus", 5 + (level / 10)));
                 break;

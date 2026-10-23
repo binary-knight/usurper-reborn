@@ -408,6 +408,20 @@ public class Character
         ClearSlotBonus(BonusSlot.Defense);
     }
 
+    /// <summary>The source of the attack entry a Warrior or Barbarian takes from a room feature (1.3.7: it lasts into the next fight).</summary>
+    public const string FeatureWeaknessSource = "feature_weakness";
+
+    /// <summary>
+    /// 1.3.7: the fight start clear. Empties both slots as ClearSlotBonuses does, except the attack entry a room feature
+    /// gave for the next fight, which stays untimed until the fight end clear.
+    /// </summary>
+    public void ClearSlotBonusesForFightStart()
+    {
+        int carried = SlotBonusValue(BonusSlot.Attack, FeatureWeaknessSource);
+        ClearSlotBonuses();
+        if (carried > 0) AddSlotBonus(BonusSlot.Attack, FeatureWeaknessSource, carried, 0);
+    }
+
     /// <summary>
     /// 1.3.6 G4: the round-end tick. Each timed entry loses a round and the ones that reach 0 end; untimed entries stay.
     /// The slot then shows the highest live entry again, so an ending short bonus no longer zeroes a longer one.
