@@ -114,7 +114,7 @@ public class AB137Abysswarden
         var data = new PlayerData { Class = CharacterClass.Abysswarden, BaseConstitution = 10 };
         var m = typeof(OnlineAdminConsole).GetMethod("ApplyClassStatIncreasesToSaveData", BindingFlags.NonPublic | BindingFlags.Static);
         m.Should().NotBeNull();
-        m!.Invoke(null, new object[] { data, 4 });
+        m!.Invoke(null, new object[] { data, 4, 1 });   // 1.3.7: oldLevel 1, so the edit reaches levels 2 to 5
         data.BaseConstitution.Should().Be(10 + 4 * 3);
     }
 
