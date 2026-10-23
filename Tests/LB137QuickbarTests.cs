@@ -113,6 +113,7 @@ public class LB137Quickbar
         {
             var l = lines[i];
             if (l.StartsWith("╠") || l.StartsWith("╚")) { inBar = false; if (i + 1 < lines.Length && Regex.IsMatch(lines[i + 1], "^║ \\[[1-9]\\] ")) inBar = true; continue; }
+            if (inBar && l.StartsWith("║ [") && !Regex.IsMatch(l, "^║ \\[[1-9]\\] ")) inBar = false;
             if (inBar && l.StartsWith("║")) rows.Add(l);
         }
         return rows;
