@@ -11658,7 +11658,7 @@
   "character_creation.stat_desc_dex": "Találati esély, kritikus csapások",
   "character_creation.stat_desc_con": "Bónusz ÉP, méregellenállás",
   "character_creation.stat_desc_int": "Varázssebzés, mana",
-  "character_creation.stat_desc_wis": "Mágia hatékonyság, mágiaellenállás",
+  "character_creation.stat_desc_wis": "Mana, olcsóbb varázslatok, gyógyítás",
   "character_creation.stat_desc_cha": "Bolti árak, NPC reakciók",
   "character_creation.stat_desc_mana": "Varázsláshoz szükséges erőforrás",
   "character_creation.stat_desc_mana_grows": "Szintlépésekkel növekszik",
