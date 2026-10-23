@@ -1250,6 +1250,8 @@ namespace UsurperRemake.Systems
                 terminal.WriteLine($"  {Loc.Get("world_boss.step_back")}");
             }
 
+            player.ClearSlotBonuses();   // 1.3.7: the fight end clear; the start keeps the room feature attack entry for this fight
+
             // v1.1.4: the session on the player's row: counts and the re-entry cooldown
             int cooldownSeconds = state.Killed ? 0 : state.Died ? GameConfig.WorldBossFallCooldownSeconds : GameConfig.WorldBossRetreatCooldownSeconds;
             await backend.RecordWorldBossSession(boss.Id, playerKey, player.Level, state.Round, state.Died, cooldownSeconds, player.DisplayName);
