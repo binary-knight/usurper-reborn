@@ -258,10 +258,22 @@ public class FR137FoundRows
         finally { Directory.Delete(dir, recursive: true); }
     }
 
+    private static void RowFits(string shown)
+    {
+        var rows = shown.Replace("\r", "").Split('\n').Where(r => r.Contains("(VoidreaverConstitutionApplied=")).ToList();
+        rows.Should().HaveCount(2, "the menu is shown before and after the toggle");
+        foreach (var row in rows)
+        {
+            row.TrimEnd().Length.Should().BeLessOrEqualTo(79, $"\"{row}\"");
+            row.Trim().Should().StartWith("12 ", "the row after the NG+ cycle marker toggle");
+        }
+    }
+
     [Fact]
     public void FR137FoundRows_SaveEditor_TogglesTheVoidreaverMarker_OffToOn()
     {
         var (marker, shown) = ToggleSaveAndReadBack(start: false);
+        RowFits(shown);
         shown.Should().Contain("VoidreaverConstitutionApplied=False");
         shown.Should().Contain("VoidreaverConstitutionApplied = True.");
         marker.Should().BeTrue("the toggle is written to the save file and read back");
@@ -271,6 +283,7 @@ public class FR137FoundRows
     public void FR137FoundRows_SaveEditor_TogglesTheVoidreaverMarker_OnToOff()
     {
         var (marker, shown) = ToggleSaveAndReadBack(start: true);
+        RowFits(shown);
         shown.Should().Contain("VoidreaverConstitutionApplied=True");
         shown.Should().Contain("VoidreaverConstitutionApplied = False.");
         marker.Should().BeFalse("the toggle is written to the save file and read back");

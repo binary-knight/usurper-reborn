@@ -57,14 +57,17 @@ public static class SpellLearningSystem
                     if (spell != null)
                     {
                         int manaCost = SpellSystem.CalculateManaCost(spell, player);
+                        string slotTag = $"  [{i + 1}] ";
+                        string nameCol = $"{spell.DisplayName,-22}";
+                        string costCol = $" {Loc.Get("ability.cost_mp", manaCost)} ";
                         terminal.SetColor("bright_yellow");
-                        terminal.Write($"  [{i + 1}] ");
+                        terminal.Write(slotTag);
                         terminal.SetColor("yellow");
-                        terminal.Write($"{spell.DisplayName,-22}");
+                        terminal.Write(nameCol);
                         terminal.SetColor("cyan");
-                        terminal.Write($" {Loc.Get("ability.cost_mp", manaCost)} ");
+                        terminal.Write(costCol);
                         terminal.SetColor("gray");
-                        terminal.WriteLine(spell.DisplayDescription);
+                        WriteDescription(terminal, slotTag + nameCol + costCol, spell.DisplayDescription, slotTag.Length);
                     }
                     else
                     {
@@ -108,6 +111,7 @@ public static class SpellLearningSystem
                 {
                     char letter = (char)('a' + i);
                     int manaCost = SpellSystem.CalculateManaCost(knownUnequipped[i], player);
+                    string nameCost = $"{knownUnequipped[i].DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} ";
                     terminal.SetColor("darkgray");
                     terminal.Write("  [");
                     terminal.SetColor("bright_yellow");
@@ -115,9 +119,9 @@ public static class SpellLearningSystem
                     terminal.SetColor("darkgray");
                     terminal.Write("] ");
                     terminal.SetColor("green");
-                    terminal.Write($"{knownUnequipped[i].DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} ");
+                    terminal.Write(nameCost);
                     terminal.SetColor("gray");
-                    terminal.WriteLine(knownUnequipped[i].DisplayDescription);
+                    WriteDescription(terminal, $"  [{letter}] " + nameCost, knownUnequipped[i].DisplayDescription, 6);
                 }
             }
 
@@ -134,12 +138,14 @@ public static class SpellLearningSystem
                 {
                     int manaCost = SpellSystem.CalculateManaCost(spell, player);
                     string learnKey = $"L{spell.Level}";
+                    string keyTag = $"  [{learnKey,-3}] ";
+                    string nameCost = $"{spell.DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} ";
                     terminal.SetColor("darkgray");
-                    terminal.Write($"  [{learnKey,-3}] ");
+                    terminal.Write(keyTag);
                     terminal.SetColor("white");
-                    terminal.Write($"{spell.DisplayName,-22} {Loc.Get("ability.cost_mp", manaCost)} ");
+                    terminal.Write(nameCost);
                     terminal.SetColor("gray");
-                    terminal.WriteLine(spell.DisplayDescription);
+                    WriteDescription(terminal, keyTag + nameCost, spell.DisplayDescription, keyTag.Length);
                 }
             }
 
@@ -154,8 +160,10 @@ public static class SpellLearningSystem
                 foreach (var spell in locked)
                 {
                     int reqLevel = SpellSystem.GetLevelRequired(player.Class, spell.Level);
+                    string lockedRow = $"       {spell.DisplayName,-22} {Loc.Get("spell_learning.locked_requires", reqLevel)} - ";
                     terminal.SetColor("darkgray");
-                    terminal.WriteLine($"       {spell.DisplayName,-22} {Loc.Get("spell_learning.locked_requires", reqLevel)} - {spell.DisplayDescription}");
+                    terminal.Write(lockedRow);
+                    WriteDescription(terminal, lockedRow, spell.DisplayDescription, 7);
                 }
             }
 
@@ -367,6 +375,43 @@ public static class SpellLearningSystem
     /// Check if a spell is known by the player
     /// </summary>
     /// <summary>v1.2.2: a spell's type (Attack, Heal, Buff, ...) in the player's language; an unknown type is shown as is.</summary>
+    /// <summary>1.3.7: the widest a spell row may be.</summary>
+    internal const int DescriptionRowWidth = 79;
+
+    /// <summary>1.3.7: the fewest columns the description keeps under itself; with fewer, its
+    /// later rows start under the spell name instead.</summary>
+    internal const int MinDescriptionColumns = 30;
+
+    /// <summary>
+    /// 1.3.7: a spell description that follows a row's prefix (key, name, cost), wrapped with
+    /// UIHelper.WordWrap so no row passes 79 columns. Item 0 is the text that ends the prefix row;
+    /// each later item is a whole row, indented under the description's start column, or under
+    /// the spell name (rowIndent) when the description starts too far right. A first word that
+    /// does not fit after the prefix starts the second row. Screen reader mode prints the same
+    /// rows: these screens have no separate screen reader form.
+    /// </summary>
+    internal static List<string> DescriptionRows(int prefixWidth, string? description, int rowIndent)
+    {
+        int width = DescriptionRowWidth;
+        int indent = width - prefixWidth >= MinDescriptionColumns ? prefixWidth : rowIndent;
+        var rows = UIHelper.WordWrap(description, width - indent, Math.Max(0, prefixWidth - indent));
+        if (prefixWidth + UIHelper.VisibleLength(rows[0]) > width)
+        {
+            rows = UIHelper.WordWrap(description, width - indent);
+            rows.Insert(0, "");
+        }
+        string pad = new string(' ', indent);
+        for (int i = 1; i < rows.Count; i++) rows[i] = pad + rows[i];
+        return rows;
+    }
+
+    /// <summary>1.3.7: writes a description after a prefix already written on the row.</summary>
+    private static void WriteDescription(TerminalEmulator terminal, string prefix, string? description, int rowIndent)
+    {
+        foreach (var row in DescriptionRows(UIHelper.VisibleLength(prefix), description, rowIndent))
+            terminal.WriteLine(row);
+    }
+
     internal static string SpellTypeLabel(string spellType)
     {
         string key = "spell_learning.type." + (spellType ?? "").ToLowerInvariant();
