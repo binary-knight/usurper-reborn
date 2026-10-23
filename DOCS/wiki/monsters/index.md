@@ -30,7 +30,7 @@ Each is multiplied by the tier's power and then by {{balance:BaseMonsterDifficul
 
 A floor boss is built from its tier's boss power where the tier has one (the Orc's is 1.0 against its 0.9), then has 2.8 times the HP, 1.25 times the Strength, punch and weapon power and 1.2 times the Defence and armor of a monster of its level and tier; the deep factors below multiply on top.
 
-The deep floors from 25 are built for a full team of five: a tank, a healer and damage dealers. From level 25 HP is also multiplied by a deep factor that rises in straight lines from 1.0 at level 25 to 1.44 at 35, 1.605 at 50 and 1.66 at 100, and Strength, punch and weapon power by one that rises from 1.0 at 25 to 1.44 at 35, 1.605 at 50, 1.715 at 75 and 2.1 at 100. Defence and armor are not. A level 60 monster of power 1.0 has 18,328 HP and 852 Strength.
+The deep floors from 25 are built for a full team of five: a tank, a healer and damage dealers. From level 25 HP is also multiplied by a deep factor that rises in straight lines from 1.0 at level 25 to 1.44 at 35, 1.605 at 50 and 1.66 at 100, and Strength, punch and weapon power by one that rises from 1.0 at 25 to 1.44 at 35, 1.605 at 50, 1.715 at 75, 1.97 at 80 and 2.31 at 100. Defence and armor are not. A level 60 monster of power 1.0 has 18,328 HP and 852 Strength.
 
 ### Monsters on the first floors
 
