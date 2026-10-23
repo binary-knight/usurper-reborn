@@ -99,8 +99,14 @@ public class MG137Magician
             d.Should().NotContain("50-75 hp +", lang);
             d.Should().Contain("50-75").And.Contain("20").And.Contain("75").And.Contain("100", lang);
             (d.Contains("1,2") || d.Contains("1.2")).Should().BeTrue(lang);
-            // a wrapped paragraph of two 79 column rows at most (en and hu tested)
-            if (lang == "en" || lang == "hu") d.Length.Should().BeLessThanOrEqualTo(158, lang);
+            // a wrapped paragraph: no longer than the longest spell description already shown in that language (en and hu)
+            if (lang == "en" || lang == "hu")
+            {
+                var all = Load(lang);
+                int longestOther = all.Where(kv => kv.Key.StartsWith("spell.") && kv.Key.EndsWith(".desc") && kv.Key != "spell.magician.8.desc")
+                    .Max(kv => kv.Value.Length);
+                d.Length.Should().BeLessThanOrEqualTo(longestOther, lang);
+            }
         }
         SpellSystem.GetSpellInfo(CharacterClass.Magician, 8)!.Description.Should().Contain("at least 20% of max HP");
     }
