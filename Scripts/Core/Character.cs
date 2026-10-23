@@ -1041,6 +1041,8 @@ public class Character
     public bool ArtifactStatsApplied { get; set; } = true;
     // 1.2.0: the one-time login backfill of the NG+ cycle stat bonus has run (or was never needed); as above.
     public bool CycleStatBonusApplied { get; set; } = true;
+    // 1.3.7: the one-time Voidreaver Constitution top-up has run (or was never needed); as above, a player or an NPC.
+    public bool VoidreaverConstitutionApplied { get; set; } = true;
     public int SteroidShopPurchases { get; set; } = 0;          // Lifetime steroid purchases (cap 3)
     public int AlchemistINTBoosts { get; set; } = 0;            // Lifetime alchemist INT boosts (cap 3)
     public int GamblingRoundsToday { get; set; } = 0;           // Daily gambling counter (max 10)

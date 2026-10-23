@@ -244,7 +244,8 @@ namespace UsurperRemake.Systems
         /// Apply class-based stat increases to raw PlayerSaveData for admin level edits.
         /// Mirrors LevelMasterLocation.ApplyClassStatIncreases() but works on save data directly.
         /// </summary>
-        private static void ApplyClassStatIncreasesToSaveData(PlayerData player, int levelsGained)
+        /// 1.3.7: <paramref name="oldLevel"/> is the level before the edit, so iteration i reaches oldLevel + i + 1.
+        private static void ApplyClassStatIncreasesToSaveData(PlayerData player, int levelsGained, int oldLevel)
         {
             for (int i = 0; i < levelsGained; i++)
             {
@@ -319,6 +320,10 @@ namespace UsurperRemake.Systems
                     case CharacterClass.Voidreaver:
                         player.BaseStrength += 5; player.BaseIntelligence += 5; player.BaseDexterity += 4;
                         player.BaseAgility += 3; player.BaseStamina += 2; player.BaseMaxHP += 6; player.BaseMaxMana += 12;
+                        // 1.3.7: the lifted Constitution of the level reached, from the level up's own function; a save
+                        // without the marker gains none here, as its next load tops up every level at once
+                        if (player.VoidreaverConstitutionApplied)
+                            player.BaseConstitution += LevelMasterLocation.VoidreaverConstitutionGain(oldLevel + i + 1);
                         break;
                     case CharacterClass.MysticShaman:
                         player.BaseStrength += 3; player.BaseDefence += 2; player.BaseIntelligence += 3;
@@ -796,7 +801,7 @@ namespace UsurperRemake.Systems
                             int levelsGained = player.Level - oldLevel;
                             if (levelsGained > 0)
                             {
-                                ApplyClassStatIncreasesToSaveData(player, levelsGained);
+                                ApplyClassStatIncreasesToSaveData(player, levelsGained, oldLevel);
                                 terminal.WriteLine($"  Applied {levelsGained} levels of {GetClassName((int)player.Class)} stat increases.", "bright_green");
                             }
                             else

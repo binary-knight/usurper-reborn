@@ -220,20 +220,24 @@ public static class WikiDataExporter
             BaseMaxHP = baseline, BaseMaxMana = baseline,
             BaseDefence = baseline, BaseStamina = baseline, BaseAgility = baseline
         };
-        LevelMasterLocation.ApplyClassStatIncreases(character);
+        // 1.3.7: two level ups (to levels 2 and 3), halved, so a gain that alternates by level (the Voidreaver's
+        // Constitution, 2 then 1) shows its average, 1.5; a gain that does not stays a whole number
+        LevelMasterLocation.ApplyClassStatIncreases(character, 2);
+        LevelMasterLocation.ApplyClassStatIncreases(character, 3);
+        static object PerLevel(long twoLevels) => twoLevels % 2 == 0 ? twoLevels / 2 : twoLevels / 2.0;
         return new
         {
-            strength = character.BaseStrength - baseline,
-            dexterity = character.BaseDexterity - baseline,
-            constitution = character.BaseConstitution - baseline,
-            intelligence = character.BaseIntelligence - baseline,
-            wisdom = character.BaseWisdom - baseline,
-            charisma = character.BaseCharisma - baseline,
-            maxHP = character.BaseMaxHP - baseline,
-            maxMana = character.BaseMaxMana - baseline,
-            defence = character.BaseDefence - baseline,
-            stamina = character.BaseStamina - baseline,
-            agility = character.BaseAgility - baseline
+            strength = PerLevel(character.BaseStrength - baseline),
+            dexterity = PerLevel(character.BaseDexterity - baseline),
+            constitution = PerLevel(character.BaseConstitution - baseline),
+            intelligence = PerLevel(character.BaseIntelligence - baseline),
+            wisdom = PerLevel(character.BaseWisdom - baseline),
+            charisma = PerLevel(character.BaseCharisma - baseline),
+            maxHP = PerLevel(character.BaseMaxHP - baseline),
+            maxMana = PerLevel(character.BaseMaxMana - baseline),
+            defence = PerLevel(character.BaseDefence - baseline),
+            stamina = PerLevel(character.BaseStamina - baseline),
+            agility = PerLevel(character.BaseAgility - baseline)
         };
     }
 

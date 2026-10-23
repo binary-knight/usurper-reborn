@@ -10959,7 +10959,7 @@
   "spell.voidreaver.4.name": "Elesettek Felemésztése",
   "spell.voidreaver.4.desc": "Elnyeli az elesettek maradék energiáját. Meggyógyítja a maximum ÉP 25%-át (min. 100). Időtartam: 1 kör.",
   "spell.voidreaver.5.name": "Megsemmisítés",
-  "spell.voidreaver.5.desc": "Kitörli a célpontot a valóságból. Sebzés: 200-280. Jelenlegi ÉP-ed 25%-ába kerül. Ha megöli: helyreállítja az összes ÉP-t és manát. Időtartam: 1 kör.",
+  "spell.voidreaver.5.desc": "Kitörli a célpontot a valóságból. Sebzés: 200-280. Jelenlegi ÉP-ed 10%-ába kerül. Ha megöli: helyreállítja az összes ÉP-t és manát. Időtartam: 1 kör.",
   "_comment_music_shop_extra": "=== Hangszerbolt -- további kulcsok ===",
   "music_shop.bbs_buy_instruments": "Hangszerek vásárlása",
   "music_shop.bbs_performance": "Előadás",

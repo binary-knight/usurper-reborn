@@ -10951,7 +10951,7 @@
   "spell.voidreaver.4.name": "Consumare i Caduti",
   "spell.voidreaver.4.desc": "Divora l'energia residua dei caduti. Cura il 25% dei PF massimi (min. 100). Durata: 1 turno.",
   "spell.voidreaver.5.name": "Disfacimento",
-  "spell.voidreaver.5.desc": "Cancella il bersaglio dalla realtà. Danni: 200-280. Costa il 25% dei PF attuali. Se uccide: ripristina tutti i PF e il mana. Durata: 1 turno.",
+  "spell.voidreaver.5.desc": "Cancella il bersaglio dalla realtà. Danni: 200-280. Costa il 10% dei PF attuali. Se uccide: ripristina tutti i PF e il mana. Durata: 1 turno.",
   "_comment_music_shop_extra": "=== Negozio di Musica -- chiavi aggiuntive ===",
   "music_shop.bbs_buy_instruments": "cquista Strumenti",
   "music_shop.bbs_performance": "sibizione",

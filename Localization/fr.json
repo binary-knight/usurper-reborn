@@ -10951,7 +10951,7 @@
   "spell.voidreaver.4.name": "Consumer les Déchus",
   "spell.voidreaver.4.desc": "Dévore l'énergie résiduelle des déchus. Soigne 25 % des pv max (min. 100). Durée : 1 tour.",
   "spell.voidreaver.5.name": "Défaisance",
-  "spell.voidreaver.5.desc": "Efface la cible de la réalité. Dégâts : 200-280. Coûte 25 % de vos pv actuels. En cas de mise à mort : restaure tous les pv et le mana. Durée : 1 tour.",
+  "spell.voidreaver.5.desc": "Efface la cible de la réalité. Dégâts : 200-280. Coûte 10 % de vos pv actuels. En cas de mise à mort : restaure tous les pv et le mana. Durée : 1 tour.",
   "_comment_music_shop_extra": "=== Boutique de Musique -- clés additionnelles ===",
   "music_shop.bbs_buy_instruments": "cheter instruments",
   "music_shop.bbs_performance": "eprésentation",

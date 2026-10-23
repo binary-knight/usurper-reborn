@@ -291,7 +291,7 @@ public static class SpellSystem
             [2] = new SpellInfo(2, "Blood Pact", "Sacrifice 20% of max HP. Gain +50 attack for the fight and guaranteed critical strike on next hit. Cannot be dispelled.", 30, 5, "Bloodpactarie", false, "Buff"),
             [3] = new SpellInfo(3, "Void Bolt", "Fire a bolt of annihilating nothingness. Damage: 90-120. Ignores all defense. Duration: 1 turn.", 55, 10, "Voidboltarie", false, "Attack"),
             [4] = new SpellInfo(4, "Consume the Fallen", "Devour residual energy from the fallen. Heals 25% of max HP (min 100). Duration: 1 turn.", 80, 16, "Consumfallarie", false, "Heal"),
-            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 200-280. Costs 25% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
+            [5] = new SpellInfo(5, "Unmaking", "Erase the target from reality. Damage: 200-280. Costs 10% current HP. If kills: restore all HP and mana. Duration: 1 turn.", 250, 24, "Unmakingarie", false, "Attack")
         }
     };
     
@@ -1800,7 +1800,7 @@ public static class SpellSystem
                 result.Healing = Math.Max(100, (int)(caster.MaxHP * 0.25));
                 result.Message += $" {Loc.Get("combat.spell_consume_fallen_cast", caster.Name2, result.Healing)}";
                 break;
-            case 5: // Unmaking - 200-280 damage, costs 25% current HP (reduced from 350-450)
+            case 5: // Unmaking - 200-280 damage, costs 10% current HP (1.3.7: was 25%; damage reduced from 350-450)
                 // 1-round cooldown — can't spam the most powerful spell every round
                 if (caster.UnmakingCooldown > 0)
                 {
@@ -1812,7 +1812,7 @@ public static class SpellSystem
                     caster.Mana += result.ManaCost;
                     break;
                 }
-                int unmakeCost = (int)(caster.HP * 0.25);
+                int unmakeCost = (int)(caster.HP * 0.10);   // 1.3.7: was 0.25
                 caster.HP = Math.Max(1, caster.HP - unmakeCost);
                 int vrDmg5 = 200 + random.Next(81);
                 result.Damage = ScaleSpellEffect(vrDmg5, caster, random, profMult);

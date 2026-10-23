@@ -10951,7 +10951,7 @@
   "spell.voidreaver.4.name": "Consumir a los Caídos",
   "spell.voidreaver.4.desc": "Devora la energía residual de los caídos. Cura el 25% de los PV máx. (mín. 100). Duración: 1 turno.",
   "spell.voidreaver.5.name": "Deshacimiento",
-  "spell.voidreaver.5.desc": "Borra al objetivo de la realidad. Daño: 200-280. Cuesta el 25% de tus PV actuales. Si mata: restaura todos los PV y maná. Duración: 1 turno.",
+  "spell.voidreaver.5.desc": "Borra al objetivo de la realidad. Daño: 200-280. Cuesta el 10% de tus PV actuales. Si mata: restaura todos los PV y maná. Duración: 1 turno.",
   "_comment_music_shop_extra": "=== Tienda de Música -- claves adicionales ===",
   "music_shop.bbs_buy_instruments": "omprar Instrumentos",
   "music_shop.bbs_performance": "ctuación",
