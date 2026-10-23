@@ -32,7 +32,7 @@ The Faith room holds the Faith faction's oath and cloister: you join the Faith t
 
 ### What does the Inner Sanctum give
 
-The Inner Sanctum is for members of the Faith: once a day, for {{balance:InnerSanctumCost}} gold, it raises one of nine attributes by 1 for good, chosen at random among Strength, Defence, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution.
+The Inner Sanctum is for members of the Faith: once a day, for {{balance:InnerSanctumCost}} gold, it raises one of nine attributes by 1 for good, chosen at random among Strength, Defense, Stamina, Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution.
 
 ### Settling a betrayal
 

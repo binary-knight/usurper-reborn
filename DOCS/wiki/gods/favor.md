@@ -7,7 +7,7 @@ history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | Rescuing a Downed ally counts as healing an ally, a deed Amara likes.
-history: 1.3.2 | A Temple blessing's damage bonus, from daily prayer or a gold sacrifice, applies on your basic swings, and divine wrath cuts your damage and defence by the percent the screen states for the whole fight.
+history: 1.3.2 | A Temple blessing's damage bonus, from daily prayer or a gold sacrifice, applies on your basic swings, and divine wrath cuts your damage and defense by the percent the screen states for the whole fight.
 ---
 Favor is your relationship with the god you worship: a number from {{balance:GodFavorMin}} to {{balance:GodFavorMax}}, saved with your character. Your tier sets how much of your god's boon you receive, and it changes the moment you cross a tier.
 
@@ -49,7 +49,7 @@ Daily Temple prayer gives {{balance:GodFavorPrayerGain}} Favor and, from a Templ
 
 A god's power is its divine experience on a scale of 0.1 to 1.0: the logarithm (base 10) of its experience divided by 7. A Temple god starts with 5,000 to 20,000 experience, a power of about 0.53 to 0.61, so its blessing cuts 5 or 6 percent of the damage and adds 10 or 11 percent experience. The blessing also carries a damage bonus of the same size as the cut on your basic swings.
 
-Prayer to a player-god takes the larger of the damage and defence percent of that god's configured Favors, doubles it, and gives it as a blessing that raises both your attack and your defence by that much for {{balance:GodPrayerBlessingCombats}} fights, twice as many at Zealot and Chosen. Favors of 10 percent damage give a 20 percent blessing. A god with no damage or defence Favor gives no blessing. See [player-gods](/wiki/en/gods/player-gods/#favors).
+Prayer to a player-god takes the larger of the damage and defense percent of that god's configured Favors, doubles it, and gives it as a blessing that raises both your attack and your defense by that much for {{balance:GodPrayerBlessingCombats}} fights, twice as many at Zealot and Chosen. Favors of 10 percent damage give a 20 percent blessing. A god with no damage or defense Favor gives no blessing. See [player-gods](/wiki/en/gods/player-gods/#favors).
 
 ### The gold sacrifice blessing
 

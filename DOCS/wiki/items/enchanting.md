@@ -19,15 +19,15 @@ The cost is the base price plus the per-level price times your level, and then t
 
 ## Stat enchants
 
-Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add their bonus to one stat you choose: weapon power, Strength, Dexterity, Defence, Wisdom, armor class, Constitution, Intelligence, Charisma, Agility or Stamina. Mythic, Legendary and Godforged also take crafting materials.
+Minor, Standard, Greater, Superior, Mythic, Legendary and Godforged each add their bonus to one stat you choose: weapon power, Strength, Dexterity, Defense, Wisdom, armor class, Constitution, Intelligence, Charisma, Agility or Stamina. Mythic, Legendary and Godforged also take crafting materials.
 
 ## Named enchants
 
-Divine Blessing adds +3 to Strength, Dexterity, Defence and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defence. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
+Divine Blessing adds +3 to Strength, Dexterity, Defense and Wisdom, and +3 weapon power and armor class. Ocean's Touch adds +6 Intelligence and +4 Wisdom, and needs Awakening level 2 or more as well as character level 20. Ward adds +20 magic resistance and +2 Defense. Predator adds +5 percent critical hit chance and +10 percent critical damage. Lifedrinker adds +6 percent life steal.
 
 ### Magic resistance
 
-Magic resistance on your gear (Ward gives 20, and found gear may carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defence and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
+Magic resistance on your gear (Ward gives 20, and found gear may carry it too) cuts a magical hit by MR / (MR + 100), at most half: Ward's 20 takes a sixth off, and 100 or more takes half. It comes last, after your Defense and every other cut, even below the usual minimum, and a hit still does at least 1. It protects you and each ally in your party by the magic resistance of their own gear.
 
 The magical attacks are the monster breaths and spells: Fire Breath, Frost Breath, Poison Cloud, Poison Gas, Spellcasting, Ancient Magic, Hellfire, Immolate, Fireball, Inferno, Lightning, Holy Smite, Divine Judgment, Madness, Terror, Nightmare, Reality Break, Overload, Whirlpool and Tidal Wave, and also Boulder, Earthquake and Root Entangle. A monster's normal blows and its other abilities, Crushing Blow and Life Drain among them, are not magical. Old God attacks are excluded: magic resistance does nothing against an Old God, whatever the attack. A world boss's attacks are not magical either. In a fight between players, magic resistance cuts the damage of every spell that hits you the same way, after the Team HQ Barracks.
 

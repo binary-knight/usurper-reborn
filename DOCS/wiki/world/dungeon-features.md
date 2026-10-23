@@ -63,7 +63,7 @@ A chest trap you open first gives you the room trap evade roll (below). If it hi
 
 ### Mimic
 
-A mimic is a champion fight. Its HP, Strength, Defence, punch and weapon power are 1.5 times the plain monster formulas of the floor's level, without the monster difficulty scale of {{balance:BaseMonsterDifficultyScale}} or the early floor softening that ordinary monsters get.
+A mimic is a champion fight. Its HP, Strength, Defense, punch and weapon power are 1.5 times the plain monster formulas of the floor's level, without the monster difficulty scale of {{balance:BaseMonsterDifficultyScale}} or the early floor softening that ordinary monsters get.
 
 ## Room traps
 

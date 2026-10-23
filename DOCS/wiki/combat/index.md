@@ -3,8 +3,8 @@ title: Combat basics
 path: /wiki/en/combat/
 checked: 1.3.6
 sources: Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Core/Character.cs, Scripts/Core/Monster.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/DailySystemManager.cs, Scripts/Locations/DungeonLocation.cs, Scripts/Locations/InnLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/HomeLocation.cs
-history: 1.3.6 | Magic resistance on your gear now cuts a monster's breath and spell damage by up to half, except an Old God's, a weakened monster sets 0.80 times its armor and Defence against your hits, Boss Slayer gear now adds its 10 percent to Power Attack, and U rescues each Downed ally once per fight.
-history: 1.3.5 | Gear HP and mana regeneration restores a share of the maximum each round, at most 10 percent, armor piercing also lowers monster Defence against abilities and area attacks and adds up to at most 50 percent, and gear crit damage adds on top of the 3 times Dexterity cap.
+history: 1.3.6 | Magic resistance on your gear now cuts a monster's breath and spell damage by up to half, except an Old God's, a weakened monster sets 0.80 times its armor and Defense against your hits, Boss Slayer gear now adds its 10 percent to Power Attack, and U rescues each Downed ally once per fight.
+history: 1.3.5 | Gear HP and mana regeneration restores a share of the maximum each round, at most 10 percent, armor piercing also lowers monster Defense against abilities and area attacks and adds up to at most 50 percent, and gear crit damage adds on top of the 3 times Dexterity cap.
 history: 1.3.4 | A Cyclebreaker's Probability Shift makes 30 percent of a monster's hits on you miss and turns its natural 20 into an ordinary hit, and the difficulty's monster damage now applies to Manwe's named abilities.
 history: 1.3.3 | A companion or NPC ally at 0 HP is Downed, not dead: U spends a healing potion to rescue it, and a Beast, Insectoid, Shadow or Undead monster or a boss can spend its action to finish it.
 history: 1.3.2 | Class combat bonuses, divine damage bonuses, the Blood Price cut and the world boss Boss Slayer bonus apply on your swings, a monster's Thorns costs a melee attacker a quarter of the damage dealt, and every party member regains stamina and mana at round end.
@@ -36,9 +36,9 @@ There is no initiative roll and Agility does not decide who acts first. Each rou
 
 When a fight starts as an ambush, each monster rolls its level x 3 plus a twenty-sided die against your party's awareness plus a twenty-sided die, and each monster that rolls higher gets one free attack before round 1. Awareness is the best base Agility in the party / 4, plus the best base Dexterity / 4, plus the highest level x 2. A Swift [elite](/wiki/en/monsters/#elites) always gets one free attack before round 1, ambush or not.
 
-## Damage and defence
+## Damage and defense
 
-A physical attack on a monster first rolls to hit, then works out its damage; criticals have additional rules and bonuses. Defence, armor, blocks and dodges protect in different ways. A miss is not necessarily evidence that your weapon has too little power.
+A physical attack on a monster first rolls to hit, then works out its damage; criticals have additional rules and bonuses. Defense, armor, blocks and dodges protect in different ways. A miss is not necessarily evidence that your weapon has too little power.
 
 When you dual wield, each swing uses the weapon in its own hand and the off-hand swing deals half damage. Abilities count the main-hand weapon in full and the off-hand weapon at half.
 
@@ -60,7 +60,7 @@ A monster's own evasion is checked first, before the roll. A swing from hiding d
 
 Against a monster more than {{balance:AtLevelAccuracyGap}} levels above you, the number you need is the monster's armor class minus your hit modifier, kept between {{balance:PlayerHitMinNeeded}} and {{balance:PlayerHitMaxNeededAbove}}.
 
-- The monster's armor class is 10 + its level / 2 + its Defence / 10. It is 4 higher while you rage, 2 higher in Power Attack's stance, 6 higher while you are blinded, and 2 lower while you are Blessed or have the King's blessing.
+- The monster's armor class is 10 + its level / 2 + its Defense / 10. It is 4 higher while you rage, 2 higher in Power Attack's stance, 6 higher while you are blinded, and 2 lower while you are Blessed or have the King's blessing.
 - Your hit modifier is (Strength - 10) / 3 + (Dexterity - 10) / 4 + your basic attack [proficiency](/wiki/en/characters/leveling/) modifier (-2 at Untrained up to +7 at Legendary) + your level / 5 + your weapon power / 20. Above +6, only a third of the rest counts: a raw +15 counts as +9.
 
 Against a monster up to {{balance:AtLevelAccuracyGap}} levels above you none of this counts: the number is always {{balance:PlayerHitMinNeeded}}.
@@ -99,11 +99,11 @@ A basic swing's power is Strength + Strength / 4 + your level, plus the weapon t
 
 Weapon power above 800 counts at half in a swing's damage: 1,000 counts as 900. Your sheet still shows the full number. The cap also applies to the weapon power that abilities and teammates use.
 
-### Monster armor and Defence
+### Monster armor and Defense
 
-A monster takes your damage minus its armor power, at least 1. A basic swing and Backstab ignore its Defence; Power Attack and Precise Strike first take off its Defence plus a random 0 to Defence / 8. A weakened monster sets 0.80 times its armor and Defence against every hit. A sleeping monster then takes 50 percent more.
+A monster takes your damage minus its armor power, at least 1. A basic swing and Backstab ignore its Defense; Power Attack and Precise Strike first take off its Defense plus a random 0 to Defense / 8. A weakened monster sets 0.80 times its armor and Defense against every hit. A sleeping monster then takes 50 percent more.
 
-Armor piercing on your gear takes its percent off the armor or Defence a monster sets against your basic attacks, abilities and area attacks; the sum over all your gear is at most 50 percent.
+Armor piercing on your gear takes its percent off the armor or Defense a monster sets against your basic attacks, abilities and area attacks; the sum over all your gear is at most 50 percent.
 
 ### Area damage
 
@@ -124,9 +124,9 @@ When you dual wield, every swing past the first (and past a Warrior's extra swin
 
 ## Weapon setup: two-handed, dual wield and shields
 
-- **Two-handed:** a two-handed weapon, and any bow, staff, maul or polearm, multiplies your swing damage by {{balance:TwoHandedDamageBonus}} and your defence against monster hits by 0.85.
-- **Dual wield:** two one-handed weapons and no shield give 1 extra off-hand swing per Attack at 0.50 damage with the off-hand weapon, and multiply your defence by 0.90.
-- **Shield:** a shield gives a 20 percent chance to block a monster hit that landed; a block takes off half of the damage left after defence, never below the minimum. A shield has no defence penalty.
+- **Two-handed:** a two-handed weapon, and any bow, staff, maul or polearm, multiplies your swing damage by {{balance:TwoHandedDamageBonus}} and your defense against monster hits by 0.85.
+- **Dual wield:** two one-handed weapons and no shield give 1 extra off-hand swing per Attack at 0.50 damage with the off-hand weapon, and multiply your defense by 0.90.
+- **Shield:** a shield gives a 20 percent chance to block a monster hit that landed; a block takes off half of the damage left after defense, never below the minimum. A shield has no defense penalty.
 
 ## Tactical actions
 
@@ -134,11 +134,11 @@ These actions work for any class unless stated, and each one ends your turn, eve
 
 ### Power Attack (P)
 
-Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, a Boss Slayer item's +10 percent against a boss or mini-boss (+4.5 percent against Manwe), and the monster's Defence and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
+Power Attack costs 15 combat stamina and hits for (Strength + Strength / 4 + level + W + a random 0 to W / 2 + a random 1 to 20) x 1.75, where W is your main-hand weapon power plus half the off hand's. Then come your weapon setup, basic attack proficiency, crit and difficulty, a Boss Slayer item's +10 percent against a boss or mini-boss (+4.5 percent against Manwe), and the monster's Defense and armor are taken off. A Bard, Jester or Wavecaller uses Charisma in place of Strength. It rolls to hit, crits half as often as a basic swing, and puts you in Power Stance for the round: the monster's armor class for you is 2 higher. With too little stamina the turn is spent and nothing happens. A dual-wielder follows with an off-hand swing.
 
 ### Precise Strike (E)
 
-Precise Strike needs {{balance:PreciseStrikeNeededBonus}} less on the hit die and costs nothing. Its damage is Strength + weapon power + a random 1 to 14, times your weapon setup, minus the monster's Defence and armor. It never crits. It only helps against a monster more than {{balance:AtLevelAccuracyGap}} levels above you.
+Precise Strike needs {{balance:PreciseStrikeNeededBonus}} less on the hit die and costs nothing. Its damage is Strength + weapon power + a random 1 to 14, times your weapon setup, minus the monster's Defense and armor. It never crits. It only helps against a monster more than {{balance:AtLevelAccuracyGap}} levels above you.
 
 ### Backstab (K, Assassin)
 
@@ -158,11 +158,11 @@ Disarm succeeds 50 percent of the time plus half of (your Dexterity - the monste
 
 ### Taunt (T)
 
-Taunt makes the monster attack you for 2 rounds, whoever else is in the party, and lowers its Defence by 3 and its armor by 2 for the rest of the fight. It costs nothing.
+Taunt makes the monster attack you for 2 rounds, whoever else is in the party, and lowers its Defense by 3 and its armor by 2 for the rest of the fight. It costs nothing.
 
 ### Rage (G, Barbarian)
 
-Rage lasts 5 rounds: the Strength and level part of your basic swing and Power Attack is multiplied by 1.5, your defence against monster hits drops by 4 and the monster's armor class for you is 4 higher. You cannot rage again while raging.
+Rage lasts 5 rounds: the Strength and level part of your basic swing and Power Attack is multiplied by 1.5, your defense against monster hits drops by 4 and the monster's armor class for you is 4 higher. You cannot rage again while raging.
 
 ### Defend (D)
 
@@ -195,13 +195,13 @@ Probability Shift, dodge, Blur and block work only against a monster's normal at
 
 A monster's hit is its Strength + weapon power + punch, plus a random 0 to 9 (0 to 5 for a monster of level 3 or less). A boss hits 1.3 times as hard. The hit does 1.25 times when its roll beat the number needed by 5, 1.5 times when by 10, and double on a natural 20 (not under Probability Shift). A weakened monster hits for 0.70 times.
 
-### Your defence
+### Your defense
 
-Your defence against a monster's hit is your Defence + a ward spell's bonus + 75 to 100 percent of your armor power, times your weapon setup (two-handed 0.85, dual wield 0.90), then Blessed +2, the King's blessing +10 percent, Rage -4, the Grief, Mental and Fatigue penalty, and your buffs: King +10 percent, Knight +5 percent, Grand Champion +3 percent and others. The hit does its damage minus your defence. A Barbarian or Mystic Shaman then takes 2 less, never below the minimum.
+Your defense against a monster's hit is your Defense + a ward spell's bonus + 75 to 100 percent of your armor power, times your weapon setup (two-handed 0.85, dual wield 0.90), then Blessed +2, the King's blessing +10 percent, Rage -4, the Grief, Mental and Fatigue penalty, and your buffs: King +10 percent, Knight +5 percent, Grand Champion +3 percent and others. The hit does its damage minus your defense. A Barbarian or Mystic Shaman then takes 2 less, never below the minimum.
 
 ### Minimum damage
 
-A monster hit that lands does at least the larger of 1, 5 percent of the hit before defence, and 0.25 percent of your maximum HP. Defend can halve it below that.
+A monster hit that lands does at least the larger of 1, 5 percent of the hit before defense, and 0.25 percent of your maximum HP. Defend can halve it below that.
 
 ### Most damage from one hit
 
@@ -211,7 +211,7 @@ An ordinary monster's hit can take at most 75 percent of your maximum HP and a b
 
 A monster with abilities uses one on 30 percent of its turns plus 1 percent per 5 levels: a level 50 monster 40 percent of the time. An Old God uses one 70 percent of the time. When every ability would be wasted it makes its normal attack instead ([how monsters choose](/wiki/en/monsters/#how-monsters-fight)).
 
-An ability's direct damage is reduced by your Defence + half your armor power + a ward spell's bonus, with the same minimum and caps as a normal hit. Defend, dodge, Blur and a shield do not help against it. Last, a monster breath or spell loses the share your gear's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) takes, at most half and even below the minimum; an Old God's never does.
+An ability's direct damage is reduced by your Defense + half your armor power + a ward spell's bonus, with the same minimum and caps as a normal hit. Defend, dodge, Blur and a shield do not help against it. Last, a monster breath or spell loses the share your gear's [magic resistance](/wiki/en/items/enchanting/#magic-resistance) takes, at most half and even below the minimum; an Old God's never does.
 
 ## Life steal and thorns
 
@@ -250,13 +250,13 @@ Your damage is multiplied by 1.15 on Easy, 1.0 on Normal and Hard and 0.9 on Nig
 
 ## Fatigue
 
-In single-player each fight adds {{balance:FatigueCostCombat}} Fatigue, 2 in light armor. At {{balance:FatigueTiredThreshold}} Fatigue you are Tired: 5 percent less damage and defence. At {{balance:FatigueExhaustedThreshold}} you are Exhausted: 10 percent less damage and defence and 10 percent less experience from kills. Fatigue counts only on basic swings and against monster normal attacks, and together with Mental it never takes more than {{percent:MentalFatigueCombatCap}} percent unless you are Broken.
+In single-player each fight adds {{balance:FatigueCostCombat}} Fatigue, 2 in light armor. At {{balance:FatigueTiredThreshold}} Fatigue you are Tired: 5 percent less damage and defense. At {{balance:FatigueExhaustedThreshold}} you are Exhausted: 10 percent less damage and defense and 10 percent less experience from kills. Fatigue counts only on basic swings and against monster normal attacks, and together with Mental it never takes more than {{percent:MentalFatigueCombatCap}} percent unless you are Broken.
 
 Rest removes it: {{balance:FatigueReductionHomeRest}} at a Home rest, {{balance:FatigueReductionInnRest}} at an Inn table rest, {{balance:FatigueReductionDungeonRest}} at a dungeon rest, and all of it at the new day. Online there is no Fatigue.
 
 ## Rank bonuses
 
-As King your basic swings deal 10 percent more damage, your defence is 10 percent higher and your maximum HP 5 percent higher. A Knight deals {{percent:KnightDamageBonus}} percent more damage with basic swings and has 5 percent more defence; a Grand Champion of the Gauntlet {{percent:GrandChampionDamageBonus}} percent more of each. Spells, abilities, PvP and teammates do not get these.
+As King your basic swings deal 10 percent more damage, your defense is 10 percent higher and your maximum HP 5 percent higher. A Knight deals {{percent:KnightDamageBonus}} percent more damage with basic swings and has 5 percent more defense; a Grand Champion of the Gauntlet {{percent:GrandChampionDamageBonus}} percent more of each. Spells, abilities, PvP and teammates do not get these.
 
 ## When a fight goes wrong
 

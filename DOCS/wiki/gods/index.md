@@ -7,7 +7,7 @@ history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
 history: 1.3.3 | none
-history: 1.3.2 | Divine wrath cuts your damage and defence by 10, 20 or 30 percent for the whole fight, as the screen states.
+history: 1.3.2 | Divine wrath cuts your damage and defense by 10, 20 or 30 percent for the whole fight, as the screen states.
 history: 1.3.0 | none
 history: 1.2.5 | A Temple priest now points you to the first Seal from level 10, Temple screens are shown in all five languages, and sacrifice notices reach a player-god in that god's language.
 history: 1.2.4 | The notice a player-god gets when you sacrifice gold at its altar now reaches its mailbox.
@@ -46,7 +46,7 @@ Divine wrath strikes before a dungeon fight. Each time a fight starts, the chanc
 - **Level 2:** you lose a quarter of your current HP, never below 1.
 - **Level 3:** you lose half your current HP, never below 1, and half your mana, and half the time you are struck blind or catch the plague or measles.
 
-Then your basic swings deal 10, 20 or 30 percent less and your defence against monster hits is 10, 20 or 30 percent lower for that fight, as the screen states. After striking, level 3 drops to level 1, and levels 1 and 2 are cleared.
+Then your basic swings deal 10, 20 or 30 percent less and your defense against monster hits is 10, 20 or 30 percent lower for that fight, as the screen states. After striking, level 3 drops to level 1, and levels 1 and 2 are cleared.
 
 Wrath that has not struck fades: each fight start that does not strike counts down from 50 + 20 x the level last recorded, and at 0 the level falls by one and the count restarts at 30.
 

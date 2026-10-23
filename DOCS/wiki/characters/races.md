@@ -28,7 +28,7 @@ The table also shows each race's NPC lifespan. An NPC ages one game year every {
 
 ## Creation bonuses
 
-At character creation a race adds its bonus to Strength, Stamina, Defence and hit points only. Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution come from the dice and your class, with no race bonus. See [stats](/wiki/en/characters/stats/) for the full creation roll.
+At character creation a race adds its bonus to Strength, Stamina, Defense and hit points only. Agility, Charisma, Dexterity, Wisdom, Intelligence and Constitution come from the dice and your class, with no race bonus. See [stats](/wiki/en/characters/stats/) for the full creation roll.
 
 ## Classes each race cannot take
 

@@ -26,7 +26,7 @@ The catalog distinguishes starting classes from prestige classes. Starting avail
 
 Creation values are the class contribution before race bonuses and other character-creation rules. The generated growth table is the base class increase on a level-up; specialization, training, equipment and other rewards are separate.
 
-The table's HP, Defence and mana per level are what one level adds to the base value for that class. They include the 5 maximum HP, 1 Defence and 1 Stamina that every class gains each level.
+The table's HP, Defense and mana per level are what one level adds to the base value for that class. They include the 5 maximum HP, 1 Defense and 1 Stamina that every class gains each level.
 
 A Voidreaver's Constitution growth alternates: 2 on reaching an even level and 1 on reaching an odd one, 1.5 a level on average.
 
@@ -44,7 +44,7 @@ The game holds no ranking of classes. It names a role only for a specialization 
 
 Thundering Roar is the first taunt: level 20, 40 stamina, for Warrior, Paladin, Barbarian and Tidesworn. It turns every living monster onto you for 3 rounds, and each round each monster has a {{balance:SoftTauntStickChance}} percent chance to keep to it. The level 40 taunts (Shield Wall Formation, Divine Mandate, Rage Challenge) and the Tidesworn's Undertow Stance and Abyssal Anchor hold at the same {{balance:SoftTauntStickChance}} percent. Eternal Vigil always holds.
 
-Every class also has the basic Taunt action in a fight. It turns one monster onto you for 2 rounds, always holds, and lowers that monster's Defence by 3 and its armor power by 2.
+Every class also has the basic Taunt action in a fight. It turns one monster onto you for 2 rounds, always holds, and lowers that monster's Defense by 3 and its armor power by 2.
 
 A boss's area attack looks for a tank. If a teammate holds the boss's taunt, that teammate is the tank; if you hold it, you are. With no taunt at all, a Warrior, Paladin, Barbarian or Tidesworn player still counts as the tank. Everyone else then takes 60 percent less from the area attack and the tank takes 30 percent more. With no tank, everyone takes the full amount.
 
@@ -129,7 +129,7 @@ Six classes carry a bonus in every fight. It holds for you and for a teammate or
 - **Warrior:** each basic swing adds level / 5 to its attack power: 2 at level 10, 20 at level 100.
 - **Assassin:** each melee hit an Assassin lands on a monster has a 5 percent chance to poison it for 3 rounds, unless it is already poisoned. It does not come from spells, from magical abilities, from ranged abilities, or from a swing made with a bow in hand. Only an Assassin can [Backstab](/wiki/en/combat/#backstab-k-assassin).
 - **Barbarian and Mystic Shaman:** a monster's normal attack does 2 less damage, never below the minimum; its special abilities do their full damage. A Barbarian can [Rage](/wiki/en/combat/#rage-g-barbarian).
-- **Paladin:** while a living Paladin is in the party, monsters need 2 more on the die to hit you, and teammates and companions have 2 more Defence; two Paladins do not add up. A Paladin has 1 + level / 10 charges a day for [Smite](/wiki/en/combat/#smite-z-paladin).
+- **Paladin:** while a living Paladin is in the party, monsters need 2 more on the die to hit you, and teammates and companions have 2 more Defense; two Paladins do not add up. A Paladin has 1 + level / 10 charges a day for [Smite](/wiki/en/combat/#smite-z-paladin).
 - **Ranger:** a swing with a bow, a bow ability and the ranged attack each add 4 to their damage.
 
 ### Interrupting a boss's channel

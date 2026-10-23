@@ -22,7 +22,7 @@ The Level Master is still where you arrange your abilities and spells, spend tra
 
 ## What a level gives
 
-Gaining a level restores your HP and mana to full. Every class gains 5 maximum HP, 1 Defence and 1 Stamina per level before its own growth; the [class table](/wiki/en/characters/classes/) shows the totals. You also gain training points and an [alignment bonus](/wiki/en/characters/stats/#alignment).
+Gaining a level restores your HP and mana to full. Every class gains 5 maximum HP, 1 Defense and 1 Stamina per level before its own growth; the [class table](/wiki/en/characters/classes/) shows the totals. You also gain training points and an [alignment bonus](/wiki/en/characters/stats/#alignment).
 
 ## Experience for each level
 
