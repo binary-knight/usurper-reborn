@@ -97,8 +97,7 @@ public class LE137Fixes : IDisposable
         return Regex.Replace(Encoding.UTF8.GetString(output.ToArray()), "\u001b\\[[0-9;?]*[A-Za-z]", "");
     }
 
-    [Fact]
-    public async Task LE137_EnchantSuffix_IsAddedWhenTheNameReaches40()
+    private static Character ShopHero(string bladeName)
     {
         var hero = new Character
         {
@@ -107,22 +106,44 @@ public class LE137Fixes : IDisposable
             AI = CharacterAI.Human, Gold = 9_000_000_000, AutoEquipDisabled = true,
         };
         hero.Achievements.Unlock("first_enchant");
-        var blade = new Equipment
-        {
-            Name = "Exceedingly Long Named Leech Blade", Slot = EquipmentSlot.MainHand, WeaponPower = 10, MinLevel = 1, Value = 100,
-        };
-        blade.Name.Length.Should().BeInRange(30, 39);
+        var blade = new Equipment { Name = bladeName, Slot = EquipmentSlot.MainHand, WeaponPower = 10, MinLevel = 1, Value = 100 };
         hero.EquippedItems[EquipmentSlot.MainHand] = EquipmentDatabase.RegisterDynamic(blade);
         hero.RecalculateStats();
-        long strBefore = hero.Strength;
+        return hero;
+    }
 
-        await Run(hero, "EnchantEquipment", "1", "1", "2", "Y");
+    [Fact]
+    public async Task LE137_EnchantTag_LeftOffALongName_AndThePlayerIsTold()
+    {
+        const string longName = "Exceedingly Long Named Leech Blade";   // 34 characters: the tag would reach 41
+        var hero = ShopHero(longName);
+        string screen = await Run(hero, "EnchantEquipment", "1", "1", "2", "Y");
 
         var worn = hero.GetEquipment(EquipmentSlot.MainHand)!;
-        worn.GetEnchantmentCount().Should().Be(1, "the enchant is applied");
+        worn.GetEnchantmentCount().Should().Be(1, "the enchant is applied either way");
         worn.StrengthBonus.Should().BeGreaterThan(0);
-        worn.Name.Length.Should().BeGreaterThanOrEqualTo(40, "the test name plus the suffix reaches 40");
-        worn.Name.Should().MatchRegex(@" \+\d+ Str$", "the suffix is on the name whatever its length");
-        MagicShopLocation.StripEnchantTags(worn.Name).Should().Be("Exceedingly Long Named Leech Blade");
+        worn.Name.Should().Be(longName, "the tag would push the name to 40 or more, so it stays off");
+        screen.Should().Contain(Loc.GetIn("en", "magic_shop.enchant_tag_skipped"), "and the player is told");
+
+        var shortHero = ShopHero("Short Blade");
+        string shortScreen = await Run(shortHero, "EnchantEquipment", "1", "1", "2", "Y");
+        shortHero.GetEquipment(EquipmentSlot.MainHand)!.Name.Should().MatchRegex(@"^Short Blade \+\d+ Str$");
+        shortScreen.Should().NotContain(Loc.GetIn("en", "magic_shop.enchant_tag_skipped"), "a name that fits is told nothing");
+    }
+
+    [Theory]
+    [InlineData("en")]
+    [InlineData("es")]
+    [InlineData("fr")]
+    [InlineData("hu")]
+    [InlineData("it")]
+    public void LE137_EnchantTagSkippedText_IsTranslated_AndFits79(string lang)
+    {
+        const string key = "magic_shop.enchant_tag_skipped";
+        Loc.HasIn(lang, key).Should().BeTrue();
+        string text = Loc.GetIn(lang, key);
+        text.Should().NotBe(key);
+        if (lang != "en") text.Should().NotBe(Loc.GetIn("en", key), "a real translation");
+        text.Length.Should().BeLessThanOrEqualTo(79);
     }
 }
