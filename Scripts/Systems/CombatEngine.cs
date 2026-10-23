@@ -1583,6 +1583,7 @@ public partial class CombatEngine
 
         // Combat continues as long as ANY party member is alive (not just leader)
         bool anyGroupedAlive() => result.Teammates?.Any(t => t.IsGroupedPlayer && t.IsAlive) == true;
+        var voidFed = new HashSet<Monster>();   // the foes Void Hunger has fed on this fight
         while ((player.IsAlive || anyGroupedAlive()) && monsters.Any(m => m.IsAlive) && !globalEscape)
         {
             roundNumber++;
@@ -1937,6 +1938,8 @@ public partial class CombatEngine
                 }
             }
 
+            FeedVoidHunger(player, monsters, voidFed);   // Void Hunger and Soul Eater at the kill
+
             // Check if all monsters defeated
             if (!monsters.Any(m => m.IsAlive))
                 break;
@@ -1978,6 +1981,8 @@ public partial class CombatEngine
                     }
                 }
             }
+
+            FeedVoidHunger(player, monsters, voidFed);   // Void Hunger and Soul Eater at the kill
 
             // Check if all monsters defeated
             if (!monsters.Any(m => m.IsAlive))
@@ -2267,6 +2272,8 @@ public partial class CombatEngine
                 if (result.IsPermadeath)
                     runVictory = false;
             }
+            // Foes that fell after the last in-round check (end of round effects) are fed once here, never twice
+            FeedVoidHunger(player, monsters, voidFed);
             if (runVictory)
                 await HandleVictoryMultiMonster(result, offerMonkEncounter);
         }
@@ -2284,6 +2291,7 @@ public partial class CombatEngine
                     if (!m.IsAlive && !result.DefeatedMonsters.Contains(m))
                         result.DefeatedMonsters.Add(m);
                 }
+                FeedVoidHunger(player, monsters, voidFed);
                 await HandleVictoryMultiMonster(result, offerMonkEncounter);
             }
             else
@@ -7984,21 +7992,9 @@ public partial class CombatEngine
             UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal), "dark_red");
         }
 
-        // Voidreaver Void Hunger: heal 10% max HP on every kill
-        if (result.Player.Class == CharacterClass.Voidreaver)
-        {
-            long voidHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
-            result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + voidHeal);
-            UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal), "dark_red");
-
-            // Soul Eater: restore 15% max mana on killing blow
-            if (result.Player.IsManaClass)
-            {
-                int manaRestore = Math.Max(1, (int)(result.Player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
-                result.Player.Mana = Math.Min(result.Player.MaxMana, result.Player.Mana + manaRestore);
-                UIHelper.WriteRow(terminal, Loc.Get("combat.soul_eater", manaRestore), "dark_magenta");
-            }
-        }
+        // Void Hunger and Soul Eater (GameConfig.VoidreaverVoidHungerPercent, VoidreaverSoulEaterManaPercent): a single monster fight
+        // ends at its one kill, so this point is the kill; the same helper as the group fight keeps one rule
+        FeedVoidHunger(result.Player, new List<Monster> { result.Monster }, new HashSet<Monster>());
 
         // MUD mode: broadcast boss kills only (regular kills too spammy).
         // Rendered per-recipient so each player in the room reads it in their own language.
@@ -23457,6 +23453,27 @@ public partial class CombatEngine
         DebugLogger.Instance.LogInfo("COMBAT", $"Mercenary DIED: {mercenary.DisplayName} killed by {killerName}");
     }
 
+    /// <summary>The Voidreaver's Void Hunger (heal GameConfig.VoidreaverVoidHungerPercent of max HP) and Soul Eater (restore VoidreaverSoulEaterManaPercent of max
+    /// mana) for each foe fallen since the last check, once a foe, inside the fight; the victory pipeline no longer repeats
+    /// them. Called after the player's action and after the teammates' turns.</summary>
+    private void FeedVoidHunger(Character player, List<Monster> monsters, HashSet<Monster> fed)
+    {
+        if (player == null || player.Class != CharacterClass.Voidreaver || !player.IsAlive) return;
+        foreach (var monster in monsters)
+        {
+            if (monster.IsAlive || !fed.Add(monster)) continue;
+            long voidHeal = Math.Max(1, (long)(player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
+            player.HP = Math.Min(player.MaxHP, player.HP + voidHeal);
+            UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal, MonsterNames.Display(monster)), "dark_red");
+            if (player.IsManaClass)
+            {
+                int manaRestore = Math.Max(1, (int)(player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
+                player.Mana = Math.Min(player.MaxMana, player.Mana + manaRestore);
+                UIHelper.WriteRow(terminal, Loc.Get("combat.soul_eater", manaRestore, MonsterNames.Display(monster)), "dark_magenta");
+            }
+        }
+    }
+
     /// <summary>
     /// Handle victory over multiple monsters
     /// </summary>
@@ -23558,21 +23575,7 @@ public partial class CombatEngine
                 UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal, MonsterNames.Display(monster)), "dark_red");
             }
 
-            // Voidreaver Void Hunger: heal 10% max HP on every kill
-            if (result.Player.Class == CharacterClass.Voidreaver)
-            {
-                long voidHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
-                result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + voidHeal);
-                UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal, MonsterNames.Display(monster)), "dark_red");
-
-                // Soul Eater: restore 15% max mana on killing blow
-                if (result.Player.IsManaClass)
-                {
-                    int manaRestore = Math.Max(1, (int)(result.Player.MaxMana * GameConfig.VoidreaverSoulEaterManaPercent));
-                    result.Player.Mana = Math.Min(result.Player.MaxMana, result.Player.Mana + manaRestore);
-                    UIHelper.WriteRow(terminal, Loc.Get("combat.soul_eater", manaRestore, MonsterNames.Display(monster)), "dark_magenta");
-                }
-            }
+            // Void Hunger and Soul Eater act at the kill, inside the fight (FeedVoidHunger), not again here
 
             // Track monster kill stats
             result.Player.MKills++;
