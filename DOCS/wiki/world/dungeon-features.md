@@ -121,7 +121,7 @@ A skill check rolls a twenty-sided die plus the stat / 10 (at most +40) against 
 
 ### Feature class bonus
 
-Warriors and Barbarians gain 5 + floor / 10 attack for the trip, Magicians and Sages regain 10 + floor / 5 mana, Clerics and Paladins heal a quarter of their maximum HP and so does each living teammate, Assassins gain 1 + floor / 25 poison vials, Rangers find gold and one healing potion, Bards gain experience, and every other class finds gold.
+Warriors and Barbarians gain 5 + floor / 10 attack for the next fight, Magicians and Sages regain 10 + floor / 5 mana, Clerics and Paladins heal a quarter of their maximum HP and so does each living teammate, Assassins gain 1 + floor / 25 poison vials, Rangers find gold and one healing potion, Bards gain experience, and every other class finds gold.
 
 ### Risk and reward features
 

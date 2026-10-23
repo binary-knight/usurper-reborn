@@ -1160,7 +1160,7 @@ public partial class CombatEngine
         // Reset temporary flags per battle
         player.IsDefending = false; // leaks when the prior fight ended mid-round (victory break skips round-end cleanup)
         player.IsRaging = false;
-        player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+        player.ClearSlotBonusesForFightStart();   // 1.3.7: keeps the room feature attack entry for this fight
         player.ClearPrestigeCombatState();   // 1.3.6 G11
         player.MagicACBonus = 0; // Clear spell protection buffs from previous fight
         player.HasOceanMemory = false; // v1.1.15: Ocean's Memory lasts one fight

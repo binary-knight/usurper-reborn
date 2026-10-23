@@ -991,7 +991,7 @@ namespace UsurperRemake.Systems
 
             // Reset transient combat buffs so leftover buffs from a previous fight (dungeon, etc.)
             // don't carry into the world boss, and so ability/spell buffs applied this fight start clean.
-            player.ClearSlotBonuses();   // 1.3.6 G4: the entries with the slots
+            player.ClearSlotBonusesForFightStart();   // 1.3.7: keeps the room feature attack entry for this fight
             player.TempDamageReductionPercent = 0;
             player.TempDamageReductionDuration = 0;
             player.HasStatusImmunity = false;
