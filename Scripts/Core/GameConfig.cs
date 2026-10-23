@@ -2337,6 +2337,7 @@ public static partial class GameConfig
     public const double AurelionDivineShield = 0.25;           // 25% divine armor cut, lifted only by the god's counter
     public const double TerravokStoneSkin = 0.35;              // 35% divine armor cut, lifted only by the god's counter
     public const double ManweCreatorsWard = 0.50;              // 50% divine armor cut, lifted only by the god's counter
+    public const double ManweWardOnRiders = 0.55;              // 1.3.7: the share of each enchant rider the Creator's Ward still stops on Manwe, counter held or not
     public const double ArtifactBossDamageBonus = 0.03;        // +3% player damage per artifact collected
 
     public class CraftingMaterialDef

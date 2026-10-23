@@ -480,6 +480,12 @@ namespace UsurperRemake.Systems
                     terminal.SetColor("yellow");
                     terminal.WriteLine(Loc.Get("old_god.warning_enchant", CounterTierName(boss.Type)));
                 }
+                // 1.3.7: on Manwe the ward still stops a share of what gear enchantments add, counter held or not
+                if (boss.Type == OldGodType.Manwe)
+                {
+                    terminal.SetColor("yellow");
+                    terminal.WriteLine(Loc.Get("old_god.ward_on_riders", $"{GameConfig.ManweWardOnRiders * 100:N0}"));
+                }
             }
 
             terminal.WriteLine("");
@@ -1836,6 +1842,14 @@ namespace UsurperRemake.Systems
             OldGodType.Manwe => "godbane",
             _ => ""
         };
+
+        /// <summary>1.3.7: the share of an enchant item rider after a hit that reaches the foe. On Manwe himself the
+        /// Creator's Ward stops GameConfig.ManweWardOnRiders of each rider (the weapon procs, Lifedrinker, Siphon, Boss
+        /// Slayer, equipment Thorns), with the counter held or not: the counter lifts the ward from the strike only.
+        /// 1.0 for every other foe, Manwe's summons and the other gods among them. Read only where the item is present.
+        /// The share is rounded to 9 places, so 1.0 - 0.55 is 0.45 and 45 of a 100 point rider reaches him, not 44.</summary>
+        internal static double ManweRiderShare(Monster? target) =>
+            target != null && target.OldGod == OldGodType.Manwe ? Math.Round(1.0 - GameConfig.ManweWardOnRiders, 9) : 1.0;
 
         /// <summary>1.3.5 (CT-2): true when the player's main or off hand carries the god's counter code.</summary>
         internal static bool HoldsCounter(OldGodType godType, Character player)
