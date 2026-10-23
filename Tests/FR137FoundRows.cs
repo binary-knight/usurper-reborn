@@ -12,19 +12,120 @@ using FluentAssertions;
 using Spectre.Console;
 using Spectre.Console.Rendering;
 using UsurperRemake.Systems;
+using UsurperRemake.Data;
 using UsurperRemake.UI;
 using Xunit;
 
 namespace UsurperReborn.Tests;
 
 /// <summary>
-/// 1.3.7 found rows: the spell learning screens wrap each description to 79 columns, and the
-/// offline save editor toggles the Voidreaver Constitution marker.
+/// 1.3.7 found rows: the admin level edit gives what the live level up gives, the spell learning
+/// screens wrap each description to 79 columns, and the offline save editor toggles the Voidreaver
+/// Constitution marker.
 /// </summary>
 [Collection("SharedGameSingletons")]
 public class FR137FoundRows
 {
     private const BindingFlags SNP = BindingFlags.NonPublic | BindingFlags.Static;
+
+    // ---------------- the admin level edit ----------------
+
+    private static readonly string[] BaseStats =
+    {
+        "BaseStrength", "BaseDexterity", "BaseConstitution", "BaseIntelligence", "BaseWisdom", "BaseCharisma",
+        "BaseDefence", "BaseAgility", "BaseStamina", "BaseMaxHP", "BaseMaxMana",
+    };
+
+    private static long Stat(object o, string name) => Convert.ToInt64(o.GetType().GetProperty(name)!.GetValue(o));
+
+    private static Character Hero(CharacterClass cls, int level, ClassSpecialization spec, bool marker) => new Character
+    {
+        Name1 = "Fr137 Admin", Name2 = "Fr137 Admin", AI = CharacterAI.Human, Level = level, HP = 100, MaxHP = 100,
+        BaseMaxHP = 500, BaseStrength = 40, BaseDexterity = 41, BaseConstitution = 42, BaseIntelligence = 43,
+        BaseWisdom = 24, BaseCharisma = 15, BaseDefence = 26, BaseStamina = 37, BaseAgility = 38, BaseMaxMana = 209,
+        Mental = 80, Class = cls, Race = CharacterRace.Human, Specialization = spec, VoidreaverConstitutionApplied = marker,
+        Experience = GameConfig.GetExperienceForLevel(level),
+    };
+
+    /// <summary>The save the game writes for a character (SaveSystem.SerializePlayer).</summary>
+    private static PlayerData Serialize(Character c)
+    {
+        var ser = typeof(SaveSystem).GetMethod("SerializePlayer", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        try { return (PlayerData)ser.Invoke(SaveSystem.Instance, new object[] { c })!; }
+        catch (TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+    }
+
+    /// <summary>
+    /// Raises a save through the admin edit and the same character through the live level up
+    /// (LevelMasterLocation.ApplyClassStatIncreases with each level reached) and compares the gain in
+    /// every Base* stat. The live level up always adds the Voidreaver Constitution; the admin edit adds
+    /// it only behind the marker, as a save without it gets every level's Constitution at its next load.
+    /// </summary>
+    private static void AdminEqualsLive(CharacterClass cls, int from, int gained, ClassSpecialization spec, bool marker)
+    {
+        var hero = Hero(cls, from, spec, marker);
+        var save = Serialize(hero);
+        save.Specialization.Should().Be((int)spec, "the save keeps the specialization as its int");
+        save.VoidreaverConstitutionApplied.Should().Be(marker);
+        var adminBefore = BaseStats.ToDictionary(n => n, n => Stat(save, n));
+        var liveBefore = BaseStats.ToDictionary(n => n, n => Stat(hero, n));
+        BaseStats.All(n => adminBefore[n] == liveBefore[n]).Should().BeTrue("the save holds the character's base stats");
+
+        var m = typeof(OnlineAdminConsole).GetMethod("ApplyClassStatIncreasesToSaveData", SNP)!;
+        save.Level = from + gained;   // the edit sets the level first (OnlineAdminConsole.cs)
+        m.Invoke(null, new object[] { save, gained, from });
+
+        long voidCon = 0;
+        for (int i = 0; i < gained; i++)
+        {
+            UsurperRemake.Locations.LevelMasterLocation.ApplyClassStatIncreases(hero, from + i + 1);
+            if (cls == CharacterClass.Voidreaver) voidCon += UsurperRemake.Locations.LevelMasterLocation.VoidreaverConstitutionGain(from + i + 1);
+        }
+
+        foreach (var n in BaseStats)
+        {
+            long live = Stat(hero, n) - liveBefore[n];
+            if (n == "BaseConstitution" && !marker) live -= voidCon;
+            (Stat(save, n) - adminBefore[n]).Should().Be(live, $"{cls} {spec} marker {marker} from {from} gaining {gained}: {n}");
+        }
+    }
+
+    public static IEnumerable<object[]> AllClasses() => Enum.GetValues<CharacterClass>().Select(c => new object[] { c });
+
+    [Theory]
+    [MemberData(nameof(AllClasses))]
+    public void FR137FoundRows_AdminLevelEdit_GivesTheLiveLevelUp_ForEveryClass(CharacterClass cls)
+    {
+        Enum.GetValues<CharacterClass>().Should().HaveCount(17);
+        foreach (int from in new[] { 9, 10, 41, 60 })
+            foreach (int gained in new[] { 1, 2, 5 })
+            {
+                AdminEqualsLive(cls, from, gained, ClassSpecialization.None, marker: true);
+                if (cls == CharacterClass.Voidreaver) AdminEqualsLive(cls, from, gained, ClassSpecialization.None, marker: false);
+            }
+    }
+
+    [Fact]
+    public void FR137FoundRows_AdminLevelEdit_GivesTheLiveSpecializationGrowth_ForEverySpec()
+    {
+        var specs = Enum.GetValues<ClassSpecialization>().Where(s => s != ClassSpecialization.None).ToList();
+        specs.Should().NotBeEmpty();
+        int withGrowth = 0;
+        foreach (var spec in specs)
+        {
+            var def = UsurperRemake.Data.SpecializationData.GetSpec(spec);
+            def.Should().NotBeNull($"{spec} has a definition");
+            if (def!.BonusStrength + def.BonusConstitution + def.BonusMaxHP + def.BonusDefence + def.BonusIntelligence + def.BonusWisdom
+                + def.BonusCharisma + def.BonusMaxMana + def.BonusDexterity + def.BonusAgility + def.BonusStamina != 0) withGrowth++;
+            foreach (int from in new[] { 9, 10 })
+                foreach (int gained in new[] { 1, 2, 5 })
+                {
+                    AdminEqualsLive(def.ForClass, from, gained, spec, marker: true);
+                    if (def.ForClass == CharacterClass.Voidreaver) AdminEqualsLive(def.ForClass, from, gained, spec, marker: false);
+                }
+        }
+        withGrowth.Should().BeGreaterThan(0, "some specializations add stat growth, so the test can see it");
+    }
 
     // ---------------- the spell learning screens ----------------
 
