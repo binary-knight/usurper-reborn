@@ -15,7 +15,7 @@ module.exports = [
   ["S7","which class is the best tank","/wiki/en/characters/classes/","a Warrior, Paladin, Barbarian or Tidesworn player still counts as the tank","first"],
   ["S8","how long does an npc of each race live","/wiki/en/online/npcs/","a Human lives 75 game years, about 30 real days from birth","miss: characters/races/ ranks first"],
   ["S9","how do i get each ending","/wiki/en/world/story/","Spoiler: ending conditions","fold"],
-  ["S10a","does the wiki have a changelog","/wiki/en/reference/changelog/","Version 1.3.6 brought 79 changes","first"],
+  ["S10a","does the wiki have a changelog","/wiki/en/reference/changelog/","This page lists each release as a short summary, newest first, with a link to its release notes","first"],
   ["S10b","what info do you have on immortals","/wiki/en/gods/player-gods/","An immortal is a player who finished the main story","miss: fact outside the excerpt"],
   ["A99","what is the crit multiplier","/wiki/en/combat/","a Dexterity crit multiplies the swing by 1.5, plus 0.02 per point of Dexterity above 10","first"],
   ["A100","can a server change backstab damage","/wiki/en/reference/balance/","Backstab's triple damage is fixed in the game and a server cannot change it","miss: monsters/ ranks first"],
