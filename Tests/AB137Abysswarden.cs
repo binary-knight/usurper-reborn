@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using FluentAssertions;
 using UsurperRemake;
+using UsurperRemake.Locations;
 using UsurperRemake.Systems;
 using Xunit;
 using G = UsurperReborn.Tests.HitRoll128Golden;

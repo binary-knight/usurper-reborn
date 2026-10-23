@@ -314,7 +314,7 @@ namespace UsurperRemake.Systems
                         break;
                     case CharacterClass.Abysswarden:
                         player.BaseDexterity += 5; player.BaseStrength += 4; player.BaseAgility += 4;
-                        player.BaseIntelligence += 3; player.BaseConstitution += 2; player.BaseMaxHP += 8; player.BaseMaxMana += 10;
+                        player.BaseIntelligence += 3; player.BaseConstitution += 3; player.BaseMaxHP += 8; player.BaseMaxMana += 10;
                         break;
                     case CharacterClass.Voidreaver:
                         player.BaseStrength += 5; player.BaseIntelligence += 5; player.BaseDexterity += 4;

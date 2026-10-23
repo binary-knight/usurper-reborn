@@ -18136,7 +18136,7 @@
   "base.buff_corruption_harvest": "  - Raccolto della Corruzione: cura il {0}% dei PV max uccidendo un nemico avvelenato",
   "base.buff_void_hunger": "  - Fame del Vuoto: cura il {0}% dei PV max a ogni uccisione",
   "base.buff_pain_threshold": "  - Soglia del Dolore: +{0}% danni da abilità sotto il 50% PV",
-  "base.buff_soul_eater": "  - Divoratore di Anime: ripristina il {0}% del mana max col colpo di grazia",
+  "base.buff_soul_eater": "  - Divoratore di Anime: ripristina il {0}% del mana max a ogni uccisione",
   "base.buff_god_slayer": "  - Ammazzadei: +{0}% danni, +{1}% dif ({2} combattimenti)",
   "base.buff_dark_pact": "  - Patto Oscuro: +{0}% danni ({1} combattimenti)",
   "base.buff_settlement": "  - {0}: +{1}% ({2} combattimenti)",

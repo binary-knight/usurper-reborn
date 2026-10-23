@@ -18144,7 +18144,7 @@
   "base.buff_corruption_harvest": "  - Romlásaratás: {0}% max ÉP gyógyulás mérgezett ellenség megölésekor",
   "base.buff_void_hunger": "  - Üresség éhsége: {0}% max ÉP gyógyulás minden ölésnél",
   "base.buff_pain_threshold": "  - Fájdalomküszöb: +{0}% képességsebzés 50% ÉP alatt",
-  "base.buff_soul_eater": "  - Lélekfaló: {0}% max mana visszatöltés halálos csapásnál",
+  "base.buff_soul_eater": "  - Lélekfaló: {0}% max mana visszatöltés minden ölésnél",
   "base.buff_god_slayer": "  - Istenölő: +{0}% sebzés, +{1}% véd. ({2} harc)",
   "base.buff_dark_pact": "  - Sötét paktum: +{0}% sebzés ({1} harc)",
   "base.buff_settlement": "  - {0}: +{1}% ({2} harc)",

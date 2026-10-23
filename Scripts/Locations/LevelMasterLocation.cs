@@ -1194,7 +1194,7 @@ public class LevelMasterLocation : BaseLocation
                 player.BaseStrength = Math.Max(1, player.BaseStrength - 4);
                 player.BaseAgility = Math.Max(1, player.BaseAgility - 4);
                 player.BaseIntelligence = Math.Max(1, player.BaseIntelligence - 3);
-                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 2);
+                player.BaseConstitution = Math.Max(1, player.BaseConstitution - 3);
                 player.BaseMaxHP = Math.Max(10, player.BaseMaxHP - 8);
                 player.BaseMaxMana = Math.Max(0, player.BaseMaxMana - 10);
                 break;
@@ -1387,7 +1387,7 @@ public class LevelMasterLocation : BaseLocation
                 expStr  += levelsGained * 4;
                 expAgi  += levelsGained * 4;
                 expInt  += levelsGained * 3;
-                expCon  += levelsGained * 2;
+                expCon  += levelsGained * 3;
                 expHP   += levelsGained * 8;
                 expMana += levelsGained * 10;
                 break;

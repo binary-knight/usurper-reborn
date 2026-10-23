@@ -18136,7 +18136,7 @@
   "base.buff_corruption_harvest": "  - Cosecha de Corrupción: cura {0}% de PV máx. al matar a un enemigo envenenado",
   "base.buff_void_hunger": "  - Hambre del Vacío: cura {0}% de PV máx. con cada muerte",
   "base.buff_pain_threshold": "  - Umbral de Dolor: +{0}% daño de habilidad por debajo del 50% de PV",
-  "base.buff_soul_eater": "  - Devorador de Almas: restaura {0}% de maná máx. con el golpe final",
+  "base.buff_soul_eater": "  - Devorador de Almas: restaura {0}% de maná máx. con cada muerte",
   "base.buff_god_slayer": "  - Matadioses: +{0}% daño, +{1}% def ({2} combates)",
   "base.buff_dark_pact": "  - Pacto Oscuro: +{0}% daño ({1} combates)",
   "base.buff_settlement": "  - {0}: +{1}% ({2} combates)",

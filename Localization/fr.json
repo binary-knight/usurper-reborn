@@ -18136,7 +18136,7 @@
   "base.buff_corruption_harvest": "  - Moisson de Corruption : soigne {0}% PV max en tuant un ennemi empoisonné",
   "base.buff_void_hunger": "  - Faim du Néant : soigne {0}% PV max à chaque élimination",
   "base.buff_pain_threshold": "  - Seuil de Douleur : +{0}% dégâts des capacités sous 50% PV",
-  "base.buff_soul_eater": "  - Mangeur d'Âmes : restaure {0}% du mana max au coup fatal",
+  "base.buff_soul_eater": "  - Mangeur d'Âmes : restaure {0}% du mana max à chaque élimination",
   "base.buff_god_slayer": "  - Tueur de Dieux : +{0}% dég, +{1}% déf ({2} combats)",
   "base.buff_dark_pact": "  - Pacte Sombre : +{0}% dég ({1} combats)",
   "base.buff_settlement": "  - {0} : +{1}% ({2} combats)",

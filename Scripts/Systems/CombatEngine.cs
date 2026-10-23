@@ -7779,15 +7779,7 @@ public partial class CombatEngine
         terminal.WriteLine(Loc.Get("combat.you_slain", MonsterNames.Display(result.Monster)));
         terminal.WriteLine("");
 
-        // Abysswarden Corruption Harvest: heal 15% max HP on killing a poisoned enemy
-        if (result.Player.Class == CharacterClass.Abysswarden && result.Monster.Poisoned)
-        {
-            long corruptHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
-            result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + corruptHeal);
-            UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal), "dark_red");
-        }
-
-        // Void Hunger and Soul Eater (GameConfig.VoidreaverVoidHungerPercent, VoidreaverSoulEaterManaPercent): a single monster fight
+        // Void Hunger, Soul Eater and Corruption Harvest (GameConfig.VoidreaverVoidHungerPercent, VoidreaverSoulEaterManaPercent): a single monster fight
         // ends at its one kill, so this point is the kill; the same helper as the group fight keeps one rule. This method is
         // dead code (DetermineCombatOutcome has no callers; PlayerVsMonster delegates to the multi monster path), so no double heal
         FeedVoidHunger(result.Player, new List<Monster> { result.Monster }, new HashSet<Monster>());
@@ -23251,13 +23243,28 @@ public partial class CombatEngine
 
     /// <summary>The Voidreaver's Void Hunger (heal GameConfig.VoidreaverVoidHungerPercent of max HP) and Soul Eater (restore VoidreaverSoulEaterManaPercent of max
     /// mana) for each foe fallen since the last check, once a foe, inside the fight; the victory pipeline no longer repeats
-    /// them. Called after the player's action and after the teammates' turns.</summary>
+    /// them. The Abysswarden's Corruption Harvest (heal AbysswardenCorruptionHealPercent of max HP) shares the sweep for each
+    /// fallen foe that is poisoned; one helper keeps one rule for when a kill pays. Called after the player's action and after the teammates' turns.</summary>
     private void FeedVoidHunger(Character player, List<Monster> monsters, HashSet<Monster> fed)
     {
-        if (player == null || player.Class != CharacterClass.Voidreaver || !player.IsAlive) return;
+        if (player == null || !player.IsAlive) return;
+        bool reaver = player.Class == CharacterClass.Voidreaver;
+        bool warden = player.Class == CharacterClass.Abysswarden;
+        if (!reaver && !warden) return;
         foreach (var monster in monsters)
         {
             if (monster.IsAlive || !fed.Add(monster)) continue;
+            if (warden)
+            {
+                // Abysswarden Corruption Harvest: heal AbysswardenCorruptionHealPercent of max HP at the kill of a poisoned foe
+                if (monster.Poisoned)
+                {
+                    long corruptHeal = Math.Max(1, (long)(player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
+                    player.HP = Math.Min(player.MaxHP, player.HP + corruptHeal);
+                    UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal, MonsterNames.Display(monster)), "dark_red");
+                }
+                continue;
+            }
             long voidHeal = Math.Max(1, (long)(player.MaxHP * GameConfig.VoidreaverVoidHungerPercent));
             player.HP = Math.Min(player.MaxHP, player.HP + voidHeal);
             UIHelper.WriteRow(terminal, Loc.Get("combat.void_hunger", voidHeal, MonsterNames.Display(monster)), "dark_red");
@@ -23363,15 +23370,7 @@ public partial class CombatEngine
             totalExp += expReward;
             totalGold += goldReward;
 
-            // Abysswarden Corruption Harvest: heal 15% max HP on killing a poisoned enemy
-            if (result.Player.Class == CharacterClass.Abysswarden && monster.Poisoned)
-            {
-                long corruptHeal = Math.Max(1, (long)(result.Player.MaxHP * GameConfig.AbysswardenCorruptionHealPercent));
-                result.Player.HP = Math.Min(result.Player.MaxHP, result.Player.HP + corruptHeal);
-                UIHelper.WriteRow(terminal, Loc.Get("combat.corruption_harvest", corruptHeal, MonsterNames.Display(monster)), "dark_red");
-            }
-
-            // Void Hunger and Soul Eater act at the kill, inside the fight (FeedVoidHunger), not again here
+            // Void Hunger, Soul Eater and Corruption Harvest act at the kill, inside the fight (FeedVoidHunger), not again here
 
             // Track monster kill stats
             result.Player.MKills++;
