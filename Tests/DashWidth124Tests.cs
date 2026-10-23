@@ -129,7 +129,9 @@ public class DashWidth124Tests
     [Fact]
     public void CurseRemovalRows_Fit()
     {
-        int item = EquipmentDatabase.GetAll().Max(e => e.Name.Length);
+        // 1.3.7: the static catalog only. GetAll() also holds the dynamic loot other tests register, so the
+        // result depended on which test ran first; the wrapped real rows are measured in LF137Hygiene.
+        int item = EquipmentDatabase.GetAll().Where(e => !EquipmentDatabase.IsDynamic(e.Id)).Max(e => e.Name.Length);
         int slot = Enum.GetValues(typeof(EquipmentSlot)).Cast<EquipmentSlot>().Max(s => s.GetDisplayName().Length);
         int own = 2 + 2 + 2 + item + " (your ".Length + slot + ") -- ".Length + "9,999,999 gold".Length;
         own.Should().BeLessThanOrEqualTo(MaxWidth, "own gear row; widest item name " + item);

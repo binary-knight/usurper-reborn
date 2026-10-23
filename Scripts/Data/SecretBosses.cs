@@ -12,8 +12,11 @@ namespace UsurperRemake.Data
     /// </summary>
     public class SecretBossManager
     {
-        private static SecretBossManager? _instance;
-        public static SecretBossManager Instance => _instance ??= new SecretBossManager();
+        // Built once, whole, whatever the number of sessions that ask first (the same Lazy pattern
+        // GearSetFamilyResolver.Catalog uses). The old `_instance ??= new` could build two, and the
+        // constructor published `this` before InitializeBosses had filled the table.
+        private static Lazy<SecretBossManager> _lazy = new(() => new SecretBossManager(), System.Threading.LazyThreadSafetyMode.ExecutionAndPublication);
+        public static SecretBossManager Instance => _lazy.Value;
 
         private Dictionary<SecretBossType, SecretBossData> bosses = new();
 
@@ -21,7 +24,6 @@ namespace UsurperRemake.Data
 
         public SecretBossManager()
         {
-            _instance = this;
             InitializeBosses();
         }
 
