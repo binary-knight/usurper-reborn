@@ -11650,7 +11650,7 @@
   "character_creation.stat_desc_dex": "Chances de toucher, coups critiques",
   "character_creation.stat_desc_con": "PV bonus, résistance au poison",
   "character_creation.stat_desc_int": "Dégâts des sorts, réserve de mana",
-  "character_creation.stat_desc_wis": "Efficacité du mana, résistance magique",
+  "character_creation.stat_desc_wis": "Mana, sorts moins chers, soins",
   "character_creation.stat_desc_cha": "Prix des boutiques, réactions des PNJ",
   "character_creation.stat_desc_mana": "Ressource d’incantation",
   "character_creation.stat_desc_mana_grows": "Croît avec les niveaux",

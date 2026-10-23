@@ -11650,7 +11650,7 @@
   "character_creation.stat_desc_dex": "Probabilità di colpire, colpi critici",
   "character_creation.stat_desc_con": "PV bonus, resistenza al veleno",
   "character_creation.stat_desc_int": "Danno incantesimi, riserva mana",
-  "character_creation.stat_desc_wis": "Efficienza mana, resistenza magica",
+  "character_creation.stat_desc_wis": "Mana, incantesimi più economici, cure",
   "character_creation.stat_desc_cha": "Prezzi nei negozi, reazioni dei PNG",
   "character_creation.stat_desc_mana": "Risorsa per incantesimi",
   "character_creation.stat_desc_mana_grows": "Cresce con i livelli",

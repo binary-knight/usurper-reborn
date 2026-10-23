@@ -4,13 +4,13 @@
 Usurper Reborn ships with a modding system and a standalone editor tool, analogous to the old DOS-era `USEDIT.EXE` companion tool that shipped with the original game. There are two ways to modify game content:
 
 1. **Edit JSON files directly** in the `GameData/` folder next to the executable. Any text editor works.
-2. **Run the editor** — `UsurperReborn --editor` (or `--usedit`) launches an interactive menu-driven editor that reads and writes the same files.
+2. **Run the editor**: `UsurperReborn --editor` (or `--usedit`) launches an interactive menu-driven editor that reads and writes the same files.
 
 Both approaches produce the same result. The editor is a convenience for people who prefer menus over JSON editing.
 
 ## What's moddable today
 
-Drop any of these files into `GameData/` next to the game executable. Missing files fall back to built-in defaults. Malformed files log an error and also fall back — the game never crashes on a bad mod.
+Drop any of these files into `GameData/` next to the game executable. Missing files fall back to built-in defaults. Malformed files log an error and also fall back: the game never crashes on a bad mod.
 
 | File                     | What it controls                                                         |
 |--------------------------|--------------------------------------------------------------------------|
@@ -47,10 +47,10 @@ What tuning cannot do today: add a new spell or ability, remove one, change an a
 
 ## Equipment modding
 
-Custom equipment lives in `equipment.json`. Each entry is a full `Equipment` object — name, slot, stats, restrictions. Rules:
+Custom equipment lives in `equipment.json`. Each entry is a full `Equipment` object: name, slot, stats, restrictions. Rules:
 
 - **IDs must be 200,000 or higher.** IDs below 200000 are reserved for built-in items (1000 to 14999), shop-generated items (50000 to 99999), and dungeon-generated loot (100000 to 199999). The game skips a custom item below 200000 with a warning in the log, and the editor refuses to save one.
-- **Built-in items stay read-only.** You can't edit or delete the starter equipment (Rusty Dagger, etc.). This preserves save compatibility across game versions — an existing save referencing item #1023 will always find the same item.
+- **Built-in items stay read-only.** You can't edit or delete the starter equipment (Rusty Dagger, etc.). This preserves save compatibility across game versions: an existing save referencing item #1023 will always find the same item.
 - **You can add as many custom items as you want.** They'll appear in the world alongside built-ins once wired into loot tables, shops, or quest rewards.
 
 A minimum example:
@@ -72,7 +72,7 @@ A minimum example:
 ]
 ```
 
-Full schema: any public property on the `Equipment` class in `Scripts/Core/Items.cs`. All enums (slot, rarity, weapon type, etc.) accept their name in JSON — `"MainHand"`, `"Legendary"`, `"TwoHanded"` and so on.
+Full schema: any public property on the `Equipment` class in `Scripts/Core/Items.cs`. All enums (slot, rarity, weapon type, etc.) accept their name in JSON: `"MainHand"`, `"Legendary"`, `"TwoHanded"` and so on.
 
 ## Running the editor
 
@@ -98,15 +98,15 @@ Works on Windows, Linux, and macOS. Pure console-mode tool; no graphical termina
 ## Save compatibility and mods
 
 - If a save references a custom item ID that's no longer in your `equipment.json` (e.g., you deleted a mod item), the game silently drops that reference from the save. Your inventory slot becomes empty for that item; nothing crashes.
-- Built-in items are permanent — removing a mod never affects them.
+- Built-in items are permanent: removing a mod never affects them.
 - Modded NPCs that appear in a save reference names, not IDs, so renaming an NPC in a mod effectively removes it from existing saves (the save won't find the renamed NPC on load).
-- Balance tweaks apply immediately on next launch. They don't retroactively change existing characters' stats — those values were already applied when the character levelled.
+- Balance tweaks apply immediately on next launch. They don't retroactively change existing characters' stats: those values were already applied when the character levelled.
 
 ## Concurrency warning
 
 Don't run the editor against a save file while the game is holding it. Save files aren't file-locked, so you could lose writes. Standard practice: exit the game, edit, restart.
 
-For `GameData/*.json` mods, the game only reads them at startup, so editing them mid-game is safe — the changes just don't take effect until the next launch.
+For `GameData/*.json` mods, the game only reads them at startup, so editing them mid-game is safe: the changes just don't take effect until the next launch.
 
 ## Future phases
 

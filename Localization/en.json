@@ -11890,7 +11890,7 @@
   "character_creation.stat_desc_dex": "Hit chance, critical hits",
   "character_creation.stat_desc_con": "Bonus HP, poison resist",
   "character_creation.stat_desc_int": "Spell damage, mana pool",
-  "character_creation.stat_desc_wis": "Mana efficiency, magic resist",
+  "character_creation.stat_desc_wis": "Mana pool, cheaper spells, healing",
   "character_creation.stat_desc_cha": "Shop prices, NPC reactions",
   "character_creation.stat_desc_mana": "Spellcasting resource",
   "character_creation.stat_desc_mana_grows": "Grows with level-ups",

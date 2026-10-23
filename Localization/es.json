@@ -11650,7 +11650,7 @@
   "character_creation.stat_desc_dex": "Probabilidad de golpear, golpes críticos",
   "character_creation.stat_desc_con": "PV extra, resistencia a veneno",
   "character_creation.stat_desc_int": "Daño mágico, reserva de maná",
-  "character_creation.stat_desc_wis": "Eficiencia de maná, resistencia mágica",
+  "character_creation.stat_desc_wis": "Maná, hechizos más baratos, curación",
   "character_creation.stat_desc_cha": "Precios en tiendas, reacciones de PNJ",
   "character_creation.stat_desc_mana": "Recurso de lanzamiento de hechizos",
   "character_creation.stat_desc_mana_grows": "Crece con las subidas de nivel",
