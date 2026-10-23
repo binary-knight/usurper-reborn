@@ -114,7 +114,7 @@ Abyssal Siphon heals an Abysswarden for {{percent:AbysswardenAbyssalSiphonPercen
 
 ### Void Hunger, Soul Eater and Pain Threshold (Voidreaver)
 
-With Void Hunger every monster killed heals a Voidreaver for {{percent:VoidreaverVoidHungerPercent}} percent of maximum HP, and with Soul Eater it also restores {{percent:VoidreaverSoulEaterManaPercent}} percent of maximum mana. Both are paid when the fight is won. Pain Threshold makes abilities deal {{percent:VoidreaverPainThresholdBonus}} percent more damage while you are below half HP. While a Voidreaver has the Reflecting status, a monster that damages it takes {{percent:VoidreaverReflectionPercent}} percent of that damage back.
+With Void Hunger every monster killed heals a Voidreaver for {{percent:VoidreaverVoidHungerPercent}} percent of maximum HP, and with Soul Eater it also restores {{percent:VoidreaverSoulEaterManaPercent}} percent of maximum mana. Both are paid as each monster falls, inside the fight. Pain Threshold makes abilities deal {{percent:VoidreaverPainThresholdBonus}} percent more damage while you are below half HP. While a Voidreaver has the Reflecting status, a monster that damages it takes {{percent:VoidreaverReflectionPercent}} percent of that damage back.
 
 ### Class bonus to fleeing
 
