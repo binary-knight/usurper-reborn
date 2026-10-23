@@ -28837,6 +28837,7 @@
   "magic_shop.enchant_anvil": "{0} ősi rúnákkal faragott üllőre helyezi: {1}...",
   "magic_shop.enchant_sparks": "Szikrák pattognak, ahogy mágikus energia járja át a tárgyat!",
   "magic_shop.enchant_result": "{0} mostantól: {1}!",
+  "magic_shop.enchant_tag_skipped": "A varázslat érvényben van, de a név túl hosszú a címkéjéhez.",
   "magic_shop.remove_nods": "'{0} komolyan bólint. 'Egy bűvölés eltávolítása kényes munka.'",
   "magic_shop.remove_no_gold": "'Nincs elég aranyad' - mondja a gnóm.",
   "magic_shop.remove_no_base": "Eredeti alakja nincs feljegyezve, ezért a bűvölés nem oldható le róla.",

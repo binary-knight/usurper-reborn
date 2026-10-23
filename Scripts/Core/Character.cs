@@ -1460,6 +1460,24 @@ public class Character
     /// </summary>
     public bool EquipItem(Equipment item, EquipmentSlot? targetSlot, out string message)
     {
+        int titanBefore = EquippedTitanResolveCount();
+        bool equipped = EquipItemCore(item, targetSlot, out message);
+        RecalculateIfTitanChanged(titanBefore);
+        return equipped;
+    }
+
+    /// <summary>
+    /// 1.3.7: Titan's Resolve is applied by RecalculateStats alone, not by the per-item apply and remove, so
+    /// an equip or unequip that changes whether any worn item carries it runs the game's own recalculation
+    /// at once. The shown max HP is then right without waiting for the next fight start or load.
+    /// </summary>
+    private void RecalculateIfTitanChanged(int titanBefore)
+    {
+        if ((titanBefore > 0) != (EquippedTitanResolveCount() > 0)) RecalculateStats();
+    }
+
+    private bool EquipItemCore(Equipment item, EquipmentSlot? targetSlot, out string message)
+    {
         message = "";
 
         if (item == null)
@@ -1481,7 +1499,7 @@ public class Character
             // Unequip main hand first
             if (EquippedItems.TryGetValue(EquipmentSlot.MainHand, out var mainId) && mainId > 0)
             {
-                var mainHandItem = UnequipSlot(EquipmentSlot.MainHand);
+                var mainHandItem = UnequipSlotCore(EquipmentSlot.MainHand);
                 if (mainHandItem != null)
                 {
                     var legacyMainHand = ConvertEquipmentToItem(mainHandItem);
@@ -1493,7 +1511,7 @@ public class Character
             // Unequip off-hand
             if (EquippedItems.TryGetValue(EquipmentSlot.OffHand, out var offId) && offId > 0)
             {
-                var offHandItem = UnequipSlot(EquipmentSlot.OffHand);
+                var offHandItem = UnequipSlotCore(EquipmentSlot.OffHand);
                 if (offHandItem != null)
                 {
                     var legacyOffHand = ConvertEquipmentToItem(offHandItem);
@@ -1624,7 +1642,7 @@ public class Character
             }
 
             // Shield (OffHandOnly) — unequip the 2H weapon to allow sword-and-board.
-            var displacedTwoHand = UnequipSlot(EquipmentSlot.MainHand);
+            var displacedTwoHand = UnequipSlotCore(EquipmentSlot.MainHand);
             if (displacedTwoHand != null)
             {
                 var legacyTwoHand = ConvertEquipmentToItem(displacedTwoHand);
@@ -1658,7 +1676,7 @@ public class Character
         }
 
         // Unequip current item in slot if any and move to inventory
-        var oldEquipment = UnequipSlot(slot);
+        var oldEquipment = UnequipSlotCore(slot);
         if (oldEquipment != null)
         {
             // Convert Equipment to legacy Item and add to inventory
@@ -1755,6 +1773,10 @@ public class Character
             Family = equipment.Family ?? "",
             EnchantBase = equipment.EnchantBase ?? ""   // v1.2.5: the pre-enchant form, for full removal
         };
+
+        // 1.3.7: the loot effect line (Description[0], the line GetFullDescription shows) goes with the item
+        var effectLine = equipment.GetEffectLine();
+        if (effectLine.Length > 0 && item.Description.Count > 0) item.Description[0] = effectLine;
 
         // Preserve CON/INT as LootEffects for re-equip
         if (equipment.ConstitutionBonus != 0)
@@ -1867,6 +1889,9 @@ public class Character
     /// </summary>
     public static void ApplyItemLootEffectsToEquipment(global::Item item, Equipment equipment)
     {
+        // 1.3.7: the item's effect line (Description[0]) rides on the equipment, so converting back keeps it
+        if (item.Description != null && item.Description.Count > 0 && !string.IsNullOrEmpty(item.Description[0]))
+            equipment.SetEffectLine(item.Description[0]);
         if (item.LootEffects == null) return;
         foreach (var (effectType, value) in item.LootEffects)
         {
@@ -1934,6 +1959,14 @@ public class Character
     /// Unequip item from a specific slot
     /// </summary>
     public Equipment? UnequipSlot(EquipmentSlot slot)
+    {
+        int titanBefore = EquippedTitanResolveCount();
+        var removed = UnequipSlotCore(slot);
+        RecalculateIfTitanChanged(titanBefore);
+        return removed;
+    }
+
+    private Equipment? UnequipSlotCore(EquipmentSlot slot)
     {
         if (!EquippedItems.TryGetValue(slot, out var id) || id == 0)
             return null;

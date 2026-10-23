@@ -28531,6 +28531,7 @@
   "magic_shop.enchant_anvil": "{0} posa {1} su un'incudine incisa di rune antiche...",
   "magic_shop.enchant_sparks": "Volano scintille mentre l'energia magica attraversa l'oggetto!",
   "magic_shop.enchant_result": "Il tuo {0} ora è {1}!",
+  "magic_shop.enchant_tag_skipped": "L'incantamento regge, ma il nome è troppo lungo per la sua etichetta.",
   "magic_shop.remove_nods": "'{0} annuisce gravemente. 'Rimuovere un incantamento è un lavoro delicato.'",
   "magic_shop.remove_no_gold": "'Ti manca l'oro', dice lo gnomo.",
   "magic_shop.remove_no_base": "Forma originale sconosciuta: i suoi incantesimi non si possono rimuovere.",

@@ -2236,8 +2236,11 @@ public partial class MagicShopLocation : BaseLocation
                 break;
         }
 
-        // Update name
-        if (enchanted.Name.Length + suffix.Length < 40)
+        // Update name. The tag is kept off a name it would push to 40 or more (the enchant lists, the curse removal rows
+        // and the Dash width rows are sized to that longest name); 1.3.7: the enchant itself is applied either way and the
+        // player is told the tag was left off.
+        bool tagFits = suffix.Length == 0 || enchanted.Name.Length + suffix.Length < 40;
+        if (tagFits)
             enchanted.Name += suffix;
 
         // v1.1.7: the item gains the gold actually charged (after discounts, before tax), not half
@@ -2257,6 +2260,8 @@ public partial class MagicShopLocation : BaseLocation
         await Pacing.Wait(500);
         DisplayMessage("");
         DisplayMessage(Loc.Get("magic_shop.enchant_result", ItemNames.Display(selectedEquip), ItemNames.Display(enchanted)), "bright_green");
+        if (!tagFits)
+            DisplayMessage(Loc.Get("magic_shop.enchant_tag_skipped"), "yellow");
 
         // Track stats
         player.Statistics?.RecordEnchantment(enchantCost);
