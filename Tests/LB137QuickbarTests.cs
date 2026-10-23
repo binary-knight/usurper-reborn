@@ -184,4 +184,16 @@ public class LB137Quickbar
         var rows = await AllRows("hu", Menu.SingleSr, false);
         rows.Should().Contain(r => r.StartsWith("      ") && r.Trim().Length > 0, "a long row continues on an indented row");
     }
+
+    [Theory]
+    [MemberData(nameof(BoxLangs))]
+    public async Task DungeonScreenReaderRow_ShowsTheUnavailableNoteWithSingleParens(string lang)
+    {
+        var rows = await AllRows(lang, Menu.DungeonSr, false);
+        string note = null!;
+        var prev = GameConfig.Language;
+        try { GameConfig.Language = lang; note = Loc.Get("combat.menu_unavailable"); } finally { GameConfig.Language = prev; }
+        rows.Should().Contain(r => r.Contains(note));
+        rows.Should().NotContain(r => r.Contains("((") || r.Contains("))"));
+    }
 }

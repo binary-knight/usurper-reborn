@@ -3362,7 +3362,7 @@ public partial class CombatEngine
             terminal.WriteLine(Loc.Get("combat.menu_quickbar"));
             foreach (var (key, name, available) in classInfo)
             {
-                foreach (var row in QuickbarScreenReaderRows(key, name, available ? null : $"({Loc.Get("combat.menu_unavailable")})"))
+                foreach (var row in QuickbarScreenReaderRows(key, name, available ? null : Loc.Get("combat.menu_unavailable")))
                     terminal.WriteLine(row);
             }
         }
