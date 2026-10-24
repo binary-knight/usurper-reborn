@@ -1311,7 +1311,7 @@ namespace UsurperRemake.Systems
 
     /// <summary>
     /// Persistent dungeon floor state - tracks exploration progress and respawn timing
-    /// Regular floors respawn after 24 hours, boss/seal floors stay cleared permanently
+    /// Regular floors respawn after 1 hour, boss/seal floors stay cleared permanently
     /// </summary>
     public class DungeonFloorState
     {

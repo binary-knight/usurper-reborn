@@ -8,10 +8,8 @@ const path = require("node:path");
 const siteDir =
   process.env.WIKI_SITE_DIR || path.resolve(__dirname, "../../../web/wiki");
 // Kept text: a pattern that may say Defence, by page.
-// items/armor: the gear set bonus rows are the game's own en.json item.set.bonus.defence ("+{0} Defence").
 // reference/balance: the name of the C# constant GodBoonJudicarDefencePct.
 const kept = [
-  ["en/items/armor/index.html", /\+\d+ Defence/g],
   ["en/reference/balance/index.html", /God Boon Judicar Defence Pct/g],
 ];
 function htmlFiles(dir, out = []) {
