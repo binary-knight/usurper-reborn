@@ -151,6 +151,8 @@ public class W140Withdraw
         r.Text.Should().NotContain(DoneLine(ally));
         r.Result.Teammates.Should().Contain(ally);
         r.Result.Monsters[0].HP.Should().Be(mobHp, "a failed try spends the turn");
+        ally.IsDefending.Should().BeFalse("nothing else that turn, not even a brace: {0}", r.Text);
+        r.Text.Should().NotContain(Loc.Get("combat.teammate_defends", ally.DisplayName));
         Withdrew(r.Engine, ally).Should().BeFalse();
         ally.HP.Should().Be(15, "a failure has no other cost");
 
