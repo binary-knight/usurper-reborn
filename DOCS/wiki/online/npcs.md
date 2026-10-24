@@ -45,6 +45,8 @@ At most {{balance:MaxNPCPopulation}} living NPCs. At 200, newcomers, new pregnan
 
 An NPC made when the world starts gets a level by a roll: 20 percent of them 1 to 15, 30 percent 15 to 40, 30 percent 40 to 65 and 20 percent 65 to 80. A newcomer's level follows the town: in single-player the average level of the living NPCs, at least 10, plus or minus 10; online the average plus or minus 3. A newcomer's class leans toward the classes the town lacks.
 
+An NPC Voidreaver is raised once, when it first loads in 1.3.7 or later, to a Constitution of at least 10 plus the total its levels have given the class, so one made before the Voidreaver's Constitution gain was lifted is not left behind.
+
 A new NPC starts in one of 15 places, weighted: Main Street, the Inn and the Castle twice each, and the Auction House, the Temple, the Church, the Weapon, Armor and Magic shops, the Bank, the Healer and the Dark Alley once each. A moving NPC goes to another place, more often where its friends are and less often where its enemies are or a crowd of 6 or more has gathered.
 
 ## How do NPCs get married
