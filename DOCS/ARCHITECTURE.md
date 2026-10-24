@@ -210,7 +210,7 @@ Standalone class (not extending Character). Combat-relevant fields only: `Level`
 
 ### 17 Total Classes (12 base + 5 prestige)
 
-Defined in `CharacterClass` enum. Per-class starting stats and per-level growth in `GameConfig.cs` and `LevelMasterLocation.cs`. The Voidreaver's Constitution gain alternates by level, 2 on an even level and 1 on an odd one (`LevelMasterLocation.VoidreaverConstitutionGain`, 1.3.7). A Voidreaver or NPC saved before then gets the Constitution its levels would have gained once on load (`ApplyVoidreaverConstitutionTopUp`), guarded by the saved marker `VoidreaverConstitutionApplied` in the player and NPC save data; the admin console level edit (`OnlineAdminConsole.ApplyClassStatIncreasesToSaveData`) gives the same class and specialization gains as a level up.
+Defined in `CharacterClass` enum. Per-class starting stats and per-level growth in `GameConfig.cs` and `LevelMasterLocation.cs`. The Voidreaver's Constitution gain alternates by level, 2 on an even level and 1 on an odd one (`LevelMasterLocation.VoidreaverConstitutionGain`, 1.3.7). A player Voidreaver saved before then gets the Constitution its levels would have gained once on load, and an NPC Voidreaver is raised once to the floor of 10 plus that total (`ApplyVoidreaverConstitutionTopUp`), guarded by the saved marker `VoidreaverConstitutionApplied` in the player and NPC save data; the admin console level edit (`OnlineAdminConsole.ApplyClassStatIncreasesToSaveData`) gives the same class and specialization gains as a level up.
 
 **Base classes (12)**: Alchemist, Assassin, Barbarian, Bard, Cleric, Jester, Magician, Paladin, Ranger, Sage, Warrior, Mystic Shaman.
 
