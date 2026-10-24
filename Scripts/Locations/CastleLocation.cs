@@ -968,12 +968,13 @@ public class CastleLocation : BaseLocation
     };
 
     /// <summary>v1.2.5: one framed row of a rebellion box, the text centred (or, for a body row, indented 3)
-    /// and padded to the frame.</summary>
+    /// and padded to the frame. v1.3.8: measured in display columns, so a Chinese or Japanese title is
+    /// centred and padded by the width it is drawn at rather than by its character count.</summary>
     internal static string FramedRow(string text, int inner, bool centre)
     {
-        if (!centre) return $"  ║   {text.PadRight(inner - 3)}║";
-        int left = Math.Max(0, (inner - text.Length) / 2);
-        return $"  ║{(new string(' ', left) + text).PadRight(inner)}║";
+        if (!centre) return $"  ║   {UsurperRemake.UI.TextWidth.PadRight(text, inner - 3)}║";
+        int left = Math.Max(0, (inner - UsurperRemake.UI.TextWidth.Width(text)) / 2);
+        return $"  ║{UsurperRemake.UI.TextWidth.PadRight(new string(' ', left) + text, inner)}║";
     }
 
     /// <summary>v1.2.5: a rebellion box (the hand-drawn rows were a column short of the frame).</summary>
