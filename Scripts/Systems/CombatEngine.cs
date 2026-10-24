@@ -1145,7 +1145,7 @@ public partial class CombatEngine
             });
             // Seed initial party state so MUD clients can render party panes
             // without waiting for the first round-end update.
-            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates);
+            UsurperRemake.Server.GmcpBridge.EmitCombatPartyIfChanged(teammates != null ? new List<Character>(teammates).FindAll(t => t == null || !t.IsWaiting) : null);   // 1.4.0 H: as the fight's list, no waiting ally
         }
 
         // Store teammates for healing/support actions.

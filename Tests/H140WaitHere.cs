@@ -185,6 +185,44 @@ public class H140WaitHere
         present.Experience.Should().BeGreaterThan(0, "the ally with the party still shares: {0}", text);
     }
 
+    /// <summary>The first Char.Combat.Party frame of a fight (the seed sent with Char.Combat.Start) holds the
+    /// fight's list: a MUD client's combat party pane never shows a waiting ally.</summary>
+    [Fact]
+    public async Task TheFirstGmcpPartyFrame_HoldsNoWaitingAlly()
+    {
+        var saved = UsurperRemake.Server.SessionContext.Current;
+        var gmcp = new MemoryStream();
+        var ctx = new UsurperRemake.Server.SessionContext { Username = "h140gmcp", CharacterKey = "h140gmcp", OutputStream = gmcp, GmcpEnabled = true };
+        ctx.InitializeSystems();   // the per-session systems a fight reads (grief, companions)
+        UsurperRemake.Server.SessionContext.Current = ctx;
+        try
+        {
+            var hero = PartySurvival133Harness.Hero();
+            var present = PartySurvival133Harness.Ally("Kadewyn", 100, 100);
+            var waiting = PartySurvival133Harness.Ally("Mirabeth", 100, 100);
+            waiting.WaitingAt = new WaitMark(6, "r1");
+            var output = new MemoryStream();
+            var term = new TerminalEmulator(new PartySurvival133Harness.ScriptedStream(string.Concat(Enumerable.Repeat("A\n\n", 30))), output);
+            var e = new CombatEngine(term);
+            e.SeedRandomForTests(140);
+            var task = e.PlayerVsMonsters(hero, new List<Monster> { Rat() }, new List<Character> { present, waiting }, offerMonkEncounter: false);
+            (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(60)))).Should().Be(task, "the fight ends");
+            await task;
+
+            string frames = Encoding.UTF8.GetString(gmcp.ToArray());
+            int start = frames.IndexOf("Char.Combat.Start", StringComparison.Ordinal);
+            int party = frames.IndexOf("Char.Combat.Party", StringComparison.Ordinal);
+            start.Should().BeGreaterOrEqualTo(0, "GMCP is on: {0}", frames);
+            party.Should().BeGreaterThan(start, "the party seed follows the start frame");
+            int next = frames.IndexOf("Char.", party + 5, StringComparison.Ordinal);
+            var first = next > party ? frames.Substring(party, next - party) : frames.Substring(party);
+            first.Should().Contain("Kadewyn", "the ally with the party is in the pane");
+            first.Should().NotContain("Mirabeth", "a waiting ally is not in the fight's pane");
+            frames.Should().NotContain("Mirabeth", "no later frame of the fight shows it either");
+        }
+        finally { UsurperRemake.Server.SessionContext.Current = saved; }
+    }
+
     [Fact]
     public void AWaitingAlly_IsLeftOutOfThePotionMenu_TheShares_AndTheBossCount()
     {
