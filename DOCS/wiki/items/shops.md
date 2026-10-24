@@ -1,8 +1,9 @@
 ---
 title: Shopping, magic services and auctions
 path: /wiki/en/items/shops/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/WeaponShopLocation.cs, Scripts/Locations/ArmorShopLocation.cs, Scripts/Locations/MagicShopLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Systems/ShopItemGenerator.cs, Scripts/Systems/HagglingEngine.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/DifficultySystem.cs, Scripts/Systems/CityControlSystem.cs, Scripts/Core/King.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/MarketplaceSystem.cs
+history: 1.3.7 | The Magic Shop says when an item's name is too long to carry the enchant's tag; the enchant is applied all the same.
 history: 1.3.6 | none
 history: 1.3.5 | Enchant removal lists enchanted items in your backpack, a failed 4th or 5th enchant destroys one random enchant whole, and items sold at the auction keep their loot effects, such as fire, frost and life steal.
 history: 1.3.4 | none

@@ -1,8 +1,9 @@
 ---
 title: What each god's boon does
 path: /wiki/en/gods/boons/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/GodBoonSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/CombatEngine.cs, Scripts/Systems/StatEffectsSystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/WorldBossSystem.cs, Scripts/Locations/WildernessLocation.cs, Scripts/Locations/DarkAlleyLocation.cs, Scripts/Locations/HomeLocation.cs, Scripts/Locations/SettlementLocation.cs, Scripts/Systems/QuestSystem.cs, Scripts/Core/Character.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none

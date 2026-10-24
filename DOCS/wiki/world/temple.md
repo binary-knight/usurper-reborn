@@ -1,8 +1,9 @@
 ---
 title: Temple rooms
 path: /wiki/en/world/temple/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/TempleLocation.cs, Scripts/Systems/GodSystem.cs, Scripts/Systems/AlignmentSystem.cs, Scripts/Systems/FactionSystem.cs, Scripts/Systems/FaithSystem.cs, Scripts/Systems/DivineBlessingSystem.cs, Scripts/Systems/GodDeedSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none

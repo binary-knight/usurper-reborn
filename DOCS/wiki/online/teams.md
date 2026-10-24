@@ -1,8 +1,9 @@
 ---
 title: Teams and guilds
 path: /wiki/en/online/teams/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/TeamSystem.cs, Scripts/Systems/GuildSystem.cs, Scripts/Locations/TeamCornerLocation.cs, Scripts/Systems/TeamHQBonus.cs, Scripts/Server/GroupSystem.cs, Scripts/Core/GameConfig.cs, Scripts/Server/MudChatSystem.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | Items kept in the guild bank keep their loot effects, such as fire, frost and life steal.
 history: 1.3.4 | none
