@@ -11254,6 +11254,28 @@ public class DungeonLocation : BaseLocation
         await Pacing.Wait(1200);
     }
 
+    /// <summary>
+    /// 1.4.0 SW: the rows of one stance choice, "  [N] name  description", each at most 79 columns. A row that fits is one
+    /// row; a longer description continues on rows indented under its start (the quickbar wrap).
+    /// </summary>
+    internal static List<string> StanceDescriptionRows(string key, string name, string desc)
+    {
+        int lead = $"  [{key}] {name}  ".Length;
+        return CombatEngine.WrapQuickbarText(desc, UsurperRemake.UI.UIHelper.WrapWidth - lead);
+    }
+
+    /// <summary>1.4.0 SW: write one stance choice row (the dungeon party menu and the Inn share it).</summary>
+    internal static void WriteStanceRow(TerminalEmulator terminal, string key, TeammateStance stance)
+    {
+        string name = Loc.Get(TeammateStances.NameKey(stance));
+        var parts = StanceDescriptionRows(key, name, Loc.Get(TeammateStances.NameKey(stance) + ".desc"));
+        string pad = new string(' ', $"  [{key}] {name}  ".Length);
+        terminal.SetColor("bright_yellow"); terminal.Write($"  [{key}] ");
+        terminal.SetColor("white"); terminal.Write(name);
+        terminal.SetColor("gray"); terminal.WriteLine($"  {parts[0]}");
+        for (int i = 1; i < parts.Count; i++) terminal.WriteLine(pad + parts[i]);
+    }
+
     /// <summary>The three presets with one line each; null when the player backs out.</summary>
     internal async Task<TeammateStance?> PromptStanceChoice(string memberName)
     {
@@ -11262,9 +11284,7 @@ public class DungeonLocation : BaseLocation
         terminal.WriteLine(Loc.Get("dungeon.stance_prompt", memberName));
         foreach (var (key, stance) in new[] { ("1", TeammateStance.Aggressive), ("2", TeammateStance.Balanced), ("3", TeammateStance.Cautious) })
         {
-            terminal.SetColor("bright_yellow"); terminal.Write($"  [{key}] ");
-            terminal.SetColor("white"); terminal.Write(Loc.Get(TeammateStances.NameKey(stance)));
-            terminal.SetColor("gray"); terminal.WriteLine($"  {Loc.Get(TeammateStances.NameKey(stance) + ".desc")}");
+            WriteStanceRow(terminal, key, stance);
         }
         terminal.WriteLine("");
         terminal.SetColor("cyan");
