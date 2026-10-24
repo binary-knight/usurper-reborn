@@ -1,8 +1,9 @@
 ---
 title: Dungeon features and random events
 path: /wiki/en/world/dungeon-features/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/FeatureInteractionSystem.cs, Scripts/Systems/DiscoverySystem.cs, Scripts/Data/DiscoveryData.cs, Scripts/Systems/PuzzleSystem.cs, Scripts/Data/RiddleDatabase.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | The Warrior and Barbarian attack bonus from a room feature lasts into the next fight.
 history: 1.3.6 | none
 history: 1.3.5 | A living companion now takes 75 percent of the experience from a room feature you examine, as an NPC teammate does.
 history: 1.3.4 | none
