@@ -43,10 +43,11 @@ namespace UsurperRemake.UI
             }
             else
             {
-                // Center the title within the box
-                int padding = (BoxWidth - title.Length - 2) / 2; // -2 for spaces around title
+                // Center the title within the box (measured in display columns)
+                int titleWidth = TextWidth.Width(title);
+                int padding = (BoxWidth - titleWidth - 2) / 2; // -2 for spaces around title
                 string left = new string(Horizontal, Math.Max(1, padding));
-                string right = new string(Horizontal, Math.Max(1, BoxWidth - padding - title.Length - 2));
+                string right = new string(Horizontal, Math.Max(1, BoxWidth - padding - titleWidth - 2));
                 terminal.WriteLine($"{TopLeft}{left} {title} {right}{TopRight}", color);
             }
         }
@@ -63,7 +64,7 @@ namespace UsurperRemake.UI
             }
 
             // Word-wrap if too long instead of truncating
-            if (text.Length > BoxWidth)
+            if (TextWidth.Width(text) > BoxWidth)
             {
                 // Find leading whitespace to preserve indent on wrapped lines
                 int indent = 0;
@@ -74,32 +75,41 @@ namespace UsurperRemake.UI
                 string remaining = text;
                 while (remaining.Length > 0)
                 {
-                    if (remaining.Length <= BoxWidth)
+                    if (TextWidth.Width(remaining) <= BoxWidth)
                     {
-                        string padded = remaining.PadRight(BoxWidth);
-                        terminal.Write($"{Vertical}", borderColor);
-                        terminal.Write(padded, textColor);
-                        terminal.WriteLine($"{Vertical}", borderColor);
+                        WriteBoxRow(terminal, TextWidth.PadRight(remaining, BoxWidth), borderColor, textColor);
                         break;
                     }
 
-                    // Find last space within BoxWidth
-                    int breakAt = remaining.LastIndexOf(' ', BoxWidth - 1);
-                    if (breakAt <= indent) breakAt = BoxWidth; // No good break point, force break
+                    // The last space that still fits, or none when the run has no break in it
+                    // (East Asian prose and long unbroken tokens): then break on the column.
+                    int breakAt = TextWidth.LastSpaceWithin(remaining, BoxWidth);
+                    string line;
+                    string rest;
+                    if (breakAt > indent)
+                    {
+                        line = remaining.Substring(0, breakAt);
+                        rest = remaining.Substring(breakAt).TrimStart();
+                    }
+                    else
+                    {
+                        line = TextWidth.BreakAt(remaining, BoxWidth, out rest);
+                    }
 
-                    string line = remaining.Substring(0, breakAt).PadRight(BoxWidth);
-                    terminal.Write($"{Vertical}", borderColor);
-                    terminal.Write(line, textColor);
-                    terminal.WriteLine($"{Vertical}", borderColor);
-
-                    remaining = indentStr + remaining.Substring(breakAt).TrimStart();
+                    WriteBoxRow(terminal, TextWidth.PadRight(line, BoxWidth), borderColor, textColor);
+                    remaining = indentStr + rest;
                 }
                 return;
             }
 
             // Pad to fill the box
-            string paddedText = text.PadRight(BoxWidth);
+            WriteBoxRow(terminal, TextWidth.PadRight(text, BoxWidth), borderColor, textColor);
+        }
 
+        /// <summary>One row of a box: the left border, the padded content, the right border.</summary>
+        private static void WriteBoxRow(TerminalEmulator terminal, string paddedText,
+            string borderColor, string textColor)
+        {
             terminal.Write($"{Vertical}", borderColor);
             terminal.Write(paddedText, textColor);
             terminal.WriteLine($"{Vertical}", borderColor);
@@ -117,13 +127,13 @@ namespace UsurperRemake.UI
                 return;
             }
 
-            string combined = $"{label}: {value}";
-            if (combined.Length > BoxWidth)
-                combined = combined.Substring(0, BoxWidth);
+            int valueWidth = Math.Max(0, BoxWidth - TextWidth.Width(label) - 2);
+            if (TextWidth.Width(value) > valueWidth)
+                value = TextWidth.Truncate(value, valueWidth);
 
             terminal.Write($"{Vertical}", borderColor);
             terminal.Write(label + ": ", labelColor);
-            terminal.Write(value.PadRight(BoxWidth - label.Length - 2), valueColor);
+            terminal.Write(TextWidth.PadRight(value, valueWidth), valueColor);
             terminal.WriteLine($"{Vertical}", borderColor);
         }
 
@@ -167,15 +177,15 @@ namespace UsurperRemake.UI
                 return;
             }
 
-            string line = $"  [{key}] {description}";
-            if (line.Length > BoxWidth)
-                line = line.Substring(0, BoxWidth);
+            int descriptionWidth = Math.Max(0, BoxWidth - TextWidth.Width(key) - 5);
+            if (TextWidth.Width(description) > descriptionWidth)
+                description = TextWidth.Truncate(description, descriptionWidth);
 
             terminal.Write($"{Vertical}", borderColor);
             terminal.Write("  [", bracketColor);
             terminal.Write(key, keyColor);
             terminal.Write("] ", bracketColor);
-            terminal.Write(description.PadRight(BoxWidth - key.Length - 5), textColor);
+            terminal.Write(TextWidth.PadRight(description, descriptionWidth), textColor);
             terminal.WriteLine($"{Vertical}", borderColor);
         }
 
@@ -201,11 +211,12 @@ namespace UsurperRemake.UI
         public static void DrawBoxCentered(TerminalEmulator terminal, string text,
             string borderColor = "bright_blue", string textColor = "white")
         {
-            if (text.Length > BoxWidth)
-                text = text.Substring(0, BoxWidth);
+            if (TextWidth.Width(text) > BoxWidth)
+                text = TextWidth.Truncate(text, BoxWidth);
 
-            int padding = (BoxWidth - text.Length) / 2;
-            string paddedText = new string(' ', padding) + text + new string(' ', BoxWidth - padding - text.Length);
+            int padding = (BoxWidth - TextWidth.Width(text)) / 2;
+            string paddedText = new string(' ', padding) + text +
+                                new string(' ', Math.Max(0, BoxWidth - padding - TextWidth.Width(text)));
 
             terminal.Write($"{Vertical}", borderColor);
             terminal.Write(paddedText, textColor);
@@ -242,7 +253,7 @@ namespace UsurperRemake.UI
             terminal.Write("[", "white");
             terminal.Write(new string('█', Math.Max(0, Math.Min(barWidth, filled))), barColor);
             terminal.Write(new string('░', Math.Max(0, barWidth - filled)), "gray");
-            terminal.Write($"] {stats}".PadRight(BoxWidth - label.Length - barWidth - 7), "white");
+            terminal.Write($"] {stats}".PadRight(Math.Max(0, BoxWidth - TextWidth.Width(label) - barWidth - 7)), "white");
             terminal.WriteLine($"{Vertical}", borderColor);
         }
 
@@ -277,9 +288,13 @@ namespace UsurperRemake.UI
         private static readonly System.Text.RegularExpressions.Regex AnsiEscape =
             new System.Text.RegularExpressions.Regex("\u001b\\[[0-9;?]*[A-Za-z]");
 
-        /// <summary>v1.1.14: visible length of a string, not counting ANSI escape sequences.</summary>
+        /// <summary>
+        /// v1.1.14: visible length of a string in terminal columns, not counting ANSI escape
+        /// sequences. v1.3.8: measured in display columns, so a Chinese, Japanese or Korean
+        /// character counts two and an emoji two, exactly as the terminal draws them.
+        /// </summary>
         public static int VisibleLength(string text) =>
-            string.IsNullOrEmpty(text) ? 0 : AnsiEscape.Replace(text, "").Length;
+            string.IsNullOrEmpty(text) ? 0 : TextWidth.Width(AnsiEscape.Replace(text, ""));
 
         /// <summary>v1.2.4: text without its ANSI escape sequences.</summary>
         public static string StripAnsi(string? text) =>
@@ -304,17 +319,33 @@ namespace UsurperRemake.UI
                 int len = 0;
                 foreach (var word in JoinMarksToPreviousWord(para.Split(' ', StringSplitOptions.RemoveEmptyEntries)))
                 {
-                    int w = VisibleLength(word);
-                    if (len > 0 && used + len + 1 + w > width)
+                    // v1.3.8: a run with double width characters in it (Chinese prose has no spaces
+                    // at all) is broken on column boundaries, each piece after the first starting a
+                    // new row. A single width word that is too long still stays whole, as before.
+                    var pieces = TextWidth.HasWide(word) && VisibleLength(word) > width
+                        ? TextWidth.SplitToFit(word, width)
+                        : new List<string> { word };
+                    for (int p = 0; p < pieces.Count; p++)
                     {
-                        lines.Add(sb.ToString());
-                        sb.Clear();
-                        len = 0;
-                        used = 0;
+                        if (p > 0)
+                        {
+                            lines.Add(sb.ToString());
+                            sb.Clear();
+                            len = 0;
+                            used = 0;
+                        }
+                        int w = VisibleLength(pieces[p]);
+                        if (len > 0 && used + len + 1 + w > width)
+                        {
+                            lines.Add(sb.ToString());
+                            sb.Clear();
+                            len = 0;
+                            used = 0;
+                        }
+                        if (len > 0) { sb.Append(' '); len++; }
+                        sb.Append(pieces[p]);
+                        len += w;
                     }
-                    if (len > 0) { sb.Append(' '); len++; }
-                    sb.Append(word);
-                    len += w;
                 }
                 lines.Add(sb.ToString());
             }
@@ -505,8 +536,9 @@ namespace UsurperRemake.UI
             }
             terminal.SetColor(color);
             terminal.WriteLine($"╔{new string('═', width)}╗");
-            int l = (width - title.Length) / 2;
-            int r = width - title.Length - l;
+            int titleWidth = TextWidth.Width(title);
+            int l = Math.Max(0, (width - titleWidth) / 2);
+            int r = Math.Max(0, width - titleWidth - l);
             terminal.WriteLine($"║{new string(' ', l)}{title}{new string(' ', r)}║");
             terminal.WriteLine($"╚{new string('═', width)}╝");
         }
@@ -573,12 +605,12 @@ namespace UsurperRemake.UI
             var words = header.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             var w = (int[])widths.Clone();
             if (words.Length != widths.Length + 3) return new ShopColumns(header, w);
-            var sb = new StringBuilder("  " + words[0].PadRight(3) + words[1].PadRight(NameWidth));
+            var sb = new StringBuilder("  " + TextWidth.PadRight(words[0], 3) + TextWidth.PadRight(words[1], NameWidth));
             for (int i = 0; i < w.Length; i++)
             {
-                int width = Math.Max(Math.Abs(w[i]), words[2 + i].Length);
+                int width = Math.Max(Math.Abs(w[i]), TextWidth.Width(words[2 + i]));
                 w[i] = w[i] < 0 ? -width : width;
-                sb.Append(w[i] < 0 ? words[2 + i].PadRight(width) : words[2 + i].PadLeft(width)).Append(' ');
+                sb.Append(w[i] < 0 ? TextWidth.PadRight(words[2 + i], width) : TextWidth.PadLeft(words[2 + i], width)).Append(' ');
             }
             sb.Append(words[words.Length - 1]);
             return new ShopColumns(sb.ToString(), w);
@@ -586,6 +618,6 @@ namespace UsurperRemake.UI
 
         /// <summary>The cell of column i and the space after it.</summary>
         public string Cell(int i, string text) =>
-            (Widths[i] < 0 ? text.PadRight(-Widths[i]) : text.PadLeft(Widths[i])) + " ";
+            (Widths[i] < 0 ? TextWidth.PadRight(text, -Widths[i]) : TextWidth.PadLeft(text, Widths[i])) + " ";
     }
 }
