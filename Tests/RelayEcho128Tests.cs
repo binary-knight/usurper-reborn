@@ -107,7 +107,9 @@ namespace UsurperRemake.Tests
                 {
                     "tester", "secret", port, "Test", cts.Token, false, rawTerminal, "en"
                 })!;
-                // The server task ends after it sent the reply and closed, so the relay had its answer.
+                // The server task ends after it sent the reply and closed, so the relay had its answer. Bounded by
+                // the safety stop: a relay that never connects fails here instead of hanging the test run.
+                (await Task.WhenAny(server, Task.Delay(SafetyStop))).Should().BeSameAs(server, "the relay connects and sends AUTH");
                 await server;
                 authSeen.Should().StartWith("AUTH:tester:secret:Test");
                 if (!expectConnected)
