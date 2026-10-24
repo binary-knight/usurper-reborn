@@ -8720,7 +8720,7 @@ public partial class CombatEngine
     /// <summary>
     /// Class abilities whose SpecialEffect represents pure magical/divine damage.
     /// These should NOT trigger weapon-based enchants (lifedrinker, mana siphon, elemental procs, poison coating)
-    /// because the damage doesn't actually come from the weapon — it's channeled magic/divine power.
+    /// because the damage doesn't actually come from the weapon: it's channeled magic/divine power.
     /// Physical/melee abilities (backstab, power_strike, execute, last_stand, etc.) are NOT in this set
     /// because they DO use the weapon and SHOULD proc weapon enchants.
     /// </summary>
