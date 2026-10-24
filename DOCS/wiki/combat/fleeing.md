@@ -46,6 +46,10 @@ A Smoke Bomb, if you carry one, is used first when you press R and gets you out 
 
 On Nightmare difficulty you cannot flee at all, and a Smoke Bomb cannot be used either.
 
+### Allies pulling back
+
+Your R takes the whole party out. A Cautious ally close to death with no heal left can also try to leave a fight on its own turn, rolling this chance on its own stats; it rejoins you when the fight ends. See [pulling back from a fight](/wiki/en/combat/party/#pulling-back-from-a-fight).
+
 ## What fleeing costs
 
 A successful flee from a monster fight costs 1 Fame and {{balance:MentalFleeLoss}} Mental (Umbrath's ward can lower the Mental loss), and Valorian counts it as a taboo: {{balance:GodTabooMinor}} Favor lost for his followers. Read the outcome messages rather than assuming escape is free.
