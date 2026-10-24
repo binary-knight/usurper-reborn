@@ -2653,6 +2653,9 @@ public partial class GameEngine
     {
         try
         {
+            // 1.4.0: a single player load starts from a clean story, before any restore step
+            ResetStoryForSinglePlayerLoad();
+
             // v0.60.0 beta-launch Rage event: short-circuit BEFORE any save
             // restore happens. The cinematic plays for ~25 seconds, and any
             // restore step that fires a fire-and-forget save would race with
@@ -4724,6 +4727,9 @@ public partial class GameEngine
     /// </summary>
     private async Task LoadExistingGame(string playerName)
     {
+        // 1.4.0: a single player load starts from a clean story, before any restore step
+        ResetStoryForSinglePlayerLoad();
+
         terminal.WriteLine(Loc.Get("save.loading"), "yellow");
 
         // Clear dungeon party before loading to prevent state leak between saves
@@ -4837,6 +4843,20 @@ public partial class GameEngine
         UsurperRemake.Systems.GriefSystem.Instance.Reset();
         UsurperRemake.Systems.MoralParadoxSystem.Instance.Reset();
         UsurperRemake.Systems.BetrayalSystem.Instance.Reset();
+    }
+
+    /// <summary>
+    /// 1.4.0: a single player load starts from a clean story, the state a fresh process starts with:
+    /// the story (seals, artifacts, flags, endings, Old God states, cycle) and the narrative systems a
+    /// new character starts without. Both load paths call it before any restore step. An online
+    /// session has its own systems on its SessionContext and is left alone. Returns true when it ran.
+    /// </summary>
+    internal static bool ResetStoryForSinglePlayerLoad()
+    {
+        if (UsurperRemake.Server.SessionContext.Current != null) return false;
+        UsurperRemake.Systems.StoryProgressionSystem.Instance.FullReset();
+        ResetNarrativeSystemsForNewGame();
+        return true;
     }
 
     public static int ClearLeftoversForNewCharacter(string? name2)
