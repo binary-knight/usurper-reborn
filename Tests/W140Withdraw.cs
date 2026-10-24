@@ -145,9 +145,14 @@ public class W140Withdraw
         var ally = Cautious(owner, Low("Mira", 15));
         var r = TurnRig(ally, owner);
         long mobHp = r.Result.Monsters[0].HP;
+        long stamina = ally.CurrentCombatStamina = 500;
         ForceRoll(r.Engine, 100);
         await Turn(r, ally);
         r.Text.Should().Contain(TryLine(ally)).And.Contain(FailLine(ally));
+        string shown = System.Text.RegularExpressions.Regex.Replace(r.Text, "\u001b\\[[0-9;]*[A-Za-z]", "");
+        shown.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).Should()
+            .Equal(new[] { TryLine(ally), FailLine(ally) }, "the try is the whole turn: {0}", shown);
+        ally.CurrentCombatStamina.Should().Be(stamina, "no ability that turn");
         r.Text.Should().NotContain(DoneLine(ally));
         r.Result.Teammates.Should().Contain(ally);
         r.Result.Monsters[0].HP.Should().Be(mobHp, "a failed try spends the turn");
