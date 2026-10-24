@@ -1,8 +1,9 @@
 ---
 title: Weapons and restrictions
 path: /wiki/en/items/weapons/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Data/EquipmentData.cs, Scripts/Core/Items.cs, Scripts/Core/EquipmentEnums.cs
+history: 1.3.7 | A loot weapon keeps its effect line after it has been worn.
 history: 1.3.6 | Weapon poison now poisons a monster for 4 rounds in place of a single hit, a new proc refreshes it, and it is one hit in a player fight and on the world boss.
 history: 1.3.5 | Shadowfang, Venomstrike and Serpent's Fang now have a 20 percent chance on each hit to deal their poison damage.
 history: 1.3.2 | A Mystic Shaman follows its own main hand weapon rule.

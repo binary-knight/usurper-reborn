@@ -1,8 +1,9 @@
 ---
 title: Dungeon travel and outposts
 path: /wiki/en/world/dungeon/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Data/DungeonSettlementData.cs, Scripts/Systems/MentalSystem.cs, Scripts/Systems/DungeonGenerator.cs, Scripts/Systems/MonsterGenerator.cs, Scripts/Systems/OldGodBossSystem.cs, Scripts/Systems/SevenSealsSystem.cs, Scripts/Core/GameConfig.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none

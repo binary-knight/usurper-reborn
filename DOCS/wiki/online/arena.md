@@ -1,8 +1,9 @@
 ---
 title: The Arena
 path: /wiki/en/online/arena/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/ArenaLocation.cs, Scripts/Locations/MainStreetDistricts.cs, Scripts/Core/GameConfig.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.7 | none
 history: 1.3.6 | Weapon enchants and life steal now work in Arena fights, and magic resistance cuts a spell's damage there by up to half.
 history: 1.3.5 | none
 history: 1.3.4 | none

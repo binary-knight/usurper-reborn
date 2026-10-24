@@ -1,8 +1,9 @@
 ---
 title: Leveling and training
 path: /wiki/en/characters/leveling/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/LevelMasterLocation.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md, Scripts/Core/GameConfig.cs, Scripts/Systems/SysOpConfigSystem.cs, Scripts/Systems/EndingsSystem.cs, Scripts/Core/Character.cs, Scripts/Locations/BaseLocation.cs, Scripts/Systems/TrainingSystem.cs, Scripts/Systems/ClassAbilitySystem.cs, Scripts/Systems/SpellSystem.cs, Scripts/Systems/CombatEngine.cs
+history: 1.3.7 | A Voidreaver gains Constitution on each level, 2 on an even level and 1 on an odd one, and an existing Voidreaver received what its levels would have given.
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.4 | none
