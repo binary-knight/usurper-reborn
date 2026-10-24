@@ -1,8 +1,9 @@
 ---
 title: NPC life and relationships
 path: /wiki/en/online/npcs/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Systems/CompanionSystem.cs, Scripts/Systems/WorldSimulator.cs, Scripts/Systems/NPCSpawnSystem.cs, Scripts/AI/EnhancedNPCBehaviors.cs, Scripts/Systems/FamilySystem.cs, Scripts/Systems/WorldSimService.cs, Scripts/BBS/DoorMode.cs, Scripts/Core/GameConfig.cs, DOCS/release-notes/RELEASE_NOTES_1.2.0.md
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | Online, an NPC that died of old age or for good is removed from the world 7 days after its death.
 history: 1.3.4 | none

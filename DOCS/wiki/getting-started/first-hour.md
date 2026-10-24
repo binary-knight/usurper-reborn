@@ -1,8 +1,9 @@
 ---
 title: Your first expedition
 path: /wiki/en/getting-started/first-hour/
-checked: 1.3.6
+checked: 1.3.7
 sources: Scripts/Locations/DungeonLocation.cs, Scripts/Locations/HealerLocation.cs, Scripts/Locations/LevelMasterLocation.cs
+history: 1.3.7 | none
 history: 1.3.6 | none
 history: 1.3.5 | none
 history: 1.3.2 | Every healing potion you or your party drink follows the difficulty's healing multiplier.
