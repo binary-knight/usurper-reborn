@@ -255,7 +255,7 @@ module.exports = [
   ["C15","what does godforged enchant give","/wiki/en/items/enchanting/","Godforged +38 to one stat you choose 500,000 + 5,000 per level","miss: fact outside the excerpt"],
   ["C16","what does predator enchant do","/wiki/en/items/enchanting/","Predator adds +5 percent critical hit chance and +10 percent critical damage.","miss: fact outside the excerpt"],
   ["C17","what does oceans touch enchant do","/wiki/en/items/enchanting/","Ocean's Touch adds +6 Intelligence and +4 Wisdom","miss: fact outside the excerpt"],
-  ["C18","what does phoenix fire do","/wiki/en/items/enchanting/","each hit with that weapon has a 30 percent chance of extra fire damage","first"],
+  ["C18","what does phoenix fire do","/wiki/en/items/enchanting/","each hit with that weapon has a 30 percent chance of extra fire damage","first"],   // 1.3.6: Phoenix Fire's chance is 30 percent
   ["C19","how many enchants can an item have","/wiki/en/items/enchanting/","An item holds at most 5 enchants, and never the same kind twice.","first"],
   ["C20","can enchanting fail","/wiki/en/items/enchanting/","The 4th enchant on an item fails 25 percent of the time","first"],
   ["C21","how much to remove an enchant","/wiki/en/items/enchanting/","Enchant removal (W) costs 5,000 + level x 200 gold before the price modifiers","first"],
