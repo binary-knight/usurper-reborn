@@ -239,7 +239,7 @@ public class CS140CascadeTests
                 blame[0].Description.Should().Be(Loc.GetIn("en", "combat.memory_saw_ally_left", r.Owner.Name2, "Mira"), "stored in English");
                 MemorySystem.ImpressionChangeFor(MemoryType.SawCombat).Should().Be(-0.1f);
             }
-            Mem(twin).AllMemories.Where(m => m.InvolvedCharacter == r.Owner.Name2).Should().OnlyContain(m => m.Type == MemoryType.SawCombat,
+            Mem(twin).AllMemories.Where(m => m.InvolvedCharacter == r.Owner.Name2).Should().HaveCount(blameMemories,
                 "the only memory naming the player is the SawCombat");
         });
     }
