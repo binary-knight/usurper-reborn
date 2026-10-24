@@ -1138,6 +1138,8 @@ namespace UsurperRemake.Systems
             }
             for (int level = 1; level <= 10; level++)
                 if (stored == Loc.GetIn("en", RomanceMilestoneKey(level))) return Loc.Get(RomanceMilestoneKey(level));
+            // 1.4.0: saw an ally finished that the player could have rescued (stored English with the ally's name)
+            if (Between(stored, "companion.history_saw_ally_left") is string fallen) return Loc.Get("companion.history_saw_ally_left", fallen);
             return StoredText(stored);
         }
 

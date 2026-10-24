@@ -23025,6 +23025,7 @@ public partial class CombatEngine
         var deathLocation = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
         bool wasPermadeath = false;
         bool warded = false;   // v1.2.8 (H3)
+        bool fallNewsWritten = false;   // 1.4.0: MarkNPCDead writes the one news line of the fall
         var worldNpc = UsurperRemake.Systems.NPCSpawnSystem.Instance?.ActiveNPCs?.FirstOrDefault(n => n.ID == npcId);
         if (worldNpc != null)
         {
@@ -23061,6 +23062,7 @@ public partial class CombatEngine
             // the "player killed an NPC" rate (8 percent) this passed since v0.42.
             wasPermadeath = WorldSimulator.Instance?.MarkNPCDead(worldNpc, GameConfig.PermadeathChanceDungeonTeam,
                 killerName, deathLocation, atPlayersSide: true) ?? false;
+            fallNewsWritten = WorldSimulator.Instance != null;
             worldNpc.IsInConversation = savedEngaged;
             worldNpc.Team = savedTeam;
 
@@ -23181,9 +23183,13 @@ public partial class CombatEngine
         terminal.WriteLine("");
         await Pacing.Wait(1000);
 
-        // Generate death news for the realm
-        string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
-        NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, MonsterNames.Display(killerName), location);
+        // Generate death news for the realm. 1.4.0: only when MarkNPCDead did not run above; it already wrote the
+        // one line of the fall (the death line, or the permadeath "will not return" line)
+        if (!fallNewsWritten)
+        {
+            string location = string.IsNullOrEmpty(result.Player?.CurrentLocation) ? Loc.Get("combat.news_the_dungeons") : result.Player.CurrentLocation;
+            NewsSystem.Instance?.WriteDeathNews(npc.DisplayName, MonsterNames.Display(killerName), location);
+        }
 
         // Ocean Philosophy awakening moment
         if (!OceanPhilosophySystem.Instance.ExperiencedMoments.Contains(AwakeningMoment.FirstCompanionDeath))

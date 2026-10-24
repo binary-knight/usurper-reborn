@@ -20,7 +20,9 @@ public partial class MemorySystem
     public Dictionary<string, float> CharacterImpressions => characterImpressions;
 
     /// <param name="keepTimestamp">v1.1.13: a memory restored from a save keeps the time it was recorded.</param>
-    public void RecordEvent(MemoryEvent memoryEvent, bool keepTimestamp = false)
+    /// <param name="moveImpression">1.4.0: false records the memory and leaves the impression of
+    /// InvolvedCharacter as it was (an ally who saw a teammate finished grieves it, not blames it).</param>
+    public void RecordEvent(MemoryEvent memoryEvent, bool keepTimestamp = false, bool moveImpression = true)
     {
         if (!keepTimestamp) memoryEvent.Timestamp = DateTime.Now;
         memories.Add(memoryEvent);
@@ -47,7 +49,7 @@ public partial class MemorySystem
         }
         
         // Update character impressions if this involves another character
-        if (!string.IsNullOrEmpty(memoryEvent.InvolvedCharacter))
+        if (moveImpression && !string.IsNullOrEmpty(memoryEvent.InvolvedCharacter))
         {
             UpdateCharacterImpression(memoryEvent);
         }
@@ -113,6 +115,15 @@ public partial class MemorySystem
         };
     }
     
+    /// <summary>1.4.0: moves the impression of a character by delta, held to -1..1, with no memory
+    /// behind it (as gossip moves it).</summary>
+    public void AdjustImpression(string characterId, float delta)
+    {
+        if (string.IsNullOrEmpty(characterId)) return;
+        float now = characterImpressions.GetValueOrDefault(characterId, 0.0f);
+        characterImpressions[characterId] = Math.Max(-1.0f, Math.Min(1.0f, now + delta));
+    }
+
     public float GetCharacterImpression(string characterId)
     {
         return characterImpressions.GetValueOrDefault(characterId, 0.0f);

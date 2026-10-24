@@ -94,6 +94,8 @@ A companion at 0 HP in a fight is Downed, not dead: it stays in the party until 
 
 If a companion was Downed at the start of your turn, had not already been rescued in that fight, you held a usable healing potion and you did not choose Rescue, its finish also costs {{balance:AbandonCompanionLoyaltyPenalty}} loyalty and counts as leaving a companion to die (see resentment below).
 
+A companion in the fight who sees another ally finished, a companion or an NPC ally, that you could have rescued by the same test loses {{balance:AbandonCompanionLoyaltyPenalty}} loyalty too, with a line in its history. This adds nothing to the resentment below.
+
 ### A companion who dies for you
 
 When a monster's blow would kill you and a companion is in the fight, an active companion may take the blow and die in your place; you live with 1 HP. Only a companion standing in the fight can, never a Downed one, and it dies at once: a sacrifice is never a down. Aldric can always do it: his chance is his loyalty, and above loyalty 50 it is certain. Any other companion needs loyalty 90 or more, with a chance equal to its loyalty. A romance above 5 adds 30 to the chance.

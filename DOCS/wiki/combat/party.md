@@ -117,6 +117,8 @@ A story companion, an NPC ally, your spouse or lover, or a fighting beast at 0 H
 
 Grief, the Mental loss and the loyalty cost of leaving a companion to die come only with a finish, never with a down. A Downed ally counts as left to die when it was Downed at the start of your turn, you could have rescued it (it had not already been rescued in that fight) and you did not choose Rescue. The party summary after a fight shows how often each ally went down and was rescued.
 
+When a monster finishes an ally, every other NPC ally and story companion in the fight saw it, Downed ones included; a royal mercenary, a player echo and a grouped player do not count. Each NPC ally who saw it remembers the fall. If you could have rescued the fallen ally, by the same test, each NPC ally who saw it also thinks a little less of you, which gossip can carry through town, and each story companion who saw it loses {{balance:AbandonCompanionLoyaltyPenalty}} loyalty, with a line in its history.
+
 ### Story companion
 
 A companion that a monster finishes is dead for good: see [when a companion dies](/wiki/en/combat/companions/#when-a-companion-dies).
