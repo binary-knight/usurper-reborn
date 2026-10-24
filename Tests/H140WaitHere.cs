@@ -459,6 +459,47 @@ public class H140WaitHere
             }
     }
 
+    /// <summary>The party rows that carry the waiting tag: the party management list, the remove list and a
+    /// follower's party view, with a 16 letter name, a caster and five digit HP and mana.</summary>
+    [Theory]
+    [InlineData("en")]
+    [InlineData("hu")]
+    public async Task TheTaggedPartyRows_Fit79Columns(string lang)
+    {
+        var prev = GameConfig.Language;
+        try
+        {
+            GameConfig.Language = lang;
+            string name = new string('W', 16);
+            var ally = Ally("h140_tagged", name, level: 100);
+            ally.Class = CharacterClass.Magician;
+            ally.HP = 12345; ally.MaxHP = 12345; ally.MaxMana = 12345; ally.Mana = 12345;
+            ally.WaitingAt = new WaitMark(6, "r1");
+            string tag = Loc.Get("dungeon.wait_tag");
+
+            var r = NewRig("B\n", party: new[] { ally });
+            await Call(r.D, "ManageTeam");
+            typeof(BaseLocation).GetField("terminal", F)!.SetValue(r.D, r.Term = new TerminalEmulator(new MemoryStream(Encoding.UTF8.GetBytes("\n")), r.Output));
+            await Call(r.D, "RemoveTeammateFromParty");
+            var dungeonRows = Rows(r.Text).Where(x => x.Contains(name)).ToList();
+            dungeonRows.Should().HaveCount(2, "the party management row and the remove row: {0}", r.Text);
+
+            var output = new MemoryStream();
+            var term = new TerminalEmulator(new MemoryStream(), output);
+            typeof(DungeonLocation).GetMethod("RenderPartyStatus", FS)!.Invoke(null, new object?[] { term, Hero(), new List<Character> { ally }, null });
+            term.StreamWriterInternal?.Flush();
+            var followerRows = Rows(Strip(Encoding.UTF8.GetString(output.ToArray()))).Where(x => x.Contains(name)).ToList();
+            followerRows.Should().HaveCount(1);
+
+            foreach (var row in dungeonRows.Concat(followerRows))
+            {
+                row.Should().Contain(tag);
+                row.Length.Should().BeLessOrEqualTo(MaxWidth, $"{lang}: \"{row}\"");
+            }
+        }
+        finally { GameConfig.Language = prev; }
+    }
+
     [Theory]
     [InlineData("en")]
     [InlineData("hu")]
