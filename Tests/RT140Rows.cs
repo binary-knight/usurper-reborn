@@ -22,10 +22,6 @@ public class RT140Rows
         return dir!.FullName;
     }
 
-    /// <summary>Values that existing tests pin with the old spelling: the wiki armor page quotes the first (three wiki tests),
-    /// TownBase125Tests the second (the auction details label), TownMagic125Tests the third (the enchant menu text).</summary>
-    private static readonly string[] PinnedByTests = { "item.set.bonus.defence", "combat.status_defence_label", "magic_shop.tier_desc_ward" };
-
     private static readonly string[] KeysKept =
     {
         "combat.status_defence_label", "temple.blessing_defence", "artifact.stat.defence",
@@ -39,11 +35,31 @@ public class RT140Rows
     }
 
     [Fact]
-    public void RT140_NoEnglishValueSaysDefence_ExceptTheThreePinnedByExistingTests()
+    public void RT140_NoEnglishValueSaysDefence()
     {
-        var bad = En().Where(kv => !PinnedByTests.Contains(kv.Key)
-            && kv.Value.IndexOf("defence", StringComparison.OrdinalIgnoreCase) >= 0).Select(kv => kv.Key).ToList();
+        var bad = En().Where(kv => kv.Value.IndexOf("defence", StringComparison.OrdinalIgnoreCase) >= 0).Select(kv => kv.Key).ToList();
         bad.Should().BeEmpty("the English text spells it Defense");
+    }
+
+    [Theory]
+    [InlineData("level_master.crystal_str_def", "Defense")]
+    [InlineData("combat.status_defence_label", "Defense")]
+    [InlineData("god.boon.law", "defense")]
+    [InlineData("temple.blessing_defence", "Defense")]
+    [InlineData("artifact.stat.defence", "Defense")]
+    [InlineData("opening.bonus_defence", "Defense")]
+    [InlineData("opening.cycle_def_bonus", "Defense")]
+    [InlineData("encounter.tavern.stranger_deal_stats", "Defense")]
+    [InlineData("encounter.minstrel.song_warding", "Defense")]
+    [InlineData("encounter.minstrel.plus_defence", "Defense")]
+    [InlineData("encounter.timewarp.death_reward", "Defense")]
+    [InlineData("base.mental_afflictions_pct", "defense")]
+    [InlineData("base.mental_afflictions_broken", "defense")]
+    [InlineData("item.set.bonus.defence", "Defense")]
+    [InlineData("magic_shop.tier_desc_ward", "defense")]
+    public void RT140_EachOfTheFifteenValuesSaysDefense(string key, string word)
+    {
+        En()[key].Should().Contain(word, key);
     }
 
     [Fact]
