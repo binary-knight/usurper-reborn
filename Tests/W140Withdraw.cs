@@ -480,25 +480,28 @@ public class W140Withdraw
 
     private static string Sha(string s) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(s))).Substring(0, 16);
 
+    /// <summary>A Balanced fight on a fixed seed: the outcome, the rounds, every HP at the end, and the count and a
+    /// hash of the random draws until the monster falls (HitRoll128Golden's recording random). The screen text is
+    /// left out: other classes of the shared collection change settings that only change how lines look.</summary>
     private static async Task<string> BalancedSignature()
     {
         var hero = Hero();
-        var a = Ally("Mira", 15, 100);   // Balanced: would withdraw if Cautious
+        var a = Ally("Mira", 15, 100);   // Balanced: would withdraw if Cautious and out of heals
         var b = Ally("Kade", 100, 100);
         var mob = Mob("Rat", "Goblinoid", hp: 600, str: 30);
         var output = new MemoryStream();
         var term = new TerminalEmulator(new ScriptedStream(Attacks()), output);
         var e = new CombatEngine(term) { DivineFavorChanceOverride = () => 0f };
-        e.SeedRandomForTests(1404);
+        var rng = new HitRoll128Golden.RecordingRandom(1404) { Over = () => !mob.IsAlive || !hero.IsAlive };
+        typeof(CombatEngine).GetField("random", NPI)!.SetValue(e, rng);
         var task = e.PlayerVsMonsters(hero, new List<Monster> { mob }, new List<Character> { a, b }, offerMonkEncounter: false);
         (await Task.WhenAny(task, Task.Delay(TimeSpan.FromSeconds(60)))).Should().BeSameAs(task);
         var res = await task;
-        string text = Encoding.UTF8.GetString(output.ToArray());
-        return $"{res.Outcome}|{res.CurrentRound}|{hero.HP}|{a.HP}|{b.HP}|{a.IsDowned}|{b.IsDowned}|{mob.HP}|{Sha(text)}";
+        return $"{res.Outcome}|{res.CurrentRound}|{hero.HP}|{a.HP}|{b.HP}|{a.IsDowned}|{b.IsDowned}|{mob.HP}|{rng.Calls.Count}|{Sha(string.Join("\n", rng.Calls))}";
     }
 
     /// <summary>Written by this test on release-1.4.0 at 54f1c3cd, before the piece.</summary>
-    private const string BalancedOnTheBase = "Victory|4|600|50|50|False|False|0|131A88860B0BB44B";
+    private const string BalancedOnTheBase = "Victory|4|600|50|50|False|False|0|57|E27EDBC212B3BCEF";
 
     [Fact]
     public async Task ABalancedFight_IsByteEqualToTheBase_OnAFixedSeed()
