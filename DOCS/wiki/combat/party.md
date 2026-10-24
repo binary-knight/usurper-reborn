@@ -38,7 +38,7 @@ Your experience from a fight is cut when the highest level living ally who is no
 
 ### Experience split
 
-By default the fight's experience is split evenly between you and every living ally below level 100 in the party, and you take what is left over. Grouped players and player echoes take no share here: grouped players earn their own. With X in party management you can set your own percentages for you and 4 ally places instead. Then the share of a place whose ally is dead, missing or at level 100 goes to you, or, with automatic redistribution on, is spread over you and the living allies. Percent you leave unassigned is not paid to anyone.
+By default the fight's experience is split evenly between you and every living ally below level 100 in the fight, and you take what is left over. Grouped players and player echoes take no share here: grouped players earn their own. With X in party management you can set your own percentages for you and 4 ally places instead. Then the share of a place whose ally is dead, missing or at level 100 goes to you, or, with automatic redistribution on, is spread over you and the living allies. Percent you leave unassigned is not paid to anyone. An ally told to wait is not in the fight and takes no share; in that fight the allies after it in the party fill the places one earlier.
 
 ### Catch-up for allies below your level
 
@@ -50,7 +50,7 @@ At the Level Master, H (help a team member) gives an active companion, an NPC on
 
 ## Gold in a party
 
-Without a grouped player in the fight you keep all the gold. Online, with a grouped player in the fight, the gold is split equally between you and every living ally except story companions and player echoes; each grouped player and each NPC ally gets one share.
+Without a grouped player in the fight you keep all the gold. Online, with a grouped player in the fight, the gold is split equally between you and every living ally except story companions and player echoes; each grouped player and each NPC ally gets one share. An ally told to wait gets no share.
 
 ## Ally stances
 
@@ -69,6 +69,12 @@ A Wavecaller's Empathic Link links one ally for 4 rounds: you pick the ally from
 ### Pulling back from a fight
 
 A Cautious ally below 20 percent of its maximum HP with no heal left spends its turn trying to pull back from the fight. No heal left means no healing potion of its own, none it may take from your shared belt, and no heal spell or healing ability, Second Wind included, that it can use that turn. It rolls the [flee chance](/wiki/en/combat/fleeing/#flee-chance) on its own Dexterity, level and class, or the Old God chance in an Old God fight; on Nightmare it never tries. A failed try is its turn, and it tries at most once a round. After a success it is out of the fight: no monster can pick it, it takes no turn and the allies box no longer shows it. When the fight ends, won, fled or lost, it is back in its place in the party with the HP it left with, and it keeps its share of the experience. Balanced and Aggressive allies, grouped players, player echoes and royal mercenaries never pull back.
+
+## Telling an ally to wait
+
+In a cleared dungeon room, Y (party), then W tells an ally that takes orders to wait there; a fighting beast can wait too. Grouped players, player echoes and royal mercenaries take no such order, and only the leader of a group has it. A waiting ally keeps its place in the party, so it still counts toward the 4 allies, but it is in no fight, ambushes included, and it takes no experience or gold share, no potion, no camp or rest and no effect of a room feature. In the party menu it shows as waiting in place of its stance.
+
+It rejoins when you walk into its room, with a line, or when you call it back with Y, then C, anywhere on the floor. It catches up with you, with a line, when you take the stairs or change floor in any other way, when you leave the dungeon by any exit, and when your session ends: a wait is never saved. An ally that leaves the party while it waits is no longer waiting. Online, a grouped follower's party view shows it as waiting.
 
 ## Potions and rest for allies
 

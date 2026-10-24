@@ -69,7 +69,7 @@ Aurelion, Terravok and Manwe wear divine armor: every hit you deal them, spells 
 
 **Fighting alone.** With no living NPC teammate or companion, an Old God's named abilities deal {{percent:OldGodSoloDamageBonus}} percent more damage and you then take {{percent:OldGodSoloPlayerDamageReduction}} percent less, 0.92 times in all. Manwe's own abilities skip this.
 
-**Maelketh and a small party.** With fewer than five fighters his health is lower: three quarters with four, a half with three and a quarter with two. The fighters are you and every living teammate, companion or ally, counted once as the fight starts, so a fall during the fight does not change it. Alone or with five or more his health is as above. No other Old God changes with the party's size.
+**Maelketh and a small party.** With fewer than five fighters his health is lower: three quarters with four, a half with three and a quarter with two. The fighters are you and every living teammate, companion or ally, counted once as the fight starts, so a fall during the fight does not change it; an ally told to wait is not a fighter. Alone or with five or more his health is as above. No other Old God changes with the party's size.
 
 **Most damage from one hit.** An Old God's area attack and channel have no cap on the damage to you; a teammate takes at most {{percent:OldGodTeammateDamageCapPercent}} percent of its maximum HP from one hit. Manwe's own abilities take at most 85 percent of your maximum HP from the first round, without the lower cap of the first rounds.
 
